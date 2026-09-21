@@ -1,0 +1,48 @@
+{
+  "status": "generated-agent-inspected-owner-review-pending",
+  "date": "2026-09-19",
+  "brief": "../view-intents.md",
+  "profile": "../system-profile.md",
+  "reference": "docs/evidence/d-01b-v4/overview.png",
+  "reference_role": "rejected wireframe, content and failure evidence only",
+  "dimensions": "1440x1024",
+  "tool": "image_gen built-in",
+  "concepts": [
+    {
+      "visible_option": 1,
+      "id": "attention-workspace",
+      "image": "attention-workspace.png",
+      "prompt": "attention-workspace.prompt.txt",
+      "sha256": "ae125fd41a07a2f9ceb3da3d278cbf112d1035bc5bfaa7420d060afe72d15c59",
+      "actual_dimensions": [
+        1487,
+        1058
+      ]
+    },
+    {
+      "visible_option": 2,
+      "id": "outcome-briefing",
+      "image": "outcome-briefing.png",
+      "prompt": "outcome-briefing.prompt.txt",
+      "sha256": "f03e0accffa6ca63e24fad7b1aebb4d4c38e89439f661824c9e48b3c35515dff",
+      "actual_dimensions": [
+        1487,
+        1058
+      ]
+    },
+    {
+      "visible_option": 3,
+      "id": "focus-and-context",
+      "image": "focus-and-context.png",
+      "prompt": "focus-and-context.prompt.txt",
+      "sha256": "1d663da2e0af5c3662fa897a6fb1ab3e5cee51d9596e51c790258a3b2a29a307",
+      "actual_dimensions": [
+        1487,
+        1058
+      ]
+    }
+  ],
+  "acceptance": "none; generation is not system implementation",
+  "display_order_basis": "Observed main-thread image results: attention-workspace, outcome-briefing, focus-and-context; not inferred from submission order.",
+  "limitations": "Static generated composition hypotheses, not library output, MD3 conformance, responsive behavior or accessibility evidence. See review-record.md."
+}

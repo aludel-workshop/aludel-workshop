@@ -1,0 +1,82 @@
+{
+  "id": "d-01c-v2",
+  "created": "2026-09-18",
+  "status": "B selected by owner, 2026-09-18; D-01C complete",
+  "supersedes": "d-01c-v1",
+  "author": "Codex",
+  "method": "static HTML/CSS; BorrowBox fixture; no generated imagery",
+  "source_revisions": [
+    {
+      "path": "docs/design/demo-app/borrowbox.md",
+      "sha256": "8cfccb0648f78c43274018dbfa57814410c6f2f1826869f6b0e78b824b4287c8"
+    },
+    {
+      "path": "docs/product.md",
+      "sha256": "b94359dc3a446789922b3318c5b1d25b62b2c70a6a8bd85c29fa00796a2ac965"
+    },
+    {
+      "path": "docs/design/experience-foundation.md",
+      "sha256": "cb3602b6ce5c70552eb2fab3f7c04c749fc39d8efda0db1e727e1df8612108c3"
+    },
+    {
+      "path": "docs/design/self-change-brief.md",
+      "sha256": "7e9918b191eb07a7b5a264f21534b75bf9addc63e91275b8c72feafc7cb3687a"
+    },
+    {
+      "path": "docs/design/product-development-workflow.md",
+      "sha256": "536b7f832c9dac9f867eff7eaea42daea22ef4176a919b1e4fea1fa8e2189529"
+    },
+    {
+      "path": "docs/evidence/r-07b-workflow-benchmark.md",
+      "sha256": "c5226ee21cd8e1266f6174943a39c4c6cae155251123d2461a1816a8dca7bc20"
+    },
+    {
+      "path": "docs/execution-plan.md",
+      "sha256": "bd1b175567752e51046ec9fe443be935b2f0cc9bfac3d58c34624343af313bfa"
+    },
+    {
+      "path": "docs/decisions.md",
+      "sha256": "4aa799be6f6aa86997bbdfde08d2258f4a079bd0dd5694f0b74a0d7e880a4808",
+      "previous_sha256": "3834eef45355b6a684d6f8a9b0f43d6d0414c0cc3a1ae79c85c2dc1794057cf4"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "docs/design/self-change/v2/composition-a-mobile.png",
+      "sha256": "e37456b60ccb0407134e34f93e67eeee8b002307094a185afb6aa24f627dd881"
+    },
+    {
+      "path": "docs/design/self-change/v2/composition-a.png",
+      "sha256": "95b9beeee30cfd6e2be037060bc43ff9beca734f0a05f6a58fd6faf75a88ca57"
+    },
+    {
+      "path": "docs/design/self-change/v2/composition-b.png",
+      "sha256": "ae4a608542e027bbbc8a0d5e05207f9b39eeff294fdfd2a568347fcf27469936"
+    },
+    {
+      "path": "docs/design/self-change/v2/feature.md",
+      "sha256": "8106d12c210055ad1535680f8f2c14b41b5cb8bbadd3518246361fe380c91a09",
+      "previous_sha256": "2aabdc48e35ee26a5cb445f0765e948fe90b812d32b27358b214548c93f9a1dc"
+    },
+    {
+      "path": "docs/design/self-change/v2/review-record.md",
+      "sha256": "9c400f1036225a04a476bd132199f493a9f54ff9069167d21945f756b129ac9f",
+      "previous_sha256": "4332b5906c34cd5de332d1bcb69204f68d261b1563670795d14ab3fd8bcd735a"
+    },
+    {
+      "path": "docs/design/self-change/v2/review.html",
+      "sha256": "0b42e118017926fb10f4d163620de673636308dd32d1d946afe309be0ea970cd",
+      "previous_sha256": "1be491bd16cb598672154bec9d3d640ad1e68dd836892567417e7b50deb7887c"
+    },
+    {
+      "path": "docs/design/self-change/v2/validation.json",
+      "sha256": "4b7f79ecde3646e1550e4eb10b4ffca42046952f848e418331a9e72cbb74ddc9"
+    },
+    {
+      "path": "docs/design/self-change/v2/views-and-components.md",
+      "sha256": "e7c9efa48dc5a0f1553c4f3a4ec5f7352627800fde1c861abf550c0f15ead2b9"
+    }
+  ],
+  "git_commit": null,
+  "selection_note": "Review board annotations updated; composition screenshots unchanged. Prior rendering checks cover compositions, not updated selection wording."
+}

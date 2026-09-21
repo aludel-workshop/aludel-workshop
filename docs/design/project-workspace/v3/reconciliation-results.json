@@ -1,0 +1,18 @@
+{
+  "status": "pass",
+  "temporaryDirectory": "fresh mkdtemp directory removed by the host later",
+  "cases": {
+    "failureAtomicity": true,
+    "firstApplyCreated": 4,
+    "idempotentReplayCreated": 0,
+    "changedSourceRejected": true,
+    "projectScopedLookup": true,
+    "existingWorkLinkedNotRecreated": true,
+    "backupRestoreReturnedPlanCount": 0
+  },
+  "limitations": [
+    "Disposable schema proof, not production portal migration",
+    "Source hashes prove exact local inputs; no Git identity available",
+    "No live portal database opened or modified"
+  ]
+}

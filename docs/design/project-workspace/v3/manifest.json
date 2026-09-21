@@ -1,0 +1,106 @@
+{
+  "id": "project-workspace-d03-v1",
+  "date": "2026-09-20",
+  "authorization": {
+    "work": "WORK-7a16bfe6-4a20-4e0c-bc04-3d9d9cd038f1",
+    "proposalRevision": 2,
+    "decisionRevision": 2
+  },
+  "sources": [
+    {
+      "path": "docs/design/project-workspace/v1/audit.md",
+      "sha256": "d708f09f39945248eec9edd1a4ba6509a1b03fdb5dcc5de07e010e5daf85a2d3"
+    },
+    {
+      "path": "docs/design/project-workspace/v1/contracts.md",
+      "sha256": "fce9d1999410617932f99206d87c468bdb283a8b6d69a39e8dd84886308720f2"
+    },
+    {
+      "path": "docs/design/project-workspace/v1/delivery-plan.md",
+      "sha256": "74f6cb4d6db3b00d17742884cbdfbce22a2f9bd439bf736d45ee1aa1b4a4e1e6"
+    },
+    {
+      "path": "docs/design/project-workspace/v2/selection.md",
+      "sha256": "533473d80793e6cd988d13803133aa3e813c5175bc9459ec0634569ee133b683"
+    },
+    {
+      "path": "docs/design/portal-system/v3/system-profile.md",
+      "sha256": "79e1ae802cc84f16465057f9d60694da2fda04b8906ab22e881b302ae00a47c2"
+    },
+    {
+      "path": "docs/design/portal-system/v3/catalog.json",
+      "sha256": "dc01133c946acab3fc19de286d3948d040417b6fe7db7a4377507b0b200bc5aa"
+    },
+    {
+      "path": "docs/evidence/b-03a-work-navigation.md",
+      "sha256": "d5ff84853e378059614f5ddfecb163fcd4070e577c83b5419afa73a859d8a147"
+    },
+    {
+      "path": "docs/execution-plan.md",
+      "sha256": "16e383c61c3a4d79c073d2105c54e60785e464e3cb87c5fc18e97eb7903aae0a"
+    },
+    {
+      "path": "docs/status.md",
+      "sha256": "647bd400ee8eb6d402a230b351591cffb82553622715f84784fc37bbe9350459"
+    }
+  ],
+  "outputs": [
+    {
+      "path": "docs/design/project-workspace/v3/README.md",
+      "sha256": "1a84ab107e531e18d188d47009be799880053af0088303c1f4c6a9d3a973ccef"
+    },
+    {
+      "path": "docs/design/project-workspace/v3/app.js",
+      "sha256": "c004a60eb4788aa5f943fed76e12dbff20485362ce6be1485b5552971454f227"
+    },
+    {
+      "path": "docs/design/project-workspace/v3/browser-check.mjs",
+      "sha256": "1ba4df6859abbae146b67e311b454ebafebdfa825e48a7abba404d51978bd510"
+    },
+    {
+      "path": "docs/design/project-workspace/v3/browser-results.json",
+      "sha256": "9e528cc5c5008dac15bdbb22c41cae66df7f9de67296a775f85090267e21b604"
+    },
+    {
+      "path": "docs/design/project-workspace/v3/design.md",
+      "sha256": "086c92726c3022b9580115173e15d99f4d9047e7762f67644eed03bea0bb36a0"
+    },
+    {
+      "path": "docs/design/project-workspace/v3/index.html",
+      "sha256": "2c8e84a21632468d20716f8a2b0709aacb5036bb4e84d01bac13eb40397b057d"
+    },
+    {
+      "path": "docs/design/project-workspace/v3/plan-wide.png",
+      "sha256": "89d906c1cfcc7973d8483514c2f838652f89cf294b5ab20970e44f476f21e2fb"
+    },
+    {
+      "path": "docs/design/project-workspace/v3/pw01-contract.md",
+      "sha256": "7da1f8371b4c96829edbdd637153d2b5ac28a41811aaeef51d3cb84e337ae735"
+    },
+    {
+      "path": "docs/design/project-workspace/v3/reconciliation-narrow.png",
+      "sha256": "74c39387c7b148ed9406db66cf54c1c9a5bc176636c5185c49ad3e618b009102"
+    },
+    {
+      "path": "docs/design/project-workspace/v3/reconciliation-proof.mjs",
+      "sha256": "07cc81ab2ff2e8bfd6f5a4184e6c252053250e21e5de608b7234d7a2088665f6"
+    },
+    {
+      "path": "docs/design/project-workspace/v3/reconciliation-results.json",
+      "sha256": "ee7f9dc9c23670e33b5264d25194cab93dfb031605afd275219d57cf19ef620f"
+    },
+    {
+      "path": "docs/design/project-workspace/v3/styles.css",
+      "sha256": "7463f88b001728d5795aec61302a4d6230b9118047037f20fdb69d795f3592ce"
+    },
+    {
+      "path": "docs/design/project-workspace/v3/work-record.md",
+      "sha256": "e7b703d1e1c3b8453ed02d9e839aab717459cf21c524aee6a5cb60fd28ed1d80"
+    }
+  ],
+  "limits": [
+    "No Git repository available",
+    "Design prototype and disposable schema proof",
+    "No live portal data migration or production feature implementation"
+  ]
+}

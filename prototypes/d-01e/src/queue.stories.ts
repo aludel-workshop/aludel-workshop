@@ -1,0 +1,11 @@
+import type {Meta,StoryObj} from '@storybook/angular-vite';
+import {DecisionQueueComponent} from './components';
+import {decisions,manyDecisions} from './model';
+const meta:Meta<DecisionQueueComponent>={title:'Patterns/Decision queue',component:DecisionQueueComponent,args:{items:decisions,availability:'known',limit:3},parameters:{docs:{description:{component:'Incubating. Overview summary, not a decision form. Named rows navigate; count failure is never zero. MP2, MP4, MP9.'}}}};
+export default meta;
+type Story=StoryObj<DecisionQueueComponent>;
+export const Three:Story={};
+export const Zero:Story={args:{items:[]}};
+export const One:Story={args:{items:decisions.slice(0,1)}};
+export const Many:Story={args:{items:manyDecisions()}};
+export const Unknown:Story={args:{availability:'unknown'},render:(args)=>({props:args,template:`<machine-decision-queue [items]="items" [availability]="availability" (retry)="availability = 'known'" />`})};

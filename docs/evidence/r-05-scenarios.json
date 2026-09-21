@@ -1,0 +1,307 @@
+{
+  "schemaVersion": 1,
+  "command": "node spikes/r-05/verify.mjs",
+  "node": "v18.19.1",
+  "passed": 9,
+  "failed": 0,
+  "results": [
+    {
+      "name": "success",
+      "failpoint": null,
+      "terminalJobState": "completed",
+      "terminalTaskState": "awaiting_review",
+      "attempts": [
+        {
+          "number": 1,
+          "state": "completed"
+        }
+      ],
+      "leases": [
+        "released"
+      ],
+      "resources": {
+        "mappings": 1,
+        "effects": 1,
+        "createMappingCalls": 1,
+        "createEffectCalls": 1
+      },
+      "eventTypes": [
+        "job_queued",
+        "attempt_started",
+        "mapping_reconciled",
+        "effect_reconciled",
+        "job_completed"
+      ]
+    },
+    {
+      "name": "crash-before-mapping",
+      "failpoint": "before_mapping_call",
+      "terminalJobState": "completed",
+      "terminalTaskState": "awaiting_review",
+      "attempts": [
+        {
+          "number": 1,
+          "state": "interrupted"
+        },
+        {
+          "number": 2,
+          "state": "completed"
+        }
+      ],
+      "leases": [
+        "expired",
+        "released"
+      ],
+      "resources": {
+        "mappings": 1,
+        "effects": 1,
+        "createMappingCalls": 1,
+        "createEffectCalls": 1
+      },
+      "eventTypes": [
+        "job_queued",
+        "attempt_started",
+        "lease_expired",
+        "attempt_started",
+        "mapping_reconciled",
+        "effect_reconciled",
+        "job_completed"
+      ]
+    },
+    {
+      "name": "crash-after-mapping",
+      "failpoint": "after_mapping_call_before_persist",
+      "terminalJobState": "completed",
+      "terminalTaskState": "awaiting_review",
+      "attempts": [
+        {
+          "number": 1,
+          "state": "interrupted"
+        },
+        {
+          "number": 2,
+          "state": "completed"
+        }
+      ],
+      "leases": [
+        "expired",
+        "released"
+      ],
+      "resources": {
+        "mappings": 1,
+        "effects": 1,
+        "createMappingCalls": 1,
+        "createEffectCalls": 1
+      },
+      "eventTypes": [
+        "job_queued",
+        "attempt_started",
+        "lease_expired",
+        "attempt_started",
+        "mapping_reconciled",
+        "effect_reconciled",
+        "job_completed"
+      ]
+    },
+    {
+      "name": "crash-before-effect",
+      "failpoint": "before_effect_call",
+      "terminalJobState": "completed",
+      "terminalTaskState": "awaiting_review",
+      "attempts": [
+        {
+          "number": 1,
+          "state": "interrupted"
+        },
+        {
+          "number": 2,
+          "state": "completed"
+        }
+      ],
+      "leases": [
+        "expired",
+        "released"
+      ],
+      "resources": {
+        "mappings": 1,
+        "effects": 1,
+        "createMappingCalls": 1,
+        "createEffectCalls": 1
+      },
+      "eventTypes": [
+        "job_queued",
+        "attempt_started",
+        "mapping_reconciled",
+        "lease_expired",
+        "attempt_started",
+        "effect_reconciled",
+        "job_completed"
+      ]
+    },
+    {
+      "name": "crash-after-effect",
+      "failpoint": "after_effect_call_before_persist",
+      "terminalJobState": "completed",
+      "terminalTaskState": "awaiting_review",
+      "attempts": [
+        {
+          "number": 1,
+          "state": "interrupted"
+        },
+        {
+          "number": 2,
+          "state": "completed"
+        }
+      ],
+      "leases": [
+        "expired",
+        "released"
+      ],
+      "resources": {
+        "mappings": 1,
+        "effects": 1,
+        "createMappingCalls": 1,
+        "createEffectCalls": 1
+      },
+      "eventTypes": [
+        "job_queued",
+        "attempt_started",
+        "mapping_reconciled",
+        "lease_expired",
+        "attempt_started",
+        "effect_reconciled",
+        "job_completed"
+      ]
+    },
+    {
+      "name": "ambiguous-effect",
+      "failpoint": "after_effect_call_before_persist",
+      "terminalJobState": "blocked",
+      "terminalTaskState": "blocked",
+      "attempts": [
+        {
+          "number": 1,
+          "state": "interrupted"
+        },
+        {
+          "number": 2,
+          "state": "blocked"
+        }
+      ],
+      "leases": [
+        "expired",
+        "released"
+      ],
+      "resources": {
+        "mappings": 1,
+        "effects": 1,
+        "createMappingCalls": 1,
+        "createEffectCalls": 1
+      },
+      "eventTypes": [
+        "job_queued",
+        "attempt_started",
+        "mapping_reconciled",
+        "lease_expired",
+        "attempt_started",
+        "reconciliation_required"
+      ]
+    },
+    {
+      "name": "cancellation",
+      "failpoint": "after_mapping_persist",
+      "terminalJobState": "cancelled",
+      "terminalTaskState": "cancelled",
+      "attempts": [
+        {
+          "number": 1,
+          "state": "interrupted"
+        },
+        {
+          "number": 2,
+          "state": "cancelled"
+        }
+      ],
+      "leases": [
+        "expired",
+        "released"
+      ],
+      "resources": {
+        "mappings": 1,
+        "effects": 0,
+        "createMappingCalls": 1,
+        "createEffectCalls": 0
+      },
+      "eventTypes": [
+        "job_queued",
+        "attempt_started",
+        "mapping_reconciled",
+        "cancellation_requested",
+        "lease_expired",
+        "attempt_started",
+        "cancelled"
+      ]
+    },
+    {
+      "name": "conflict",
+      "failpoint": "after_mapping_persist",
+      "terminalJobState": "blocked",
+      "terminalTaskState": "blocked",
+      "attempts": [
+        {
+          "number": 1,
+          "state": "interrupted"
+        },
+        {
+          "number": 2,
+          "state": "blocked"
+        }
+      ],
+      "leases": [
+        "expired",
+        "released"
+      ],
+      "resources": {
+        "mappings": 1,
+        "effects": 0,
+        "createMappingCalls": 1,
+        "createEffectCalls": 0
+      },
+      "eventTypes": [
+        "job_queued",
+        "attempt_started",
+        "mapping_reconciled",
+        "lease_expired",
+        "attempt_started",
+        "connector_conflict"
+      ]
+    },
+    {
+      "name": "failure",
+      "failpoint": null,
+      "terminalJobState": "failed",
+      "terminalTaskState": "failed",
+      "attempts": [
+        {
+          "number": 1,
+          "state": "failed"
+        }
+      ],
+      "leases": [
+        "released"
+      ],
+      "resources": {
+        "mappings": 1,
+        "effects": 0,
+        "createMappingCalls": 1,
+        "createEffectCalls": 1
+      },
+      "eventTypes": [
+        "job_queued",
+        "attempt_started",
+        "mapping_reconciled",
+        "attempt_failed"
+      ]
+    }
+  ]
+}

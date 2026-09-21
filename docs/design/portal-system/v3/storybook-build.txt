@@ -1,0 +1,102 @@
+
+> machine-md3-foundation-trial@0.1.0 build-storybook
+> storybook build --disable-telemetry
+
+Unable to save global settings file to /home/henrydker/.storybook/settings.json
+Reason: ENOENT: no such file or directory, mkdir '/home/henrydker/.storybook'
+
+┌  Building storybook v10.6.0
+│
+◇  Cleaning outputDir: storybook-static
+│
+◇  Loading presets
+│
+◇  Building manager..
+│
+●  Building open services..
+│
+●  Building preview..
+│  Vite vite v8.3.0 building client environment for production...
+transforming...
+✓ 377 modules transformed.
+rendering chunks...
+computing gzip size...
+│  Vite
+│  storybook-static/assets/material-symbols-rounded-subset-D2kQJje1.ttf
+│  6.08 kB
+│  storybook-static/iframe.html
+│  18.89 kB │ gzip:   5.35 kB
+│  storybook-static/assets/roboto-latin-400-normal-D27F5sTu.woff
+│  21.06 kB
+│  storybook-static/assets/roboto-latin-500-normal-fsTFPL3E.woff
+│  21.16 kB
+│  storybook-static/assets/roboto-latin-700-normal-YuyVweIx.woff
+│  21.21 kB
+│  storybook-static/assets/roboto-latin-400-normal-BqEyEoaF.woff2
+│  21.88 kB
+│  storybook-static/assets/roboto-latin-500-normal-7RbcRiD8.woff2
+│  22.20 kB
+│  storybook-static/assets/roboto-latin-700-normal-BZpUvMxY.woff2
+│  22.24 kB
+│  storybook-static/assets/iframe-BVzyn86r.css
+│  19.57 kB │ gzip:   4.35 kB
+│  storybook-static/assets/preview.stories-DNUCxhtI.js
+│  0.49 kB │ gzip:   0.31 kB
+│  storybook-static/assets/work.stories-CRgjLUer.js
+│  0.54 kB │ gzip:   0.35 kB
+│  storybook-static/assets/status.stories-BdL7BWCM.js
+│  0.55 kB │ gzip:   0.32 kB
+│  storybook-static/assets/queue.stories-Cqdf0NfM.js
+│  0.91 kB │ gzip:   0.54 kB
+│  storybook-static/assets/rolldown-runtime-D_-wTCJc.js
+│  1.35 kB │ gzip:   0.73 kB
+│  storybook-static/assets/preload-helper-VNhFExJA.js
+│  1.52 kB │ gzip:   0.80 kB
+│  storybook-static/assets/model-vSo5ypEw.js
+│  2.03 kB │ gzip:   0.87 kB
+│  storybook-static/assets/_icon-registry-chunk-q1P2WGto.js
+│  12.35 kB │ gzip:   4.21 kB
+│  storybook-static/vite-inject-mocker-entry.js
+│  29.69 kB │ gzip:   9.94 kB
+│  storybook-static/assets/matchers-JIUQ3HVY-1Tc8fpol.js
+│  32.33 kB │ gzip:  10.05 kB
+│  storybook-static/assets/components-2Ig7wxh-.js
+│  245.12 kB │ gzip:  47.24 kB
+│  storybook-static/assets/angular-platform-C1HQK4Ex.js
+│  499.55 kB │ gzip: 142.18 kB
+│  storybook-static/assets/axe-BYKBC-S9.js
+│  639.84 kB │ gzip: 170.25 kB
+│  storybook-static/assets/iframe-ArGZFJFT.js
+│  1,626.06 kB │ gzip: 444.16 kB
+
+│
+▲  Vite [plugin builtin:vite-reporter]
+│  (!) Some chunks are larger than 500 kB after minification. Consider:
+│  - Using dynamic import() to code-split the application
+│  - Use build.rolldownOptions.output.codeSplitting to improve chunking:
+│  https://rolldown.rs/reference/OutputOptions.codeSplitting
+│  - Adjust chunk size limit for this warning via
+│  build.chunkSizeWarningLimit.
+│  Vite ✓ built in 20.75s
+│
+▲  Vite [PLUGIN_TIMINGS] Plugin hooks ran for 19.0s of this 20.0s build
+│  (95%).
+│  The slowest hooks, timed inside each callback (the wait before a
+│  callback starts is excluded, the time it awaits is included):
+│  - @analogjs/vite-plugin-angular buildStart (51%, 10.3s, 1 call)
+│  - vite:css transform (39%, 7.8s, 2 calls)
+│  Additional hook time came from the hooks below and from hooks under
+│  1s.
+│  1 hook is listed without a time. Its calls overlapped, so the time
+│  inside one call includes work from other calls. To find its cost,
+│  profile the build with `node --cpu-prof`:
+│  - @analogjs/vite-plugin-angular-optimizer transform (367 calls)
+│  See https://rolldown.rs/reference/InputOptions.checks#plugintimings
+│  for more details.
+
+│
+◇  Output directory: /mnt/c/Users/henry/VSCode
+│  Projects/app-builder/prototypes/d-01f/storybook-static
+│
+└  Storybook build completed successfully
+

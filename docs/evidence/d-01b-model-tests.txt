@@ -1,0 +1,55 @@
+TAP version 13
+# Subtest: decision required; happy path acceptance binds artifact
+ok 1 - decision required; happy path acceptance binds artifact
+  ---
+  duration_ms: 3.123911
+  ...
+# Subtest: revision keeps A1 unchanged and creates new authorization and A2
+ok 2 - revision keeps A1 unchanged and creates new authorization and A2
+  ---
+  duration_ms: 0.358916
+  ...
+# Subtest: decision changes make old build unacceptably stale
+ok 3 - decision changes make old build unacceptably stale
+  ---
+  duration_ms: 0.3936
+  ...
+# Subtest: offline worker cannot start; return claims one existing mapping
+ok 4 - offline worker cannot start; return claims one existing mapping
+  ---
+  duration_ms: 0.281536
+  ...
+# Subtest: unknown write and conflict block claims until reconciliation
+ok 5 - unknown write and conflict block claims until reconciliation
+  ---
+  duration_ms: 0.325868
+  ...
+# Subtest: failure retains attempt; retry creates linked successor
+ok 6 - failure retains attempt; retry creates linked successor
+  ---
+  duration_ms: 0.220622
+  ...
+# Subtest: blocked input requires separate continuation authorization
+ok 7 - blocked input requires separate continuation authorization
+  ---
+  duration_ms: 0.644351
+  ...
+# Subtest: cancellation is not terminal until both confirmations
+ok 8 - cancellation is not terminal until both confirmations
+  ---
+  duration_ms: 0.456297
+  ...
+# Subtest: browser JSON round trip preserves artifact and revision histories
+ok 9 - browser JSON round trip preserves artifact and revision histories
+  ---
+  duration_ms: 2.157953
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 276.987003

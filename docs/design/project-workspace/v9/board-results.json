@@ -1,0 +1,26 @@
+{
+  "status": "pass",
+  "kind": "Static composition study; no product controls or record mutations tested",
+  "sections": [
+    "overview",
+    "plan-a",
+    "plan-b",
+    "operations",
+    "intake"
+  ],
+  "nextUpRemoved": true,
+  "overviewActions": 3,
+  "planTableRows": 4,
+  "operationStates": [
+    "ready-for-review",
+    "problem",
+    "in-progress",
+    "not-started-queued",
+    "not-started-blocked"
+  ],
+  "fontLoaded": true,
+  "narrowNoOverflow": true,
+  "wideAxe": [],
+  "narrowAxe": [],
+  "pageErrors": []
+}

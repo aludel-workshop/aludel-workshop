@@ -1,0 +1,14 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {initial,act,stale} from './model.mjs';
+function ready(s=initial()){act(s,'decision','Confirm immediately');return s}
+function run(s){act(s,'authorize');act(s,'map');act(s,'start');act(s,'finish');return s}
+test('decision required; happy path acceptance binds artifact',()=>{const s=initial();assert.throws(()=>act(s,'authorize'));act(s,'defer');assert.equal(s.state,'Blocked');act(s,'decision','Confirm immediately');run(s);act(s,'accept');assert.equal(s.state,'Completed');assert.equal(s.reviews[0].digest,s.artifacts[0].digest)});
+test('revision keeps A1 unchanged and creates new authorization and A2',()=>{const s=run(ready());const a=JSON.stringify(s.artifacts[0]);act(s,'revision','Separate release and task blockers');assert.throws(()=>act(s,'start'));run(s);assert.equal(JSON.stringify(s.artifacts[0]),a);assert.equal(s.artifacts[1].revision,2);assert.equal(s.auth.length,2);assert.equal(s.mapping,'LIN-42')});
+test('decision changes make old build unacceptably stale',()=>{const s=run(ready());act(s,'decision','Require volunteer approval');assert.ok(stale(s,s.artifacts[0]));assert.throws(()=>act(s,'accept'));run(s);s.selected=1;assert.throws(()=>act(s,'accept'))});
+test('offline worker cannot start; return claims one existing mapping',()=>{const s=ready();s.scenario='Worker unavailable';act(s,'authorize');act(s,'map');assert.throws(()=>act(s,'start'));act(s,'worker');act(s,'start');assert.throws(()=>act(s,'start'));assert.equal(s.attempts.length,1)});
+test('unknown write and conflict block claims until reconciliation',()=>{for(const scenario of ['Connector unavailable','Connector conflict']){const s=ready();s.scenario=scenario;act(s,'authorize');act(s,'map');assert.throws(()=>act(s,'start'));act(s,'reconcile');act(s,'start');assert.equal(s.mapping,'LIN-42');assert.equal(s.attempts.length,1)}});
+test('failure retains attempt; retry creates linked successor',()=>{const s=ready();s.scenario='Failure';run(s);assert.equal(s.state,'Failed');s.scenario='Happy path';run(s);assert.equal(s.attempts[0].state,'Failed');assert.equal(s.attempts[1].id,2)});
+test('blocked input requires separate continuation authorization',()=>{const s=ready();s.scenario='Blocked input';run(s);act(s,'answer','Keep deferred blockers visible');assert.throws(()=>act(s,'start'));run(s);assert.equal(s.auth.length,2);assert.equal(s.attempts.length,2)});
+test('cancellation is not terminal until both confirmations',()=>{const s=ready();act(s,'authorize');act(s,'map');act(s,'start');act(s,'cancel');act(s,'uncertain');assert.equal(s.state,'Cancellation uncertain');assert.throws(()=>act(s,'start'));act(s,'confirmCancel');assert.equal(s.attempts[0].state,'Cancelled')});
+test('browser JSON round trip preserves artifact and revision histories',()=>{const s=run(ready());assert.deepEqual(JSON.parse(JSON.stringify(s)),s)});

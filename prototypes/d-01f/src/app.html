@@ -1,0 +1,48 @@
+<a class="skip-link" href="#main" (click)="$event.preventDefault(); main.focus()">Skip to content</a>
+<aside class="sidebar">
+ <a class="brand" href="#/borrowbox/overview"><mat-icon>deployed_code</mat-icon><span>Aludel</span></a>
+ <a class="projects-link" href="#/projects"><mat-icon>arrow_back</mat-icon><span>Projects</span></a>
+ <nav aria-label="Project navigation">@for(link of [{id:'overview',icon:'home',label:'Overview'},{id:'work',icon:'format_list_bulleted',label:'Work'},{id:'decisions',icon:'chat_bubble',label:'Decisions'},{id:'reviews',icon:'groups',label:'Reviews'}];track link.id){<a [href]="'#/borrowbox/'+link.id" [class.active]="page()===link.id" [attr.aria-current]="page()===link.id?'page':null"><mat-icon>{{link.icon}}</mat-icon><span>{{link.label}}</span></a>}</nav>
+ <p class="trial-label">Local design trial<br>Synthetic BorrowBox data</p>
+</aside>
+<div class="workspace"><header class="topbar"><span class="project-name">BorrowBox</span><div class="topbar-actions"><a mat-stroked-button href="#/borrowbox/request"><mat-icon>add</mat-icon>New request</a><span class="avatar" aria-label="Owner JD">JD</span></div></header>
+<main id="main" #main tabindex="-1">
+@if(page()==='overview'){
+ <header class="page-intro"><h1 tabindex="-1">Members can reserve a tool for pickup.</h1><p>A neighborhood tool library</p></header>
+ <machine-decision-queue [items]="open()" [availability]="availability()" (retry)="retry()"/>
+ <machine-work-summary [items]="work()"/>
+ <machine-preview-summary/>
+}
+@else if(page()==='decisions' && !isDetail()){
+ <header class="page-intro"><h1 tabindex="-1">Decisions</h1><p>Make the choices that shape BorrowBox.</p></header>
+ <nav class="filters" aria-label="Decision filter"><a mat-button href="#/borrowbox/decisions?filter=open" [attr.aria-current]="filter()==='open'?'page':null">Open@if(availability()==='known'){ ({{open().length}})}</a><a mat-button href="#/borrowbox/decisions?filter=all" [attr.aria-current]="filter()==='all'?'page':null">All decisions</a></nav>
+ <machine-decision-queue [items]="open()" [limit]="100" heading="Open decisions" [returnTo]="filter()" [availability]="availability()" (retry)="retry()"/>
+ @if(filter()==='all'){@for(d of items();track d.id){@if(d.answer){<a class="answered-row" [href]="'#/borrowbox/decisions/'+d.id+'?from=all'"><span>{{d.title}}</span><machine-status label="Answered"/></a>}}}
+}
+@else if(page()==='decisions' && isDetail()){
+ <a class="back-link" [href]="returnHref()"><mat-icon>arrow_back</mat-icon>Back to {{returnHref().includes('overview')?'Overview':'Decisions'}}</a>
+ @if(current();as d){<article class="detail-content"><p class="eyebrow">{{d.id}} · revision {{d.revision}}</p><h1 tabindex="-1">{{d.title}}</h1><machine-status [label]="d.answer?'Answered':d.blocking?'Blocking':'Optional'"/><p class="lead">{{d.effect}}</p>
+ @if(d.id==='BB-D01'){<p>Reservation checks also need implementation evidence. Answering this decision does not make those checks ready.</p>}
+ <details><summary>Why this decision matters</summary><p>{{d.blocking?'Agree on the behavior before preparing the affected work.':'This is a wording improvement; independent work can continue.'}} Your answer records a product choice. It does not authorize execution.</p></details>
+ @if(availability()==='unknown'){<p role="alert">Current revision is unavailable. Refresh before answering.</p><button mat-stroked-button (click)="retry()">Refresh decision</button>}
+ @else if(!d.answer){<fieldset><legend>Choose an answer</legend><mat-radio-group aria-label="Choose an answer" [ngModel]="answer" (ngModelChange)="draftAnswer($event)">@for(option of d.options;track option){<mat-radio-button [value]="option">{{option}}</mat-radio-button>}</mat-radio-group></fieldset><button mat-flat-button (click)="saveAnswer()" [disabled]="!answer||busy()">{{busy()?'Saving…':'Save answer'}}</button>}
+ @else{<div class="saved-answer"><h2>Recorded answer</h2><p>{{d.answer}}</p><p>No work has started. Authorizing execution is a separate step.</p></div>}
+ @if(message()){<p class="feedback" role="status">{{message()}}</p>}
+ @if(failure==='conflict' && message()){<button mat-stroked-button (click)="refreshRevision()">Review current revision</button>}
+ @if(saved() && d.id==='BB-D01'){<p>Reservation implementation is ready for authorization. Reservation checks are still waiting for implementation evidence.</p>}
+ @if(d.answer && open().length){<a class="next-link" [href]="'#/borrowbox/decisions/'+open()[0].id+'?from=open'">Next decision: {{open()[0].title}}<mat-icon>arrow_forward</mat-icon></a>}
+ </article>}@else{<h1 tabindex="-1">Decision not found</h1><p>This link doesn’t identify a decision in this project.</p>}
+}
+@else if(page()==='request'){
+ <a class="back-link" href="#/borrowbox/overview"><mat-icon>arrow_back</mat-icon>Back to Overview</a><article class="detail-content"><h1 tabindex="-1">What should BorrowBox do next?</h1><p class="lead">Describe the outcome you want and what would make it useful.</p>
+ @if(!requestSaved()){<mat-form-field appearance="outline"><mat-label>Your request</mat-label><textarea matInput rows="7" [ngModel]="requestText" (ngModelChange)="requestDraft($event)"></textarea></mat-form-field><p class="draft-note">Draft kept in this browser tab, including when you leave this page.</p><div class="actions"><button mat-flat-button (click)="saveRequest()" [disabled]="!requestText.trim()">Save request</button><button mat-button (click)="discard()" [disabled]="!requestText">Discard draft</button></div>@if(requestError()){<p role="alert">{{requestError()}}</p>}}
+ @else{<div class="saved-answer" role="status"><h2>Request saved locally</h2><p>{{requestText}}</p><p>It is ready for interpretation. No work has started.</p></div><a mat-button href="#/borrowbox/overview">Return to Overview</a>}
+ </article>
+}
+@else if(page()==='work'){
+ @if(currentWork();as w){<a class="back-link" href="#/borrowbox/work"><mat-icon>arrow_back</mat-icon>Back to Work</a><article class="detail-content"><p class="eyebrow">{{w.id}}</p><h1 tabindex="-1">{{w.title}}</h1><machine-status [label]="w.state"/><p class="lead">{{w.reason}}</p><p>No run has been authorized for this task.</p></article>}
+ @else{<header class="page-intro"><h1 tabindex="-1">Project work</h1><p>Readiness and dependencies, before execution.</p></header><machine-work-summary [items]="work()"/>}
+}
+@else if(page()==='reviews'){<header class="page-intro"><h1 tabindex="-1">Reviews</h1><p>Inspect a specific candidate before deciding what happens next.</p></header><machine-preview-summary/><p>A preview will appear after authorized work produces an identified candidate.</p>}
+@else{<header class="page-intro"><h1 tabindex="-1">Projects</h1><p>Choose the product you want to work on.</p></header><a class="project-card" href="#/borrowbox/overview"><h2>BorrowBox</h2><p>A neighborhood tool library</p><span>Open project <mat-icon>arrow_forward</mat-icon></span></a>}
+</main></div>

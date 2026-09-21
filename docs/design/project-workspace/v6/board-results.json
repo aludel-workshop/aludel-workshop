@@ -1,0 +1,22 @@
+{
+  "kind": "Static composition review, not interactive prototype",
+  "routes": {
+    "work": {
+      "reviewAnchor": true
+    },
+    "plan": {
+      "reviewAnchor": true
+    },
+    "agents": {
+      "reviewAnchor": true
+    },
+    "intake": {
+      "reviewAnchor": true
+    }
+  },
+  "fontLoaded": true,
+  "narrowNoOverflow": true,
+  "wideAxe": [],
+  "narrowAxe": [],
+  "pageErrors": []
+}

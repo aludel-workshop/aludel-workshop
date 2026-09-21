@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "integration": {
+    "provider": "github-app",
+    "ownership": "vendor",
+    "callbackPath": "/api/integrations/github/callback",
+    "setupPath": "/api/integrations/github/installed",
+    "installationRepositorySelection": "all",
+    "gitCredentialStrategy": "per-operation-installation-token",
+    "requiredRepositoryPermissions": {
+      "administration": "write",
+      "contents": "write"
+    }
+  },
+  "defaultSourceControlProfile": "git-local-v1",
+  "sourceControlProfiles": {
+    "git-local-v1": {
+      "provider": "git",
+      "initialBranch": "main",
+      "initialCommitMessage": "chore: establish project baseline",
+      "gitignore": [
+        "# Dependencies and generated builds",
+        "node_modules/",
+        "dist/",
+        "storybook-static/",
+        "out-tsc/",
+        ".angular/",
+        ".vite/",
+        "coverage/",
+        "test-results/",
+        "",
+        "# Local runtime state and credentials",
+        ".data/",
+        "*.sqlite",
+        "*.sqlite3",
+        "*.db",
+        ".env",
+        ".env.*",
+        "!.env.example",
+        "*.pem",
+        "*.key",
+        "",
+        "# Language and tool caches",
+        "__pycache__/",
+        "*.py[cod]",
+        ".pytest_cache/",
+        "",
+        "# Disposable workspace output",
+        "/tmp/",
+        "/temp/",
+        "",
+        "# Local editor and agent state",
+        ".vscode/",
+        ".idea/",
+        ".agents/",
+        ".codex/",
+        ".DS_Store",
+        "Thumbs.db"
+      ],
+      "gitattributes": [
+        "* text=auto",
+        "",
+        "*.sh text eol=lf",
+        "*.py text eol=lf",
+        "*.mjs text eol=lf",
+        "*.js text eol=lf",
+        "*.ts text eol=lf",
+        "*.json text eol=lf",
+        "*.md text eol=lf",
+        "*.html text eol=lf",
+        "*.css text eol=lf",
+        "*.scss text eol=lf",
+        "*.yml text eol=lf",
+        "*.yaml text eol=lf",
+        "launch-machine text eol=lf",
+        "",
+        "*.png binary",
+        "*.jpg binary",
+        "*.jpeg binary",
+        "*.webp binary",
+        "*.gif binary",
+        "*.woff binary",
+        "*.woff2 binary",
+        "*.ttf binary"
+      ]
+    }
+  },
+  "projects": {
+    "the-machine": {
+      "repositoryPath": "../../..",
+      "sourceControlProfile": "git-local-v1"
+    }
+  }
+}

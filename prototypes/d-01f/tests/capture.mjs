@@ -1,0 +1,7 @@
+import {chromium} from '/tmp/app-builder-d01b-browser/node_modules/playwright/index.mjs';
+import fs from 'node:fs';import path from 'node:path';
+const dir=path.resolve('../../tmp/the-machine-overview-concepts');const source=fs.readFileSync('../../docs/design/portal-system/v2/overview.png');
+const width=source.readUInt32BE(16),height=source.readUInt32BE(20);console.log({width,height});
+const browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width,height},deviceScaleFactor:1});
+page.on('pageerror',e=>console.log('PAGE ERROR',e.message));await page.goto('http://127.0.0.1:4173/');await page.locator('main h1').waitFor();await page.evaluate(()=>document.fonts.ready);if(await page.evaluate(()=>[...document.fonts].some(f=>f.status==='error')))throw new Error('Font loading failed');await page.screenshot({path:dir+'/overview-built-wide.png'});
+const screenshot=fs.readFileSync(dir+'/overview-built-wide.png');await page.setViewportSize({width:width*2,height});await page.setContent(`<body style="margin:0;display:flex"><img width="${width}" height="${height}" src="data:image/png;base64,${source.toString('base64')}"><img width="${width}" height="${height}" src="data:image/png;base64,${screenshot.toString('base64')}"></body>`);await page.locator('img').last().evaluate(e=>e.decode());await page.screenshot({path:dir+'/overview-comparison.png'});await browser.close();

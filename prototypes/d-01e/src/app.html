@@ -1,0 +1,95 @@
+<a class="skip-link" href="#main" (click)="$event.preventDefault(); main.focus()">Skip to content</a>
+<aside class="sidebar">
+ <a class="brand" href="#/borrowbox/overview"><mat-icon>deployed_code</mat-icon><span>Aludel</span></a>
+ <a class="projects-link" href="#/projects"><mat-icon>arrow_back</mat-icon><span>Projects</span></a>
+ <nav aria-label="Project navigation">@for(link of [{id:'overview',icon:'home',label:'Overview'},{id:'work',icon:'format_list_bulleted',label:'Work'},{id:'decisions',icon:'chat_bubble',label:'Decisions'},{id:'reviews',icon:'groups',label:'Reviews'}];track link.id){<a [href]="'#/borrowbox/'+link.id" [class.active]="page()===link.id" [attr.aria-current]="page()===link.id?'page':null"><mat-icon>{{link.icon}}</mat-icon><span>{{link.label}}</span></a>}</nav>
+ <p class="trial-label">Local design trial<br>Synthetic BorrowBox data</p>
+</aside>
+<div class="workspace"><header class="topbar"><span class="project-name">BorrowBox</span><div class="topbar-actions"><a mat-stroked-button href="#/borrowbox/request"><mat-icon>add</mat-icon>New request</a><span class="avatar" aria-label="Owner JD">JD</span></div></header>
+<main id="main" #main tabindex="-1">
+@if(page()==='overview'){
+ <header class="page-intro"><h1 tabindex="-1">Members can reserve a tool for pickup.</h1><p>A neighborhood tool library</p></header>
+ <machine-decision-queue [items]="open()" [availability]="availability()" (retry)="retry()"/>
+ <machine-work-summary [items]="work()"/>
+ @if(candidateScenario){<a href="#/borrowbox/reviews/A1">Review candidate A1</a>}@else{<machine-preview-summary/>}
+}
+@else if(page()==='decisions' && !isDetail()){
+ <header class="page-intro"><h1 tabindex="-1">Decisions</h1><p>Make the choices that shape BorrowBox.</p></header>
+ <nav class="filters" aria-label="Decision filter"><a mat-button href="#/borrowbox/decisions?filter=open" [attr.aria-current]="filter()==='open'?'page':null">Open@if(availability()==='known'){ ({{open().length}})}</a><a mat-button href="#/borrowbox/decisions?filter=all" [attr.aria-current]="filter()==='all'?'page':null">All decisions</a></nav>
+ <machine-decision-queue [items]="open()" [limit]="100" heading="Open decisions" [returnTo]="filter()" [availability]="availability()" (retry)="retry()"/>
+ @if(filter()==='all'){@for(d of items();track d.id){@if(d.answer){<a class="answered-row" [href]="'#/borrowbox/decisions/'+d.id+'?from=all'"><span>{{d.title}}</span><machine-status label="Answered"/></a>}}}
+}
+@else if(page()==='decisions' && isDetail()){
+ <a class="back-link" [href]="returnHref()"><mat-icon>arrow_back</mat-icon>Back to {{returnHref().includes('overview')?'Overview':'Decisions'}}</a>
+ @if(current();as d){<article class="detail-content"><p class="eyebrow">{{d.id}} · revision {{d.revision}}</p><h1 tabindex="-1">{{d.title}}</h1><machine-status [label]="d.answer?'Answered':d.blocking?'Blocking':'Optional'"/><p class="lead">{{d.effect}}</p>
+ @if(d.id==='BB-D01'){<p>Reservation checks also need implementation evidence. Answering this decision does not make those checks ready.</p>}
+ <details><summary>Why this decision matters</summary><p>{{d.blocking?'Agree on the behavior before preparing the affected work.':'This is a wording improvement; independent work can continue.'}} Your answer records a product choice. It does not authorize execution.</p></details>
+ @if(availability()==='unknown'){<p role="alert">Current revision is unavailable. Refresh before answering.</p><button mat-stroked-button (click)="retry()">Refresh decision</button>}
+ @else if(!d.answer){<fieldset><legend>Choose an answer</legend><mat-radio-group aria-label="Choose an answer" [ngModel]="answer" (ngModelChange)="draftAnswer($event)">@for(option of d.options;track option){<mat-radio-button [value]="option">{{option}}</mat-radio-button>}</mat-radio-group></fieldset><button mat-flat-button (click)="saveAnswer()" [disabled]="!answer||busy()">{{busy()?'Saving…':'Save answer'}}</button>}
+ @else{<div class="saved-answer"><h2>Recorded answer</h2><p>{{d.answer}}</p><p>No work has started. Authorizing execution is a separate step.</p></div>}
+ @if(message()){<p class="feedback" role="status">{{message()}}</p>}
+ @if(failure==='conflict' && message()){<button mat-stroked-button (click)="refreshRevision()">Review current revision</button>}
+ @if(saved() && d.id==='BB-D01'){<p>Reservation implementation is ready for authorization. Reservation checks are still waiting for implementation evidence.</p>}
+ @if(d.answer && open().length){<a class="next-link" [href]="'#/borrowbox/decisions/'+open()[0].id+'?from=open'">Next decision: {{open()[0].title}}<mat-icon>arrow_forward</mat-icon></a>}
+ </article>}@else{<h1 tabindex="-1">Decision not found</h1><p>This link doesn’t identify a decision in this project.</p>}
+}
+@else if(page()==='request'){
+ <a class="back-link" href="#/borrowbox/overview"><mat-icon>arrow_back</mat-icon>Back to Overview</a><article class="detail-content"><h1 tabindex="-1">What should BorrowBox do next?</h1><p class="lead">Describe the outcome you want and what would make it useful.</p>
+ @if(!requestSaved()){<mat-form-field appearance="outline"><mat-label>Your request</mat-label><textarea matInput rows="7" [ngModel]="requestText" (ngModelChange)="requestDraft($event)"></textarea></mat-form-field><p class="draft-note">Draft kept in this browser tab, including when you leave this page.</p><div class="actions"><button mat-flat-button (click)="saveRequest()" [disabled]="!requestText.trim()">Save request</button><button mat-button (click)="discard()" [disabled]="!requestText">Discard draft</button></div>@if(requestError()){<p role="alert">{{requestError()}}</p>}}
+ @else{<div class="saved-answer" role="status"><h2>Request saved locally</h2><p>{{requestText}}</p><p>It is ready for interpretation. No work has started.</p></div><a mat-button href="#/borrowbox/overview">Return to Overview</a>}
+ </article>
+}
+@else if(page()==='work'){
+ @if(currentWork();as w){
+  @if(w.id==='BB-001' && candidateScenario){
+   <a class="back-link" href="#/borrowbox/work"><mat-icon>arrow_back</mat-icon>Back to Work</a>
+   <article class="task-layout"><section class="task-document"><p class="eyebrow">BB-001 · revision 1</p><div class="record-title"><h1 tabindex="-1">Reservation implementation</h1><machine-status label="Awaiting review"/></div><p class="lead">Members can reserve a tool for pickup.</p>
+   <section class="task-section"><span class="section-icon"><mat-icon>target</mat-icon></span><div><h2>What success means</h2><ul><li>Reserve an available tool for Oct 15–16, 2026.</li><li>Prevent overlapping reservations.</li><li>Keep entered dates after validation errors.</li></ul></div></section>
+   <section class="task-section"><span class="section-icon"><mat-icon>description</mat-icon></span><div><h2>Authorized scope</h2><p>Build and test a local preview only. Production release is not authorized.</p></div></section>
+   <details class="history-disclosure"><summary>Attempt and task history</summary><p>Attempt 1 produced candidate A1 from task revision 1. Previous task states remain available in the durable history.</p></details></section>
+   <aside class="task-result" aria-labelledby="task-result-heading"><p class="eyebrow">Current result</p><h2 id="task-result-heading">Candidate A1</h2><machine-status label="Current candidate"/><div class="task-result-thumb"><img src="/assets/cordless-drill.png" alt="Unbranded yellow cordless drill in the BorrowBox preview"><span>BorrowBox reservation preview</span></div><p><strong>8 passed · 1 known gap</strong></p><p>Volunteer approval is outside this candidate.</p><a mat-flat-button href="#/borrowbox/reviews/A1"><mat-icon>rate_review</mat-icon>Review candidate A1</a></aside></article>
+  }
+  @else{<a class="back-link" href="#/borrowbox/work"><mat-icon>arrow_back</mat-icon>Back to Work</a><article class="detail-content"><p class="eyebrow">{{w.id}} · revision 1</p><h1 tabindex="-1">{{w.title}}</h1><machine-status [label]="w.state"/><p class="lead">{{w.reason}}</p>
+  @if(w.id==='BB-001'){
+   @if(w.state==='Ready'){<h2>Start this task</h2><p>Permit one simulated attempt to build and test a local preview. No production release, purchases or external writes. Stop for a consequential question.</p><button mat-flat-button (click)="startTask()">Authorize task</button>}
+   @else if(w.state==='Running'){<h2>Building the preview</h2><p role="status">Simulated attempt 1 is running. Use “Simulate build completion” in the outer review controls.</p>}
+   @else{<a href="#/borrowbox/decisions/BB-D01">Answer reservation policy</a>}
+  }@else{<p>This supporting task is outside the executable demo. Explore BB-001 to try the complete flow.</p><a href="#/borrowbox/work/BB-001">Open reservation implementation</a>}
+  </article>}
+ }
+ @else{<header class="page-intro"><h1 tabindex="-1">Project work</h1><p>Readiness and dependencies, before execution.</p></header><machine-work-summary [items]="work()"/>}
+}
+@else if(page()==='reviews' && isDetail()){
+ <a class="back-link review-back" href="#/borrowbox/work/BB-001"><mat-icon>arrow_back</mat-icon>Back to task BB-001</a>
+ <article class="review-page" [class.review-stale]="reviewScenario==='stale'" [class.review-unavailable]="reviewScenario==='unavailable'">
+  <header class="review-heading"><div><div class="record-title"><h1 tabindex="-1">Candidate A1</h1><machine-status [label]="reviewScenario==='stale'?'Stale':reviewScenario==='unavailable'?'Preview unavailable':reviewOutcome()==='accepted'?'Accepted':reviewOutcome()==='revision'?'Revision requested':'Current candidate'"/></div><p>BB-001 · Reservation flow</p></div></header>
+  @if(reviewScenario==='stale'){<div class="review-alert" role="alert"><mat-icon>history</mat-icon><div><strong>This candidate uses an earlier task revision.</strong><p>You can inspect it, but acceptance is unavailable until the task is reassessed.</p></div></div>}
+  @if(reviewScenario==='unavailable'){<div class="review-alert" role="alert"><mat-icon>cloud_off</mat-icon><div><strong>Candidate A1 is temporarily unavailable.</strong><p>Its identity and evidence remain here; a newer candidate has not been substituted.</p></div></div>}
+  <div class="review-workspace">
+   <section class="candidate-stage" aria-labelledby="preview-heading"><h2 id="preview-heading" class="visually-hidden">Interactive BorrowBox preview</h2>
+    @if(reviewScenario==='unavailable'){<div class="preview-unavailable"><mat-icon>cloud_off</mat-icon><h2>Preview unavailable</h2><p>Try again later. Review evidence remains available.</p></div>}
+    @else{<div class="product-preview"><header><a class="borrowbox-brand" href="#/borrowbox/reviews/A1" aria-label="BorrowBox home"><mat-icon>deployed_code</mat-icon><strong>BorrowBox</strong></a><nav aria-label="BorrowBox preview navigation"><a href="#/borrowbox/reviews/A1">Tools</a><a href="#/borrowbox/reviews/A1">How it works</a><a href="#/borrowbox/reviews/A1">Locations</a></nav><span class="preview-avatar" aria-hidden="true">JD</span></header>
+     <a class="preview-back" href="#/borrowbox/reviews/A1"><mat-icon>arrow_back</mat-icon>Back to tools</a>
+     <div class="tool-layout"><div class="tool-image"><img src="/assets/cordless-drill.png" alt="Unbranded yellow cordless drill"></div><section class="tool-details"><p class="preview-eyebrow">Power tools</p><h2>Cordless drill</h2><p>A versatile cordless drill for everyday repairs and small projects.</p><div class="tool-tags"><span>18V</span><span>Cordless</span><span>2 batteries</span></div><div class="date-fields"><label>Pickup date<input type="date" [(ngModel)]="pickupDate"></label><label>Return date<input type="date" [(ngModel)]="returnDate"></label></div><button mat-flat-button (click)="reserveTool()">Reserve tool</button>@if(reservationMessage()){<p class="reservation-message" [class.error]="reservationTone()==='error'" role="status">{{reservationMessage()}}</p>}</section></div>
+     <section class="tool-about"><h3>About this tool</h3><p>A reliable cordless drill with charger, two batteries and a carrying case.</p></section></div>}
+   </section>
+   <aside class="evaluation-pane" aria-labelledby="evaluation-heading"><div class="evaluation-identity"><div><h2 id="evaluation-heading">Candidate A1</h2><p>BB-001 · Reservation flow</p></div><machine-status [label]="reviewScenario==='stale'?'Stale':reviewScenario==='unavailable'?'Unavailable':'Current candidate'"/></div>
+    <section class="evaluation-section"><mat-icon>subject</mat-icon><div><h3>Task intent</h3><p>Members can reserve a tool for pickup.</p></div></section>
+    <section class="evaluation-section"><mat-icon>checklist</mat-icon><div><h3>Things to try</h3><ol><li>Select pickup and return dates.</li><li>Try reserving the tool.</li><li>Try Oct 11–13 to see overlap handling.</li></ol></div></section>
+    <section class="evidence-row"><mat-icon>check_circle</mat-icon><strong>Checks</strong><span>8 passed · 1 gap</span></section>
+    <section class="gap-row"><mat-icon>warning</mat-icon><div><strong>Known gap</strong><p>Volunteer approval path is not included in this candidate.</p></div></section>
+    <label class="feedback-field" for="review-feedback">Your feedback<textarea id="review-feedback" rows="4" [ngModel]="reviewFeedback" (ngModelChange)="reviewDraft($event)" placeholder="Add feedback for the next revision"></textarea></label>
+    @if(reviewOutcome()==='accepted'){<div class="review-confirmation" role="status"><mat-icon>check_circle</mat-icon><div><strong>Candidate A1 accepted.</strong><p>Release still requires a separate authorization.</p></div></div>}
+    @else if(reviewOutcome()==='revision'){<div class="review-confirmation" role="status"><mat-icon>edit_note</mat-icon><div><strong>Revision requested.</strong><p>Your feedback is attached to A1. No new run has started.</p></div></div>}
+    @else{<div class="review-actions"><button mat-flat-button (click)="acceptCandidate()" [disabled]="reviewScenario==='stale'||reviewScenario==='unavailable'"><mat-icon>check_circle</mat-icon>Accept candidate A1</button><button mat-stroked-button (click)="requestRevision()"><mat-icon>edit</mat-icon>Request revision</button></div><p class="release-note"><mat-icon>info</mat-icon>Acceptance does not release this build.</p>}
+   </aside>
+  </div>
+ </article>
+}
+@else if(page()==='reviews'){
+ <header class="page-intro"><h1 tabindex="-1">Reviews</h1><p>Inspect a specific candidate before deciding what happens next.</p></header>
+ @if(candidateScenario){<a class="review-row" href="#/borrowbox/reviews/A1"><span><strong>Candidate A1</strong><small>BB-001 · Reservation flow</small></span><machine-status label="Current candidate"/><mat-icon>chevron_right</mat-icon></a>}
+ @else{<machine-preview-summary/><p>A preview will appear after authorized work produces an identified candidate.</p>}
+}
+@else{<header class="page-intro"><h1 tabindex="-1">Projects</h1><p>Choose the product you want to work on.</p></header><a class="project-card" href="#/borrowbox/overview"><h2>BorrowBox</h2><p>A neighborhood tool library</p><span>Open project <mat-icon>arrow_forward</mat-icon></span></a>}
+</main></div>

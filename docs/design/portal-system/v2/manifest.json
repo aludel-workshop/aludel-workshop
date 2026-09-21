@@ -1,0 +1,42 @@
+{
+  "date": "2026-09-19",
+  "status": "generated-agent-inspected-revision-review-pending",
+  "tool": "image_gen built-in",
+  "requested_dimensions": [
+    1440,
+    1024
+  ],
+  "actual_dimensions": [
+    1487,
+    1058
+  ],
+  "image": "overview.png",
+  "image_sha256": "318d0c3c92c1a6656902f15802004df928403a358ae00b9b54addb5af6ac2572",
+  "review_copy": "tmp/the-machine-overview-concepts/overview-v2.png",
+  "source_roles": [
+    "Option 2 outcome-first composition",
+    "Option 1 left navigation only"
+  ],
+  "inputs": [
+    {
+      "path": "docs/design/portal-system/v1/concepts/outcome-briefing.png",
+      "sha256": "f03e0accffa6ca63e24fad7b1aebb4d4c38e89439f661824c9e48b3c35515dff"
+    },
+    {
+      "path": "docs/design/portal-system/v1/concepts/attention-workspace.png",
+      "sha256": "ae125fd41a07a2f9ceb3da3d278cbf112d1035bc5bfaa7420d060afe72d15c59"
+    },
+    {
+      "path": "docs/design/portal-system/v2/overview.prompt.txt",
+      "sha256": "6ac1a9788e2f50d7a57eea1614e4e45f741bac98469c0aaa510bfdacdf1ba1da"
+    },
+    {
+      "path": "docs/design/portal-system/v2/interaction-contract.md",
+      "sha256": "b7dbb0b2b07cb1dd8fd6b854379b19477204596846641faec2d07c1eac152e53"
+    },
+    {
+      "path": "docs/design/process/interaction-placement.md",
+      "sha256": "069d1655a890c79e4f2a7786486c118d078cca986817a39d03ab1c4459251e12"
+    }
+  ]
+}

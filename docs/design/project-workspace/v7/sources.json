@@ -1,0 +1,101 @@
+[
+  {
+    "id": "linear-overview",
+    "page": "https://linear.app/docs/project-overview",
+    "asset": "https://webassets.linear.app/images/ornj730p/production/6f0a51a748dfb751052a8dc0e0b67670c845ab6c-2296x2006.png",
+    "alt": "Project details sidebar view",
+    "local": "references/linear-overview.png",
+    "sha256": "697f8985ed22cf38bb8e2f8cef855ede0311873c642067e6244e1745b58839e1",
+    "mime": "image/png",
+    "accessed": "2026-09-20",
+    "kind": "Vendor-published screenshot; not a live account test"
+  },
+  {
+    "id": "linear-milestones",
+    "page": "https://linear.app/docs/project-milestones",
+    "asset": "https://webassets.linear.app/images/ornj730p/production/59f96a11448bfb1bc23d25979f45975cfe8a8f28-1046x545.png",
+    "alt": "Multiple project milestones visible on a timeline",
+    "local": "references/linear-milestones.png",
+    "sha256": "277698ee1706d9e3848eb2fb5100e0f7c2996998160f57cbfa24e2b01fd38014",
+    "mime": "image/png",
+    "accessed": "2026-09-20",
+    "kind": "Vendor-published screenshot; not a live account test"
+  },
+  {
+    "id": "linear-inbox",
+    "page": "https://linear.app/docs/inbox",
+    "asset": "https://webassets.linear.app/images/ornj730p/production/b442b340278740de70919c868dce1afca4335fe7-3600x2080.png",
+    "alt": "Linear Inbox in dark mode, showing Priority and Other tabs with several notifications about issue assignments, project updates, comments, and mentions.",
+    "local": "references/linear-inbox.png",
+    "sha256": "0754627b5db89fec5b1819a799d17940105c2bbb5ef830c215caf8d0b6fe14b3",
+    "mime": "image/png",
+    "accessed": "2026-09-20",
+    "kind": "Vendor-published screenshot; not a live account test"
+  },
+  {
+    "id": "linear-initiatives",
+    "page": "https://linear.app/docs/initiatives",
+    "asset": "https://webassets.linear.app/images/ornj730p/production/5d7fe012f553e761f905a74ccef97a6faa2a7482-1344x960.png",
+    "alt": "Initiatives on a Linear workspace called RideShare",
+    "local": "references/linear-initiatives.png",
+    "sha256": "090b6d983ed09b64d0d51ff0511961570d47e67d6fa96418b8595521214ef35d",
+    "mime": "image/png",
+    "accessed": "2026-09-20",
+    "kind": "Vendor-published screenshot; not a live account test"
+  },
+  {
+    "id": "github-roadmap",
+    "page": "https://docs.github.com/en/issues/planning-and-tracking-with-projects/customizing-views-in-your-project/customizing-the-roadmap-layout",
+    "asset": "https://docs.github.com/assets/cb-3550/images/help/projects-v2/roadmap-menu-dates.png",
+    "alt": "Screenshot showing the menu items for a roadmap layout. The \"Date fields\" button is highlighted with an orange rectangle.",
+    "local": "references/github-roadmap.png",
+    "sha256": "8dd6eaf47eda32a5158453f224ca5fe391bb8c465e000af85885b01ec083738f",
+    "mime": "image/png",
+    "accessed": "2026-09-20",
+    "kind": "Vendor-published screenshot; not a live account test"
+  },
+  {
+    "id": "github-agents",
+    "page": "https://github.blog/changelog/2025-10-28-a-mission-control-to-assign-steer-and-track-copilot-coding-agent-tasks/",
+    "asset": "https://github.com/user-attachments/assets/1dffaa3b-ff6f-4c6e-a8aa-964841ea6725",
+    "alt": "Agent sessions in one view",
+    "local": "references/github-agents.png",
+    "sha256": "2c6b7a80d4b533d8fa8d03f1f9e8d8214f82387b7b23bacc988ddb824f320af4",
+    "mime": "image/png",
+    "accessed": "2026-09-20",
+    "kind": "Vendor-published screenshot; not a live account test"
+  },
+  {
+    "id": "buildkite-queue",
+    "page": "https://buildkite.com/docs/pipelines/insights/queue-metrics",
+    "asset": "https://buildkite.com/docs/assets/queue-metrics-overview-CMBq09gU.png",
+    "alt": "Queue details showing agent capacity, job states, current wait-time percentiles, and the Agent and Job Activity chart",
+    "local": "references/buildkite-queue.png",
+    "sha256": "abaf23618fe1a27183a8f6694487b1188b5b79699a43210c2f809fe46db9cf4c",
+    "mime": "image/png",
+    "accessed": "2026-09-20",
+    "kind": "Vendor-published screenshot; not a live account test"
+  },
+  {
+    "id": "linear-timeline",
+    "page": "https://linear.app/docs/timeline",
+    "asset": "https://webassets.linear.app/images/ornj730p/production/6a5478c3bc2de4eae7b848954548c9ddb2b0f53c-4460x2868.png",
+    "alt": "Timeline view",
+    "local": "references/linear-timeline.png",
+    "sha256": "c7f14e32c95ad306f276d4893a68dcb4d0d8478b327bb78122122db33715f59a",
+    "mime": "image/png",
+    "accessed": "2026-09-20",
+    "kind": "Vendor-published screenshot; not a live account test"
+  },
+  {
+    "id": "github-agents-panel",
+    "page": "https://github.blog/news-insights/product-news/agents-panel-launch-copilot-coding-agent-tasks-anywhere-on-github/",
+    "asset": "https://github.blog/wp-content/uploads/2025/08/Agents-panel-with-callout-2.png",
+    "alt": "A screenshot of the new Agents panel in GitHub that allows developers to track, manage, and start Copilot coding agent workflows from anywhere on GitHub. This screenshot shows recent tasks that coding agent, an agentic workflow that generates draft pull requests based on requirements set out by a developer, is working on with the option to view all tasks. Developers can also enter a natural language prompt in a box and specify which repository and which branch coding agent should work on.",
+    "local": "references/github-agents-panel.png",
+    "sha256": "1b8dcc497a83832e6fe3e4efffbdd104dfa23116a52612212fe2ba1ccae6cc53",
+    "mime": "image/png",
+    "accessed": "2026-09-20",
+    "kind": "Vendor-published screenshot; not a live account test"
+  }
+]

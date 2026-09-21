@@ -1,0 +1,24 @@
+{
+  "date": "2026-09-19",
+  "decision": "DEC-025",
+  "owner_feedback": "looks great. finish this up",
+  "packet": "D-01F",
+  "status": "complete",
+  "scope": "Selected foundation for D-01E; components incubating; supporting compositions experimental; no production transition",
+  "tested_manifest_sha256": "80e8c981d87709279061fb3c61a0afbd2a5a6e1ac8fc1f3b9b86b30b9b084567",
+  "implementation_source_check": {
+    "files": 31,
+    "result": "all matched original test manifest; no application edits"
+  },
+  "accepted_record_hashes": {
+    "docs/design/portal-system/v3/review-record.md": "e34ec75fe9e47e7837471ac03286207372ba7154a42cfd753ede3f655176b61d",
+    "docs/design/portal-system/v3/system-profile.md": "79e1ae802cc84f16465057f9d60694da2fda04b8906ab22e881b302ae00a47c2",
+    "docs/design/portal-system/v3/catalog.json": "dc01133c946acab3fc19de286d3948d040417b6fe7db7a4377507b0b200bc5aa",
+    "docs/design/portal-system/v3/work-record.md": "7ab3e895e4da0bc8085f7c27eafb121cc2e50b4692e36c23a8aae58ce8126b30",
+    "docs/design/portal-system/v3/d-01e-handoff.md": "9c0cf462cf9b846b3d7e27d05402c2486fd365e4b7855cfc1481965f7e2a527a",
+    "docs/design/portal-system/v1/view-intents.md": "862c7f429c749d7578a8733f6384450e28b91ba0adbbe2a7d9acd96ac90c08ae",
+    "docs/design/portal-system/v1/system-profile.md": "5997605cc818944362eaa5597af088e59daece99b8f042834974ac57f2de8ea5",
+    "docs/design/portal-system/v2/interaction-contract.md": "b7dbb0b2b07cb1dd8fd6b854379b19477204596846641faec2d07c1eac152e53"
+  },
+  "next_action": "D-01E"
+}

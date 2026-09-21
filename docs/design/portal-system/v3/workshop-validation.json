@@ -1,0 +1,155 @@
+{
+  "date": "2026-09-19",
+  "stories": [
+    {
+      "id": "patterns-preview-summary--no-candidate",
+      "render": "passed",
+      "axe": "passed"
+    },
+    {
+      "id": "patterns-preview-summary--unknown",
+      "render": "passed",
+      "axe": "passed"
+    },
+    {
+      "id": "patterns-preview-summary--candidate",
+      "render": "passed",
+      "axe": "passed"
+    },
+    {
+      "id": "patterns-decision-queue--three",
+      "render": "passed",
+      "axe": "passed"
+    },
+    {
+      "id": "patterns-decision-queue--zero",
+      "render": "passed",
+      "axe": "passed"
+    },
+    {
+      "id": "patterns-decision-queue--one",
+      "render": "passed",
+      "axe": "passed"
+    },
+    {
+      "id": "patterns-decision-queue--many",
+      "render": "passed",
+      "axe": "passed"
+    },
+    {
+      "id": "patterns-decision-queue--unknown",
+      "render": "passed",
+      "axe": "passed"
+    },
+    {
+      "id": "primitives-status--blocked",
+      "render": "passed",
+      "axe": "passed"
+    },
+    {
+      "id": "primitives-status--waiting",
+      "render": "passed",
+      "axe": "passed"
+    },
+    {
+      "id": "primitives-status--ready",
+      "render": "passed",
+      "axe": "passed"
+    },
+    {
+      "id": "primitives-status--chip-substitution",
+      "render": "passed",
+      "axe": "passed"
+    },
+    {
+      "id": "patterns-work-summary--dependencies",
+      "render": "passed",
+      "axe": "passed"
+    },
+    {
+      "id": "patterns-work-summary--answered-still-waiting",
+      "render": "passed",
+      "axe": "passed"
+    }
+  ],
+  "negativeControl": "Deliberately incorrect expectation that retry leaves the count unavailable was rejected after the actual recovery interaction",
+  "componentSubstitution": "Status label replaced with Material chip through the same label input; browser rendering and axe passed",
+  "catalogDiscovery": [
+    {
+      "id": "patterns-preview-summary--no-candidate",
+      "title": "Patterns/Preview summary",
+      "source": "./src/preview.stories.ts"
+    },
+    {
+      "id": "patterns-preview-summary--unknown",
+      "title": "Patterns/Preview summary",
+      "source": "./src/preview.stories.ts"
+    },
+    {
+      "id": "patterns-preview-summary--candidate",
+      "title": "Patterns/Preview summary",
+      "source": "./src/preview.stories.ts"
+    },
+    {
+      "id": "patterns-decision-queue--three",
+      "title": "Patterns/Decision queue",
+      "source": "./src/queue.stories.ts"
+    },
+    {
+      "id": "patterns-decision-queue--zero",
+      "title": "Patterns/Decision queue",
+      "source": "./src/queue.stories.ts"
+    },
+    {
+      "id": "patterns-decision-queue--one",
+      "title": "Patterns/Decision queue",
+      "source": "./src/queue.stories.ts"
+    },
+    {
+      "id": "patterns-decision-queue--many",
+      "title": "Patterns/Decision queue",
+      "source": "./src/queue.stories.ts"
+    },
+    {
+      "id": "patterns-decision-queue--unknown",
+      "title": "Patterns/Decision queue",
+      "source": "./src/queue.stories.ts"
+    },
+    {
+      "id": "primitives-status--blocked",
+      "title": "Primitives/Status",
+      "source": "./src/status.stories.ts"
+    },
+    {
+      "id": "primitives-status--waiting",
+      "title": "Primitives/Status",
+      "source": "./src/status.stories.ts"
+    },
+    {
+      "id": "primitives-status--ready",
+      "title": "Primitives/Status",
+      "source": "./src/status.stories.ts"
+    },
+    {
+      "id": "primitives-status--chip-substitution",
+      "title": "Primitives/Status",
+      "source": "./src/status.stories.ts"
+    },
+    {
+      "id": "patterns-work-summary--dependencies",
+      "title": "Patterns/Work summary",
+      "source": "./src/work.stories.ts"
+    },
+    {
+      "id": "patterns-work-summary--answered-still-waiting",
+      "title": "Patterns/Work summary",
+      "source": "./src/work.stories.ts"
+    }
+  ],
+  "errors": [],
+  "limitations": [
+    "Automatic source docgen disabled after two 120-second worker timeouts",
+    "Story index provides discovery; no preview MCP or automatic API manifest dependency",
+    "Axe subset is not a complete accessibility audit"
+  ]
+}

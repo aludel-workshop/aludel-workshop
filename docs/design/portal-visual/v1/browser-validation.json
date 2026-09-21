@@ -1,0 +1,54 @@
+{
+  "date": "2026-09-20",
+  "browser": "130.0.6723.31",
+  "checks": [
+    {
+      "name": "Accepted Overview remains unchanged in its default no-candidate state",
+      "status": "passed"
+    },
+    {
+      "name": "Task keeps intent, scope, history and one named candidate transition",
+      "status": "passed"
+    },
+    {
+      "name": "Candidate workspace preserves identity, task return, evidence and release separation",
+      "status": "passed"
+    },
+    {
+      "name": "BorrowBox preview handles success and overlap while preserving dates",
+      "status": "passed"
+    },
+    {
+      "name": "Feedback persists and revision request does not start another run",
+      "status": "passed"
+    },
+    {
+      "name": "Acceptance binds A1 and remains separate from release",
+      "status": "passed"
+    },
+    {
+      "name": "Stale and unavailable states retain A1 and block acceptance",
+      "status": "passed"
+    },
+    {
+      "name": "Narrow review reflows without horizontal overflow and keeps action order",
+      "status": "passed"
+    }
+  ],
+  "errors": [],
+  "viewports": [
+    {
+      "width": 1487,
+      "height": 1058
+    },
+    {
+      "width": 390,
+      "height": 844
+    }
+  ],
+  "limitations": [
+    "Synthetic browser-local state; no server concurrency or integration",
+    "Automated axe subset and keyboard-native controls, not a full assistive-technology audit",
+    "Q-005 evidence sufficiency remains a product-policy decision"
+  ]
+}

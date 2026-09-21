@@ -1,0 +1,20 @@
+{
+  "work": {
+    "title": "Keep the product moving."
+  },
+  "plan": {
+    "title": "M1 · Request a change and review its preview",
+    "actionChangesContent": false,
+    "detailTitleVisible": false,
+    "detailTitleDisplay": "none"
+  },
+  "agents": {
+    "title": "Execution capacity and queue"
+  },
+  "intake": {
+    "title": "Turn signals into intentional work.",
+    "checked": 0,
+    "summary": "Triage session\n\n3 selected signals appear to describe one Work-planning need.\n\nGroup as “Work planning model”\n\nOther actions\nLink existing · request clarification · defer · archive",
+    "groupedWithZeroSelection": true
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "date": "2026-09-19",
+  "identity": "Local SHA-256; no Git metadata",
+  "baseline_changes": [],
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "8431c6eb735a1d20fe55a9aa7513d4ceab533f7c7a77ab49540a4bb6b121c8bc"
+    },
+    {
+      "path": "docs/status.md",
+      "sha256": "f1503c64396597098c7debb729d99adfcaf5277320b3daaa5b35637d474c2097"
+    },
+    {
+      "path": "docs/execution-plan.md",
+      "sha256": "8a78527fa53f6ecbb924925bf15ca59bf822525e0054a698c5ef08a1d4f48149"
+    },
+    {
+      "path": "docs/decisions.md",
+      "sha256": "8d053d0b129a84b7c1287a381cd76e851a8c371524db9cc8a1e8a4cb028c4af1"
+    },
+    {
+      "path": "docs/product.md",
+      "sha256": "b94359dc3a446789922b3318c5b1d25b62b2c70a6a8bd85c29fa00796a2ac965"
+    },
+    {
+      "path": "docs/design/experience-foundation.md",
+      "sha256": "0be577f4879754ed492a2370c98d9fbcd25e3f2de27a9078ca6aee1a61ad04af"
+    },
+    {
+      "path": "docs/design/product-development-workflow.md",
+      "sha256": "cfb1dae4acee35eaece22ec53482a9ed57d571482cf3a2c47d57cf71f3068fb4"
+    },
+    {
+      "path": "docs/design/process/operating-procedure.md",
+      "sha256": "308f48e8e452441b5a97f497d3d7000c2e6001bae455d45e02ca87f5713afa9a"
+    },
+    {
+      "path": "docs/design/process/d-01d-work-record.md",
+      "sha256": "6ea9bb9e0dfa4d2c7392ae9bb9e97f8878747660529ed7547cfa873f344afab4"
+    },
+    {
+      "path": "docs/design/portal-foundation/feedback-2026-09-19.md",
+      "sha256": "74eb1f010a2f49b38df652982ff9b7210cff278955a1a82ce0097fe96ee3865c"
+    },
+    {
+      "path": "docs/design/demo-app/borrowbox.md",
+      "sha256": "8cfccb0648f78c43274018dbfa57814410c6f2f1826869f6b0e78b824b4287c8"
+    },
+    {
+      "path": "docs/design/self-change/v2/review-record.md",
+      "sha256": "d79e76f1250c434d930b2cf6a0ba23422de19b0919d2dfcfaf9e0e62a7236857"
+    },
+    {
+      "path": "docs/design/self-change/v2/views-and-components.md",
+      "sha256": "e7c9efa48dc5a0f1553c4f3a4ec5f7352627800fde1c861abf550c0f15ead2b9"
+    },
+    {
+      "path": "docs/design/self-change-brief.md",
+      "sha256": "7e9918b191eb07a7b5a264f21534b75bf9addc63e91275b8c72feafc7cb3687a"
+    },
+    {
+      "path": "docs/evidence/r-07c-process-validation.md",
+      "sha256": "3c80f14575019e4ab162f474ab01bbfb93e8cea730e2208d6eb05666ae6c6b1f"
+    },
+    {
+      "path": "docs/evidence/r-07b-workflow-benchmark.md",
+      "sha256": "c5226ee21cd8e1266f6174943a39c4c6cae155251123d2461a1816a8dca7bc20"
+    }
+  ]
+}

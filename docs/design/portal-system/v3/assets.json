@@ -1,0 +1,22 @@
+{
+  "date": "2026-09-19",
+  "assets": [
+    {
+      "name": "Material Symbols Rounded 13-icon subset",
+      "source": "https://fonts.gstatic.com/l/font?kit=syl0-zNym6YjUruM-QrEh7-nyTnjDwKNJ_190FjpZIvDmUSVOK7BDB_Qb9vUSzq3wzLK-P0J-V_Zs-QtQth3-jOcbTCVpeRL2w5rwZu2rIelXxKRO8cDe81u7DANSS1DH1lE6hjYcjkbXcFTU9QACkjfGqe-6Ga3CddlcCf5NrZNh59kmcdnkv3-&skey=70ddea8fe54d532e&v=v374",
+      "path": "prototypes/d-01f/src/material-symbols-rounded-subset.ttf",
+      "sha256": "d1c4257d8ca64473001feeee7cd9aac3507e2d4ae08149fed18dfb469d206469",
+      "bytes": 6088,
+      "license": "Apache-2.0",
+      "notice": "prototypes/d-01f/licenses/Material-Symbols-LICENSE",
+      "note": "Official Google Fonts subset, served locally; not raster artwork or a final brand mark"
+    },
+    {
+      "name": "Roboto Latin 400/500/700",
+      "source": "@fontsource/roboto@5.3.0",
+      "license": "OFL-1.1",
+      "notice": "prototypes/d-01f/licenses/Roboto-LICENSE",
+      "integrity": "See package-lock.json and built asset hashes"
+    }
+  ]
+}

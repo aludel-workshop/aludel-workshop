@@ -1,0 +1,428 @@
+* {
+    box-sizing: border-box
+}
+
+body {
+    margin: 0;
+    background: #f3f1eb;
+    color: #252e28;
+    font: 16px/1.6 system-ui, sans-serif
+}
+
+a {
+    color: #285e4b;
+    text-underline-offset: 4px
+}
+
+button,
+input,
+select,
+textarea {
+    font: inherit
+}
+
+button,
+.button {
+    display: inline-block;
+    padding: 10px 16px;
+    border: 1px solid #647568;
+    border-radius: 5px;
+    background: white;
+    color: #253d30;
+    cursor: pointer;
+    text-decoration: none
+}
+
+button.primary {
+    background: #28563e;
+    color: white;
+    border-color: #28563e
+}
+
+button:disabled {
+    opacity: .5;
+    cursor: not-allowed
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible {
+    outline: 3px solid #b65c20;
+    outline-offset: 4px
+}
+
+.experiment {
+    padding: 28px 4vw;
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+    align-items: center;
+    background: #202f28;
+    color: #fff
+}
+
+.experiment a {
+    color: #fff
+}
+
+.experiment h1 {
+    font-size: 28px;
+    margin: 6px 0
+}
+
+.experiment p {
+    margin: 0;
+    color: #d1dfd5
+}
+
+.guide {
+    padding: 18px 4vw;
+    background: #e6e9df;
+    border-bottom: 1px solid #a8b1a5
+}
+
+.guide summary {
+    font-weight: 650;
+    cursor: pointer
+}
+
+.guide li {
+    margin: 8px 0
+}
+
+.harness {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: end
+}
+
+.harness label {
+    max-width: 250px
+}
+
+.harness button {
+    padding: 6px 10px;
+    font-size: 14px
+}
+
+.stage-label {
+    font-size: 11px;
+    letter-spacing: .1em;
+    padding: 9px 4vw;
+    background: #dadfd4
+}
+
+.topbar {
+    background: #fff;
+    border-bottom: 1px solid #ccd2c7;
+    padding: 18px 28px;
+    display: flex;
+    gap: 30px;
+    align-items: center
+}
+
+.brand {
+    font-weight: 750;
+    letter-spacing: .08em
+}
+
+.shell {
+    display: grid;
+    grid-template-columns: 190px minmax(0, 1fr);
+    min-height: 650px
+}
+
+.sidebar {
+    padding: 28px 18px;
+    border-right: 1px solid #ccd2c7;
+    background: #eef0e9
+}
+
+.sidebar nav {
+    display: grid;
+    gap: 8px
+}
+
+.sidebar a {
+    padding: 10px 14px;
+    text-decoration: none;
+    border-radius: 5px
+}
+
+.sidebar a[aria-current=page] {
+    background: #d9e3d4;
+    font-weight: 700
+}
+
+.sidebar small {
+    padding: 14px;
+    display: block
+}
+
+main {
+    width: 100%;
+    max-width: 1100px;
+    padding: 32px 48px 64px;
+    min-width: 0
+}
+
+h1 {
+    font-size: 32px;
+    line-height: 1.2;
+    margin: 12px 0 18px
+}
+
+h2 {
+    font-size: 21px;
+    line-height: 1.3
+}
+
+h3 {
+    font-size: 17px
+}
+
+p {
+    max-width: 78ch
+}
+
+.eyebrow,
+small {
+    font-size: 12px;
+    letter-spacing: .04em
+}
+
+.muted {
+    color: #58665c
+}
+
+.card {
+    padding: 22px 24px;
+    margin: 20px 0;
+    background: #fff;
+    border: 1px solid #d1d6cc;
+    border-radius: 7px
+}
+
+.attention {
+    border-left: 4px solid #aa7334
+}
+
+.action {
+    border-left: 4px solid #35674c
+}
+
+.row {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    align-items: center;
+    padding: 18px 0;
+    border-top: 1px solid #dde1d8
+}
+
+.row p {
+    margin: 4px 0
+}
+
+.badge {
+    display: inline-block;
+    padding: 3px 10px;
+    background: #e8eee2;
+    border-radius: 4px;
+    font-size: 13px
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 18px 0
+}
+
+label {
+    display: block;
+    margin: 10px 0
+}
+
+select,
+textarea,
+input[type=date] {
+    display: block;
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #899889;
+    background: #fff;
+    border-radius: 4px
+}
+
+textarea {
+    min-height: 100px
+}
+
+fieldset {
+    border: 1px solid #c8d1c5;
+    border-radius: 5px;
+    padding: 16px
+}
+
+fieldset label {
+    padding: 10px;
+    background: #f5f7f1
+}
+
+details {
+    margin: 20px 0
+}
+
+summary {
+    cursor: pointer
+}
+
+pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: 13px
+}
+
+.review-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    gap: 22px
+}
+
+.review-grid .card {
+    margin-top: 0
+}
+
+iframe {
+    width: 100%;
+    height: 480px;
+    border: 1px solid #b4c0b0;
+    background: #fff
+}
+
+.notice {
+    padding: 14px 18px;
+    background: #f4ead4;
+    border-left: 4px solid #a87627;
+    margin: 16px 0
+}
+
+.error:empty {
+    display: none
+}
+
+.error {
+    padding: 14px;
+    background: #f9ded5
+}
+
+footer {
+    margin-top: 32px;
+    border-top: 1px solid #ccd2c7;
+    padding-top: 16px;
+    font-size: 13px
+}
+
+nav.filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px
+}
+
+.mobile-menu {
+    display: none
+}
+
+#simulation {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap
+}
+
+main:focus {
+    outline: none
+}
+
+@media(max-width:760px) {
+    .experiment {
+        display: block
+    }
+
+    .experiment a {
+        display: block;
+        margin-top: 14px
+    }
+
+    .shell {
+        grid-template-columns: 1fr
+    }
+
+    .sidebar {
+        border-right: 0;
+        border-bottom: 1px solid #ccd2c7;
+        padding: 12px 20px
+    }
+
+    .sidebar nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px
+    }
+
+    .sidebar a {
+        padding: 7px 10px
+    }
+
+    .sidebar small {
+        padding: 0 10px
+    }
+
+    .topbar {
+        padding: 15px 20px;
+        gap: 18px;
+        flex-wrap: wrap
+    }
+
+    main {
+        padding: 24px 20px 40px
+    }
+
+    h1 {
+        font-size: 27px
+    }
+
+    .review-grid {
+        grid-template-columns: 1fr
+    }
+
+    .row {
+        align-items: start;
+        flex-direction: column;
+        gap: 8px
+    }
+
+    .card {
+        padding: 18px
+    }
+
+    .harness {
+        display: block
+    }
+
+    .harness button {
+        margin: 5px 5px 5px 0
+    }
+
+    .harness label {
+        max-width: none
+    }
+
+    iframe {
+        height: 470px
+    }
+}

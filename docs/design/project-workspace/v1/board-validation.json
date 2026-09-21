@@ -1,0 +1,12 @@
+{
+  "checkedAt": "2026-09-21T00:41:40.104Z",
+  "url": "http://127.0.0.1:4310/reviews/project-workspace-v1.html",
+  "servedSourceMatches": true,
+  "walkthroughs": 6,
+  "sectionTargetsResolve": true,
+  "narrowWidth": 390,
+  "noHorizontalOverflow": true,
+  "axeViolations": [],
+  "pageErrors": [],
+  "limitation": "Static strategy review board; no product feature or owner usability acceptance proven."
+}

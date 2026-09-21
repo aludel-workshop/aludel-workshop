@@ -1,0 +1,41 @@
+{
+  "status": "pass",
+  "type": "Research-board checks only; no product workflow validated",
+  "reviewAnchors": 4,
+  "referenceImages": [
+    {
+      "source": "references/linear-overview.png",
+      "loaded": true
+    },
+    {
+      "source": "references/linear-inbox.png",
+      "loaded": true
+    },
+    {
+      "source": "references/linear-initiatives.png",
+      "loaded": true
+    },
+    {
+      "source": "references/linear-timeline.png",
+      "loaded": true
+    },
+    {
+      "source": "references/github-roadmap.png",
+      "loaded": true
+    },
+    {
+      "source": "references/github-agents-panel.png",
+      "loaded": true
+    },
+    {
+      "source": "references/buildkite-queue.png",
+      "loaded": true
+    }
+  ],
+  "keyboardDisclosure": true,
+  "fontLoaded": true,
+  "narrowNoOverflow": true,
+  "wideAxe": [],
+  "narrowAxe": [],
+  "pageErrors": []
+}

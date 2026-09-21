@@ -1,0 +1,72 @@
+{
+  "date": "2026-09-19",
+  "scope": "record consistency and deliberately invalid copies; no runtime tool integration",
+  "results": [
+    {
+      "case": "both projects satisfy the same structural contract",
+      "passed": true,
+      "observed": "24 allocations each; no inherited provider defaults"
+    },
+    {
+      "case": "required capability silently omitted",
+      "expected_detection": "missing, duplicate or unknown capability",
+      "passed": true,
+      "observed": [
+        "the-machine: missing, duplicate or unknown capability allocation"
+      ]
+    },
+    {
+      "case": "tracker also claims authorization authority",
+      "expected_detection": "one explicit target authority",
+      "passed": true,
+      "observed": [
+        "the-machine/C09: output requires one explicit target authority"
+      ]
+    },
+    {
+      "case": "service uses unregistered provider project",
+      "expected_detection": "unknown or incorrect project binding",
+      "passed": true,
+      "observed": [
+        "borrowbox/machine-develops-borrowbox: unknown or incorrect project binding"
+      ]
+    },
+    {
+      "case": "candidate is its own deployed provider",
+      "expected_detection": "separate provider and candidate revisions",
+      "passed": true,
+      "observed": [
+        "the-machine/machine-develops-machine: self-development must separate provider and candidate revisions"
+      ]
+    },
+    {
+      "case": "documented capability mislabeled verified",
+      "expected_detection": "lacks explicit verification scope",
+      "passed": true,
+      "observed": [
+        "the-machine/C07: verified claim lacks explicit verification scope"
+      ]
+    },
+    {
+      "case": "service mislabeled integrated without evidence",
+      "expected_detection": "lacks integration evidence",
+      "passed": true,
+      "observed": [
+        "the-machine/machine-develops-machine: verified service binding lacks integration evidence"
+      ]
+    },
+    {
+      "case": "old global contract silently consumed",
+      "expected_detection": "stale capability catalog revision",
+      "passed": true,
+      "observed": [
+        "borrowbox: stale capability catalog revision"
+      ]
+    },
+    {
+      "case": "MD3 is specific to Aludel; BorrowBox remains unselected",
+      "passed": true,
+      "observed": "same C05 contract, different explicit allocations"
+    }
+  ]
+}

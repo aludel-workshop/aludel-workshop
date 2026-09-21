@@ -1,0 +1,142 @@
+{
+  "date": "2026-09-19",
+  "purpose": "Groundwork and concept-review input identities; no usable Git repository",
+  "sources": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "bfcd05267e88e4fd8f62fd480ea335c524a9a382ee8b5b527f88433b38c56bf6"
+    },
+    {
+      "path": "docs/architecture.md",
+      "sha256": "5c9d7c5b01ee63422d6ca7c3bd7c90166852a9fb92ce78330bb96d40c2d6d760"
+    },
+    {
+      "path": "docs/decisions.md",
+      "sha256": "2a18a0cde3797261320fa2bfe23be953164a7042b865902bd43ed2325cd4ac7f"
+    },
+    {
+      "path": "docs/design/demo-app/borrowbox.md",
+      "sha256": "8cfccb0648f78c43274018dbfa57814410c6f2f1826869f6b0e78b824b4287c8"
+    },
+    {
+      "path": "docs/design/design-system-strategy.md",
+      "sha256": "933591ca17f856a79a6165d3a4fe30df9d59f12c6e83dc7bedd0272f049ba2d9"
+    },
+    {
+      "path": "docs/design/experience-foundation.md",
+      "sha256": "cc557a50f478fd6ea89186e315e50002e555477dcbd352aa03e4d7ac969b5f2c"
+    },
+    {
+      "path": "docs/design/portal-foundation/v1/structure.md",
+      "sha256": "04cc60aebf287c458bea5127de1ac29b729b4f4a6635e7ed4d6c24ce6a7c6cba"
+    },
+    {
+      "path": "docs/design/portal-system/v1/concepts/attention-workspace.prompt.txt",
+      "sha256": "7f0acc0e68bbedcd6b1a11236c536e66d9ccc884980f29f065f1a744db4af6f6"
+    },
+    {
+      "path": "docs/design/portal-system/v1/concepts/focus-and-context.prompt.txt",
+      "sha256": "ac8c396b63934d5a1452d9cf0b5a97e6b3369ed412887555cf539d0e5a360139"
+    },
+    {
+      "path": "docs/design/portal-system/v1/concepts/manifest.json",
+      "sha256": "7665fb8e8fb1769a21b6f612c635a8160434be800abd5a99d662928b8b6b7a2f"
+    },
+    {
+      "path": "docs/design/portal-system/v1/concepts/outcome-briefing.prompt.txt",
+      "sha256": "47f609cfde91ce2960c28e0723ba7792f0962c3c556ac8d5d5a6dbb4e1b1bef4"
+    },
+    {
+      "path": "docs/design/portal-system/v1/concepts/review-record.md",
+      "sha256": "8a127630d0c3f64c2a886c82a01d1407c204cbb34c56821d848c64acbb4b848d"
+    },
+    {
+      "path": "docs/design/portal-system/v1/system-profile.md",
+      "sha256": "5997605cc818944362eaa5597af088e59daece99b8f042834974ac57f2de8ea5"
+    },
+    {
+      "path": "docs/design/portal-system/v1/view-intents.md",
+      "sha256": "862c7f429c749d7578a8733f6384450e28b91ba0adbbe2a7d9acd96ac90c08ae"
+    },
+    {
+      "path": "docs/design/portal-system/v1/work-record.md",
+      "sha256": "5694b9a9b125645ab11e72fa0d263448cfa9f98349e5091e20b671664e12c415"
+    },
+    {
+      "path": "docs/design/process/design-system-profile-template.md",
+      "sha256": "0d6b87c990f1508b4085f9521bf18f189af7860dec20b6ac5e64e50997ea3ceb"
+    },
+    {
+      "path": "docs/design/process/operating-procedure.md",
+      "sha256": "cdc8770f7cbef372dd7bad8190972102dc1a7a17a68c7d4e5917801be1e483a4"
+    },
+    {
+      "path": "docs/design/process/work-record-template.md",
+      "sha256": "7dc37573aa359659f51249eee89ff1a74cc9b36fe6eacd0442402f63b83cc947"
+    },
+    {
+      "path": "docs/design/product-development-workflow.md",
+      "sha256": "d01a995564d58b3083de4bc66ae7050eda230b842c08b8e7eb8317f147b524d0"
+    },
+    {
+      "path": "docs/evidence/d-01b-v4/overview.png",
+      "sha256": "daaa276625244677a215c43515a79b6641aa46dfc5e97378b671995bfe8061be"
+    },
+    {
+      "path": "docs/evidence/d-01f-md3-landscape.md",
+      "sha256": "a61810aa475cfba7f7b846e2d63647d3dbf1cdc191993b2f629ee43f943066b5"
+    },
+    {
+      "path": "docs/execution-plan.md",
+      "sha256": "678bd3e823a1cfe265e43833baffbe31ae21752d592e974709b9c53927792895"
+    },
+    {
+      "path": "docs/knowledge-strategy.md",
+      "sha256": "2f00466cc381f8333ac32640cb0678bb8c7b15a70ff6d5c9bf480a51261f8b45"
+    },
+    {
+      "path": "docs/product-system-framework.md",
+      "sha256": "17e79fe8c19fe9f8ea115a48820ba0c078052125c990a332a64db8f011ad1077"
+    },
+    {
+      "path": "docs/product.md",
+      "sha256": "796855c064f73cb6d7dfd69b6156aeb5abf2c6fe0844ba43e3512b68f714cb65"
+    },
+    {
+      "path": "docs/roadmap.md",
+      "sha256": "75e3968292b63292e790c215ec6e33d7c40f466313648fef592613a8b6cb163c"
+    },
+    {
+      "path": "docs/status.md",
+      "sha256": "89684f69e322705950a15c7d202595b4ae078e064160ec4c09c49a8ad972c3b7"
+    },
+    {
+      "path": "docs/system/borrowbox.json",
+      "sha256": "d3e96d7ac11b0993e477608b4221094fe5bf7a556bd9b8424a18ec1d424ddf6a"
+    },
+    {
+      "path": "docs/system/borrowbox.md",
+      "sha256": "2641fbf6960f6bf8ff4f946f08f920b6203704adc7838fc8d0287d6b2d808dc6"
+    },
+    {
+      "path": "docs/system/capabilities.json",
+      "sha256": "740377a4346af7e0f48aa881de8b87a3fe9e4b176fd93e55a05d696888c91687"
+    },
+    {
+      "path": "docs/system/the-machine.json",
+      "sha256": "246b03e73c8c4eadbc2adb17afdbfe23cfa575a2bade53ae2aa393a995ee846e"
+    },
+    {
+      "path": "docs/system/the-machine.md",
+      "sha256": "ad4c2332896a7017930cbe0945424279a3b22f8177ea4ff7f2cfe3a00745a23e"
+    },
+    {
+      "path": "docs/tool-ecosystem.md",
+      "sha256": "dadf57df80677a1039adb658120bdb6d04eb1f83d8144829a8649687450ee8e8"
+    },
+    {
+      "path": "tools/check_product_system.py",
+      "sha256": "2ab9628fea46e6e6cefa2820750bb6de63e0fd29c63f9811163fd8b54ab3d12a"
+    }
+  ]
+}

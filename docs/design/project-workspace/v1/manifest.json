@@ -1,0 +1,200 @@
+{
+  "id": "project-workspace-strategy-v1",
+  "date": "2026-09-20",
+  "scope": "Agent-authored strategic groundwork; owner structural selection pending",
+  "request": "REQ-53291e13-d7d6-4007-b100-7f2b46f8c897",
+  "proposal": {
+    "id": "PROP-22d2e9e3-8f0a-4d7e-8b2e-a53d9665c1f8",
+    "revision": 2
+  },
+  "work": "WORK-17d6c61a-3b7f-4a58-a382-f67f9e5c6a3b",
+  "sourceNote": "Final inspected source identities, including explicitly updated closeout records; not a claim of a Git commit or pristine pre-task snapshot. Portal snapshot/event history identifies authorized input revisions.",
+  "sources": [
+    {
+      "path": "docs/product.md",
+      "sha256": "57b5c752c6748535d6645a5ce425d38eb361ed0b51e1c4ed20864fbedfe12b24"
+    },
+    {
+      "path": "docs/architecture.md",
+      "sha256": "3d41c0d241178e3153ba36b4f6a1ef7540f9a29a26d81d418039a1a054c98eb7"
+    },
+    {
+      "path": "docs/knowledge-strategy.md",
+      "sha256": "2f6375400070896c456918b35f551445e4b9450d9bc0bbdab0da72594ee46235"
+    },
+    {
+      "path": "docs/product-system-framework.md",
+      "sha256": "17e79fe8c19fe9f8ea115a48820ba0c078052125c990a332a64db8f011ad1077"
+    },
+    {
+      "path": "docs/system/the-machine.json",
+      "sha256": "1c568b216ceb176254bea8c0620cbc6388c32f58bc4177a761636f8383f64303"
+    },
+    {
+      "path": "docs/system/borrowbox.json",
+      "sha256": "d3e96d7ac11b0993e477608b4221094fe5bf7a556bd9b8424a18ec1d424ddf6a"
+    },
+    {
+      "path": "docs/system/capabilities.json",
+      "sha256": "740377a4346af7e0f48aa881de8b87a3fe9e4b176fd93e55a05d696888c91687"
+    },
+    {
+      "path": "docs/tool-ecosystem.md",
+      "sha256": "943606db897157e8bfecc5329160539de9fe3bbc13fb288e3c2cb8e6ced4362d"
+    },
+    {
+      "path": "docs/roadmap.md",
+      "sha256": "3382eaa061767203bb0c166cde112976a8703f70a06b7bde6c577d82024708f2"
+    },
+    {
+      "path": "docs/execution-plan.md",
+      "sha256": "31338943db559adbdcb86a8cf259285f90201c3dc5c3f66d2d09055c1d87d994"
+    },
+    {
+      "path": "docs/status.md",
+      "sha256": "c01f0785d9cd87de97d7ad37542d3c0f9f70adf2a1632944d1ae9d02de297d59"
+    },
+    {
+      "path": "docs/decisions.md",
+      "sha256": "71d545fa07fb23f41149abfdfbbee80129272492eb1e1e44db00356251d6456d"
+    },
+    {
+      "path": "docs/design/product-development-workflow.md",
+      "sha256": "1a402c7c888094063f4d80642dc70d5d5b779c855d8793c94884792c750b525f"
+    },
+    {
+      "path": "docs/design/experience-foundation.md",
+      "sha256": "1ecea163fb8190600c961201d9cb04b8a5479de9755175a6d39aeaf321ad521b"
+    },
+    {
+      "path": "docs/design/process/operating-procedure.md",
+      "sha256": "4bba195a78673e32939c5e3a590c4814bc388f6994d14f7d48ba974649532564"
+    },
+    {
+      "path": "docs/design/process/portal-operator.md",
+      "sha256": "cf62950e10fa288d74726e20746ca48fd4abceac9ce8e0f4fcdd5c867cf223e6"
+    },
+    {
+      "path": "docs/design/portal-system/v3/system-profile.md",
+      "sha256": "79e1ae802cc84f16465057f9d60694da2fda04b8906ab22e881b302ae00a47c2"
+    },
+    {
+      "path": "docs/design/portal-system/v3/catalog.json",
+      "sha256": "dc01133c946acab3fc19de286d3948d040417b6fe7db7a4377507b0b200bc5aa"
+    },
+    {
+      "path": "docs/design/portal-system/v3/review-record.md",
+      "sha256": "e34ec75fe9e47e7837471ac03286207372ba7154a42cfd753ede3f655176b61d"
+    },
+    {
+      "path": "docs/design/demo-app/borrowbox.md",
+      "sha256": "8cfccb0648f78c43274018dbfa57814410c6f2f1826869f6b0e78b824b4287c8"
+    },
+    {
+      "path": "apps/portal/server/storage.mjs",
+      "sha256": "b1024763c3b3692ee4e56fda0f1f05fa36abe45f79863949e1665170e786392d"
+    },
+    {
+      "path": "apps/portal/server/importer.mjs",
+      "sha256": "c8e55eb3875654f905aa5d3239ef4ba37f54fe6c5cd2214e5c1bedafbfd277cd"
+    },
+    {
+      "path": "apps/portal/server/product-records.mjs",
+      "sha256": "6e1eb19cbc0bb18639a4046240c240bbc35cae0f35a9aed34c3ceae41471b40c"
+    },
+    {
+      "path": "apps/portal/server/workflow.mjs",
+      "sha256": "cd8fa941ebb2cb0d8afb77a6355254675a880aaebf91b1fd46d017fc114965ca"
+    },
+    {
+      "path": "apps/portal/server/server.mjs",
+      "sha256": "bfbda774e70e31ec9393c3133eed262c0e427e3f63178c85112a5a6f7aec709d"
+    },
+    {
+      "path": "apps/portal/server/operator.mjs",
+      "sha256": "8bd3984aa02f2048dd534ce63da5ab94eb4f934ba0b3a911381922099e6c8e2e"
+    },
+    {
+      "path": "apps/portal/src/app.ts",
+      "sha256": "a119441aa7db1b77f8788efe739941fd8b182a72fc73bf3c9894d213a1a580a0"
+    },
+    {
+      "path": "apps/portal/src/app.html",
+      "sha256": "3abbba688bd218960b2b4080409cbb70c1190194c619512d16181e6625691c35"
+    },
+    {
+      "path": "apps/portal/tests/workflow-browser.mjs",
+      "sha256": "648faef9c51717692399361a3982da27e5963590ea0c827550d7bc4f54ba3603"
+    },
+    {
+      "path": "docs/evidence/b-03a-work-navigation.md",
+      "sha256": "d5ff84853e378059614f5ddfecb163fcd4070e577c83b5419afa73a859d8a147"
+    }
+  ],
+  "outputs": [
+    {
+      "path": "docs/design/project-workspace/v1/audit.md",
+      "sha256": "d708f09f39945248eec9edd1a4ba6509a1b03fdb5dcc5de07e010e5daf85a2d3"
+    },
+    {
+      "path": "docs/design/project-workspace/v1/board-validation.json",
+      "sha256": "cb2e6f593bfe03be90d9a231f9925d31813cfd06f850e59110490985d393dc49"
+    },
+    {
+      "path": "docs/design/project-workspace/v1/contracts.md",
+      "sha256": "fce9d1999410617932f99206d87c468bdb283a8b6d69a39e8dd84886308720f2"
+    },
+    {
+      "path": "docs/design/project-workspace/v1/delivery-plan.md",
+      "sha256": "74f6cb4d6db3b00d17742884cbdfbce22a2f9bd439bf736d45ee1aa1b4a4e1e6"
+    },
+    {
+      "path": "docs/design/project-workspace/v1/journeys.md",
+      "sha256": "7e63539afd56e91da6f2c1326550036765a96b5317872c96f1a6982d6b23735e"
+    },
+    {
+      "path": "docs/design/project-workspace/v1/review-narrow.png",
+      "sha256": "804158df20020ce4ef4bca2e0686a32254f0a6ce1d61ca54e84566bf40430e61"
+    },
+    {
+      "path": "docs/design/project-workspace/v1/review-wide.png",
+      "sha256": "75227e6461039253a86a69edf37c4b80c4717a5465c8e83e1dcebbab951fb030"
+    },
+    {
+      "path": "docs/design/project-workspace/v1/review.html",
+      "sha256": "a3396eee6d8c0e8c9418099c02951700ade2f0aa4ce941e0958ddace70398c72"
+    },
+    {
+      "path": "docs/design/project-workspace/v1/structure.md",
+      "sha256": "8599ecb627e72408737f768bf1d65cc2fe82f71cdc320da35297efc2d19791fb"
+    },
+    {
+      "path": "docs/design/project-workspace/v1/work-record.md",
+      "sha256": "8178049c901e188830581156841e7f944cf241dfe4224fa30518667584483583"
+    },
+    {
+      "path": "docs/design/project-workspace/v1/link-validation.json",
+      "sha256": "9f90325f47cc72d364c3b2b8b98e2040f9cb343d6fb0509174cbc16e8dbb2c62"
+    }
+  ],
+  "navigationBuild": [
+    {
+      "path": "apps/portal/dist/assets/index-DAXk6Ysm.css",
+      "sha256": "157cac5be677a2a9a4d51fafe9914e26cfa96ce0de59fcac274fda570df6d3e1"
+    },
+    {
+      "path": "apps/portal/dist/assets/index-DjExr7Yv.js",
+      "sha256": "a2170dd1f7b935f04e18469837bd9d0c796d47343e9a5bcc60e28822bc93f333"
+    }
+  ],
+  "navigationScreenshots": [
+    {
+      "path": "docs/evidence/b-03a-work-navigation/wide.png",
+      "sha256": "f62bbe314b6aca705f563e7dbb4f3f2b2cdce7cbabf656eecd06fab9b2691366"
+    },
+    {
+      "path": "docs/evidence/b-03a-work-navigation/narrow.png",
+      "sha256": "6af8da4b5c87704463ad6b6fb9876402c325f5cc2291b82e1888ef3d16376a20"
+    }
+  ]
+}

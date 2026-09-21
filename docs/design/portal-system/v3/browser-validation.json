@@ -1,0 +1,56 @@
+{
+  "date": "2026-09-19",
+  "browser": "130.0.6723.31",
+  "viewport": {
+    "width": 1487,
+    "height": 1058
+  },
+  "checks": [
+    {
+      "name": "Overview desktop: selected hierarchy, three decision rows, four tasks, honest preview",
+      "status": "passed"
+    },
+    {
+      "name": "Zero, one, twenty and unavailable decision counts",
+      "status": "passed"
+    },
+    {
+      "name": "Decision save is explicit, stays on record, preserves remaining dependency",
+      "status": "passed"
+    },
+    {
+      "name": "Failed and conflicting saves retain draft; conflict requires explicit re-review",
+      "status": "passed"
+    },
+    {
+      "name": "Collection filter, browser return, scroll and deep-link fallback",
+      "status": "passed"
+    },
+    {
+      "name": "Request draft survives navigation/reload; failed save and discard dialog focus",
+      "status": "passed"
+    },
+    {
+      "name": "Request happy path creates local fixture without starting work",
+      "status": "passed"
+    },
+    {
+      "name": "Keyboard reaches and answers a decision",
+      "status": "passed"
+    },
+    {
+      "name": "Narrow Overview and detail, readable navigation, no horizontal overflow",
+      "status": "passed"
+    },
+    {
+      "name": "Semantic primary token propagates to app link and Material button",
+      "status": "passed"
+    }
+  ],
+  "errors": [],
+  "limitations": [
+    "Synthetic browser-local persistence; no server races or integrations",
+    "Automated axe subset and keyboard checks, not full screen-reader audit",
+    "Owner usability and adjacent page acceptance remain open"
+  ]
+}

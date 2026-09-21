@@ -1,0 +1,173 @@
+{
+  "date": "2026-09-19",
+  "runtime": "Node 24.15.0 (isolated /tmp runtime)",
+  "packages": [
+    {
+      "package": "@angular/animations",
+      "version": "22.1.7",
+      "license": "MIT",
+      "role": "dependencies"
+    },
+    {
+      "package": "@angular/common",
+      "version": "22.1.7",
+      "license": "MIT",
+      "role": "dependencies"
+    },
+    {
+      "package": "@angular/compiler",
+      "version": "22.1.7",
+      "license": "MIT",
+      "role": "dependencies"
+    },
+    {
+      "package": "@angular/core",
+      "version": "22.1.7",
+      "license": "MIT",
+      "role": "dependencies"
+    },
+    {
+      "package": "@angular/forms",
+      "version": "22.1.7",
+      "license": "MIT",
+      "role": "dependencies"
+    },
+    {
+      "package": "@angular/platform-browser",
+      "version": "22.1.7",
+      "license": "MIT",
+      "role": "dependencies"
+    },
+    {
+      "package": "@angular/router",
+      "version": "22.1.7",
+      "license": "MIT",
+      "role": "dependencies"
+    },
+    {
+      "package": "@angular/cdk",
+      "version": "22.1.7",
+      "license": "MIT",
+      "role": "dependencies"
+    },
+    {
+      "package": "@angular/material",
+      "version": "22.1.7",
+      "license": "MIT",
+      "role": "dependencies"
+    },
+    {
+      "package": "rxjs",
+      "version": "7.8.2",
+      "license": "Apache-2.0",
+      "role": "dependencies"
+    },
+    {
+      "package": "zone.js",
+      "version": "0.16.3",
+      "license": "MIT",
+      "role": "dependencies"
+    },
+    {
+      "package": "@fontsource/roboto",
+      "version": "5.3.0",
+      "license": "OFL-1.1",
+      "role": "dependencies"
+    },
+    {
+      "package": "material-symbols",
+      "version": "0.40.2",
+      "license": "Apache-2.0",
+      "role": "dependencies"
+    },
+    {
+      "package": "@angular/build",
+      "version": "22.1.7",
+      "license": "MIT",
+      "role": "devDependencies"
+    },
+    {
+      "package": "@angular/cli",
+      "version": "22.1.7",
+      "license": "MIT",
+      "role": "devDependencies"
+    },
+    {
+      "package": "@angular/compiler-cli",
+      "version": "22.1.7",
+      "license": "MIT",
+      "role": "devDependencies"
+    },
+    {
+      "package": "@angular-devkit/core",
+      "version": "22.1.7",
+      "license": "MIT",
+      "role": "devDependencies"
+    },
+    {
+      "package": "@angular-devkit/architect",
+      "version": "0.2201.7",
+      "license": "MIT",
+      "role": "devDependencies"
+    },
+    {
+      "package": "@analogjs/vite-plugin-angular",
+      "version": "2.7.2",
+      "license": "MIT",
+      "role": "devDependencies"
+    },
+    {
+      "package": "@storybook/angular-vite",
+      "version": "10.6.0",
+      "license": "MIT",
+      "role": "devDependencies"
+    },
+    {
+      "package": "@storybook/addon-a11y",
+      "version": "10.6.0",
+      "license": "MIT",
+      "role": "devDependencies"
+    },
+    {
+      "package": "storybook",
+      "version": "10.6.0",
+      "license": "MIT",
+      "role": "devDependencies"
+    },
+    {
+      "package": "vite",
+      "version": "8.3.0",
+      "license": "MIT",
+      "role": "devDependencies"
+    },
+    {
+      "package": "typescript",
+      "version": "6.0.3",
+      "license": "Apache-2.0",
+      "role": "devDependencies"
+    },
+    {
+      "package": "sass",
+      "version": "1.104.1",
+      "license": "MIT",
+      "role": "devDependencies"
+    },
+    {
+      "package": "less",
+      "version": "4.9.1",
+      "license": "Apache-2.0",
+      "role": "devDependencies"
+    },
+    {
+      "package": "axe-core",
+      "version": "4.13.0",
+      "license": "MPL-2.0",
+      "role": "devDependencies"
+    }
+  ],
+  "sources": [
+    "https://angular.dev/reference/versions",
+    "https://storybook.js.org/docs/get-started/frameworks/angular-vite"
+  ],
+  "note": "Exact resolution and integrity are in prototypes/d-01f/package-lock.json. License inventory covers direct dependencies; transitive notices remain in installed packages."
+}

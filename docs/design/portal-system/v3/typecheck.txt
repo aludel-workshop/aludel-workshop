@@ -1,0 +1,4 @@
+
+> machine-md3-foundation-trial@0.1.0 typecheck
+> ngc -p tsconfig.app.json --noEmit
+

@@ -1,0 +1,779 @@
+{
+  "id": "the-machine",
+  "kind": "product-project",
+  "revision": 6,
+  "catalog_revision": 1,
+  "status": "bootstrap-project-map",
+  "constraints": [
+    "single owner",
+    "no incremental spending",
+    "production phase transition remains gated"
+  ],
+  "allocations": [
+    {
+      "capability": "C01",
+      "usage": "experience",
+      "output": "Intent, constraints and measurable success",
+      "current": {
+        "state": "manual",
+        "summary": "See evidence; provision applies only to its recorded scope.",
+        "evidence": [
+          "docs/product.md",
+          "docs/design/project-workspace/v1/audit.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "owner-approved product record"
+        ],
+        "providers": [
+          "Repository product brief"
+        ],
+        "adoption": "adopted"
+      },
+      "gap": "No native direction/outcome editor; source text is not a structured product record",
+      "next_evidence": "D-02R \u2192 PW-02",
+      "required_by": "M1"
+    },
+    {
+      "capability": "C02",
+      "usage": "delivery",
+      "output": "Findings with provenance and uncertainty",
+      "current": {
+        "state": "manual",
+        "summary": "See evidence; provision applies only to its recorded scope.",
+        "evidence": [
+          "docs/research.md",
+          "docs/design/project-workspace/v1/audit.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "versioned research record"
+        ],
+        "providers": [
+          "Primary sources",
+          "Repository evidence"
+        ],
+        "adoption": "adopted"
+      },
+      "gap": "Sources available as imported documents; research authoring/expiry and typed evidence relations remain incomplete",
+      "next_evidence": "D-02R \u2192 PW-03",
+      "required_by": "M1"
+    },
+    {
+      "capability": "C03",
+      "usage": "delivery",
+      "output": "Versioned product records and relations",
+      "current": {
+        "state": "verified",
+        "summary": "Local portal persists versioned proposals and decisions, exact dependency bindings, owner requests, and immutable imported sources.",
+        "evidence": [
+          "docs/evidence/b-02-product-records.md",
+          "docs/design/project-workspace/v1/audit.md"
+        ],
+        "verification_scope": "B-02 local proposal/decision revisioning, conflicts, dependency currency, import, search, and restart persistence"
+      },
+      "target": {
+        "authorities": [
+          "project domain API and database (target)"
+        ],
+        "providers": [
+          "SQLite local adapter",
+          "PostgreSQL hosted candidate"
+        ],
+        "adoption": "adopted"
+      },
+      "gap": "Supervised work exists; native product/plan/design records, reviewed reconciliation and immutable artifact/review schemas remain",
+      "next_evidence": "D-02R \u2192 PW-01; B-03",
+      "required_by": "M1"
+    },
+    {
+      "capability": "C04",
+      "usage": "experience",
+      "output": "Stories, view intents and transitions",
+      "current": {
+        "state": "experiment",
+        "summary": "See evidence; provision applies only to its recorded scope.",
+        "evidence": [
+          "docs/design/portal-system/v1/view-intents.md",
+          "docs/design/portal-system/v3/work-record.md",
+          "docs/design/portal-system/v3/review-record.md",
+          "docs/design/project-workspace/v1/audit.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "owner-reviewed experience contracts"
+        ],
+        "providers": [
+          "View-intent map",
+          "Concept review"
+        ],
+        "adoption": "trial-selected"
+      },
+      "gap": "Current foundation accepted within historical scope; new Product/Design/Work structure requires scoped selection",
+      "next_evidence": "D-02R \u2192 D-03",
+      "required_by": "M1"
+    },
+    {
+      "capability": "C05",
+      "usage": "experience",
+      "output": "Principles, patterns and deviation profile",
+      "current": {
+        "state": "experiment",
+        "summary": "See evidence; provision applies only to its recorded scope.",
+        "evidence": [
+          "docs/design/portal-system/v1/system-profile.md",
+          "docs/design/portal-system/v3/system-profile.md",
+          "docs/design/portal-system/v3/review-record.md",
+          "docs/design/project-workspace/v1/audit.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "product-owned system profile"
+        ],
+        "providers": [
+          "MD3 guidance"
+        ],
+        "adoption": "selected-direction"
+      },
+      "gap": "MD3 foundation selected; live design registry and source/current-catalog reconciliation remain",
+      "next_evidence": "PW-03",
+      "required_by": "M1"
+    },
+    {
+      "capability": "C06",
+      "usage": "runtime",
+      "output": "Implemented reusable UI assets",
+      "current": {
+        "state": "partial",
+        "summary": "Four reusable Angular Material-based patterns assembled into a bounded MD3 Overview and supporting flows. Not production adoption.",
+        "evidence": [
+          "docs/design/portal-system/v3/catalog.json",
+          "docs/design/portal-system/v3/system-profile.md",
+          "docs/design/portal-system/v3/review-record.md",
+          "docs/design/project-workspace/v1/audit.md",
+          "docs/evidence/b-01-local-foundation.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "product repository component source"
+        ],
+        "providers": [
+          "Angular Material 22.1.7",
+          "Product-owned patterns"
+        ],
+        "adoption": "adopted"
+      },
+      "gap": "Angular/Material adopted locally; incubating source patterns need current catalog reconciliation and new-view readiness",
+      "next_evidence": "D-03; PW-03",
+      "required_by": "M1"
+    },
+    {
+      "capability": "C07",
+      "usage": "delivery",
+      "output": "Inspectable component states and usage contracts",
+      "current": {
+        "state": "verified",
+        "summary": "Storybook 10.6 builds explicit populated and empty source stories for the real knowledge-list component.",
+        "evidence": [
+          "docs/evidence/b-01-local-foundation.md",
+          "docs/design/project-workspace/v1/audit.md"
+        ],
+        "verification_scope": "B-01 static source-story build with docgen-off fallback"
+      },
+      "target": {
+        "authorities": [
+          "component source, stories and contracts"
+        ],
+        "providers": [
+          "Storybook",
+          "Optional Storybook MCP"
+        ],
+        "adoption": "adopted"
+      },
+      "gap": "Explicit stories adopted; automatic docgen fallback and project asset discovery remain gaps",
+      "next_evidence": "PW-03",
+      "required_by": "M1"
+    },
+    {
+      "capability": "C08",
+      "usage": "delivery",
+      "output": "Identified source revision and reviewed diff",
+      "current": {
+        "state": "partial",
+        "summary": "Vendor-owned GitHub App authorization/installation, recoverable repository creation, configured Git policy, and per-operation installation-token pushes pass local and mocked checks; no live GitHub repository exists yet.",
+        "evidence": [
+          "docs/design/process/enterprise-github-app-work-record.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "source repository revision"
+        ],
+        "providers": [
+          "Portal Git profile",
+          "Vendor GitHub App"
+        ],
+        "adoption": "adopted"
+      },
+      "gap": "Installation-token flow is locally/mocked verified; owner must complete the first live install/create/push, and reviewed diff/PR behavior remains pending",
+      "next_evidence": "B-03",
+      "required_by": "M1"
+    },
+    {
+      "capability": "C09",
+      "usage": "delivery",
+      "output": "Authorized task revision and permitted effects",
+      "current": {
+        "state": "verified",
+        "summary": "Supervised local task scope, owner authorization, operator claims and event lifecycle checked; owner real request/authorization observed.",
+        "verification_scope": "B-03A bounded local bridge and two-item navigation; no automated worker or full review acceptance",
+        "evidence": [
+          "docs/evidence/b-03a-supervised-cycle.md",
+          "docs/evidence/b-03a-work-navigation.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "project authorization operation"
+        ],
+        "providers": [
+          "Owner review",
+          "Portal domain API target"
+        ],
+        "adoption": "selected-direction"
+      },
+      "gap": "Supervised authorization checked; plan/history readiness and automated immutable input/lease protocol remain",
+      "next_evidence": "PW-01; B-03",
+      "required_by": "M1"
+    },
+    {
+      "capability": "C10",
+      "usage": "delivery",
+      "output": "Execution queue state and optional external mappings",
+      "current": {
+        "state": "none",
+        "summary": "See evidence; provision applies only to its recorded scope.",
+        "evidence": [
+          "docs/decisions.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "tracker native issue fields and connector mapping"
+        ],
+        "providers": [
+          "Linear",
+          "Portal connector target"
+        ],
+        "adoption": "selected-direction"
+      },
+      "gap": "No account integration; portal intent is not tracker-owned",
+      "next_evidence": "B-03",
+      "required_by": "M1"
+    },
+    {
+      "capability": "C11",
+      "usage": "delivery",
+      "output": "Durable attempts, leases and reconciled effects",
+      "current": {
+        "state": "experiment",
+        "summary": "See evidence; provision applies only to its recorded scope.",
+        "evidence": [
+          "docs/evidence/r-05-recovery.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "project coordination records"
+        ],
+        "providers": [
+          "Local gateway target",
+          "Symphony",
+          "Fake-provider harness"
+        ],
+        "adoption": "selected-direction"
+      },
+      "gap": "Fake-provider recovery is not real connector/concurrency proof",
+      "next_evidence": "B-03",
+      "required_by": "M1"
+    },
+    {
+      "capability": "C12",
+      "usage": "delivery",
+      "output": "Bounded run, isolated workspace and result",
+      "current": {
+        "state": "experiment",
+        "summary": "See evidence; provision applies only to its recorded scope.",
+        "evidence": [
+          "docs/evidence/r-03-local-codex.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "run result in bounded workspace"
+        ],
+        "providers": [
+          "Codex local execution",
+          "Symphony integration target"
+        ],
+        "adoption": "selected-direction"
+      },
+      "gap": "Local execution observed; dispatched portal run/isolation integration pending",
+      "next_evidence": "B-03",
+      "required_by": "M1"
+    },
+    {
+      "capability": "C13",
+      "usage": "delivery",
+      "output": "Component, domain and integrated acceptance evidence",
+      "current": {
+        "state": "partial",
+        "summary": "See evidence; provision applies only to its recorded scope.",
+        "evidence": [
+          "docs/evidence/b-02-product-records.md",
+          "docs/evidence/b-03a-work-navigation.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "versioned check result for exact inputs"
+        ],
+        "providers": [
+          "Playwright",
+          "Storybook checks proposed",
+          "Domain tests proposed"
+        ],
+        "adoption": "trial-selected"
+      },
+      "gap": "Domain and browser checks exist; multi-record route regression now applied; new workspace flows need scoped tests",
+      "next_evidence": "D-03; B-03",
+      "required_by": "M1"
+    },
+    {
+      "capability": "C14",
+      "usage": "delivery",
+      "output": "Immutable artifact manifest and retrievable bytes",
+      "current": {
+        "state": "partial",
+        "summary": "See evidence; provision applies only to its recorded scope.",
+        "evidence": [
+          "docs/knowledge-strategy.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "artifact manifest and immutable bytes"
+        ],
+        "providers": [
+          "Local evidence files",
+          "Object storage target"
+        ],
+        "adoption": "candidate"
+      },
+      "gap": "Retention/access/digest binding across runtime unimplemented",
+      "next_evidence": "B-03",
+      "required_by": "M1"
+    },
+    {
+      "capability": "C15",
+      "usage": "delivery",
+      "output": "Identified accessible candidate with lifecycle",
+      "current": {
+        "state": "experiment",
+        "summary": "See evidence; provision applies only to its recorded scope.",
+        "evidence": [
+          "docs/evidence/r-04a-preview-options.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "preview operation and provider deployment identity"
+        ],
+        "providers": [
+          "Local static preview",
+          "Cloudflare Pages trial"
+        ],
+        "adoption": "trial-selected"
+      },
+      "gap": "External hosted trial requires authorization; immutable hosting unproven",
+      "next_evidence": "R-04B",
+      "required_by": "M1"
+    },
+    {
+      "capability": "C16",
+      "usage": "delivery",
+      "output": "Owner judgment tied to artifact and input revisions",
+      "current": {
+        "state": "manual",
+        "summary": "See evidence; provision applies only to its recorded scope.",
+        "evidence": [
+          "docs/evidence/d-01b-prototype-review.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "owner acceptance record"
+        ],
+        "providers": [
+          "Repository review ledger",
+          "Portal review target"
+        ],
+        "adoption": "adopted"
+      },
+      "gap": "Runtime review binding and required evidence threshold Q-005 pending",
+      "next_evidence": "B-03",
+      "required_by": "M1"
+    },
+    {
+      "capability": "C17",
+      "usage": "runtime",
+      "output": "Working accessible routes and stateful navigation",
+      "current": {
+        "state": "verified",
+        "summary": "Angular portal with real source/proposal/decision/work routes; Work collection/detail repair checked.",
+        "evidence": [
+          "docs/design/portal-foundation/v1/structure.md",
+          "docs/design/project-workspace/v1/audit.md",
+          "docs/evidence/b-01-local-foundation.md",
+          "docs/evidence/b-03a-work-navigation.md"
+        ],
+        "verification_scope": "Local single-project routes and two-item Work return/reload; no claim of complete workspace or multi-project correctness"
+      },
+      "target": {
+        "authorities": [
+          "project application source"
+        ],
+        "providers": [
+          "Angular/Material local portal"
+        ],
+        "adoption": "adopted"
+      },
+      "gap": "Local routes implemented; two-item Work navigation corrected; broader structure and multiple-project navigation pending",
+      "next_evidence": "D-02R \u2192 D-03; PW-01",
+      "required_by": "M1"
+    },
+    {
+      "capability": "C18",
+      "usage": "runtime",
+      "output": "Validated product operations and invariants",
+      "current": {
+        "state": "verified",
+        "summary": "Transactional domain operations enforce immutable revisions, optimistic conflicts, scoped staleness, and explicit reassessment.",
+        "evidence": [
+          "docs/evidence/b-02-product-records.md",
+          "docs/design/project-workspace/v1/audit.md",
+          "docs/evidence/b-03a-supervised-cycle.md"
+        ],
+        "verification_scope": "B-02 local proposal, decision, and dependency operations only"
+      },
+      "target": {
+        "authorities": [
+          "project domain operations"
+        ],
+        "providers": [
+          "Local domain API"
+        ],
+        "adoption": "adopted"
+      },
+      "gap": "Supervised work operations implemented; project-scoped APIs, product object authoring and immutable artifact acceptance remain",
+      "next_evidence": "PW-01; B-03",
+      "required_by": "M1"
+    },
+    {
+      "capability": "C19",
+      "usage": "runtime",
+      "output": "Durable scoped data and migration contracts",
+      "current": {
+        "state": "verified",
+        "summary": "SQLite local adapter passed relational import, changed-source revision, search, durable request, and restart checks.",
+        "evidence": [
+          "docs/evidence/b-01-local-foundation.md",
+          "docs/design/project-workspace/v1/audit.md"
+        ],
+        "verification_scope": "Single-owner loopback B-01 persistence; not hosted concurrency or PostgreSQL equivalence"
+      },
+      "target": {
+        "authorities": [
+          "project database operations"
+        ],
+        "providers": [
+          "SQLite local adapter",
+          "PostgreSQL hosted candidate"
+        ],
+        "adoption": "adopted"
+      },
+      "gap": "Single-project local persistence verified; multi-project scope, reviewed domain migration, backups and hosted equivalence unproven",
+      "next_evidence": "D-03 \u2192 PW-01",
+      "required_by": "M1"
+    },
+    {
+      "capability": "C20",
+      "usage": "runtime",
+      "output": "Authenticated operations and scoped credentials references",
+      "current": {
+        "state": "verified",
+        "summary": "Loopback owner setup uses a scrypt digest and HttpOnly SameSite session; the vendor GitHub App uses deployment-managed credentials, encrypted user tokens, PKCE/state validation, verified installations, and ephemeral installation tokens.",
+        "evidence": [
+          "docs/evidence/b-01-local-foundation.md",
+          "docs/design/process/enterprise-github-app-work-record.md"
+        ],
+        "verification_scope": "Single-owner local loopback access plus locally/mocked GitHub credential flow; no live GitHub account or hosted identity trial"
+      },
+      "target": {
+        "authorities": [
+          "project access policy and connection operations"
+        ],
+        "providers": [
+          "Local owner key/session",
+          "Encrypted user-token vault",
+          "Deployment-managed vendor GitHub App",
+          "Per-operation installation tokens"
+        ],
+        "adoption": "adopted"
+      },
+      "gap": "Live GitHub authorization/refresh/revocation, platform-native secret storage, internet-facing identity and multi-user policy remain unproven",
+      "next_evidence": "B-03",
+      "required_by": "M1"
+    },
+    {
+      "capability": "C21",
+      "usage": "delivery",
+      "output": "Promoted artifact, health and independent recovery",
+      "current": {
+        "state": "deferred",
+        "summary": "See evidence; provision applies only to its recorded scope.",
+        "evidence": [
+          "docs/architecture.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "separate owner release operation"
+        ],
+        "providers": [
+          "Provider adapter undecided",
+          "Independent recovery path"
+        ],
+        "adoption": "deferred"
+      },
+      "gap": "M2: prove accepted artifact promotion and data-aware rollback",
+      "next_evidence": "M2 gate",
+      "required_by": "M2"
+    },
+    {
+      "capability": "C22",
+      "usage": "runtime",
+      "output": "Available environments and correlated operational evidence",
+      "current": {
+        "state": "verified",
+        "summary": "One-command build/serve launches the real portal on loopback with persistent local data.",
+        "evidence": [
+          "docs/evidence/b-01-local-foundation.md"
+        ],
+        "verification_scope": "Owner-operated loopback environment only"
+      },
+      "target": {
+        "authorities": [
+          "project environment configuration and runtime health"
+        ],
+        "providers": [
+          "Node loopback local environment",
+          "Cloudflare/Supabase proposals"
+        ],
+        "adoption": "adopted"
+      },
+      "gap": "Hosted portal/API/database operations and external preview path remain unproven and unauthorized",
+      "next_evidence": "B-03",
+      "required_by": "M1"
+    },
+    {
+      "capability": "C23",
+      "usage": "experience",
+      "output": "Feedback linked to outcomes and follow-up decisions",
+      "current": {
+        "state": "manual",
+        "summary": "See evidence; provision applies only to its recorded scope.",
+        "evidence": [
+          "docs/evidence/d-01-design-retrospective.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "project observation and outcome records"
+        ],
+        "providers": [
+          "Owner feedback",
+          "Retrospectives"
+        ],
+        "adoption": "candidate"
+      },
+      "gap": "Runtime telemetry/outcome link not implemented; later measured loop",
+      "next_evidence": "M3 gate",
+      "required_by": "M3"
+    },
+    {
+      "capability": "C24",
+      "usage": "delivery",
+      "output": "Audience, distribution experiments and authorized communication",
+      "current": {
+        "state": "deferred",
+        "summary": "See evidence; provision applies only to its recorded scope.",
+        "evidence": [
+          "docs/product.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "project communication policy"
+        ],
+        "providers": [
+          "No provider selected"
+        ],
+        "adoption": "deferred"
+      },
+      "gap": "M4: actual audience/distribution need and explicit message authority",
+      "next_evidence": "M4 gate",
+      "required_by": "M4"
+    }
+  ],
+  "service_bindings": [
+    {
+      "id": "machine-develops-machine",
+      "consumer_project": "the-machine",
+      "provider_project": "the-machine",
+      "capabilities": [
+        "C09",
+        "C10",
+        "C11",
+        "C12",
+        "C14",
+        "C15",
+        "C16"
+      ],
+      "contract": "Versioned task/attempt/artifact protocol in docs/architecture.md",
+      "state": "planned",
+      "provider_revision": "accepted-deployed-revision-required; none deployed yet",
+      "candidate_revision": "separate-candidate-required",
+      "recovery": "Independent local/provider recovery path; candidate is never sole evaluator or recovery authority"
+    }
+  ],
+  "handoffs": [
+    {
+      "id": "H01",
+      "producer": "C01",
+      "consumer": "C04",
+      "payload": "Outcome + story revision",
+      "validation": "View design must identify the user job; reject layout-first work",
+      "next_evidence": "D-01F"
+    },
+    {
+      "id": "H02",
+      "producer": "C04",
+      "consumer": "C05",
+      "payload": "View intent + pattern rationale",
+      "validation": "Check design philosophy before selecting widgets",
+      "next_evidence": "D-01F"
+    },
+    {
+      "id": "H03",
+      "producer": "C05",
+      "consumer": "C06",
+      "payload": "Accepted profile + deviations + token roles",
+      "validation": "Unsupported library feature becomes explicit gap, not silent CSS patch",
+      "next_evidence": "D-01F"
+    },
+    {
+      "id": "H04",
+      "producer": "C06",
+      "consumer": "C07",
+      "payload": "Component source + named state fixtures",
+      "validation": "Workshop renders real component; do not fork demo implementation",
+      "next_evidence": "D-01F"
+    },
+    {
+      "id": "H05",
+      "producer": "C07",
+      "consumer": "C13",
+      "payload": "Stories + input/build identity",
+      "validation": "Story checks cover components only; full flow needs app checks",
+      "next_evidence": "D-01F"
+    },
+    {
+      "id": "H06",
+      "producer": "C09",
+      "consumer": "C10",
+      "payload": "Authorized task revision + effect scope",
+      "validation": "Connector never infers permission from issue status alone",
+      "next_evidence": "B-03 / Q-002"
+    },
+    {
+      "id": "H07",
+      "producer": "C10",
+      "consumer": "C11",
+      "payload": "External ID + version + named transition",
+      "validation": "Conflict/unknown state reconciles; no last-write-wins",
+      "next_evidence": "B-03 / Q-008"
+    },
+    {
+      "id": "H08",
+      "producer": "C11",
+      "consumer": "C12",
+      "payload": "Attempt + frozen context + lease",
+      "validation": "Run starts only with valid authorization and isolation",
+      "next_evidence": "B-03"
+    },
+    {
+      "id": "H09",
+      "producer": "C12",
+      "consumer": "C14",
+      "payload": "Source identity + build + checks",
+      "validation": "Reject missing identity or secrets; retain partial failure evidence",
+      "next_evidence": "B-03"
+    },
+    {
+      "id": "H10",
+      "producer": "C14",
+      "consumer": "C15",
+      "payload": "Artifact digest + preview operation key",
+      "validation": "Lookup before replay; ambiguous external effect stays blocked",
+      "next_evidence": "R-04B"
+    },
+    {
+      "id": "H11",
+      "producer": "C15",
+      "consumer": "C16",
+      "payload": "Exact candidate URL + currency + evidence",
+      "validation": "Unavailable candidate is not replaced with latest; check stale inputs",
+      "next_evidence": "B-03 / Q-005"
+    },
+    {
+      "id": "H12",
+      "producer": "C16",
+      "consumer": "C21",
+      "payload": "Accepted artifact + separate release authority",
+      "validation": "Acceptance never implicitly promotes; recovery independent",
+      "next_evidence": "M2 gate"
+    },
+    {
+      "id": "H13",
+      "producer": "C22",
+      "consumer": "C23",
+      "payload": "Release identity + scoped observation",
+      "validation": "Operational logs do not alone establish user outcome",
+      "next_evidence": "M3 gate"
+    },
+    {
+      "id": "H14",
+      "producer": "C23",
+      "consumer": "C01",
+      "payload": "Observed problem + outcome hypothesis",
+      "validation": "New work returns to prioritization and authorization",
+      "next_evidence": "M3 gate"
+    }
+  ]
+}

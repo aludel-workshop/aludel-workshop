@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+machine_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+portal_dir="$machine_root/apps/portal"
+runtime_dir="/tmp/machine-md3-runtime/node_modules/node/bin"
+
+if [[ -x "$runtime_dir/node" ]]; then
+  export PATH="$runtime_dir:$PATH"
+fi
+
+node_major="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || true)"
+if [[ -z "$node_major" || "$node_major" -lt 24 ]]; then
+  echo "Aludel requires Node 24. Install Node 24 or make it available on PATH."
+  exit 1
+fi
+
+cd "$portal_dir"
+if [[ ! -x node_modules/.bin/vite ]]; then
+  npm ci
+fi
+
+npm run build
+exec node --env-file-if-exists="$machine_root/.env" server/server.mjs

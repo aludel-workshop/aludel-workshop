@@ -1,0 +1,75 @@
+{
+  "id": "d-01c-v1",
+  "created": "2026-09-18",
+  "status": "proposed; owner selection pending",
+  "author": "Codex",
+  "method": "hand-authored static HTML/CSS compositions; no image generation",
+  "source_revisions": [
+    {
+      "path": "docs/product.md",
+      "sha256": "a615035a9694e17f3c010cbccc40298fc0b681a5196434b98e30fb7ae56353e1"
+    },
+    {
+      "path": "docs/design/experience-foundation.md",
+      "sha256": "97bf73db46aa02583ab0023646bf9449b3547d498290d088a7c6c80585c4e672"
+    },
+    {
+      "path": "docs/design/self-change-brief.md",
+      "sha256": "6aba36e27dceeb71daeb840b5e4528e90ff6ebfa00d3d8b1eff47bf1e50738a6"
+    },
+    {
+      "path": "docs/design/product-development-workflow.md",
+      "sha256": "536b7f832c9dac9f867eff7eaea42daea22ef4176a919b1e4fea1fa8e2189529"
+    },
+    {
+      "path": "docs/evidence/r-07b-workflow-benchmark.md",
+      "sha256": "c5226ee21cd8e1266f6174943a39c4c6cae155251123d2461a1816a8dca7bc20"
+    },
+    {
+      "path": "docs/execution-plan.md",
+      "sha256": "e88e6c5ce485c454cbd233a5e8473119838c3b935c776fc7204b55788d038523"
+    },
+    {
+      "path": "docs/decisions.md",
+      "sha256": "0275d578b1b9bbc5498be4a74caea6646a4105a81805ce2348ca26f8d9c3d43a"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "docs/design/self-change/v1/composition-a-mobile.png",
+      "sha256": "0f422641b331d16ba83a295d26d66da28c5246a6b23258b1635edf564b57fc29"
+    },
+    {
+      "path": "docs/design/self-change/v1/composition-a.png",
+      "sha256": "3f90288ec619a48bba842677615b4408b734ebe1c9aa3f70fbe6ec4365267db0"
+    },
+    {
+      "path": "docs/design/self-change/v1/composition-b.png",
+      "sha256": "22834b138e0acbad912863a84c1befeeffcf4278a60039bf7fc8f6275abf92d1"
+    },
+    {
+      "path": "docs/design/self-change/v1/feature.md",
+      "sha256": "0edd8f8ece0b52b155a127f6887be313880a8ede8ae267fcd319a4657f7c98dc"
+    },
+    {
+      "path": "docs/design/self-change/v1/review-record.md",
+      "sha256": "bcf356e9b0578bf08d46b5801ae7cdb60cda6355ab983af61d3fa61cf91f130d"
+    },
+    {
+      "path": "docs/design/self-change/v1/review.html",
+      "sha256": "9a52426b94739791777471e206648e23f5617ce5b356b1881a651af713240957",
+      "original_sha256": "8a893e4462101c741d41d5eef716ba3377eee1a03cc3a4ceb2a9183f1e61d129"
+    },
+    {
+      "path": "docs/design/self-change/v1/validation.json",
+      "sha256": "4b7f79ecde3646e1550e4eb10b4ffca42046952f848e418331a9e72cbb74ddc9"
+    },
+    {
+      "path": "docs/design/self-change/v1/views-and-components.md",
+      "sha256": "975ed817cbbbe3284bda6368a3c8b34bd505cd2b370a96b721926c0d8b6155d6"
+    }
+  ],
+  "reference_assets": "docs/evidence/r-07b-references/manifest.json",
+  "git_commit": null,
+  "archive_note": "2026-09-18: superseded notice added to review.html; original composition screenshots retained."
+}

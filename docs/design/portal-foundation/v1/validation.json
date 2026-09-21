@@ -1,0 +1,26 @@
+{
+  "date": "2026-09-19",
+  "method": "Playwright with existing bundled Chromium; static board only",
+  "results": [
+    {
+      "width": 1440,
+      "height": 1000,
+      "overflow": false,
+      "scripts": 0,
+      "frames": 16,
+      "brokenAnchors": [],
+      "navigation": "5 section anchors passed"
+    },
+    {
+      "width": 390,
+      "height": 1000,
+      "overflow": false,
+      "scripts": 0,
+      "frames": 16,
+      "brokenAnchors": [],
+      "navigation": "5 section anchors passed"
+    }
+  ],
+  "errors": [],
+  "limitations": "No product behavior, screen reader or owner usability test"
+}

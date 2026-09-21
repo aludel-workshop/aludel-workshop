@@ -1,0 +1,21 @@
+{
+  "id": "project-workspace-d03-closeout-addendum",
+  "date": "2026-09-20",
+  "submittedManifest": {
+    "path": "docs/design/project-workspace/v3/manifest.json",
+    "sha256": "89646644d983d1c11e91c364cd1232ad1102ccfb3e2046e9ff6c589ee74f9a9a",
+    "note": "Immutable submission-time manifest. Its embedded work-record/status source hashes precede adding the follow-on review decision link."
+  },
+  "postSubmissionRouting": [
+    {
+      "path": "docs/design/project-workspace/v3/work-record.md",
+      "sha256": "1ce6c2824c977a365b5c3be8ef027b910689a39f65dd1e9aa99194cd2e13fd80"
+    },
+    {
+      "path": "docs/status.md",
+      "sha256": "f05960dfbe9038bce552bcf78a5c7ad660e41b51989e3eacd6ee93fb7428ed34"
+    }
+  ],
+  "portalReviewDecision": "QUESTION-0b429660-5753-4cc3-9092-0d878c1fb14e",
+  "claim": "Routing-only closeout; no D-03 product artifact or tested prototype source changed after submission."
+}

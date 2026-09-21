@@ -1,0 +1,6 @@
+{
+  "relativeLinksChecked": 66,
+  "missing": [],
+  "method": "Resolve local Markdown link file targets; anchor semantics and remote URLs excluded.",
+  "coverageReview": "Manual mapping R1-R11 against all four saved request paragraphs; J1-J6 inspected for owning record, action, result, return and adverse case. This is design coverage, not product acceptance."
+}

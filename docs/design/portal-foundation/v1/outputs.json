@@ -1,0 +1,38 @@
+{
+  "date": "2026-09-19",
+  "identity": "SHA-256 of local v1 outputs after owner selection",
+  "files": [
+    {
+      "path": "docs/design/portal-foundation/v1/assessment.md",
+      "sha256": "3fc783da3a0382676e2c56988d1c35ab986fa8ccd09c2890657bbd5f9b9a85a4"
+    },
+    {
+      "path": "docs/design/portal-foundation/v1/prototype-readiness.md",
+      "sha256": "eb8fc5803184ecdb2066cca43d69ef47e79af1843ad9a091caec3103c63fdeda"
+    },
+    {
+      "path": "docs/design/portal-foundation/v1/review-record.md",
+      "sha256": "b06651b45a2db153e2e773855eab33011508f3c01759ad58e3a377ab1f479f5c"
+    },
+    {
+      "path": "docs/design/portal-foundation/v1/review.html",
+      "sha256": "abaa6bb0a4f9387bb7a11e5001eb1b87ac195a14206162aee26eeb2c39ddfd93"
+    },
+    {
+      "path": "docs/design/portal-foundation/v1/shells-1440.png",
+      "sha256": "d97768e7498f71e462040433e94ad54789119d551fbd659217f11d14ac2ad2c5"
+    },
+    {
+      "path": "docs/design/portal-foundation/v1/shells-390.png",
+      "sha256": "f0379c576f5dc56951f1c70287e1c2df1222576ac308ee2348429173974ab604"
+    },
+    {
+      "path": "docs/design/portal-foundation/v1/structure.md",
+      "sha256": "04cc60aebf287c458bea5127de1ac29b729b4f4a6635e7ed4d6c24ce6a7c6cba"
+    },
+    {
+      "path": "docs/design/portal-foundation/v1/validation.json",
+      "sha256": "161f100620e9b84f39347b7c2e5fb271557adf599dfd63ec24b587f371e02d51"
+    }
+  ]
+}

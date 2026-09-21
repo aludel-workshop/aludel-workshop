@@ -1,0 +1,13 @@
+{
+  "date": "2026-09-19",
+  "url": "http://127.0.0.1:4174/",
+  "artifact": "prototypes/d-01f/dist",
+  "result": "passed",
+  "checks": [
+    "3 initial decision rows",
+    "all fonts loaded",
+    "decision navigation and explicit answer save",
+    "no page errors"
+  ],
+  "errors": []
+}

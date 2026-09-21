@@ -1,0 +1,22 @@
+{
+  "date": "2026-09-19",
+  "appBuild": {
+    "command": "npm run build",
+    "exitCode": 0,
+    "log": "app-build.txt"
+  },
+  "angularTemplateCheck": {
+    "command": "npm run typecheck",
+    "exitCode": 0,
+    "log": "typecheck.txt"
+  },
+  "staticWorkshop": {
+    "command": "npm run build-storybook",
+    "exitCode": 0,
+    "log": "storybook-build.txt"
+  },
+  "limitations": [
+    "App chunk exceeds Vite 500KB warning threshold; prototype includes compiler, no production performance acceptance",
+    "Storybook automatic docgen disabled after observed timeouts; global settings write warning does not prevent local build"
+  ]
+}

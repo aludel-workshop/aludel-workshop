@@ -1,0 +1,18 @@
+{
+  "local_link_check": "passed",
+  "markdown_files_checked": 11,
+  "tmp_copy_matches_source": true,
+  "routing": "D-01F",
+  "observed_image_checks": [
+    "left nav",
+    "outcome-led",
+    "three decision rows",
+    "2 blocking / 1 optional",
+    "four work items",
+    "one New request",
+    "no inline answer or authorization"
+  ],
+  "known_correction": "Replace Proposed outcome preview with Latest preview",
+  "runtime_tests": "not run; no executable UI changes",
+  "owner_revision_acceptance": "pending"
+}

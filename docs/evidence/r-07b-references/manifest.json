@@ -1,0 +1,38 @@
+[
+  {
+    "file": "linear-overview.png",
+    "source_page": "https://linear.app/docs/project-overview",
+    "asset_url": "https://webassets.linear.app/images/ornj730p/production/6f0a51a748dfb751052a8dc0e0b67670c845ab6c-2296x2006.png",
+    "accessed": "2026-09-18",
+    "sha256": "697f8985ed22cf38bb8e2f8cef855ede0311873c642067e6244e1745b58839e1",
+    "bytes": 2507780,
+    "kind": "unaltered publisher screenshot; not a local product test"
+  },
+  {
+    "file": "figma-dev-mode.png",
+    "source_page": "https://help.figma.com/hc/en-us/articles/15023124644247-Guide-to-Dev-Mode",
+    "asset_url": "https://help.figma.com/hc/article_attachments/26975834817175",
+    "accessed": "2026-09-18",
+    "sha256": "b3b1a51c1f29ece5d841d55c4070fdf62bf6fd2c970f711dfcd095238f3ea71e",
+    "bytes": 222621,
+    "kind": "unaltered publisher screenshot; not a local product test"
+  },
+  {
+    "file": "storybook-interactions.png",
+    "source_page": "https://storybook.js.org/docs/writing-tests/interaction-testing",
+    "asset_url": "https://storybook.js.org/docs-assets/10.6/writing-tests/interaction-test-pass.png",
+    "accessed": "2026-09-18",
+    "sha256": "d026bcdc58e238d4a641de206d8ee4c8253fa419e53b9eb56bb060d8662c78b9",
+    "bytes": 151196,
+    "kind": "unaltered publisher screenshot; not a local product test"
+  },
+  {
+    "file": "chromatic-changes.webp",
+    "source_page": "https://www.chromatic.com/docs/review/",
+    "asset_url": "https://www.chromatic.com/docs/_astro/prscreen-changes.DDzws8_f_Z2kqOM.webp",
+    "accessed": "2026-09-18",
+    "sha256": "2fef3313b68f0054b3b701df1f490a2df624f050bd463b6ada550c1e867b9aa2",
+    "bytes": 391008,
+    "kind": "unaltered publisher screenshot; not a local product test"
+  }
+]

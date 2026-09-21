@@ -1,0 +1,58 @@
+{
+  "date": "2026-09-19",
+  "packet": "D-01B",
+  "version": 4,
+  "inputs": [
+    {
+      "path": "docs/design/portal-foundation/v1/structure.md",
+      "sha256": "04cc60aebf287c458bea5127de1ac29b729b4f4a6635e7ed4d6c24ce6a7c6cba"
+    },
+    {
+      "path": "docs/design/portal-foundation/v1/review-record.md",
+      "sha256": "b06651b45a2db153e2e773855eab33011508f3c01759ad58e3a377ab1f479f5c"
+    },
+    {
+      "path": "docs/design/portal-foundation/v1/prototype-readiness.md",
+      "sha256": "eb8fc5803184ecdb2066cca43d69ef47e79af1843ad9a091caec3103c63fdeda"
+    },
+    {
+      "path": "docs/design/demo-app/borrowbox.md",
+      "sha256": "8cfccb0648f78c43274018dbfa57814410c6f2f1826869f6b0e78b824b4287c8"
+    },
+    {
+      "path": "docs/design/self-change/v2/feature.md",
+      "sha256": "8106d12c210055ad1535680f8f2c14b41b5cb8bbadd3518246361fe380c91a09"
+    },
+    {
+      "path": "docs/design/process/d-01b-v4-work-record.md",
+      "sha256": "a48ee329a92ea675f8487a37c51e193bd07659499a9861de5ebdeadadcbdc49e"
+    }
+  ],
+  "source": [
+    {
+      "path": "prototypes/d-01b/v4/app.mjs",
+      "sha256": "ec9208ef5ddb42548eb1a0fd4db3494891024f9a61357774e879094fff7cdd32"
+    },
+    {
+      "path": "prototypes/d-01b/v4/browser-check.mjs",
+      "sha256": "593dcc4f4b4efe825a255435a85f155ff6bfb1c5b3843fa6c5ee92d1df054d85"
+    },
+    {
+      "path": "prototypes/d-01b/v4/index.html",
+      "sha256": "087344a0977cc3c376e668301a499359aa733c45aa14dce5045b0eb2130dbc31"
+    },
+    {
+      "path": "prototypes/d-01b/v4/model.mjs",
+      "sha256": "8ca3e7787f068b8e7bd534612e4f4b3f95e10587dde593ee012839d8a2bbddf0"
+    },
+    {
+      "path": "prototypes/d-01b/v4/model.test.mjs",
+      "sha256": "9368c821842d98e9fddc962a9408e224235a569e5b06779fe7fb67bbcd0daed6"
+    },
+    {
+      "path": "prototypes/d-01b/v4/style.css",
+      "sha256": "0820b1967981c964061d02a2403e74bc282d391086e4a92fc79f9c011d57f84e"
+    }
+  ],
+  "identity_note": "Local file identities, not Git commits or synthetic candidate build identities"
+}

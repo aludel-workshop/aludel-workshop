@@ -1,0 +1,564 @@
+{
+  "id": "borrowbox",
+  "kind": "product-project",
+  "revision": 1,
+  "catalog_revision": 1,
+  "status": "fictional-fixture-not-implemented",
+  "constraints": [
+    "synthetic data",
+    "no build or deployment authorization",
+    "independent member-facing product"
+  ],
+  "allocations": [
+    {
+      "capability": "C01",
+      "usage": "experience",
+      "output": "Intent, constraints and measurable success",
+      "current": {
+        "state": "manual",
+        "summary": "Fictional tool-reservation brief only; no working product.",
+        "evidence": [
+          "docs/design/demo-app/borrowbox.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "BorrowBox project owner / scoped product contract"
+        ],
+        "providers": [],
+        "adoption": "deferred"
+      },
+      "gap": "Choose from BorrowBox needs; no implicit inheritance of MD3, Angular, Linear or Aludel runtime.",
+      "next_evidence": "M3 representative-product selection; Q-003 remains open",
+      "required_by": "unscoped-fictional-fixture"
+    },
+    {
+      "capability": "C02",
+      "usage": "delivery",
+      "output": "Findings with provenance and uncertainty",
+      "current": {
+        "state": "deferred",
+        "summary": "Unselected fixture capability; evaluate when the real second-product packet is authorized.",
+        "evidence": [
+          "docs/design/demo-app/borrowbox.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "BorrowBox project owner / scoped product contract"
+        ],
+        "providers": [],
+        "adoption": "deferred"
+      },
+      "gap": "Choose from BorrowBox needs; no implicit inheritance of MD3, Angular, Linear or Aludel runtime.",
+      "next_evidence": "M3 representative-product selection; Q-003 remains open",
+      "required_by": "unscoped-fictional-fixture"
+    },
+    {
+      "capability": "C03",
+      "usage": "delivery",
+      "output": "Versioned product records and relations",
+      "current": {
+        "state": "deferred",
+        "summary": "Unselected fixture capability; evaluate when the real second-product packet is authorized.",
+        "evidence": [
+          "docs/design/demo-app/borrowbox.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "BorrowBox project owner / scoped product contract"
+        ],
+        "providers": [],
+        "adoption": "deferred"
+      },
+      "gap": "Choose from BorrowBox needs; no implicit inheritance of MD3, Angular, Linear or Aludel runtime.",
+      "next_evidence": "M3 representative-product selection; Q-003 remains open",
+      "required_by": "unscoped-fictional-fixture"
+    },
+    {
+      "capability": "C04",
+      "usage": "experience",
+      "output": "Stories, view intents and transitions",
+      "current": {
+        "state": "manual",
+        "summary": "Fictional tool-reservation brief only; no working product.",
+        "evidence": [
+          "docs/design/demo-app/borrowbox.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "BorrowBox project owner / scoped product contract"
+        ],
+        "providers": [],
+        "adoption": "deferred"
+      },
+      "gap": "Choose from BorrowBox needs; no implicit inheritance of MD3, Angular, Linear or Aludel runtime.",
+      "next_evidence": "M3 representative-product selection; Q-003 remains open",
+      "required_by": "unscoped-fictional-fixture"
+    },
+    {
+      "capability": "C05",
+      "usage": "experience",
+      "output": "Principles, patterns and deviation profile",
+      "current": {
+        "state": "deferred",
+        "summary": "Unselected fixture capability; evaluate when the real second-product packet is authorized.",
+        "evidence": [
+          "docs/design/demo-app/borrowbox.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "BorrowBox project owner / scoped product contract"
+        ],
+        "providers": [],
+        "adoption": "deferred"
+      },
+      "gap": "Choose from BorrowBox needs; no implicit inheritance of MD3, Angular, Linear or Aludel runtime.",
+      "next_evidence": "M3 representative-product selection; Q-003 remains open",
+      "required_by": "unscoped-fictional-fixture"
+    },
+    {
+      "capability": "C06",
+      "usage": "runtime",
+      "output": "Implemented reusable UI assets",
+      "current": {
+        "state": "deferred",
+        "summary": "Unselected fixture capability; evaluate when the real second-product packet is authorized.",
+        "evidence": [
+          "docs/design/demo-app/borrowbox.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "BorrowBox project owner / scoped product contract"
+        ],
+        "providers": [],
+        "adoption": "deferred"
+      },
+      "gap": "Choose from BorrowBox needs; no implicit inheritance of MD3, Angular, Linear or Aludel runtime.",
+      "next_evidence": "M3 representative-product selection; Q-003 remains open",
+      "required_by": "unscoped-fictional-fixture"
+    },
+    {
+      "capability": "C07",
+      "usage": "delivery",
+      "output": "Inspectable component states and usage contracts",
+      "current": {
+        "state": "deferred",
+        "summary": "Unselected fixture capability; evaluate when the real second-product packet is authorized.",
+        "evidence": [
+          "docs/design/demo-app/borrowbox.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "BorrowBox project owner / scoped product contract"
+        ],
+        "providers": [],
+        "adoption": "deferred"
+      },
+      "gap": "Choose from BorrowBox needs; no implicit inheritance of MD3, Angular, Linear or Aludel runtime.",
+      "next_evidence": "M3 representative-product selection; Q-003 remains open",
+      "required_by": "unscoped-fictional-fixture"
+    },
+    {
+      "capability": "C08",
+      "usage": "delivery",
+      "output": "Identified source revision and reviewed diff",
+      "current": {
+        "state": "deferred",
+        "summary": "Unselected fixture capability; evaluate when the real second-product packet is authorized.",
+        "evidence": [
+          "docs/design/demo-app/borrowbox.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "BorrowBox project owner / scoped product contract"
+        ],
+        "providers": [],
+        "adoption": "deferred"
+      },
+      "gap": "Choose from BorrowBox needs; no implicit inheritance of MD3, Angular, Linear or Aludel runtime.",
+      "next_evidence": "M3 representative-product selection; Q-003 remains open",
+      "required_by": "unscoped-fictional-fixture"
+    },
+    {
+      "capability": "C09",
+      "usage": "delivery",
+      "output": "Authorized task revision and permitted effects",
+      "current": {
+        "state": "deferred",
+        "summary": "Unselected fixture capability; evaluate when the real second-product packet is authorized.",
+        "evidence": [
+          "docs/design/demo-app/borrowbox.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "BorrowBox project owner / scoped product contract"
+        ],
+        "providers": [],
+        "adoption": "deferred"
+      },
+      "gap": "Choose from BorrowBox needs; no implicit inheritance of MD3, Angular, Linear or Aludel runtime.",
+      "next_evidence": "M3 representative-product selection; Q-003 remains open",
+      "required_by": "unscoped-fictional-fixture"
+    },
+    {
+      "capability": "C10",
+      "usage": "delivery",
+      "output": "Execution queue state and optional external mappings",
+      "current": {
+        "state": "deferred",
+        "summary": "Unselected fixture capability; evaluate when the real second-product packet is authorized.",
+        "evidence": [
+          "docs/design/demo-app/borrowbox.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "BorrowBox project owner / scoped product contract"
+        ],
+        "providers": [],
+        "adoption": "deferred"
+      },
+      "gap": "Choose from BorrowBox needs; no implicit inheritance of MD3, Angular, Linear or Aludel runtime.",
+      "next_evidence": "M3 representative-product selection; Q-003 remains open",
+      "required_by": "unscoped-fictional-fixture"
+    },
+    {
+      "capability": "C11",
+      "usage": "delivery",
+      "output": "Durable attempts, leases and reconciled effects",
+      "current": {
+        "state": "deferred",
+        "summary": "Unselected fixture capability; evaluate when the real second-product packet is authorized.",
+        "evidence": [
+          "docs/design/demo-app/borrowbox.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "BorrowBox project owner / scoped product contract"
+        ],
+        "providers": [],
+        "adoption": "deferred"
+      },
+      "gap": "Choose from BorrowBox needs; no implicit inheritance of MD3, Angular, Linear or Aludel runtime.",
+      "next_evidence": "M3 representative-product selection; Q-003 remains open",
+      "required_by": "unscoped-fictional-fixture"
+    },
+    {
+      "capability": "C12",
+      "usage": "delivery",
+      "output": "Bounded run, isolated workspace and result",
+      "current": {
+        "state": "deferred",
+        "summary": "Unselected fixture capability; evaluate when the real second-product packet is authorized.",
+        "evidence": [
+          "docs/design/demo-app/borrowbox.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "BorrowBox project owner / scoped product contract"
+        ],
+        "providers": [],
+        "adoption": "deferred"
+      },
+      "gap": "Choose from BorrowBox needs; no implicit inheritance of MD3, Angular, Linear or Aludel runtime.",
+      "next_evidence": "M3 representative-product selection; Q-003 remains open",
+      "required_by": "unscoped-fictional-fixture"
+    },
+    {
+      "capability": "C13",
+      "usage": "delivery",
+      "output": "Component, domain and integrated acceptance evidence",
+      "current": {
+        "state": "deferred",
+        "summary": "Unselected fixture capability; evaluate when the real second-product packet is authorized.",
+        "evidence": [
+          "docs/design/demo-app/borrowbox.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "BorrowBox project owner / scoped product contract"
+        ],
+        "providers": [],
+        "adoption": "deferred"
+      },
+      "gap": "Choose from BorrowBox needs; no implicit inheritance of MD3, Angular, Linear or Aludel runtime.",
+      "next_evidence": "M3 representative-product selection; Q-003 remains open",
+      "required_by": "unscoped-fictional-fixture"
+    },
+    {
+      "capability": "C14",
+      "usage": "delivery",
+      "output": "Immutable artifact manifest and retrievable bytes",
+      "current": {
+        "state": "deferred",
+        "summary": "Unselected fixture capability; evaluate when the real second-product packet is authorized.",
+        "evidence": [
+          "docs/design/demo-app/borrowbox.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "BorrowBox project owner / scoped product contract"
+        ],
+        "providers": [],
+        "adoption": "deferred"
+      },
+      "gap": "Choose from BorrowBox needs; no implicit inheritance of MD3, Angular, Linear or Aludel runtime.",
+      "next_evidence": "M3 representative-product selection; Q-003 remains open",
+      "required_by": "unscoped-fictional-fixture"
+    },
+    {
+      "capability": "C15",
+      "usage": "delivery",
+      "output": "Identified accessible candidate with lifecycle",
+      "current": {
+        "state": "deferred",
+        "summary": "Unselected fixture capability; evaluate when the real second-product packet is authorized.",
+        "evidence": [
+          "docs/design/demo-app/borrowbox.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "BorrowBox project owner / scoped product contract"
+        ],
+        "providers": [],
+        "adoption": "deferred"
+      },
+      "gap": "Choose from BorrowBox needs; no implicit inheritance of MD3, Angular, Linear or Aludel runtime.",
+      "next_evidence": "M3 representative-product selection; Q-003 remains open",
+      "required_by": "unscoped-fictional-fixture"
+    },
+    {
+      "capability": "C16",
+      "usage": "delivery",
+      "output": "Owner judgment tied to artifact and input revisions",
+      "current": {
+        "state": "deferred",
+        "summary": "Unselected fixture capability; evaluate when the real second-product packet is authorized.",
+        "evidence": [
+          "docs/design/demo-app/borrowbox.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "BorrowBox project owner / scoped product contract"
+        ],
+        "providers": [],
+        "adoption": "deferred"
+      },
+      "gap": "Choose from BorrowBox needs; no implicit inheritance of MD3, Angular, Linear or Aludel runtime.",
+      "next_evidence": "M3 representative-product selection; Q-003 remains open",
+      "required_by": "unscoped-fictional-fixture"
+    },
+    {
+      "capability": "C17",
+      "usage": "runtime",
+      "output": "Working accessible routes and stateful navigation",
+      "current": {
+        "state": "deferred",
+        "summary": "Unselected fixture capability; evaluate when the real second-product packet is authorized.",
+        "evidence": [
+          "docs/design/demo-app/borrowbox.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "BorrowBox project owner / scoped product contract"
+        ],
+        "providers": [],
+        "adoption": "deferred"
+      },
+      "gap": "Choose from BorrowBox needs; no implicit inheritance of MD3, Angular, Linear or Aludel runtime.",
+      "next_evidence": "M3 representative-product selection; Q-003 remains open",
+      "required_by": "unscoped-fictional-fixture"
+    },
+    {
+      "capability": "C18",
+      "usage": "runtime",
+      "output": "Validated product operations and invariants",
+      "current": {
+        "state": "manual",
+        "summary": "Fictional tool-reservation brief only; no working product.",
+        "evidence": [
+          "docs/design/demo-app/borrowbox.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "BorrowBox project owner / scoped product contract"
+        ],
+        "providers": [],
+        "adoption": "deferred"
+      },
+      "gap": "Choose from BorrowBox needs; no implicit inheritance of MD3, Angular, Linear or Aludel runtime.",
+      "next_evidence": "M3 representative-product selection; Q-003 remains open",
+      "required_by": "unscoped-fictional-fixture"
+    },
+    {
+      "capability": "C19",
+      "usage": "runtime",
+      "output": "Durable scoped data and migration contracts",
+      "current": {
+        "state": "deferred",
+        "summary": "Unselected fixture capability; evaluate when the real second-product packet is authorized.",
+        "evidence": [
+          "docs/design/demo-app/borrowbox.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "BorrowBox project owner / scoped product contract"
+        ],
+        "providers": [],
+        "adoption": "deferred"
+      },
+      "gap": "Choose from BorrowBox needs; no implicit inheritance of MD3, Angular, Linear or Aludel runtime.",
+      "next_evidence": "M3 representative-product selection; Q-003 remains open",
+      "required_by": "unscoped-fictional-fixture"
+    },
+    {
+      "capability": "C20",
+      "usage": "runtime",
+      "output": "Authenticated operations and scoped credentials references",
+      "current": {
+        "state": "deferred",
+        "summary": "Unselected fixture capability; evaluate when the real second-product packet is authorized.",
+        "evidence": [
+          "docs/design/demo-app/borrowbox.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "BorrowBox project owner / scoped product contract"
+        ],
+        "providers": [],
+        "adoption": "deferred"
+      },
+      "gap": "Choose from BorrowBox needs; no implicit inheritance of MD3, Angular, Linear or Aludel runtime.",
+      "next_evidence": "M3 representative-product selection; Q-003 remains open",
+      "required_by": "unscoped-fictional-fixture"
+    },
+    {
+      "capability": "C21",
+      "usage": "delivery",
+      "output": "Promoted artifact, health and independent recovery",
+      "current": {
+        "state": "deferred",
+        "summary": "Unselected fixture capability; evaluate when the real second-product packet is authorized.",
+        "evidence": [
+          "docs/design/demo-app/borrowbox.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "BorrowBox project owner / scoped product contract"
+        ],
+        "providers": [],
+        "adoption": "deferred"
+      },
+      "gap": "Choose from BorrowBox needs; no implicit inheritance of MD3, Angular, Linear or Aludel runtime.",
+      "next_evidence": "M3 representative-product selection; Q-003 remains open",
+      "required_by": "unscoped-fictional-fixture"
+    },
+    {
+      "capability": "C22",
+      "usage": "runtime",
+      "output": "Available environments and correlated operational evidence",
+      "current": {
+        "state": "deferred",
+        "summary": "Unselected fixture capability; evaluate when the real second-product packet is authorized.",
+        "evidence": [
+          "docs/design/demo-app/borrowbox.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "BorrowBox project owner / scoped product contract"
+        ],
+        "providers": [],
+        "adoption": "deferred"
+      },
+      "gap": "Choose from BorrowBox needs; no implicit inheritance of MD3, Angular, Linear or Aludel runtime.",
+      "next_evidence": "M3 representative-product selection; Q-003 remains open",
+      "required_by": "unscoped-fictional-fixture"
+    },
+    {
+      "capability": "C23",
+      "usage": "experience",
+      "output": "Feedback linked to outcomes and follow-up decisions",
+      "current": {
+        "state": "deferred",
+        "summary": "Unselected fixture capability; evaluate when the real second-product packet is authorized.",
+        "evidence": [
+          "docs/design/demo-app/borrowbox.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "BorrowBox project owner / scoped product contract"
+        ],
+        "providers": [],
+        "adoption": "deferred"
+      },
+      "gap": "Choose from BorrowBox needs; no implicit inheritance of MD3, Angular, Linear or Aludel runtime.",
+      "next_evidence": "M3 representative-product selection; Q-003 remains open",
+      "required_by": "unscoped-fictional-fixture"
+    },
+    {
+      "capability": "C24",
+      "usage": "delivery",
+      "output": "Audience, distribution experiments and authorized communication",
+      "current": {
+        "state": "deferred",
+        "summary": "Unselected fixture capability; evaluate when the real second-product packet is authorized.",
+        "evidence": [
+          "docs/design/demo-app/borrowbox.md"
+        ]
+      },
+      "target": {
+        "authorities": [
+          "BorrowBox project owner / scoped product contract"
+        ],
+        "providers": [],
+        "adoption": "deferred"
+      },
+      "gap": "Choose from BorrowBox needs; no implicit inheritance of MD3, Angular, Linear or Aludel runtime.",
+      "next_evidence": "M3 representative-product selection; Q-003 remains open",
+      "required_by": "unscoped-fictional-fixture"
+    }
+  ],
+  "service_bindings": [
+    {
+      "id": "machine-develops-borrowbox",
+      "consumer_project": "borrowbox",
+      "provider_project": "the-machine",
+      "capabilities": [
+        "C09",
+        "C10",
+        "C11",
+        "C12",
+        "C14",
+        "C15",
+        "C16"
+      ],
+      "contract": "Same versioned task/attempt/artifact protocol as Aludel project",
+      "state": "illustrative",
+      "provider_revision": "accepted-deployed-revision-required; none deployed yet",
+      "candidate_revision": "BorrowBox candidate stays in BorrowBox project",
+      "recovery": "Retain project record export and independent artifact access"
+    }
+  ],
+  "handoffs": []
+}

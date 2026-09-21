@@ -1,0 +1,18 @@
+{
+  "date": "2026-09-19",
+  "status": "passed",
+  "checks": [
+    "T1/T2: zero, one and many affected records; answer stays on decision; no authorization; filtered return",
+    "Unsaved review draft survives navigation and reload within the browser session",
+    "T7–T10: immutable candidate routes, reload, missing evidence/preview guards, A1 feedback → r2/A2, exact acceptance, stale protection",
+    "T3–T6: separate authorization/queue/claim; offline worker; connector unknown/conflict; uncertain cancellation; linked retry; answer requires continuation",
+    "T11: filtered deep-link reload; 390px overflow on five routes; keyboard Tab reaches a link with visible focus",
+    "No JavaScript page errors"
+  ],
+  "errors": [],
+  "limits": [
+    "Agent browser checks do not prove owner usability",
+    "Static BorrowBox preview and synthetic check data",
+    "No live integration, recovery or implementation evidence"
+  ]
+}

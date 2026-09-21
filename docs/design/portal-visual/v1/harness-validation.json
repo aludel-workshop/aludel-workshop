@@ -1,0 +1,14 @@
+{
+  "date": "2026-09-20",
+  "checks": [
+    "Published entry → Work → authorize → complete → review → reserve → accept, without URL manipulation",
+    "Reset restores Ready and preserves outer review notes",
+    "Visible scenario controls reach stale/unavailable and block acceptance",
+    "390px host has no horizontal overflow"
+  ],
+  "errors": [],
+  "limitations": [
+    "Local same-origin synthetic fixture",
+    "No production identity, isolation or real execution proof"
+  ]
+}

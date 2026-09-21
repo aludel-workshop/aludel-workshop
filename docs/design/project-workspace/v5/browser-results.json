@@ -1,0 +1,25 @@
+{
+  "status": "pass",
+  "crossViewIdentity": true,
+  "collapseAggregation": true,
+  "projectionSelectionPreserved": true,
+  "detailReloadReturn": true,
+  "agentStates": [
+    "active",
+    "awaiting-input",
+    "failed",
+    "ready-for-review"
+  ],
+  "missing": true,
+  "zero": true,
+  "many": 24,
+  "errorUnknown": true,
+  "stale": true,
+  "intakeKeyboardAction": true,
+  "intakeDraftReload": true,
+  "intakeCreatesProposalOnly": true,
+  "narrowNoOverflow": true,
+  "axeViolations": [],
+  "pageErrors": [],
+  "limitation": "Connected fixture prototype; no portal API or worker capability implemented."
+}

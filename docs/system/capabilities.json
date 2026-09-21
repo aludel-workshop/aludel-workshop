@@ -1,0 +1,151 @@
+{
+  "id": "product-capabilities",
+  "revision": 1,
+  "status": "proposed-applied-to-records",
+  "capabilities": [
+    {
+      "id": "C01",
+      "name": "Frame outcomes",
+      "output": "Intent, constraints and measurable success",
+      "usage": "experience"
+    },
+    {
+      "id": "C02",
+      "name": "Research and source evidence",
+      "output": "Findings with provenance and uncertainty",
+      "usage": "delivery"
+    },
+    {
+      "id": "C03",
+      "name": "Product knowledge and decisions",
+      "output": "Versioned product records and relations",
+      "usage": "delivery"
+    },
+    {
+      "id": "C04",
+      "name": "Experience architecture",
+      "output": "Stories, view intents and transitions",
+      "usage": "experience"
+    },
+    {
+      "id": "C05",
+      "name": "Design-system philosophy and patterns",
+      "output": "Principles, patterns and deviation profile",
+      "usage": "experience"
+    },
+    {
+      "id": "C06",
+      "name": "UI components and theme",
+      "output": "Implemented reusable UI assets",
+      "usage": "runtime"
+    },
+    {
+      "id": "C07",
+      "name": "Component workshop and discovery",
+      "output": "Inspectable component states and usage contracts",
+      "usage": "delivery"
+    },
+    {
+      "id": "C08",
+      "name": "Source identity and change review",
+      "output": "Identified source revision and reviewed diff",
+      "usage": "delivery"
+    },
+    {
+      "id": "C09",
+      "name": "Work readiness and authorization",
+      "output": "Authorized task revision and permitted effects",
+      "usage": "delivery"
+    },
+    {
+      "id": "C10",
+      "name": "Execution queue and tracking",
+      "output": "Execution queue state and optional external mappings",
+      "usage": "delivery"
+    },
+    {
+      "id": "C11",
+      "name": "Execution coordination and recovery",
+      "output": "Durable attempts, leases and reconciled effects",
+      "usage": "delivery"
+    },
+    {
+      "id": "C12",
+      "name": "Agent execution and workspaces",
+      "output": "Bounded run, isolated workspace and result",
+      "usage": "delivery"
+    },
+    {
+      "id": "C13",
+      "name": "Quality verification",
+      "output": "Component, domain and integrated acceptance evidence",
+      "usage": "delivery"
+    },
+    {
+      "id": "C14",
+      "name": "Artifact identity and retention",
+      "output": "Immutable artifact manifest and retrievable bytes",
+      "usage": "delivery"
+    },
+    {
+      "id": "C15",
+      "name": "Preview delivery",
+      "output": "Identified accessible candidate with lifecycle",
+      "usage": "delivery"
+    },
+    {
+      "id": "C16",
+      "name": "Product acceptance",
+      "output": "Owner judgment tied to artifact and input revisions",
+      "usage": "delivery"
+    },
+    {
+      "id": "C17",
+      "name": "Application shell and navigation",
+      "output": "Working accessible routes and stateful navigation",
+      "usage": "runtime"
+    },
+    {
+      "id": "C18",
+      "name": "Domain behavior and APIs",
+      "output": "Validated product operations and invariants",
+      "usage": "runtime"
+    },
+    {
+      "id": "C19",
+      "name": "Data and retrieval",
+      "output": "Durable scoped data and migration contracts",
+      "usage": "runtime"
+    },
+    {
+      "id": "C20",
+      "name": "Identity, permissions and connections",
+      "output": "Authenticated operations and scoped credentials references",
+      "usage": "runtime"
+    },
+    {
+      "id": "C21",
+      "name": "Release and recovery",
+      "output": "Promoted artifact, health and independent recovery",
+      "usage": "delivery"
+    },
+    {
+      "id": "C22",
+      "name": "Runtime hosting and operations",
+      "output": "Available environments and correlated operational evidence",
+      "usage": "runtime"
+    },
+    {
+      "id": "C23",
+      "name": "Product observation and learning",
+      "output": "Feedback linked to outcomes and follow-up decisions",
+      "usage": "experience"
+    },
+    {
+      "id": "C24",
+      "name": "Go-to-market and communication",
+      "output": "Audience, distribution experiments and authorized communication",
+      "usage": "delivery"
+    }
+  ]
+}

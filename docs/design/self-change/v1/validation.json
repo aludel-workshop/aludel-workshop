@@ -1,0 +1,58 @@
+{
+  "date": "2026-09-18",
+  "tool": "existing Playwright 1.48.2 / bundled Chromium",
+  "kind": "static board render checks only",
+  "results": [
+    {
+      "width": 1440,
+      "height": 1000,
+      "overflow": false,
+      "images": [
+        {
+          "src": "../../../evidence/r-07b-references/linear-overview.png",
+          "loaded": true
+        },
+        {
+          "src": "../../../evidence/r-07b-references/figma-dev-mode.png",
+          "loaded": true
+        },
+        {
+          "src": "../../../evidence/r-07b-references/storybook-interactions.png",
+          "loaded": true
+        },
+        {
+          "src": "../../../evidence/r-07b-references/chromatic-changes.webp",
+          "loaded": true
+        }
+      ],
+      "scripts": 0,
+      "navigation": "5 anchor links passed"
+    },
+    {
+      "width": 390,
+      "height": 1000,
+      "overflow": false,
+      "images": [
+        {
+          "src": "../../../evidence/r-07b-references/linear-overview.png",
+          "loaded": true
+        },
+        {
+          "src": "../../../evidence/r-07b-references/figma-dev-mode.png",
+          "loaded": true
+        },
+        {
+          "src": "../../../evidence/r-07b-references/storybook-interactions.png",
+          "loaded": true
+        },
+        {
+          "src": "../../../evidence/r-07b-references/chromatic-changes.webp",
+          "loaded": true
+        }
+      ],
+      "scripts": 0,
+      "navigation": "5 anchor links passed"
+    }
+  ],
+  "errors": []
+}

@@ -1,0 +1,137 @@
+{
+  "id": "machine-md3-catalog",
+  "revision": 3,
+  "maturity": "incubating",
+  "project": "the-machine",
+  "source_of_truth": "prototypes/d-01f/src; stories are executable examples, not separate implementations",
+  "components": [
+    {
+      "id": "status",
+      "source": "prototypes/d-01f/src/components.ts#StatusComponent",
+      "contract": "label expresses state in text; optional Material-chip substitution preserves label input",
+      "consumers": [
+        "decision-queue",
+        "work-summary",
+        "decision-detail"
+      ],
+      "stories": [
+        "primitives-status--blocked",
+        "primitives-status--waiting",
+        "primitives-status--ready",
+        "primitives-status--chip-substitution"
+      ],
+      "principles": [
+        "MP5",
+        "MP7"
+      ],
+      "maturity": "incubating"
+    },
+    {
+      "id": "decision-queue",
+      "source": "prototypes/d-01f/src/components.ts#DecisionQueueComponent",
+      "contract": "items, availability, limit, returnTo; retry output; never render unknown as zero; each row has a named link",
+      "consumers": [
+        "Overview",
+        "Decisions experimental collection"
+      ],
+      "stories": [
+        "patterns-decision-queue--zero",
+        "patterns-decision-queue--one",
+        "patterns-decision-queue--three",
+        "patterns-decision-queue--many",
+        "patterns-decision-queue--unknown"
+      ],
+      "principles": [
+        "MP1",
+        "MP2",
+        "MP3",
+        "MP4",
+        "MP8",
+        "MP9"
+      ],
+      "maturity": "incubating"
+    },
+    {
+      "id": "work-summary",
+      "source": "prototypes/d-01f/src/components.ts#WorkSummaryComponent",
+      "contract": "receives assessed tasks; never derives readiness from color or one decision; links identify each work item",
+      "consumers": [
+        "Overview",
+        "Work experimental collection"
+      ],
+      "stories": [
+        "patterns-work-summary--dependencies",
+        "patterns-work-summary--answered-still-waiting"
+      ],
+      "principles": [
+        "MP4",
+        "MP5",
+        "MP8"
+      ],
+      "maturity": "incubating"
+    },
+    {
+      "id": "preview-summary",
+      "source": "prototypes/d-01f/src/components.ts#PreviewSummaryComponent",
+      "contract": "none, unknown, candidate summary; no acceptance/release control; candidate identity is synthetic only",
+      "consumers": [
+        "Overview",
+        "Reviews experimental empty destination"
+      ],
+      "stories": [
+        "patterns-preview-summary--no-candidate",
+        "patterns-preview-summary--unknown",
+        "patterns-preview-summary--candidate"
+      ],
+      "principles": [
+        "MP5",
+        "MP8"
+      ],
+      "maturity": "incubating"
+    }
+  ],
+  "composition_patterns": [
+    {
+      "id": "outcome-overview",
+      "source": "prototypes/d-01f/src/app.html",
+      "maturity": "incubating",
+      "accepted_scope": "Owner accepted executable Overview foundation in DEC-025; not acceptance of all adjacent destinations",
+      "principles": [
+        "MP1",
+        "MP2",
+        "MP3",
+        "MP9"
+      ]
+    },
+    {
+      "id": "decision-destination",
+      "source": "prototypes/d-01f/src/app.html",
+      "maturity": "experimental",
+      "accepted_scope": "none; bounded supporting flow",
+      "principles": [
+        "MP4",
+        "MP5",
+        "MP7",
+        "MP9"
+      ]
+    },
+    {
+      "id": "request-destination",
+      "source": "prototypes/d-01f/src/app.html",
+      "maturity": "experimental",
+      "accepted_scope": "none; bounded draft and discard behavior",
+      "principles": [
+        "MP4",
+        "MP5",
+        "MP7",
+        "MP9"
+      ]
+    }
+  ],
+  "promotion": "Stable requires scoped owner acceptance, representative checks and a supported upgrade path; no asset here is stable.",
+  "replacement": "Change the catalog contract and affected stories first; exercise consumers and integrated flow; retain old identity with migration note when semantics change. A chip swap is not framework migration proof.",
+  "acceptance": {
+    "decision": "DEC-025",
+    "scope": "Foundation for D-01E; components remain incubating; supporting compositions experimental"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "status": "pass",
+  "base": "http://127.0.0.1:4310/reviews/project-workspace-v3/index.html",
+  "twoRecordSelection": true,
+  "detailReload": true,
+  "returnToCollection": true,
+  "missing": true,
+  "zero": true,
+  "error": true,
+  "many": 24,
+  "draftReload": true,
+  "reconciliationInteraction": true,
+  "narrowNoOverflow": true,
+  "axeViolations": [],
+  "pageErrors": [],
+  "limitation": "Design prototype with deterministic fixtures; no portal product records mutated."
+}

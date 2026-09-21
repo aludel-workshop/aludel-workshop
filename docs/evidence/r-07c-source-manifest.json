@@ -1,0 +1,66 @@
+{
+  "date": "2026-09-19",
+  "identity": "SHA-256 of local files; workspace has no Git metadata",
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "8431c6eb735a1d20fe55a9aa7513d4ceab533f7c7a77ab49540a4bb6b121c8bc"
+    },
+    {
+      "path": "docs/status.md",
+      "sha256": "f1503c64396597098c7debb729d99adfcaf5277320b3daaa5b35637d474c2097"
+    },
+    {
+      "path": "docs/execution-plan.md",
+      "sha256": "8a78527fa53f6ecbb924925bf15ca59bf822525e0054a698c5ef08a1d4f48149"
+    },
+    {
+      "path": "docs/decisions.md",
+      "sha256": "8d053d0b129a84b7c1287a381cd76e851a8c371524db9cc8a1e8a4cb028c4af1"
+    },
+    {
+      "path": "docs/design/product-development-workflow.md",
+      "sha256": "cfb1dae4acee35eaece22ec53482a9ed57d571482cf3a2c47d57cf71f3068fb4"
+    },
+    {
+      "path": "docs/design/experience-foundation.md",
+      "sha256": "0be577f4879754ed492a2370c98d9fbcd25e3f2de27a9078ca6aee1a61ad04af"
+    },
+    {
+      "path": "docs/design/self-change/v2/feature.md",
+      "sha256": "8106d12c210055ad1535680f8f2c14b41b5cb8bbadd3518246361fe380c91a09"
+    },
+    {
+      "path": "docs/design/self-change/v2/views-and-components.md",
+      "sha256": "e7c9efa48dc5a0f1553c4f3a4ec5f7352627800fde1c861abf550c0f15ead2b9"
+    },
+    {
+      "path": "docs/design/self-change/v2/review-record.md",
+      "sha256": "d79e76f1250c434d930b2cf6a0ba23422de19b0919d2dfcfaf9e0e62a7236857"
+    },
+    {
+      "path": "docs/design/portal-foundation/feedback-2026-09-19.md",
+      "sha256": "74eb1f010a2f49b38df652982ff9b7210cff278955a1a82ce0097fe96ee3865c"
+    },
+    {
+      "path": "docs/evidence/d-01b-prototype-review.md",
+      "sha256": "2233cb3f0bb0ae7c966cccf17e8b8408a2c3c4845bf501ee26ce25910eaa0f66"
+    },
+    {
+      "path": "docs/design/process/d-01d-work-record.md",
+      "sha256": "6ea9bb9e0dfa4d2c7392ae9bb9e97f8878747660529ed7547cfa873f344afab4"
+    },
+    {
+      "path": "docs/design/process/operating-procedure.md",
+      "sha256": "308f48e8e452441b5a97f497d3d7000c2e6001bae455d45e02ca87f5713afa9a"
+    },
+    {
+      "path": "docs/design/process/r-07c-dry-runs.md",
+      "sha256": "a3a6ac5ed5db97593eee03b8a96e234ef7a54643f52e5a47afcebedb2291a187"
+    },
+    {
+      "path": "docs/design/process/work-record-template.md",
+      "sha256": "62fe51bdd39941d685750654ad06f08e6b3824dfd549d85556d200f3ad296bbf"
+    }
+  ]
+}
