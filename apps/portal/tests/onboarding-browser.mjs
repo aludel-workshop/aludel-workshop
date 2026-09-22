@@ -49,9 +49,9 @@ try {
   await page.getByLabel('Elevator pitch').fill('Neighbours lend and borrow tools they rarely use, so nobody has to buy a ladder for one afternoon.');
   await page.getByRole('button', { name: 'Continue' }).click();
 
-  await page.getByRole('heading', { name: 'Create your account to keep Tool Share' }).waitFor();
+  await page.getByRole('heading', { name: 'Save Tool Share to an account' }).waitFor();
   await page.reload();
-  await page.getByRole('heading', { name: 'Create your account to keep Tool Share' }).waitFor({ timeout: 5000 });
+  await page.getByRole('heading', { name: 'Save Tool Share to an account' }).waitFor({ timeout: 5000 });
   await check('account');
   await page.getByLabel('Your name').fill('Ada Lovelace');
   await page.getByLabel('Email').fill('ada@example.com');

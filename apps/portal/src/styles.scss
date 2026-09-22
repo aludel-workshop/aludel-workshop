@@ -188,3 +188,4 @@ fieldset{border:0;padding:0;margin:0;min-width:0}legend{font-weight:600;margin-b
 .pub-email-form{margin-top:18px}
 .pub-form-note{font-size:14px;color:var(--machine-muted);margin:0 0 10px}
 .pub-divider{display:flex;align-items:center;gap:12px;color:var(--machine-muted);font-size:14px;margin:22px 0 16px}.pub-divider::before,.pub-divider::after{content:'';flex:1;border-top:1px solid var(--machine-line)}
+.pub-github + .field-hint{margin-top:12px}

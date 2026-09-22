@@ -21,6 +21,17 @@ Authorization: owner chat instruction of 2026-09-22 ("go ahead, document plan, a
 | ONB-05 skeleton and preview | The deterministic `aludel-web-v1` scaffold (Angular/Material/Vite/Node/SQLite, with its own email/password auth) is committed to the project repository, then built and run on a loopback port. `<slug>.<base>` is reverse-proxied to it, and it is framed in the portal under a CSP `frame-src` limited to app origins. Previews restart on demand. |
 | Project page (`/projects/<id>`) | Switch working style or change single preferences, reset overrides, set-up checklist, preview controls, agent connection. |
 
+## Owner feedback applied — sign in with GitHub (2026-09-22)
+
+The owner reached the account step, chose "I have an account", and read the email and password form as a request for their GitHub password. Enterprise products never collect third-party passwords, so the owner asked for a redirect to GitHub. The change:
+
+- When the GitHub App is configured, **Continue with GitHub** is the primary action on the account step and on `/login`. It uses the same vendor GitHub App: OAuth with PKCE and one-time state, callback on the registered URL, then a single-use two-minute login ticket that hands the session to the portal host. One trip signs the person in (creating the account if needed), connects their GitHub identity, and claims the draft.
+- Email and password stays as a secondary path, labelled as an *Aludel* account that is "not your GitHub password".
+- A GitHub identity belongs to at most one Aludel account (unique index; connecting an identity already linked elsewhere is refused). A GitHub email never attaches to an existing password account; the person is asked to sign in and connect instead, which prevents account takeover through a provider email.
+- Callback errors return to `/login` with a readable message instead of raw JSON.
+- Checked: server test for create/reuse/no-takeover/no-sharing/single-use tickets (27/27 pass); onboarding browser script passes. With a stand-in configuration, the button sends the browser to `github.com/login/oauth/authorize` with the app's client ID, S256 PKCE and the registered callback. Not yet exercised against real GitHub.
+- Enterprise SSO (SAML/OIDC via an identity provider) is the later equivalent for organizations and belongs to ONB-07.
+
 ## Checks run (Node 24.14.0, 2026-09-22)
 
 | Check | Result |
