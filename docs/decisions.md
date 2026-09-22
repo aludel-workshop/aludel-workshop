@@ -2,7 +2,7 @@
 id: decisions-001
 kind: decision-register
 status: active
-updated: 2026-09-21
+updated: 2026-09-22
 ---
 
 # Decision inbox
@@ -10,6 +10,14 @@ updated: 2026-09-21
 This is the seed of the portal's decision workflow. Confirmed owner answers and proposed defaults are distinct. No unanswered question silently becomes an owner decision.
 
 ## Confirmed
+
+2026-09-22 — **DEC-035: the first stack preset is the portal's own stack.** Owner: "first stack preset, go with what we've already got running." `aludel-web-v1` = Angular 22 / Angular Material 22 (MD3) / Vite / Node 24 `node:http` / SQLite. Other stacks (e.g. Django) are listed as unavailable until a preset is checked to work. Skeletons are generated deterministically from the preset, not by an agent. [Onboarding record](design/onboarding/work-record.md#stack-presets-and-skeleton).
+
+2026-09-22 — **DEC-034: agent connections are project-level and identical for Aludel and every other project.** Owner: "aludel is being built inside itself, the same way that another app would be built inside it. so connecting an agent would be done the same for this project as for other projects." One connection record, component and API serve every project, including `the-machine`. Storing a key does not authorize calling the provider; provider calls remain gated by execution authorization.
+
+2026-09-22 — **DEC-033: projects are served as subdomains of the Aludel domain.** Owner: "all project apps can start as a subdomain from the main aludel domain, kind of railway style ... since we're just localhost for now, can we subdomain that? and might need to move aludel to have its own subdomain." Portal at `aludel.<base>`, project previews at `<slug>.<base>`, `MACHINE_BASE_DOMAIN` defaulting to `localhost` (browsers resolve `*.localhost` to loopback). `127.0.0.1` keeps serving the portal for the registered GitHub callback. Hosted operation later needs wildcard DNS/TLS; not authorized now.
+
+2026-09-22 — **DEC-032: build the public-shaped new-project onboarding, local-only but portable to hosted.** Owner supplied the [new project flow](design/onboarding/work-record.md#owner-intent-source-2026-09-22) and: "we'll keep this local for now, but build it to port easily to hosted ... go ahead, document plan, and start building." Supersedes DEC-002's single-owner account model: accounts are per user and projects have members, while the deployment stays local and owner-operated. Replaces proposed PW-05 with ONB-00–ONB-07. Authorizes local implementation and checks for ONB-01–ONB-05 only: no public deployment, spending, GitHub App reconfiguration, agent-created live repositories, provider API calls or email.
 
 2026-09-21 — **DEC-031: name the self-hosting product Aludel and make branding project-owned.** The owner selected “Aludel” for its alchemical image of staged condensation of ideas and supplied workshop concept art. Human-facing product language uses Aludel. Project name, description, tagline, accent and hero artwork are mutable project data consumed by the shared shell; future projects use the same contract. Stable compatibility identifiers (`the-machine`, `machine-*`, `MACHINE_*`, and `launch-machine`) remain until a separately justified migration. This authorizes local brand implementation and checks only. [Implementation evidence](design/process/aludel-brand-work-record.md).
 
@@ -29,7 +37,7 @@ DEC-028 is superseded for interim dispatch by DEC-029. Its bridge evidence and p
 | ID | Decision | Source / effect |
 |---|---|---|
 | DEC-001 | Begin with research and definition | Original brief; no implementation or deployment in this session |
-| DEC-002 | Serve the owner managing several projects | Owner reply, 2026-09-18; defer collaborative account model |
+| DEC-002 | Serve the owner managing several projects | Owner reply, 2026-09-18; defer collaborative account model. **Account model superseded by DEC-032** (per-user accounts, local deployment) |
 | DEC-003 | First valuable milestone: request a change and review an agent-built preview | Owner reply, 2026-09-18; M1 requires an actual agent-built preview; execution location is a proposed implementation choice |
 | DEC-004 | Low/no incremental budget; prefer free tiers and use existing ChatGPT Plus coding access | Owner reply, 2026-09-18; no assumed API budget or dedicated paid compute |
 | DEC-005 | Owner can prioritize and click Go; heavy automation is unnecessary initially | Owner reply, 2026-09-18; defer scheduled autonomous work |

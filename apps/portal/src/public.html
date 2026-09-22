@@ -1,0 +1,471 @@
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="pub-bar">
+  <a class="pub-brand" href="/" (click)="go('/', $event)"><mat-icon aria-hidden="true">deployed_code</mat-icon>Aludel</a>
+  <nav class="pub-bar-actions" aria-label="Account">
+    @if (session()?.authenticated) {
+      @if (session()?.aludelMember) { <a mat-button href="/#/the-machine/overview">Aludel workspace</a> }
+      <a mat-button href="/projects" (click)="go('/projects', $event)">Your apps</a>
+      <button mat-button type="button" (click)="signOut()">Sign out</button>
+    } @else if (view() !== 'login') {
+      <a mat-button href="/login" (click)="go('/login', $event)">Sign in</a>
+    }
+  </nav>
+</header>
+
+@if (isStep()) {
+  <nav class="pub-steps" aria-label="New app setup">
+    <p class="pub-steps-compact">Step {{ stepIndex() + 1 }} of {{ steps.length }} · <strong>{{ steps[stepIndex()].label }}</strong></p>
+    <ol>
+      @for (step of steps; track step.id; let index = $index) {
+        <li [class]="'pub-step ' + stepState(step, index)">
+          @if (canOpenStep(index) && index !== stepIndex()) {
+            <a [href]="stepPath(step.id)" (click)="go(stepPath(step.id), $event)"><span class="pub-step-dot" aria-hidden="true">{{ index + 1 }}</span>{{ step.label }}</a>
+          } @else {
+            <span [attr.aria-current]="index === stepIndex() ? 'step' : null"><span class="pub-step-dot" aria-hidden="true">{{ index + 1 }}</span>{{ step.label }}</span>
+          }
+        </li>
+      }
+    </ol>
+  </nav>
+}
+
+<main id="main" class="pub-main" [class.pub-wide]="view() === 'landing'">
+  @if (error()) { <p class="error-message pub-alert" role="alert">{{ error() }}</p> }
+  @if (notice()) { <p class="success-message pub-alert" role="status">{{ notice() }}</p> }
+
+  @switch (view()) {
+    @case ('landing') {
+      <section class="pub-hero" aria-labelledby="landing-heading">
+        <div>
+          <p class="eyebrow">Aludel</p>
+          <h1 id="landing-heading" tabindex="-1">Turn an idea into an app you can click around.</h1>
+          <p class="pub-lead">Describe what you imagine. Aludel sets up the repository, the design and a working skeleton, then keeps your plan, code and previews in one place.</p>
+          <div class="pub-actions">
+            <a mat-flat-button class="pub-cta" href="/start" (click)="go('/start', $event)">Get started</a>
+            @if (!session()?.authenticated) { <a mat-button href="/login" (click)="go('/login', $event)">I have an account</a> }
+          </div>
+          <p class="field-hint">No account needed to start. You'll create one after you've described your idea.</p>
+        </div>
+        <img src="/brand/aludel-workshop.png" alt="" class="pub-hero-art">
+      </section>
+      <section class="pub-how" aria-labelledby="how-heading">
+        <h2 id="how-heading">How it works</h2>
+        <ol class="pub-how-list">
+          <li><mat-icon aria-hidden="true">tune</mat-icon><h3>Choose how you work</h3><p>Dream big and let agents build, plan the details yourself, or tinker hands-on with no AI at all. Change it any time.</p></li>
+          <li><mat-icon aria-hidden="true">description</mat-icon><h3>Describe the idea</h3><p>A name and a sentence or two. That's the start of your product plan.</p></li>
+          <li><mat-icon aria-hidden="true">palette</mat-icon><h3>Pick a feel</h3><p>Start from a feel like sleek SaaS or mobile-first social, then set colours and add your own images.</p></li>
+          <li><mat-icon aria-hidden="true">rocket_launch</mat-icon><h3>Click around</h3><p>Your app gets its own address and a working skeleton, with the code in your GitHub repository.</p></li>
+        </ol>
+      </section>
+    }
+
+    @case ('login') {
+      <section class="pub-card pub-narrow" aria-labelledby="login-heading">
+        @if (session()?.setupRequired && accountMode() === 'owner') {
+          <h1 id="login-heading" tabindex="-1">Set up owner access</h1>
+          <p>Choose an owner key for this local Aludel. It is stored only as a one-way digest.</p>
+          <form (ngSubmit)="submitAccount()">
+            <mat-form-field appearance="outline" class="wide-field"><mat-label>Owner access key</mat-label><input matInput name="ownerKey" type="password" [(ngModel)]="ownerKey" autocomplete="new-password"></mat-form-field>
+            <mat-form-field appearance="outline" class="wide-field"><mat-label>Confirm owner access key</mat-label><input matInput name="confirmKey" type="password" [(ngModel)]="confirmPassword" autocomplete="new-password"></mat-form-field>
+            <button mat-flat-button type="submit" [disabled]="busy() || ownerKey.length < 12 || ownerKey !== confirmPassword">{{ busy() ? 'Setting up…' : 'Create owner access' }}</button>
+            <p class="field-hint">Use at least 12 characters. Keep it in your password manager.</p>
+          </form>
+        } @else if (accountMode() === 'owner') {
+          <h1 id="login-heading" tabindex="-1">Open Aludel as owner</h1>
+          <form (ngSubmit)="submitAccount()">
+            <mat-form-field appearance="outline" class="wide-field"><mat-label>Owner access key</mat-label><input matInput name="ownerKey" type="password" [(ngModel)]="ownerKey" autocomplete="current-password"></mat-form-field>
+            <button mat-flat-button type="submit" [disabled]="busy() || !ownerKey">{{ busy() ? 'Opening…' : 'Open portal' }}</button>
+          </form>
+          <button mat-button type="button" (click)="accountMode.set('sign-in')">Sign in with email instead</button>
+        } @else {
+          <h1 id="login-heading" tabindex="-1">Sign in</h1>
+          @if (session()?.githubSignIn) {
+            <button mat-flat-button type="button" class="pub-github" (click)="signInWithGithub('/projects')"><mat-icon aria-hidden="true">code</mat-icon>Continue with GitHub</button>
+            <p class="pub-divider"><span>or use your Aludel email and password</span></p>
+          }
+          <form (ngSubmit)="accountMode.set('sign-in'); submitAccount()">
+            <mat-form-field appearance="outline" class="wide-field"><mat-label>Email</mat-label><input matInput name="email" type="email" [(ngModel)]="email" autocomplete="email"></mat-form-field>
+            <mat-form-field appearance="outline" class="wide-field"><mat-label>Password</mat-label><input matInput name="password" type="password" [(ngModel)]="password" autocomplete="current-password"></mat-form-field>
+            <button mat-flat-button type="submit" [disabled]="busy() || !email || !password">{{ busy() ? 'Signing in…' : 'Sign in' }}</button>
+          </form>
+          <div class="pub-actions">
+            <a mat-button href="/start" (click)="go('/start', $event)">New here? Start an app</a>
+            <button mat-button type="button" (click)="accountMode.set('owner')">{{ session()?.setupRequired ? 'Set up owner access' : 'Use owner access key' }}</button>
+          </div>
+        }
+      </section>
+    }
+
+    @case ('profile') {
+      <section aria-labelledby="profile-heading">
+        <p class="eyebrow">Step 1 · Working style</p>
+        <h1 id="profile-heading" tabindex="-1">How do you want to work?</h1>
+        <p class="pub-lead">This sets how much Aludel does for you. It isn't permanent: you can switch styles or change single preferences later.</p>
+        <fieldset class="pub-choice-grid">
+          <legend class="visually-hidden">Working style</legend>
+          @for (item of profileEntries(); track item.id) {
+            <label class="pub-choice" [class.selected]="profile === item.id">
+              <input type="radio" name="profile" [value]="item.id" [checked]="profile === item.id" (change)="chooseProfile(item.id)">
+              <mat-icon aria-hidden="true">{{ item.icon }}</mat-icon>
+              <strong>{{ item.label }}</strong>
+              <span>{{ item.summary }}</span>
+              <small>{{ item.detail }}</small>
+            </label>
+          }
+        </fieldset>
+        <div class="pub-actions pub-footer-actions">
+          <button mat-flat-button type="button" (click)="saveProfile()" [disabled]="!profile || busy()">Continue<mat-icon iconPositionEnd aria-hidden="true">arrow_forward</mat-icon></button>
+        </div>
+      </section>
+    }
+
+    @case ('idea') {
+      <section class="pub-narrow" aria-labelledby="idea-heading">
+        <p class="eyebrow">Step 2 · Your idea</p>
+        <h1 id="idea-heading" tabindex="-1">What are you making?</h1>
+        <p class="pub-lead">An elevator pitch, not a list of requirements. It becomes the starting point for everything else.</p>
+        <form (ngSubmit)="saveIdea()">
+          <mat-form-field appearance="outline" class="wide-field"><mat-label>App name</mat-label><input matInput name="appName" [(ngModel)]="appName" maxlength="60" autocomplete="off"><mat-hint>You can rename it later.</mat-hint></mat-form-field>
+          <mat-form-field appearance="outline" class="wide-field"><mat-label>Elevator pitch</mat-label><textarea matInput name="pitch" [(ngModel)]="pitch" rows="4" maxlength="600"></textarea><mat-hint>{{ pitchHint() }}</mat-hint><mat-hint align="end">{{ pitch.length }}/600</mat-hint></mat-form-field>
+          <div class="pub-actions pub-footer-actions">
+            <a mat-button href="/start" (click)="go('/start', $event)"><mat-icon aria-hidden="true">arrow_back</mat-icon>Back</a>
+            <button mat-flat-button type="submit" [disabled]="busy() || !appName.trim() || pitch.trim().length < 10">Continue<mat-icon iconPositionEnd aria-hidden="true">arrow_forward</mat-icon></button>
+          </div>
+        </form>
+      </section>
+    }
+
+    @case ('account') {
+      <section class="pub-narrow" aria-labelledby="account-heading">
+        <p class="eyebrow">Step 3 · Account</p>
+        @if (session()?.authenticated) {
+          <h1 id="account-heading" tabindex="-1">Save {{ appName }} to your account</h1>
+          <p class="pub-lead">You're signed in as {{ session()?.user?.name }}{{ session()?.user?.email ? ' (' + session()?.user?.email + ')' : '' }}.</p>
+          <button mat-flat-button type="button" (click)="continueSignedIn()" [disabled]="busy()">Create {{ appName }}<mat-icon iconPositionEnd aria-hidden="true">arrow_forward</mat-icon></button>
+        } @else {
+          <h1 id="account-heading" tabindex="-1">{{ accountMode() === 'owner' ? 'Open Aludel as owner' : 'Save ' + appName + ' to an account' }}</h1>
+          @if (session()?.githubSignIn && accountMode() !== 'owner') {
+            <p class="pub-lead">Your idea is saved. Continue with the GitHub account {{ appName }}'s code should live in. That signs you in and connects GitHub in one step.</p>
+            <button mat-flat-button type="button" class="pub-github" (click)="signInWithGithub('/start/account')"><mat-icon aria-hidden="true">code</mat-icon>Continue with GitHub</button>
+            <p class="field-hint">You'll approve access on github.com and come straight back. Aludel never sees your GitHub password.</p>
+            @if (!emailForm()) { <button mat-button type="button" class="pub-email-toggle" (click)="emailForm.set(true)">Use an email and password instead</button> }
+          } @else if (accountMode() !== 'owner') {
+            <p class="pub-lead">Your idea is saved. Create an Aludel account (or sign in) to keep it. You'll connect GitHub on the next step.</p>
+          }
+          @if (!session()?.githubSignIn || emailForm() || accountMode() === 'owner') {
+          <form (ngSubmit)="submitAccount()" class="pub-email-form">
+            @if (accountMode() !== 'owner') { <p class="pub-form-note">{{ accountMode() === 'sign-up' ? 'New Aludel account' : 'Sign in to your Aludel account' }} · this is not your GitHub password</p> }
+            @if (accountMode() === 'sign-up') {
+              <mat-form-field appearance="outline" class="wide-field"><mat-label>Your name</mat-label><input matInput name="accountName" [(ngModel)]="accountName" autocomplete="name"></mat-form-field>
+            }
+            @if (accountMode() !== 'owner') {
+              <mat-form-field appearance="outline" class="wide-field"><mat-label>Email</mat-label><input matInput name="email" type="email" [(ngModel)]="email" autocomplete="email"></mat-form-field>
+              <mat-form-field appearance="outline" class="wide-field"><mat-label>Password</mat-label><input matInput name="password" type="password" [(ngModel)]="password" [autocomplete]="accountMode() === 'sign-up' ? 'new-password' : 'current-password'">@if (accountMode() === 'sign-up') {<mat-hint>At least 12 characters.</mat-hint>}</mat-form-field>
+            } @else {
+              <mat-form-field appearance="outline" class="wide-field"><mat-label>Owner access key</mat-label><input matInput name="ownerKey" type="password" [(ngModel)]="ownerKey" autocomplete="current-password"></mat-form-field>
+            }
+            @if (accountMode() === 'sign-up') {
+              <mat-form-field appearance="outline" class="wide-field"><mat-label>Confirm password</mat-label><input matInput name="confirmPassword" type="password" [(ngModel)]="confirmPassword" autocomplete="new-password"></mat-form-field>
+            }
+            <div class="pub-actions pub-footer-actions">
+              <a mat-button href="/start/idea" (click)="go('/start/idea', $event)"><mat-icon aria-hidden="true">arrow_back</mat-icon>Back</a>
+              <button mat-flat-button type="submit" [disabled]="busy()">{{ accountMode() === 'sign-up' ? 'Create account and continue' : 'Sign in and continue' }}</button>
+            </div>
+          </form>
+          }
+          <div class="pub-actions">
+            @if (accountMode() === 'sign-up') { <button mat-button type="button" (click)="accountMode.set('sign-in'); emailForm.set(true)">I already have an Aludel account</button> }
+            @else { <button mat-button type="button" (click)="accountMode.set('sign-up')">Create a new Aludel account instead</button> }
+            @if (accountMode() !== 'owner' && !session()?.setupRequired) { <button mat-button type="button" (click)="accountMode.set('owner')">Use owner access key</button> }
+          </div>
+        }
+      </section>
+    }
+
+    @case ('github') {
+      @if (setup(); as current) {
+        <section class="pub-narrow" aria-labelledby="github-heading">
+          <p class="eyebrow">Step 4 · GitHub</p>
+          <h1 id="github-heading" tabindex="-1">Give {{ current.project.name }} a home on GitHub</h1>
+          <p class="pub-lead">Connect the GitHub account you'll use for your repositories. Aludel creates the repository and pushes the first commit for you.</p>
+          <div class="pub-status-card">
+            <mat-icon aria-hidden="true">folder</mat-icon>
+            <div><strong>Local repository ready</strong><span>README, AGENTS.md and your product plan are committed on <code>{{ current.github.local?.branch || 'main' }}</code>.</span></div>
+          </div>
+          @if (current.github.repository; as repository) {
+            <div class="pub-status-card" [class.ok]="repository.status === 'ready'">
+              <mat-icon aria-hidden="true">{{ repository.status === 'ready' ? 'check_circle' : 'warning' }}</mat-icon>
+              <div><strong>{{ repository.owner }}/{{ repository.name }}</strong>
+                <span>{{ repository.status === 'ready' ? 'On GitHub with your first commit.' : 'Created on GitHub; the first push needs attention: ' + (repository.last_error || 'unknown error') }}</span>
+                <a [href]="repository.html_url" target="_blank" rel="noopener">Open on GitHub<mat-icon aria-hidden="true" class="inline-icon">open_in_new</mat-icon></a></div>
+            </div>
+            <div class="pub-actions pub-footer-actions"><button mat-flat-button type="button" (click)="markAndNext('github')" [disabled]="busy()">Continue<mat-icon iconPositionEnd aria-hidden="true">arrow_forward</mat-icon></button></div>
+          } @else if (!current.github.configured) {
+            <div class="pub-status-card warn">
+              <mat-icon aria-hidden="true">warning</mat-icon>
+              <div><strong>GitHub isn't set up on this Aludel yet</strong><span>The operator needs to configure the Aludel GitHub App (see the portal README). You can keep going with the local repository and publish it to GitHub from your app's page later.</span></div>
+            </div>
+            <div class="pub-actions pub-footer-actions"><button mat-flat-button type="button" (click)="next()">Continue with the local repository<mat-icon iconPositionEnd aria-hidden="true">arrow_forward</mat-icon></button></div>
+          } @else if (!current.github.connected) {
+            <button mat-flat-button type="button" (click)="connectGithub()"><mat-icon aria-hidden="true">link</mat-icon>Connect GitHub</button>
+            <p class="field-hint">You'll approve access on GitHub and come straight back here.</p>
+          } @else if (!eligibleInstallations().length) {
+            <p>Connected as <strong>{{ current.github.login }}</strong>. Now install the Aludel app on the account or organization that should own {{ current.project.name }}, with access to all repositories.</p>
+            <div class="pub-actions"><button mat-flat-button type="button" (click)="installGithub()">Install the Aludel GitHub App</button><button mat-button type="button" (click)="refreshInstallations()" [disabled]="busy()">I've installed it, check again</button></div>
+          } @else {
+            <p>Connected as <strong>{{ current.github.login }}</strong>.</p>
+            <form (ngSubmit)="createRepository()">
+              <label class="pub-select-label" for="installation">Owner</label>
+              <select id="installation" name="installation" class="pub-select" [(ngModel)]="installationId">
+                @for (item of eligibleInstallations(); track item.installation_id) { <option [value]="item.installation_id">{{ item.account_login }} ({{ item.target_type === 'User' ? 'personal' : 'organization' }})</option> }
+              </select>
+              <mat-form-field appearance="outline" class="wide-field"><mat-label>Repository name</mat-label><input matInput name="repositoryName" [(ngModel)]="repositoryName" pattern="[A-Za-z0-9._-]+"></mat-form-field>
+              <label class="pub-check"><input type="checkbox" name="private" [(ngModel)]="repositoryPrivate"> Private repository</label>
+              <div class="pub-actions pub-footer-actions"><button mat-flat-button type="submit" [disabled]="busy() || !repositoryName || !installationId">{{ busy() ? 'Creating…' : 'Create repository' }}</button></div>
+            </form>
+          }
+        </section>
+      }
+    }
+
+    @case ('agent') {
+      @if (setup(); as current) {
+        <section class="pub-narrow" aria-labelledby="agent-step-heading">
+          <p class="eyebrow">Step 5 · Agent · optional</p>
+          <h1 id="agent-step-heading" tabindex="-1">{{ preferences()['agentSetup'] === 'optional' ? 'Want an agent on hand?' : 'Connect an agent' }}</h1>
+          <p class="pub-lead">{{ preferences()['agentSetup'] === 'optional' ? 'No AI is required. Connect one now or later if you ever want to delegate a task.' : 'An agent does the implementation work you authorize. Aludel uses the same connection for every project, including itself.' }}</p>
+          <aludel-agent-connection [projectId]="current.project.id" heading="Agent for {{ current.project.name }}" description="Bring your own API key, or use Codex on this computer." (changed)="agentChanged($event)"></aludel-agent-connection>
+          <div class="pub-actions pub-footer-actions">
+            <button mat-flat-button type="button" (click)="markAndNext('agent')" [disabled]="busy()">{{ current.agentConnection ? 'Continue' : 'Skip for now' }}<mat-icon iconPositionEnd aria-hidden="true">arrow_forward</mat-icon></button>
+          </div>
+        </section>
+      }
+    }
+
+    @case ('look') {
+      @if (setup(); as current) {
+        <section aria-labelledby="look-heading">
+          <p class="eyebrow">Step 6 · Look & feel · optional</p>
+          <h1 id="look-heading" tabindex="-1">Choose a starting feel</h1>
+          <p class="pub-lead">A feel sets type, shape, density and navigation. It doesn't decide features. You can refine everything later.</p>
+          <fieldset class="pub-feel-grid">
+            <legend class="visually-hidden">Starting feel</legend>
+            @for (item of feelEntries(); track item.id) {
+              <label class="pub-feel" [class.selected]="feel === item.id" [style]="feelStyle(item)">
+                <input type="radio" name="feel" [value]="item.id" [checked]="feel === item.id" (change)="chooseFeel(item.id, item)">
+                <span [class]="'pub-feel-sample nav-' + item.navigation + (item.theme === 'dark' ? ' dark' : '')" aria-hidden="true"><i></i><b></b><b></b><em></em></span>
+                <strong>{{ item.label }}</strong><span>{{ item.summary }}</span>
+              </label>
+            }
+          </fieldset>
+          <div class="pub-look-controls">
+            <fieldset class="pub-segmented">
+              <legend>Theme</legend>
+              @for (option of [{ id: 'light', label: 'Light' }, { id: 'dark', label: 'Dark' }, { id: 'system', label: 'Match device' }]; track option.id) {
+                <label [class.selected]="theme === option.id"><input type="radio" name="theme" [value]="option.id" [(ngModel)]="theme">{{ option.label }}</label>
+              }
+            </fieldset>
+            <div class="pub-accent"><label for="accent">Accent colour</label><input id="accent" name="accent" type="color" [(ngModel)]="accent"><code>{{ accent }}</code></div>
+          </div>
+          <section class="pub-uploads" aria-labelledby="media-heading">
+            <h2 id="media-heading">Images and media</h2>
+            <p>Add a logo, photos or anything else, with a note on how it should be used (e.g. "hero image on the home page").</p>
+            <div class="pub-upload-row">
+              <mat-form-field appearance="outline" class="wide-field"><mat-label>How should this be used?</mat-label><input matInput name="uploadNotes" [(ngModel)]="uploadNotes" maxlength="1000"></mat-form-field>
+              <label class="pub-file"><mat-icon aria-hidden="true">upload</mat-icon>Choose file<input type="file" [accept]="details() ? 'image/png,image/jpeg,image/webp,.md,.txt,text/markdown,text/plain' : 'image/png,image/jpeg,image/webp'" (change)="upload($event)"></label>
+            </div>
+            @if (current.assets.length) {
+              <ul class="pub-assets">
+                @for (asset of current.assets; track asset.id) {
+                  <li>@if (asset.kind === 'image') { <img [src]="asset.url" alt=""> } @else { <mat-icon aria-hidden="true">description</mat-icon> }
+                    <span><strong>{{ asset.filename }}</strong><small>{{ asset.notes || 'No usage note' }} · {{ size(asset.size) }}</small></span>
+                    <button mat-icon-button type="button" (click)="removeAsset(asset.id)" [attr.aria-label]="'Remove ' + asset.filename"><mat-icon>delete</mat-icon></button></li>
+                }
+              </ul>
+            }
+          </section>
+          <label class="pub-toggle"><input type="checkbox" [checked]="details()" (change)="details.set(!details())"> More details</label>
+          @if (details()) {
+            <mat-form-field appearance="outline" class="wide-field"><mat-label>Design direction notes</mat-label><textarea matInput name="designNotes" [(ngModel)]="designNotes" rows="4" maxlength="2000"></textarea><mat-hint>Brand guidelines, apps you admire, anything to keep or avoid. You can also upload Markdown or text documents above.</mat-hint></mat-form-field>
+          }
+          <div class="pub-actions pub-footer-actions">
+            <button mat-button type="button" (click)="markAndNext('look')">Skip</button>
+            <button mat-flat-button type="button" (click)="saveLook()" [disabled]="busy()">Save and continue<mat-icon iconPositionEnd aria-hidden="true">arrow_forward</mat-icon></button>
+          </div>
+        </section>
+      }
+    }
+
+    @case ('features') {
+      @if (setup(); as current) {
+        <section aria-labelledby="features-heading">
+          <p class="eyebrow">Step 7 · Features · optional</p>
+          <h1 id="features-heading" tabindex="-1">What should {{ current.project.name }} include to start?</h1>
+          <p class="pub-lead">Each choice becomes a feature in your product plan and a page in the skeleton.</p>
+          <fieldset class="pub-feature-grid">
+            <legend class="visually-hidden">Starting features</legend>
+            @for (item of featureEntries(); track item.id) {
+              <label class="pub-feature" [class.selected]="picks.has(item.id)">
+                <input type="checkbox" [checked]="picks.has(item.id)" (change)="togglePick(item.id)">
+                <mat-icon aria-hidden="true">{{ item.icon }}</mat-icon><span><strong>{{ item.label }}</strong><small>{{ item.summary }}</small></span>
+              </label>
+            }
+          </fieldset>
+          <label class="pub-toggle"><input type="checkbox" [checked]="details()" (change)="details.set(!details())"> More details</label>
+          @if (details()) {
+            <section class="pub-custom" aria-labelledby="custom-heading">
+              <h2 id="custom-heading">Your own features</h2>
+              @if (customFeatures().length) {
+                <ul class="pub-assets">
+                  @for (item of customFeatures(); track item.id) {
+                    <li><mat-icon aria-hidden="true">widgets</mat-icon><span><strong>{{ item.title }}</strong><small>{{ item.summary }}</small></span>
+                      <button mat-icon-button type="button" (click)="removeFeature(item.id)" [attr.aria-label]="'Remove ' + item.title"><mat-icon>delete</mat-icon></button></li>
+                  }
+                </ul>
+              }
+              <mat-form-field appearance="outline" class="wide-field"><mat-label>Feature name</mat-label><input matInput name="newFeatureTitle" [(ngModel)]="newFeatureTitle" maxlength="90"></mat-form-field>
+              <mat-form-field appearance="outline" class="wide-field"><mat-label>What it does</mat-label><textarea matInput name="newFeatureSummary" [(ngModel)]="newFeatureSummary" rows="2" maxlength="600"></textarea></mat-form-field>
+              <button mat-stroked-button type="button" (click)="saveFeatures(false)" [disabled]="busy() || !newFeatureTitle.trim()"><mat-icon aria-hidden="true">add</mat-icon>Add feature</button>
+              <p class="field-hint">Have a requirements document? Upload it as Markdown or text on the Look & feel step with a note, and it goes into the repository's docs.</p>
+            </section>
+          }
+          <div class="pub-actions pub-footer-actions">
+            <button mat-button type="button" (click)="markAndNext('features')">Skip</button>
+            <button mat-flat-button type="button" (click)="saveFeatures()" [disabled]="busy()">Save and continue<mat-icon iconPositionEnd aria-hidden="true">arrow_forward</mat-icon></button>
+          </div>
+        </section>
+      }
+    }
+
+    @case ('stack') {
+      @if (setup(); as current) {
+        <section class="pub-narrow" aria-labelledby="stack-heading">
+          <p class="eyebrow">Step 8 · Stack · optional</p>
+          <h1 id="stack-heading" tabindex="-1">How it's built</h1>
+          <p class="pub-lead">Aludel only offers stacks it has checked end to end. The recommended one is ready now.</p>
+          @for (item of stackEntries(); track item.id) {
+            @if (item.recommended || details()) {
+              <label class="pub-stack" [class.selected]="stackPreset === item.id" [class.unavailable]="!item.available">
+                <input type="radio" name="stack" [value]="item.id" [(ngModel)]="stackPreset" [disabled]="!item.available">
+                <span><strong>{{ item.label }}@if (item.recommended) { <em class="pub-badge">Recommended</em> }</strong>
+                  <small>{{ item.available ? item.summary : item.unavailableReason }}</small>
+                  @if (item.available) { <span class="pub-layers">@for (layer of layerEntries(item.id); track layer.layer) { <span><b>{{ layer.layer }}</b>{{ layer.value }}</span> }</span> }
+                </span>
+              </label>
+            }
+          }
+          <label class="pub-toggle"><input type="checkbox" [checked]="details()" (change)="details.set(!details())"> More options</label>
+          @if (details()) {
+            <fieldset class="pub-options">
+              <legend>Options for {{ stackLabel(stackPreset) }}</legend>
+              @for (option of optionEntries(stackPreset); track option.key) {
+                <label class="pub-check"><input type="checkbox" [name]="option.key" [(ngModel)]="stackOptions[option.key]"> {{ option.label }}</label>
+              }
+            </fieldset>
+          }
+          <div class="pub-actions pub-footer-actions">
+            <button mat-flat-button type="button" (click)="saveStack()" [disabled]="busy()">{{ details() ? 'Save and continue' : 'Use the recommended setup' }}<mat-icon iconPositionEnd aria-hidden="true">arrow_forward</mat-icon></button>
+          </div>
+        </section>
+      }
+    }
+
+    @case ('build') {
+      @if (setup(); as current) {
+        <section aria-labelledby="build-heading">
+          <p class="eyebrow">Step 9 · Build</p>
+          <h1 id="build-heading" tabindex="-1">{{ current.preview.status === 'running' ? current.project.name + ' is ready to click around' : 'Build ' + current.project.name }}</h1>
+          <dl class="pub-summary">
+            <div><dt>Working style</dt><dd>{{ profileLabel(current.profile) }}</dd></div>
+            <div><dt>Feel</dt><dd><span class="pub-swatch" [style.background]="current.design.accent"></span>{{ feelLabel(current.design.feel) }} · {{ current.design.theme === 'system' ? 'matches device' : current.design.theme }}</dd></div>
+            <div><dt>Features</dt><dd>{{ current.features.records.length ? current.features.records.length + ' planned' : 'None yet (home page only)' }}</dd></div>
+            <div><dt>Stack</dt><dd>{{ stackLabel(current.stack.preset) }}</dd></div>
+            <div><dt>Address</dt><dd><code>{{ current.urls.app }}</code></dd></div>
+            <div><dt>Repository</dt><dd>{{ current.github.repository ? current.github.repository.owner + '/' + current.github.repository.name : 'Local only for now' }}</dd></div>
+          </dl>
+          <div class="pub-preview-bar" role="status">
+            <strong>{{ previewLabel() }}</strong>
+            @if (current.preview.status === 'running' || current.preview.status === 'stopped') { <a mat-flat-button [href]="current.urls.app" target="_blank" rel="noopener">Open {{ current.project.name }}<mat-icon iconPositionEnd aria-hidden="true">open_in_new</mat-icon></a> }
+            <button mat-stroked-button type="button" (click)="build()" [disabled]="busy() || current.preview.status === 'building' || current.preview.status === 'starting'">{{ current.preview.status === 'not-built' ? 'Build my app' : 'Rebuild from current setup' }}</button>
+            <a mat-button [href]="'/projects/' + current.project.id" (click)="go('/projects/' + current.project.id, $event)">Go to app page</a>
+          </div>
+          @if (current.preview.status === 'failed') {
+            <p class="error-message">{{ current.preview.error }}</p>
+            <details class="pub-log"><summary>Build log</summary><pre>{{ current.preview.log }}</pre></details>
+          }
+          @if (current.preview.status === 'running') {
+            <iframe class="pub-preview-frame" [src]="current.urls.app | safeUrl" [title]="current.project.name + ' preview'"></iframe>
+          }
+        </section>
+      }
+    }
+
+    @case ('projects') {
+      <section aria-labelledby="projects-heading">
+        <div class="pub-split"><h1 id="projects-heading" tabindex="-1">Your apps</h1><a mat-flat-button href="/start" (click)="go('/start', $event)"><mat-icon aria-hidden="true">add</mat-icon>New app</a></div>
+        @if (session()?.projects?.length) {
+          <ul class="pub-project-list">
+            @for (item of session()?.projects; track item.id) {
+              <li><a [href]="item.id === 'the-machine' ? '/#/the-machine/overview' : '/projects/' + item.id" (click)="go(item.id === 'the-machine' ? '/#/the-machine/overview' : '/projects/' + item.id, $event)">
+                <span class="pub-swatch big" [style.background]="item.accent_color"></span><span><strong>{{ item.name }}</strong><small>{{ item.description }}</small></span><mat-icon aria-hidden="true">chevron_right</mat-icon></a></li>
+            }
+          </ul>
+        } @else {
+          <p>No apps yet. <a href="/start" (click)="go('/start', $event)">Start one</a>.</p>
+        }
+      </section>
+    }
+
+    @case ('project') {
+      @if (setup(); as current) {
+        <section aria-labelledby="project-heading">
+          <p class="eyebrow"><a href="/projects" (click)="go('/projects', $event)">Your apps</a></p>
+          <h1 id="project-heading" tabindex="-1">{{ current.project.name }}</h1>
+          <p class="pub-lead">{{ current.direction?.summary }}</p>
+          <div class="pub-preview-bar">
+            <strong>{{ previewLabel() }}</strong>
+            @if (current.preview.status === 'running' || current.preview.status === 'stopped') { <a mat-flat-button [href]="current.urls.app" target="_blank" rel="noopener">Open app<mat-icon iconPositionEnd aria-hidden="true">open_in_new</mat-icon></a> }
+            <a mat-stroked-button [href]="stepPath('build')" (click)="go(stepPath('build'), $event)">{{ current.preview.status === 'not-built' ? 'Finish setup and build' : 'Rebuild' }}</a>
+            <code>{{ current.urls.app }}</code>
+          </div>
+          <div class="pub-project-grid">
+            <section class="pub-card" aria-labelledby="style-heading">
+              <h2 id="style-heading">Working style</h2>
+              <fieldset class="pub-segmented">
+                <legend class="visually-hidden">Working style</legend>
+                @for (item of profileEntries(); track item.id) {
+                  <label [class.selected]="current.profile === item.id"><input type="radio" name="projectProfile" [value]="item.id" [checked]="current.profile === item.id" (change)="switchProfile(item.id)">{{ item.label }}</label>
+                }
+              </fieldset>
+              <div class="pub-preferences">
+                @for (item of preferenceEntries(); track item.id) {
+                  <label [for]="'pref-' + item.id">{{ item.label }}@if (isOverridden(item.id)) { <em class="pub-badge">changed</em> }</label>
+                  <select class="pub-select" [id]="'pref-' + item.id" [value]="current.preferences[item.id]" (change)="setPreference(item.id, $any($event.target).value)">
+                    @for (option of item.options; track option.key) { <option [value]="option.key" [selected]="current.preferences[item.id] === option.key">{{ option.label }}</option> }
+                  </select>
+                }
+              </div>
+              @if (current.overrides && (current.overrides | keyvalue).length) { <button mat-button type="button" (click)="resetPreferences()">Reset to {{ profileLabel(current.profile) }} defaults</button> }
+            </section>
+            <section class="pub-card" aria-labelledby="setup-heading">
+              <h2 id="setup-heading">Setup</h2>
+              <ul class="pub-setup-list">
+                @for (step of steps.slice(3); track step.id) {
+                  <li><mat-icon aria-hidden="true">{{ current.completedSteps.includes(step.id) ? 'check_circle' : 'radio_button_unchecked' }}</mat-icon>
+                    <a [href]="stepPath(step.id)" (click)="go(stepPath(step.id), $event)">{{ step.label }}</a></li>
+                }
+              </ul>
+              <p class="field-hint">Repository: {{ current.github.repository ? current.github.repository.owner + '/' + current.github.repository.name : 'local only' }}</p>
+            </section>
+          </div>
+          <aludel-agent-connection [projectId]="current.project.id" heading="Agent connection" (changed)="agentChanged($event)"></aludel-agent-connection>
+        </section>
+      }
+    }
+
+    @default {
+      <h1 tabindex="-1">Page not found</h1>
+      <p><a href="/" (click)="go('/', $event)">Go to Aludel</a></p>
+    }
+  }
+</main>

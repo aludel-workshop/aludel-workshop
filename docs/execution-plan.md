@@ -346,6 +346,10 @@ These are stable planning IDs, not dispatch authorization. PW-01 delivers projec
 
 **B-03 impact:** the owner cycle supplied a real navigation failure and successful subsequent authorization, not blanket acceptance. Preserve the [navigation correction](evidence/b-03a-work-navigation.md), no-op revision friction and project-scope/source-identity gaps in adapter readiness. B-03 still owns workers, recovery and real artifact review; the workspace expansion must not replace it with manual-only work or force every future feature into M1.
 
+## New-project onboarding — ONB (DEC-032–DEC-035)
+
+The owner's new-project flow replaces proposed PW-05. The contracts, packet table and readiness verdict are in the [onboarding work record](design/onboarding/work-record.md). In summary: ONB-01 accounts and tenancy → ONB-02 pre-account profile/pitch draft → ONB-03 account, per-user GitHub identity and repository → ONB-04 optional setup (agent connection, look & feel, features, stack) → ONB-05 deterministic skeleton and `<slug>.localhost` preview → ONB-06 project-scoped workspace → ONB-07 hosted-port readiness. ONB-01–05 are authorized for local build; ONB-06 and ONB-07 are planned only. B-03B remains required for agent execution against generated repositories.
+
 ## Later phase gates
 
 M2 begins only after the M1 acceptance criteria in [roadmap.md](roadmap.md) pass and the owner approves release scope. M3 requires a real second-product brief. M4 requires observed signals and an explicit automation budget. Expand these packets when the preceding phase produces evidence; do not prebuild speculative subsystems.

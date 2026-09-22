@@ -10,7 +10,7 @@ From the repository root:
 ./launch-machine
 ```
 
-Open <http://127.0.0.1:4310>. On first start, choose an owner access key in the local setup screen. Only a scrypt digest is stored. The session survives restart. If the key is lost, reset owner access locally and choose a new one in the setup screen:
+Open <http://aludel.localhost:4310> (`http://127.0.0.1:4310` still serves the portal too). Logged out, `/` is the marketing page and **Get started** runs the new-app onboarding. The owner signs in at `/login` → **Use owner access key**; on first start that page offers **Set up owner access** to choose the key. Only a scrypt digest is stored. The session survives restart. If the key is lost, reset owner access locally and choose a new one in the setup screen:
 
 ```sh
 cd apps/portal
@@ -18,6 +18,18 @@ npm run reset-owner
 ```
 
 The server binds to `127.0.0.1` by default. `MACHINE_PORT` and `MACHINE_DATA_DIR` may override the port and data directory. Do not set `MACHINE_HOST` to a public interface; this bootstrap identity boundary is only approved for local use.
+
+## Accounts, onboarding and app previews
+
+Onboarding ([work record](../../docs/design/onboarding/work-record.md), DEC-032–DEC-035) has these parts:
+
+- **Accounts.** Email and password accounts sit alongside the owner key. The owner key signs in as the built-in `owner` user, the only member of Aludel's own project (`the-machine`). Other accounts see only their own apps, and Aludel's workspace endpoints return 404 to them.
+- **Working styles.** `config/interaction-profiles.json` defines the Dreamer, Planner and Tinkerer preference sets. Starter feels and quick-pick features are in `config/starter-kit.json`, and trusted stacks in `config/stack-presets.json`.
+- **Subdomains.** The portal lives at `aludel.<base>` and each app at `<slug>.<base>` (`MACHINE_BASE_DOMAIN`, default `localhost`). Browsers resolve `*.localhost` to this machine, so no hosts-file edits are needed. For a hosted deployment, also set `MACHINE_PUBLIC_SCHEME=https` and `MACHINE_PUBLIC_PORT=` (empty).
+- **Skeletons.** A skeleton is generated from the `aludel-web-v1` preset (no agent involved) into `$MACHINE_DATA_DIR/workspaces/<project-id>`, a git repository. It builds with this portal's installed toolchain and runs as its own process on a private loopback port, which the portal reverse-proxies. Builds and previews get only `PATH`/`HOME`, not the portal's secrets. Build logs are in `$MACHINE_DATA_DIR/preview-logs/`. Previews restart on demand after a portal restart.
+- **GitHub.** Identity and installations belong to the user (`github_identities`). Repository bindings belong to the project. When the operator has not configured the GitHub App, onboarding continues with the local repository.
+
+Browser checks for the flow: start a fresh portal, then `MACHINE_PORT=<port> PLAYWRIGHT_MODULE=<path to playwright/index.mjs> node tests/onboarding-browser.mjs`. Icons come from a subset font. After using a new icon name, run `python3 tools/subset-icons.py` (needs `pip install fonttools brotli`); `tests/icon-subset.test.mjs` fails until you do.
 
 ## GitHub App setup
 
@@ -125,6 +137,8 @@ The configuration and recovery behavior are locally and mock tested. A real GitH
 
 - `.data/machine.sqlite`: projects, owner requests, source identities, immutable source revisions, relationships, import runs, access digest, and sessions.
 - `.data/integration-vault.key`: local AES-256-GCM key for encrypted provider credentials. It is generated with owner-only file mode where the platform supports POSIX permissions. Back it up separately from the database or reconnect integrations after loss.
+- `.data/workspaces/<project-id>/`: each generated app's git repository (its own `.data/` holds the app's SQLite database). `.data/workspaces/node_modules` links to this portal's dependencies for local builds.
+- `.data/project-assets/`, `.data/preview-logs/`: onboarding uploads (images, reference documents) and per-app build/run logs.
 - `docs/**/*.md`: seed/audit sources. Re-importing unchanged files is idempotent; changes create new source revisions.
 - `src/`: accepted project-specific UI implementation and reusable component stories.
 - large artifact storage, final normalized decision/task models, external identity, and hosted topology remain later packets.

@@ -2,10 +2,10 @@
 id: status-001
 kind: project-status
 status: active
-updated: 2026-09-21
+updated: 2026-09-22
 current_phase: M1
 phase_state: in-progress
-next_action: B-03B
+next_action: ONB-REVIEW
 ---
 
 # Current project status
@@ -16,11 +16,13 @@ Turn the running local portal foundation into the first complete request → del
 
 ## Next action
 
-**B-03B — validate the supervised cycle, then integrate execution.** PW-02 is complete and returns the pointer to the minimum real request → execution → immutable candidate review loop. Prepare the bounded implementation scope before authorization; no worker, deployment or external effect is authorized by PW-02. [PW-02 evidence](evidence/pw-02-product-workspace.md) · [execution packet](execution-plan.md#b-03b--validate-the-supervised-cycle-then-integrate-execution).
+**ONB-REVIEW — owner walkthrough of the new-project onboarding.** ONB-01–ONB-05 are built and agent-checked locally ([evidence](evidence/onb-01-05-onboarding.md)). Run `./launch-machine`, open `http://aludel.localhost:4310` and choose **Get started**. Owner judgment is needed on the flow, copy and scaffold look, and then on the next slice: ONB-06 (project-scoped workspace) or B-03B (agent execution against generated repositories).
 
 ## Ready queue
 
-1. **B-03B** — Product and Work workspace prerequisites exist; requires separate implementation authorization.
+1. **ONB-REVIEW** — owner walkthrough; no further build until it happens.
+2. **ONB-06** — new projects open in the Overview/Product/Work workspace (planned).
+3. **B-03B** — still requires separate implementation authorization; now has generated repositories with a preview pipeline as its target.
 
 One packet at a time. B-03's worker/artifact/recovery work remains required and must not be displaced by later workspace expansion. [Proposed dependency order](design/project-workspace/v1/delivery-plan.md).
 
@@ -55,6 +57,7 @@ One packet at a time. B-03's worker/artifact/recovery work remains required and 
 
 | Packet | Result | Evidence |
 |---|---|---|
+| ONB-01–05 | Accounts/tenancy, pre-account working style and idea, account + per-user GitHub + local repository, optional agent/look/features/stack, deterministic skeleton at `<slug>.localhost`; agent-checked, owner review pending | [Evidence/retrospective](evidence/onb-01-05-onboarding.md), [work record](design/onboarding/work-record.md) |
 | PW-02 | Revisioned Direction/Roadmap/Features, research-backed projections, responsibility-based navigation and legacy-route compatibility | [Evidence/retrospective](evidence/pw-02-product-workspace.md), [research](design/project-workspace/pw-02/research.md) |
 | BRAND-001 | Aludel name/art applied through reusable project brand data and upload contract; server and browser checks pass | [Evidence/retrospective](design/process/aludel-brand-work-record.md) |
 | Enterprise GitHub App | Vendor app configuration, live organization authorization/all-repositories installation/private create/push, endpoint-token matrix, ephemeral installation-token Git and no-duplicate recovery agent-checked; remaining live variants explicit | [Evidence/retrospective](design/process/enterprise-github-app-work-record.md) |
@@ -74,6 +77,8 @@ One packet at a time. B-03's worker/artifact/recovery work remains required and 
 | M0 research/design | Product loop, local agent path, runner choice, recovery model, product workflow, knowledge boundary, experience architecture, and design-system strategy | [Execution plan](execution-plan.md), [decision register](decisions.md) |
 
 ## Latest handoff
+
+2026-09-22: new-project onboarding built locally (DEC-032–035). The end-to-end browser script takes a new user from the marketing page to a running generated app on its own subdomain. Fixed on the way: non-executable git askpass (GitHub pushes would have failed), 19 missing workspace icons, the stale Playwright path. `tests/browser.mjs` fails on the baseline too (pre-existing). [Evidence](evidence/onb-01-05-onboarding.md).
 
 2026-09-21: PW-02 is complete. The Product area now provides revisioned Direction, horizon Roadmap and feature comparison/detail over one product record set; route and authority boundaries survived desktop/narrow browser checks and the existing Work lifecycle regression. [Evidence](evidence/pw-02-product-workspace.md). B-03B is again the single next planning pointer and needs separate authorization.
 

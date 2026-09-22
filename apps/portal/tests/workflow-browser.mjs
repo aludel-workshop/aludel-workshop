@@ -1,4 +1,4 @@
-import { chromium } from '/tmp/app-builder-d01b-browser/node_modules/playwright/index.mjs';
+import { chromium, ownerSignIn } from './browser-support.mjs';
 import { randomBytes } from 'node:crypto';
 import { openDatabase } from '../server/storage.mjs';
 import { createProposal, reviseProposal } from '../server/product-records.mjs';
@@ -15,11 +15,8 @@ const browser = await chromium.launch({headless:true});
 const page = await browser.newPage({viewport:{width:1440,height:1000},bypassCSP:true});
 const errors=[];page.on('pageerror',e=>errors.push(e.message));
 try {
- await page.goto(baseUrl);
  const key=randomBytes(24).toString('hex');
- await page.getByLabel('Owner access key',{exact:true}).fill(key);
- await page.getByLabel('Confirm owner access key').fill(key);
- await page.getByRole('button',{name:'Create owner access'}).click();
+ await ownerSignIn(page, baseUrl, key);
  await page.getByRole('link',{name:'New request',exact:true}).click();
  await page.getByLabel('Your request').fill('Browser supervised cycle');
  await page.getByRole('button',{name:'Save request',exact:true}).click();

@@ -68,3 +68,40 @@ export function initializeAndPush({ repository, profile, remoteUrl, login, userI
   const head = git(repository, ['rev-parse', 'HEAD']).stdout.trim();
   return { branch: profile.initialBranch, commit: head, trackedFiles: tracked.length };
 }
+
+function trackedPaths(repository) {
+  return git(repository, ['diff', '--cached', '--name-only', '-z']).stdout.split('\0').filter(Boolean);
+}
+
+// Generated project workspaces commit locally first and publish to a remote later, so onboarding never depends on GitHub being reachable.
+export function commitWorkspace({ repository, profile, message, name, email }) {
+  const before = inspectGitRepository(repository);
+  if (!before.initialized) git(repository, ['init', '-b', profile.initialBranch]);
+  git(repository, ['config', 'user.name', name]);
+  git(repository, ['config', 'user.email', email]);
+  git(repository, ['add', '-A']);
+  const staged = trackedPaths(repository);
+  const blocked = staged.filter(path => sensitivePath.test(path) && path !== '.env.example');
+  if (blocked.length) {
+    git(repository, ['reset'], { allowFailure: true, quiet: true });
+    throw new Error(`Sensitive local files would be committed: ${blocked.join(', ')}`);
+  }
+  const changed = git(repository, ['diff', '--cached', '--quiet'], { allowFailure: true, quiet: true }).status !== 0;
+  if (changed) git(repository, ['commit', '-m', message]);
+  const head = git(repository, ['rev-parse', 'HEAD']).stdout.trim();
+  const trackedFiles = git(repository, ['ls-files', '-z']).stdout.split('\0').filter(Boolean).length;
+  return { branch: profile.initialBranch, commit: head, trackedFiles, changed };
+}
+
+export function pushWorkspace({ repository, remoteUrl, token, branch }) {
+  const current = git(repository, ['remote', 'get-url', 'origin'], { allowFailure: true, quiet: true });
+  if (current.status !== 0) git(repository, ['remote', 'add', 'origin', remoteUrl]);
+  else if (current.stdout.trim() !== remoteUrl) git(repository, ['remote', 'set-url', 'origin', remoteUrl]);
+  const askpass = fileURLToPath(new URL('./git-askpass.mjs', import.meta.url));
+  git(repository, ['push', '--set-upstream', 'origin', branch], {
+    env: { GIT_ASKPASS: askpass, GIT_ASKPASS_REQUIRE: 'force', GIT_TERMINAL_PROMPT: '0', MACHINE_GITHUB_PUSH_TOKEN: token }
+  });
+  const head = git(repository, ['rev-parse', 'HEAD']).stdout.trim();
+  const trackedFiles = git(repository, ['ls-files', '-z']).stdout.split('\0').filter(Boolean).length;
+  return { branch, commit: head, trackedFiles };
+}

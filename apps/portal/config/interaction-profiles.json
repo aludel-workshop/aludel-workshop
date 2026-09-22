@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "preferences": {
+    "implementation": {
+      "label": "Who writes the code",
+      "values": {
+        "agent": "Agents implement; you see results",
+        "agent-with-review": "Agents implement; you review each change",
+        "self": "You write the code; agents only when you delegate"
+      }
+    },
+    "planning": {
+      "label": "Who turns ideas into tasks",
+      "values": {
+        "agent": "Aludel drafts the plan and tasks",
+        "collaborative": "Aludel proposes; you shape and approve",
+        "self": "You write the plan and tasks"
+      }
+    },
+    "autofill": {
+      "label": "Filling in details",
+      "values": {
+        "fill-for-me": "Fill in details for me",
+        "suggest": "Suggest details; I confirm",
+        "off": "Leave fields for me"
+      }
+    },
+    "setupDetail": {
+      "label": "Setup detail",
+      "values": {
+        "quick": "Quick picks with recommended defaults",
+        "detailed": "Show detailed options and documents"
+      }
+    },
+    "interruptions": {
+      "label": "Which questions reach you",
+      "values": {
+        "blockers-only": "Only choices that block progress",
+        "consequential": "Choices with real consequences",
+        "all": "Every open choice"
+      }
+    },
+    "agentSetup": {
+      "label": "Agent connection",
+      "values": {
+        "recommended": "Recommend connecting an agent",
+        "optional": "Offer agents as an optional extra"
+      }
+    }
+  },
+  "profiles": {
+    "dreamer": {
+      "label": "Dreamer",
+      "summary": "Describe what you imagine. Agents handle the implementation details.",
+      "detail": "Focus on the big idea. You won't be asked to micromanage.",
+      "icon": "auto_awesome",
+      "defaults": { "implementation": "agent", "planning": "agent", "autofill": "fill-for-me", "setupDetail": "quick", "interruptions": "blockers-only", "agentSetup": "recommended" }
+    },
+    "planner": {
+      "label": "Planner",
+      "summary": "Shape the vision, roadmap and finer details without writing the code.",
+      "detail": "You act as product or project manager. Agents implement and you review.",
+      "icon": "view_timeline",
+      "defaults": { "implementation": "agent-with-review", "planning": "collaborative", "autofill": "suggest", "setupDetail": "detailed", "interruptions": "consequential", "agentSetup": "recommended" }
+    },
+    "tinkerer": {
+      "label": "Tinkerer",
+      "summary": "Hands-on and self-directed. No AI required.",
+      "detail": "Aludel is your home base for plan, code, commits, design and previews. Delegate to agents later if you choose.",
+      "icon": "construction",
+      "defaults": { "implementation": "self", "planning": "self", "autofill": "off", "setupDetail": "detailed", "interruptions": "all", "agentSetup": "optional" }
+    }
+  }
+}

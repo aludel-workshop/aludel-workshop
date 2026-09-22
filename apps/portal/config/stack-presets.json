@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "default": "aludel-web-v1",
+  "presets": {
+    "aludel-web-v1": {
+      "label": "Aludel web",
+      "summary": "The stack Aludel itself runs on: an Angular app with Material components, served by a small Node server with a SQLite database.",
+      "available": true,
+      "recommended": true,
+      "layers": {
+        "Frontend": "Angular 22 + Vite",
+        "UI kit": "Angular Material 22 (Material Design 3)",
+        "Backend": "Node 24 (node:http)",
+        "Database": "SQLite (node:sqlite)",
+        "Authentication": "Built-in email and password"
+      },
+      "options": {
+        "auth": { "label": "Built-in email and password sign-in", "default": true },
+        "sampleContent": { "label": "Sample content on each page", "default": true }
+      }
+    },
+    "django-htmx": {
+      "label": "Django + HTMX",
+      "summary": "Python backend with server-rendered pages.",
+      "available": false,
+      "unavailableReason": "Not yet checked as a working preset."
+    },
+    "nextjs-postgres": {
+      "label": "Next.js + PostgreSQL",
+      "summary": "React full-stack framework with a Postgres database.",
+      "available": false,
+      "unavailableReason": "Not yet checked as a working preset."
+    }
+  }
+}

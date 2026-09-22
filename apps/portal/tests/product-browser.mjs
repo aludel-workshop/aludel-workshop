@@ -1,4 +1,4 @@
-import { chromium } from '/tmp/app-builder-d01b-browser/node_modules/playwright/index.mjs';
+import { chromium, ownerSignIn } from './browser-support.mjs';
 import { randomBytes } from 'node:crypto';
 import assert from 'node:assert/strict';
 
@@ -13,11 +13,8 @@ const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, bypassCSP: true });
 const errors = []; page.on('pageerror', error => errors.push(error.message));
 try {
-  await page.goto(baseUrl);
   const key = randomBytes(24).toString('hex');
-  await page.getByLabel('Owner access key', { exact: true }).fill(key);
-  await page.getByLabel('Confirm owner access key').fill(key);
-  await page.getByRole('button', { name: 'Create owner access' }).click();
+  await ownerSignIn(page, baseUrl, key);
   await page.getByRole('link', { name: 'Product', exact: true }).click();
   await page.getByRole('heading', { name: 'Build software from durable product intent' }).waitFor();
   await page.getByRole('button', { name: 'Edit direction' }).click();

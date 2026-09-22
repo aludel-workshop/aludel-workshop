@@ -2,15 +2,20 @@ import { initWorkflow, workList, workOperation } from './workflow.mjs';
 import { createServer } from 'node:http';
 import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
+import { aludelProjectId, createExternalUser, createLoginTicket, createSession, createUser, endSession, getUser, redeemLoginTicket, initAccounts, isMember, ownerUserId, requireMember, sessionUser, userProjects, verifyUser } from './accounts.mjs';
+import { hostTopology } from './hosts.mjs';
+import { initOnboarding, loadCatalogs, onboarding } from './onboarding.mjs';
+import { previewManager } from './previews.mjs';
+import { copyMedia, initialFiles, skeletonFiles, writeFiles } from './scaffold.mjs';
 import { extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { importCorpus } from './importer.mjs';
 import { openDatabase } from './storage.mjs';
 import { answerDecision, createProposal, ensureB02Fixture, getDecision, getProposal, listDecisions, listDownstreamRecords, listProposals, reassessRecord, reviseProposal } from './product-records.mjs';
 import { openSecretStore } from './secret-store.mjs';
-import { githubIntegration } from './github-integration.mjs';
+import { githubIntegration, initGithubIdentities } from './github-integration.mjs';
 import { loadGitHubVendorConfig } from './github-vendor-config.mjs';
-import { initializeAndPush, inspectGitRepository, loadGitProfile } from './git-repository.mjs';
+import { commitWorkspace, initializeAndPush, inspectGitRepository, loadGitProfile, pushWorkspace } from './git-repository.mjs';
 import { getProjectBrand, updateProjectBrand } from './project-brand.mjs';
 import { ensureProductWorkspace, getProductWorkspace, saveProductRecord } from './product-workspace.mjs';
 
@@ -23,16 +28,34 @@ const brandAssetDirectory = join(dataDirectory, 'brand-assets');
 const host = process.env.MACHINE_HOST || '127.0.0.1';
 const port = Number(process.env.MACHINE_PORT || 4310);
 const publicBaseUrl = (process.env.MACHINE_PUBLIC_BASE_URL || `http://${host}:${port}`).replace(/\/$/, '');
-const sessionMaxAge = 60 * 60 * 24 * 30;
 const db = openDatabase(databasePath);
 initWorkflow(db);
 ensureProductWorkspace(db);
+initAccounts(db);
+initGithubIdentities(db);
+initOnboarding(db);
 const secrets = openSecretStore(dataDirectory);
-const gitSetup = loadGitProfile(join(portalRoot, 'config', 'project-setup.json'), 'the-machine');
+const topology = hostTopology(process.env, port);
+const setupConfigPath = join(portalRoot, 'config', 'project-setup.json');
+const gitSetup = loadGitProfile(setupConfigPath, 'the-machine');
+const projectGitProfile = (config => config.sourceControlProfiles[config.defaultSourceControlProfile])(JSON.parse(readFileSync(setupConfigPath, 'utf8')));
+const catalogs = loadCatalogs(join(portalRoot, 'config'));
+const workspaceRoot = join(dataDirectory, 'workspaces');
+const previews = previewManager({ db, portalRoot, workspaceRoot, logRoot: join(dataDirectory, 'preview-logs') });
+const appUrls = slug => ({ portal: topology.portalOrigin, app: topology.appOrigin(slug) });
+const commitIdentity = user => ({ name: user?.name || 'Aludel', email: user?.email || 'owner@aludel.invalid' });
+// A new project's repository starts local; GitHub publishing is a later, separate step.
+function createWorkspace(setup, user) {
+  if (inspectGitRepository(setup.workspacePath).committed) return;
+  writeFiles(setup.workspacePath, initialFiles(setup, catalogs, projectGitProfile, appUrls(setup.project.slug)));
+  commitWorkspace({ repository: setup.workspacePath, profile: projectGitProfile, message: `chore: start ${setup.project.name} with Aludel`, ...commitIdentity(user) });
+}
+const flows = onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot: join(dataDirectory, 'project-assets'), createWorkspace });
 const github = githubIntegration({
   db, secrets, config: loadGitHubVendorConfig(),
   callbackUrl: `${publicBaseUrl}/api/integrations/github/callback`,
-  setupUrl: `${publicBaseUrl}/api/integrations/github/installed`
+  setupUrl: `${publicBaseUrl}/api/integrations/github/installed`,
+  createUserFromGithub: profile => createExternalUser(db, { email: profile.email, name: profile.name || profile.login }).id
 });
 
 const digest = value => createHash('sha256').update(value).digest('hex');
@@ -48,6 +71,8 @@ const readJson = (request, maxBytes = 1024 * 1024) => new Promise((resolveBody, 
   request.on('end', () => { try { resolveBody(body ? JSON.parse(body) : {}); } catch (error) { reject(error); } });
   request.on('error', reject);
 });
+const draftCookie = (token, maxAge) => `aludel_draft=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAge}`;
+const safeReturnPath = value => /^\/(?![/\\])[^\s]*$/.test(String(value || '')) ? String(value) : null;
 const cookie = request => Object.fromEntries((request.headers.cookie || '').split(';').flatMap(part => {
   const index = part.indexOf('=');
   return index < 0 ? [] : [[part.slice(0, index).trim(), decodeURIComponent(part.slice(index + 1))]];
@@ -72,11 +97,44 @@ if (process.argv.includes('--reset-owner')) {
 importCorpus(db, { root: repositoryRoot });
 ensureB02Fixture(db);
 
-function authenticated(request) {
-  const token = cookie(request).machine_session;
-  if (!token) return false;
-  const session = db.prepare('SELECT expires_at FROM sessions WHERE token_hash = ?').get(digest(token));
-  return Boolean(session && session.expires_at > new Date().toISOString());
+const currentUser = request => sessionUser(db, cookie(request).machine_session);
+const currentOwner = () => getUser(db, ownerUserId);
+
+function projectView(user, projectId) {
+  const setup = flows.projectSetup(user, projectId);
+  const repository = inspectGitRepository(setup.workspacePath || gitSetup.repository);
+  return { ...setup, urls: appUrls(setup.project.slug), github: github.status(user.id, projectId, repository), preview: previews.status(projectId) };
+}
+
+// Sign-up and sign-in continue the onboarding: an unclaimed draft becomes the new user's project.
+function continueWithDraft(request, user, headers) {
+  const token = cookie(request).aludel_draft;
+  const draft = flows.getDraft(token);
+  if (!draft || draft.claimedProjectId || !draft.profile || !draft.name) return null;
+  const setup = flows.claimDraft(token, user, user);
+  headers.push(draftCookie('', 0));
+  return setup.project;
+}
+
+async function generateSkeleton(user, projectId) {
+  const setup = flows.projectSetup(user, projectId);
+  const { files, media } = skeletonFiles(setup, catalogs, projectGitProfile, appUrls(setup.project.slug), flows.projectAssets(projectId));
+  createWorkspace(setup, user);
+  writeFiles(setup.workspacePath, files);
+  copyMedia(setup.workspacePath, media);
+  const result = commitWorkspace({ repository: setup.workspacePath, profile: projectGitProfile, message: `feat: generate ${setup.project.name} skeleton from ${setup.stack.preset}`, ...commitIdentity(user) });
+  const binding = github.status(user.id, projectId, null).repository;
+  let pushed = false; let pushError = null;
+  if (binding?.status === 'ready') {
+    try {
+      const token = await github.installationTokenForRepository(projectId, binding.name);
+      pushWorkspace({ repository: setup.workspacePath, remoteUrl: binding.clone_url, token, branch: result.branch });
+      pushed = true;
+    } catch (error) { pushError = String(error.message || error); }
+  }
+  flows.markStep(user, projectId, 'build');
+  void previews.build(projectId, setup.workspacePath, result.commit);
+  return { commit: result.commit, trackedFiles: result.trackedFiles, pushed, pushError };
 }
 
 function overview() {
@@ -99,20 +157,41 @@ function overview() {
 }
 
 async function api(request, response, url) {
+  const user = currentUser(request);
   if (url.pathname === '/api/session' && request.method === 'GET') return json(response, 200, {
-    authenticated: authenticated(request),
-    setupRequired: !db.prepare('SELECT id FROM auth_config WHERE id = 1').get()
+    authenticated: Boolean(user), user,
+    setupRequired: !db.prepare('SELECT id FROM auth_config WHERE id = 1').get(),
+    aludelMember: Boolean(user && isMember(db, user.id, aludelProjectId)),
+    githubSignIn: github.status(null, null, null).configured,
+    projects: user ? userProjects(db, user.id) : [],
+    draft: flows.getDraft(cookie(request).aludel_draft)
   });
+  if (url.pathname === '/api/onboarding/catalog' && request.method === 'GET') return json(response, 200, flows.catalog());
+  if (url.pathname === '/api/onboarding/draft' && request.method === 'GET') return json(response, 200, { draft: flows.getDraft(cookie(request).aludel_draft) });
+  if (url.pathname === '/api/onboarding/draft' && request.method === 'PUT') {
+    const saved = flows.saveDraft(cookie(request).aludel_draft, await readJson(request));
+    return json(response, 200, { draft: saved.draft }, saved.token ? { 'set-cookie': draftCookie(saved.token, saved.maxAge) } : {});
+  }
+  if (url.pathname === '/api/accounts' && request.method === 'POST') {
+    const created = createUser(db, await readJson(request));
+    const headers = [createSession(db, created.id)];
+    const project = continueWithDraft(request, created, headers);
+    return json(response, 201, { user: created, project }, { 'set-cookie': headers });
+  }
+  if (url.pathname === '/api/sign-in' && request.method === 'POST') {
+    const signedIn = verifyUser(db, await readJson(request));
+    const headers = [createSession(db, signedIn.id)];
+    const project = continueWithDraft(request, signedIn, headers);
+    return json(response, 200, { user: signedIn, project }, { 'set-cookie': headers });
+  }
   if (url.pathname === '/api/setup' && request.method === 'POST') {
     if (db.prepare('SELECT id FROM auth_config WHERE id = 1').get()) return json(response, 409, { error: 'Owner access is already configured.' });
     const { key = '' } = await readJson(request);
     if (String(key).length < 12) return json(response, 400, { error: 'Use at least 12 characters for the owner key.' });
     saveOwnerKey(String(key));
-    const token = randomBytes(32).toString('base64url');
-    const created = new Date();
-    const expires = new Date(created.getTime() + sessionMaxAge * 1000);
-    db.prepare('INSERT INTO sessions(token_hash, created_at, expires_at) VALUES (?, ?, ?)').run(digest(token), created.toISOString(), expires.toISOString());
-    return json(response, 201, { authenticated: true }, { 'set-cookie': `machine_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${sessionMaxAge}` });
+    const headers = [createSession(db, ownerUserId)];
+    const project = continueWithDraft(request, currentOwner(), headers);
+    return json(response, 201, { authenticated: true, project }, { 'set-cookie': headers });
   }
   if (url.pathname === '/api/login' && request.method === 'POST') {
     const { key = '' } = await readJson(request);
@@ -121,29 +200,116 @@ async function api(request, response, url) {
     const candidate = Buffer.from(hashKey(String(key), config.salt), 'hex');
     const expected = Buffer.from(config.key_hash, 'hex');
     if (candidate.length !== expected.length || !timingSafeEqual(candidate, expected)) return json(response, 401, { error: 'That owner key is not valid.' });
-    const token = randomBytes(32).toString('base64url');
-    const created = new Date();
-    const expires = new Date(created.getTime() + sessionMaxAge * 1000);
-    db.prepare('INSERT INTO sessions(token_hash, created_at, expires_at) VALUES (?, ?, ?)').run(digest(token), created.toISOString(), expires.toISOString());
-    return json(response, 200, { authenticated: true }, { 'set-cookie': `machine_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${sessionMaxAge}` });
+    const headers = [createSession(db, ownerUserId)];
+    const project = continueWithDraft(request, currentOwner(), headers);
+    return json(response, 200, { authenticated: true, project }, { 'set-cookie': headers });
   }
   if (url.pathname === '/api/logout' && request.method === 'POST') {
-    const token = cookie(request).machine_session;
-    if (token) db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(digest(token));
-    return json(response, 200, { authenticated: false }, { 'set-cookie': 'machine_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0' });
+    return json(response, 200, { authenticated: false }, { 'set-cookie': endSession(db, cookie(request).machine_session) });
+  }
+  if (url.pathname === '/api/auth/github' && request.method === 'GET') {
+    const path = safeReturnPath(url.searchParams.get('return')) || '/projects';
+    response.writeHead(302, { location: github.startSignIn(`${topology.portalOriginFor(request.headers.host)}${path}`) });
+    return response.end();
+  }
+  if (url.pathname === '/api/auth/complete' && request.method === 'GET') {
+    const signedIn = redeemLoginTicket(db, url.searchParams.get('ticket'));
+    const headers = [createSession(db, signedIn.id)];
+    let project = null;
+    try { project = continueWithDraft(request, signedIn, headers); } catch { /* The draft stays available to claim from the account step. */ }
+    const path = safeReturnPath(url.searchParams.get('return')) || '/projects';
+    const location = project ? `/start/${encodeURIComponent(project.id)}/github` : path === '/start/account' ? path : isMember(db, signedIn.id, aludelProjectId) && path === '/projects' ? '/#/the-machine/overview' : path;
+    response.writeHead(302, { location, 'set-cookie': headers, 'cache-control': 'no-store' });
+    return response.end();
   }
   if (url.pathname === '/api/integrations/github/callback' && request.method === 'GET') {
-    await github.callback({ code: url.searchParams.get('code'), state: url.searchParams.get('state') });
-    response.writeHead(302, { location: '/#/the-machine/overview?github=connected' });
+    let result;
+    try { result = await github.callback({ code: url.searchParams.get('code'), state: url.searchParams.get('state') }); }
+    catch (error) {
+      // GitHub returns to the registered callback host; send people back to a readable page rather than raw JSON.
+      response.writeHead(302, { location: `${topology.portalOrigin}/login?github_error=${encodeURIComponent(error.status ? error.message : 'GitHub sign-in failed. Please try again.')}` });
+      return response.end();
+    }
+    if (result.signIn) {
+      const target = new URL(result.returnTo || `${topology.portalOrigin}/projects`);
+      const ticket = createLoginTicket(db, result.userId);
+      response.writeHead(302, { location: `${target.origin}/api/auth/complete?ticket=${encodeURIComponent(ticket)}&return=${encodeURIComponent(target.pathname)}` });
+      return response.end();
+    }
+    response.writeHead(302, { location: result.returnTo || '/#/the-machine/overview?github=connected' });
     return response.end();
   }
   if (url.pathname === '/api/integrations/github/installed' && request.method === 'GET') {
-    await github.installed({ installationId: url.searchParams.get('installation_id'), state: url.searchParams.get('state') });
-    response.writeHead(302, { location: '/#/the-machine/overview?github=installed' });
+    const result = await github.installed({ installationId: url.searchParams.get('installation_id'), state: url.searchParams.get('state') });
+    response.writeHead(302, { location: result.returnTo || '/#/the-machine/overview?github=installed' });
     return response.end();
   }
-  if (!authenticated(request)) return json(response, 401, { error: 'Owner session required.' });
+  if (!user) return json(response, 401, { error: 'Sign in to continue.' });
+  const returnTo = () => {
+    const path = safeReturnPath(url.searchParams.get('return'));
+    return path ? `${topology.portalOriginFor(request.headers.host)}${path}` : null;
+  };
+  if (url.pathname === '/api/github' && request.method === 'GET') return json(response, 200, github.status(user.id, null, null));
+  if (url.pathname === '/api/github/connect' && request.method === 'GET') {
+    response.writeHead(302, { location: github.startAuthorization(user.id, returnTo()) });
+    return response.end();
+  }
+  if (url.pathname === '/api/github/install' && request.method === 'GET') {
+    response.writeHead(302, { location: github.startInstallation(user.id, returnTo()) });
+    return response.end();
+  }
+  if (url.pathname === '/api/github/installations/refresh' && request.method === 'POST') {
+    await github.refreshInstallations(user.id);
+    return json(response, 200, github.status(user.id, null, null));
+  }
+  if (url.pathname === '/api/onboarding/claim' && request.method === 'POST') {
+    const token = cookie(request).aludel_draft;
+    const setup = flows.claimDraft(token, user, user);
+    return json(response, 201, { project: setup.project }, { 'set-cookie': draftCookie('', 0) });
+  }
+  if (url.pathname === '/api/projects' && request.method === 'GET') return json(response, 200, { projects: userProjects(db, user.id) });
+  const projectRoute = /^\/api\/projects\/([^/]+)\/(setup|preferences|design|assets|features|stack|connections\/agent|steps|repository|skeleton|preview)(?:\/([^/]+))?$/.exec(url.pathname);
+  if (projectRoute) {
+    const [, rawId, section, rawItem] = projectRoute;
+    const projectId = decodeURIComponent(rawId);
+    const item = rawItem ? decodeURIComponent(rawItem) : null;
+    requireMember(db, user, projectId);
+    const method = request.method;
+    if (section === 'setup' && method === 'GET') return json(response, 200, projectView(user, projectId));
+    if (section === 'preferences' && method === 'PUT') { flows.savePreferences(user, projectId, await readJson(request)); return json(response, 200, projectView(user, projectId)); }
+    if (section === 'design' && method === 'PUT') { flows.saveDesign(user, projectId, await readJson(request)); return json(response, 200, projectView(user, projectId)); }
+    if (section === 'assets' && method === 'POST' && !item) { flows.addAsset(user, projectId, await readJson(request, 12 * 1024 * 1024)); return json(response, 201, projectView(user, projectId)); }
+    if (section === 'assets' && method === 'GET' && item) {
+      const asset = flows.assetFile(user, projectId, item);
+      const body = readFileSync(asset.path);
+      response.writeHead(200, { 'content-type': asset.mime, 'content-length': body.length, 'x-content-type-options': 'nosniff', 'cache-control': 'private, max-age=3600' });
+      return response.end(body);
+    }
+    if (section === 'assets' && method === 'DELETE' && item) { flows.removeAsset(user, projectId, item); return json(response, 200, projectView(user, projectId)); }
+    if (section === 'features' && method === 'PUT' && !item) { flows.saveFeatures(user, projectId, await readJson(request)); return json(response, 200, projectView(user, projectId)); }
+    if (section === 'features' && method === 'DELETE' && item) { flows.removeFeature(user, projectId, item); return json(response, 200, projectView(user, projectId)); }
+    if (section === 'stack' && method === 'PUT') { flows.saveStack(user, projectId, await readJson(request)); return json(response, 200, projectView(user, projectId)); }
+    if (section === 'connections/agent' && method === 'GET') return json(response, 200, flows.agentConnection(user, projectId));
+    if (section === 'connections/agent' && method === 'PUT') return json(response, 200, flows.saveAgentConnection(user, projectId, await readJson(request)));
+    if (section === 'connections/agent' && method === 'DELETE') return json(response, 200, flows.removeAgentConnection(user, projectId));
+    if (section === 'steps' && method === 'POST' && item) { flows.markStep(user, projectId, item); return json(response, 200, projectView(user, projectId)); }
+    if (section === 'repository' && method === 'POST' && projectId !== aludelProjectId) {
+      const input = await readJson(request);
+      const workspace = flows.projectSetup(user, projectId).workspacePath;
+      await github.createRepository(user.id, projectId, input, ({ remoteUrl, token }) => pushWorkspace({ repository: workspace, remoteUrl, token, branch: projectGitProfile.initialBranch }));
+      flows.markStep(user, projectId, 'github');
+      return json(response, 201, projectView(user, projectId));
+    }
+    if (section === 'skeleton' && method === 'POST') {
+      if (projectId === aludelProjectId) return json(response, 409, { error: 'Aludel is already running; it has no generated skeleton.' });
+      const result = await generateSkeleton(user, projectId);
+      return json(response, 202, { ...projectView(user, projectId), result });
+    }
+    if (section === 'preview' && method === 'GET') return json(response, 200, { preview: previews.status(projectId), urls: appUrls(flows.projectSetup(user, projectId).project.slug) });
+    return json(response, 404, { error: 'Not found.' });
+  }
   const brandMatch = /^\/api\/projects\/([^/]+)\/brand$/.exec(url.pathname);
+  if (brandMatch) requireMember(db, user, decodeURIComponent(brandMatch[1]));
   if (brandMatch && request.method === 'GET') {
     const brand = getProjectBrand(db, decodeURIComponent(brandMatch[1]));
     return brand ? json(response, 200, brand) : json(response, 404, { error: 'Project not found.' });
@@ -152,24 +318,36 @@ async function api(request, response, url) {
     const brand = updateProjectBrand(db, brandAssetDirectory, decodeURIComponent(brandMatch[1]), await readJson(request, 12 * 1024 * 1024));
     return brand ? json(response, 200, brand) : json(response, 404, { error: 'Project not found.' });
   }
+  const productMatch = /^\/api\/projects\/([^/]+)\/product(?:\/(direction|outcome|feature)(?:\/([^/]+))?)?$/.exec(url.pathname);
+  if (productMatch) {
+    const projectId = decodeURIComponent(productMatch[1]);
+    requireMember(db, user, projectId);
+    if (!productMatch[2] && request.method === 'GET') return json(response, 200, getProductWorkspace(db, projectId));
+    if (productMatch[2] && request.method === 'PUT') {
+      const id = productMatch[3] ? decodeURIComponent(productMatch[3]) : undefined;
+      return json(response, id ? 200 : 201, saveProductRecord(db, projectId, productMatch[2], id, await readJson(request)));
+    }
+  }
+  // Everything below is Aludel's own workspace (still single-project until ONB-06), so it needs Aludel membership.
+  if (!isMember(db, user.id, aludelProjectId)) return json(response, 404, { error: 'Not found.' });
   if (url.pathname === '/api/integrations/github' && request.method === 'GET') return json(response, 200,
-    github.status('the-machine', inspectGitRepository(gitSetup.repository)));
+    github.status(user.id, 'the-machine', inspectGitRepository(gitSetup.repository)));
   if (url.pathname === '/api/integrations/github/connect' && request.method === 'GET') {
-    response.writeHead(302, { location: github.startAuthorization('the-machine') });
+    response.writeHead(302, { location: github.startAuthorization(user.id) });
     return response.end();
   }
   if (url.pathname === '/api/integrations/github/install' && request.method === 'GET') {
-    response.writeHead(302, { location: github.startInstallation('the-machine') });
+    response.writeHead(302, { location: github.startInstallation(user.id) });
     return response.end();
   }
   if (url.pathname === '/api/integrations/github/installations/refresh' && request.method === 'POST') {
-    await github.refreshInstallations('the-machine');
-    return json(response, 200, github.status('the-machine', inspectGitRepository(gitSetup.repository)));
+    await github.refreshInstallations(user.id);
+    return json(response, 200, github.status(user.id, 'the-machine', inspectGitRepository(gitSetup.repository)));
   }
   if (url.pathname === '/api/integrations/github/repository' && request.method === 'POST') {
     const input = await readJson(request);
     if (input.confirmName !== input.name) return json(response, 400, { error: 'Type the repository name exactly to confirm creation.' });
-    const binding = await github.createRepository('the-machine', input, values => initializeAndPush({ ...values, repository: gitSetup.repository, profile: gitSetup.profile }));
+    const binding = await github.createRepository(user.id, 'the-machine', input, values => initializeAndPush({ ...values, repository: gitSetup.repository, profile: gitSetup.profile }));
     return json(response, 201, binding);
   }
   if (url.pathname === '/api/integrations/github/repository/finish' && request.method === 'POST') {
@@ -179,13 +357,6 @@ async function api(request, response, url) {
   if (url.pathname === '/api/work' && request.method === 'GET') return json(response, 200, { tasks: workList(db), requests: db.prepare('SELECT id, body, status, created_at FROM owner_requests ORDER BY created_at DESC').all() });
   if (/^\/api\/work\/(authorize|answer|resume|cancel|refresh)$/.test(url.pathname) && request.method === 'POST') return json(response, 200, workOperation(db, 'owner', url.pathname.split('/').pop(), await readJson(request)));
   if (url.pathname === '/api/overview' && request.method === 'GET') return json(response, 200, overview());
-  if (url.pathname === '/api/projects/the-machine/product' && request.method === 'GET') return json(response, 200, getProductWorkspace(db));
-  const productRecordMatch = /^\/api\/projects\/the-machine\/product\/(direction|outcome|feature)(?:\/([^/]+))?$/.exec(url.pathname);
-  if (productRecordMatch && request.method === 'PUT') {
-    const kind = productRecordMatch[1];
-    const id = productRecordMatch[2] ? decodeURIComponent(productRecordMatch[2]) : undefined;
-    return json(response, id ? 200 : 201, saveProductRecord(db, 'the-machine', kind, id, await readJson(request)));
-  }
   if (url.pathname === '/api/product-state' && request.method === 'GET') return json(response, 200, {
     proposals: listProposals(db), decisions: listDecisions(db), records: listDownstreamRecords(db)
   });
@@ -274,12 +445,35 @@ function serveStatic(response, pathname) {
 function serveFile(response, path) {
   const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml' }[extname(path)] || 'application/octet-stream';
   const body = readFileSync(path);
-  response.writeHead(200, { 'content-type': mime, 'content-length': body.length, 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'self'" });
+  response.writeHead(200, { 'content-type': mime, 'content-length': body.length, 'x-content-type-options': 'nosniff', 'content-security-policy': `default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-src ${topology.appOrigin('*')}; frame-ancestors 'self'` });
   response.end(body);
+}
+
+function appPage(response, status, title, message) {
+  const body = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title>
+<style>body{font-family:Roboto,system-ui,sans-serif;display:grid;place-items:center;min-height:100vh;margin:0;background:#f5f6fb;color:#141727}main{max-width:460px;padding:32px}a{color:#3047b9}</style>
+</head><body><main><h1>${title}</h1><p>${message}</p><p><a href="${topology.portalOrigin}/projects">Open Aludel</a></p></main></body></html>`;
+  response.writeHead(status, { 'content-type': 'text/html; charset=utf-8', 'content-length': Buffer.byteLength(body), 'cache-control': 'no-store' });
+  response.end(body);
+}
+
+// <slug>.<base> serves only that project's preview. Portal APIs and cookies never exist on app hosts.
+async function serveApp(request, response, slug) {
+  const project = db.prepare('SELECT p.id, p.name, s.workspace_path FROM projects p JOIN project_setup s ON s.project_id = p.id WHERE p.slug = ?').get(slug);
+  if (!project?.workspace_path) return appPage(response, 404, 'No app here yet', 'There is no Aludel project at this address.');
+  const port = await previews.ensureRunning(project.id, project.workspace_path);
+  if (!port) {
+    const status = previews.status(project.id).status;
+    return appPage(response, 503, `${project.name.replace(/[<>&"]/g, '')} is not built yet`, status === 'building' ? 'The skeleton is building. Refresh in a few seconds.' : 'Finish setup in Aludel to generate and build this app.');
+  }
+  previews.proxy(request, response, port);
 }
 
 const server = createServer(async (request, response) => {
   try {
+    const target = topology.classify(request.headers.host);
+    if (target.kind === 'app') return await serveApp(request, response, target.slug);
+    if (target.kind !== 'portal') return appPage(response, 421, 'Unknown address', 'This host is not served by Aludel.');
     const url = new URL(request.url, `http://${host}:${port}`);
     if (url.pathname.startsWith('/api/')) await api(request, response, url);
     else serveStatic(response, url.pathname);
@@ -291,8 +485,9 @@ const server = createServer(async (request, response) => {
 });
 
 server.listen(port, host, () => {
-  console.log(`Aludel is running at http://${host}:${port}`);
+  console.log(`Aludel is running at ${topology.portalOrigin} (also http://${host}:${port})`);
+  console.log(`Project apps are served at ${topology.appOrigin('<app>')}`);
   console.log(`Database: ${databasePath}`);
 });
 
-for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => server.close(() => { db.close(); process.exit(0); }));
+for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => { previews.stopAll(); server.close(() => { db.close(); process.exit(0); }); server.closeAllConnections?.(); });

@@ -6,16 +6,22 @@ import { MatIconModule, MatIconRegistry } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { DependencyListComponent, RecordListComponent, StatusComponent } from './components';
+import { AgentConnectionComponent } from './agent-connection';
+import { Session } from './onboarding-model';
+import { PublicComponent } from './public';
 import { Decision, DownstreamRecord, GitHubIntegration, Overview, OwnerRequest, ProductDirection, ProductFeature, ProductOutcome, ProductWorkspace, ProjectBrand, Proposal, RecordDetail, SourceRecord, WorkTask } from './model';
 
 @Component({
   selector: 'machine-app', standalone: true,
-  imports: [FormsModule, NgTemplateOutlet, MatButtonModule, MatIconModule, MatFormFieldModule, MatInputModule, DependencyListComponent, RecordListComponent, StatusComponent],
+  imports: [FormsModule, NgTemplateOutlet, MatButtonModule, MatIconModule, MatFormFieldModule, MatInputModule, DependencyListComponent, RecordListComponent, StatusComponent, AgentConnectionComponent, PublicComponent],
   templateUrl: './app.html'
 })
 export class App {
   private readonly changeDetector = inject(ChangeDetectorRef);
   authenticated = signal<boolean | null>(null);
+  // Public pages (marketing, sign-in, onboarding, apps) use real paths; Aludel's own workspace keeps its hash routes until ONB-06.
+  mode = signal<'loading' | 'public' | 'workspace'>('loading');
+  session = signal<Session | null>(null);
   setupRequired = signal(false);
   loading = signal(false);
   error = signal('');
@@ -52,8 +58,6 @@ export class App {
   showDone = signal(false);
   answers: Record<string, string> = {};
   searchQuery = '';
-  accessKey = '';
-  confirmKey = '';
   requestText = '';
   requestSaved = signal(false);
   savedRequestId = '';
@@ -126,50 +130,40 @@ export class App {
   private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const response = await fetch(path, { ...options, headers: { 'content-type': 'application/json', ...(options.headers || {}) } });
     const value = await response.json();
-    if (response.status === 401 && path !== '/api/login') this.authenticated.set(false);
+    if (response.status === 401 && path !== '/api/login') this.showPublic('/login');
     if (!response.ok) throw new Error(value.error || 'The request failed.');
     return value as T;
   }
 
   private async initialize() {
     try {
-      const session = await this.request<{ authenticated: boolean; setupRequired: boolean }>('/api/session');
+      const session = await this.request<Session>('/api/session');
+      this.session.set(session);
       this.authenticated.set(session.authenticated);
       this.setupRequired.set(session.setupRequired);
-      if (session.authenticated) { await this.loadBrand(); await this.loadRoute(); }
-    } catch (error) { this.authenticated.set(false); this.error.set(String(error)); }
+      const workspaceRoute = location.pathname === '/' && location.hash.startsWith('#/');
+      if (location.pathname !== '/') this.mode.set('public');
+      else if (session.authenticated && session.aludelMember) {
+        this.mode.set('workspace');
+        await this.loadBrand(); await this.loadRoute();
+      } else if (workspaceRoute) this.showPublic(session.authenticated ? '/projects' : '/login');
+      else this.showPublic(session.authenticated ? '/projects' : '/');
+    } catch (error) {
+      this.session.set({ authenticated: false, user: null, setupRequired: false, aludelMember: false, githubSignIn: false, projects: [], draft: null });
+      this.error.set(String(error)); this.showPublic('/');
+    }
   }
 
-  async login() {
-    if (!this.accessKey || this.loading()) return;
-    this.loading.set(true); this.error.set('');
-    try {
-      await this.request('/api/login', { method: 'POST', body: JSON.stringify({ key: this.accessKey }) });
-      this.accessKey = '';
-      this.authenticated.set(true);
-      await this.loadBrand();
-      await this.loadRoute();
-    } catch (error) { this.error.set(error instanceof Error ? error.message : String(error)); }
-    finally { this.loading.set(false); }
-  }
-
-  async setup() {
-    if (this.accessKey.length < 12 || this.accessKey !== this.confirmKey || this.loading()) return;
-    this.loading.set(true); this.error.set('');
-    try {
-      await this.request('/api/setup', { method: 'POST', body: JSON.stringify({ key: this.accessKey }) });
-      this.accessKey = ''; this.confirmKey = '';
-      this.setupRequired.set(false);
-      this.authenticated.set(true);
-      await this.loadBrand();
-      await this.loadRoute();
-    } catch (error) { this.error.set(error instanceof Error ? error.message : String(error)); }
-    finally { this.loading.set(false); }
+  private showPublic(path: string) {
+    if (location.pathname !== path) history.replaceState({}, '', path);
+    this.authenticated.set(false);
+    this.session.update(session => session ? { ...session, authenticated: path === '/projects' && session.authenticated } : session);
+    this.mode.set('public');
   }
 
   async logout() {
     await this.request('/api/logout', { method: 'POST' });
-    this.authenticated.set(false);
+    location.assign('/');
   }
 
   async loadRoute() {

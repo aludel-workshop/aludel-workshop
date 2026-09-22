@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, verify } from 'node:crypto';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import { createAppJwt, mintInstallationToken } from '../server/github-app-auth.mjs';
-import { githubIntegration } from '../server/github-integration.mjs';
+import { githubIntegration, initGithubIdentities } from '../server/github-integration.mjs';
+import { createExternalUser, createLoginTicket, createUser, initAccounts, redeemLoginTicket } from '../server/accounts.mjs';
 import { loadGitHubVendorConfig } from '../server/github-vendor-config.mjs';
 import { initializeAndPush, inspectGitRepository } from '../server/git-repository.mjs';
 import { openSecretStore } from '../server/secret-store.mjs';
@@ -15,6 +16,7 @@ import { openDatabase } from '../server/storage.mjs';
 const response = (value, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => value });
 const keys = generateKeyPairSync('rsa', { modulusLength: 2048 });
 const privateKey = keys.privateKey.export({ type: 'pkcs8', format: 'pem' });
+const openFixture = path => { const db = openDatabase(path); initAccounts(db); initGithubIdentities(db); return db; };
 const vendorConfig = { configured: true, issues: [], appId: '24680', appSlug: 'the-machine-app',
   clientId: 'Iv1234567890', clientSecret: 'a-very-long-vendor-client-secret', privateKey };
 
@@ -44,7 +46,7 @@ test('vendor configuration validates once and app JWTs are short-lived and signe
 
 test('organization flow verifies installation, seals user token, and recovers with fresh installation tokens', async () => {
   const root = mkdtempSync(join(tmpdir(), 'machine-github-org-'));
-  const db = openDatabase(join(root, 'data', 'test.sqlite')); const secrets = openSecretStore(join(root, 'data'));
+  const db = openFixture(join(root, 'data', 'test.sqlite')); const secrets = openSecretStore(join(root, 'data'));
   assert.equal(db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='github_connections'").get(), undefined);
   const calls = []; const minted = [];
   const fetcher = async (url, options = {}) => {
@@ -62,20 +64,20 @@ test('organization flow verifies installation, seals user token, and recovers wi
     mintInstallationToken: async (_config, installationId, options) => {
       minted.push({ installationId, options }); return { token: `installation-token-${minted.length}`, expiresAt: 'soon' };
     } });
-  const authorization = new URL(integration.startAuthorization('the-machine'));
+  const authorization = new URL(integration.startAuthorization('owner'));
   assert.equal(authorization.searchParams.get('code_challenge_method'), 'S256');
   assert.equal(authorization.searchParams.get('redirect_uri'), 'https://portal.example/api/integrations/github/callback');
   await integration.callback({ code: 'oauth-code', state: authorization.searchParams.get('state') });
-  const status = integration.status('the-machine', { initialized: false, committed: false });
+  const status = integration.status('owner', 'the-machine', { initialized: false, committed: false });
   assert.equal(status.connected, true); assert.equal(status.installations[0].eligible, true);
   assert.equal(JSON.stringify(status).includes('user-token'), false);
   assert.equal(JSON.stringify(status).includes(vendorConfig.clientSecret), false);
   assert.equal(JSON.stringify(status).includes('BEGIN PRIVATE KEY'), false);
-  const installationUrl = new URL(integration.startInstallation('the-machine'));
+  const installationUrl = new URL(integration.startInstallation('owner'));
   assert.match(installationUrl.toString(), /^https:\/\/github.com\/apps\/the-machine-app\/installations\/new\?state=/);
   await assert.rejects(() => integration.installed({ installationId: 91, state: 'wrong-state' }), /invalid or expired/);
   await integration.installed({ installationId: 91, state: installationUrl.searchParams.get('state') });
-  const partial = await integration.createRepository('the-machine', { installationId: 91, name: 'machine', private: true }, () => {
+  const partial = await integration.createRepository('owner', 'the-machine', { installationId: 91, name: 'machine', private: true }, () => {
     throw new Error('simulated local push failure');
   });
   assert.equal(partial.status, 'local-setup-needed');
@@ -87,13 +89,13 @@ test('organization flow verifies installation, seals user token, and recovers wi
   });
   assert.equal(ready.status, 'ready'); assert.equal(calls.filter(call => call.url.endsWith('/orgs/acme/repos')).length, 1);
   assert.equal(JSON.stringify(db.prepare('SELECT * FROM repository_bindings').all()).includes('installation-token'), false);
-  assert.equal(JSON.stringify(db.prepare('SELECT * FROM github_users').all()).includes('user-token'), false);
+  assert.equal(JSON.stringify(db.prepare('SELECT * FROM github_identities').all()).includes('user-token'), false);
   db.close();
 });
 
 test('personal repository creation uses the required user token, then installation identity for Git', async () => {
   const root = mkdtempSync(join(tmpdir(), 'machine-github-user-'));
-  const db = openDatabase(join(root, 'data', 'test.sqlite')); const secrets = openSecretStore(join(root, 'data')); const calls = [];
+  const db = openFixture(join(root, 'data', 'test.sqlite')); const secrets = openSecretStore(join(root, 'data')); const calls = [];
   const fetcher = async (url, options = {}) => {
     calls.push({ url, authorization: options.headers?.authorization });
     if (url.includes('login/oauth/access_token')) return response({ access_token: 'user-token' });
@@ -107,14 +109,35 @@ test('personal repository creation uses the required user token, then installati
   const integration = githubIntegration({ db, secrets, config: vendorConfig, callbackUrl: 'https://portal.example/callback',
     setupUrl: 'https://portal.example/installed', fetcher,
     mintInstallationToken: async () => ({ token: 'installation-token', expiresAt: 'soon' }) });
-  const authorization = new URL(integration.startAuthorization('the-machine'));
+  const authorization = new URL(integration.startAuthorization('owner'));
   await integration.callback({ code: 'code', state: authorization.searchParams.get('state') });
   let gitToken;
-  await integration.createRepository('the-machine', { installationId: 44, name: 'machine', private: true }, values => {
+  await integration.createRepository('owner', 'the-machine', { installationId: 44, name: 'machine', private: true }, values => {
     gitToken = values.token; return { commit: 'def456', trackedFiles: 12 };
   });
   assert.equal(calls.find(call => call.url.endsWith('/user/repos')).authorization, 'Bearer user-token');
   assert.equal(gitToken, 'installation-token');
+  // Another account sees neither the owner's identity nor installations, and cannot use them to create repositories.
+  const other = createUser(db, { email: 'someone@example.com', name: 'Someone', password: 'a-long-password' });
+  const otherStatus = integration.status(other.id, null, null);
+  assert.equal(otherStatus.connected, false); assert.deepEqual(otherStatus.installations, []);
+  db.prepare(`INSERT INTO projects(id, slug, name, description, created_at, updated_at) VALUES ('p-other', 'other', 'Other', 'Other app', ?, ?)`).run(new Date().toISOString(), new Date().toISOString());
+  await assert.rejects(() => integration.createRepository(other.id, 'p-other', { installationId: 44, name: 'again', private: true }, () => ({})), /Choose an active all-repositories installation/);
+  db.close();
+});
+
+test('legacy project-keyed GitHub rows move once to the owner account', () => {
+  const root = mkdtempSync(join(tmpdir(), 'machine-github-migrate-'));
+  const db = openDatabase(join(root, 'test.sqlite')); initAccounts(db);
+  const now = new Date().toISOString();
+  db.prepare(`INSERT INTO github_users(project_id, access_token_encrypted, login, user_id, connected_at, updated_at) VALUES ('the-machine', 'sealed', 'octocat', '7', ?, ?)`).run(now, now);
+  db.prepare(`INSERT INTO github_installations(project_id, installation_id, account_login, account_id, target_type, repository_selection, permissions_json, status, updated_at)
+    VALUES ('the-machine', 44, 'octocat', '7', 'User', 'all', '{}', 'active', ?)`).run(now);
+  initGithubIdentities(db);
+  assert.equal(db.prepare("SELECT login FROM github_identities WHERE user_id = 'owner'").get().login, 'octocat');
+  db.prepare("DELETE FROM github_user_installations WHERE user_id = 'owner'").run();
+  initGithubIdentities(db);
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM github_user_installations').get().count, 0, 'a removed installation must not be resurrected on restart');
   db.close();
 });
 
@@ -131,4 +154,53 @@ test('configured Git profile creates and pushes a clean initial repository', () 
   assert.equal(readFileSync(join(repository, '.gitignore'), 'utf8'), '.data/\nnode_modules/\n');
   const remoteHead = spawnSync('git', ['--git-dir', remote, 'rev-parse', 'main'], { encoding: 'utf8' });
   assert.equal(remoteHead.status, 0); assert.equal(remoteHead.stdout.trim(), result.commit);
+});
+
+// Git runs askpass directly and the owner runs ./launch-machine directly; both broke when committed as 644.
+test('every tracked script with a shebang is committed executable', () => {
+  const root = new URL('../../..', import.meta.url).pathname;
+  const entries = spawnSync('git', ['ls-files', '-s'], { cwd: root, encoding: 'utf8' }).stdout.trim().split('\n');
+  const missing = entries.map(line => /^(\d+) \S+ \d+\t(.+)$/.exec(line)).filter(Boolean)
+    .filter(([, mode, path]) => mode !== '100755' && !path.startsWith('prototypes/') && readFileSync(join(root, path)).subarray(0, 2).toString() === '#!')
+    .map(([, , path]) => path);
+  assert.deepEqual(missing, [], 'Fix with: git update-index --chmod=+x <path> && chmod +x <path>');
+});
+
+test('continue with GitHub creates or finds one account, never takes over by email, and never shares an identity', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'machine-github-signin-'));
+  const db = openFixture(join(root, 'test.sqlite')); const secrets = openSecretStore(root);
+  let profile = { login: 'octocat', id: 7, name: 'Mona', email: 'mona@example.com' };
+  const fetcher = async url => {
+    if (url.includes('login/oauth/access_token')) return response({ access_token: 'user-token' });
+    if (url.endsWith('/user')) return response(profile);
+    if (url.includes('/user/installations')) return response({ installations: [] });
+    throw new Error(`Unexpected request ${url}`);
+  };
+  const integration = githubIntegration({ db, secrets, config: vendorConfig, callbackUrl: 'https://portal.example/callback', setupUrl: 'https://portal.example/installed', fetcher,
+    createUserFromGithub: value => createExternalUser(db, { email: value.email, name: value.name || value.login }).id });
+  const signIn = async () => integration.callback({ code: 'code', state: new URL(integration.startSignIn('https://aludel.example/start/account')).searchParams.get('state') });
+
+  const first = await signIn();
+  assert.equal(first.signIn, true); assert.equal(first.created, true);
+  assert.equal(first.returnTo, 'https://aludel.example/start/account');
+  assert.equal(db.prepare('SELECT display_name, password_hash FROM users WHERE id = ?').get(first.userId).display_name, 'Mona');
+  assert.equal(db.prepare('SELECT password_hash FROM users WHERE id = ?').get(first.userId).password_hash, null, 'GitHub accounts have no Aludel password');
+  const again = await signIn();
+  assert.equal(again.userId, first.userId); assert.equal(again.created, false);
+  await assert.rejects(() => integration.callback({ code: 'code', state: new URL(integration.startSignIn(null)).searchParams.get('state').replace(/.$/, 'x') }), /invalid or expired/);
+
+  createUser(db, { email: 'grace@example.com', name: 'Grace', password: 'correct-horse-battery' });
+  profile = { login: 'grace-gh', id: 8, name: 'Grace', email: 'grace@example.com' };
+  await assert.rejects(signIn, error => error.status === 409 && /Sign in with your email and password/.test(error.message));
+
+  const ada = createUser(db, { email: 'ada@example.com', name: 'Ada', password: 'correct-horse-battery' });
+  profile = { login: 'octocat', id: 7, name: 'Mona', email: null };
+  const connect = new URL(integration.startAuthorization(ada.id)).searchParams.get('state');
+  await assert.rejects(() => integration.callback({ code: 'code', state: connect }), /already connected to a different Aludel account/);
+  assert.equal(integration.status(ada.id, null, null).connected, false);
+
+  const ticket = createLoginTicket(db, first.userId);
+  assert.equal(redeemLoginTicket(db, ticket).id, first.userId);
+  assert.throws(() => redeemLoginTicket(db, ticket), error => error.status === 401, 'tickets are single use');
+  db.close();
 });

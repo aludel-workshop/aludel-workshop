@@ -2,7 +2,7 @@
 id: product-001
 kind: product-definition
 status: proposed
-updated: 2026-09-19
+updated: 2026-09-22
 source: ../instructions.md
 ---
 
@@ -114,3 +114,8 @@ Owner direction (2026-09-18): use an invented independent app in mockups to sepa
 ## Supervised local transition — DEC-028
 
 The portal now owns the supervised request/authorization/question cycle. Repository status is a planning handoff, not execution permission. The trusted local operator uses shared transactional work operations with actor separation, exact input/version checks and durable events. See [operator contract](design/process/portal-operator.md). Automatic runner integration, leases/recovery and full immutable candidate acceptance remain B-03B; this bridge does not complete M1.
+
+
+## New-project onboarding — DEC-032
+
+A new user reaches a working skeleton app without an administrative detour: marketing page → choose a working style (Dreamer, Planner, Tinkerer) → name and elevator pitch → sign up or sign in → connect GitHub and create the repository → optional agent connection, look & feel, features and stack → a clickable skeleton at the project's own subdomain. Working styles are sets of interaction preferences that the user can change individually or switch later. The pitch becomes the project's Direction and the chosen features become Feature records. Aludel's own project uses the same connections and records. The deployment stays local for now and is designed for a later hosted port. [Onboarding record](design/onboarding/work-record.md).

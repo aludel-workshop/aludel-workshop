@@ -1,4 +1,4 @@
-import { chromium } from '/tmp/app-builder-d01b-browser/node_modules/playwright/index.mjs';
+import { chromium, ownerSignIn } from './browser-support.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
@@ -13,14 +13,7 @@ const page = await context.newPage();
 const errors = [];
 page.on('pageerror', error => errors.push(error.message));
 try {
-  await page.goto(base);
-  await page.getByLabel('Owner access key', { exact: true }).fill(key);
-  if (await page.getByLabel('Confirm owner access key').count()) {
-    await page.getByLabel('Confirm owner access key').fill(key);
-    await page.getByRole('button', { name: 'Create owner access' }).click();
-  } else {
-    await page.getByRole('button', { name: 'Open portal' }).click();
-  }
+  await ownerSignIn(page, base, key);
   await page.getByRole('heading', { name: 'Aludel', exact: true }).waitFor();
   assert.match(await page.locator('main').innerText(), /knowledge (records|sources)/i);
   await page.getByRole('link', { name: 'Browse sources' }).click();
