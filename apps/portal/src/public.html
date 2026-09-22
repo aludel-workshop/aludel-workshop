@@ -298,7 +298,7 @@
       @if (setup(); as current) {
         <div class="pub-workbench">
           <section class="pub-panel" aria-labelledby="pages-heading">
-            <p class="eyebrow">Step 7 · Pages · optional</p>
+            <p class="eyebrow">Step 8 · Pages · optional</p>
             <h1 id="pages-heading" tabindex="-1">Shape the navigation</h1>
             <p class="pub-panel-lead">These are the main places in {{ current.project.name }}, the ones in its navigation. Edit them right in the preview.</p>
             <ul class="pub-howto">
@@ -310,9 +310,19 @@
             <h2 class="pub-panel-heading">Your pages <span class="pub-count">{{ describedCount() }} of {{ routes().length }} described</span></h2>
             <ol class="pub-page-summary">
               @for (page of routes(); track page.id) {
-                <li><mat-icon aria-hidden="true">{{ page.description.trim() ? 'check_circle' : 'radio_button_unchecked' }}</mat-icon><span><strong>{{ page.label }}</strong><small>{{ pageTypeLabel(page.pageType) }}</small></span></li>
+                <li><mat-icon aria-hidden="true">{{ page.description.trim() ? 'check_circle' : 'radio_button_unchecked' }}</mat-icon><span><strong>{{ page.label }}</strong><small>{{ pageTypeLabel(page.pageType) }}{{ page.origin && page.origin.endsWith('pack') ? ' · from the ' + page.origin : '' }}{{ page.stories?.length ? ' · ' + page.stories.length + (page.stories.length === 1 ? ' story' : ' stories') : '' }}</small></span></li>
               }
             </ol>
+            @if (pendingDelete(); as pending) {
+              <div class="pub-reassign" role="alert">
+                <p><strong>“{{ pending.label }}” realises {{ pending.stories }} {{ pending.stories === 1 ? 'story' : 'stories' }}.</strong> Which page should take {{ pending.stories === 1 ? 'it' : 'them' }}?</p>
+                <label class="visually-hidden" for="reassign-target">Page that takes the stories</label>
+                <select id="reassign-target" class="pub-select" [(ngModel)]="reassignTarget">
+                  @for (page of routes(); track page.id) { <option [value]="page.id">{{ page.label }}</option> }
+                </select>
+                <div class="pub-actions"><button mat-flat-button type="button" (click)="confirmReassign()">Move stories and delete</button><button mat-button type="button" (click)="keepPage()">Keep “{{ pending.label }}”</button></div>
+              </div>
+            }
             <p class="pub-save-state" role="status">{{ pagesSaved() === 'saved' ? 'All changes saved' : pagesSaved() === 'saving' ? 'Saving…' : 'Unsaved changes' }}</p>
             <div class="pub-panel-actions">
               <button mat-flat-button type="button" (click)="continueFromPages()" [disabled]="busy()">Continue<mat-icon iconPositionEnd aria-hidden="true">arrow_forward</mat-icon></button>
@@ -327,33 +337,39 @@
       @if (setup(); as current) {
         <div class="pub-workbench">
           <section class="pub-panel" aria-labelledby="features-heading">
-            <p class="eyebrow">Step 8 · Functionality · optional</p>
+            <p class="eyebrow">Step 7 · Functionality · optional</p>
             <h1 id="features-heading" tabindex="-1">What should {{ current.project.name }} be able to do?</h1>
-            <p class="pub-panel-lead">Capabilities, not pages. Each one becomes a feature in your product plan for building out later.</p>
+            <p class="pub-panel-lead">Each story pack adds real stories to your story map and proposes where they live in the app. They're yours to change afterwards.</p>
             <fieldset class="pub-feature-list">
-              <legend class="visually-hidden">Functionality</legend>
+              <legend class="visually-hidden">Story packs</legend>
               @for (item of featureEntries(); track item.id) {
                 <label class="pub-feature" [class.selected]="picks.has(item.id)">
                   <input type="checkbox" [checked]="picks.has(item.id)" (change)="togglePick(item.id)">
-                  <mat-icon aria-hidden="true">{{ item.icon }}</mat-icon><span><strong>{{ item.label }}</strong><small>{{ item.summary }}</small></span>
+                  <mat-icon aria-hidden="true">{{ item.icon }}</mat-icon>
+                  <span><strong>{{ item.label }}</strong><small>{{ item.summary }} · {{ item.stories.length }} stories{{ templateCount(item) ? ' · ' + templateCount(item) + ' built by the template' : '' }}</small></span>
                 </label>
+                @if (picks.has(item.id)) {
+                  <ul class="pub-pack-stories" [attr.aria-label]="item.label + ' stories'">
+                    @for (story of item.stories; track $index) { <li><span class="pub-phase">{{ phaseLabel(story.phase) }}</span>{{ story.title }}@if (story.template) { <em class="pub-badge">template</em> }</li> }
+                  </ul>
+                }
               }
             </fieldset>
             <label class="pub-toggle"><input type="checkbox" [checked]="details()" (change)="details.set(!details())"> More details</label>
             @if (details()) {
               <section class="pub-custom" aria-labelledby="custom-heading">
-                <h2 id="custom-heading">Your own</h2>
+                <h2 id="custom-heading">Your own story ideas</h2>
                 @if (customFeatures().length) {
                   <ul class="pub-assets">
                     @for (item of customFeatures(); track item.id) {
-                      <li><mat-icon aria-hidden="true">widgets</mat-icon><span><strong>{{ item.title }}</strong><small>{{ item.summary }}</small></span>
+                      <li><mat-icon aria-hidden="true">lightbulb</mat-icon><span><strong>{{ item.title }}</strong><small>{{ phaseLabel(item.phase) }}</small></span>
                         <button mat-icon-button type="button" (click)="removeFeature(item.id)" [attr.aria-label]="'Remove ' + item.title"><mat-icon>delete</mat-icon></button></li>
                     }
                   </ul>
                 }
-                <mat-form-field appearance="outline" class="wide-field"><mat-label>Feature name</mat-label><input matInput name="newFeatureTitle" [(ngModel)]="newFeatureTitle" maxlength="90"></mat-form-field>
-                <mat-form-field appearance="outline" class="wide-field"><mat-label>What it does</mat-label><textarea matInput name="newFeatureSummary" [(ngModel)]="newFeatureSummary" rows="2" maxlength="600"></textarea></mat-form-field>
-                <button mat-stroked-button type="button" (click)="saveFeatures(false)" [disabled]="busy() || !newFeatureTitle.trim()"><mat-icon aria-hidden="true">add</mat-icon>Add feature</button>
+                <mat-form-field appearance="outline" class="wide-field"><mat-label>Someone can…</mat-label><input matInput name="newFeatureTitle" [(ngModel)]="newFeatureTitle" maxlength="160"></mat-form-field>
+                <mat-form-field appearance="outline" class="wide-field"><mat-label>Why it matters</mat-label><textarea matInput name="newFeatureSummary" [(ngModel)]="newFeatureSummary" rows="2" maxlength="400"></textarea></mat-form-field>
+                <button mat-stroked-button type="button" (click)="saveFeatures(false)" [disabled]="busy() || !newFeatureTitle.trim()"><mat-icon aria-hidden="true">add</mat-icon>Add story idea</button>
               </section>
             }
             <div class="pub-panel-actions">
@@ -361,7 +377,7 @@
               <button mat-flat-button type="button" (click)="saveFeatures()" [disabled]="busy()">Save and continue<mat-icon iconPositionEnd aria-hidden="true">arrow_forward</mat-icon></button>
             </div>
           </section>
-          <ng-container *ngTemplateOutlet="stage; context: { mode: 'pages', current: current }" />
+          <ng-container *ngTemplateOutlet="stage; context: { mode: 'look', current: current }" />
         </div>
       }
     }
@@ -401,7 +417,7 @@
             <div class="pub-preview-status" role="status"><strong>{{ previewLabel() }}</strong>
               @if (current.preview.status === 'running' || current.preview.status === 'stopped') {
                 <div class="pub-panel-actions start">
-                  <a mat-flat-button [href]="'/projects/' + current.project.id" (click)="go('/projects/' + current.project.id, $event)">Continue in Aludel<mat-icon iconPositionEnd aria-hidden="true">arrow_forward</mat-icon></a>
+                  <a mat-flat-button [href]="'/p/' + current.project.slug" (click)="openProject(current.project.slug, $event)">Continue in Aludel<mat-icon iconPositionEnd aria-hidden="true">arrow_forward</mat-icon></a>
                   <a mat-stroked-button [href]="current.urls.app" target="_blank" rel="noopener">Open {{ current.project.name }}<mat-icon iconPositionEnd aria-hidden="true">open_in_new</mat-icon></a>
                 </div>
               }
@@ -436,7 +452,7 @@
         @if (session()?.projects?.length) {
           <ul class="pub-project-list">
             @for (item of session()?.projects; track item.id) {
-              <li><a [href]="item.id === 'the-machine' ? '/#/the-machine/overview' : '/projects/' + item.id" (click)="go(item.id === 'the-machine' ? '/#/the-machine/overview' : '/projects/' + item.id, $event)">
+              <li><a [href]="item.id === 'the-machine' ? '/#/the-machine/overview' : '/p/' + item.slug" (click)="go(item.id === 'the-machine' ? '/#/the-machine/overview' : '/p/' + item.slug, $event)">
                 <span class="pub-swatch big" [style.background]="item.accent_color"></span><span><strong>{{ item.name }}</strong><small>{{ item.description }}</small></span><mat-icon aria-hidden="true">chevron_right</mat-icon></a></li>
             }
           </ul>

@@ -1,4 +1,6 @@
-@if(mode() === 'public' && session(); as current){
+@if(mode() === 'project' && session(); as current){
+ <aludel-project-shell [initialSession]="current"></aludel-project-shell>
+}@else if(mode() === 'public' && session(); as current){
  <aludel-public [initialSession]="current"></aludel-public>
 }@else if(mode() === 'workspace' && authenticated() === true){
  <a class="skip-link" href="#main">Skip to content</a>

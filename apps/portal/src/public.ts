@@ -20,8 +20,8 @@ const steps: Step[] = [
   { id: 'github', label: 'GitHub', optional: false },
   { id: 'agent', label: 'Agent', optional: true },
   { id: 'look', label: 'Look & feel', optional: true },
-  { id: 'pages', label: 'Pages', optional: true },
   { id: 'features', label: 'Functionality', optional: true },
+  { id: 'pages', label: 'Pages', optional: true },
   { id: 'stack', label: 'Build', optional: false }
 ];
 // From Look & feel onward, settings sit beside a live proto-site of the app.
@@ -93,10 +93,12 @@ export class PublicComponent implements OnDestroy {
   readonly featureEntries = computed(() => Object.entries(this.catalog()?.features || {}).map(([id, value]) => ({ id, ...value })));
   readonly stackEntries = computed(() => Object.entries(this.catalog()?.stacks.presets || {}).map(([id, value]) => ({ id, ...value })));
   readonly preferenceEntries = computed(() => Object.entries(this.catalog()?.preferences || {}).map(([id, value]) => ({ id, ...value, options: Object.entries(value.values).map(([key, label]) => ({ key, label })) })));
-  readonly customFeatures = computed(() => {
-    const picks = new Set(Object.values(this.catalog()?.features || {}).map(item => item.label));
-    return (this.setup()?.features.records || []).filter(item => !picks.has(item.title));
-  });
+  // Story ideas the person added themselves (stories without a pack).
+  readonly customFeatures = computed(() => (this.setup()?.features.stories || []).filter(story => !story.pack));
+  readonly pendingDelete = signal<{ id: string; label: string; stories: number } | null>(null);
+  reassignTarget = '';
+  // The latest edit of every page seen in this session, so undoing a delete keeps unsaved changes to that page.
+  private readonly lastKnown = new Map<string, PageRoute>();
   readonly eligibleInstallations = computed(() => (this.setup()?.github.installations || []).filter(item => item.eligible));
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -137,7 +139,7 @@ export class PublicComponent implements OnDestroy {
   go(path: string, event?: Event) {
     event?.preventDefault();
     if (this.pagesSaved() === 'unsaved' && this.projectId()) void this.savePages();
-    if (path.startsWith('/#')) { location.assign(path); return; }
+    if (path.startsWith('/#') || path.startsWith('/p/')) { location.assign(path); return; }
     history.pushState({}, '', path);
     this.path.set(path);
     this.error.set(''); this.notice.set('');
@@ -387,6 +389,7 @@ export class PublicComponent implements OnDestroy {
 
   // Pages: edited directly in the proto-site and saved shortly after each change.
   routesChanged(routes: PageRoute[]) {
+    for (const route of this.routes()) this.lastKnown.set(route.id, { ...route });
     this.routes.set(routes);
     this.schedulePagesSave();
   }
@@ -397,17 +400,22 @@ export class PublicComponent implements OnDestroy {
     this.pagesTimer = setTimeout(() => void this.savePages(), 700);
   }
 
-  private async savePages() {
+  private async savePages(reassign: Record<string, string> = {}) {
     if (this.pagesTimer) { clearTimeout(this.pagesTimer); this.pagesTimer = null; }
+    if (this.pendingDelete()) return;
     this.pagesSaved.set('saving');
     try {
-      const setup = await this.api<ProjectSetup>(`/api/projects/${encodeURIComponent(this.projectId())}/pages`, 'PUT', { routes: this.routes(), navigation: this.navigation });
+      const setup = await this.api<ProjectSetup>(`/api/projects/${encodeURIComponent(this.projectId())}/pages`, 'PUT', { routes: this.routes(), navigation: this.navigation, reassign });
       this.setup.set(setup);
       this.pagesSaved.set('saved');
       this.error.set('');
     } catch (error) {
       this.pagesSaved.set('unsaved');
-      this.error.set(error instanceof Error ? error.message : String(error));
+      const deleted = (this.setup()?.pages.routes || []).find(page => !this.routes().some(route => route.id === page.id) && page.stories?.length);
+      if ((error as { status?: number }).status === 409 && deleted) {
+        this.reassignTarget = this.routes()[0]?.id || '';
+        this.pendingDelete.set({ id: deleted.id, label: deleted.label, stories: deleted.stories?.length || 0 });
+      } else this.error.set(error instanceof Error ? error.message : String(error));
     } finally { this.changeDetector.markForCheck(); }
   }
 
@@ -419,6 +427,37 @@ export class PublicComponent implements OnDestroy {
       this.next();
     });
   }
+
+  // Deleting a page that realises stories needs somewhere for them to go (knowledge-structures: Pages).
+  confirmReassign() {
+    const pending = this.pendingDelete();
+    if (!pending || !this.reassignTarget) return;
+    this.pendingDelete.set(null);
+    void this.savePages({ [pending.id]: this.reassignTarget });
+  }
+
+  // Undo only the deletion: put that page back where it was and keep every other unsaved edit.
+  keepPage() {
+    const pending = this.pendingDelete();
+    this.pendingDelete.set(null);
+    const saved = this.setup()?.pages.routes || [];
+    const savedPage = saved.find(route => route.id === pending?.id);
+    const page = (pending && this.lastKnown.get(pending.id)) || savedPage;
+    if (page) {
+      const next = [...this.routes()];
+      next.splice(Math.min(savedPage ? saved.indexOf(savedPage) : next.length, next.length), 0, { ...page });
+      this.routes.set(next.slice(0, 5));
+    }
+    this.schedulePagesSave();
+  }
+
+  openProject(slug: string, event: Event) {
+    event.preventDefault();
+    location.assign(`/p/${encodeURIComponent(slug)}`);
+  }
+
+  templateCount(pack: { stories: { template?: boolean }[] }) { return pack.stories.filter(story => story.template).length; }
+  phaseLabel(phase: string) { return ({ demo: 'Demo', mvp: 'MVP', later: 'Later' } as Record<string, string>)[phase] || phase; }
 
   pageTypeLabel(id: string) { return this.catalog()?.pageTypes[id]?.label || id; }
 
@@ -434,7 +473,7 @@ export class PublicComponent implements OnDestroy {
       const custom = this.newFeatureTitle.trim() ? [{ title: this.newFeatureTitle, summary: this.newFeatureSummary }] : [];
       this.applySetup(await this.api<ProjectSetup>(`/api/projects/${encodeURIComponent(this.projectId())}/features`, 'PUT', { picks: [...this.picks], custom }));
       this.newFeatureTitle = ''; this.newFeatureSummary = '';
-      if (advance) this.next(); else this.notice.set('Feature added.');
+      if (advance) this.next(); else this.notice.set('Story idea added.');
     });
   }
 

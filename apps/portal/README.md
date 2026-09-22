@@ -31,6 +31,10 @@ Onboarding ([work record](../../docs/design/onboarding/work-record.md), DEC-032â
 
 Browser checks for the flow: start a fresh portal, then `MACHINE_PORT=<port> PLAYWRIGHT_MODULE=<path to playwright/index.mjs> node tests/onboarding-browser.mjs`. Icons come from a subset font. After using a new icon name, run `python3 tools/subset-icons.py` (needs `pip install fonttools brotli`); `tests/icon-subset.test.mjs` fails until you do.
 
+## Project layers (`/p/<slug>`)
+
+Every project except Aludel itself opens in its layered workspace: Home, Product, Design, Pages, Platform, Work (DEC-036/037). Records live in `server/knowledge.mjs` (typed `knowledge_records`, revisions with rationale, `layer_work_items`). The UI lives in `src/layers/`. Story packs are in `config/story-packs.json`. The handoff for continuing this work is [the implementation plan](../../docs/design/portal-layers/implementation-plan.md). Browser check: `MACHINE_PORT=<port> PLAYWRIGHT_MODULE=<â€¦> node tests/layers-browser.mjs` against a fresh portal.
+
 ## GitHub App setup
 
 The portal uses one deployment-owned GitHub App. The operator registers and configures the app once; each owner then authorizes and installs that app from the portal. Owners do not create their own app or paste GitHub credentials into the UI.

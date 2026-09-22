@@ -17,7 +17,9 @@
     "category",
     "chat",
     "check_circle",
+    "checklist",
     "chevron_right",
+    "close",
     "cloud_off",
     "code",
     "construction",
@@ -27,6 +29,7 @@
     "description",
     "desktop_windows",
     "diamond",
+    "dns",
     "edit",
     "explore",
     "favorite",
@@ -36,9 +39,13 @@
     "group",
     "help",
     "home",
+    "image",
     "info",
     "inventory_2",
+    "lightbulb",
     "link",
+    "logout",
+    "magic_button",
     "map",
     "mobile",
     "notifications",
@@ -60,6 +67,7 @@
     "smart_toy",
     "storefront",
     "subject",
+    "swap_horiz",
     "sync",
     "table_rows",
     "target",
@@ -67,7 +75,7 @@
     "upload",
     "view_timeline",
     "warning",
-    "widgets"
+    "web"
   ],
   "appIcons": [
     "home",
@@ -97,6 +105,7 @@
     "receipt_long",
     "payments",
     "help",
-    "build"
+    "build",
+    "admin_panel_settings"
   ]
 }

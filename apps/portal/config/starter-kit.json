@@ -353,6 +353,9 @@
     },
     {
       "icon": "build"
+    },
+    {
+      "icon": "admin_panel_settings"
     }
   ],
   "defaultRoute": {

@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aludel · Layers prototype v1 · Tool Share</title>
+<!-- LAY-01 structure prototype (DEC-036). Illustrative Tool Share data; no backend. Fonts load from Google Fonts when online. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0&display=block">
+<style>
+:root{--bg:#fafbff;--rail:#f0f4fc;--panel:#f3f6fd;--line:#dce2ef;--ink:#141727;--muted:#52617d;--primary:#3047b9;--on-primary:#fff;--container:#dfe5ff;--on-container:#163698;--radius:12px;
+  --product:#6b35c9;--product-bg:#efe7ff;--design:#b3245f;--design-bg:#ffe4ee;--platform:#0f7465;--platform-bg:#d9f3ec;--work:#8a5300;--work-bg:#fff0d4;
+  --ok:#146446;--ok-bg:#d9f3e7;--warn:#6b4b00;--warn-bg:#fff0c9;--bad:#842321;--bad-bg:#fce1e0}
+*{box-sizing:border-box}body{margin:0;font-family:Roboto,system-ui,Arial,sans-serif;font-size:16px;line-height:1.5;color:var(--ink);background:var(--bg)}
+a{color:var(--primary)}button{font:inherit}
+.icon{font-family:'Material Symbols Rounded';font-weight:normal;font-style:normal;font-size:22px;line-height:1;letter-spacing:normal;text-transform:none;white-space:nowrap;direction:ltr;display:inline-block;vertical-align:middle;-webkit-font-feature-settings:'liga';font-feature-settings:'liga'}
+:focus-visible{outline:3px solid var(--primary);outline-offset:2px}
+.proto-banner{position:fixed;right:14px;bottom:12px;z-index:50;font-size:12px;background:#141727;color:#fff;padding:6px 12px;border-radius:999px;opacity:.85}
+.shell{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:100vh}
+.rail{background:var(--rail);border-right:1px solid var(--line);padding:16px 12px;display:flex;flex-direction:column;gap:6px;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:20px;padding:4px 10px 12px;color:var(--ink);text-decoration:none}.brand .icon{color:var(--primary);font-size:30px}
+.project{display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;background:#fff;border:1px solid var(--line);margin-bottom:10px}
+.project .mark{display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:#ca3e6f;color:#fff;font-weight:700;font-size:13px}.project small{display:block;color:var(--muted);font-size:12px}
+.nav a{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:999px;color:var(--ink);text-decoration:none;font-weight:500}
+.nav a:hover{background:#e3e9f7}.nav a.active{background:var(--container);color:var(--on-container);font-weight:700}
+.nav .badge{margin-left:auto;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:var(--primary);color:#fff;font-size:12px;display:grid;place-items:center}
+.nav .role{margin-left:auto;font-size:11px;color:var(--muted);font-weight:400}
+.nav a.active .role{color:var(--on-container)}
+.rail .spacer{flex:1}.rail .settings{display:flex;align-items:center;gap:12px;padding:10px 12px;color:var(--muted);text-decoration:none;border-radius:999px}
+.main{min-width:0}main:focus{outline:none}.shell{background:linear-gradient(90deg,var(--rail) 240px,transparent 240px)}
+.topbar{display:flex;align-items:center;gap:16px;padding:12px 32px;border-bottom:1px solid var(--line);background:var(--bg);position:sticky;top:0;z-index:10}
+.search{position:relative;flex:1;max-width:560px}.search input{width:100%;padding:10px 14px 10px 42px;border:1px solid var(--line);border-radius:999px;background:#fff;font:inherit;font-size:15px}
+.search .icon{position:absolute;left:12px;top:9px;color:var(--muted)}
+.results{position:absolute;top:calc(100% + 6px);left:0;right:0;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 18px 50px #1c2a5a26;padding:8px;max-height:60vh;overflow:auto}
+.results h3{font-size:12px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin:10px 10px 4px}
+.results a{display:flex;gap:10px;align-items:baseline;padding:8px 10px;border-radius:10px;color:var(--ink);text-decoration:none}.results a:hover,.results a:focus{background:var(--panel)}
+.results small{color:var(--muted)}
+.content{padding:28px 32px 64px;max-width:1280px}
+.eyebrow{font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin:0 0 4px}
+h1{font-size:34px;line-height:1.15;margin:0 0 6px}h2{font-size:21px;margin:0 0 12px}h3{font-size:17px;margin:0 0 6px}
+.lead{color:var(--muted);font-size:18px;margin:0 0 22px;max-width:760px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:0 0 24px}.tabs a{padding:10px 16px;color:var(--muted);text-decoration:none;font-weight:500;border-bottom:3px solid transparent;margin-bottom:-1px}
+.tabs a.active{color:var(--ink);border-color:var(--primary)}
+.grid{display:grid;gap:18px}.grid>*{min-width:0}.g2{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:repeat(3,minmax(0,1fr))}.g-side{grid-template-columns:minmax(0,1fr) 380px}
+.card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:20px}
+.card.wide{grid-column:span 2}.table-wrap{overflow-x:auto}.card.quiet{background:var(--panel);border-style:dashed}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap}
+.l-product{background:var(--product-bg);color:var(--product)}.l-design{background:var(--design-bg);color:var(--design)}.l-platform{background:var(--platform-bg);color:var(--platform)}.l-work{background:var(--work-bg);color:var(--work)}
+.s-ok{background:var(--ok-bg);color:var(--ok)}.s-warn{background:var(--warn-bg);color:var(--warn)}.s-bad{background:var(--bad-bg);color:var(--bad)}.s-plain{background:var(--panel);color:var(--muted)}
+.row{display:flex;align-items:center;gap:12px}.muted{color:var(--muted)}.small{font-size:14px}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:999px;border:1px solid var(--primary);background:var(--primary);color:#fff;font-weight:500;cursor:pointer;text-decoration:none;font-size:14px}
+.btn.ghost{background:transparent;color:var(--primary)}.btn.small{padding:4px 12px;font-size:13px}
+.stat{display:flex;flex-direction:column}.stat strong{font-size:30px;line-height:1.1}
+.progress{display:flex;height:12px;border-radius:999px;overflow:hidden;background:var(--panel);margin:10px 0 6px}.progress span{display:block}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted)}.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px}
+.list{list-style:none;margin:0;padding:0}.list li{border-top:1px solid var(--line)}.list li:first-child{border-top:0}
+.item{display:flex;gap:12px;align-items:flex-start;padding:12px 4px;color:var(--ink);text-decoration:none}.item:hover{background:var(--panel)}
+.item .body{flex:1;min-width:0}.item .title{font-weight:500}.item small{display:block;color:var(--muted);font-size:13.5px}
+.who{display:inline-flex;align-items:center;gap:4px;font-size:13px;color:var(--muted);white-space:nowrap}
+.stepper{display:flex;gap:3px;align-items:center}.stepper i{width:26px;height:6px;border-radius:3px;background:var(--line)}.stepper i.on{background:var(--primary)}
+.feature{margin-bottom:18px}.feature header{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.story{display:grid;grid-template-columns:minmax(0,1fr) 90px 150px 110px;gap:14px;align-items:center;padding:10px 12px;border-radius:12px;color:var(--ink);text-decoration:none}
+.story:hover{background:var(--panel)}.story.active{background:var(--container)}
+.phase{font-size:12px;font-weight:700;padding:2px 8px;border-radius:6px;background:var(--panel);color:var(--muted);text-align:center}.phase.current{background:var(--container);color:var(--on-container)}
+.side{position:sticky;top:84px;align-self:start}
+.connected h3{font-size:12px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin:16px 0 6px}
+.connected a{display:flex;gap:8px;align-items:center;padding:6px 8px;border-radius:10px;text-decoration:none;color:var(--ink);font-size:14.5px}.connected a:hover{background:var(--panel)}
+.history{border-left:2px solid var(--line);padding-left:14px;margin:8px 0}.history p{margin:0 0 10px;font-size:14.5px}.history small{color:var(--muted)}
+.columns{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.column{background:var(--panel);border-radius:18px;padding:14px}.column.current{background:#e9edfb;outline:2px solid var(--container)}
+.scard{display:block;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:8px;color:var(--ink);text-decoration:none;font-size:14.5px}.scard:hover{border-color:var(--primary)}
+.tree{list-style:none;margin:0;padding:0}.tree ul{list-style:none;margin:0 0 0 18px;padding:0;border-left:1px solid var(--line)}
+.tree a{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:10px;color:var(--ink);text-decoration:none;font-size:15px}.tree a:hover{background:var(--panel)}.tree a.active{background:var(--design-bg);color:var(--design);font-weight:700}
+.tree .gap{color:var(--muted);font-style:italic}
+.design-grid{display:grid;grid-template-columns:230px minmax(0,1fr) 320px;gap:18px;align-items:start}
+.canvas{background:linear-gradient(160deg,#e7e3ee,#f3eef3);border-radius:18px;padding:22px;display:flex;justify-content:center;gap:18px;flex-wrap:wrap}
+.phone{width:240px;background:#fff7fa;border:8px solid #1b1d24;border-radius:30px;overflow:hidden;font-size:11px;color:#171a24;display:flex;flex-direction:column}
+.phone header{display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid #0001;font-weight:700}.phone header b{display:grid;place-items:center;width:20px;height:20px;border-radius:7px;background:#ca3e6f;color:#fff;font-size:9px}
+.phone main{padding:10px;display:grid;gap:8px;min-height:300px;align-content:start}.phone footer{display:flex;justify-content:space-around;padding:6px;border-top:1px solid #0001;background:#f5eef2}
+.phone footer span{font-size:10px;text-align:center;color:#3a3d46}.phone footer span.on{color:#8f2349;font-weight:700}
+.bar{height:8px;border-radius:5px;background:#0000001a}.bar.w6{width:60%}.bar.w4{width:40%}.tile{height:62px;border-radius:12px;background:#0000001f}.tiles{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.pill{height:24px;border-radius:999px;background:#0000001a}.map{height:90px;border-radius:12px;background:repeating-linear-gradient(45deg,#dce8e3,#dce8e3 8px,#cfdfd9 8px,#cfdfd9 16px)}
+.rowish{display:flex;gap:6px;align-items:center}.dot{width:22px;height:22px;border-radius:50%;background:#0000001f;flex:none}
+.option{text-align:center}.option .phone{width:190px}.option .phone main{min-height:250px}.option figcaption{margin-top:8px;font-weight:700;font-size:14px}
+.question{border:2px solid var(--warn-bg);background:#fffaf0;border-radius:16px;padding:16px;margin:0 0 18px}
+.question h2{font-size:18px}.choices{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+.swatches{display:flex;gap:10px;flex-wrap:wrap}.swatch{width:110px;border-radius:12px;overflow:hidden;border:1px solid var(--line);font-size:12.5px}.swatch i{display:block;height:54px}.swatch span{display:block;padding:6px 8px}
+.kv{display:grid;grid-template-columns:160px minmax(0,1fr);gap:8px 16px;font-size:15px}.kv dt{color:var(--muted)}.kv dd{margin:0}
+table{border-collapse:collapse;width:100%;font-size:14.5px}th,td{text-align:left;padding:10px 8px;border-top:1px solid var(--line);vertical-align:top}th{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);border-top:0}
+.section-title{display:flex;align-items:center;gap:10px;margin:22px 0 6px}.section-title h2{margin:0;font-size:17px}.count{font-size:13px;color:var(--muted)}
+details.quiet summary{cursor:pointer;color:var(--muted);font-weight:500;padding:8px 0}
+.toggle{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}.toggle button{border:0;background:#fff;padding:6px 14px;cursor:pointer;font-size:14px}.toggle button.on{background:var(--container);color:var(--on-container);font-weight:700}
+.note{font-size:14.5px;background:var(--panel);border-radius:12px;padding:12px 14px;margin:0 0 10px}
+@media(max-width:1100px){.design-grid{grid-template-columns:200px minmax(0,1fr)}.design-grid>aside:last-child{grid-column:1/-1}.g-side{grid-template-columns:1fr}.side{position:static}}
+@media(max-width:800px){.shell{background:none}.card.wide{grid-column:auto}.row{flex-wrap:wrap}.item{flex-wrap:wrap}.shell{grid-template-columns:1fr}.rail{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center}.rail .spacer,.project,.nav .role{display:none}.nav{display:flex;flex-wrap:wrap;gap:2px}
+  .content,.topbar{padding-left:16px;padding-right:16px}.g2,.g3,.columns,.design-grid{grid-template-columns:1fr}.story{grid-template-columns:1fr 70px}.story .hide-narrow{display:none}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="rail">
+    <a class="brand" href="#/home"><span class="icon" aria-hidden="true">deployed_code</span>Aludel</a>
+    <div class="project"><span class="mark" aria-hidden="true">TS</span><div><strong>Tool Share</strong><small>Dreamer · Demo phase</small></div></div>
+    <nav class="nav" aria-label="Layers" id="nav"></nav>
+    <div class="spacer"></div>
+    <a class="settings" href="#/settings"><span class="icon" aria-hidden="true">settings</span>Settings</a>
+  </aside>
+  <div class="main">
+    <div class="topbar">
+      <div class="search" role="search">
+        <span class="icon" aria-hidden="true">search</span>
+        <label class="visually-hidden" for="q" style="position:absolute;left:-999px">Search every layer</label>
+        <input id="q" type="search" placeholder="Search stories, pages, work, decisions…" autocomplete="off">
+        <div class="results" id="results" hidden></div>
+      </div>
+      <span class="muted small">Prototype · illustrative data</span>
+    </div>
+    <main class="content" id="main" tabindex="-1"></main>
+  </div>
+</div>
+<div class="proto-banner">LAY-01 prototype · not the real app</div>
+<script>
+const esc = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const icon = (name, label) => `<span class="icon" ${label ? `role="img" aria-label="${esc(label)}"` : 'aria-hidden="true"'}>${name}</span>`;
+const layerChip = layer => `<span class="chip l-${layer}">${{ product: 'Product', design: 'Design', platform: 'Platform', work: 'Work' }[layer]}</span>`;
+
+// ---- Tool Share, as onboarding left it plus a few days of work (illustrative) ----
+const phases = [{ id: 'demo', label: 'Demo', note: 'Clickable core flow with sample data', current: true }, { id: 'mvp', label: 'MVP', note: 'Real accounts and data; testers invited' }, { id: 'later', label: 'Later', note: 'Polish and growth' }];
+const statuses = ['proposed', 'defined', 'designed', 'built', 'shipped'];
+const statusLabel = { proposed: 'Proposed', defined: 'Defined', designed: 'Designed', built: 'Built', shipped: 'Shipped' };
+const statusColor = { proposed: '#c9cfdd', defined: '#9aa7d8', designed: '#e07aa2', built: '#3047b9', shipped: '#146446' };
+const features = [
+  { id: 'borrowing', title: 'Borrowing', summary: 'Neighbours find a tool nearby, ask to borrow it, and give it back.', stories: [
+    { id: 'S1', title: 'Browse tools available nearby', phase: 'demo', status: 'designed', pages: ['browse'], work: ['W-09'], acceptance: ['Shows tools within 2 km, closest first', 'Each card shows photo, name, lender and distance'], history: [{ text: 'Cards rather than a table: photos drive the choice.', source: 'W-08', date: 'Sep 21' }] },
+    { id: 'S2', title: 'Request to borrow a tool', phase: 'demo', status: 'defined', pages: ['tool'], work: ['W-13', 'W-10'], acceptance: ['A request names the dates needed', 'The lender is notified'], history: [] },
+    { id: 'S3', title: 'Lender approves or declines a request', phase: 'mvp', status: 'defined', pages: [], work: [], acceptance: ['Approve or decline with an optional note'], history: [] },
+    { id: 'S4', title: 'Return reminders', phase: 'mvp', status: 'proposed', pages: [], work: ['W-S2'], acceptance: [], history: [] }] },
+  { id: 'messaging', title: 'Messaging', summary: 'Borrowers and lenders talk about a tool and arrange pick-up.', stories: [
+    { id: 'S5', title: 'Message a lender about a tool', phase: 'demo', status: 'defined', pages: ['messages'], work: ['W-S1'], acceptance: ['Starts from the tool page', 'Thread shows the tool it is about'], history: [] },
+    { id: 'S6', title: 'Get notified of replies', phase: 'mvp', status: 'proposed', pages: [], work: ['W-11'], acceptance: [], history: [] },
+    { id: 'S7', title: 'Street-wide group threads', phase: 'later', status: 'proposed', pages: [], work: [], acceptance: [], history: [] }] },
+  { id: 'accounts', title: 'Accounts and profiles', summary: 'People sign up, sign in and show what they lend.', stories: [
+    { id: 'S8', title: 'Sign up and sign in', phase: 'demo', status: 'built', pages: ['profile'], work: ['W-12'], acceptance: ['Email and password', 'Signed-in name in the header'], history: [{ text: 'Email and password for Demo; social sign-in deferred to MVP.', source: 'W-07', date: 'Sep 20' }] },
+    { id: 'S9', title: 'Profile shows the tools I lend', phase: 'mvp', status: 'proposed', pages: ['profile'], work: [], acceptance: [], history: [] }] },
+  { id: 'search', title: 'Search', summary: 'Find a specific tool quickly.', stories: [
+    { id: 'S10', title: 'Search tools by name and distance', phase: 'demo', status: 'defined', pages: ['browse'], work: ['W-14'], acceptance: ['Matches tool names and categories', 'Can narrow by distance'], history: [] }] }
+];
+const stories = features.flatMap(feature => feature.stories.map(story => ({ ...story, feature })));
+const pageTree = [
+  { id: 'home', label: 'Home', type: 'Feed', icon: 'home', status: 'Accepted · rev 1', stories: [], notes: 'Recent tools shared nearby, then requests waiting for you.' },
+  { id: 'browse', label: 'Browse', type: 'Gallery', icon: 'explore', status: 'Accepted · rev 2 · options open for search results', stories: ['S1', 'S10'], notes: 'Photo-led cards; search pinned to the top. Hero image from onboarding used as the empty state.', children: [
+    { id: 'tool', label: 'Tool detail', type: 'Detail', icon: 'build', status: 'Not designed yet', stories: ['S2'], gap: true, notes: '' }] },
+  { id: 'messages', label: 'Messages', type: 'Messages', icon: 'chat', status: 'Not designed yet', stories: ['S5'], gap: true, notes: '', children: [
+    { id: 'thread', label: 'Conversation', type: 'Messages', icon: 'forum', status: 'Not designed yet', stories: ['S5'], gap: true, notes: '' }] },
+  { id: 'profile', label: 'Profile', type: 'Detail', icon: 'person', status: 'Accepted · rev 1', stories: ['S8', 'S9'], notes: 'Name, neighbourhood and the tools this person lends.' }
+];
+const pages = pageTree.flatMap(page => [page, ...(page.children || [])]);
+const work = [
+  { id: 'W-14', state: 'needs-input', layer: 'design', type: 'Design', title: 'Search results layout for Browse', who: 'agent', agent: 'Design agent', targets: [['design', 'browse', 'Browse page'], ['product', 'S10', 'S10 Search tools by name and distance']],
+    question: { text: 'Which layout should search results use?', why: 'Distance matters as much as the tool itself (S10 acceptance). Both layouts use the system tokens and the gallery page type.', options: ['A · Card grid, distance on each card', 'B · Map above a compact list'] },
+    documents: ['Design › Browse page, new revision with the chosen layout and why', 'Product › S10 status becomes Designed'], log: ['Claimed by Design agent (policy: Dreamer automates design)', 'Drafted two options from S10 and the Mobile-first social feel', 'Asked: which layout?'] },
+  { id: 'W-13', state: 'needs-input', layer: 'product', type: 'Define', title: 'Acceptance for “Request to borrow a tool”', who: 'agent', agent: 'Product agent', targets: [['product', 'S2', 'S2 Request to borrow a tool']],
+    question: { text: 'Can people ask to borrow for specific dates, or only “as soon as possible”?', why: 'Dates change the page (a date picker) and later the data model.', options: ['Specific dates', 'As soon as possible', 'Both'] },
+    documents: ['Product › S2 acceptance examples (new revision)'], log: ['Claimed by Product agent', 'Drafted acceptance from the pitch and Messaging stories', 'Asked about dates'] },
+  { id: 'W-12', state: 'review', layer: 'product', type: 'Implement', title: 'Build “Sign up and sign in”', who: 'agent', agent: 'Coding agent', targets: [['product', 'S8', 'S8 Sign up and sign in'], ['design', 'profile', 'Profile page']],
+    documents: ['Product › S8 status becomes Built once accepted', 'Platform › Preview build 7c1e2a4'], log: ['Claimed by Coding agent', 'Preview build 7c1e2a4 ready', 'Checks: 14 passed'] },
+  { id: 'W-11', state: 'claimed', layer: 'product', type: 'Define', title: 'Draft stories for reply notifications', who: 'agent', agent: 'Product agent', targets: [['product', 'S6', 'S6 Get notified of replies']], documents: ['Product › Messaging stories'], log: ['Claimed by Product agent'] },
+  { id: 'W-10', state: 'ready', layer: 'design', type: 'Design', title: 'Design the Tool detail page', who: 'agent', agent: 'Design agent', targets: [['design', 'tool', 'Tool detail page'], ['product', 'S2', 'S2 Request to borrow']], documents: ['Design › Tool detail page (first revision)'], log: ['Staged from the page tree gap'] },
+  { id: 'W-09', state: 'ready', layer: 'product', type: 'Implement', title: 'Build “Browse tools available nearby”', who: 'person', agent: 'You', targets: [['product', 'S1', 'S1 Browse tools nearby'], ['design', 'browse', 'Browse page']], documents: ['Product › S1 status becomes Built once accepted'], log: ['Staged when S1 became Designed', 'Assigned to you (you picked this one up yourself)'] },
+  { id: 'W-S1', state: 'suggested', layer: 'design', type: 'Design', title: 'Messages page is not designed yet', targets: [['design', 'messages', 'Messages page'], ['product', 'S5', 'S5 Message a lender']], documents: [], log: [] },
+  { id: 'W-S2', state: 'suggested', layer: 'product', type: 'Define', title: 'Define “Return reminders”', targets: [['product', 'S4', 'S4 Return reminders']], documents: [], log: [] },
+  { id: 'W-S3', state: 'suggested', layer: 'platform', type: 'Configure', title: 'Set up a production environment', targets: [['platform', 'environments', 'Environments']], documents: [], log: [] },
+  { id: 'W-08', state: 'done', layer: 'design', type: 'Design', title: 'Design the Browse page', who: 'agent', agent: 'Design agent', targets: [['design', 'browse', 'Browse page']], documents: ['Design › Browse rev 2', 'Product › S1 became Designed', 'Decision: cards rather than a table'], log: [] }
+];
+const stateLabel = { 'needs-input': 'Needs you', review: 'In review', claimed: 'In progress', ready: 'Ready', suggested: 'Suggested', done: 'Done' };
+const stateChip = { 'needs-input': 's-warn', review: 's-warn', claimed: 's-plain', ready: 's-plain', suggested: 's-plain', done: 's-ok' };
+const routines = [
+  { title: 'Product drift check', layer: 'product', every: 'Weekly · Mondays', last: 'Sep 15: no drift', next: 'Sep 29', creates: 'Define items when built behaviour and stories disagree' },
+  { title: 'Accessibility sweep', layer: 'design', every: 'Weekly', last: 'Sep 19: 1 item (W-06, done)', next: 'Sep 26', creates: 'Design items for contrast or focus problems' },
+  { title: 'Dependency updates', layer: 'platform', every: 'Monthly', last: 'Sep 1: up to date', next: 'Oct 1', creates: 'Implement items per update, with previews' },
+  { title: 'Security audit', layer: 'platform', every: 'Before each release', last: 'Not run yet', next: 'First production release', creates: 'Implement items for findings' }
+];
+const policy = [
+  ['Vision and roadmap', 'Product', 'Agent asks you a few questions, then drafts', 'Person drafts', 'Person'],
+  ['Stories and acceptance', 'Product', 'Agent drafts · you review', 'Person drafts', 'Person'],
+  ['Page designs and options', 'Design', 'Agent · asks only when options differ', 'Agent · you choose', 'Person'],
+  ['Design system changes', 'Design', 'Agent · you review', 'Agent · you review', 'Person'],
+  ['Implementation', 'Work', 'Agent · you review previews', 'Agent · you review previews', 'Person (hand to agent any time)'],
+  ['Platform configuration', 'Platform', 'Agent · you approve effects', 'Agent · you approve effects', 'Person'],
+  ['Routines', 'All', 'Automatic', 'Automatic', 'Suggested only']
+];
+const recent = [
+  ['design', 'Browse page rev 2 accepted: cards rather than a table', 'Sep 21', '#/design/pages/browse'],
+  ['product', 'S1 became Designed', 'Sep 21', '#/product/features/S1'],
+  ['work', 'Preview build 7c1e2a4 ready for “Sign up and sign in”', 'Sep 22', '#/work/item/W-12'],
+  ['product', 'Messaging split into three stories across phases', 'Sep 22', '#/product/features/S5']
+];
+
+const routes = { home, product, design, platform, work: workLayer, settings };
+const nav = [['home', 'home', 'Home', ''], ['product', 'lightbulb', 'Product', 'lead'], ['design', 'palette', 'Design', 'creative'], ['platform', 'dns', 'Platform', 'ops'], ['work', 'checklist', 'Work', '']];
+const needsYou = work.filter(item => ['needs-input', 'review'].includes(item.state));
+
+function render() {
+  const [layer = 'home', ...rest] = location.hash.replace(/^#\/?/, '').split('/');
+  document.getElementById('nav').innerHTML = nav.map(([id, glyph, label, role]) => `<a href="#/${id}" class="${layer === id ? 'active' : ''}" ${layer === id ? 'aria-current="page"' : ''}>${icon(glyph)}${label}${id === 'work' ? `<span class="badge" aria-label="${needsYou.length} need you">${needsYou.length}</span>` : role ? `<span class="role">${role}</span>` : ''}</a>`).join('');
+  const main = document.getElementById('main');
+  main.innerHTML = (routes[layer] || home)(rest);
+  document.title = `${(nav.find(entry => entry[0] === layer) || ['', '', 'Home'])[2]} · Tool Share · Aludel prototype`;
+  main.focus({ preventScroll: true }); window.scrollTo(0, 0);
+}
+window.addEventListener('hashchange', render);
+
+function tabs(base, items, active) {
+  return `<nav class="tabs" aria-label="Sections">${items.map(([id, label]) => `<a href="#/${base}/${id}" class="${active === id ? 'active' : ''}" ${active === id ? 'aria-current="page"' : ''}>${label}</a>`).join('')}</nav>`;
+}
+// Narrow cards (Home) stack chips, title and assignee instead of squeezing a table-like row.
+function compactRow(item) {
+  const who = item.who === 'agent' ? `${icon('smart_toy')}${esc(item.agent)}` : item.who === 'person' ? `${icon('person')}You` : '';
+  return `<li><a class="item compact" href="#/work/item/${item.id}"><span class="body"><span class="row" style="gap:6px">${layerChip(item.layer)}<span class="chip ${stateChip[item.state]}">${stateLabel[item.state]}</span></span><span class="title" style="display:block;margin-top:4px">${esc(item.title)}</span><span class="who">${who}</span></span></a></li>`;
+}
+function workRow(item) {
+  const who = item.who === 'agent' ? `${icon('smart_toy')}${esc(item.agent)}` : item.who === 'person' ? `${icon('person')}You` : '';
+  return `<li><a class="item" href="#/work/item/${item.id}">${layerChip(item.layer)}<span class="body"><span class="title">${esc(item.title)}</span><small>${esc(item.type)} · ${item.targets.map(target => esc(target[2])).join(' · ')}</small></span><span class="who">${who}</span><span class="chip ${stateChip[item.state]}">${stateLabel[item.state]}</span></a></li>`;
+}
+function stepper(status) {
+  const index = statuses.indexOf(status);
+  return `<span class="stepper" role="img" aria-label="${statusLabel[status]}">${statuses.slice(1).map((_, i) => `<i class="${i < index ? 'on' : ''}"></i>`).join('')}</span>`;
+}
+const targetHref = ([layer, id]) => layer === 'product' ? `#/product/features/${id}` : layer === 'design' ? `#/design/pages/${id}` : layer === 'platform' ? '#/platform' : `#/work/item/${id}`;
+
+function home() {
+  const demo = stories.filter(story => story.phase === 'demo');
+  const counts = statuses.map(status => [status, demo.filter(story => story.status === status).length]);
+  return `<p class="eyebrow">Tool Share · Home</p><h1>Good afternoon</h1><p class="lead">Demo phase: a clickable core flow with sample data. Here's where it stands across every layer.</p>
+  <div class="grid g3">
+    <section class="card wide" aria-labelledby="phase-h"><div class="row"><h2 id="phase-h" style="margin:0">Demo phase</h2><span class="chip s-plain">${demo.length} stories</span><a class="small" style="margin-left:auto" href="#/product/roadmap">Roadmap</a></div>
+      <div class="progress" role="img" aria-label="${counts.filter(c => c[1]).map(([s, n]) => `${n} ${statusLabel[s]}`).join(', ')}">${counts.map(([status, n]) => n ? `<span style="width:${n / demo.length * 100}%;background:${statusColor[status]}"></span>` : '').join('')}</div>
+      <div class="legend">${counts.map(([status, n]) => `<span><i style="background:${statusColor[status]}"></i>${n} ${statusLabel[status]}</span>`).join('')}</div>
+      <ul class="list" style="margin-top:12px">${demo.map(story => `<li><a class="item" href="#/product/features/${story.id}"><span class="body"><span class="title">${esc(story.title)}</span><small>${esc(story.feature.title)}</small></span>${stepper(story.status)}<span class="chip s-plain">${statusLabel[story.status]}</span></a></li>`).join('')}</ul></section>
+    <section class="card" aria-labelledby="needs-h"><h2 id="needs-h">Needs you <span class="count">${needsYou.length}</span></h2><ul class="list">${needsYou.map(compactRow).join('')}</ul><a class="btn ghost small" href="#/work/queue" style="margin-top:10px">All work</a></section>
+    <section class="card" aria-labelledby="live-h"><h2 id="live-h">Your app</h2><dl class="kv"><dt>Preview</dt><dd><span class="chip s-ok">Running</span> <a href="#/platform">tool-share.localhost</a></dd><dt>Latest build</dt><dd>7c1e2a4 · waiting for your review</dd><dt>Production</dt><dd><span class="chip s-plain">Not set up</span></dd></dl></section>
+    <section class="card" aria-labelledby="recent-h"><h2 id="recent-h">Recent changes</h2><ul class="list">${recent.map(([layer, text, date, href]) => `<li><a class="item" href="${href}">${layerChip(layer)}<span class="body"><span class="title">${esc(text)}</span><small>${date}</small></span></a></li>`).join('')}</ul></section>
+    <section class="card quiet" aria-labelledby="insights-h"><h2 id="insights-h">${icon('monitoring')} Insights</h2><p class="muted small">Usage, feedback and experiments will live in their own layer once the app has users. Nothing to show yet.</p></section>
+  </div>`;
+}
+
+function product([section = 'vision', id]) {
+  const head = `<p class="eyebrow">Product · founder and product lead</p><h1>What we're building, and why</h1>` + tabs('product', [['vision', 'Vision'], ['features', 'Features & stories'], ['roadmap', 'Roadmap']], section);
+  if (section === 'roadmap') {
+    return head + `<p class="lead">Stories, not whole features, are placed in phases. A feature grows over several phases.</p><div class="columns">${phases.map(phase => `<section class="column ${phase.current ? 'current' : ''}" aria-labelledby="ph-${phase.id}"><div class="row"><h2 id="ph-${phase.id}" style="margin:0">${phase.label}</h2>${phase.current ? '<span class="chip s-ok">Current</span>' : ''}</div><p class="muted small" style="margin:4px 0 0">${phase.note}</p>
+      ${features.map(feature => { const list = feature.stories.filter(story => story.phase === phase.id); return list.length ? `<h3 class="small muted" style="margin:14px 0 0">${esc(feature.title)}</h3>${list.map(story => `<a class="scard" href="#/product/features/${story.id}"><div class="row"><span style="flex:1">${esc(story.title)}</span>${stepper(story.status)}</div></a>`).join('')}` : ''; }).join('')}</section>`).join('')}</div>`;
+  }
+  if (section === 'features') {
+    const selected = stories.find(story => story.id === id) || stories[0];
+    return head + `<div class="grid g-side"><div>${features.map(feature => `<section class="feature card" aria-labelledby="f-${feature.id}"><header><h2 id="f-${feature.id}" style="margin:0">${esc(feature.title)}</h2><span class="muted small">${esc(feature.summary)}</span></header>
+      ${feature.stories.map(story => `<a class="story ${story.id === selected.id ? 'active' : ''}" href="#/product/features/${story.id}" ${story.id === selected.id ? 'aria-current="true"' : ''}><span>${esc(story.title)}</span><span class="phase ${story.phase === 'demo' ? 'current' : ''}">${phases.find(p => p.id === story.phase).label}</span><span class="hide-narrow">${stepper(story.status)}</span><span class="chip s-plain hide-narrow">${statusLabel[story.status]}</span></a>`).join('')}
+      <a class="btn ghost small" href="#/work/queue" style="margin-top:6px">${icon('add')}Add a story idea</a></section>`).join('')}</div>
+      <aside class="card side connected" aria-labelledby="story-h"><p class="eyebrow">${esc(selected.feature.title)} · ${selected.id}</p><h2 id="story-h">${esc(selected.title)}</h2>
+        <div class="row"><span class="phase ${selected.phase === 'demo' ? 'current' : ''}">${phases.find(p => p.id === selected.phase).label}</span>${stepper(selected.status)}<span class="chip s-plain">${statusLabel[selected.status]}</span></div>
+        <p class="muted small">Status comes from connected work: defined → designed → built → shipped.</p>
+        <h3>Acceptance</h3>${selected.acceptance.length ? `<ul class="small">${selected.acceptance.map(line => `<li>${esc(line)}</li>`).join('')}</ul>` : `<p class="note">Not defined yet. <a href="#/work/queue">Start now or add to Work</a></p>`}
+        <h3>Designed in</h3>${selected.pages.length ? selected.pages.map(pid => { const page = pages.find(p => p.id === pid); return `<a href="#/design/pages/${pid}">${icon(page.icon)}${esc(page.label)} <span class="muted small">${esc(page.status)}</span></a>`; }).join('') : '<p class="muted small">No page yet</p>'}
+        <h3>Work</h3>${selected.work.length ? selected.work.map(wid => { const item = work.find(w => w.id === wid); return `<a href="#/work/item/${wid}">${layerChip(item.layer)} ${esc(item.title)} <span class="chip ${stateChip[item.state]}">${stateLabel[item.state]}</span></a>`; }).join('') : '<p class="muted small">None</p>'}
+        <h3>Runs in</h3><a href="#/platform">${icon('dns')}Preview ${selected.status === 'built' ? '<span class="chip s-ok">Built</span>' : '<span class="muted small">not built yet</span>'}</a>
+        <h3>Why it is this way</h3>${selected.history.length ? `<div class="history">${selected.history.map(entry => `<p>${esc(entry.text)}<br><small>${entry.date} · from <a href="#/work/item/${entry.source}">${entry.source}</a></small></p>`).join('')}</div>` : '<p class="muted small">No decisions yet.</p>'}
+      </aside></div>`;
+  }
+  return head + `<div class="grid g-side"><div class="grid">
+    <section class="card" aria-labelledby="pitch-h"><h2 id="pitch-h">Elevator pitch</h2><p style="font-size:19px;margin:0">Neighbours lend and borrow tools they rarely use, so nobody has to buy a ladder for one afternoon.</p><p class="muted small">Revision 1 · from onboarding</p></section>
+    <section class="card" aria-labelledby="aud-h"><h2 id="aud-h">Who it's for and what hurts</h2><p class="note">${icon('smart_toy')} Product agent drafted this from your pitch. <a href="#/work/item/W-13">Review</a></p><ul><li><strong>Occasional DIYers</strong> who need a tool once and don't want to buy it.</li><li><strong>Neighbours with a shed full of tools</strong> who'd happily lend them to someone they can trust.</li></ul></section>
+    <section class="card" aria-labelledby="out-h"><h2 id="out-h">Outcomes</h2><ol><li>A borrower finds and requests a nearby tool in under two minutes.</li><li>Lenders feel safe: they know who has their tool and when it comes back.</li></ol></section></div>
+    <aside class="card connected side" aria-labelledby="vc-h"><h2 id="vc-h">Connected</h2><h3>Shapes</h3><a href="#/product/features">${icon('lightbulb')}4 features, 10 stories</a><a href="#/design/system">${icon('palette')}Design system · Mobile-first social</a>
+      <h3>Routines watching this</h3><a href="#/work/routines">${icon('event_repeat')}Product drift check · weekly</a>
+      <h3>History</h3><div class="history"><p>Pitch written during onboarding<br><small>Sep 20</small></p><p>Audience drafted by Product agent<br><small>Sep 21 · <a href="#/work/item/W-13">W-13</a></small></p></div></aside></div>`;
+}
+
+function phoneMock(kind, active = 'Browse') {
+  const body = kind === 'grid' ? `<div class="pill"></div><div class="tiles"><div class="tile"></div><div class="tile"></div><div class="tile"></div><div class="tile"></div></div><div class="bar w6"></div>`
+    : kind === 'map' ? `<div class="pill"></div><div class="map"></div>${[1, 2, 3].map(() => '<div class="rowish"><span class="dot"></span><div style="flex:1;display:grid;gap:4px"><div class="bar"></div><div class="bar w4"></div></div></div>').join('')}`
+    : kind === 'detail' ? `<div class="tile" style="height:110px"></div><div class="bar w6"></div><div class="bar"></div><div class="bar w4"></div>`
+    : `<div class="tile" style="height:70px"></div>${[1, 2, 3].map(() => '<div class="rowish"><span class="dot"></span><div style="flex:1;display:grid;gap:4px"><div class="bar"></div><div class="bar w4"></div></div></div>').join('')}`;
+  return `<div class="phone" aria-hidden="true"><header><b>TS</b>Tool Share</header><main>${body}</main><footer>${['Home', 'Browse', 'Messages', 'Profile'].map(label => `<span class="${label === active ? 'on' : ''}">${label}</span>`).join('')}</footer></div>`;
+}
+
+function design([section = 'pages', id = 'browse']) {
+  const head = `<p class="eyebrow">Design · creative lead</p><h1>How it looks and where things happen</h1>` + tabs('design', [['pages', 'Pages'], ['system', 'Design system']], section);
+  if (section === 'system') {
+    return head + `<div class="grid g2"><section class="card" aria-labelledby="feel-h"><h2 id="feel-h">Feel</h2><p><strong>Mobile-first social</strong>: thumb-friendly and lively, rounded cards, bottom navigation on phones.</p><p class="muted small">From onboarding · rev 1</p></section>
+      <section class="card" aria-labelledby="col-h"><h2 id="col-h">Colour</h2><div class="swatches">${[['#e0457b', 'Accent (brand)'], ['#ca3e6f', 'Primary · 4.5:1 on surface'], ['#fff7fa', 'Surface'], ['#170f13', 'Surface (dark)'], ['#fbdbe6', 'Container']].map(([hex, label]) => `<div class="swatch"><i style="background:${hex}"></i><span><strong>${hex}</strong><br>${label}</span></div>`).join('')}</div></section>
+      <section class="card" aria-labelledby="type-h"><h2 id="type-h">Type and shape</h2><dl class="kv"><dt>Typeface</dt><dd>Roboto</dd><dt>Corner radius</dt><dd>22px cards · full pills</dd><dt>Density</dt><dd>Comfortable</dd><dt>Navigation</dt><dd>Top bar on desktop · bottom tabs on phones</dd></dl></section>
+      <section class="card" aria-labelledby="comp-h"><h2 id="comp-h">Components</h2><ul class="list">${[['Tab bar', 'Used on 5 pages'], ['Tool card', 'Browse, Home · new in rev 2'], ['Page blocks', 'Skeleton placeholders from onboarding'], ['Message bubble', 'Not built yet']].map(([name, note]) => `<li class="item"><span class="body"><span class="title">${name}</span><small>${note}</small></span></li>`).join('')}</ul></section>
+      <section class="card" aria-labelledby="asset-h"><h2 id="asset-h">Assets and references</h2><ul class="list"><li class="item">${icon('image')}<span class="body"><span class="title">aludel-workshop.png</span><small>“Hero image on the home page” · from onboarding</small></span></li></ul></section></div>`;
+  }
+  const page = pages.find(p => p.id === id) || pages[0];
+  const treeHtml = list => `<ul class="tree">${list.map(p => `<li><a href="#/design/pages/${p.id}" class="${p.id === page.id ? 'active' : ''} ${p.gap ? 'gap' : ''}" ${p.id === page.id ? 'aria-current="page"' : ''}>${icon(p.icon)}${esc(p.label)}${p.gap ? ' <span class="small" style="margin-left:auto">gap</span>' : ''}</a>${p.children ? treeHtml(p.children) : ''}</li>`).join('')}</ul>`;
+  const options = page.id === 'browse' ? `<div class="question"><h2>${icon('help')} Choose a layout for search results</h2><p class="small muted">Asked in <a href="#/work/item/W-14">W-14</a> by the Design agent. Your answer becomes the next revision of this page, with your reason.</p>
+      <div class="canvas">${[['grid', 'A · Card grid'], ['map', 'B · Map above a list']].map(([kind, label]) => `<figure class="option" style="margin:0">${phoneMock(kind)}<figcaption>${label}</figcaption></figure>`).join('')}</div>
+      <div class="choices"><a class="btn" href="#/work/item/W-14">Answer in W-14</a></div></div>` : '';
+  const canvas = page.gap ? `<div class="card quiet"><h2>${esc(page.label)} isn't designed yet</h2><p class="muted">It serves ${page.stories.map(sid => esc(stories.find(s => s.id === sid).title)).join(', ')}.</p><div class="row"><a class="btn" href="#/work/queue">Start now</a><a class="btn ghost" href="#/work/queue">Add to Work</a></div></div>`
+    : `<div class="canvas">${phoneMock(page.type === 'Detail' ? 'detail' : page.type === 'Gallery' ? 'grid' : 'feed', page.label === 'Home' ? 'Home' : page.label)}</div>`;
+  return head + `<div class="design-grid"><nav aria-label="Page tree" class="card" style="padding:12px">${treeHtml(pageTree)}<a class="btn ghost small" href="#/work/queue" style="margin:10px 0 0 6px">${icon('add')}Add page</a></nav>
+    <section aria-labelledby="page-h"><div class="row"><h2 id="page-h" style="margin:0;font-size:26px">${esc(page.label)}</h2><span class="chip l-design">${esc(page.type)}</span></div><p class="muted small">${esc(page.status)}</p>${options}${canvas}</section>
+    <aside class="card connected" aria-labelledby="pc-h"><h2 id="pc-h">About this page</h2>${page.notes ? `<p class="note">${esc(page.notes)}</p>` : ''}
+      <h3>Stories it realizes</h3>${page.stories.length ? page.stories.map(sid => { const s = stories.find(x => x.id === sid); return `<a href="#/product/features/${sid}">${icon('lightbulb')}${esc(s.title)} <span class="phase ${s.phase === 'demo' ? 'current' : ''}">${phases.find(p => p.id === s.phase).label}</span></a>`; }).join('') : '<p class="muted small">None linked yet</p>'}
+      <h3>Work on this page</h3>${work.filter(w => w.targets.some(t => t[0] === 'design' && t[1] === page.id)).map(w => `<a href="#/work/item/${w.id}">${esc(w.title)} <span class="chip ${stateChip[w.state]}">${stateLabel[w.state]}</span></a>`).join('') || '<p class="muted small">None</p>'}
+      <h3>Why it is this way</h3>${page.id === 'browse' ? '<div class="history"><p>Cards rather than a table: photos drive the choice.<br><small>Rev 2 · Sep 21 · from <a href="#/work/item/W-08">W-08</a></small></p><p>Created from onboarding (Gallery page type).<br><small>Rev 1 · Sep 20</small></p></div>' : '<div class="history"><p>Created from onboarding.<br><small>Rev 1 · Sep 20</small></p></div>'}
+    </aside></div>`;
+}
+
+function platform() {
+  return `<p class="eyebrow">Platform · engineering and operations</p><h1>How it's built and where it runs</h1><p class="lead">Configuration only. What to build comes from Product and Design; the building happens in Work.</p>
+  <div class="grid g2"><section class="card" aria-labelledby="stack-h"><h2 id="stack-h">Stack</h2><dl class="kv"><dt>Preset</dt><dd>Aludel web (aludel-web-v1)</dd><dt>Frontend</dt><dd>Angular 22 + Material 3</dd><dt>Backend</dt><dd>Node 24</dd><dt>Database</dt><dd>SQLite</dd><dt>Auth</dt><dd>Built-in email and password</dd></dl></section>
+    <section class="card" aria-labelledby="env-h" id="environments"><h2 id="env-h">Environments</h2><table><thead><tr><th>Environment</th><th>Status</th><th>Build</th></tr></thead><tbody><tr><td>Preview</td><td><span class="chip s-ok">Running</span><br><span class="small">tool-share.localhost</span></td><td>7c1e2a4 · in review</td></tr><tr><td>Production</td><td><span class="chip s-plain">Not set up</span></td><td><a href="#/work/item/W-S3">Suggested in Work</a></td></tr></tbody></table></section>
+    <section class="card" aria-labelledby="repo-h"><h2 id="repo-h">Repository</h2><p>Local repository · 3 commits on <code>main</code></p><p class="muted small">GitHub isn't connected on this Aludel yet.</p><a class="btn ghost small" href="#/platform">Connect GitHub</a></section>
+    <section class="card" aria-labelledby="int-h"><h2 id="int-h">Connections</h2><ul class="list"><li class="item">${icon('smart_toy')}<span class="body"><span class="title">Agent: Codex on this machine</span><small>Used by Product, Design and Coding agents</small></span><span class="chip s-ok">Connected</span></li><li class="item">${icon('code')}<span class="body"><span class="title">GitHub</span><small>Needed to publish the repository</small></span><span class="chip s-plain">Not set up</span></li></ul></section></div>`;
+}
+
+function workLayer([section = 'queue', id]) {
+  if (section === 'item') return workItem(id);
+  const head = `<p class="eyebrow">Work · the shared bench</p><h1>Everything to do, from every layer</h1><p class="lead">Agents and people pick up items the same way. Questions stay on the item that raised them; answers land in the layer they change.</p>` + tabs('work', [['queue', 'Queue'], ['routines', 'Routines'], ['style', 'Working style']], section);
+  if (section === 'routines') return head + `<div class="table-wrap" tabindex="0" role="region" aria-label="Routines"><table><thead><tr><th>Routine</th><th>Layer</th><th>Runs</th><th>Last run</th><th>Next</th><th>Creates</th></tr></thead><tbody>${routines.map(r => `<tr><td><strong>${r.title}</strong></td><td>${layerChip(r.layer)}</td><td>${r.every}</td><td>${r.last}</td><td>${r.next}</td><td class="small">${r.creates}</td></tr>`).join('')}</tbody></table></div><a class="btn ghost small" href="#/work/routines" style="margin-top:14px">${icon('add')}Add routine</a>`;
+  if (section === 'style') return head + `<div class="row" style="margin-bottom:12px"><span>Working style for Tool Share:</span><div class="toggle" role="group" aria-label="Working style"><button class="on" aria-pressed="true">Dreamer</button><button aria-pressed="false">Planner</button><button aria-pressed="false">Tinkerer</button></div></div>
+    <p class="muted">The style decides which kinds of work are staged and handed to agents automatically. It isn't stored on a task; you can reassign any single item.</p>
+    <div class="table-wrap" tabindex="0" role="region" aria-label="Automation by working style"><table><thead><tr><th>Work type</th><th>Layer</th><th>Dreamer (current)</th><th>Planner</th><th>Tinkerer</th></tr></thead><tbody>${policy.map(row => `<tr>${row.map((cell, i) => `<td>${i === 2 ? `<strong>${cell}</strong>` : cell}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
+    <section class="card" style="margin-top:18px" aria-labelledby="ins-h"><h2 id="ins-h">Agent instructions</h2><p class="muted small">Work's own documentation: how agents approach each work type in this project. Versioned like any record.</p><ul class="list">${['Product agent: draft stories as “someone can…” with 2–4 acceptance examples', 'Design agent: offer at most two options; always use system tokens', 'Coding agent: one story per build; keep page-blocks until a page is real'].map(line => `<li class="item"><span class="body">${line}</span></li>`).join('')}</ul></section>`;
+  const group = (states, title, quiet) => { const list = work.filter(w => states.includes(w.state)); if (!list.length) return ''; const inner = `<ul class="list card" style="padding:4px 16px">${list.map(workRow).join('')}</ul>`; return quiet ? `<details class="quiet"><summary>${title} · ${list.length}</summary>${inner}</details>` : `<div class="section-title"><h2>${title}</h2><span class="count">${list.length}</span></div>${inner}`; };
+  return head + `<div class="row" style="gap:6px;flex-wrap:wrap"><span class="small muted">Show:</span>${['All', 'Product', 'Design', 'Platform'].map((label, i) => `<button class="btn ${i ? 'ghost' : ''} small" aria-pressed="${i === 0}">${label}</button>`).join('')}</div>
+    ${group(['needs-input'], 'Needs you')}${group(['review'], 'In review')}${group(['claimed'], 'In progress')}${group(['ready'], 'Ready to pick up')}${group(['suggested'], 'Suggested by the layers (not queued yet)', true)}${group(['done'], 'Done recently', true)}`;
+}
+
+function workItem(id) {
+  const item = work.find(w => w.id === id) || work[0];
+  const who = item.who === 'agent' ? 'agent' : item.who === 'person' ? 'person' : '';
+  return `<p class="eyebrow"><a href="#/work/queue">Work</a> · ${item.id}</p><div class="row" style="flex-wrap:wrap"><h1 style="margin:0">${esc(item.title)}</h1>${layerChip(item.layer)}<span class="chip ${stateChip[item.state]}">${stateLabel[item.state]}</span></div><p class="muted">${esc(item.type)} work from the ${item.layer.charAt(0).toUpperCase() + item.layer.slice(1)} layer</p>
+  <div class="grid g-side"><div>
+    ${item.question ? `<section class="question" aria-labelledby="qq"><h2 id="qq">${icon('help')} ${esc(item.question.text)}</h2><p class="small">${esc(item.question.why)}</p>${item.id === 'W-14' ? `<div class="canvas" style="margin:10px 0">${[['grid', 'A · Card grid'], ['map', 'B · Map above a list']].map(([kind, label]) => `<figure class="option" style="margin:0">${phoneMock(kind)}<figcaption>${label}</figcaption></figure>`).join('')}</div>` : ''}
+      <div class="choices">${item.question.options.map(option => `<button class="btn ghost">${esc(option)}</button>`).join('')}</div><label class="small" style="display:block;margin-top:10px">Why (saved with the decision)<br><textarea rows="2" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:8px"></textarea></label></section>` : ''}
+    ${item.state === 'review' ? `<section class="question" aria-labelledby="rv"><h2 id="rv">${icon('preview')} Review preview build 7c1e2a4</h2><p class="small">Try it on the preview, then accept it or ask for changes. Accepting makes S8 Built.</p><div class="choices"><a class="btn" href="#/platform">Open preview</a><button class="btn ghost">Accept</button><button class="btn ghost">Ask for changes</button></div></section>` : ''}
+    <section class="card" aria-labelledby="ctx"><h2 id="ctx">What this work needs</h2><p class="muted small">The same context an agent receives. Everything links back to its layer.</p><div class="connected">${item.targets.map(t => `<a href="${targetHref(t)}">${layerChip(t[0])} ${esc(t[2])}</a>`).join('')}<a href="#/design/system">${layerChip('design')} Design system · Mobile-first social</a><a href="#/product/vision">${layerChip('product')} Vision and outcomes</a><a href="#/work/style">${layerChip('work')} Agent instructions</a></div></section>
+    <section class="card" style="margin-top:18px" aria-labelledby="docs"><h2 id="docs">Will document</h2><p class="muted small">Closing this item means these records were created or revised. The log below is not documentation.</p>${item.documents.length ? `<ul>${item.documents.map(d => `<li>${esc(d)}</li>`).join('')}</ul>` : '<p class="note">Decided when the item is staged.</p>'}</section>
+    ${item.log.length ? `<details class="quiet" style="margin-top:14px"><summary>Activity log · ${item.log.length}</summary><ol class="small">${item.log.map(l => `<li>${esc(l)}</li>`).join('')}</ol></details>` : ''}
+  </div>
+  <aside class="card side" aria-labelledby="who-h"><h2 id="who-h">Who's on it</h2>${item.state === 'suggested' ? `<p class="muted">Not queued yet.</p><div class="row"><button class="btn">Start now</button><button class="btn ghost">Add to queue</button></div>` : `<div class="toggle" role="group" aria-label="Assignee"><button class="${who === 'agent' ? 'on' : ''}" aria-pressed="${who === 'agent'}">${icon('smart_toy')} Agent</button><button class="${who === 'person' ? 'on' : ''}" aria-pressed="${who === 'person'}">${icon('person')} Me</button></div><p class="small muted" style="margin-top:10px">${who === 'agent' ? `${esc(item.agent)} picked this up because Dreamer hands ${esc(item.type.toLowerCase())} work to agents. Take it over at any time.` : 'You picked this up. Hand it to an agent at any time; it gets exactly this page.'}</p>`}</aside></div>`;
+}
+
+function settings() {
+  return `<p class="eyebrow">Settings</p><h1>Tool Share settings</h1><div class="grid g2"><section class="card"><h2>Project</h2><dl class="kv"><dt>Name</dt><dd>Tool Share</dd><dt>Address</dt><dd>tool-share.localhost</dd><dt>Members</dt><dd>You (owner)</dd></dl></section><section class="card"><h2>Working style</h2><p>Dreamer · <a href="#/work/style">change in Work</a></p></section></div>`;
+}
+
+// Global search across every layer's records.
+const index = [
+  ...stories.map(s => ({ layer: 'Product', text: `${s.title}`, sub: `${s.feature.title} · ${statusLabel[s.status]}`, href: `#/product/features/${s.id}` })),
+  ...features.map(f => ({ layer: 'Product', text: f.title, sub: f.summary, href: `#/product/features/${f.stories[0].id}` })),
+  ...pages.map(p => ({ layer: 'Design', text: `${p.label} page`, sub: p.status, href: `#/design/pages/${p.id}` })),
+  ...work.map(w => ({ layer: 'Work', text: w.title, sub: `${w.id} · ${stateLabel[w.state]}`, href: `#/work/item/${w.id}` })),
+  ...stories.flatMap(s => s.history.map(h => ({ layer: 'Decisions', text: h.text, sub: `${s.title} · ${h.date}`, href: `#/product/features/${s.id}` }))),
+  { layer: 'Platform', text: 'Environments', sub: 'Preview running · production not set up', href: '#/platform' }
+];
+const q = document.getElementById('q'); const results = document.getElementById('results');
+q.addEventListener('input', () => {
+  const term = q.value.trim().toLowerCase();
+  if (!term) { results.hidden = true; return; }
+  const hits = index.filter(entry => `${entry.text} ${entry.sub}`.toLowerCase().includes(term));
+  const groups = [...new Set(hits.map(hit => hit.layer))];
+  results.innerHTML = hits.length ? groups.map(group => `<h3>${group}</h3>${hits.filter(h => h.layer === group).slice(0, 5).map(h => `<a href="${h.href}"><span>${esc(h.text)}</span><small>${esc(h.sub)}</small></a>`).join('')}`).join('') : '<p class="muted small" style="padding:8px 10px">Nothing matches.</p>';
+  results.hidden = false;
+});
+results.addEventListener('click', () => { results.hidden = true; q.value = ''; });
+document.addEventListener('keydown', event => { if (event.key === 'Escape') { results.hidden = true; } if (event.key === '/' && document.activeElement !== q) { event.preventDefault(); q.focus(); } });
+render();
+</script>
+</body>
+</html>

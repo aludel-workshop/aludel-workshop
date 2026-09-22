@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { aludelProjectId, requireMember } from './accounts.mjs';
 import { reservedSlugs, slugify } from './hosts.mjs';
 import { getProductWorkspace, saveProductRecord } from './product-workspace.mjs';
+import { loadStoryPacks } from './knowledge.mjs';
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const now = () => new Date().toISOString();
@@ -32,7 +33,7 @@ export function loadCatalogs(configDirectory) {
     }
   }
   if (!stacks.presets[stacks.default]?.available) throw new Error('The default stack preset must be available.');
-  return { preferences: profiles.preferences, profiles: profiles.profiles, feels: starter.feels, features: starter.features, stacks,
+  return { preferences: profiles.preferences, profiles: profiles.profiles, feels: starter.feels, features: starter.features, packs: loadStoryPacks(configDirectory), stacks,
     pageTypes: pages.types, routeIcons, defaultRoute: starter.defaultRoute };
 }
 
@@ -73,7 +74,7 @@ export const agentProviders = {
   'codex-local': { label: 'Codex on this machine', secret: null, pattern: null }
 };
 
-export function onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot, createWorkspace }) {
+export function onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot, createWorkspace, know }) {
   const draftRow = token => token ? db.prepare('SELECT * FROM onboarding_drafts WHERE token_hash = ? AND expires_at > ?').get(digest(token), now()) : null;
   const draftView = row => row && { profile: row.profile, name: row.name, pitch: row.pitch, claimedProjectId: row.claimed_project_id };
 
@@ -123,13 +124,9 @@ export function onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot, cr
     db.prepare('UPDATE project_setup SET completed_steps_json = ?, updated_at = ? WHERE project_id = ?').run(JSON.stringify([...steps]), now(), projectId);
   }
 
-  // Pages (primary routes) are distinct from functionality. Until someone saves them, they are seeded from the
-  // chosen feel so a marketplace starts with marketplace-shaped navigation; descriptions are always left blank.
-  function routesFor(setup) {
-    const stored = parse(setup.routes_json, null);
-    if (stored) return { routes: stored, seeded: false };
-    const seed = catalogs.feels[setup.feel]?.seedRoutes || [catalogs.defaultRoute];
-    return { routes: seed.map((route, index) => ({ id: `page-${index + 1}`, label: route.label, icon: route.icon, pageType: route.pageType, description: '' })), seeded: true };
+  // Pages are knowledge records (the Pages layer). Until someone edits the navigation, it follows the chosen feel.
+  function routesFor(projectId, setup) {
+    return { routes: know.navRoutes(projectId), seeded: !setup.pages_customized };
   }
 
   function connectionView(projectId) {
@@ -145,7 +142,7 @@ export function onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot, cr
   const api = {
     catalog() {
       return {
-        preferences: catalogs.preferences, profiles: catalogs.profiles, feels: catalogs.feels, features: catalogs.features,
+        preferences: catalogs.preferences, profiles: catalogs.profiles, feels: catalogs.feels, features: catalogs.packs,
         stacks: catalogs.stacks, pageTypes: catalogs.pageTypes, routeIcons: catalogs.routeIcons, agentProviders: Object.fromEntries(Object.entries(agentProviders).map(([id, value]) => [id, { label: value.label, secret: value.secret }]))
       };
     },
@@ -202,6 +199,8 @@ export function onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot, cr
         db.exec('COMMIT');
       } catch (error) { db.exec('ROLLBACK'); throw error; }
       saveProductRecord(db, projectId, 'direction', null, { title: name, summary: pitch, audience: '', outcomes: [], constraints: [], success: [] });
+      know.ensureProject(projectId, { pitch });
+      know.seedPages(projectId, null);
       createWorkspace(api.projectSetup(user, projectId), authorIdentity);
       return api.projectSetup(user, projectId);
     },
@@ -212,17 +211,18 @@ export function onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot, cr
       const setup = setupRow(projectId);
       const overrides = parse(setup.overrides_json, {});
       const product = getProductWorkspace(db, projectId);
-      const featureRecords = parse(setup.feature_records_json, {});
       return {
         project,
         profile: setup.profile, overrides, preferences: effectivePreferences(setup.profile, overrides),
         design: { feel: setup.feel, theme: setup.theme, accent: project.accent_color, notes: setup.design_notes,
           navigation: setup.navigation || catalogs.feels[setup.feel || 'sleek-saas'].navigation },
-        pages: routesFor(setup),
+        pages: routesFor(projectId, setup),
         stack: { preset: setup.stack_preset, options: parse(setup.stack_options_json, {}) },
+        // Functionality is story packs (DEC-037): the picks, and the stories they put on the map.
         features: {
-          picks: Object.keys(featureRecords).filter(key => !key.startsWith('custom:')),
-          records: product.features.filter(item => item.status !== 'retired').map(item => ({ id: item.id, title: item.title, summary: item.summary, status: item.status }))
+          picks: parse(setup.story_packs_json, []),
+          records: parse(setup.story_packs_json, []).map(id => ({ id, title: catalogs.packs[id]?.label || id, summary: catalogs.packs[id]?.summary || '', status: 'seeded' })),
+          stories: know.list(projectId, 'story').map(story => ({ id: story.id, title: story.title, phase: story.phase, pack: story.pack, template: story.template }))
         },
         direction: product.direction && { title: product.direction.title, summary: product.direction.summary, revision: product.direction.revision },
         completedSteps: parse(setup.completed_steps_json, []),
@@ -262,6 +262,7 @@ export function onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot, cr
       db.prepare('UPDATE project_setup SET feel = ?, theme = ?, design_notes = ?, navigation = COALESCE(?, navigation), updated_at = ? WHERE project_id = ?')
         .run(feel, theme, String(notes).trim(), navigation || null, updated, projectId);
       db.prepare('UPDATE projects SET accent_color = ?, updated_at = ? WHERE id = ?').run(accentColor, updated, projectId);
+      know.seedPages(projectId, feel);
       markStep(projectId, 'look');
       return api.projectSetup(user, projectId);
     },
@@ -313,62 +314,26 @@ export function onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot, cr
 
     saveFeatures(user, projectId, { picks = [], custom = [] }) {
       requireMember(db, user, projectId);
-      if (!Array.isArray(picks) || !Array.isArray(custom)) fail('Choose features from the list.');
-      for (const pick of picks) if (!catalogs.features[pick]) fail('Choose features from the list.');
-      if (custom.length > 30) fail('Add up to 30 custom features at a time.');
-      const records = parse(setupRow(projectId).feature_records_json, {});
-      const current = new Map(getProductWorkspace(db, projectId).features.map(item => [item.id, item]));
-      const retire = record => record && record.status !== 'retired' && saveProductRecord(db, projectId, 'feature', record.id, { ...record, status: 'retired', expectedRevision: record.revision });
-      for (const [key, recordId] of Object.entries(records)) {
-        if (!key.startsWith('custom:') && !picks.includes(key)) retire(current.get(recordId));
-      }
-      for (const pick of picks) {
-        const existing = current.get(records[pick]);
-        const feature = catalogs.features[pick];
-        if (!existing) records[pick] = saveProductRecord(db, projectId, 'feature', null, { title: feature.label, summary: feature.summary, status: 'planned', outcome_id: null, evidence: [] }).id;
-        else if (existing.status === 'retired') saveProductRecord(db, projectId, 'feature', existing.id, { ...existing, status: 'planned', expectedRevision: existing.revision });
-      }
-      for (const item of custom) {
-        const title = String(item?.title || '').trim();
-        const summary = String(item?.summary || '').trim() || title;
-        if (!title) continue;
-        if (title.length > 90 || summary.length > 600) fail('Keep custom feature titles under 90 characters and descriptions under 600.');
-        const saved = saveProductRecord(db, projectId, 'feature', null, { title, summary, status: 'planned', outcome_id: null, evidence: [] });
-        records[`custom:${saved.id}`] = saved.id;
-      }
-      db.prepare('UPDATE project_setup SET feature_records_json = ?, updated_at = ? WHERE project_id = ?').run(JSON.stringify(records), now(), projectId);
+      if (!Array.isArray(picks) || !Array.isArray(custom)) fail('Choose story packs from the list.');
+      if (custom.length > 30) fail('Add up to 30 story ideas at a time.');
+      know.applyPacks(projectId, picks, { customIdeas: custom });
       markStep(projectId, 'features');
       return api.projectSetup(user, projectId);
     },
 
     removeFeature(user, projectId, recordId) {
       requireMember(db, user, projectId);
-      const record = getProductWorkspace(db, projectId).features.find(item => item.id === recordId);
-      if (!record) fail('Feature not found.', 404);
-      saveProductRecord(db, projectId, 'feature', record.id, { ...record, status: 'retired', expectedRevision: record.revision });
+      const story = know.list(projectId, 'story').find(item => item.id === recordId);
+      if (!story) fail('Story not found.', 404);
+      know.remove(projectId, story.id);
       return api.projectSetup(user, projectId);
     },
 
-    saveRoutes(user, projectId, { routes, navigation }) {
+    saveRoutes(user, projectId, { routes, navigation, reassign = {} }) {
       requireMember(db, user, projectId);
-      if (!Array.isArray(routes) || routes.length < 1 || routes.length > 5) fail('Keep between one and five pages in the navigation.');
-      const seen = new Set();
-      const clean = routes.map((route, index) => {
-        const label = String(route?.label || '').trim();
-        const description = String(route?.description || '').trim();
-        if (!label || label.length > 30) fail('Give every page a name of up to 30 characters.');
-        if (seen.has(label.toLowerCase())) fail(`Two pages are both called “${label}”. Give each page its own name.`);
-        seen.add(label.toLowerCase());
-        if (!catalogs.routeIcons.includes(route.icon)) fail(`Choose an icon from the list for “${label}”.`);
-        if (!catalogs.pageTypes[route.pageType]) fail(`Choose a page type for “${label}”.`);
-        if (description.length > 1000) fail(`Keep the description of “${label}” under 1,000 characters.`);
-        const id = /^page-[a-z0-9-]{1,40}$/.test(String(route.id || '')) ? route.id : `page-${randomBytes(4).toString('hex')}`;
-        return { id, label, icon: route.icon, pageType: route.pageType, description, order: index };
-      });
-      if (new Set(clean.map(route => route.id)).size !== clean.length) fail('Each page needs its own id.');
       if (navigation !== undefined && !['sidebar', 'top'].includes(navigation)) fail('Choose side or top navigation.');
-      db.prepare('UPDATE project_setup SET routes_json = ?, navigation = COALESCE(?, navigation), updated_at = ? WHERE project_id = ?')
-        .run(JSON.stringify(clean.map(({ order, ...route }) => route)), navigation || null, now(), projectId);
+      know.saveNavRoutes(projectId, routes, { reassign, author: user.name });
+      if (navigation) db.prepare('UPDATE project_setup SET navigation = ?, updated_at = ? WHERE project_id = ?').run(navigation, now(), projectId);
       return api.projectSetup(user, projectId);
     },
 

@@ -88,6 +88,19 @@ try {
   await check('look');
   await page.getByRole('button', { name: 'Save and continue' }).click();
 
+  // Functionality comes before Pages (DEC-037): story packs seed the story map and propose pages.
+  await page.getByRole('heading', { name: 'What should Tool Share be able to do?' }).waitFor();
+  await page.getByRole('checkbox', { name: /^Accounts/ }).check();
+  await page.getByRole('list', { name: 'Accounts stories' }).getByText('Someone can sign up with email and password').waitFor();
+  await page.getByRole('checkbox', { name: /^Messaging/ }).check();
+  await page.getByRole('checkbox', { name: 'More details' }).check();
+  await page.getByLabel('Someone can…').fill('Someone can list a tool to lend');
+  await page.getByLabel('Why it matters').fill('Lenders share what they own.');
+  await page.getByRole('button', { name: 'Add story idea' }).click();
+  await page.getByText('Story idea added.').waitFor();
+  await check('features');
+  await page.getByRole('button', { name: 'Save and continue' }).click();
+
   await page.getByRole('heading', { name: 'Shape the navigation' }).waitFor();
   const nav = proto.getByRole('navigation', { name: 'Pages in your app' });
   const labels = () => nav.locator('.proto-link span').allInnerTexts();
@@ -120,6 +133,12 @@ try {
   for (let step = 1; step <= 12; step++) await page.mouse.move(from.x + (to.x - from.x) * step / 12 - 4, to.y + to.height / 2);
   await page.mouse.up();
   await expectPages(['Home', 'Profile', 'Messages', 'Tool library'], 'dragging reorders pages');
+  await nav.getByRole('button', { name: 'Messages' }).click();
+  await nav.getByRole('button', { name: 'Edit Messages' }).click();
+  await proto.getByRole('button', { name: 'Delete' }).click();
+  await page.getByRole('alert').getByText(/“Messages” realises 2 stories/).waitFor();
+  await page.getByRole('button', { name: 'Keep “Messages”' }).click();
+  await expectPages(['Home', 'Profile', 'Messages', 'Tool library'], 'keeping the page restores the navigation');
   await page.getByRole('radio', { name: 'Side nav' }).check();
   await page.getByRole('radio', { name: 'Mobile' }).check();
   await proto.locator('.proto-frame.mobile .proto-tabs .proto-link').nth(3).waitFor({ timeout: 3000 });
@@ -130,18 +149,6 @@ try {
   assert.equal(await page.getByText('1 of 4 described').count(), 1);
   await check('pages');
   await page.getByRole('button', { name: 'Continue' }).click();
-
-  await page.getByRole('heading', { name: 'What should Tool Share be able to do?' }).waitFor();
-  await page.getByRole('checkbox', { name: /^Search/ }).check();
-  await page.getByRole('checkbox', { name: /^Messages and comments/ }).check();
-  await page.getByRole('checkbox', { name: 'More details' }).check();
-  await page.getByLabel('Feature name').fill('Lending history');
-  await page.getByLabel('What it does').fill('Remember who borrowed what, and when it came back.');
-  await page.getByRole('button', { name: 'Add feature' }).click();
-  await page.getByText('Feature added.').waitFor();
-  await check('features');
-  await page.getByRole('button', { name: 'Save and continue' }).click();
-
   await page.getByRole('heading', { name: 'Build Tool Share' }).waitFor();
   assert.equal(await page.getByText('Django + HTMX').count(), 0, 'unavailable presets stay behind More options');
   await page.getByRole('checkbox', { name: 'More options' }).check();
@@ -194,12 +201,14 @@ try {
   await appPage.screenshot({ path: 'test-results/onboarding/app-narrow.png', fullPage: true });
 
   await page.getByRole('link', { name: 'Continue in Aludel' }).click();
+  await page.waitForURL(`${portal}/p/tool-share`);
   await page.getByRole('heading', { name: 'Tool Share', level: 1 }).waitFor();
-  await page.getByRole('radio', { name: 'Planner' }).check();
-  await page.getByText('Working style changed to Planner. Your individual changes were kept.').waitFor();
+  await page.getByRole('navigation', { name: 'Layers' }).getByRole('link', { name: 'Work' }).click();
+  await page.getByRole('link', { name: 'Working style' }).click();
+  await page.getByRole('button', { name: 'Planner' }).click();
+  await page.getByText('Working style changed. Your individual preferences were kept.').waitFor();
   await page.getByLabel('Who writes the code').selectOption('self');
   await page.getByText('Preference saved.').waitFor();
-  await page.getByText('changed', { exact: true }).waitFor();
   await check('project');
 
   await page.goto(`${portal}/#/the-machine/overview`);
@@ -227,7 +236,7 @@ try {
   await page.waitForURL(`${portal}/projects`);
   await page.setViewportSize({ width: 390, height: 844 });
   const projectId = (await page.evaluate(async () => (await (await fetch('/api/projects')).json()).projects[0].id));
-  for (const [name, step, heading] of [['look', 'look', 'Choose a starting feel'], ['pages', 'pages', 'Shape the navigation'], ['features', 'features', 'What should Tool Share be able to do?'], ['build', 'build', 'Tool Share is built']]) {
+  for (const [name, step, heading] of [['look', 'look', 'Choose a starting feel'], ['features', 'features', 'What should Tool Share be able to do?'], ['pages', 'pages', 'Shape the navigation'], ['build', 'build', 'Tool Share is built']]) {
     await page.goto(`${portal}/start/${projectId}/${step}`);
     await page.getByRole('heading', { name: heading }).waitFor();
     assert.equal(await noOverflow(page), true, `${name} overflows at 390px`);

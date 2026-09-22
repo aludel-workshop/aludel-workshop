@@ -5,7 +5,7 @@ status: active
 updated: 2026-09-22
 current_phase: M1
 phase_state: in-progress
-next_action: ONB-REVIEW
+next_action: LAY-REVIEW
 ---
 
 # Current project status
@@ -16,13 +16,14 @@ Turn the running local portal foundation into the first complete request → del
 
 ## Next action
 
-**ONB-REVIEW — owner walkthrough of the new-project onboarding.** ONB-01–ONB-05 are built and agent-checked locally ([evidence](evidence/onb-01-05-onboarding.md)). Run `./launch-machine`, open `http://aludel.localhost:4310` and choose **Get started**. Owner judgment is needed on the flow, copy and scaffold look, and then on the next slice: ONB-06 (project-scoped workspace) or B-03B (agent execution against generated repositories).
+**LAY-REVIEW: owner walkthrough of the real layers** at `/p/<slug>` (start a new app via **Get started**, then **Continue in Aludel**). LAY-02 and LAY-03 are built and agent-checked ([evidence](evidence/lay-02-03-layers.md)). After review, **LAY-04** starts with verified outputs and applied answers; see the [implementation plan](design/portal-layers/implementation-plan.md#current-state).
 
 ## Ready queue
 
-1. **ONB-REVIEW** — owner walkthrough; no further build until it happens.
-2. **ONB-06** — new projects open in the Overview/Product/Work workspace (planned).
-3. **B-03B** — still requires separate implementation authorization; now has generated repositories with a preview pipeline as its target.
+1. **LAY-REVIEW**: owner walkthrough.
+2. **LAY-04**: verified work outputs and applied answers, then working-style automation, routines and the Product agent (spending needs owner OK).
+3. **LAY-05**: coding agents against stories (absorbs B-03B).
+4. **LAY-06**: Aludel's own knowledge into its layers; retire the hash workspace.
 
 One packet at a time. B-03's worker/artifact/recovery work remains required and must not be displaced by later workspace expansion. [Proposed dependency order](design/project-workspace/v1/delivery-plan.md).
 
@@ -57,6 +58,7 @@ One packet at a time. B-03's worker/artifact/recovery work remains required and 
 
 | Packet | Result | Evidence |
 |---|---|---|
+| LAY-02/03 | Project shell at `/p/<slug>`; knowledge records, story packs, page records, work items, derived story status; every layer usable; onboarding writes into the layers | [Evidence/retrospective](evidence/lay-02-03-layers.md), [plan](design/portal-layers/implementation-plan.md) |
 | ONB-01–05 | Accounts/tenancy, pre-account working style and idea, account + per-user GitHub + local repository, optional agent/look/features/stack, deterministic skeleton at `<slug>.localhost`; agent-checked, owner review pending | [Evidence/retrospective](evidence/onb-01-05-onboarding.md), [work record](design/onboarding/work-record.md) |
 | PW-02 | Revisioned Direction/Roadmap/Features, research-backed projections, responsibility-based navigation and legacy-route compatibility | [Evidence/retrospective](evidence/pw-02-product-workspace.md), [research](design/project-workspace/pw-02/research.md) |
 | BRAND-001 | Aludel name/art applied through reusable project brand data and upload contract; server and browser checks pass | [Evidence/retrospective](design/process/aludel-brand-work-record.md) |
@@ -77,6 +79,8 @@ One packet at a time. B-03's worker/artifact/recovery work remains required and 
 | M0 research/design | Product loop, local agent path, runner choice, recovery model, product workflow, knowledge boundary, experience architecture, and design-system strategy | [Execution plan](execution-plan.md), [decision register](decisions.md) |
 
 ## Latest handoff
+
+2026-09-22: the layers are real (LAY-02/03). A new session should read [the layers implementation plan](design/portal-layers/implementation-plan.md) first; its "Current state" section names the next concrete steps and entry points. Server 32/32; onboarding and layers browser tests pass.
 
 2026-09-22: new-project onboarding built locally (DEC-032–035). The end-to-end browser script takes a new user from the marketing page to a running generated app on its own subdomain. Fixed on the way: non-executable git askpass (GitHub pushes would have failed), 19 missing workspace icons, the stale Playwright path. `tests/browser.mjs` fails on the baseline too (pre-existing). [Evidence](evidence/onb-01-05-onboarding.md).
 

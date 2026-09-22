@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "note": "Story packs seed ordinary stories into a project's story map (DEC-037). template: true only where the aludel-web-v1 scaffold really builds the story today; everything else becomes work.",
+  "packs": {
+    "accounts": {
+      "label": "Accounts", "icon": "person", "summary": "Sign up, sign in and manage an account.",
+      "activity": { "title": "Join", "persona": "Everyone" },
+      "steps": ["Sign up", "Sign in and out", "Recover", "Manage my account"],
+      "stories": [
+        { "title": "Someone can sign up with email and password", "step": 0, "phase": "demo", "template": true, "acceptance": [{ "given": "a visitor on the sign-in page", "when": "they enter a name, email and a password of 8+ characters", "then": "an account exists and they are signed in" }] },
+        { "title": "Someone can sign in", "step": 1, "phase": "demo", "template": true, "acceptance": [{ "given": "a registered person", "when": "they enter their email and password", "then": "they are signed in and see their name in the header" }] },
+        { "title": "Someone can sign out", "step": 1, "phase": "demo", "template": true, "acceptance": [{ "given": "a signed-in person", "when": "they choose Sign out", "then": "they are signed out and the header offers Sign in" }] },
+        { "title": "Someone can reset a forgotten password", "step": 2, "phase": "mvp", "clarifications": ["Needs an email delivery provider (Platform › Connections)"] },
+        { "title": "Someone can change their name and password", "step": 3, "phase": "mvp" }
+      ],
+      "pages": [{ "label": "Sign in", "icon": "person", "pageType": "form", "inNav": false, "stories": [0, 1, 2, 3] }]
+    },
+    "messaging": {
+      "label": "Messaging", "icon": "chat", "summary": "People message each other one to one.",
+      "activity": { "title": "Talk it over", "persona": "Everyone" },
+      "steps": ["Start", "Read and reply", "Stay informed"],
+      "stories": [
+        { "title": "Someone can start a conversation from [a record in this app]", "step": 0, "phase": "demo", "clarifications": ["Which record do conversations start from (a product, a profile, a listing)?"] },
+        { "title": "Someone can see their conversations, with unread counts", "step": 1, "phase": "demo" },
+        { "title": "Someone can read and reply in a conversation", "step": 1, "phase": "demo" },
+        { "title": "Someone is notified of new messages", "step": 2, "phase": "mvp" },
+        { "title": "Someone can block another person", "step": 2, "phase": "later" }
+      ],
+      "pages": [{ "label": "Messages", "icon": "chat", "pageType": "messages", "inNav": true, "stories": [1, 2], "children": [{ "label": "Conversation", "icon": "forum", "pageType": "messages", "stories": [0, 2] }] }]
+    },
+    "search": {
+      "label": "Search", "icon": "search", "summary": "Find things by keyword and narrow the results.",
+      "activity": { "title": "Find", "persona": "Everyone" },
+      "steps": ["Search", "Refine"],
+      "stories": [
+        { "title": "Someone can search by keyword", "step": 0, "phase": "demo", "clarifications": ["What can be searched (names, descriptions, categories)?"] },
+        { "title": "Someone can filter the results", "step": 1, "phase": "mvp" },
+        { "title": "Someone can see their recent searches", "step": 0, "phase": "later" }
+      ],
+      "pages": []
+    },
+    "notifications": {
+      "label": "Notifications", "icon": "notifications", "summary": "Tell people what needs their attention.",
+      "activity": { "title": "Stay informed", "persona": "Everyone" },
+      "steps": ["See what's new", "Choose what to hear about"],
+      "stories": [
+        { "title": "Someone can see what needs their attention", "step": 0, "phase": "mvp" },
+        { "title": "Someone can choose what they are notified about", "step": 1, "phase": "later" }
+      ],
+      "pages": [{ "label": "Notifications", "icon": "notifications", "pageType": "list", "inNav": false, "stories": [0, 1] }]
+    },
+    "profiles": {
+      "label": "Profiles", "icon": "badge", "summary": "Each person has a public profile.",
+      "activity": { "title": "Know who's who", "persona": "Everyone" },
+      "steps": ["View", "Edit"],
+      "stories": [
+        { "title": "Someone can view another person's profile", "step": 0, "phase": "demo" },
+        { "title": "Someone can edit their public profile", "step": 1, "phase": "mvp" }
+      ],
+      "pages": [{ "label": "Profile", "icon": "person", "pageType": "detail", "inNav": true, "stories": [0, 1] }]
+    },
+    "uploads": {
+      "label": "Photo and file uploads", "icon": "upload", "summary": "People attach photos or files.",
+      "activity": { "title": "Share media", "persona": "Everyone" },
+      "steps": ["Upload", "Manage"],
+      "stories": [
+        { "title": "Someone can attach a photo", "step": 0, "phase": "mvp" },
+        { "title": "Someone can remove something they uploaded", "step": 1, "phase": "mvp" }
+      ],
+      "pages": []
+    },
+    "payments": {
+      "label": "Payments", "icon": "payments", "summary": "Take payments (a provider is connected later).",
+      "activity": { "title": "Pay", "persona": "Customer" },
+      "steps": ["Check out", "History"],
+      "stories": [
+        { "title": "Someone can pay for [something in this app]", "step": 0, "phase": "mvp", "clarifications": ["What is being paid for, and which payment provider?"] },
+        { "title": "Someone can see their payment history", "step": 1, "phase": "later" }
+      ],
+      "pages": [{ "label": "Checkout", "icon": "payments", "pageType": "form", "inNav": false, "stories": [0] }]
+    },
+    "admin": {
+      "label": "Admin area", "icon": "admin_panel_settings", "summary": "A private area for running the app.",
+      "activity": { "title": "Run the app", "persona": "Admin" },
+      "steps": ["Moderate", "Manage people"],
+      "stories": [
+        { "title": "An admin can review and remove reported content", "step": 0, "phase": "mvp" },
+        { "title": "An admin can manage people's accounts", "step": 1, "phase": "later" }
+      ],
+      "pages": [{ "label": "Admin", "icon": "admin_panel_settings", "pageType": "dashboard", "inNav": false, "stories": [0, 1] }]
+    }
+  }
+}

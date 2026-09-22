@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aludel · Layers prototype v2 · Tool Share</title>
+<!-- LAY-02 prototype (DEC-036, DEC-037): the researched knowledge structures with illustrative Tool Share data. Stylesheet base carried over from v1. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0&display=block">
+<style>
+:root{--bg:#fafbff;--rail:#f0f4fc;--panel:#f3f6fd;--line:#dce2ef;--ink:#141727;--muted:#52617d;--primary:#3047b9;--on-primary:#fff;--container:#dfe5ff;--on-container:#163698;--radius:12px;
+  --product:#6b35c9;--product-bg:#efe7ff;--design:#b3245f;--design-bg:#ffe4ee;--platform:#0f7465;--platform-bg:#d9f3ec;--work:#8a5300;--work-bg:#fff0d4;
+  --ok:#146446;--ok-bg:#d9f3e7;--warn:#6b4b00;--warn-bg:#fff0c9;--bad:#842321;--bad-bg:#fce1e0}
+*{box-sizing:border-box}body{margin:0;font-family:Roboto,system-ui,Arial,sans-serif;font-size:16px;line-height:1.5;color:var(--ink);background:var(--bg)}
+a{color:var(--primary)}button{font:inherit}
+.icon{font-family:'Material Symbols Rounded';font-weight:normal;font-style:normal;font-size:22px;line-height:1;letter-spacing:normal;text-transform:none;white-space:nowrap;direction:ltr;display:inline-block;vertical-align:middle;-webkit-font-feature-settings:'liga';font-feature-settings:'liga'}
+:focus-visible{outline:3px solid var(--primary);outline-offset:2px}
+.proto-banner{position:fixed;right:14px;bottom:12px;z-index:50;font-size:12px;background:#141727;color:#fff;padding:6px 12px;border-radius:999px;opacity:.85}
+.shell{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:100vh}
+.rail{background:var(--rail);border-right:1px solid var(--line);padding:16px 12px;display:flex;flex-direction:column;gap:6px;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:20px;padding:4px 10px 12px;color:var(--ink);text-decoration:none}.brand .icon{color:var(--primary);font-size:30px}
+.project{display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;background:#fff;border:1px solid var(--line);margin-bottom:10px}
+.project .mark{display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:#ca3e6f;color:#fff;font-weight:700;font-size:13px}.project small{display:block;color:var(--muted);font-size:12px}
+.nav a{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:999px;color:var(--ink);text-decoration:none;font-weight:500}
+.nav a:hover{background:#e3e9f7}.nav a.active{background:var(--container);color:var(--on-container);font-weight:700}
+.nav .badge{margin-left:auto;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:var(--primary);color:#fff;font-size:12px;display:grid;place-items:center}
+.nav .role{margin-left:auto;font-size:11px;color:var(--muted);font-weight:400}
+.nav a.active .role{color:var(--on-container)}
+.rail .spacer{flex:1}.rail .settings{display:flex;align-items:center;gap:12px;padding:10px 12px;color:var(--muted);text-decoration:none;border-radius:999px}
+.main{min-width:0}main:focus{outline:none}.shell{background:linear-gradient(90deg,var(--rail) 240px,transparent 240px)}
+.topbar{display:flex;align-items:center;gap:16px;padding:12px 32px;border-bottom:1px solid var(--line);background:var(--bg);position:sticky;top:0;z-index:10}
+.search{position:relative;flex:1;max-width:560px}.search input{width:100%;padding:10px 14px 10px 42px;border:1px solid var(--line);border-radius:999px;background:#fff;font:inherit;font-size:15px}
+.search .icon{position:absolute;left:12px;top:9px;color:var(--muted)}
+.results{position:absolute;top:calc(100% + 6px);left:0;right:0;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 18px 50px #1c2a5a26;padding:8px;max-height:60vh;overflow:auto}
+.results h3{font-size:12px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin:10px 10px 4px}
+.results a{display:flex;gap:10px;align-items:baseline;padding:8px 10px;border-radius:10px;color:var(--ink);text-decoration:none}.results a:hover,.results a:focus{background:var(--panel)}
+.results small{color:var(--muted)}
+.content{padding:28px 32px 64px;max-width:1280px}
+.eyebrow{font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin:0 0 4px}
+h1{font-size:34px;line-height:1.15;margin:0 0 6px}h2{font-size:21px;margin:0 0 12px}h3{font-size:17px;margin:0 0 6px}
+.lead{color:var(--muted);font-size:18px;margin:0 0 22px;max-width:760px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:0 0 24px}.tabs a{padding:10px 16px;color:var(--muted);text-decoration:none;font-weight:500;border-bottom:3px solid transparent;margin-bottom:-1px}
+.tabs a.active{color:var(--ink);border-color:var(--primary)}
+.grid{display:grid;gap:18px}.grid>*{min-width:0}.g2{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:repeat(3,minmax(0,1fr))}.g-side{grid-template-columns:minmax(0,1fr) 380px}
+.card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:20px}
+.card.wide{grid-column:span 2}.table-wrap{overflow-x:auto}.card.quiet{background:var(--panel);border-style:dashed}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap}
+.l-product{background:var(--product-bg);color:var(--product)}.l-design{background:var(--design-bg);color:var(--design)}.l-platform{background:var(--platform-bg);color:var(--platform)}.l-work{background:var(--work-bg);color:var(--work)}
+.s-ok{background:var(--ok-bg);color:var(--ok)}.s-warn{background:var(--warn-bg);color:var(--warn)}.s-bad{background:var(--bad-bg);color:var(--bad)}.s-plain{background:var(--panel);color:var(--muted)}
+.row{display:flex;align-items:center;gap:12px}.muted{color:var(--muted)}.small{font-size:14px}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:999px;border:1px solid var(--primary);background:var(--primary);color:#fff;font-weight:500;cursor:pointer;text-decoration:none;font-size:14px}
+.btn.ghost{background:transparent;color:var(--primary)}.btn.small{padding:4px 12px;font-size:13px}
+.stat{display:flex;flex-direction:column}.stat strong{font-size:30px;line-height:1.1}
+.progress{display:flex;height:12px;border-radius:999px;overflow:hidden;background:var(--panel);margin:10px 0 6px}.progress span{display:block}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted)}.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px}
+.list{list-style:none;margin:0;padding:0}.list li{border-top:1px solid var(--line)}.list li:first-child{border-top:0}
+.item{display:flex;gap:12px;align-items:flex-start;padding:12px 4px;color:var(--ink);text-decoration:none}.item:hover{background:var(--panel)}
+.item .body{flex:1;min-width:0}.item .title{font-weight:500}.item small{display:block;color:var(--muted);font-size:13.5px}
+.who{display:inline-flex;align-items:center;gap:4px;font-size:13px;color:var(--muted);white-space:nowrap}
+.stepper{display:flex;gap:3px;align-items:center}.stepper i{width:26px;height:6px;border-radius:3px;background:var(--line)}.stepper i.on{background:var(--primary)}
+.feature{margin-bottom:18px}.feature header{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.story{display:grid;grid-template-columns:minmax(0,1fr) 90px 150px 110px;gap:14px;align-items:center;padding:10px 12px;border-radius:12px;color:var(--ink);text-decoration:none}
+.story:hover{background:var(--panel)}.story.active{background:var(--container)}
+.phase{font-size:12px;font-weight:700;padding:2px 8px;border-radius:6px;background:var(--panel);color:var(--muted);text-align:center}.phase.current{background:var(--container);color:var(--on-container)}
+.side{position:sticky;top:84px;align-self:start}
+.connected h3{font-size:12px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin:16px 0 6px}
+.connected a{display:flex;gap:8px;align-items:center;padding:6px 8px;border-radius:10px;text-decoration:none;color:var(--ink);font-size:14.5px}.connected a:hover{background:var(--panel)}
+.history{border-left:2px solid var(--line);padding-left:14px;margin:8px 0}.history p{margin:0 0 10px;font-size:14.5px}.history small{color:var(--muted)}
+.columns{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.column{background:var(--panel);border-radius:18px;padding:14px}.column.current{background:#e9edfb;outline:2px solid var(--container)}
+.scard{display:block;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:8px;color:var(--ink);text-decoration:none;font-size:14.5px}.scard:hover{border-color:var(--primary)}
+.tree{list-style:none;margin:0;padding:0}.tree ul{list-style:none;margin:0 0 0 18px;padding:0;border-left:1px solid var(--line)}
+.tree a{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:10px;color:var(--ink);text-decoration:none;font-size:15px}.tree a:hover{background:var(--panel)}.tree a.active{background:var(--design-bg);color:var(--design);font-weight:700}
+.tree .gap{color:var(--muted);font-style:italic}
+.design-grid{display:grid;grid-template-columns:230px minmax(0,1fr) 320px;gap:18px;align-items:start}
+.canvas{background:linear-gradient(160deg,#e7e3ee,#f3eef3);border-radius:18px;padding:22px;display:flex;justify-content:center;gap:18px;flex-wrap:wrap}
+.phone{width:240px;background:#fff7fa;border:8px solid #1b1d24;border-radius:30px;overflow:hidden;font-size:11px;color:#171a24;display:flex;flex-direction:column}
+.phone header{display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid #0001;font-weight:700}.phone header b{display:grid;place-items:center;width:20px;height:20px;border-radius:7px;background:#ca3e6f;color:#fff;font-size:9px}
+.phone main{padding:10px;display:grid;gap:8px;min-height:300px;align-content:start}.phone footer{display:flex;justify-content:space-around;padding:6px;border-top:1px solid #0001;background:#f5eef2}
+.phone footer span{font-size:10px;text-align:center;color:#3a3d46}.phone footer span.on{color:#8f2349;font-weight:700}
+.bar{height:8px;border-radius:5px;background:#0000001a}.bar.w6{width:60%}.bar.w4{width:40%}.tile{height:62px;border-radius:12px;background:#0000001f}.tiles{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.pill{height:24px;border-radius:999px;background:#0000001a}.map{height:90px;border-radius:12px;background:repeating-linear-gradient(45deg,#dce8e3,#dce8e3 8px,#cfdfd9 8px,#cfdfd9 16px)}
+.rowish{display:flex;gap:6px;align-items:center}.dot{width:22px;height:22px;border-radius:50%;background:#0000001f;flex:none}
+.option{text-align:center}.option .phone{width:190px}.option .phone main{min-height:250px}.option figcaption{margin-top:8px;font-weight:700;font-size:14px}
+.question{border:2px solid var(--warn-bg);background:#fffaf0;border-radius:16px;padding:16px;margin:0 0 18px}
+.question h2{font-size:18px}.choices{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+.swatches{display:flex;gap:10px;flex-wrap:wrap}.swatch{width:110px;border-radius:12px;overflow:hidden;border:1px solid var(--line);font-size:12.5px}.swatch i{display:block;height:54px}.swatch span{display:block;padding:6px 8px}
+.kv{display:grid;grid-template-columns:160px minmax(0,1fr);gap:8px 16px;font-size:15px}.kv dt{color:var(--muted)}.kv dd{margin:0}
+table{border-collapse:collapse;width:100%;font-size:14.5px}th,td{text-align:left;padding:10px 8px;border-top:1px solid var(--line);vertical-align:top}th{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);border-top:0}
+.section-title{display:flex;align-items:center;gap:10px;margin:22px 0 6px}.section-title h2{margin:0;font-size:17px}.count{font-size:13px;color:var(--muted)}
+details.quiet summary{cursor:pointer;color:var(--muted);font-weight:500;padding:8px 0}
+.toggle{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}.toggle button{border:0;background:#fff;padding:6px 14px;cursor:pointer;font-size:14px}.toggle button.on{background:var(--container);color:var(--on-container);font-weight:700}
+.note{font-size:14.5px;background:var(--panel);border-radius:12px;padding:12px 14px;margin:0 0 10px}
+@media(max-width:1100px){.design-grid{grid-template-columns:200px minmax(0,1fr)}.design-grid>aside:last-child{grid-column:1/-1}.g-side{grid-template-columns:1fr}.side{position:static}}
+@media(max-width:800px){.shell{background:none}.card.wide{grid-column:auto}.row{flex-wrap:wrap}.item{flex-wrap:wrap}.shell{grid-template-columns:1fr}.rail{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center}.rail .spacer,.project,.nav .role{display:none}.nav{display:flex;flex-wrap:wrap;gap:2px}
+  .content,.topbar{padding-left:16px;padding-right:16px}.g2,.g3,.columns,.design-grid{grid-template-columns:1fr}.story{grid-template-columns:1fr 70px}.story .hide-narrow{display:none}}
+/* v2 additions */
+.tabs{overflow-x:auto;scrollbar-width:thin}.tabs a{flex:none;white-space:nowrap}
+.l-pages{background:#e6eefe;color:#1f4fb8}
+.account{display:flex;align-items:center;gap:10px;padding:8px 10px;border:0;border-radius:999px;background:none;cursor:pointer;width:100%;text-align:left;color:var(--ink)}
+.account:hover{background:#e3e9f7}.avatar{display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:#2f3a57;color:#fff;font-size:13px;font-weight:700;flex:none}
+.account small{display:block;color:var(--muted);font-size:12px}
+.account-menu{margin:4px 0 0;padding:6px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px #1c2a5a1f}
+.account-menu a,.account-menu button{display:flex;gap:10px;align-items:center;width:100%;padding:8px 10px;border:0;background:none;border-radius:8px;color:var(--ink);text-decoration:none;font-size:14.5px;cursor:pointer}
+.account-menu a:hover,.account-menu button:hover{background:var(--panel)}
+.map-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:18px;background:#fff;padding:14px}
+.storymap{display:grid;gap:8px;min-width:max-content}
+.personas{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 14px}.persona{display:flex;gap:10px;align-items:center;padding:8px 14px;border-radius:14px;background:var(--product-bg);color:#3b1f78}
+.persona .avatar{background:var(--product)}.persona small{display:block;font-size:12.5px;color:#5b4a86}
+.activity{padding:10px 12px;border-radius:12px;background:#2f2356;color:#fff;font-weight:700;display:flex;align-items:center;gap:8px;min-width:0}
+.activity small{font-weight:400;opacity:.8}
+.pack{font-size:11px;font-weight:700;padding:1px 8px;border-radius:999px;background:#ffe9b3;color:#5b3b00;white-space:nowrap}
+.activity .pack{margin-left:auto}
+.step{padding:8px 10px;border-radius:10px;background:#e8e2f7;color:#2f2356;font-weight:500;font-size:14px}
+.band{grid-column:1/-1;display:flex;align-items:center;gap:10px;margin-top:6px;padding-top:8px;border-top:2px dashed #b9c3de;color:var(--muted);font-size:13px}
+.band>*{position:sticky;left:0}.band strong{color:var(--ink)}.band.current strong{color:var(--on-container)}
+.cell{display:flex;flex-direction:column;gap:6px;min-height:40px}
+.card-story{display:block;width:210px;padding:8px 10px;border-radius:10px;background:#fffdf3;border:1px solid #eadfb4;color:var(--ink);text-decoration:none;font-size:14px;line-height:1.35;box-shadow:0 1px 0 #0000000d}
+.card-story:hover{border-color:var(--primary)}.card-story.active{outline:3px solid var(--primary)}
+.card-story .meta{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:11.5px;color:var(--muted)}
+.dot{width:9px;height:9px;border-radius:50%;flex:none}
+.card-story.built{background:#eef8f2;border-color:#b9dfc9}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(440px,100vw);background:#fff;border-left:1px solid var(--line);box-shadow:-20px 0 60px #1c2a5a26;overflow:auto;padding:22px 24px 40px;z-index:30}
+.drawer:focus{outline:none}.drawer .close{position:absolute;top:14px;right:14px;border:0;background:none;cursor:pointer;color:var(--muted);padding:6px;border-radius:50%}.drawer .close:hover{background:var(--panel)}
+.gwt{margin:8px 0;padding:10px 12px;border-radius:10px;background:var(--panel);font-size:14px}.gwt b{display:inline-block;min-width:48px;color:var(--product)}
+.clar{border-left:4px solid #e0a100;background:#fff8e1;padding:8px 12px;border-radius:0 10px 10px 0;font-size:14px;margin:8px 0}
+.spec h3{margin-top:18px}.req{font-family:ui-monospace,monospace;font-size:13.5px;background:var(--panel);padding:2px 6px;border-radius:6px}
+.doclist a{display:flex;gap:12px;align-items:center;padding:12px 6px;border-top:1px solid var(--line);color:var(--ink);text-decoration:none}.doclist a:first-child{border-top:0}.doclist a:hover{background:var(--panel)}
+.templates{display:flex;gap:8px;flex-wrap:wrap}
+.flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0 16px}.flow a{padding:8px 12px;border-radius:10px;background:#e6eefe;color:#1f4fb8;text-decoration:none;font-weight:500;font-size:14px}
+.flow .icon{color:var(--muted);font-size:18px}
+.token-swatch{display:inline-block;width:18px;height:18px;border-radius:5px;vertical-align:middle;margin-right:8px;border:1px solid #0002}
+.citation{font-size:12.5px;color:var(--muted)}.bundle li{margin:6px 0}
+.origin{font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="rail">
+    <a class="brand" href="#/home"><span class="icon" aria-hidden="true">deployed_code</span>Aludel</a>
+    <div class="project"><span class="mark" aria-hidden="true">TS</span><div><strong>Tool Share</strong><small>Dreamer · Demo phase</small></div></div>
+    <nav class="nav" aria-label="Layers" id="nav"></nav>
+    <div class="spacer"></div>
+    <a class="settings" href="#/settings"><span class="icon" aria-hidden="true">settings</span>Settings</a>
+    <div>
+      <button class="account" id="account" aria-expanded="false" aria-controls="account-menu"><span class="avatar" aria-hidden="true">AL</span><span><strong>Ada Lovelace</strong><small>ada@example.com</small></span></button>
+      <div class="account-menu" id="account-menu" hidden><a href="#/account"><span class="icon" aria-hidden="true">person</span>Account</a><a href="#/settings"><span class="icon" aria-hidden="true">swap_horiz</span>Switch project</a><button type="button"><span class="icon" aria-hidden="true">logout</span>Sign out</button></div>
+    </div>
+  </aside>
+  <div class="main">
+    <div class="topbar">
+      <div class="search" role="search">
+        <span class="icon" aria-hidden="true">search</span>
+        <label for="q" style="position:absolute;left:-999px">Search every layer</label>
+        <input id="q" type="search" placeholder="Search stories, specs, pages, work, decisions…" autocomplete="off">
+        <div class="results" id="results" hidden></div>
+      </div>
+      <span class="muted small">Prototype v2 · illustrative data</span>
+    </div>
+    <main class="content" id="main" tabindex="-1"></main>
+  </div>
+</div>
+<div id="drawer-root"></div>
+<div class="proto-banner">LAY-02 prototype · not the real app</div>
+<script>
+const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const icon = name => `<span class="icon" aria-hidden="true">${name}</span>`;
+const layerName = { product: 'Product', design: 'Design', pages: 'Pages', platform: 'Platform', work: 'Work' };
+const layerChip = layer => `<span class="chip l-${layer}">${layerName[layer]}</span>`;
+
+// ---------- Product ----------
+const phases = [
+  { id: 'demo', label: 'Demo', goal: 'Someone can find a nearby tool, ask to borrow it and talk it over, all with sample data.', appetite: '1 week', exit: 'The whole borrow flow is clickable end to end', current: true },
+  { id: 'mvp', label: 'MVP', goal: 'Twenty neighbours on one street really lend and return tools.', appetite: '3 weeks', exit: '10 completed loans with real accounts' },
+  { id: 'later', label: 'Later', goal: 'Trust and scale across neighbourhoods.', appetite: 'Not set', exit: 'Decided after MVP' }
+];
+const statuses = ['proposed', 'defined', 'designed', 'built', 'shipped'];
+const statusLabel = { proposed: 'Proposed', defined: 'Defined', designed: 'Designed', built: 'Built', shipped: 'Shipped' };
+const statusColor = { proposed: '#c1c8d8', defined: '#8e9ad0', designed: '#e07aa2', built: '#3047b9', shipped: '#146446' };
+const personas = [{ id: 'sam', name: 'Sam', role: 'Borrower', note: 'Needs a tool once, hates buying it' }, { id: 'priya', name: 'Priya', role: 'Lender', note: 'Shed full of tools, wants them back' }];
+const activities = [
+  { id: 'join', title: 'Join', persona: 'Everyone', pack: 'Accounts', steps: ['Sign up', 'Sign in and out', 'Recover'] },
+  { id: 'find', title: 'Find a tool', persona: 'Sam', steps: ['Browse nearby', 'Search', 'See details'] },
+  { id: 'borrow', title: 'Borrow', persona: 'Sam', steps: ['Request', 'Get an answer'] },
+  { id: 'talk', title: 'Talk it over', persona: 'Sam and Priya', pack: 'Messaging', steps: ['Start', 'Read and reply', 'Stay informed'] },
+  { id: 'return', title: 'Give it back', persona: 'Sam', steps: ['Hand back', 'Confirm'] },
+  { id: 'lend', title: 'Lend my tools', persona: 'Priya', steps: ['List a tool', 'Manage listings'] }
+];
+const S = (id, activity, step, phase, status, title, extra = {}) => ({ id, activity, step, phase, status, title, origin: extra.pack ? `Story pack: ${extra.pack}` : 'You', acceptance: [], edges: [], clarifications: [], pages: [], work: [], why: '', history: [], ...extra });
+const stories = [
+  S('S1', 'join', 0, 'demo', 'built', 'Someone can sign up with email and password', { pack: 'Accounts', template: true, pages: ['signin'], work: ['W-01'], acceptance: [['a visitor on the sign-in page', 'they enter a name, email and a password of 8+ characters', 'an account exists and they are signed in']], edges: ['What happens when the email is already registered?'] }),
+  S('S2', 'join', 1, 'demo', 'built', 'Someone can sign in and sign out', { pack: 'Accounts', template: true, pages: ['signin'], work: ['W-01'], acceptance: [['a registered person', 'they enter their email and password', 'they are signed in and see their name in the header']] }),
+  S('S3', 'join', 2, 'mvp', 'proposed', 'Someone can reset a forgotten password', { pack: 'Accounts', pages: ['signin'], clarifications: ['Email delivery provider not chosen (Platform › Connections)'] }),
+  S('S4', 'find', 0, 'demo', 'designed', 'Sam can browse tools near him, closest first', { pages: ['browse'], work: ['W-09'], why: 'Need: find a tool without buying one', acceptance: [['Sam is signed in with a location', 'he opens Browse', 'he sees tools within 2 km, closest first, each with photo, name, lender and distance']], history: [{ text: 'Cards rather than a table: photos drive the choice.', source: 'W-08', date: 'Sep 21' }] }),
+  S('S5', 'find', 1, 'demo', 'defined', 'Sam can search tools by name', { pack: 'Search', pages: ['browse'], work: ['W-14'], acceptance: [['tools named “ladder” and “step ladder” exist nearby', 'Sam searches for “ladder”', 'both appear, closest first']], edges: ['What happens when nothing matches?'] }),
+  S('S6', 'find', 1, 'mvp', 'proposed', 'Sam can filter results by distance and category', { pack: 'Search', pages: ['browse'] }),
+  S('S7', 'find', 2, 'demo', 'defined', 'Sam can see a tool’s photos, condition and lender', { pages: ['tool'], work: ['W-10'], acceptance: [['a listed tool', 'Sam opens it', 'he sees its photos, condition notes, the lender’s first name and rough distance']] }),
+  S('S8', 'borrow', 0, 'demo', 'defined', 'Sam can ask to borrow a tool for specific dates', { pages: ['tool'], work: ['W-13'], why: 'Need: know when I can have it', acceptance: [['a tool that is available', 'Sam picks dates and sends a request', 'Priya sees the request with the dates']], clarifications: ['Can a request be “as soon as possible” instead of specific dates? (asked in W-13)'] }),
+  S('S9', 'borrow', 1, 'demo', 'defined', 'Priya can approve or decline a request', { pages: ['tool'], acceptance: [['a pending request', 'Priya approves it', 'Sam is told and the dates are blocked out']] }),
+  S('S10', 'borrow', 1, 'mvp', 'proposed', 'Sam gets a reminder the day before pick-up'),
+  S('S11', 'talk', 0, 'demo', 'defined', 'Sam can message the lender from a tool page', { pack: 'Messaging', pages: ['tool', 'thread'], work: ['W-16'], acceptance: [['Sam is looking at a tool', 'he taps “Message Priya”', 'a conversation opens that shows which tool it is about']], clarifications: ['Pack placeholder “start from a record” resolved to “from a tool page”: confirm'] }),
+  S('S12', 'talk', 1, 'demo', 'built', 'Someone can see their conversations with unread counts', { pack: 'Messaging', template: true, pages: ['messages'], work: ['W-02'] }),
+  S('S13', 'talk', 1, 'demo', 'built', 'Someone can read and reply in a thread', { pack: 'Messaging', template: true, pages: ['thread'], work: ['W-02'] }),
+  S('S14', 'talk', 2, 'mvp', 'proposed', 'Someone gets notified of new messages', { pack: 'Messaging' }),
+  S('S15', 'talk', 2, 'later', 'proposed', 'Someone can block another person', { pack: 'Messaging' }),
+  S('S16', 'return', 0, 'mvp', 'proposed', 'Sam can mark a tool as handed back'),
+  S('S17', 'return', 1, 'mvp', 'proposed', 'Priya confirms she has it back'),
+  S('S18', 'return', 1, 'later', 'proposed', 'Priya can rate how the loan went'),
+  S('S19', 'lend', 0, 'demo', 'defined', 'Priya can list a tool with a photo', { pages: ['list'], acceptance: [['Priya is signed in', 'she adds a name, photo and condition', 'the tool appears in Browse for nearby people']] }),
+  S('S20', 'lend', 1, 'mvp', 'proposed', 'Priya can pause a listing')
+];
+const specs = [
+  { id: 'SPEC-01', title: 'Ask to borrow, and get an answer', phase: 'demo', status: 'In review', by: 'Product agent', stories: ['S7', 'S8', 'S9'], problem: 'Sam can find a tool but has no way to ask for it; Priya needs to see who wants what, and when.', appetite: '2 days of the Demo week', solution: 'A “Request” button on the tool page opens a date picker; Priya gets the request in Messages-style inbox with Approve / Decline.', rabbit: ['Double-booking across overlapping requests: block dates only on approval', 'Time zones: dates are local to the tool'], nogos: ['No deposits or payments', 'No counter-offers on dates'],
+    reqs: ['FR-001 The system must let a signed-in person request an available tool for a start and end date.', 'FR-002 WHEN a request is sent, the system must notify the lender.', 'FR-003 The system must let the lender approve or decline a pending request.', 'FR-004 WHEN a request is approved, the system must mark those dates unavailable.'],
+    entities: ['Tool (name, photos, condition, lender, location)', 'BorrowRequest (tool, borrower, dates, status)'], success: ['A request takes under 30 seconds to send', 'Lenders answer 80% of requests within a day (MVP measure)'], assumptions: ['Requests are for whole days'], clar: ['Needs clarification: can a request be “as soon as possible”? (W-13)'] },
+  { id: 'SPEC-02', title: 'Browse and search nearby', phase: 'demo', status: 'Accepted', by: 'Product agent, reviewed by you', stories: ['S4', 'S5'], problem: 'Sam needs to see what exists near him before anything else matters.', appetite: '2 days', solution: 'Photo-led card grid, closest first, with a search field pinned to the top.', rabbit: ['Location precision: show rough distance only'], nogos: ['No map view in Demo'], reqs: ['FR-001 The system must list tools within 2 km, closest first.', 'FR-002 The system must match search terms against tool names and categories.'], entities: ['Tool', 'Location'], success: ['Sam finds a ladder in under two minutes'], assumptions: ['Sample data for Demo'], clar: [] },
+  { id: 'SPEC-03', title: 'Conversations (Messaging pack)', phase: 'demo', status: 'Accepted · template', by: 'Aludel template', stories: ['S12', 'S13'], problem: 'People need to arrange pick-up.', appetite: 'Template', solution: 'Messages list and thread pages from the Messaging pack.', rabbit: [], nogos: ['No attachments in Demo'], reqs: ['FR-001 The system must list a person’s conversations with unread counts.', 'FR-002 The system must show a thread and let a participant reply.'], entities: ['Conversation', 'Message'], success: [], assumptions: [], clar: [] }
+];
+const research = [
+  { title: 'Interview: Maya, first-time homeowner', date: 'Sep 18', note: '“I bought a tile cutter for one bathroom. It’s been in the garage for two years.”', supports: 'Need: use a tool once without buying it' },
+  { title: 'Interview: Tom, retired carpenter', date: 'Sep 19', note: '“Happy to lend. I just want to know who has it and that it comes back.”', supports: 'Need: lenders feel safe' }
+];
+const docs = [
+  { title: 'Launch plan', template: 'PR/FAQ', updated: 'Sep 21', by: 'Product agent draft' },
+  { title: 'Neighbourhood partnerships', template: 'Blank', updated: 'Sep 20', by: 'You' },
+  { title: 'Why not a rental marketplace', template: 'Decision memo', updated: 'Sep 19', by: 'You' }
+];
+
+// ---------- Design and Pages ----------
+const tokens = [
+  ['color.accent', 'color', '#e0457b', 'Brand accent (from onboarding)'], ['color.primary', 'color', '{color.accent} → #ca3e6f', 'Text-safe accent (4.5:1)'], ['color.surface', 'color', '#fff7fa / #170f13', 'Light / dark'],
+  ['font.family.base', 'fontFamily', 'Roboto', 'Mobile-first social'], ['radius.card', 'dimension', '22px', 'Cards and sheets'], ['radius.pill', 'dimension', '999px', 'Buttons, chips'], ['space.2', 'dimension', '8px', 'Base spacing unit']
+];
+const components = [['Tab bar', 'Stable', 'Home, Browse, Messages, Profile'], ['Tool card', 'Incubating', 'Browse, Home'], ['Message bubble', 'Stable (Messaging pack)', 'Conversation'], ['Date range picker', 'Proposed', 'Tool detail (SPEC-01)'], ['Page blocks', 'Stable (scaffold)', 'Every skeleton page']];
+const pageTree = [
+  { id: 'home', label: 'Home', type: 'Feed', icon: 'home', status: 'Accepted · rev 1', stories: [], origin: 'Onboarding' },
+  { id: 'browse', label: 'Browse', type: 'Gallery', icon: 'explore', status: 'Accepted · rev 2 · search layout open', stories: ['S4', 'S5', 'S6'], origin: 'Onboarding', children: [
+    { id: 'tool', label: 'Tool detail', type: 'Detail', icon: 'build', status: 'Not designed', gap: true, stories: ['S7', 'S8', 'S9', 'S11'], origin: 'Story map' }] },
+  { id: 'messages', label: 'Messages', type: 'Messages', icon: 'chat', status: 'Built by template · rev 1', stories: ['S12'], origin: 'Messaging pack', children: [
+    { id: 'thread', label: 'Conversation', type: 'Messages', icon: 'forum', status: 'Built by template · rev 1', stories: ['S11', 'S13'], origin: 'Messaging pack' }] },
+  { id: 'profile', label: 'Profile', type: 'Detail', icon: 'person', status: 'Accepted · rev 1', stories: [], origin: 'Onboarding', children: [
+    { id: 'list', label: 'List a tool', type: 'Form', icon: 'add_box', status: 'Not designed', gap: true, stories: ['S19'], origin: 'Story map' }] },
+  { id: 'signin', label: 'Sign in', type: 'Form', icon: 'login', status: 'Built by template · outside navigation', stories: ['S1', 'S2', 'S3'], origin: 'Accounts pack' }
+];
+const pages = pageTree.flatMap(page => [page, ...(page.children || [])]);
+
+// ---------- Work ----------
+const work = [
+  { id: 'W-14', state: 'needs-input', layer: 'pages', type: 'Design', title: 'Search results layout for Browse', who: 'agent', agent: 'Design agent', targets: [['pages', 'browse', 'Browse page'], ['product', 'S5', 'S5 Search tools by name']], question: 'Which layout should search results use?', options: ['A · Card grid, distance on each card', 'B · Map above a compact list'], documents: ['Pages › Browse: new revision with the chosen layout and why', 'Product › S5 becomes Designed'] },
+  { id: 'W-13', state: 'needs-input', layer: 'product', type: 'Spec', title: 'SPEC-01: can a request be “as soon as possible”?', who: 'agent', agent: 'Product agent', targets: [['product', 'SPEC-01', 'SPEC-01 Ask to borrow'], ['product', 'S8', 'S8 Ask to borrow for dates']], question: 'Can people ask to borrow “as soon as possible”, or only for specific dates?', options: ['Specific dates only', 'Also “as soon as possible”'], documents: ['Product › SPEC-01 requirements and clarifications', 'Product › S8 acceptance'] },
+  { id: 'W-16', state: 'needs-input', layer: 'product', type: 'Define', title: 'Confirm where conversations start (Messaging pack)', who: 'agent', agent: 'Product agent', targets: [['product', 'S11', 'S11 Message the lender from a tool page']], question: 'The Messaging pack says “start a conversation from a record”. For Tool Share, is that the tool page?', options: ['Yes, from a tool page', 'From a profile instead', 'Both'], documents: ['Product › S11 statement and acceptance'] },
+  { id: 'W-12', state: 'review', layer: 'product', type: 'Implement', title: 'Build “Browse tools near me”', who: 'agent', agent: 'Coding agent', targets: [['product', 'S4', 'S4 Browse tools near me'], ['pages', 'browse', 'Browse page']], documents: ['Product › S4 becomes Built once accepted', 'Platform › Preview build 7c1e2a4'] },
+  { id: 'W-15', state: 'ready', layer: 'platform', type: 'Plan', title: 'Technical plan for SPEC-02', who: 'agent', agent: 'Architect agent', targets: [['product', 'SPEC-02', 'SPEC-02 Browse and search'], ['platform', 'architecture', 'Architecture']], documents: ['Platform › Architecture: Tool and Location entities', 'Work › implementation tasks per story'] },
+  { id: 'W-10', state: 'ready', layer: 'pages', type: 'Design', title: 'Design the Tool detail page', who: 'agent', agent: 'Design agent', targets: [['pages', 'tool', 'Tool detail page'], ['product', 'S7', 'S7 See a tool’s details']], documents: ['Pages › Tool detail (first revision)'] },
+  { id: 'W-S1', state: 'suggested', layer: 'pages', type: 'Design', title: '“List a tool” page is not designed yet', targets: [['pages', 'list', 'List a tool page'], ['product', 'S19', 'S19 List a tool']], documents: [] },
+  { id: 'W-S2', state: 'suggested', layer: 'product', type: 'Define', title: 'Define the “Give it back” activity (MVP)', targets: [['product', 'S16', 'S16 Mark as handed back']], documents: [] },
+  { id: 'W-S3', state: 'suggested', layer: 'platform', type: 'Configure', title: 'Choose an email provider (needed by S3)', targets: [['platform', 'connections', 'Connections'], ['product', 'S3', 'S3 Reset a password']], documents: [] },
+  { id: 'W-08', state: 'done', layer: 'pages', type: 'Design', title: 'Design the Browse page', who: 'agent', agent: 'Design agent', targets: [['pages', 'browse', 'Browse page']], documents: ['Pages › Browse rev 2', 'Decision: cards rather than a table'] },
+  { id: 'W-02', state: 'done', layer: 'product', type: 'Implement', title: 'Conversations and threads (Messaging pack)', who: 'template', agent: 'Aludel template', targets: [['product', 'S12', 'S12 Conversations list'], ['product', 'S13', 'S13 Read and reply'], ['pages', 'messages', 'Messages page']], documents: ['Product › S12, S13 Built', 'Pages › Messages, Conversation rev 1'] },
+  { id: 'W-01', state: 'done', layer: 'product', type: 'Implement', title: 'Sign up, sign in and sign out (Accounts pack)', who: 'template', agent: 'Aludel template', targets: [['product', 'S1', 'S1 Sign up'], ['product', 'S2', 'S2 Sign in and out'], ['pages', 'signin', 'Sign in page']], documents: ['Product › S1, S2 Built', 'Pages › Sign in rev 1'] }
+];
+const stateLabel = { 'needs-input': 'Needs you', review: 'In review', claimed: 'In progress', ready: 'Ready', suggested: 'Suggested', done: 'Done' };
+const stateChip = { 'needs-input': 's-warn', review: 's-warn', claimed: 's-plain', ready: 's-plain', suggested: 's-plain', done: 's-ok' };
+const needsYou = work.filter(item => ['needs-input', 'review'].includes(item.state));
+
+// ---------- Rendering ----------
+const nav = [['home', 'home', 'Home'], ['product', 'lightbulb', 'Product'], ['design', 'palette', 'Design'], ['pages', 'web', 'Pages'], ['platform', 'dns', 'Platform'], ['work', 'checklist', 'Work']];
+const routes = { home, product, design, pages: pagesLayer, platform, work: workLayer, settings, account };
+const hrefFor = ([layer, id]) => layer === 'product' ? (id.startsWith('SPEC') ? `#/product/specs/${id}` : `#/product/map/${id}`) : layer === 'pages' ? `#/pages/tree/${id}` : layer === 'platform' ? `#/platform/${id === 'connections' ? 'connections' : 'architecture'}` : `#/work/item/${id}`;
+const tabs = (base, items, active) => `<nav class="tabs" aria-label="Sections">${items.map(([id, label]) => `<a href="#/${base}/${id}" class="${active === id ? 'active' : ''}" ${active === id ? 'aria-current="page"' : ''}>${label}</a>`).join('')}</nav>`;
+const stepper = status => { const index = statuses.indexOf(status); return `<span class="stepper" role="img" aria-label="${statusLabel[status]}">${statuses.slice(1).map((_, i) => `<i class="${i < index ? 'on' : ''}"></i>`).join('')}</span>`; };
+const whoLabel = item => item.who === 'agent' ? `${icon('smart_toy')}${esc(item.agent)}` : item.who === 'person' ? `${icon('person')}You` : item.who === 'template' ? `${icon('auto_fix_high')}Aludel template` : '';
+
+function render() {
+  const [layer = 'home', ...rest] = location.hash.replace(/^#\/?/, '').split('/');
+  document.getElementById('nav').innerHTML = nav.map(([id, glyph, label]) => `<a href="#/${id}" class="${layer === id ? 'active' : ''}" ${layer === id ? 'aria-current="page"' : ''}>${icon(glyph)}${label}${id === 'work' ? `<span class="badge" aria-label="${needsYou.length} need you">${needsYou.length}</span>` : ''}</a>`).join('');
+  const main = document.getElementById('main');
+  main.innerHTML = (routes[layer] || home)(rest);
+  document.getElementById('drawer-root').innerHTML = layer === 'product' && rest[0] === 'map' && rest[1] ? storyDrawer(rest[1]) : '';
+  document.title = `${(nav.find(entry => entry[0] === layer) || ['', '', 'Home'])[2]} · Tool Share · Aludel prototype v2`;
+  const drawer = document.querySelector('.drawer');
+  (drawer || main).focus({ preventScroll: true });
+  if (!drawer) window.scrollTo(0, 0);
+}
+window.addEventListener('hashchange', render);
+
+function home() {
+  const demo = stories.filter(s => s.phase === 'demo');
+  const counts = statuses.map(status => [status, demo.filter(s => s.status === status).length]);
+  return `<p class="eyebrow">Tool Share · Home</p><h1>Good afternoon, Ada</h1><p class="lead">Demo phase: ${esc(phases[0].goal)}</p>
+  <div class="grid g3">
+    <section class="card wide" aria-labelledby="ph"><div class="row"><h2 id="ph" style="margin:0">Demo phase</h2><span class="chip s-plain">${demo.length} stories · ${phases[0].appetite}</span><a class="small" style="margin-left:auto" href="#/product/map">Story map</a></div>
+      <div class="progress" role="img" aria-label="${counts.filter(c => c[1]).map(([s, n]) => `${n} ${statusLabel[s]}`).join(', ')}">${counts.map(([s, n]) => n ? `<span style="width:${n / demo.length * 100}%;background:${statusColor[s]}"></span>` : '').join('')}</div>
+      <div class="legend">${counts.map(([s, n]) => `<span><i style="background:${statusColor[s]}"></i>${n} ${statusLabel[s]}</span>`).join('')}</div>
+      <h3 style="margin-top:16px">By activity</h3><ul class="list">${activities.map(a => { const list = demo.filter(s => s.activity === a.id); return list.length ? `<li><a class="item" href="#/product/map"><span class="body"><span class="title">${esc(a.title)}${a.pack ? ` <span class="pack">${esc(a.pack)} pack</span>` : ''}</span><small>${list.filter(s => ['built', 'shipped'].includes(s.status)).length} of ${list.length} built</small></span>${stepper(list.every(s => s.status === 'built') ? 'built' : list.some(s => s.status === 'designed') ? 'designed' : 'defined')}</a></li>` : ''; }).join('')}</ul></section>
+    <section class="card" aria-labelledby="nh"><h2 id="nh">Needs you <span class="count">${needsYou.length}</span></h2><ul class="list">${needsYou.map(item => `<li><a class="item" href="#/work/item/${item.id}"><span class="body"><span class="row" style="gap:6px">${layerChip(item.layer)}<span class="chip ${stateChip[item.state]}">${stateLabel[item.state]}</span></span><span class="title" style="display:block;margin-top:4px">${esc(item.title)}</span><span class="who">${whoLabel(item)}</span></span></a></li>`).join('')}</ul></section>
+    <section class="card" aria-labelledby="ah"><h2 id="ah">Your app</h2><dl class="kv"><dt>Preview</dt><dd><span class="chip s-ok">Running</span> <a href="#/platform/environments">tool-share.localhost</a></dd><dt>Latest build</dt><dd>7c1e2a4 · in review</dd><dt>Production</dt><dd><span class="chip s-plain">Not set up</span></dd></dl></section>
+    <section class="card" aria-labelledby="rh"><h2 id="rh">Recent changes</h2><ul class="list">${[['product', 'SPEC-01 drafted: ask to borrow, and get an answer', '#/product/specs/SPEC-01'], ['product', 'Messaging pack added 5 stories', '#/product/map'], ['work', 'Template built conversations and threads', '#/work/item/W-02'], ['pages', 'Browse rev 2: cards rather than a table', '#/pages/tree/browse']].map(([l, t, h]) => `<li><a class="item" href="${h}">${layerChip(l)}<span class="body"><span class="title">${esc(t)}</span></span></a></li>`).join('')}</ul></section>
+    <section class="card quiet" aria-labelledby="ih"><h2 id="ih">${icon('monitoring')} Insights</h2><p class="muted small">Usage, feedback and experiments will get their own layer once Tool Share has users.</p></section>
+  </div>`;
+}
+
+function product([section = 'vision', id]) {
+  const head = `<p class="eyebrow">Product · founder and product lead</p><h1>What we're building, and why</h1>` + tabs('product', [['vision', 'Vision'], ['map', 'Story map'], ['roadmap', 'Roadmap'], ['specs', 'Specs'], ['research', 'Research'], ['docs', 'Docs']], section);
+  if (section === 'map') return head + storyMap(id);
+  if (section === 'roadmap') return head + `<p class="lead">Each phase is a slice of the story map with its own goal, time budget and exit criteria.</p><div class="columns">${phases.map(p => { const list = stories.filter(s => s.phase === p.id); return `<section class="column ${p.current ? 'current' : ''}" aria-labelledby="rp-${p.id}"><div class="row"><h2 id="rp-${p.id}" style="margin:0">${p.label}</h2>${p.current ? '<span class="chip s-ok">Current</span>' : ''}</div><dl class="kv small" style="grid-template-columns:90px 1fr;margin:10px 0"><dt>Goal</dt><dd>${esc(p.goal)}</dd><dt>Appetite</dt><dd>${esc(p.appetite)}</dd><dt>Done when</dt><dd>${esc(p.exit)}</dd></dl><p class="small muted" style="margin:0">${list.length} stories · ${list.filter(s => s.status === 'built').length} built</p>${list.slice(0, 6).map(s => `<a class="scard" href="#/product/map/${s.id}"><div class="row"><span style="flex:1">${esc(s.title)}</span>${stepper(s.status)}</div></a>`).join('')}${list.length > 6 ? `<p class="small muted">+ ${list.length - 6} more on the map</p>` : ''}</section>`; }).join('')}</div>`;
+  if (section === 'specs') {
+    const spec = specs.find(s => s.id === id);
+    if (!spec) return head + `<p class="lead">A spec covers an increment of related stories: the problem, a time budget, the solution sketch and the requirements agents build from.</p><ul class="list card" style="padding:4px 16px">${specs.map(s => `<li><a class="item" href="#/product/specs/${s.id}"><span class="chip l-product">${s.id}</span><span class="body"><span class="title">${esc(s.title)}</span><small>${s.stories.length} stories · ${phases.find(p => p.id === s.phase).label} · ${esc(s.by)}</small></span><span class="chip ${s.status.startsWith('Accepted') ? 's-ok' : 's-warn'}">${esc(s.status)}</span></a></li>`).join('')}</ul>`;
+    const list = arr => arr.length ? `<ul>${arr.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : '<p class="muted small">None</p>';
+    return head + `<p class="eyebrow"><a href="#/product/specs">Specs</a> · ${spec.id}</p><div class="grid g-side"><article class="card spec" aria-labelledby="sp"><div class="row" style="flex-wrap:wrap"><h2 id="sp" style="margin:0">${esc(spec.title)}</h2><span class="chip ${spec.status.startsWith('Accepted') ? 's-ok' : 's-warn'}">${esc(spec.status)}</span></div><p class="muted small">${esc(spec.by)} · ${phases.find(p => p.id === spec.phase).label}</p>
+      <h3>Problem</h3><p>${esc(spec.problem)}</p><h3>Appetite</h3><p>${esc(spec.appetite)}</p><h3>Solution sketch</h3><p>${esc(spec.solution)}</p><h3>Rabbit holes</h3>${list(spec.rabbit)}<h3>No-gos</h3>${list(spec.nogos)}
+      <h3>Requirements</h3>${spec.reqs.map(r => `<p><span class="req">${esc(r.slice(0, 6))}</span> ${esc(r.slice(7))}</p>`).join('')}<h3>Key entities</h3>${list(spec.entities)}<h3>Success criteria</h3>${list(spec.success)}<h3>Assumptions</h3>${list(spec.assumptions)}
+      ${spec.clar.length ? `<h3>Clarifications</h3>${spec.clar.map(c => `<p class="clar">${esc(c)} <a href="#/work/item/W-13">Answer</a></p>`).join('')}` : ''}</article>
+      <aside class="card side connected" aria-labelledby="spc"><h2 id="spc">Connected</h2><h3>Stories</h3>${spec.stories.map(sid => { const s = stories.find(x => x.id === sid); return `<a href="#/product/map/${sid}">${stepper(s.status)} ${esc(s.title)}</a>`; }).join('')}<h3>Next</h3><a href="#/work/item/W-15">${icon('architecture')}Technical plan (Platform)</a><h3>Format</h3><p class="small muted">Shape Up pitch (problem, appetite, solution, rabbit holes, no-gos) plus spec-driven requirements, entities and success criteria.</p></aside></div>`;
+  }
+  if (section === 'research') return head + `<p class="lead">Evidence behind needs and stories. Opportunities should come from real stories people tell, not guesses.</p><div class="grid g2">${research.map(r => `<section class="card"><h2>${esc(r.title)}</h2><p class="muted small">${r.date}</p><blockquote style="margin:0 0 10px;font-style:italic">${esc(r.note)}</blockquote><p class="small">${icon('link')} Supports <a href="#/product/vision">${esc(r.supports)}</a></p></section>`).join('')}<section class="card quiet"><h2>${icon('add')} Add research</h2><p class="muted small">Interview notes, observations, competitor notes, analytics excerpts.</p></section></div>`;
+  if (section === 'docs') return head + `<p class="lead">Free-form documents, organised your way. Mention any story, spec or page and it links both ways.</p><div class="grid g-side"><div class="card doclist">${docs.map(d => `<a href="#/product/docs">${icon('description')}<span class="body" style="flex:1"><strong>${esc(d.title)}</strong><br><small class="muted">${esc(d.template)} · ${esc(d.by)} · ${d.updated}</small></span></a>`).join('')}</div><aside class="card"><h2>New document</h2><div class="templates">${['Blank', 'PR/FAQ', 'Positioning', 'Pricing', 'Launch plan', 'Decision memo'].map(t => `<button class="btn ghost small">${t}</button>`).join('')}</div><p class="small muted" style="margin-top:10px">Templates are starting points; your organisation can add its own.</p></aside></div>`;
+  return head + `<div class="grid g2">
+    <section class="card wide" aria-labelledby="vs"><h2 id="vs">Vision</h2><p style="font-size:20px;margin:0">Every street has the tools it needs, shared between neighbours instead of bought and forgotten.</p><p class="muted small">From your pitch during onboarding · rev 2</p></section>
+    <section class="card" aria-labelledby="tu"><h2 id="tu">Target users</h2>${personas.map(p => `<div class="persona" style="margin-bottom:8px"><span class="avatar" aria-hidden="true">${p.name[0]}</span><span><strong>${p.name} · ${p.role}</strong><small>${esc(p.note)}</small></span></div>`).join('')}</section>
+    <section class="card" aria-labelledby="nd"><h2 id="nd">Needs and opportunities</h2><ul><li>Use a tool once without buying it <span class="small muted">· 1 interview</span></li><li>Lenders feel safe: know who has it and that it comes back <span class="small muted">· 1 interview</span></li></ul></section>
+    <section class="card" aria-labelledby="sc"><h2 id="sc">Standout capabilities</h2><ol><li>Find a tool within walking distance</li><li>Ask and arrange in one place</li><li>Built-in trust between neighbours</li></ol></section>
+    <section class="card" aria-labelledby="om"><h2 id="om">Outcomes and measures</h2><ul><li>A borrower finds and requests a tool in under 2 minutes</li><li>80% of loans are returned on time (MVP)</li></ul></section>
+    <section class="card" aria-labelledby="pr"><h2 id="pr">Principles</h2><p class="note">${icon('smart_toy')} Every work item's context includes these.</p><ol><li>Neighbourly, never transactional: no prices in Demo or MVP.</li><li>Show rough distance, never exact addresses.</li><li>Phones first; every flow works one-handed.</li></ol></section>
+    <section class="card" aria-labelledby="ng"><h2 id="ng">No-gos</h2><ul><li>Not a rental marketplace (see <a href="#/product/docs">decision memo</a>)</li><li>No deliveries</li></ul></section>
+  </div>`;
+}
+
+function storyMap(selected) {
+  const columns = activities.flatMap(a => a.steps.map((step, index) => ({ activity: a.id, step: index, label: step })));
+  const colOf = (activity, step) => columns.findIndex(c => c.activity === activity && c.step === step) + 1;
+  let html = `<div class="personas" aria-label="Users">${personas.map(p => `<span class="persona"><span class="avatar" aria-hidden="true">${p.name[0]}</span><span><strong>${p.name}</strong><small>${p.role}</small></span></span>`).join('')}<span class="small muted" style="align-self:center">Story packs you picked in onboarding are marked; their stories are yours to change.</span></div>`;
+  html += `<div class="map-wrap" tabindex="0" role="region" aria-label="Story map"><div class="storymap" style="grid-template-columns:repeat(${columns.length}, 210px)">`;
+  let start = 1;
+  for (const a of activities) { html += `<div class="activity" style="grid-column:${start} / span ${a.steps.length}"><span>${esc(a.title)} <small>· ${esc(a.persona)}</small></span>${a.pack ? `<span class="pack">${esc(a.pack)} pack</span>` : ''}</div>`; start += a.steps.length; }
+  columns.forEach(c => { html += `<div class="step">${esc(c.label)}</div>`; });
+  for (const phase of phases) {
+    const list = stories.filter(s => s.phase === phase.id);
+    html += `<div class="band ${phase.current ? 'current' : ''}"><strong>${phase.label}</strong> ${esc(phase.goal)}</div>`;
+    columns.forEach((c, index) => {
+      const cellStories = list.filter(s => s.activity === c.activity && s.step === c.step);
+      html += `<div class="cell" style="grid-column:${index + 1}">${cellStories.map(s => `<a class="card-story ${s.status === 'built' ? 'built' : ''} ${s.id === selected ? 'active' : ''}" href="#/product/map/${s.id}">${esc(s.title)}<span class="meta"><span class="dot" style="background:${statusColor[s.status]}"></span>${statusLabel[s.status]}${s.template ? ' · template' : ''}${s.clarifications.length ? ` · ${icon('help')}` : ''}</span></a>`).join('')}</div>`;
+    });
+  }
+  html += `</div></div><div class="row" style="margin-top:12px;flex-wrap:wrap"><button class="btn ghost small">${icon('add')}Add activity</button><button class="btn ghost small">${icon('add')}Add story</button><button class="btn ghost small">${icon('inventory_2')}Add a story pack</button><span class="small muted">Dreamer: the Product agent drafts new stories from a sentence; you review.</span></div>`;
+  return html;
+}
+
+function storyDrawer(id) {
+  const s = stories.find(x => x.id === id); if (!s) return '';
+  const a = activities.find(x => x.id === s.activity);
+  return `<aside class="drawer" tabindex="-1" role="dialog" aria-labelledby="dh"><a class="close" href="#/product/map" aria-label="Close story">${icon('close')}</a>
+    <p class="eyebrow">${esc(a.title)} › ${esc(a.steps[s.step])} · ${s.id}</p><h2 id="dh" style="font-size:22px">${esc(s.title)}</h2>
+    <div class="row" style="flex-wrap:wrap"><span class="phase ${s.phase === 'demo' ? 'current' : ''}">${phases.find(p => p.id === s.phase).label}</span>${stepper(s.status)}<span class="chip s-plain">${statusLabel[s.status]}</span></div>
+    <p class="origin">Origin: ${esc(s.origin)}${s.template ? ' · built by the Aludel template; change it like any other story' : ''}</p>
+    ${s.why ? `<p class="small"><strong>Why:</strong> ${esc(s.why)}</p>` : ''}
+    <div class="connected"><h3>Acceptance</h3>${s.acceptance.length ? s.acceptance.map(([g, w, t]) => `<div class="gwt"><b>Given</b> ${esc(g)}<br><b>When</b> ${esc(w)}<br><b>Then</b> ${esc(t)}</div>`).join('') : `<p class="note">Not written yet. <a href="#/work/queue">Draft with the Product agent</a></p>`}
+    ${s.edges.length ? `<h3>Edge cases</h3><ul class="small">${s.edges.map(e => `<li>${esc(e)}</li>`).join('')}</ul>` : ''}
+    ${s.clarifications.length ? `<h3>Open clarifications</h3>${s.clarifications.map(c => `<p class="clar">${esc(c)}</p>`).join('')}` : ''}
+    <h3>Pages</h3>${s.pages.length ? s.pages.map(pid => { const p = pages.find(x => x.id === pid); return `<a href="#/pages/tree/${pid}">${icon(p.icon)}${esc(p.label)} <span class="small muted">${esc(p.status)}</span></a>`; }).join('') : '<p class="small muted">No page yet</p>'}
+    <h3>Spec</h3>${specs.filter(sp => sp.stories.includes(s.id)).map(sp => `<a href="#/product/specs/${sp.id}">${sp.id} ${esc(sp.title)}</a>`).join('') || '<p class="small muted">Not in a spec yet</p>'}
+    <h3>Work</h3>${s.work.length ? s.work.map(wid => { const w = work.find(x => x.id === wid); return w ? `<a href="#/work/item/${wid}">${esc(w.title)} <span class="chip ${stateChip[w.state]}">${stateLabel[w.state]}</span></a>` : ''; }).join('') : '<p class="small muted">None</p>'}
+    <h3>Why it is this way</h3>${s.history.length ? `<div class="history">${s.history.map(h => `<p>${esc(h.text)}<br><small>${h.date} · from <a href="#/work/item/${h.source}">${h.source}</a></small></p>`).join('')}</div>` : '<p class="small muted">No decisions yet.</p>'}</div></aside>`;
+}
+
+function design([section = 'foundations']) {
+  const head = `<p class="eyebrow">Design · the design system</p><h1>Tool Share's design system</h1>` + tabs('design', [['foundations', 'Foundations'], ['components', 'Components'], ['patterns', 'Patterns'], ['guidelines', 'Guidelines'], ['sources', 'Sources & changes']], section);
+  if (section === 'components') return head + `<div class="table-wrap" tabindex="0" role="region" aria-label="Components"><table><thead><tr><th>Component</th><th>Maturity</th><th>Used on</th></tr></thead><tbody>${components.map(([n, m, u]) => `<tr><td><strong>${n}</strong></td><td><span class="chip ${m.startsWith('Stable') ? 's-ok' : m.startsWith('Proposed') ? 's-warn' : 's-plain'}">${m}</span></td><td>${u}</td></tr>`).join('')}</tbody></table></div><p class="small muted">Each component has a contract: purpose, anatomy, variants, states, accessibility. Proposed → incubating → stable → deprecated.</p>`;
+  if (section === 'patterns') return head + `<div class="grid g2"><section class="card"><h2>Page types</h2><p class="small muted">Archetypes the page tree and the scaffold both use.</p><ul class="list">${[['Feed', 'Stream of posts or updates'], ['Gallery', 'Image-led cards to browse'], ['Detail', 'Everything about one thing'], ['Messages', 'Conversations and a thread'], ['Form', 'Collect information'], ['Dashboard', 'Numbers and activity at a glance']].map(([n, d]) => `<li class="item"><span class="body"><span class="title">${n}</span><small>${d}</small></span></li>`).join('')}</ul></section><section class="card"><h2>Interaction rules</h2><ul><li>Primary actions sit in the thumb zone on phones.</li><li>Destructive actions confirm in place, never in a modal chain.</li><li>Lists open details as a page on phones, a side panel on desktop.</li><li>Navigation: bottom tabs (≤5) on phones, top bar on desktop.</li></ul></section></div>`;
+  if (section === 'guidelines') return head + `<div class="grid g2"><section class="card"><h2>Voice</h2><p>Neighbourly and plain. “Ask Priya” rather than “Submit request”.</p></section><section class="card"><h2>Accessibility baseline</h2><ul><li>WCAG 2.2 AA; text contrast 4.5:1 (the primary colour is derived to meet it)</li><li>Every action reachable by keyboard</li><li>Touch targets at least 44px</li></ul></section><section class="card quiet"><h2>${icon('add')} Add guidance</h2><p class="small muted">Free-form pages for anything else: photography, illustration, motion.</p></section></div>`;
+  if (section === 'sources') return head + `<div class="grid g2"><section class="card"><h2>Sources</h2><dl class="kv"><dt>Base system</dt><dd>Material Design 3 via Angular Material 22</dd><dt>Starting feel</dt><dd>Aludel “Mobile-first social” (onboarding)</dd><dt>Token format</dt><dd>DTCG 2025.10</dd></dl></section><section class="card"><h2>Deviations</h2><table><thead><tr><th>Change</th><th>Why</th></tr></thead><tbody><tr><td>Primary derived from accent</td><td>Keep brand pink while meeting 4.5:1</td></tr><tr><td>Card radius 22px</td><td>Feel: rounded, friendly</td></tr></tbody></table></section><section class="card"><h2>Changes</h2><ul class="list"><li class="item"><span class="body"><span class="title">Tool card</span><small>Proposed Sep 21 from W-08 · incubating</small></span></li><li class="item"><span class="body"><span class="title">Date range picker</span><small>Needed by SPEC-01 · proposed</small></span></li></ul></section></div>`;
+  return head + `<div class="grid g2"><section class="card"><h2>Principles</h2><ol><li>Warm and neighbourly, never corporate.</li><li>Photos first: tools are recognised by sight.</li><li>One-handed on phones.</li></ol></section><section class="card"><h2>Colour</h2><div class="swatches">${[['#e0457b', 'Accent'], ['#ca3e6f', 'Primary'], ['#fff7fa', 'Surface'], ['#170f13', 'Surface dark'], ['#fbdbe6', 'Container']].map(([h, l]) => `<div class="swatch"><i style="background:${h}"></i><span><strong>${h}</strong><br>${l}</span></div>`).join('')}</div></section>
+    <section class="card wide"><h2>Tokens</h2><div class="table-wrap" tabindex="0" role="region" aria-label="Tokens"><table><thead><tr><th>Token</th><th>$type</th><th>$value</th><th>Note</th></tr></thead><tbody>${tokens.map(([n, t, v, d]) => `<tr><td><code>${n}</code></td><td>${t}</td><td>${t === 'color' && v.startsWith('#') ? `<span class="token-swatch" style="background:${v.slice(0, 7)}"></span>` : ''}<code>${esc(v)}</code></td><td class="small">${d}</td></tr>`).join('')}</tbody></table></div><p class="small muted">Stored in the W3C Design Tokens format, so they move to and from Figma, Penpot or Tokens Studio.</p></section></div>`;
+}
+
+function phoneMock(kind, active) {
+  const rows = n => Array.from({ length: n }, () => '<div class="rowish"><span class="dot"></span><div style="flex:1;display:grid;gap:4px"><div class="bar"></div><div class="bar w4"></div></div></div>').join('');
+  const body = kind === 'Gallery' ? '<div class="pill"></div><div class="tiles"><div class="tile"></div><div class="tile"></div><div class="tile"></div><div class="tile"></div></div>' : kind === 'map' ? `<div class="pill"></div><div class="map"></div>${rows(3)}` : kind === 'Detail' ? '<div class="tile" style="height:110px"></div><div class="bar w6"></div><div class="bar"></div><div class="bar w4"></div>' : kind === 'Form' ? '<div class="bar w6"></div><div class="pill"></div><div class="pill"></div><div class="pill"></div><div class="tile" style="height:30px;width:50%"></div>' : kind === 'Messages' ? `${rows(4)}` : `<div class="tile" style="height:70px"></div>${rows(3)}`;
+  return `<div class="phone" aria-hidden="true"><header><b>TS</b>Tool Share</header><main>${body}</main><footer>${['Home', 'Browse', 'Messages', 'Profile'].map(l => `<span class="${l === active ? 'on' : ''}">${l}</span>`).join('')}</footer></div>`;
+}
+
+function pagesLayer([section = 'tree', id = 'browse']) {
+  const head = `<p class="eyebrow">Pages · where the product happens</p><h1>Tool Share's pages</h1>` + tabs('pages', [['tree', 'Page tree'], ['flows', 'Flows']], section);
+  if (section === 'flows') return head + `<p class="lead">One flow per story-map activity: the path someone takes across pages.</p>${[['Find a tool', ['browse', 'tool']], ['Borrow', ['browse', 'tool', 'messages']], ['Talk it over', ['tool', 'thread', 'messages']], ['Lend my tools', ['profile', 'list']], ['Join', ['signin', 'home']]].map(([t, ids]) => `<section class="card" style="margin-bottom:12px"><h2 style="font-size:18px">${t}</h2><div class="flow">${ids.map((pid, i) => { const p = pages.find(x => x.id === pid); return `${i ? icon('arrow_forward') : ''}<a href="#/pages/tree/${pid}">${esc(p.label)}</a>`; }).join('')}</div></section>`).join('')}`;
+  const page = pages.find(p => p.id === id) || pages[1];
+  const tree = list => `<ul class="tree">${list.map(p => `<li><a href="#/pages/tree/${p.id}" class="${p.id === page.id ? 'active' : ''} ${p.gap ? 'gap' : ''}" ${p.id === page.id ? 'aria-current="page"' : ''}>${icon(p.icon)}${esc(p.label)}${p.gap ? '<span class="small" style="margin-left:auto">gap</span>' : ''}</a>${p.children ? tree(p.children) : ''}</li>`).join('')}</ul>`;
+  const question = page.id === 'browse' ? `<div class="question"><h2>${icon('help')} Choose a layout for search results</h2><p class="small muted">Asked in <a href="#/work/item/W-14">W-14</a>. Your answer becomes the next revision of this page, with your reason.</p><div class="canvas">${[['Gallery', 'A · Card grid'], ['map', 'B · Map above a list']].map(([k, l]) => `<figure class="option" style="margin:0">${phoneMock(k, 'Browse')}<figcaption>${l}</figcaption></figure>`).join('')}</div><div class="choices"><a class="btn" href="#/work/item/W-14">Answer in W-14</a></div></div>` : '';
+  const canvas = page.gap ? `<div class="card quiet"><h2>${esc(page.label)} isn't designed yet</h2><p class="muted">Realises ${page.stories.map(sid => esc(stories.find(s => s.id === sid).title)).join('; ')}.</p><div class="row"><a class="btn" href="#/work/queue">Start now</a><a class="btn ghost" href="#/work/queue">Add to Work</a></div></div>` : `<div class="canvas">${phoneMock(page.type, ['Home', 'Browse', 'Messages', 'Profile'].includes(page.label) ? page.label : '')}</div>`;
+  return head + `<div class="design-grid"><nav aria-label="Page tree" class="card" style="padding:12px">${tree(pageTree)}<a class="btn ghost small" href="#/work/queue" style="margin:10px 0 0 6px">${icon('add')}Add page</a></nav>
+    <section aria-labelledby="pg"><div class="row"><h2 id="pg" style="margin:0;font-size:26px">${esc(page.label)}</h2><span class="chip l-pages">${esc(page.type)}</span></div><p class="muted small">${esc(page.status)} · origin: ${esc(page.origin)}</p>${question}${canvas}</section>
+    <aside class="card connected" aria-labelledby="pa"><h2 id="pa">About this page</h2>${page.origin.endsWith('pack') ? `<p class="note">Added by the ${esc(page.origin)}. Rename it, move it or merge it like any page; if you delete it, Aludel asks which page takes its stories.</p>` : ''}
+      <h3>Stories it realises</h3>${page.stories.length ? page.stories.map(sid => { const s = stories.find(x => x.id === sid); return `<a href="#/product/map/${sid}">${stepper(s.status)} ${esc(s.title)}</a>`; }).join('') : '<p class="small muted">None linked</p>'}
+      <h3>Uses</h3><a href="#/design/components">${icon('widgets')}${page.type === 'Messages' ? 'Message bubble · Tab bar' : 'Tool card · Tab bar'}</a>
+      <h3>Work on this page</h3>${work.filter(w => w.targets.some(t => t[0] === 'pages' && t[1] === page.id)).map(w => `<a href="#/work/item/${w.id}">${esc(w.title)} <span class="chip ${stateChip[w.state]}">${stateLabel[w.state]}</span></a>`).join('') || '<p class="small muted">None</p>'}
+      <h3>States</h3><p class="small muted">Empty · loading · error · signed out</p></aside></div>`;
+}
+
+function platform([section = 'architecture']) {
+  const head = `<p class="eyebrow">Platform · engineering and operations</p><h1>How it's built and where it runs</h1>` + tabs('platform', [['architecture', 'Architecture'], ['repository', 'Repository'], ['environments', 'Environments'], ['connections', 'Connections']], section);
+  if (section === 'repository') return head + `<div class="grid g2"><section class="card"><h2>Repository</h2><dl class="kv"><dt>Location</dt><dd>Local · <code>main</code></dd><dt>GitHub</dt><dd><span class="chip s-plain">Not connected</span> <a href="#/platform/connections">Connect</a></dd></dl></section><section class="card"><h2>Recent commits</h2><ul class="list">${[['7c1e2a4', 'feat: browse tools near me (W-12)'], ['a91f003', 'feat: conversations and threads (Messaging pack, template)'], ['19d55a9', 'feat: generate Tool Share skeleton'], ['a2b517a', 'chore: start Tool Share with Aludel']].map(([h, m]) => `<li class="item"><code>${h}</code><span class="body">${esc(m)}</span></li>`).join('')}</ul></section></div>`;
+  if (section === 'environments') return head + `<div class="table-wrap" tabindex="0" role="region" aria-label="Environments"><table><thead><tr><th>Environment</th><th>Status</th><th>Build</th><th>Address</th></tr></thead><tbody><tr><td>Preview</td><td><span class="chip s-ok">Running</span></td><td>7c1e2a4 · in review</td><td>tool-share.localhost</td></tr><tr><td>Production</td><td><span class="chip s-plain">Not set up</span></td><td>—</td><td><a href="#/work/queue">Suggested in Work</a></td></tr></tbody></table></div>`;
+  if (section === 'connections') return head + `<ul class="list card" style="padding:4px 16px">${[['smart_toy', 'Agent: Codex on this machine', 'Used by Product, Design, Architect and Coding agents', 's-ok', 'Connected'], ['code', 'GitHub', 'Publish the repository', 's-plain', 'Not set up'], ['mail', 'Email delivery', 'Needed by S3 (password reset)', 's-warn', 'Needed']].map(([i, t, d, c, l]) => `<li class="item">${icon(i)}<span class="body"><span class="title">${t}</span><small>${d}</small></span><span class="chip ${c}">${l}</span></li>`).join('')}</ul>`;
+  return head + `<div class="grid g2"><section class="card"><h2>Stack</h2><dl class="kv"><dt>Preset</dt><dd>Aludel web (aludel-web-v1)</dd><dt>Frontend</dt><dd>Angular 22 + Material 3</dd><dt>Backend</dt><dd>Node 24</dd><dt>Database</dt><dd>SQLite</dd></dl></section>
+    <section class="card"><h2>Data model</h2><ul class="list">${[['User', 'name, email, neighbourhood', 'Accounts pack'], ['Tool', 'name, photos, condition, lender, location', 'SPEC-02'], ['BorrowRequest', 'tool, borrower, dates, status', 'SPEC-01 (draft)'], ['Conversation / Message', 'participants, tool, text, read', 'Messaging pack']].map(([e, f, s]) => `<li class="item"><span class="body"><span class="title">${e}</span><small>${f} · from ${s}</small></span></li>`).join('')}</ul></section>
+    <section class="card"><h2>APIs</h2><ul class="small"><li><code>GET /api/tools?near=…</code> · SPEC-02</li><li><code>POST /api/requests</code> · SPEC-01 (planned)</li><li><code>/api/conversations</code> · Messaging pack</li></ul></section>
+    <section class="card"><h2>Technical decisions</h2><div class="history"><p>Distances computed server-side from rounded coordinates.<br><small>ADR-2 · from W-15 (planned)</small></p><p>SQLite for Demo and MVP; revisit at 1,000 users.<br><small>ADR-1 · stack preset</small></p></div></section></div>`;
+}
+
+function workLayer([section = 'queue', id]) {
+  if (section === 'item') return workItem(id);
+  const head = `<p class="eyebrow">Work · the shared bench</p><h1>Everything to do, from every layer</h1><p class="lead">Agents, templates and people pick up items the same way. Questions stay on the item; answers land in the layer they change.</p>` + tabs('work', [['queue', 'Queue'], ['routines', 'Routines'], ['style', 'Working style']], section);
+  if (section === 'routines') return head + `<div class="table-wrap" tabindex="0" role="region" aria-label="Routines"><table><thead><tr><th>Routine</th><th>Layer</th><th>Runs</th><th>Next</th><th>Creates</th></tr></thead><tbody>${[['Product drift check', 'product', 'Weekly', 'Sep 29', 'Define items when built behaviour and stories disagree'], ['Accessibility sweep', 'pages', 'Weekly', 'Sep 26', 'Design items for contrast or focus problems'], ['Dependency updates', 'platform', 'Monthly', 'Oct 1', 'Implement items with previews'], ['Security audit', 'platform', 'Before each release', 'First release', 'Implement items for findings']].map(([t, l, r, n, c]) => `<tr><td><strong>${t}</strong></td><td>${layerChip(l)}</td><td>${r}</td><td>${n}</td><td class="small">${c}</td></tr>`).join('')}</tbody></table></div>`;
+  if (section === 'style') return head + `<div class="table-wrap" tabindex="0" role="region" aria-label="Automation by working style"><table><thead><tr><th>Work type</th><th>Dreamer (current)</th><th>Planner</th><th>Tinkerer</th></tr></thead><tbody>${[['Vision and roadmap', 'Agent asks a few questions, then drafts', 'You', 'You'], ['Stories and acceptance', 'Agent drafts · you review', 'You', 'You'], ['Specs', 'Agent drafts · asks only blockers', 'Agent drafts · you review', 'You'], ['Technical plans', 'Agent', 'Agent', 'You'], ['Page designs', 'Agent · asks when options differ', 'Agent · you choose', 'You'], ['Implementation', 'Template if possible, else agent · you review', 'Template if possible, else agent · you review', 'Template if possible, else you'], ['Platform configuration', 'Agent · you approve effects', 'Agent · you approve effects', 'You']].map(r => `<tr>${r.map((c, i) => `<td>${i === 1 ? `<strong>${c}</strong>` : c}</td>`).join('')}</tr>`).join('')}</tbody></table></div><section class="card" style="margin-top:18px"><h2>Agent instructions</h2><p class="small muted">How agents approach each work type here, written as examples.</p><ul><li>Product agent: stories read “Someone can …”, with 1–3 Given/When/Then scenarios.</li><li>Design agent: offer at most two options; only system tokens and components.</li><li>Coding agent: one story per build; cite the spec requirement in each commit.</li></ul></section>`;
+  const row = item => `<li><a class="item" href="#/work/item/${item.id}">${layerChip(item.layer)}<span class="body"><span class="title">${esc(item.title)}</span><small>${esc(item.type)} · ${item.targets.map(t => esc(t[2])).join(' · ')}</small></span><span class="who">${whoLabel(item)}</span><span class="chip ${stateChip[item.state]}">${stateLabel[item.state]}</span></a></li>`;
+  const group = (states, title, quiet) => { const list = work.filter(w => states.includes(w.state)); if (!list.length) return ''; const inner = `<ul class="list card" style="padding:4px 16px">${list.map(row).join('')}</ul>`; return quiet ? `<details class="quiet"><summary>${title} · ${list.length}</summary>${inner}</details>` : `<div class="section-title"><h2>${title}</h2><span class="count">${list.length}</span></div>${inner}`; };
+  return head + group(['needs-input'], 'Needs you') + group(['review'], 'In review') + group(['claimed'], 'In progress') + group(['ready'], 'Ready to pick up') + group(['suggested'], 'Suggested by the layers (not queued yet)', true) + group(['done'], 'Done recently (including template work)', true);
+}
+
+function workItem(id) {
+  const item = work.find(w => w.id === id) || work[0];
+  const story = item.targets.map(t => stories.find(s => s.id === t[1])).find(Boolean);
+  const targetPages = [...new Set([...item.targets.filter(t => t[0] === 'pages').map(t => t[1]), ...(story?.pages || [])])].map(pid => pages.find(p => p.id === pid)).filter(Boolean);
+  const spec = specs.find(sp => item.targets.some(t => t[1] === sp.id) || (story && sp.stories.includes(story.id)));
+  const decisions = item.targets.flatMap(t => stories.find(s => s.id === t[1])?.history || []);
+  const bundle = [
+    ['Goal', item.title, item.id], story ? ['Story', `${story.title}`, story.id] : null,
+    story?.acceptance.length ? ['Acceptance', `${story.acceptance.length} Given/When/Then scenario(s)`, story.id] : null,
+    ['Principles', 'Neighbourly, never transactional; rough distance only; one-handed', 'Product › Vision'],
+    // Only what this item touches: its pages' components, its spec's entities, its stories' decisions.
+    targetPages.length ? ['Design', `Mobile-first social tokens; ${targetPages.map(p => p.type === 'Messages' ? 'Message bubble' : p.type === 'Form' ? 'Form fields' : 'Tool card').filter((v, i, a) => a.indexOf(v) === i).join(', ')}; Tab bar`, `Pages › ${targetPages.map(p => p.label).join(', ')}`] : null,
+    ['Technical context', `aludel-web-v1${spec ? `; ${spec.entities.map(e => e.split(' (')[0]).join(', ')}` : ''}`, spec ? `Platform › Architecture, ${spec.id}` : 'Platform › Architecture'],
+    decisions.length ? ['Decisions so far', decisions.map(d => d.text).join(' '), decisions.map(d => d.source).join(', ')] : null,
+    ['Will document', item.documents.join('; ') || 'Set when staged', 'This item']
+  ].filter(Boolean);
+  const who = item.who;
+  return `<p class="eyebrow"><a href="#/work/queue">Work</a> · ${item.id}</p><div class="row" style="flex-wrap:wrap"><h1 style="margin:0">${esc(item.title)}</h1>${layerChip(item.layer)}<span class="chip ${stateChip[item.state]}">${stateLabel[item.state]}</span></div><p class="muted">${esc(item.type)} work from the ${layerName[item.layer]} layer</p>
+  <div class="grid g-side"><div>
+    ${item.question ? `<section class="question" aria-labelledby="qq"><h2 id="qq">${icon('help')} ${esc(item.question)}</h2>${item.id === 'W-14' ? `<div class="canvas" style="margin:10px 0">${[['Gallery', 'A · Card grid'], ['map', 'B · Map above a list']].map(([k, l]) => `<figure class="option" style="margin:0">${phoneMock(k, 'Browse')}<figcaption>${l}</figcaption></figure>`).join('')}</div>` : ''}<div class="choices">${item.options.map(o => `<button class="btn ghost">${esc(o)}</button>`).join('')}</div><label class="small" style="display:block;margin-top:10px">Why (saved with the decision)<br><textarea rows="2" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:10px;padding:8px"></textarea></label></section>` : ''}
+    ${item.state === 'review' ? `<section class="question"><h2>${icon('preview')} Review preview build 7c1e2a4</h2><p class="small">Accepting makes S4 Built.</p><div class="choices"><a class="btn" href="#/platform/environments">Open preview</a><button class="btn ghost">Accept</button><button class="btn ghost">Ask for changes</button></div></section>` : ''}
+    <section class="card" aria-labelledby="cb"><h2 id="cb">Context</h2><p class="small muted">Compiled like a story file: a small set of facts, each citing its source record. Agents fetch more from the layers when they need it; you can read exactly the same.</p><ol class="bundle">${bundle.map(([k, v, src]) => `<li><strong>${k}:</strong> ${esc(v)} <span class="citation">· ${esc(src)}</span></li>`).join('')}</ol>
+      <div class="connected">${item.targets.map(t => `<a href="${hrefFor(t)}">${layerChip(t[0])} ${esc(t[2])}</a>`).join('')}</div></section>
+  </div>
+  <aside class="card side" aria-labelledby="wo"><h2 id="wo">Who's on it</h2>${item.state === 'suggested' ? '<p class="muted">Not queued yet.</p><div class="row"><button class="btn">Start now</button><button class="btn ghost">Add to queue</button></div>' : who === 'template' ? `<p>${icon('auto_fix_high')} Built by the Aludel template during onboarding.</p><p class="small muted">It's your code and your stories now. Change the story or page and new work is created like for anything else.</p>` : `<div class="toggle" role="group" aria-label="Assignee"><button class="${who === 'agent' ? 'on' : ''}" aria-pressed="${who === 'agent'}">${icon('smart_toy')} Agent</button><button class="${who === 'person' ? 'on' : ''}" aria-pressed="${who === 'person'}">${icon('person')} Me</button></div><p class="small muted" style="margin-top:10px">${esc(item.agent)} picked this up because Dreamer hands ${esc(item.type.toLowerCase())} work to agents.</p>`}</aside></div>`;
+}
+
+function settings() { return `<p class="eyebrow">Settings</p><h1>Tool Share settings</h1><div class="grid g2"><section class="card"><h2>Project</h2><dl class="kv"><dt>Name</dt><dd>Tool Share</dd><dt>Address</dt><dd>tool-share.localhost</dd><dt>Members</dt><dd>Ada (owner)</dd></dl></section><section class="card"><h2>Working style</h2><p>Dreamer · <a href="#/work/style">see what it automates</a></p></section></div>`; }
+function account() { return `<p class="eyebrow">Account</p><h1>Ada Lovelace</h1><div class="grid g2"><section class="card"><h2>Sign-in</h2><dl class="kv"><dt>Email</dt><dd>ada@example.com</dd><dt>GitHub</dt><dd>Not connected</dd></dl></section><section class="card"><h2>Your apps</h2><ul class="list"><li class="item"><span class="body"><span class="title">Tool Share</span><small>Owner</small></span></li></ul></section></div>`; }
+
+// Global search across every layer.
+const index = [
+  ...stories.map(s => ({ layer: 'Story map', text: s.title, sub: `${activities.find(a => a.id === s.activity).title} · ${statusLabel[s.status]}`, href: `#/product/map/${s.id}` })),
+  ...specs.map(s => ({ layer: 'Specs', text: `${s.id} ${s.title}`, sub: s.status, href: `#/product/specs/${s.id}` })),
+  ...docs.map(d => ({ layer: 'Docs', text: d.title, sub: d.template, href: '#/product/docs' })),
+  ...pages.map(p => ({ layer: 'Pages', text: `${p.label} page`, sub: p.status, href: `#/pages/tree/${p.id}` })),
+  ...components.map(([n, m]) => ({ layer: 'Design', text: n, sub: m, href: '#/design/components' })),
+  ...work.map(w => ({ layer: 'Work', text: w.title, sub: `${w.id} · ${stateLabel[w.state]}`, href: `#/work/item/${w.id}` }))
+];
+const q = document.getElementById('q'); const results = document.getElementById('results');
+q.addEventListener('input', () => {
+  const term = q.value.trim().toLowerCase();
+  if (!term) { results.hidden = true; return; }
+  const hits = index.filter(e => `${e.text} ${e.sub}`.toLowerCase().includes(term));
+  const groups = [...new Set(hits.map(h => h.layer))];
+  results.innerHTML = hits.length ? groups.map(g => `<h3>${g}</h3>${hits.filter(h => h.layer === g).slice(0, 5).map(h => `<a href="${h.href}"><span>${esc(h.text)}</span><small>${esc(h.sub)}</small></a>`).join('')}`).join('') : '<p class="muted small" style="padding:8px 10px">Nothing matches.</p>';
+  results.hidden = false;
+});
+results.addEventListener('click', () => { results.hidden = true; q.value = ''; });
+const accountButton = document.getElementById('account'); const accountMenu = document.getElementById('account-menu');
+accountButton.addEventListener('click', () => { const open = accountMenu.hidden; accountMenu.hidden = !open; accountButton.setAttribute('aria-expanded', String(open)); });
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') { results.hidden = true; accountMenu.hidden = true; accountButton.setAttribute('aria-expanded', 'false'); if (document.querySelector('.drawer')) location.hash = '#/product/map'; }
+  if (event.key === '/' && document.activeElement !== q) { event.preventDefault(); q.focus(); }
+});
+render();
+</script>
+</body>
+</html>

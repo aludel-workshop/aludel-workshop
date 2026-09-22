@@ -9,18 +9,19 @@ import { DependencyListComponent, RecordListComponent, StatusComponent } from '.
 import { AgentConnectionComponent } from './agent-connection';
 import { Session } from './onboarding-model';
 import { PublicComponent } from './public';
+import { ProjectShellComponent } from './layers/shell';
 import { Decision, DownstreamRecord, GitHubIntegration, Overview, OwnerRequest, ProductDirection, ProductFeature, ProductOutcome, ProductWorkspace, ProjectBrand, Proposal, RecordDetail, SourceRecord, WorkTask } from './model';
 
 @Component({
   selector: 'machine-app', standalone: true,
-  imports: [FormsModule, NgTemplateOutlet, MatButtonModule, MatIconModule, MatFormFieldModule, MatInputModule, DependencyListComponent, RecordListComponent, StatusComponent, AgentConnectionComponent, PublicComponent],
+  imports: [FormsModule, NgTemplateOutlet, MatButtonModule, MatIconModule, MatFormFieldModule, MatInputModule, DependencyListComponent, RecordListComponent, StatusComponent, AgentConnectionComponent, PublicComponent, ProjectShellComponent],
   templateUrl: './app.html'
 })
 export class App {
   private readonly changeDetector = inject(ChangeDetectorRef);
   authenticated = signal<boolean | null>(null);
   // Public pages (marketing, sign-in, onboarding, apps) use real paths; Aludel's own workspace keeps its hash routes until ONB-06.
-  mode = signal<'loading' | 'public' | 'workspace'>('loading');
+  mode = signal<'loading' | 'public' | 'workspace' | 'project'>('loading');
   session = signal<Session | null>(null);
   setupRequired = signal(false);
   loading = signal(false);
@@ -142,7 +143,9 @@ export class App {
       this.authenticated.set(session.authenticated);
       this.setupRequired.set(session.setupRequired);
       const workspaceRoute = location.pathname === '/' && location.hash.startsWith('#/');
-      if (location.pathname !== '/') this.mode.set('public');
+      // /p/<slug>/… is a project's layered workspace (LAY-02); it needs a signed-in member.
+      if (location.pathname.startsWith('/p/')) { if (session.authenticated) this.mode.set('project'); else this.showPublic('/login'); }
+      else if (location.pathname !== '/') this.mode.set('public');
       else if (session.authenticated && session.aludelMember) {
         this.mode.set('workspace');
         await this.loadBrand(); await this.loadRoute();

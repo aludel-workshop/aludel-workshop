@@ -7,10 +7,11 @@ export interface PreferenceDefinition { label: string; values: Record<string, st
 export interface Profile { label: string; summary: string; detail: string; icon: string; defaults: Record<string, string>; }
 export interface RouteSeed { label: string; icon: string; pageType: string; }
 export interface Feel { label: string; summary: string; accent: string; theme: 'light' | 'dark'; font: string; radius: number; density: number; navigation: 'sidebar' | 'top'; samplePage: string; seedRoutes: RouteSeed[]; surface: string; surfaceDark: string; }
-export interface PageRoute { id: string; label: string; icon: string; pageType: string; description: string; }
+export interface PageRoute { id: string; label: string; icon: string; pageType: string; description: string; origin?: string; stories?: string[]; }
 export interface PageBlockSpec { t: string; w?: number; n?: number; }
 export interface PageType { label: string; summary: string; blocks: PageBlockSpec[]; }
-export interface FeaturePick { label: string; summary: string; icon: string; }
+export interface PackStory { title: string; phase: string; template?: boolean; }
+export interface FeaturePick { label: string; summary: string; icon: string; stories: PackStory[]; }
 export interface StackPreset { label: string; summary: string; available: boolean; recommended?: boolean; unavailableReason?: string; layers?: Record<string, string>; options?: Record<string, { label: string; default: boolean }>; }
 export interface AgentProvider { label: string; secret: string | null; }
 export interface Catalog {
@@ -40,7 +41,7 @@ export interface ProjectSetup {
   design: { feel: string | null; theme: 'light' | 'dark' | 'system'; accent: string; notes: string; navigation: 'sidebar' | 'top' };
   pages: { routes: PageRoute[]; seeded: boolean };
   stack: { preset: string | null; options: Record<string, boolean> };
-  features: { picks: string[]; records: { id: string; title: string; summary: string; status: string }[] };
+  features: { picks: string[]; records: { id: string; title: string; summary: string; status: string }[]; stories: { id: string; title: string; phase: string; pack: string | null; template: boolean }[] };
   direction: { title: string; summary: string; revision: number } | null;
   completedSteps: string[];
   assets: ProjectAsset[];

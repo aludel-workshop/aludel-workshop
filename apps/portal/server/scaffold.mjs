@@ -31,7 +31,8 @@ export function manifest(setup, catalogs, media) {
     workingStyle: { profile: setup.profile, preferences: setup.preferences },
     design: { feel: setup.design.feel, theme: setup.design.theme, accent: setup.design.accent, navigation: setup.design.navigation, notes: setup.design.notes, media: media.map(item => ({ file: item.file, kind: item.kind, notes: item.notes })) },
     pages: (setup.pages?.routes || []).map(({ id, label, icon, pageType, description }) => ({ id, label, icon, pageType, description })),
-    functionality: setup.features.records.map(item => ({ id: item.id, title: item.title, summary: item.summary })),
+    storyPacks: setup.features.picks || [],
+    stories: (setup.features.stories || []).map(({ id, title, phase, pack }) => ({ id, title, phase, pack })),
     stack: { preset: setup.stack.preset, layers: preset?.layers || {}, options: setup.stack.options }
   };
 }
@@ -48,11 +49,14 @@ function mediaFiles(assets) {
 
 function productDoc(setup, media, catalogs) {
   const features = setup.features.records;
+  const stories = setup.features.stories || [];
   const pages = setup.pages?.routes || [];
   return [`# ${setup.project.name}`, '', '## Elevator pitch', '', setup.direction?.summary || setup.project.description, '',
     '## Pages', '', 'The primary navigation, in order.', '',
     ...(pages.length ? pages.map(page => `- **${page.label}** (${catalogs.pageTypes[page.pageType]?.label || page.pageType}) — ${page.description || '_Not described yet._'}`) : ['Not chosen yet.']), '',
-    '## Functionality', '', ...(features.length ? features.map(item => `- **${item.title}** — ${item.summary}`) : ['None chosen yet.']), '',
+    '## Stories', '', 'Seeded from story packs and ideas; the living version is the story map in Aludel.', '',
+    ...(stories.length ? ['demo', 'mvp', 'later'].flatMap(phase => { const list = stories.filter(story => story.phase === phase); return list.length ? [`### ${{ demo: 'Demo', mvp: 'MVP', later: 'Later' }[phase]}`, '', ...list.map(story => `- ${story.title}${story.pack ? ` _(${story.pack} pack)_` : ''}`), ''] : []; }) : ['None yet.', '']),
+    '## Story packs', '', ...(features.length ? features.map(item => `- **${item.title}** — ${item.summary}`) : ['None chosen.']), '',
     '## Design direction', '', `- Starting feel: ${setup.design.feel || 'not chosen yet'}`, `- Theme: ${setup.design.theme}`, `- Accent: ${setup.design.accent}`,
     `- Desktop navigation: ${setup.design.navigation === 'top' ? 'top bar' : 'side bar'} (phones use a bottom tab bar)`,
     ...(setup.design.notes ? ['', setup.design.notes] : []), '',

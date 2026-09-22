@@ -6,6 +6,7 @@ import test from 'node:test';
 import { createSession, createUser, initAccounts, isMember, ownerUserId, sessionUser, verifyUser } from '../server/accounts.mjs';
 import { hostTopology, slugify } from '../server/hosts.mjs';
 import { initOnboarding, loadCatalogs, onboarding } from '../server/onboarding.mjs';
+import { initKnowledge, knowledge } from '../server/knowledge.mjs';
 import { ensureProductWorkspace } from '../server/product-workspace.mjs';
 import { initialFiles, loadScaffoldSources, skeletonFiles } from '../server/scaffold.mjs';
 import { openSecretStore } from '../server/secret-store.mjs';
@@ -21,10 +22,11 @@ const pixel = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcS
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'aludel-onboarding-'));
   const db = openDatabase(join(root, 'machine.sqlite'));
-  initWorkflow(db); ensureProductWorkspace(db); initAccounts(db); initOnboarding(db);
+  initWorkflow(db); ensureProductWorkspace(db); initAccounts(db); initOnboarding(db); initKnowledge(db);
   const created = [];
-  const flows = onboarding({ db, catalogs, secrets: openSecretStore(root), workspaceRoot: join(root, 'workspaces'), assetRoot: join(root, 'assets'), createWorkspace: setup => created.push(setup.project.id) });
-  return { db, flows, created };
+  const know = knowledge({ db, catalogs, packs: catalogs.packs });
+  const flows = onboarding({ db, catalogs, secrets: openSecretStore(root), workspaceRoot: join(root, 'workspaces'), assetRoot: join(root, 'assets'), createWorkspace: setup => created.push(setup.project.id), know });
+  return { db, flows, created, know };
 }
 
 function startProject(flows, user, name = 'Tool Share', profile = 'dreamer') {
@@ -95,20 +97,98 @@ test('working style is a preference set: overrides survive a switch and equal-to
   assert.deepEqual(flows.savePreferences(ada, setup.project.id, { resetOverrides: true }).overrides, {});
 });
 
-test('feature picks become product records, deselection retires and reselection restores them', () => {
-  const { db, flows } = fixture();
+test('story packs seed ordinary stories and pages; unselecting removes only untouched pack content', () => {
+  const { db, flows, know } = fixture();
   const ada = createUser(db, { email: 'ada@example.com', name: 'Ada', password: 'correct-horse-battery' });
   const { setup } = startProject(flows, ada);
   const id = setup.project.id;
-  let result = flows.saveFeatures(ada, id, { picks: ['search', 'messaging'], custom: [{ title: 'Tool library', summary: 'Browse nearby tools.' }] });
-  assert.deepEqual(result.features.records.map(item => item.title).sort(), ['Messages and comments', 'Search', 'Tool library']);
-  const searchId = result.features.records.find(item => item.title === 'Search').id;
-  result = flows.saveFeatures(ada, id, { picks: ['messaging'] });
-  assert.deepEqual(result.features.records.map(item => item.title).sort(), ['Messages and comments', 'Tool library']);
-  result = flows.saveFeatures(ada, id, { picks: ['messaging', 'search'] });
-  assert.equal(result.features.records.find(item => item.title === 'Search').id, searchId, 'the same record comes back, with history');
-  assert.throws(() => flows.saveFeatures(ada, id, { picks: ['teleportation'] }), /from the list/);
-  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM product_records WHERE project_id = 'the-machine' AND kind = 'feature'").get().count, 4, "Aludel's own features are untouched");
+  flows.saveDesign(ada, id, { feel: 'mobile-social', theme: 'light' });
+  let result = flows.saveFeatures(ada, id, { picks: ['accounts', 'messaging'], custom: [{ title: 'Someone can list a tool', summary: 'Lenders share what they own' }] });
+  assert.deepEqual(result.features.picks, ['accounts', 'messaging']);
+  const view = know.view(ada, id);
+  assert.deepEqual(view.activities.map(a => a.title), ['Join', 'Talk it over', 'Ideas to place']);
+  const signUp = view.stories.find(s => s.title.startsWith('Someone can sign up'));
+  assert.equal(signUp.template, true); assert.equal(signUp.status, 'defined', 'acceptance present; built only after a real build');
+  const messages = view.pages.find(p => p.label === 'Messages');
+  assert.equal(messages.origin, 'Starting feel', 'the feel already had Messages, so pack stories join that page instead of a duplicate');
+  assert.equal(messages.stories.length, 2);
+  assert.ok(view.pages.find(p => p.label === 'Conversation' && p.parentId === messages.id), 'pack sub-pages sit under the matched page');
+  assert.equal(view.pages.find(p => p.label === 'Sign in').inNav, false);
+  const thread = view.stories.find(s => s.title.startsWith('Someone can read and reply'));
+  know.update(id, thread.id, { title: 'Sam can reply to Priya in a thread' }, { author: 'Ada', rationale: 'Specific to Tool Share' });
+  result = flows.saveFeatures(ada, id, { picks: ['accounts'] });
+  const after = know.view(ada, id);
+  assert.ok(after.activities.some(a => a.title === 'Talk it over'), 'a pack the person edited is kept when unselected');
+  flows.saveFeatures(ada, id, { picks: [] });
+  assert.equal(know.view(ada, id).activities.some(a => a.title === 'Join'), false, 'an untouched pack is removed cleanly');
+  assert.throws(() => flows.saveFeatures(ada, id, { picks: ['teleportation'] }), /story packs/);
+});
+
+test('pages are records: deleting one that realises stories needs a home for them', () => {
+  const { db, flows, know } = fixture();
+  const ada = createUser(db, { email: 'ada@example.com', name: 'Ada', password: 'correct-horse-battery' });
+  const { setup } = startProject(flows, ada);
+  const id = setup.project.id;
+  flows.saveDesign(ada, id, { feel: 'sleek-saas', theme: 'light' });
+  flows.saveFeatures(ada, id, { picks: ['messaging'] });
+  const routes = flows.projectSetup(ada, id).pages.routes;
+  const messages = routes.find(r => r.label === 'Messages');
+  assert.ok(messages, 'the Messaging pack adds Messages to the navigation');
+  const without = routes.filter(r => r.id !== messages.id);
+  assert.throws(() => flows.saveRoutes(ada, id, { routes: without }), error => error.status === 409 && /Choose which page takes them/.test(error.message));
+  const home = routes[0];
+  flows.saveRoutes(ada, id, { routes: without, reassign: { [messages.id]: home.id } });
+  const homePage = know.view(ada, id).pages.find(p => p.id === home.id);
+  assert.equal(homePage.stories.length, 2);
+  assert.match(homePage.history[0].rationale, /Took the stories of “Messages”/);
+  assert.equal(flows.saveDesign(ada, id, { feel: 'marketplace', theme: 'light' }).pages.routes[0].id, home.id, 'customised navigation is never reseeded');
+});
+
+test('story status is derived from connected work, and work cannot close without documentation', () => {
+  const { db, flows, know } = fixture();
+  const ada = createUser(db, { email: 'ada@example.com', name: 'Ada', password: 'correct-horse-battery' });
+  const { setup } = startProject(flows, ada);
+  const id = setup.project.id;
+  const activity = know.insert(id, 'activity', { title: 'Borrow', persona: 'Sam' });
+  const step = know.insert(id, 'step', { title: 'Request' }, { parentId: activity.id });
+  const story = know.insert(id, 'story', { title: 'Sam can ask to borrow a tool', phase: 'demo' }, { parentId: step.id });
+  const status = () => know.view(ada, id).stories.find(s => s.id === story.id).status;
+  assert.equal(status(), 'proposed');
+  assert.equal(story.number, 1);
+  assert.throws(() => know.update(id, story.id, { acceptance: [{ given: 'x', when: '', then: 'y' }] }), /Given, When and Then/);
+  know.update(id, story.id, { acceptance: [{ given: 'an available tool', when: 'Sam asks', then: 'the lender sees it' }] }, { expectedRevision: 1 });
+  assert.equal(status(), 'defined');
+  assert.throws(() => know.update(id, story.id, { title: 'stale' }, { expectedRevision: 1 }), error => error.status === 409);
+  const design = know.createWork(id, { layer: 'pages', type: 'design', title: 'Design the request page', targets: [{ id: story.id }] });
+  assert.throws(() => know.updateWork(ada, id, design.id, { state: 'done' }), /Name what this work documented/);
+  const implement = know.createWork(id, { layer: 'product', type: 'implement', title: 'Build the request', targets: [{ id: story.id }], documents: ['Product › story built'], question: { text: 'Dates or ASAP?', options: ['Dates', 'ASAP'] }, state: 'needs-input', assignee: { kind: 'agent', label: 'Coding agent' } });
+  const answered = know.updateWork(ada, id, implement.id, { answer: 'Dates', rationale: 'Lenders plan ahead' });
+  assert.equal(answered.state, 'claimed'); assert.equal(answered.question.answeredBy, 'Ada');
+  know.updateWork(ada, id, implement.id, { state: 'done' });
+  assert.equal(status(), 'built');
+  assert.equal(implement.ref, 'W-2');
+  const bob = createUser(db, { email: 'bob@example.com', name: 'Bob', password: 'correct-horse-battery' });
+  assert.throws(() => know.view(bob, id), error => error.status === 404);
+  assert.throws(() => know.createWork(id, { layer: 'product', type: 'implement', title: 'x', targets: [{ id: 'sto-00000000' }] }), error => error.status === 404);
+});
+
+test('a build marks template stories built with a done template work item and gives every page a skeleton', () => {
+  const { db, flows, know } = fixture();
+  const ada = createUser(db, { email: 'ada@example.com', name: 'Ada', password: 'correct-horse-battery' });
+  const { setup } = startProject(flows, ada);
+  const id = setup.project.id;
+  flows.saveFeatures(ada, id, { picks: ['accounts', 'messaging'] });
+  know.recordBuild(id, 'abc1234def', { auth: true });
+  know.recordBuild(id, 'abc1234def', { auth: true });
+  const view = know.view(ada, id);
+  const template = view.work.filter(item => item.assignee?.kind === 'template');
+  assert.equal(template.length, 1, 'recording a build twice does not duplicate template work');
+  assert.equal(template[0].state, 'done');
+  assert.deepEqual(view.stories.filter(s => s.status === 'built').map(s => s.pack), ['Accounts', 'Accounts', 'Accounts']);
+  assert.ok(view.stories.filter(s => s.pack === 'Messaging').every(s => s.status !== 'built'), 'messaging is not built by the template, so it is not claimed as built');
+  assert.ok(view.pages.every(p => p.status === 'skeleton'));
+  assert.ok(view.vision.statement.body.startsWith('Neighbours lend'));
+  assert.deepEqual(view.phases.map(p => p.key), ['demo', 'mvp', 'later']);
 });
 
 test('agent connections are sealed, never returned, and work identically for Aludel itself', () => {
@@ -199,7 +279,7 @@ test('the skeleton is deterministic, builds pages from the navigation and never 
   const { db, flows } = fixture();
   const ada = createUser(db, { email: 'ada@example.com', name: 'Ada', password: 'correct-horse-battery' });
   const { setup } = startProject(flows, ada);
-  flows.saveFeatures(ada, setup.project.id, { picks: ['search', 'accounts'] });
+  flows.saveFeatures(ada, setup.project.id, { picks: ['search'] });
   flows.saveRoutes(ada, setup.project.id, { routes: [
     { label: 'Home', icon: 'home', pageType: 'dashboard', description: 'What needs attention today.' },
     { label: 'Sign in', icon: 'person', pageType: 'form', description: '' },
@@ -219,7 +299,8 @@ test('the skeleton is deterministic, builds pages from the navigation and never 
   assert.ok(first.binaries['public/fonts/icons.ttf'].length > 1000);
   const product = files['docs/product.md'];
   assert.match(product, /## Pages[\s\S]*\*\*Home\*\* \(Dashboard\) — What needs attention today\./);
-  assert.match(product, /## Functionality[\s\S]*\*\*Search\*\*/);
+  assert.match(product, /## Stories[\s\S]*Someone can search by keyword _\(Search pack\)_/);
+  assert.match(product, /## Story packs[\s\S]*\*\*Search\*\*/);
   assert.deepEqual(JSON.parse(files['aludel.json']).pages.map(page => page.label), ['Home', 'Sign in', 'Messages']);
   assert.ok(Object.keys(initialFiles(current, catalogs, gitProfile, urls)).every(path => !path.includes('node_modules')));
   assert.equal(Object.values(files).some(content => /MACHINE_GITHUB|machine_session/.test(content)), false);

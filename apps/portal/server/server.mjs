@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { aludelProjectId, createExternalUser, createLoginTicket, createSession, createUser, endSession, getUser, redeemLoginTicket, initAccounts, isMember, ownerUserId, requireMember, sessionUser, userProjects, verifyUser } from './accounts.mjs';
 import { hostTopology } from './hosts.mjs';
 import { initOnboarding, loadCatalogs, onboarding } from './onboarding.mjs';
+import { initKnowledge, knowledge } from './knowledge.mjs';
 import { previewManager } from './previews.mjs';
 import { copyMedia, initialFiles, loadScaffoldSources, skeletonFiles, writeBinaries, writeFiles } from './scaffold.mjs';
 import { extname, join, normalize, resolve } from 'node:path';
@@ -34,6 +35,7 @@ ensureProductWorkspace(db);
 initAccounts(db);
 initGithubIdentities(db);
 initOnboarding(db);
+initKnowledge(db);
 const secrets = openSecretStore(dataDirectory);
 const topology = hostTopology(process.env, port);
 const setupConfigPath = join(portalRoot, 'config', 'project-setup.json');
@@ -51,7 +53,14 @@ function createWorkspace(setup, user) {
   writeFiles(setup.workspacePath, initialFiles(setup, catalogs, projectGitProfile, appUrls(setup.project.slug)));
   commitWorkspace({ repository: setup.workspacePath, profile: projectGitProfile, message: `chore: start ${setup.project.name} with Aludel`, ...commitIdentity(user) });
 }
-const flows = onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot: join(dataDirectory, 'project-assets'), createWorkspace });
+const know = knowledge({ db, catalogs, packs: catalogs.packs });
+const flows = onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot: join(dataDirectory, 'project-assets'), createWorkspace, know });
+// One-time: projects created before the layers (LAY-03) get phases, a vision and page records from their onboarding data.
+for (const project of db.prepare(`SELECT p.id, p.description, s.feel FROM projects p JOIN project_setup s ON s.project_id = p.id
+  WHERE p.id <> 'the-machine' AND NOT EXISTS (SELECT 1 FROM knowledge_records k WHERE k.project_id = p.id AND k.kind = 'phase')`).all()) {
+  know.ensureProject(project.id, { pitch: project.description });
+  know.seedPages(project.id, project.feel);
+}
 const github = githubIntegration({
   db, secrets, config: loadGitHubVendorConfig(),
   callbackUrl: `${publicBaseUrl}/api/integrations/github/callback`,
@@ -135,6 +144,7 @@ async function generateSkeleton(user, projectId) {
     } catch (error) { pushError = String(error.message || error); }
   }
   flows.markStep(user, projectId, 'build');
+  know.recordBuild(projectId, result.commit, { auth: Boolean(setup.stack.options?.auth) });
   void previews.build(projectId, setup.workspacePath, result.commit);
   return { commit: result.commit, trackedFiles: result.trackedFiles, pushed, pushError };
 }
@@ -270,7 +280,7 @@ async function api(request, response, url) {
     return json(response, 201, { project: setup.project }, { 'set-cookie': draftCookie('', 0) });
   }
   if (url.pathname === '/api/projects' && request.method === 'GET') return json(response, 200, { projects: userProjects(db, user.id) });
-  const projectRoute = /^\/api\/projects\/([^/]+)\/(setup|preferences|design|pages|assets|features|stack|connections\/agent|steps|repository|skeleton|preview)(?:\/([^/]+))?$/.exec(url.pathname);
+  const projectRoute = /^\/api\/projects\/([^/]+)\/(setup|preferences|design|pages|assets|features|stack|connections\/agent|steps|repository|skeleton|preview|knowledge|records|work)(?:\/([^/]+))?$/.exec(url.pathname);
   if (projectRoute) {
     const [, rawId, section, rawItem] = projectRoute;
     const projectId = decodeURIComponent(rawId);
@@ -278,6 +288,27 @@ async function api(request, response, url) {
     requireMember(db, user, projectId);
     const method = request.method;
     if (section === 'setup' && method === 'GET') return json(response, 200, projectView(user, projectId));
+    // LAY-03: the layers read one project snapshot and write records and work items through the knowledge module.
+    if (section === 'knowledge' && method === 'GET') {
+      if (projectId === aludelProjectId) return json(response, 409, { error: 'Aludel’s own knowledge moves into its layers in LAY-06.' });
+      return json(response, 200, { setup: projectView(user, projectId), knowledge: know.view(user, projectId), catalog: { pageTypes: catalogs.pageTypes, routeIcons: catalogs.routeIcons, feels: catalogs.feels, preferences: catalogs.preferences, profiles: catalogs.profiles, stacks: catalogs.stacks } });
+    }
+    if (section === 'records' && method === 'POST' && !item) {
+      const input = await readJson(request);
+      return json(response, 201, know.insert(projectId, String(input.kind || ''), input.data || {}, { parentId: input.parentId || null, author: user.name, rationale: input.rationale || null }));
+    }
+    if (section === 'records' && method === 'PUT' && item) {
+      const input = await readJson(request);
+      return json(response, 200, know.update(projectId, item, input.data || {}, { expectedRevision: input.expectedRevision, author: user.name, rationale: input.rationale || null, position: input.position, parentId: input.parentId }));
+    }
+    if (section === 'records' && method === 'DELETE' && item) {
+      const record = know.list(projectId, 'story').concat(know.list(projectId, 'spec'), know.list(projectId, 'doc'), know.list(projectId, 'research'), know.list(projectId, 'persona'), know.list(projectId, 'activity'), know.list(projectId, 'step')).find(entry => entry.id === item);
+      if (!record) return json(response, 409, { error: 'That record cannot be deleted here.' });
+      know.remove(projectId, item);
+      return json(response, 200, { deleted: item });
+    }
+    if (section === 'work' && method === 'POST' && !item) return json(response, 201, know.createWork(projectId, await readJson(request), user.name));
+    if (section === 'work' && method === 'PUT' && item) return json(response, 200, know.updateWork(user, projectId, item, await readJson(request)));
     if (section === 'preferences' && method === 'PUT') { flows.savePreferences(user, projectId, await readJson(request)); return json(response, 200, projectView(user, projectId)); }
     if (section === 'design' && method === 'PUT') { flows.saveDesign(user, projectId, await readJson(request)); return json(response, 200, projectView(user, projectId)); }
     if (section === 'assets' && method === 'POST' && !item) { flows.addAsset(user, projectId, await readJson(request, 12 * 1024 * 1024)); return json(response, 201, projectView(user, projectId)); }
