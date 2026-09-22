@@ -15,8 +15,10 @@
         "Authentication": "Built-in email and password"
       },
       "options": {
-        "auth": { "label": "Built-in email and password sign-in", "default": true },
-        "sampleContent": { "label": "Sample content on each page", "default": true }
+        "auth": {
+          "label": "Built-in email and password sign-in",
+          "default": true
+        }
       }
     },
     "django-htmx": {

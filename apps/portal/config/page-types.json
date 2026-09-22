@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "note": "Layouts are rendered by src/page-blocks.ts in both the onboarding preview and generated apps, so what people see before building is what the skeleton contains.",
+  "types": {
+    "dashboard": { "label": "Dashboard", "summary": "Key numbers, a chart and recent activity at a glance.",
+      "blocks": [{ "t": "stat", "w": 3 }, { "t": "stat", "w": 3 }, { "t": "stat", "w": 3 }, { "t": "stat", "w": 3 }, { "t": "chart", "w": 8 }, { "t": "list", "w": 4, "n": 4 }, { "t": "table", "w": 12, "n": 4 }] },
+    "feed": { "label": "Feed", "summary": "A scrolling stream of posts or updates.",
+      "blocks": [{ "t": "composer", "w": 12 }, { "t": "post", "w": 12 }, { "t": "post", "w": 12 }] },
+    "list": { "label": "List or table", "summary": "Search, filter and scan many items.",
+      "blocks": [{ "t": "search", "w": 12 }, { "t": "table", "w": 12, "n": 6 }] },
+    "gallery": { "label": "Gallery or grid", "summary": "Image-led cards to browse.",
+      "blocks": [{ "t": "search", "w": 12 }, { "t": "tile", "w": 4 }, { "t": "tile", "w": 4 }, { "t": "tile", "w": 4 }, { "t": "tile", "w": 4 }, { "t": "tile", "w": 4 }, { "t": "tile", "w": 4 }] },
+    "detail": { "label": "Detail or profile", "summary": "Everything about one thing or person.",
+      "blocks": [{ "t": "media", "w": 4 }, { "t": "text", "w": 8, "n": 5 }, { "t": "list", "w": 12, "n": 3 }] },
+    "content": { "label": "Article or content", "summary": "Long-form reading with images.",
+      "blocks": [{ "t": "media", "w": 12 }, { "t": "text", "w": 12, "n": 6 }, { "t": "text", "w": 12, "n": 4 }] },
+    "messages": { "label": "Messages", "summary": "Conversations and a chat thread.",
+      "blocks": [{ "t": "list", "w": 4, "n": 5 }, { "t": "chat", "w": 8 }] },
+    "form": { "label": "Form", "summary": "Collect information in a few fields.",
+      "blocks": [{ "t": "fields", "w": 8, "n": 4 }, { "t": "button", "w": 12 }] },
+    "settings": { "label": "Settings", "summary": "Preferences and toggles.",
+      "blocks": [{ "t": "toggles", "w": 12, "n": 5 }] }
+  }
+}

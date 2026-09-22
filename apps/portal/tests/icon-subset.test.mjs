@@ -20,3 +20,9 @@ test('every literal icon name used by the portal is in the committed font subset
   const missing = [...used].filter(name => !icons.includes(name));
   assert.deepEqual(missing, [], 'Run python3 tools/subset-icons.py to rebuild src/material-symbols-rounded-subset.ttf');
 });
+
+test('generated apps ship a font for exactly the icons a page can be given', () => {
+  const { appIcons } = JSON.parse(read('src/icon-subset.json'));
+  const routeIcons = JSON.parse(read('config/starter-kit.json')).routeIcons.map(item => item.icon);
+  assert.deepEqual(appIcons, routeIcons, 'Run python3 tools/subset-icons.py to rebuild templates/aludel-web-v1/icons.ttf');
+});

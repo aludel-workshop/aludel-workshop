@@ -7,7 +7,7 @@ import { createSession, createUser, initAccounts, isMember, ownerUserId, session
 import { hostTopology, slugify } from '../server/hosts.mjs';
 import { initOnboarding, loadCatalogs, onboarding } from '../server/onboarding.mjs';
 import { ensureProductWorkspace } from '../server/product-workspace.mjs';
-import { skeletonFiles, initialFiles } from '../server/scaffold.mjs';
+import { initialFiles, loadScaffoldSources, skeletonFiles } from '../server/scaffold.mjs';
 import { openSecretStore } from '../server/secret-store.mjs';
 import { openDatabase } from '../server/storage.mjs';
 import { initWorkflow } from '../server/workflow.mjs';
@@ -15,6 +15,7 @@ import { initWorkflow } from '../server/workflow.mjs';
 const configDirectory = new URL('../config', import.meta.url).pathname;
 const catalogs = loadCatalogs(configDirectory);
 const gitProfile = (config => config.sourceControlProfiles[config.defaultSourceControlProfile])(JSON.parse((await import('node:fs')).readFileSync(join(configDirectory, 'project-setup.json'), 'utf8')));
+const sources = loadScaffoldSources(new URL('..', import.meta.url).pathname);
 const pixel = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
 
 function fixture() {
@@ -151,9 +152,9 @@ test('only available stack presets can be chosen', () => {
   const { db, flows } = fixture();
   const ada = createUser(db, { email: 'ada@example.com', name: 'Ada', password: 'correct-horse-battery' });
   const { setup } = startProject(flows, ada);
-  assert.deepEqual(setup.stack, { preset: 'aludel-web-v1', options: { auth: true, sampleContent: true } });
+  assert.deepEqual(setup.stack, { preset: 'aludel-web-v1', options: { auth: true } });
   assert.throws(() => flows.saveStack(ada, setup.project.id, { preset: 'django-htmx' }), error => error.status === 409);
-  assert.deepEqual(flows.saveStack(ada, setup.project.id, { preset: 'aludel-web-v1', options: { auth: false } }).stack.options, { auth: false, sampleContent: true });
+  assert.deepEqual(flows.saveStack(ada, setup.project.id, { preset: 'aludel-web-v1', options: { auth: false } }).stack.options, { auth: false });
 });
 
 test('host topology separates the portal from app subdomains and supports a hosted domain', () => {
@@ -170,21 +171,56 @@ test('host topology separates the portal from app subdomains and supports a host
   assert.equal(slugify('Café  Crème!!'), 'cafe-creme');
 });
 
-test('the skeleton is deterministic, maps features to pages and never links dependencies into the repository', () => {
+test('pages are seeded from the chosen feel, then saved as the person arranges them', () => {
   const { db, flows } = fixture();
   const ada = createUser(db, { email: 'ada@example.com', name: 'Ada', password: 'correct-horse-battery' });
   const { setup } = startProject(flows, ada);
-  flows.saveFeatures(ada, setup.project.id, { picks: ['search', 'accounts'], custom: [{ title: 'Sign in', summary: 'Collides with the built-in page.' }] });
+  assert.deepEqual(setup.pages.routes.map(page => page.label), ['Home'], 'no feel yet: just Home');
+  const marketplace = flows.saveDesign(ada, setup.project.id, { feel: 'marketplace', theme: 'light' });
+  assert.equal(marketplace.design.navigation, 'top', 'the feel sets the default desktop navigation');
+  assert.deepEqual(marketplace.pages.routes.map(page => page.label), ['Home', 'Browse', 'Sell', 'Messages', 'Account']);
+  assert.ok(marketplace.pages.seeded && marketplace.pages.routes.every(page => page.description === ''), 'seeds never invent descriptions');
+  const routes = [{ ...marketplace.pages.routes[1], description: 'Find tools near you.' }, { ...marketplace.pages.routes[0], label: 'Lend', icon: 'build', pageType: 'form' }];
+  const saved = flows.saveRoutes(ada, setup.project.id, { routes, navigation: 'sidebar' });
+  assert.deepEqual(saved.pages.routes.map(page => [page.label, page.pageType]), [['Browse', 'gallery'], ['Lend', 'form']]);
+  assert.equal(saved.pages.seeded, false); assert.equal(saved.design.navigation, 'sidebar');
+  assert.equal(flows.saveDesign(ada, setup.project.id, { feel: 'editorial', theme: 'light' }).pages.routes[0].label, 'Browse', 'saved pages are never reseeded');
+  const page = { label: 'A', icon: 'home', pageType: 'feed', description: '' };
+  assert.throws(() => flows.saveRoutes(ada, setup.project.id, { routes: [] }), /one and five/);
+  assert.throws(() => flows.saveRoutes(ada, setup.project.id, { routes: Array.from({ length: 6 }, (_, index) => ({ ...page, label: `P${index}` })) }), /one and five/);
+  assert.throws(() => flows.saveRoutes(ada, setup.project.id, { routes: [page, { ...page, label: 'a' }] }), /both called/);
+  assert.throws(() => flows.saveRoutes(ada, setup.project.id, { routes: [{ ...page, icon: 'rocket' }] }), /icon/);
+  assert.throws(() => flows.saveRoutes(ada, setup.project.id, { routes: [{ ...page, pageType: 'wiki' }] }), /page type/);
+  const bob = createUser(db, { email: 'bob@example.com', name: 'Bob', password: 'correct-horse-battery' });
+  assert.throws(() => flows.saveRoutes(bob, setup.project.id, { routes: [page] }), error => error.status === 404);
+});
+
+test('the skeleton is deterministic, builds pages from the navigation and never links dependencies into the repository', () => {
+  const { db, flows } = fixture();
+  const ada = createUser(db, { email: 'ada@example.com', name: 'Ada', password: 'correct-horse-battery' });
+  const { setup } = startProject(flows, ada);
+  flows.saveFeatures(ada, setup.project.id, { picks: ['search', 'accounts'] });
+  flows.saveRoutes(ada, setup.project.id, { routes: [
+    { label: 'Home', icon: 'home', pageType: 'dashboard', description: 'What needs attention today.' },
+    { label: 'Sign in', icon: 'person', pageType: 'form', description: '' },
+    { label: 'Messages', icon: 'chat', pageType: 'messages', description: '' }
+  ] });
   const current = flows.projectSetup(ada, setup.project.id);
   const urls = { portal: 'http://aludel.localhost:4310', app: 'http://tool-share.localhost:4310' };
-  const first = skeletonFiles(current, catalogs, gitProfile, urls, []).files;
-  const second = skeletonFiles(current, catalogs, gitProfile, urls, []).files;
-  assert.deepEqual(first, second);
-  assert.match(first['.gitignore'], /^node_modules$/m);
-  const site = first['src/site.ts'];
-  assert.match(site, /"path": "\/search"/);
-  assert.match(site, /"path": "\/sign-in-page"/, 'feature pages never shadow the built-in sign-in route');
-  assert.equal(JSON.parse(first['aludel.json']).workingStyle.profile, 'dreamer');
+  const first = skeletonFiles(current, catalogs, gitProfile, urls, [], sources);
+  const second = skeletonFiles(current, catalogs, gitProfile, urls, [], sources);
+  assert.deepEqual(first.files, second.files);
+  const files = first.files;
+  assert.match(files['.gitignore'], /^node_modules$/m);
+  const site = JSON.parse(files['src/site.ts'].split('export const site: Site = ')[1].replace(/;\s*$/, ''));
+  assert.deepEqual(site.pages.map(page => page.path), ['/', '/sign-in-page', '/messages'], 'the first page is home and nothing shadows /sign-in');
+  assert.deepEqual(site.pages[0].blocks, catalogs.pageTypes.dashboard.blocks, 'the skeleton uses the same layout the preview showed');
+  assert.equal(files['src/page-blocks.ts'], sources.pageBlocks, 'the layout renderer is shared verbatim with the preview');
+  assert.ok(first.binaries['public/fonts/icons.ttf'].length > 1000);
+  const product = files['docs/product.md'];
+  assert.match(product, /## Pages[\s\S]*\*\*Home\*\* \(Dashboard\) — What needs attention today\./);
+  assert.match(product, /## Functionality[\s\S]*\*\*Search\*\*/);
+  assert.deepEqual(JSON.parse(files['aludel.json']).pages.map(page => page.label), ['Home', 'Sign in', 'Messages']);
   assert.ok(Object.keys(initialFiles(current, catalogs, gitProfile, urls)).every(path => !path.includes('node_modules')));
-  assert.equal(Object.values(first).some(content => /MACHINE_GITHUB|machine_session/.test(content)), false);
+  assert.equal(Object.values(files).some(content => /MACHINE_GITHUB|machine_session/.test(content)), false);
 });

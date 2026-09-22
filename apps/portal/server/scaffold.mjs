@@ -1,6 +1,6 @@
 // Deterministic project scaffolding for the aludel-web-v1 stack preset (DEC-035).
 // The same inputs always produce the same files, so the skeleton needs no agent and works for every working style.
-import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { slugify } from './hosts.mjs';
 
@@ -19,30 +19,8 @@ const reservedPaths = new Set(['', 'sign-in', 'api', 'media', 'assets']);
 const html = value => String(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
 const json = value => `${JSON.stringify(value, null, 2)}\n`;
 
-const channels = hex => [1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16));
-const toHex = values => `#${values.map(value => Math.round(value).toString(16).padStart(2, '0')).join('')}`;
-const luminance = hex => {
-  const [r, g, b] = channels(hex).map(value => value / 255).map(value => value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-};
-const ratio = (a, b) => { const [light, dark] = [luminance(a), luminance(b)].sort((x, y) => y - x); return (light + 0.05) / (dark + 0.05); };
-
-// Whichever of black or white text reads better on the given colour.
-export function contrastText(hex) {
-  return ratio(hex, '#000000') >= ratio(hex, '#ffffff') ? '#000000' : '#ffffff';
-}
-
-// The chosen accent is kept as the brand colour, but the primary role is also used for text on the surface,
-// so shift it toward black (light surfaces) or white (dark surfaces) until it meets WCAG AA 4.5:1.
-export function readableAccent(accent, surface) {
-  const target = luminance(surface) > 0.5 ? [0, 0, 0] : [255, 255, 255];
-  const source = channels(accent);
-  for (let step = 0; step <= 20; step++) {
-    const candidate = toHex(source.map((value, index) => value + (target[index] - value) * step / 20));
-    if (ratio(candidate, surface) >= 4.5) return candidate;
-  }
-  return toHex(target);
-}
+export { contrastText, readableAccent } from '../src/color.js';
+import { contrastText, readableAccent } from '../src/color.js';
 
 export function manifest(setup, catalogs, media) {
   const preset = catalogs.stacks.presets[setup.stack.preset];
@@ -51,8 +29,9 @@ export function manifest(setup, catalogs, media) {
     generator: 'aludel-web-v1',
     project: { id: setup.project.id, slug: setup.project.slug, name: setup.project.name, pitch: setup.direction?.summary || setup.project.description },
     workingStyle: { profile: setup.profile, preferences: setup.preferences },
-    design: { feel: setup.design.feel, theme: setup.design.theme, accent: setup.design.accent, notes: setup.design.notes, media: media.map(item => ({ file: item.file, kind: item.kind, notes: item.notes })) },
-    features: setup.features.records.map(item => ({ id: item.id, title: item.title, summary: item.summary })),
+    design: { feel: setup.design.feel, theme: setup.design.theme, accent: setup.design.accent, navigation: setup.design.navigation, notes: setup.design.notes, media: media.map(item => ({ file: item.file, kind: item.kind, notes: item.notes })) },
+    pages: (setup.pages?.routes || []).map(({ id, label, icon, pageType, description }) => ({ id, label, icon, pageType, description })),
+    functionality: setup.features.records.map(item => ({ id: item.id, title: item.title, summary: item.summary })),
     stack: { preset: setup.stack.preset, layers: preset?.layers || {}, options: setup.stack.options }
   };
 }
@@ -67,11 +46,15 @@ function mediaFiles(assets) {
   });
 }
 
-function productDoc(setup, media) {
+function productDoc(setup, media, catalogs) {
   const features = setup.features.records;
+  const pages = setup.pages?.routes || [];
   return [`# ${setup.project.name}`, '', '## Elevator pitch', '', setup.direction?.summary || setup.project.description, '',
-    '## Features', '', ...(features.length ? features.map(item => `- **${item.title}** — ${item.summary}`) : ['No features chosen yet.']), '',
+    '## Pages', '', 'The primary navigation, in order.', '',
+    ...(pages.length ? pages.map(page => `- **${page.label}** (${catalogs.pageTypes[page.pageType]?.label || page.pageType}) — ${page.description || '_Not described yet._'}`) : ['Not chosen yet.']), '',
+    '## Functionality', '', ...(features.length ? features.map(item => `- **${item.title}** — ${item.summary}`) : ['None chosen yet.']), '',
     '## Design direction', '', `- Starting feel: ${setup.design.feel || 'not chosen yet'}`, `- Theme: ${setup.design.theme}`, `- Accent: ${setup.design.accent}`,
+    `- Desktop navigation: ${setup.design.navigation === 'top' ? 'top bar' : 'side bar'} (phones use a bottom tab bar)`,
     ...(setup.design.notes ? ['', setup.design.notes] : []), '',
     '## Media and references', '', ...(media.length ? media.map(item => `- \`${item.file}\` — ${item.notes || 'No usage notes.'}`) : ['None uploaded yet.']), ''].join('\n');
 }
@@ -85,41 +68,43 @@ export function initialFiles(setup, catalogs, gitProfile, appUrl) {
     'README.md': `# ${name}\n\n${setup.direction?.summary || setup.project.description}\n\nThis repository was started with [Aludel](${appUrl.portal}). The app skeleton is generated from the \`${setup.stack.preset}\` stack preset once setup is finished.\n\n- Product intent: [docs/product.md](docs/product.md)\n- Setup choices: [aludel.json](aludel.json)\n- Agent guide: [AGENTS.md](AGENTS.md)\n`,
     'AGENTS.md': agentsGuide(setup, catalogs),
     'aludel.json': json(manifest(setup, catalogs, media)),
-    'docs/product.md': productDoc(setup, media)
+    'docs/product.md': productDoc(setup, media, catalogs)
   };
 }
 
 function agentsGuide(setup, catalogs) {
   const preset = catalogs.stacks.presets[setup.stack.preset];
   const preferences = Object.entries(setup.preferences).map(([key, value]) => `- ${catalogs.preferences[key]?.label || key}: ${catalogs.preferences[key]?.values[value] || value}`);
-  return `# Agent guide for ${setup.project.name}\n\nRead [docs/product.md](docs/product.md) for the product intent and [aludel.json](aludel.json) for the setup choices before changing anything.\n\n## Working style\n\nThe owner chose the **${catalogs.profiles[setup.profile]?.label || setup.profile}** working style:\n\n${preferences.join('\n')}\n\nRespect these preferences: do not implement work the owner chose to do themselves, and only ask the kinds of questions they asked to see.\n\n## Stack\n\n${Object.entries(preset?.layers || {}).map(([layer, value]) => `- ${layer}: ${value}`).join('\n')}\n\nCommands: \`npm install\`, \`npm run build\`, \`npm start\` (serves on \`PORT\`, default 3000).\n\n## Rules\n\n- This app is independent of Aludel. Do not import Aludel code or call Aludel services at runtime.\n- Never commit secrets, \`.env\` files or the \`.data/\` directory.\n- Keep the pages listed in \`src/site.ts\` in step with the features in \`docs/product.md\`.\n`;
+  return `# Agent guide for ${setup.project.name}\n\nRead [docs/product.md](docs/product.md) for the product intent and [aludel.json](aludel.json) for the setup choices before changing anything.\n\n## Working style\n\nThe owner chose the **${catalogs.profiles[setup.profile]?.label || setup.profile}** working style:\n\n${preferences.join('\n')}\n\nRespect these preferences: do not implement work the owner chose to do themselves, and only ask the kinds of questions they asked to see.\n\n## Stack\n\n${Object.entries(preset?.layers || {}).map(([layer, value]) => `- ${layer}: ${value}`).join('\n')}\n\nCommands: \`npm install\`, \`npm run build\`, \`npm start\` (serves on \`PORT\`, default 3000).\n\n## Rules\n\n- This app is independent of Aludel. Do not import Aludel code or call Aludel services at runtime.\n- Never commit secrets, \`.env\` files or the \`.data/\` directory.\n- Keep the pages in \`src/site.ts\` in step with the Pages section of \`docs/product.md\`. \`src/page-blocks.ts\` holds the placeholder layouts; replace a page's blocks with real UI as it is built.\n`;
 }
 
-export function skeletonFiles(setup, catalogs, gitProfile, appUrl, assets) {
+export function skeletonFiles(setup, catalogs, gitProfile, appUrl, assets, sources) {
   const feel = catalogs.feels[setup.design.feel || 'sleek-saas'] || catalogs.feels['sleek-saas'];
   const options = setup.stack.options || {};
   const media = mediaFiles(assets);
   const used = new Set();
-  const pages = setup.features.records.map(feature => {
-    let path = slugify(feature.title);
-    if (reservedPaths.has(path)) path = `${path}-page`;
-    for (let index = 2; used.has(path); index++) path = `${slugify(feature.title)}-${index}`;
+  // The first page is the app's home at '/'; the rest get stable paths from their names.
+  const pages = (setup.pages?.routes || []).map((page, index) => {
+    let path = index === 0 ? '' : slugify(page.label);
+    if (index > 0 && reservedPaths.has(path)) path = `${path}-page`;
+    for (let suffix = 2; index > 0 && used.has(path); suffix++) path = `${slugify(page.label)}-${suffix}`;
     used.add(path);
-    return { path: `/${path}`, title: feature.title, summary: feature.summary };
+    return { path: `/${path}`, label: page.label, icon: page.icon, description: page.description, pageType: page.pageType,
+      blocks: catalogs.pageTypes[page.pageType]?.blocks || [] };
   });
   const theme = setup.design.theme;
   const accent = setup.design.accent;
   const surface = theme === 'dark' ? feel.surfaceDark : theme === 'light' ? feel.surface : `light-dark(${feel.surface}, ${feel.surfaceDark})`;
+  const hero = media.find(item => item.kind === 'image');
   const site = {
     name: setup.project.name, pitch: setup.direction?.summary || setup.project.description, feel: setup.design.feel || 'sleek-saas',
-    navigation: feel.navigation, auth: Boolean(options.auth), sampleContent: Boolean(options.sampleContent), pages,
-    hero: media.find(item => item.kind === 'image') ? `/${media.find(item => item.kind === 'image').file.replace(/^public\//, '')}` : null,
-    media: media.filter(item => item.kind === 'image').map(item => ({ src: `/${item.file.replace(/^public\//, '')}`, notes: item.notes }))
+    navigation: setup.design.navigation === 'top' ? 'top' : 'sidebar', auth: Boolean(options.auth), pages,
+    hero: hero ? `/${hero.file.replace(/^public\//, '')}` : null
   };
   const files = {
     ...initialFiles(setup, catalogs, gitProfile, appUrl),
     'aludel.json': json(manifest(setup, catalogs, media)),
-    'docs/product.md': productDoc(setup, media),
+    'docs/product.md': productDoc(setup, media, catalogs),
     'package.json': json({ name: setup.project.slug, version: '0.1.0', private: true, type: 'module', engines: { node: '^24.14.0' },
       scripts: { dev: 'vite', build: 'vite build', start: 'npm run build && node server/server.mjs', serve: 'node server/server.mjs' }, dependencies, devDependencies }),
     'vite.config.ts': "import { defineConfig } from 'vite';\nimport angular from '@analogjs/vite-plugin-angular';\n\nexport default defineConfig({ plugins: [angular({ tsconfig: 'tsconfig.app.json' })], build: { outDir: 'dist' } });\n",
@@ -128,13 +113,16 @@ export function skeletonFiles(setup, catalogs, gitProfile, appUrl, assets) {
     'index.html': `<!doctype html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1">\n  <title>${html(setup.project.name)}</title>\n</head>\n<body>\n  <app-root></app-root>\n  <script type="module" src="/src/main.ts"></script>\n</body>\n</html>\n`,
     'src/main.ts': "import '@angular/compiler';\nimport { bootstrapApplication } from '@angular/platform-browser';\nimport { App } from './app';\nimport './styles.scss';\n\nbootstrapApplication(App).catch(console.error);\n",
     'src/style.d.ts': "declare module '*.scss';\n",
-    'src/site.ts': `// Generated by Aludel from aludel.json. Pages map one-to-one to product features.\nexport interface SitePage { path: string; title: string; summary: string; }\nexport interface SiteMedia { src: string; notes: string; }\nexport interface Site { name: string; pitch: string; feel: string; navigation: 'sidebar' | 'bottom' | 'top'; auth: boolean; sampleContent: boolean; pages: SitePage[]; hero: string | null; media: SiteMedia[]; }\n\nexport const site: Site = ${JSON.stringify(site, null, 2)};\n`,
+    'src/site.ts': `// Generated by Aludel from aludel.json: one entry per page in the primary navigation.\nimport { PageBlock } from './page-blocks';\n\nexport interface SitePage { path: string; label: string; icon: string; description: string; pageType: string; blocks: PageBlock[]; }\nexport interface Site { name: string; pitch: string; feel: string; navigation: 'sidebar' | 'top'; auth: boolean; pages: SitePage[]; hero: string | null; }\n\nexport const site: Site = ${JSON.stringify(site, null, 2)};\n`,
+    // Shared verbatim with the Aludel onboarding preview so the skeleton matches what was designed.
+    'src/page-blocks.ts': sources.pageBlocks,
     'src/app.ts': appComponent,
     'src/app.html': appTemplate,
     'src/styles.scss': styles({ feel, theme, accent, surface }),
-    'server/server.mjs': serverSource(Boolean(options.auth))
+    'server/server.mjs': serverSource(Boolean(options.auth)),
+    'licenses/Material-Symbols-LICENSE': sources.iconLicense
   };
-  return { files, media };
+  return { files, media, binaries: { 'public/fonts/icons.ttf': sources.iconFont } };
 }
 
 function styles({ feel, theme, accent, surface }) {
@@ -159,48 +147,39 @@ html {
   --app-radius: ${feel.radius}px;
   --app-font: ${feel.font};
 }
+@font-face { font-family: 'App Icons'; src: url('/fonts/icons.ttf') format('truetype'); font-display: block; }
+.icon { font-family: 'App Icons'; font-size: 22px; line-height: 1; font-weight: normal; font-style: normal; letter-spacing: normal; text-transform: none; white-space: nowrap; direction: ltr; font-feature-settings: 'liga'; display: inline-block; width: 1em; overflow: hidden; }
 *, *::before, *::after { box-sizing: border-box; }
 body { margin: 0; background: var(--mat-sys-surface); color: var(--mat-sys-on-surface); font-family: var(--app-font); line-height: 1.5; }
 a { color: var(--mat-sys-primary); }
 .skip-link { position: absolute; left: -999px; } .skip-link:focus { left: 12px; top: 12px; z-index: 10; background: var(--mat-sys-surface); padding: 8px 12px; }
 .shell { min-height: 100vh; display: grid; }
 .shell.sidebar { grid-template-columns: 240px 1fr; }
-.shell.top, .shell.bottom { grid-template-rows: auto 1fr auto; }
+.shell.top { grid-template-rows: auto 1fr; }
 .brand { font-weight: 700; font-size: 20px; color: inherit; text-decoration: none; display: flex; align-items: center; gap: 10px; }
 .brand-mark { display: grid; place-items: center; width: 34px; height: 34px; border-radius: calc(var(--app-radius) / 2 + 4px); background: var(--mat-sys-primary); color: var(--mat-sys-on-primary); font-size: 15px; }
 .nav { display: flex; gap: 4px; }
-.nav a { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: var(--app-radius); color: inherit; text-decoration: none; }
-.nav a.active { background: var(--mat-sys-primary-container); font-weight: 600; }
+.nav a, .tabs a { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: var(--app-radius); color: inherit; text-decoration: none; }
+.nav a.active, .tabs a.active { background: var(--mat-sys-primary-container); font-weight: 600; }
 .sidebar > header { padding: 22px 14px; border-right: 1px solid var(--mat-sys-outline-variant); display: flex; flex-direction: column; gap: 24px; }
 .sidebar .nav { flex-direction: column; }
-.top > header, .bottom > header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px clamp(16px, 4vw, 40px); border-bottom: 1px solid var(--mat-sys-outline-variant); flex-wrap: wrap; }
-.bottom-nav { position: sticky; bottom: 0; display: none; justify-content: space-around; background: var(--mat-sys-surface-container); border-top: 1px solid var(--mat-sys-outline-variant); padding: 6px; }
-.bottom-nav a { flex: 1; text-align: center; padding: 10px 4px; border-radius: var(--app-radius); color: inherit; text-decoration: none; font-size: 13px; }
-.bottom-nav a.active { background: var(--mat-sys-primary-container); font-weight: 600; }
-main { padding: clamp(20px, 4vw, 48px); max-width: 1100px; width: 100%; }
-h1 { font-size: clamp(30px, 5vw, 48px); line-height: 1.1; margin: 0 0 12px; }
-.lead { font-size: 19px; color: var(--mat-sys-on-surface-variant); max-width: 680px; }
-.hero { border-radius: calc(var(--app-radius) * 1.5); padding: clamp(24px, 5vw, 56px); background: var(--mat-sys-primary-container); margin-bottom: 32px; background-size: cover; background-position: center; }
-.hero.with-image { color: #fff; background-color: #111; min-height: 280px; display: flex; flex-direction: column; justify-content: flex-end; }
-.hero.with-image .lead { color: #f1f1f1; }
-.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
-.cards mat-card { border-radius: var(--app-radius); height: 100%; }
-.card-link { color: inherit; text-decoration: none; display: block; }
-.initials { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: var(--app-radius); background: var(--mat-sys-primary-container); font-weight: 700; margin-bottom: 10px; }
-.skeleton-note { margin-top: 32px; padding: 16px 18px; border-radius: var(--app-radius); border: 1px dashed var(--mat-sys-outline); color: var(--mat-sys-on-surface-variant); }
-.sample-row { display: flex; gap: 14px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--mat-sys-outline-variant); }
-.sample-line { height: 12px; border-radius: 6px; background: var(--mat-sys-surface-container-high); }
+.top > header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px clamp(16px, 4vw, 40px); border-bottom: 1px solid var(--mat-sys-outline-variant); flex-wrap: wrap; }
+.tabs { display: none; }
+main { padding: clamp(20px, 4vw, 48px); max-width: 1100px; width: 100%; --blk-radius: var(--app-radius); --blk-accent: var(--mat-sys-primary); }
+h1 { font-size: clamp(28px, 4vw, 40px); line-height: 1.15; margin: 0 0 8px; }
+.description { font-size: 18px; color: var(--mat-sys-on-surface-variant); max-width: 680px; margin: 0 0 24px; }
+.description.empty { font-style: italic; }
+.hero { border-radius: calc(var(--app-radius) * 1.5); min-height: 220px; margin-bottom: 24px; background-size: cover; background-position: center; }
 .auth-form { display: grid; gap: 4px; max-width: 420px; }
 .account { display: flex; gap: 8px; align-items: center; font-size: 14px; }
 .error { color: var(--mat-sys-error); }
+/* Phones: navigation moves to a bottom tab bar (at most five pages), whatever the desktop choice. */
 @media (max-width: 760px) {
-  /* Mobile-first feels move navigation to the thumb zone on phones and keep it in the header on wider screens. */
-  .bottom > header .nav { display: none; }
-  .bottom-nav { display: flex; }
-  .shell.sidebar { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
-  .sidebar > header { border-right: 0; border-bottom: 1px solid var(--mat-sys-outline-variant); padding: 12px 16px; gap: 10px; }
-  .sidebar .nav { flex-direction: row; overflow-x: auto; }
-  .top .nav { overflow-x: auto; max-width: 100%; }
+  .shell.sidebar, .shell.top { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; }
+  .shell > header { flex-direction: row !important; align-items: center; justify-content: space-between; padding: 10px 16px !important; border-right: 0 !important; border-bottom: 1px solid var(--mat-sys-outline-variant); }
+  .shell > header .nav { display: none; }
+  .tabs { display: flex; position: sticky; bottom: 0; justify-content: space-around; background: var(--mat-sys-surface-container); border-top: 1px solid var(--mat-sys-outline-variant); padding: 6px; }
+  .tabs a { flex: 1; flex-direction: column; gap: 2px; padding: 6px 2px; font-size: 12px; text-align: center; }
 }
 `;
 }
@@ -208,16 +187,16 @@ h1 { font-size: clamp(30px, 5vw, 48px); line-height: 1.1; margin: 0 0 12px; }
 const appComponent = `import { Component, computed, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { PageBlocksComponent } from './page-blocks';
 import { site, SitePage } from './site';
 
 interface Account { email: string; name: string; }
 
 @Component({
   selector: 'app-root', standalone: true,
-  imports: [FormsModule, MatButtonModule, MatCardModule, MatFormFieldModule, MatInputModule],
+  imports: [FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, PageBlocksComponent],
   templateUrl: './app.html'
 })
 export class App {
@@ -227,7 +206,6 @@ export class App {
   readonly account = signal<Account | null>(null);
   readonly message = signal('');
   readonly busy = signal(false);
-  readonly samples = [1, 2, 3];
   mode: 'sign-in' | 'sign-up' = 'sign-in';
   email = '';
   name = '';
@@ -250,10 +228,6 @@ export class App {
 
   initials(title: string) {
     return title.split(/\\s+/).map(word => word[0] || '').join('').slice(0, 2).toUpperCase();
-  }
-
-  heroStyle() {
-    return site.hero ? \`linear-gradient(0deg, rgba(0,0,0,.72), rgba(0,0,0,.12)), url('\${site.hero}')\` : '';
   }
 
   private async loadSession() {
@@ -286,13 +260,12 @@ export class App {
 `;
 
 const appTemplate = `<a class="skip-link" href="#main">Skip to content</a>
-<div class="shell" [class]="'shell ' + site.navigation">
+<div [class]="'shell ' + site.navigation">
   <header>
     <a class="brand" href="/" (click)="go($event, '/')"><span class="brand-mark" aria-hidden="true">{{ initials(site.name) }}</span>{{ site.name }}</a>
     <nav class="nav" aria-label="Main">
-      <a href="/" (click)="go($event, '/')" [class.active]="path() === '/'" [attr.aria-current]="path() === '/' ? 'page' : null">Home</a>
       @for (item of site.pages; track item.path) {
-        <a [href]="item.path" (click)="go($event, item.path)" [class.active]="path() === item.path" [attr.aria-current]="path() === item.path ? 'page' : null">{{ item.title }}</a>
+        <a [href]="item.path" (click)="go($event, item.path)" [class.active]="path() === item.path" [attr.aria-current]="path() === item.path ? 'page' : null"><span class="icon" aria-hidden="true">{{ item.icon }}</span>{{ item.label }}</a>
       }
     </nav>
     @if (site.auth) {
@@ -306,27 +279,7 @@ const appTemplate = `<a class="skip-link" href="#main">Skip to content</a>
     }
   </header>
   <main id="main">
-    @if (path() === '/') {
-      <section class="hero" [class.with-image]="site.hero" [style.background-image]="heroStyle()">
-        <h1 tabindex="-1">{{ site.name }}</h1>
-        <p class="lead">{{ site.pitch }}</p>
-      </section>
-      @if (site.pages.length) {
-        <h2>Explore</h2>
-        <div class="cards">
-          @for (item of site.pages; track item.path) {
-            <a class="card-link" [href]="item.path" (click)="go($event, item.path)">
-              <mat-card appearance="outlined"><mat-card-content>
-                <span class="initials" aria-hidden="true">{{ initials(item.title) }}</span>
-                <h3>{{ item.title }}</h3><p>{{ item.summary }}</p>
-              </mat-card-content></mat-card>
-            </a>
-          }
-        </div>
-      } @else {
-        <p class="skeleton-note">No features yet. Add features in Aludel and they will appear here as pages.</p>
-      }
-    } @else if (path() === '/sign-in' && site.auth) {
+    @if (path() === '/sign-in' && site.auth) {
       <h1 tabindex="-1">{{ mode === 'sign-in' ? 'Sign in' : 'Create an account' }}</h1>
       <form class="auth-form" (ngSubmit)="submit()">
         @if (mode === 'sign-up') {
@@ -339,29 +292,20 @@ const appTemplate = `<a class="skip-link" href="#main">Skip to content</a>
         <button mat-button type="button" (click)="mode = mode === 'sign-in' ? 'sign-up' : 'sign-in'">{{ mode === 'sign-in' ? 'New here? Create an account' : 'Have an account? Sign in' }}</button>
       </form>
     } @else if (page(); as current) {
-      <h1 tabindex="-1">{{ current.title }}</h1>
-      <p class="lead">{{ current.summary }}</p>
-      @if (site.sampleContent) {
-        <section aria-label="Sample content">
-          @for (sample of samples; track sample) {
-            <div class="sample-row"><span class="initials" aria-hidden="true">{{ sample }}</span><div style="flex:1"><div class="sample-line" style="width:60%"></div><div class="sample-line" style="width:85%;margin-top:8px"></div></div></div>
-          }
-        </section>
-      }
-      <p class="skeleton-note">This page is a skeleton for “{{ current.title }}”. Describe how it should work in Aludel to build it out.</p>
+      @if (current.path === '/' && site.hero) { <div class="hero" [style.background-image]="'url(' + site.hero + ')'" role="img" [attr.aria-label]="site.name"></div> }
+      <h1 tabindex="-1">{{ current.label }}</h1>
+      <p class="description" [class.empty]="!current.description">{{ current.description || 'This page is a skeleton. Describe what happens here in Aludel to build it out.' }}</p>
+      <page-blocks [blocks]="current.blocks"></page-blocks>
     } @else {
       <h1 tabindex="-1">Page not found</h1>
       <p><a href="/" (click)="go($event, '/')">Go home</a></p>
     }
   </main>
-  @if (site.navigation === 'bottom') {
-    <nav class="bottom-nav" aria-label="Sections">
-      <a href="/" (click)="go($event, '/')" [class.active]="path() === '/'">Home</a>
-      @for (item of site.pages.slice(0, 4); track item.path) {
-        <a [href]="item.path" (click)="go($event, item.path)" [class.active]="path() === item.path">{{ item.title }}</a>
-      }
-    </nav>
-  }
+  <nav class="tabs" aria-label="Sections">
+    @for (item of site.pages; track item.path) {
+      <a [href]="item.path" (click)="go($event, item.path)" [class.active]="path() === item.path" [attr.aria-current]="path() === item.path ? 'page' : null"><span class="icon" aria-hidden="true">{{ item.icon }}</span>{{ item.label }}</a>
+    }
+  </nav>
 </div>
 `;
 
@@ -471,6 +415,22 @@ export function writeFiles(root, files) {
     mkdirSync(dirname(target), { recursive: true });
     writeFileSync(target, content, 'utf8');
   }
+}
+
+export function writeBinaries(root, files) {
+  for (const [path, bytes] of Object.entries(files)) {
+    mkdirSync(dirname(join(root, path)), { recursive: true });
+    writeFileSync(join(root, path), bytes);
+  }
+}
+
+// Files the scaffold ships verbatim: the shared layout component, the route-icon font subset and its licence.
+export function loadScaffoldSources(portalRoot) {
+  return {
+    pageBlocks: readFileSync(join(portalRoot, 'src', 'page-blocks.ts'), 'utf8'),
+    iconFont: readFileSync(join(portalRoot, 'templates', 'aludel-web-v1', 'icons.ttf')),
+    iconLicense: readFileSync(join(portalRoot, 'licenses', 'Material-Symbols-LICENSE'), 'utf8')
+  };
 }
 
 export function copyMedia(root, media) {

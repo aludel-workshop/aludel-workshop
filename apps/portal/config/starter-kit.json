@@ -1,23 +1,363 @@
 {
   "schemaVersion": 1,
   "feels": {
-    "sleek-saas": { "label": "Sleek SaaS", "summary": "Crisp, calm and focused. Side navigation, generous whitespace.", "accent": "#3047b9", "theme": "light", "font": "Inter, Roboto, system-ui, sans-serif", "radius": 12, "density": 0, "navigation": "sidebar", "surface": "#f7f8fc", "surfaceDark": "#11131a" },
-    "mobile-social": { "label": "Mobile-first social", "summary": "Thumb-friendly and lively. Bottom navigation, rounded cards.", "accent": "#e0457b", "theme": "light", "font": "Roboto, system-ui, sans-serif", "radius": 22, "density": 0, "navigation": "bottom", "surface": "#fff7fa", "surfaceDark": "#170f13" },
-    "editorial": { "label": "Editorial", "summary": "Reading-first with serif headings, quiet chrome and strong type.", "accent": "#8a3b12", "theme": "light", "font": "Georgia, 'Times New Roman', serif", "radius": 4, "density": 0, "navigation": "top", "surface": "#fbf8f3", "surfaceDark": "#16130f" },
-    "playful": { "label": "Playful", "summary": "Bright, friendly and bouncy. Big buttons and cheerful colour.", "accent": "#7b3fe4", "theme": "light", "font": "'Trebuchet MS', Roboto, system-ui, sans-serif", "radius": 28, "density": 0, "navigation": "top", "surface": "#fbf7ff", "surfaceDark": "#140f1c" },
-    "data-console": { "label": "Data console", "summary": "Dense and information-rich. Dark by default, built for scanning.", "accent": "#12a58a", "theme": "dark", "font": "Roboto, system-ui, sans-serif", "radius": 6, "density": -2, "navigation": "sidebar", "surface": "#f4f7f7", "surfaceDark": "#0d1214" },
-    "marketplace": { "label": "Marketplace", "summary": "Browse-and-buy friendly. Search up top, image-led listings.", "accent": "#e07b12", "theme": "light", "font": "Roboto, system-ui, sans-serif", "radius": 14, "density": 0, "navigation": "top", "surface": "#fffaf4", "surfaceDark": "#17120c" }
+    "sleek-saas": {
+      "label": "Sleek SaaS",
+      "summary": "Crisp, calm and focused. Side navigation, generous whitespace.",
+      "accent": "#3047b9",
+      "theme": "light",
+      "font": "Inter, Roboto, system-ui, sans-serif",
+      "radius": 12,
+      "density": 0,
+      "surface": "#f7f8fc",
+      "surfaceDark": "#11131a",
+      "navigation": "sidebar",
+      "samplePage": "dashboard",
+      "seedRoutes": [
+        {
+          "label": "Home",
+          "icon": "home",
+          "pageType": "dashboard"
+        },
+        {
+          "label": "Projects",
+          "icon": "inventory_2",
+          "pageType": "list"
+        },
+        {
+          "label": "Reports",
+          "icon": "bar_chart",
+          "pageType": "dashboard"
+        },
+        {
+          "label": "Settings",
+          "icon": "settings",
+          "pageType": "settings"
+        }
+      ]
+    },
+    "mobile-social": {
+      "label": "Mobile-first social",
+      "summary": "Thumb-friendly and lively. Bottom navigation, rounded cards.",
+      "accent": "#e0457b",
+      "theme": "light",
+      "font": "Roboto, system-ui, sans-serif",
+      "radius": 22,
+      "density": 0,
+      "surface": "#fff7fa",
+      "surfaceDark": "#170f13",
+      "navigation": "top",
+      "samplePage": "feed",
+      "seedRoutes": [
+        {
+          "label": "Home",
+          "icon": "home",
+          "pageType": "feed"
+        },
+        {
+          "label": "Explore",
+          "icon": "explore",
+          "pageType": "gallery"
+        },
+        {
+          "label": "Messages",
+          "icon": "chat",
+          "pageType": "messages"
+        },
+        {
+          "label": "Profile",
+          "icon": "person",
+          "pageType": "detail"
+        }
+      ]
+    },
+    "editorial": {
+      "label": "Editorial",
+      "summary": "Reading-first with serif headings, quiet chrome and strong type.",
+      "accent": "#8a3b12",
+      "theme": "light",
+      "font": "Georgia, 'Times New Roman', serif",
+      "radius": 4,
+      "density": 0,
+      "surface": "#fbf8f3",
+      "surfaceDark": "#16130f",
+      "navigation": "top",
+      "samplePage": "content",
+      "seedRoutes": [
+        {
+          "label": "Home",
+          "icon": "home",
+          "pageType": "feed"
+        },
+        {
+          "label": "Articles",
+          "icon": "article",
+          "pageType": "list"
+        },
+        {
+          "label": "Topics",
+          "icon": "category",
+          "pageType": "gallery"
+        },
+        {
+          "label": "About",
+          "icon": "info",
+          "pageType": "content"
+        }
+      ]
+    },
+    "playful": {
+      "label": "Playful",
+      "summary": "Bright, friendly and bouncy. Big buttons and cheerful colour.",
+      "accent": "#7b3fe4",
+      "theme": "light",
+      "font": "'Trebuchet MS', Roboto, system-ui, sans-serif",
+      "radius": 28,
+      "density": 0,
+      "surface": "#fbf7ff",
+      "surfaceDark": "#140f1c",
+      "navigation": "top",
+      "samplePage": "gallery",
+      "seedRoutes": [
+        {
+          "label": "Home",
+          "icon": "home",
+          "pageType": "gallery"
+        },
+        {
+          "label": "Discover",
+          "icon": "explore",
+          "pageType": "gallery"
+        },
+        {
+          "label": "Friends",
+          "icon": "group",
+          "pageType": "list"
+        },
+        {
+          "label": "Profile",
+          "icon": "person",
+          "pageType": "detail"
+        }
+      ]
+    },
+    "data-console": {
+      "label": "Data console",
+      "summary": "Dense and information-rich. Dark by default, built for scanning.",
+      "accent": "#12a58a",
+      "theme": "dark",
+      "font": "Roboto, system-ui, sans-serif",
+      "radius": 6,
+      "density": -2,
+      "surface": "#f4f7f7",
+      "surfaceDark": "#0d1214",
+      "navigation": "sidebar",
+      "samplePage": "dashboard",
+      "seedRoutes": [
+        {
+          "label": "Overview",
+          "icon": "dashboard",
+          "pageType": "dashboard"
+        },
+        {
+          "label": "Data",
+          "icon": "table_rows",
+          "pageType": "list"
+        },
+        {
+          "label": "Alerts",
+          "icon": "notifications",
+          "pageType": "list"
+        },
+        {
+          "label": "Settings",
+          "icon": "settings",
+          "pageType": "settings"
+        }
+      ]
+    },
+    "marketplace": {
+      "label": "Marketplace",
+      "summary": "Browse-and-buy friendly. Search up top, image-led listings.",
+      "accent": "#e07b12",
+      "theme": "light",
+      "font": "Roboto, system-ui, sans-serif",
+      "radius": 14,
+      "density": 0,
+      "surface": "#fffaf4",
+      "surfaceDark": "#17120c",
+      "navigation": "top",
+      "samplePage": "gallery",
+      "seedRoutes": [
+        {
+          "label": "Home",
+          "icon": "storefront",
+          "pageType": "gallery"
+        },
+        {
+          "label": "Browse",
+          "icon": "search",
+          "pageType": "gallery"
+        },
+        {
+          "label": "Sell",
+          "icon": "sell",
+          "pageType": "form"
+        },
+        {
+          "label": "Messages",
+          "icon": "chat",
+          "pageType": "messages"
+        },
+        {
+          "label": "Account",
+          "icon": "person",
+          "pageType": "settings"
+        }
+      ]
+    }
   },
   "features": {
-    "accounts": { "label": "Accounts and sign-in", "summary": "People can create an account and sign in.", "icon": "person" },
-    "profiles": { "label": "User profiles", "summary": "Each person has a profile page others can see.", "icon": "badge" },
-    "dashboard": { "label": "Dashboard", "summary": "A home screen summarising what matters right now.", "icon": "dashboard" },
-    "search": { "label": "Search", "summary": "Find things quickly across the app.", "icon": "search" },
-    "messaging": { "label": "Messages and comments", "summary": "People can talk to each other or comment on things.", "icon": "forum" },
-    "notifications": { "label": "Notifications", "summary": "Tell people when something needs their attention.", "icon": "notifications" },
-    "content": { "label": "Content pages", "summary": "Publish articles, posts or informational pages.", "icon": "article" },
-    "uploads": { "label": "File and photo uploads", "summary": "People can upload images or files.", "icon": "upload" },
-    "payments": { "label": "Payments", "summary": "Take payments or subscriptions (connected later).", "icon": "payments" },
-    "admin": { "label": "Admin area", "summary": "A private area for running the app.", "icon": "admin_panel_settings" }
+    "accounts": {
+      "label": "Accounts and sign-in",
+      "summary": "People can create an account and sign in.",
+      "icon": "person"
+    },
+    "profiles": {
+      "label": "User profiles",
+      "summary": "Each person has a profile page others can see.",
+      "icon": "badge"
+    },
+    "dashboard": {
+      "label": "Dashboard",
+      "summary": "A home screen summarising what matters right now.",
+      "icon": "dashboard"
+    },
+    "search": {
+      "label": "Search",
+      "summary": "Find things quickly across the app.",
+      "icon": "search"
+    },
+    "messaging": {
+      "label": "Messages and comments",
+      "summary": "People can talk to each other or comment on things.",
+      "icon": "forum"
+    },
+    "notifications": {
+      "label": "Notifications",
+      "summary": "Tell people when something needs their attention.",
+      "icon": "notifications"
+    },
+    "content": {
+      "label": "Content pages",
+      "summary": "Publish articles, posts or informational pages.",
+      "icon": "article"
+    },
+    "uploads": {
+      "label": "File and photo uploads",
+      "summary": "People can upload images or files.",
+      "icon": "upload"
+    },
+    "payments": {
+      "label": "Payments",
+      "summary": "Take payments or subscriptions (connected later).",
+      "icon": "payments"
+    },
+    "admin": {
+      "label": "Admin area",
+      "summary": "A private area for running the app.",
+      "icon": "admin_panel_settings"
+    }
+  },
+  "routeIcons": [
+    {
+      "icon": "home"
+    },
+    {
+      "icon": "dashboard"
+    },
+    {
+      "icon": "search"
+    },
+    {
+      "icon": "explore"
+    },
+    {
+      "icon": "inventory_2"
+    },
+    {
+      "icon": "bar_chart"
+    },
+    {
+      "icon": "table_rows"
+    },
+    {
+      "icon": "settings"
+    },
+    {
+      "icon": "person"
+    },
+    {
+      "icon": "group"
+    },
+    {
+      "icon": "chat"
+    },
+    {
+      "icon": "forum"
+    },
+    {
+      "icon": "notifications"
+    },
+    {
+      "icon": "article"
+    },
+    {
+      "icon": "category"
+    },
+    {
+      "icon": "info"
+    },
+    {
+      "icon": "storefront"
+    },
+    {
+      "icon": "sell"
+    },
+    {
+      "icon": "shopping_cart"
+    },
+    {
+      "icon": "favorite"
+    },
+    {
+      "icon": "calendar_month"
+    },
+    {
+      "icon": "map"
+    },
+    {
+      "icon": "photo_library"
+    },
+    {
+      "icon": "school"
+    },
+    {
+      "icon": "receipt_long"
+    },
+    {
+      "icon": "payments"
+    },
+    {
+      "icon": "help"
+    },
+    {
+      "icon": "build"
+    }
+  ],
+  "defaultRoute": {
+    "label": "Home",
+    "icon": "home",
+    "pageType": "dashboard"
   }
 }

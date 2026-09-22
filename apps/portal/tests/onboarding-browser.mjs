@@ -75,7 +75,12 @@ try {
 
   await page.getByRole('heading', { name: 'Choose a starting feel' }).waitFor();
   assert.equal(await page.getByRole('checkbox', { name: 'More details' }).isChecked(), false, 'Dreamers start with quick picks');
+  const proto = page.locator('aludel-proto-site');
+  assert.ok(await proto.locator('.proto-pill').count() >= 3, 'Look & feel shows placeholder navigation');
   await page.getByRole('radio', { name: /Mobile-first social/ }).check();
+  await page.getByRole('radio', { name: 'Top nav', checked: true }).waitFor({ timeout: 3000 }); // the feel sets its default desktop navigation
+  await proto.locator('.proto-app.nav-top').waitFor();
+  assert.match(await proto.locator('.proto-frame').getAttribute('style'), /--p-primary: #ca3e6f/, 'the preview uses the readable accent the app will get');
   await page.getByRole('radio', { name: 'Match device' }).check();
   await page.getByLabel('How should this be used?').fill('Hero image on the home page');
   await page.locator('input[type=file]').setInputFiles(path.resolve('public/brand/aludel-workshop.png'));
@@ -83,48 +88,94 @@ try {
   await check('look');
   await page.getByRole('button', { name: 'Save and continue' }).click();
 
-  await page.getByRole('heading', { name: 'What should Tool Share include to start?' }).waitFor();
+  await page.getByRole('heading', { name: 'Shape the navigation' }).waitFor();
+  const nav = proto.getByRole('navigation', { name: 'Pages in your app' });
+  const labels = () => nav.locator('.proto-link span').allInnerTexts();
+  // The portal renders zonelessly, so wait for the navigation to settle rather than reading it once.
+  const expectPages = async (expected, message) => {
+    for (let attempt = 0; attempt < 30 && JSON.stringify(await labels()) !== JSON.stringify(expected); attempt++) await page.waitForTimeout(100);
+    assert.deepEqual(await labels(), expected, message);
+  };
+  await expectPages(['Home', 'Explore', 'Messages', 'Profile'], 'pages are seeded from the mobile-first social feel');
+  await nav.getByRole('button', { name: 'Messages' }).click();
+  await proto.getByLabel('Description of Messages').fill('Neighbours arrange pick-up and return times.');
+  await proto.getByLabel('Page type').selectOption('messages');
+  await nav.getByRole('button', { name: 'Add page' }).click();
+  const nameField = proto.getByLabel('Name', { exact: true });
+  assert.equal(await nameField.evaluate(element => element === document.activeElement && element.selectionEnd - element.selectionStart === element.value.length), true, 'a new page opens with its name selected');
+  await page.keyboard.type('Tool library');
+  await proto.getByRole('radio', { name: 'build' }).check();
+  await proto.getByRole('button', { name: 'Move left' }).click();
+  await proto.getByRole('button', { name: 'Done' }).click();
+  await expectPages(['Home', 'Explore', 'Messages', 'Tool library', 'Profile']);
+  assert.equal(await nav.getByRole('button', { name: 'Add page' }).count(), 0, 'five pages is the limit');
+  await nav.getByRole('button', { name: 'Explore' }).click();
+  await nav.getByRole('button', { name: 'Edit Explore' }).click();
+  await proto.getByRole('button', { name: 'Delete' }).click();
+  await expectPages(['Home', 'Messages', 'Tool library', 'Profile']);
+  // Drag Profile before Messages with real pointer movement, as the CDK needs.
+  const from = await nav.locator('.proto-item', { hasText: 'Profile' }).boundingBox();
+  const to = await nav.locator('.proto-item', { hasText: 'Messages' }).boundingBox();
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2); await page.mouse.down();
+  for (let step = 1; step <= 12; step++) await page.mouse.move(from.x + (to.x - from.x) * step / 12 - 4, to.y + to.height / 2);
+  await page.mouse.up();
+  await expectPages(['Home', 'Profile', 'Messages', 'Tool library'], 'dragging reorders pages');
+  await page.getByRole('radio', { name: 'Side nav' }).check();
+  await page.getByRole('radio', { name: 'Mobile' }).check();
+  await proto.locator('.proto-frame.mobile .proto-tabs .proto-link').nth(3).waitFor({ timeout: 3000 });
+  assert.equal(await proto.locator('.proto-frame.mobile .proto-tabs .proto-link').count(), 4, 'phones show a bottom tab bar');
+  await page.screenshot({ path: 'test-results/onboarding/pages-mobile.png' });
+  await page.getByRole('radio', { name: 'Desktop' }).check();
+  await page.getByText('All changes saved').waitFor();
+  assert.equal(await page.getByText('1 of 4 described').count(), 1);
+  await check('pages');
+  await page.getByRole('button', { name: 'Continue' }).click();
+
+  await page.getByRole('heading', { name: 'What should Tool Share be able to do?' }).waitFor();
   await page.getByRole('checkbox', { name: /^Search/ }).check();
   await page.getByRole('checkbox', { name: /^Messages and comments/ }).check();
   await page.getByRole('checkbox', { name: 'More details' }).check();
-  await page.getByLabel('Feature name').fill('Tool library');
-  await page.getByLabel('What it does').fill('Browse the tools your neighbours are happy to lend.');
+  await page.getByLabel('Feature name').fill('Lending history');
+  await page.getByLabel('What it does').fill('Remember who borrowed what, and when it came back.');
   await page.getByRole('button', { name: 'Add feature' }).click();
   await page.getByText('Feature added.').waitFor();
   await check('features');
   await page.getByRole('button', { name: 'Save and continue' }).click();
 
-  await page.getByRole('heading', { name: 'How it\'s built' }).waitFor();
+  await page.getByRole('heading', { name: 'Build Tool Share' }).waitFor();
   assert.equal(await page.getByText('Django + HTMX').count(), 0, 'unavailable presets stay behind More options');
   await page.getByRole('checkbox', { name: 'More options' }).check();
   assert.equal(await page.getByRole('radio', { name: /Django \+ HTMX/ }).isDisabled(), true);
   await check('stack');
-  await page.getByRole('button', { name: 'Save and continue' }).click();
-
-  await page.getByRole('heading', { name: 'Build Tool Share' }).waitFor();
   await page.getByRole('button', { name: 'Build my app' }).click();
-  await page.getByRole('heading', { name: 'Tool Share is ready to click around' }).waitFor({ timeout: 120000 });
-  await page.frameLocator('iframe.pub-preview-frame').getByRole('heading', { name: 'Tool Share', level: 1 }).waitFor({ timeout: 15000 });
+  await page.getByRole('heading', { name: 'Tool Share is built' }).waitFor({ timeout: 120000 });
+  await page.frameLocator('iframe.pub-preview-frame').getByRole('heading', { name: 'Home', level: 1 }).waitFor({ timeout: 15000 });
   await check('build');
 
   const strict = await browser.newContext({ viewport: { width: 1440, height: 1000 }, storageState: await context.storageState() });
   const strictPage = await strict.newPage();
   const violations = []; strictPage.on('console', message => { if (/Content Security Policy/i.test(message.text())) violations.push(message.text()); });
   await strictPage.goto(page.url());
-  await strictPage.frameLocator('iframe.pub-preview-frame').getByRole('heading', { name: 'Tool Share', level: 1 }).waitFor({ timeout: 15000 });
+  await strictPage.frameLocator('iframe.pub-preview-frame').getByRole('heading', { name: 'Home', level: 1 }).waitFor({ timeout: 15000 });
   assert.deepEqual(violations, [], 'the portal CSP must allow framing only the project preview');
   await strict.close();
 
   const appPage = await context.newPage();
   appPage.on('pageerror', error => errors.push(`app: ${error.message}`));
   await appPage.goto(app);
-  await appPage.getByRole('heading', { name: 'Tool Share', level: 1 }).waitFor();
+  await appPage.getByRole('heading', { name: 'Home', level: 1 }).waitFor();
   assert.match(await appPage.locator('.hero').getAttribute('style'), /url\(.+aludel-workshop\.png/, 'the uploaded hero image is used');
-  await appPage.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Tool library' }).click();
-  await appPage.getByRole('heading', { name: 'Tool library', level: 1 }).waitFor();
-  assert.equal(new URL(appPage.url()).pathname, '/tool-library');
+  const appNav = appPage.getByRole('navigation', { name: 'Main' });
+  const built = await appNav.getByRole('link').evaluateAll(links => links.map(link => [link.querySelector('.icon')?.textContent, link.textContent.replace(link.querySelector('.icon')?.textContent || '', '').trim()]));
+  assert.deepEqual(built, [['home', 'Home'], ['person', 'Profile'], ['chat', 'Messages'], ['build', 'Tool library']], 'the built app has the pages, order and icons that were arranged');
+  assert.equal(await appPage.evaluate(() => document.fonts.check('22px "App Icons"')), true, 'page icons render from the bundled font');
+  await appNav.getByRole('link', { name: /Messages/ }).click();
+  await appPage.getByRole('heading', { name: 'Messages', level: 1 }).waitFor();
+  assert.equal(new URL(appPage.url()).pathname, '/messages');
+  await appPage.getByText('Neighbours arrange pick-up and return times.').waitFor();
+  assert.equal(await appPage.locator('page-blocks .block.chat').count(), 1, 'the page type chosen in the preview is the layout that was built');
   await appPage.reload();
-  await appPage.getByRole('heading', { name: 'Tool library', level: 1 }).waitFor();
+  await appPage.getByRole('heading', { name: 'Messages', level: 1 }).waitFor();
   await appPage.getByRole('link', { name: 'Sign in' }).first().click();
   await appPage.getByRole('button', { name: 'New here? Create an account' }).click();
   await appPage.getByLabel('Name').fill('Grace');
@@ -142,8 +193,7 @@ try {
   assert.equal(await noOverflow(appPage), true, 'generated app overflows at 390px');
   await appPage.screenshot({ path: 'test-results/onboarding/app-narrow.png', fullPage: true });
 
-  await page.goto(`${portal}/projects`);
-  await page.getByRole('link', { name: /Tool Share/ }).click();
+  await page.getByRole('link', { name: 'Continue in Aludel' }).click();
   await page.getByRole('heading', { name: 'Tool Share', level: 1 }).waitFor();
   await page.getByRole('radio', { name: 'Planner' }).check();
   await page.getByText('Working style changed to Planner. Your individual changes were kept.').waitFor();
@@ -177,7 +227,7 @@ try {
   await page.waitForURL(`${portal}/projects`);
   await page.setViewportSize({ width: 390, height: 844 });
   const projectId = (await page.evaluate(async () => (await (await fetch('/api/projects')).json()).projects[0].id));
-  for (const [name, step, heading] of [['look', 'look', 'Choose a starting feel'], ['features', 'features', 'What should Tool Share include to start?'], ['build', 'build', 'Tool Share is ready to click around']]) {
+  for (const [name, step, heading] of [['look', 'look', 'Choose a starting feel'], ['pages', 'pages', 'Shape the navigation'], ['features', 'features', 'What should Tool Share be able to do?'], ['build', 'build', 'Tool Share is built']]) {
     await page.goto(`${portal}/start/${projectId}/${step}`);
     await page.getByRole('heading', { name: heading }).waitFor();
     assert.equal(await noOverflow(page), true, `${name} overflows at 390px`);

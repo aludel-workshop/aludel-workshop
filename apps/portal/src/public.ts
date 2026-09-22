@@ -7,7 +7,9 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { AgentConnectionComponent } from './agent-connection';
-import { AgentConnection, Catalog, Feel, ProjectSetup, Session } from './onboarding-model';
+import { NgTemplateOutlet } from '@angular/common';
+import { AgentConnection, Catalog, Feel, PageRoute, ProjectSetup, Session } from './onboarding-model';
+import { ProtoSiteComponent } from './proto-site';
 
 type Step = { id: string; label: string; optional: boolean };
 // The order follows the owner's flow (DEC-032): nothing administrative before the idea exists.
@@ -18,10 +20,12 @@ const steps: Step[] = [
   { id: 'github', label: 'GitHub', optional: false },
   { id: 'agent', label: 'Agent', optional: true },
   { id: 'look', label: 'Look & feel', optional: true },
-  { id: 'features', label: 'Features', optional: true },
-  { id: 'stack', label: 'Stack', optional: true },
-  { id: 'build', label: 'Build', optional: false }
+  { id: 'pages', label: 'Pages', optional: true },
+  { id: 'features', label: 'Functionality', optional: true },
+  { id: 'stack', label: 'Build', optional: false }
 ];
+// From Look & feel onward, settings sit beside a live proto-site of the app.
+const splitSteps = new Set(['look', 'pages', 'features', 'stack']);
 
 // Only the project's own app origin (from the server's topology) is ever framed.
 @Pipe({ name: 'safeUrl', standalone: true })
@@ -32,7 +36,7 @@ export class SafeUrlPipe implements PipeTransform {
 
 @Component({
   selector: 'aludel-public', standalone: true,
-  imports: [FormsModule, KeyValuePipe, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, AgentConnectionComponent, SafeUrlPipe],
+  imports: [FormsModule, KeyValuePipe, NgTemplateOutlet, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, AgentConnectionComponent, ProtoSiteComponent, SafeUrlPipe],
   templateUrl: './public.html'
 })
 export class PublicComponent implements OnDestroy {
@@ -59,6 +63,7 @@ export class PublicComponent implements OnDestroy {
     if (first === 'start') {
       if (!second) return 'profile';
       if (second === 'idea' || second === 'account') return second;
+      if (third === 'build') return 'stack';
       return third && steps.some(step => step.id === third) ? third : 'github';
     }
     return 'missing';
@@ -69,6 +74,19 @@ export class PublicComponent implements OnDestroy {
   });
   readonly stepIndex = computed(() => steps.findIndex(step => step.id === this.view()));
   readonly isStep = computed(() => this.stepIndex() >= 0);
+  readonly isSplit = computed(() => splitSteps.has(this.view()));
+  readonly device = signal<'desktop' | 'mobile'>('desktop');
+  // A desktop frame cannot fit a phone-width screen, so small screens always preview the phone layout.
+  private readonly narrowQuery = typeof matchMedia === 'function' ? matchMedia('(max-width: 760px)') : null;
+  readonly narrow = signal(this.narrowQuery?.matches ?? false);
+  readonly previewDevice = computed(() => this.narrow() ? 'mobile' : this.device());
+  readonly routes = signal<PageRoute[]>([]);
+  readonly pagesSaved = signal<'saved' | 'saving' | 'unsaved'>('saved');
+  readonly previewFeel = computed(() => this.catalog()?.feels[this.feelChoice()] || null);
+  readonly feelChoice = signal('sleek-saas');
+  readonly heroUrl = computed(() => this.setup()?.assets.find(asset => asset.kind === 'image')?.url || null);
+  readonly describedCount = computed(() => this.routes().filter(page => page.description.trim()).length);
+  private pagesTimer: ReturnType<typeof setTimeout> | null = null;
   readonly preferences = computed(() => this.setup()?.preferences || {});
   readonly profileEntries = computed(() => Object.entries(this.catalog()?.profiles || {}).map(([id, value]) => ({ id, ...value })));
   readonly feelEntries = computed(() => Object.entries(this.catalog()?.feels || {}).map(([id, value]) => ({ id, ...value })));
@@ -91,6 +109,7 @@ export class PublicComponent implements OnDestroy {
   password = '';
   confirmPassword = '';
   ownerKey = '';
+  navigation: 'sidebar' | 'top' = 'sidebar';
   feel = 'sleek-saas';
   theme: 'light' | 'dark' | 'system' = 'system';
   accent = '#3047b9';
@@ -109,13 +128,15 @@ export class PublicComponent implements OnDestroy {
     const githubError = new URLSearchParams(location.search).get('github_error');
     if (githubError) { this.error.set(githubError); history.replaceState({}, '', location.pathname); }
     window.addEventListener('popstate', () => { this.path.set(location.pathname); void this.load(); });
+    this.narrowQuery?.addEventListener('change', event => this.narrow.set(event.matches));
     queueMicrotask(() => { this.session.set(this.initialSession()); void this.load(); });
   }
 
-  ngOnDestroy() { if (this.pollTimer) clearTimeout(this.pollTimer); }
+  ngOnDestroy() { if (this.pollTimer) clearTimeout(this.pollTimer); if (this.pagesTimer) clearTimeout(this.pagesTimer); }
 
   go(path: string, event?: Event) {
     event?.preventDefault();
+    if (this.pagesSaved() === 'unsaved' && this.projectId()) void this.savePages();
     if (path.startsWith('/#')) { location.assign(path); return; }
     history.pushState({}, '', path);
     this.path.set(path);
@@ -183,7 +204,7 @@ export class PublicComponent implements OnDestroy {
       if (this.projectId()) {
         const setup = await this.api<ProjectSetup>(`/api/projects/${encodeURIComponent(this.projectId())}/setup`);
         this.applySetup(setup, true);
-        if (view === 'build' || view === 'project') this.pollPreview();
+        if (view === 'stack' || view === 'project') this.pollPreview();
       } else this.setup.set(null);
       setTimeout(() => document.querySelector<HTMLElement>('main h1')?.focus({ preventScroll: true }), 30);
     } catch (error) {
@@ -196,6 +217,10 @@ export class PublicComponent implements OnDestroy {
     this.setup.set(setup);
     if (!resetDrafts) return;
     this.feel = setup.design.feel || 'sleek-saas';
+    this.feelChoice.set(this.feel);
+    this.navigation = setup.design.navigation;
+    this.routes.set(setup.pages.routes.map(page => ({ ...page })));
+    this.pagesSaved.set('saved');
     this.theme = setup.design.theme;
     this.accent = setup.design.accent;
     this.designNotes = setup.design.notes;
@@ -314,10 +339,18 @@ export class PublicComponent implements OnDestroy {
   }
 
   // Look & feel.
+  // A feel is a starting point: it sets accent, theme and desktop navigation, all of which stay editable.
   chooseFeel(id: string, feel: Feel) {
     this.feel = id;
+    this.feelChoice.set(id);
     this.accent = feel.accent;
     this.theme = feel.theme;
+    this.navigation = feel.navigation;
+  }
+
+  setNavigation(value: 'sidebar' | 'top') {
+    this.navigation = value;
+    if (this.view() === 'pages') this.schedulePagesSave();
   }
 
   feelStyle(feel: Feel) {
@@ -326,7 +359,7 @@ export class PublicComponent implements OnDestroy {
 
   saveLook() {
     return this.run(async () => {
-      this.applySetup(await this.api<ProjectSetup>(`/api/projects/${encodeURIComponent(this.projectId())}/design`, 'PUT', { feel: this.feel, theme: this.theme, accent: this.accent, notes: this.designNotes }));
+      this.applySetup(await this.api<ProjectSetup>(`/api/projects/${encodeURIComponent(this.projectId())}/design`, 'PUT', { feel: this.feel, theme: this.theme, accent: this.accent, notes: this.designNotes, navigation: this.navigation }));
       this.next();
     });
   }
@@ -352,6 +385,43 @@ export class PublicComponent implements OnDestroy {
     return this.run(async () => this.applySetup(await this.api<ProjectSetup>(`/api/projects/${encodeURIComponent(this.projectId())}/assets/${encodeURIComponent(id)}`, 'DELETE')));
   }
 
+  // Pages: edited directly in the proto-site and saved shortly after each change.
+  routesChanged(routes: PageRoute[]) {
+    this.routes.set(routes);
+    this.schedulePagesSave();
+  }
+
+  private schedulePagesSave() {
+    this.pagesSaved.set('unsaved');
+    if (this.pagesTimer) clearTimeout(this.pagesTimer);
+    this.pagesTimer = setTimeout(() => void this.savePages(), 700);
+  }
+
+  private async savePages() {
+    if (this.pagesTimer) { clearTimeout(this.pagesTimer); this.pagesTimer = null; }
+    this.pagesSaved.set('saving');
+    try {
+      const setup = await this.api<ProjectSetup>(`/api/projects/${encodeURIComponent(this.projectId())}/pages`, 'PUT', { routes: this.routes(), navigation: this.navigation });
+      this.setup.set(setup);
+      this.pagesSaved.set('saved');
+      this.error.set('');
+    } catch (error) {
+      this.pagesSaved.set('unsaved');
+      this.error.set(error instanceof Error ? error.message : String(error));
+    } finally { this.changeDetector.markForCheck(); }
+  }
+
+  continueFromPages() {
+    return this.run(async () => {
+      await this.savePages();
+      if (this.pagesSaved() !== 'saved') return;
+      this.applySetup(await this.api<ProjectSetup>(`/api/projects/${encodeURIComponent(this.projectId())}/steps/pages`, 'POST', {}));
+      this.next();
+    });
+  }
+
+  pageTypeLabel(id: string) { return this.catalog()?.pageTypes[id]?.label || id; }
+
   // Features.
   togglePick(id: string) {
     const next = new Set(this.picks);
@@ -373,10 +443,12 @@ export class PublicComponent implements OnDestroy {
   }
 
   // Stack.
-  saveStack() {
+  // The Build step's action saves the stack choice and builds from exactly what the proto-site shows.
+  buildApp() {
     return this.run(async () => {
-      this.applySetup(await this.api<ProjectSetup>(`/api/projects/${encodeURIComponent(this.projectId())}/stack`, 'PUT', { preset: this.stackPreset, options: this.stackOptions }));
-      this.next();
+      await this.api<ProjectSetup>(`/api/projects/${encodeURIComponent(this.projectId())}/stack`, 'PUT', { preset: this.stackPreset, options: this.stackOptions });
+      this.applySetup(await this.api<ProjectSetup>(`/api/projects/${encodeURIComponent(this.projectId())}/skeleton`, 'POST', {}));
+      this.pollPreview();
     });
   }
 
@@ -384,13 +456,6 @@ export class PublicComponent implements OnDestroy {
   layerEntries(id: string) { return Object.entries(this.catalog()?.stacks.presets[id]?.layers || {}).map(([layer, value]) => ({ layer, value })); }
 
   // Build and preview.
-  build() {
-    return this.run(async () => {
-      this.applySetup(await this.api<ProjectSetup>(`/api/projects/${encodeURIComponent(this.projectId())}/skeleton`, 'POST', {}));
-      this.pollPreview();
-    });
-  }
-
   private pollPreview() {
     if (this.pollTimer) clearTimeout(this.pollTimer);
     const status = this.setup()?.preview.status;

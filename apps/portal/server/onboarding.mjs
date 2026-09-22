@@ -20,13 +20,20 @@ export function loadCatalogs(configDirectory) {
   const profiles = read('interaction-profiles.json');
   const starter = read('starter-kit.json');
   const stacks = read('stack-presets.json');
+  const pages = read('page-types.json');
+  const routeIcons = starter.routeIcons.map(item => item.icon);
+  for (const [id, feel] of Object.entries(starter.feels)) {
+    if (!['sidebar', 'top'].includes(feel.navigation) || !pages.types[feel.samplePage]) throw new Error(`Feel ${id} needs a navigation position and sample page.`);
+    for (const route of feel.seedRoutes) if (!routeIcons.includes(route.icon) || !pages.types[route.pageType]) throw new Error(`Feel ${id} seeds an unknown icon or page type.`);
+  }
   for (const [id, profile] of Object.entries(profiles.profiles)) {
     for (const [key, definition] of Object.entries(profiles.preferences)) {
       if (!(profile.defaults[key] in definition.values)) throw new Error(`Profile ${id} has an invalid default for ${key}.`);
     }
   }
   if (!stacks.presets[stacks.default]?.available) throw new Error('The default stack preset must be available.');
-  return { preferences: profiles.preferences, profiles: profiles.profiles, feels: starter.feels, features: starter.features, stacks };
+  return { preferences: profiles.preferences, profiles: profiles.profiles, feels: starter.feels, features: starter.features, stacks,
+    pageTypes: pages.types, routeIcons, defaultRoute: starter.defaultRoute };
 }
 
 export function initOnboarding(db) {
@@ -54,6 +61,9 @@ export function initOnboarding(db) {
     );
     CREATE INDEX IF NOT EXISTS idx_assets_project ON project_assets(project_id);
   `);
+  const setupColumns = new Set(db.prepare('PRAGMA table_info(project_setup)').all().map(column => column.name));
+  if (!setupColumns.has('routes_json')) db.exec('ALTER TABLE project_setup ADD COLUMN routes_json TEXT');
+  if (!setupColumns.has('navigation')) db.exec('ALTER TABLE project_setup ADD COLUMN navigation TEXT');
   db.prepare('DELETE FROM onboarding_drafts WHERE claimed_project_id IS NULL AND expires_at < ?').run(now());
 }
 
@@ -113,6 +123,15 @@ export function onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot, cr
     db.prepare('UPDATE project_setup SET completed_steps_json = ?, updated_at = ? WHERE project_id = ?').run(JSON.stringify([...steps]), now(), projectId);
   }
 
+  // Pages (primary routes) are distinct from functionality. Until someone saves them, they are seeded from the
+  // chosen feel so a marketplace starts with marketplace-shaped navigation; descriptions are always left blank.
+  function routesFor(setup) {
+    const stored = parse(setup.routes_json, null);
+    if (stored) return { routes: stored, seeded: false };
+    const seed = catalogs.feels[setup.feel]?.seedRoutes || [catalogs.defaultRoute];
+    return { routes: seed.map((route, index) => ({ id: `page-${index + 1}`, label: route.label, icon: route.icon, pageType: route.pageType, description: '' })), seeded: true };
+  }
+
   function connectionView(projectId) {
     const row = db.prepare("SELECT provider, label, secret_hint, status, updated_at FROM project_connections WHERE project_id = ? AND kind = 'agent'").get(projectId);
     return row ? { provider: row.provider, label: row.label, hint: row.secret_hint, status: row.status, updatedAt: row.updated_at } : null;
@@ -127,7 +146,7 @@ export function onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot, cr
     catalog() {
       return {
         preferences: catalogs.preferences, profiles: catalogs.profiles, feels: catalogs.feels, features: catalogs.features,
-        stacks: catalogs.stacks, agentProviders: Object.fromEntries(Object.entries(agentProviders).map(([id, value]) => [id, { label: value.label, secret: value.secret }]))
+        stacks: catalogs.stacks, pageTypes: catalogs.pageTypes, routeIcons: catalogs.routeIcons, agentProviders: Object.fromEntries(Object.entries(agentProviders).map(([id, value]) => [id, { label: value.label, secret: value.secret }]))
       };
     },
 
@@ -197,7 +216,9 @@ export function onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot, cr
       return {
         project,
         profile: setup.profile, overrides, preferences: effectivePreferences(setup.profile, overrides),
-        design: { feel: setup.feel, theme: setup.theme, accent: project.accent_color, notes: setup.design_notes },
+        design: { feel: setup.feel, theme: setup.theme, accent: project.accent_color, notes: setup.design_notes,
+          navigation: setup.navigation || catalogs.feels[setup.feel || 'sleek-saas'].navigation },
+        pages: routesFor(setup),
         stack: { preset: setup.stack_preset, options: parse(setup.stack_options_json, {}) },
         features: {
           picks: Object.keys(featureRecords).filter(key => !key.startsWith('custom:')),
@@ -229,15 +250,17 @@ export function onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot, cr
       return api.projectSetup(user, projectId);
     },
 
-    saveDesign(user, projectId, { feel, theme, accent, notes = '' }) {
+    saveDesign(user, projectId, { feel, theme, accent, notes = '', navigation }) {
       requireMember(db, user, projectId);
       if (!catalogs.feels[feel]) fail('Choose a starting feel.');
       if (!['light', 'dark', 'system'].includes(theme)) fail('Choose light, dark or match the device.');
       const accentColor = String(accent || catalogs.feels[feel].accent).trim().toLowerCase();
       if (!/^#[0-9a-f]{6}$/.test(accentColor)) fail('Accent color must be a six-digit hex color.');
       if (String(notes).length > 2000) fail('Keep design notes under 2,000 characters.');
+      if (navigation !== undefined && !['sidebar', 'top'].includes(navigation)) fail('Choose side or top navigation.');
       const updated = now();
-      db.prepare('UPDATE project_setup SET feel = ?, theme = ?, design_notes = ?, updated_at = ? WHERE project_id = ?').run(feel, theme, String(notes).trim(), updated, projectId);
+      db.prepare('UPDATE project_setup SET feel = ?, theme = ?, design_notes = ?, navigation = COALESCE(?, navigation), updated_at = ? WHERE project_id = ?')
+        .run(feel, theme, String(notes).trim(), navigation || null, updated, projectId);
       db.prepare('UPDATE projects SET accent_color = ?, updated_at = ? WHERE id = ?').run(accentColor, updated, projectId);
       markStep(projectId, 'look');
       return api.projectSetup(user, projectId);
@@ -326,6 +349,29 @@ export function onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot, cr
       return api.projectSetup(user, projectId);
     },
 
+    saveRoutes(user, projectId, { routes, navigation }) {
+      requireMember(db, user, projectId);
+      if (!Array.isArray(routes) || routes.length < 1 || routes.length > 5) fail('Keep between one and five pages in the navigation.');
+      const seen = new Set();
+      const clean = routes.map((route, index) => {
+        const label = String(route?.label || '').trim();
+        const description = String(route?.description || '').trim();
+        if (!label || label.length > 30) fail('Give every page a name of up to 30 characters.');
+        if (seen.has(label.toLowerCase())) fail(`Two pages are both called “${label}”. Give each page its own name.`);
+        seen.add(label.toLowerCase());
+        if (!catalogs.routeIcons.includes(route.icon)) fail(`Choose an icon from the list for “${label}”.`);
+        if (!catalogs.pageTypes[route.pageType]) fail(`Choose a page type for “${label}”.`);
+        if (description.length > 1000) fail(`Keep the description of “${label}” under 1,000 characters.`);
+        const id = /^page-[a-z0-9-]{1,40}$/.test(String(route.id || '')) ? route.id : `page-${randomBytes(4).toString('hex')}`;
+        return { id, label, icon: route.icon, pageType: route.pageType, description, order: index };
+      });
+      if (new Set(clean.map(route => route.id)).size !== clean.length) fail('Each page needs its own id.');
+      if (navigation !== undefined && !['sidebar', 'top'].includes(navigation)) fail('Choose side or top navigation.');
+      db.prepare('UPDATE project_setup SET routes_json = ?, navigation = COALESCE(?, navigation), updated_at = ? WHERE project_id = ?')
+        .run(JSON.stringify(clean.map(({ order, ...route }) => route)), navigation || null, now(), projectId);
+      return api.projectSetup(user, projectId);
+    },
+
     saveStack(user, projectId, { preset, options = {} }) {
       requireMember(db, user, projectId);
       const definition = catalogs.stacks.presets[preset];
@@ -370,7 +416,7 @@ export function onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot, cr
 
     markStep(user, projectId, step) {
       requireMember(db, user, projectId);
-      if (!['github', 'agent', 'look', 'features', 'stack', 'build'].includes(step)) fail('Unknown setup step.');
+      if (!['github', 'agent', 'look', 'pages', 'features', 'stack', 'build'].includes(step)) fail('Unknown setup step.');
       markStep(projectId, step);
       return api.projectSetup(user, projectId);
     },

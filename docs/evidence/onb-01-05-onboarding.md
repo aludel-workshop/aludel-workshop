@@ -32,6 +32,19 @@ The owner reached the account step, chose "I have an account", and read the emai
 - Checked: server test for create/reuse/no-takeover/no-sharing/single-use tickets (27/27 pass); onboarding browser script passes. With a stand-in configuration, the button sends the browser to `github.com/login/oauth/authorize` with the app's client ID, S256 PKCE and the registered callback. Not yet exercised against real GitHub.
 - Enterprise SSO (SAML/OIDC via an identity provider) is the later equivalent for organizations and belongs to ONB-07.
 
+## Owner feedback applied — live proto-site, pages vs functionality (2026-09-22)
+
+Owner direction: separate **functionality** from **primary routes**; from Look & feel onward, show a Gamma-style interactive preview that reflects every choice before anything is built; edit navigation in place; make the Build step's action build from the same structure; after building, the main action continues in the portal.
+
+- **Pages (routes)** are a new record per project: label, icon, description, page type, order, 1–5 pages, unique names, icons and types from `config/starter-kit.json` and `config/page-types.json`. They are seeded from the chosen feel with blank descriptions (for example, marketplace → Home, Browse, Sell, Messages, Account) and never reseeded once saved.
+- **Functionality** is the old features step, relabelled; it becomes Feature records.
+- **Proto-site** (`src/proto-site.ts`): the logged-in app in the chosen feel, with desktop (side or top nav, defaulting from the feel) or phone (bottom tabs), and screens narrower than 760px always show the phone. On Look & feel it shows placeholder nav and a sample page. On Pages you select, describe and retype a page; the pencil renames it and changes its icon, moves it (keyboard alternative to drag) or deletes it (never the last); a ghost **Add page** creates one with its name selected; drag reorders. Changes autosave.
+- **Same structure, preview and build**: `src/page-blocks.ts` renders the placeholder layouts in the preview and is copied verbatim into generated apps. Colour derivation is shared through `src/color.js`, and generated apps ship a 28-icon font subset for page icons (`templates/aludel-web-v1/icons.ttf`). The repo's `docs/product.md` gains a Pages section (name, type, description) and `aludel.json` a `pages` list.
+- **Build** is the last step's action; the stage then swaps to the live app, and **Continue in Aludel** is the primary action. Until ONB-06 it opens the interim app page, because new projects cannot yet open in the Overview/Product/Work portal.
+- Checked: 29/29 server tests (seeding, validation, ownership, scaffold built from pages with shared layouts, app icon font parity). The browser script drives select/describe/type change, add with the name selected, icon change, keyboard move, delete, pointer drag, side/top and phone toggles, and autosave, then asserts that the built app has the same pages, order, icons, description and page-type layout. axe passes on the new views and 390px checks now include Pages.
+- Defects caught on the way: two global CSS class collisions (`.sidebar` and `.pub-split`) broke the layout until namespaced; tests read zoneless renders too early (now polled); the post-build action was scrolled out of view.
+- Not yet: page records in the portal's Product area (they need a page/view record kind, part of ONB-06); Storybook stories for the proto-site.
+
 ## Checks run (Node 24.14.0, 2026-09-22)
 
 | Check | Result |

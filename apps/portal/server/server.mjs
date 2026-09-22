@@ -6,7 +6,7 @@ import { aludelProjectId, createExternalUser, createLoginTicket, createSession, 
 import { hostTopology } from './hosts.mjs';
 import { initOnboarding, loadCatalogs, onboarding } from './onboarding.mjs';
 import { previewManager } from './previews.mjs';
-import { copyMedia, initialFiles, skeletonFiles, writeFiles } from './scaffold.mjs';
+import { copyMedia, initialFiles, loadScaffoldSources, skeletonFiles, writeBinaries, writeFiles } from './scaffold.mjs';
 import { extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { importCorpus } from './importer.mjs';
@@ -40,6 +40,7 @@ const setupConfigPath = join(portalRoot, 'config', 'project-setup.json');
 const gitSetup = loadGitProfile(setupConfigPath, 'the-machine');
 const projectGitProfile = (config => config.sourceControlProfiles[config.defaultSourceControlProfile])(JSON.parse(readFileSync(setupConfigPath, 'utf8')));
 const catalogs = loadCatalogs(join(portalRoot, 'config'));
+const scaffoldSources = loadScaffoldSources(portalRoot);
 const workspaceRoot = join(dataDirectory, 'workspaces');
 const previews = previewManager({ db, portalRoot, workspaceRoot, logRoot: join(dataDirectory, 'preview-logs') });
 const appUrls = slug => ({ portal: topology.portalOrigin, app: topology.appOrigin(slug) });
@@ -118,9 +119,10 @@ function continueWithDraft(request, user, headers) {
 
 async function generateSkeleton(user, projectId) {
   const setup = flows.projectSetup(user, projectId);
-  const { files, media } = skeletonFiles(setup, catalogs, projectGitProfile, appUrls(setup.project.slug), flows.projectAssets(projectId));
+  const { files, media, binaries } = skeletonFiles(setup, catalogs, projectGitProfile, appUrls(setup.project.slug), flows.projectAssets(projectId), scaffoldSources);
   createWorkspace(setup, user);
   writeFiles(setup.workspacePath, files);
+  writeBinaries(setup.workspacePath, binaries);
   copyMedia(setup.workspacePath, media);
   const result = commitWorkspace({ repository: setup.workspacePath, profile: projectGitProfile, message: `feat: generate ${setup.project.name} skeleton from ${setup.stack.preset}`, ...commitIdentity(user) });
   const binding = github.status(user.id, projectId, null).repository;
@@ -268,7 +270,7 @@ async function api(request, response, url) {
     return json(response, 201, { project: setup.project }, { 'set-cookie': draftCookie('', 0) });
   }
   if (url.pathname === '/api/projects' && request.method === 'GET') return json(response, 200, { projects: userProjects(db, user.id) });
-  const projectRoute = /^\/api\/projects\/([^/]+)\/(setup|preferences|design|assets|features|stack|connections\/agent|steps|repository|skeleton|preview)(?:\/([^/]+))?$/.exec(url.pathname);
+  const projectRoute = /^\/api\/projects\/([^/]+)\/(setup|preferences|design|pages|assets|features|stack|connections\/agent|steps|repository|skeleton|preview)(?:\/([^/]+))?$/.exec(url.pathname);
   if (projectRoute) {
     const [, rawId, section, rawItem] = projectRoute;
     const projectId = decodeURIComponent(rawId);
@@ -288,6 +290,7 @@ async function api(request, response, url) {
     if (section === 'assets' && method === 'DELETE' && item) { flows.removeAsset(user, projectId, item); return json(response, 200, projectView(user, projectId)); }
     if (section === 'features' && method === 'PUT' && !item) { flows.saveFeatures(user, projectId, await readJson(request)); return json(response, 200, projectView(user, projectId)); }
     if (section === 'features' && method === 'DELETE' && item) { flows.removeFeature(user, projectId, item); return json(response, 200, projectView(user, projectId)); }
+    if (section === 'pages' && method === 'PUT') { flows.saveRoutes(user, projectId, await readJson(request)); return json(response, 200, projectView(user, projectId)); }
     if (section === 'stack' && method === 'PUT') { flows.saveStack(user, projectId, await readJson(request)); return json(response, 200, projectView(user, projectId)); }
     if (section === 'connections/agent' && method === 'GET') return json(response, 200, flows.agentConnection(user, projectId));
     if (section === 'connections/agent' && method === 'PUT') return json(response, 200, flows.saveAgentConnection(user, projectId, await readJson(request)));

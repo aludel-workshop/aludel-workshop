@@ -29,7 +29,7 @@
   </nav>
 }
 
-<main id="main" class="pub-main" [class.pub-wide]="view() === 'landing'">
+<main id="main" class="pub-main" [class.pub-wide]="view() === 'landing'" [class.pub-split-main]="isSplit()">
   @if (error()) { <p class="error-message pub-alert" role="alert">{{ error() }}</p> }
   @if (notice()) { <p class="success-message pub-alert" role="status">{{ notice() }}</p> }
 
@@ -244,21 +244,22 @@
 
     @case ('look') {
       @if (setup(); as current) {
-        <section aria-labelledby="look-heading">
-          <p class="eyebrow">Step 6 · Look & feel · optional</p>
-          <h1 id="look-heading" tabindex="-1">Choose a starting feel</h1>
-          <p class="pub-lead">A feel sets type, shape, density and navigation. It doesn't decide features. You can refine everything later.</p>
-          <fieldset class="pub-feel-grid">
-            <legend class="visually-hidden">Starting feel</legend>
-            @for (item of feelEntries(); track item.id) {
-              <label class="pub-feel" [class.selected]="feel === item.id" [style]="feelStyle(item)">
-                <input type="radio" name="feel" [value]="item.id" [checked]="feel === item.id" (change)="chooseFeel(item.id, item)">
-                <span [class]="'pub-feel-sample nav-' + item.navigation + (item.theme === 'dark' ? ' dark' : '')" aria-hidden="true"><i></i><b></b><b></b><em></em></span>
-                <strong>{{ item.label }}</strong><span>{{ item.summary }}</span>
-              </label>
-            }
-          </fieldset>
-          <div class="pub-look-controls">
+        <div class="pub-workbench">
+          <section class="pub-panel" aria-labelledby="look-heading">
+            <p class="eyebrow">Step 6 · Look & feel · optional</p>
+            <h1 id="look-heading" tabindex="-1">Choose a starting feel</h1>
+            <p class="pub-panel-lead">A feel sets type, shape, colour and navigation, not features. Watch your app take shape on the right.</p>
+            <fieldset class="pub-feel-list">
+              <legend class="visually-hidden">Starting feel</legend>
+              @for (item of feelEntries(); track item.id) {
+                <label class="pub-feel" [class.selected]="feel === item.id" [style]="feelStyle(item)">
+                  <input type="radio" name="feel" [value]="item.id" [checked]="feel === item.id" (change)="chooseFeel(item.id, item)">
+                  <span class="pub-feel-swatch" aria-hidden="true"></span>
+                  <span><strong>{{ item.label }}</strong><small>{{ item.summary }}</small></span>
+                </label>
+              }
+            </fieldset>
+            <h2 class="pub-panel-heading">Theme and colour</h2>
             <fieldset class="pub-segmented">
               <legend>Theme</legend>
               @for (option of [{ id: 'light', label: 'Light' }, { id: 'dark', label: 'Dark' }, { id: 'system', label: 'Match device' }]; track option.id) {
@@ -266,14 +267,10 @@
               }
             </fieldset>
             <div class="pub-accent"><label for="accent">Accent colour</label><input id="accent" name="accent" type="color" [(ngModel)]="accent"><code>{{ accent }}</code></div>
-          </div>
-          <section class="pub-uploads" aria-labelledby="media-heading">
-            <h2 id="media-heading">Images and media</h2>
-            <p>Add a logo, photos or anything else, with a note on how it should be used (e.g. "hero image on the home page").</p>
-            <div class="pub-upload-row">
-              <mat-form-field appearance="outline" class="wide-field"><mat-label>How should this be used?</mat-label><input matInput name="uploadNotes" [(ngModel)]="uploadNotes" maxlength="1000"></mat-form-field>
-              <label class="pub-file"><mat-icon aria-hidden="true">upload</mat-icon>Choose file<input type="file" [accept]="details() ? 'image/png,image/jpeg,image/webp,.md,.txt,text/markdown,text/plain' : 'image/png,image/jpeg,image/webp'" (change)="upload($event)"></label>
-            </div>
+            <h2 class="pub-panel-heading">Images and media</h2>
+            <p class="field-hint">Add a logo, photos or anything else, with a note on how it should be used. The first image becomes the home page banner.</p>
+            <mat-form-field appearance="outline" class="wide-field"><mat-label>How should this be used?</mat-label><input matInput name="uploadNotes" [(ngModel)]="uploadNotes" maxlength="1000"></mat-form-field>
+            <label class="pub-file"><mat-icon aria-hidden="true">upload</mat-icon>Choose file<input type="file" [accept]="details() ? 'image/png,image/jpeg,image/webp,.md,.txt,text/markdown,text/plain' : 'image/png,image/jpeg,image/webp'" (change)="upload($event)"></label>
             @if (current.assets.length) {
               <ul class="pub-assets">
                 @for (asset of current.assets; track asset.id) {
@@ -283,126 +280,159 @@
                 }
               </ul>
             }
+            <label class="pub-toggle"><input type="checkbox" [checked]="details()" (change)="details.set(!details())"> More details</label>
+            @if (details()) {
+              <mat-form-field appearance="outline" class="wide-field"><mat-label>Design direction notes</mat-label><textarea matInput name="designNotes" [(ngModel)]="designNotes" rows="4" maxlength="2000"></textarea><mat-hint>Brand guidelines, apps you admire, anything to keep or avoid. You can also upload Markdown or text documents above.</mat-hint></mat-form-field>
+            }
+            <div class="pub-panel-actions">
+              <button mat-button type="button" (click)="markAndNext('look')">Skip</button>
+              <button mat-flat-button type="button" (click)="saveLook()" [disabled]="busy()">Save and continue<mat-icon iconPositionEnd aria-hidden="true">arrow_forward</mat-icon></button>
+            </div>
           </section>
-          <label class="pub-toggle"><input type="checkbox" [checked]="details()" (change)="details.set(!details())"> More details</label>
-          @if (details()) {
-            <mat-form-field appearance="outline" class="wide-field"><mat-label>Design direction notes</mat-label><textarea matInput name="designNotes" [(ngModel)]="designNotes" rows="4" maxlength="2000"></textarea><mat-hint>Brand guidelines, apps you admire, anything to keep or avoid. You can also upload Markdown or text documents above.</mat-hint></mat-form-field>
-          }
-          <div class="pub-actions pub-footer-actions">
-            <button mat-button type="button" (click)="markAndNext('look')">Skip</button>
-            <button mat-flat-button type="button" (click)="saveLook()" [disabled]="busy()">Save and continue<mat-icon iconPositionEnd aria-hidden="true">arrow_forward</mat-icon></button>
-          </div>
-        </section>
+          <ng-container *ngTemplateOutlet="stage; context: { mode: 'look', current: current }" />
+        </div>
+      }
+    }
+
+    @case ('pages') {
+      @if (setup(); as current) {
+        <div class="pub-workbench">
+          <section class="pub-panel" aria-labelledby="pages-heading">
+            <p class="eyebrow">Step 7 · Pages · optional</p>
+            <h1 id="pages-heading" tabindex="-1">Shape the navigation</h1>
+            <p class="pub-panel-lead">These are the main places in {{ current.project.name }}, the ones in its navigation. Edit them right in the preview.</p>
+            <ul class="pub-howto">
+              <li><strong>Click a page</strong> in the preview's navigation to open it, then describe what people do there and choose a page type.</li>
+              <li><strong>Pencil</strong> renames it or changes its icon, order or deletes it.</li>
+              <li><strong>Drag</strong> to reorder, or <strong>Add page</strong> for up to five.</li>
+            </ul>
+            @if (current.pages.seeded) { <p class="pub-note">We started you with pages that suit {{ feelLabel(current.design.feel) }}. Rename, replace or delete any of them.</p> }
+            <h2 class="pub-panel-heading">Your pages <span class="pub-count">{{ describedCount() }} of {{ routes().length }} described</span></h2>
+            <ol class="pub-page-summary">
+              @for (page of routes(); track page.id) {
+                <li><mat-icon aria-hidden="true">{{ page.description.trim() ? 'check_circle' : 'radio_button_unchecked' }}</mat-icon><span><strong>{{ page.label }}</strong><small>{{ pageTypeLabel(page.pageType) }}</small></span></li>
+              }
+            </ol>
+            <p class="pub-save-state" role="status">{{ pagesSaved() === 'saved' ? 'All changes saved' : pagesSaved() === 'saving' ? 'Saving…' : 'Unsaved changes' }}</p>
+            <div class="pub-panel-actions">
+              <button mat-flat-button type="button" (click)="continueFromPages()" [disabled]="busy()">Continue<mat-icon iconPositionEnd aria-hidden="true">arrow_forward</mat-icon></button>
+            </div>
+          </section>
+          <ng-container *ngTemplateOutlet="stage; context: { mode: 'pages', current: current }" />
+        </div>
       }
     }
 
     @case ('features') {
       @if (setup(); as current) {
-        <section aria-labelledby="features-heading">
-          <p class="eyebrow">Step 7 · Features · optional</p>
-          <h1 id="features-heading" tabindex="-1">What should {{ current.project.name }} include to start?</h1>
-          <p class="pub-lead">Each choice becomes a feature in your product plan and a page in the skeleton.</p>
-          <fieldset class="pub-feature-grid">
-            <legend class="visually-hidden">Starting features</legend>
-            @for (item of featureEntries(); track item.id) {
-              <label class="pub-feature" [class.selected]="picks.has(item.id)">
-                <input type="checkbox" [checked]="picks.has(item.id)" (change)="togglePick(item.id)">
-                <mat-icon aria-hidden="true">{{ item.icon }}</mat-icon><span><strong>{{ item.label }}</strong><small>{{ item.summary }}</small></span>
-              </label>
-            }
-          </fieldset>
-          <label class="pub-toggle"><input type="checkbox" [checked]="details()" (change)="details.set(!details())"> More details</label>
-          @if (details()) {
-            <section class="pub-custom" aria-labelledby="custom-heading">
-              <h2 id="custom-heading">Your own features</h2>
-              @if (customFeatures().length) {
-                <ul class="pub-assets">
-                  @for (item of customFeatures(); track item.id) {
-                    <li><mat-icon aria-hidden="true">widgets</mat-icon><span><strong>{{ item.title }}</strong><small>{{ item.summary }}</small></span>
-                      <button mat-icon-button type="button" (click)="removeFeature(item.id)" [attr.aria-label]="'Remove ' + item.title"><mat-icon>delete</mat-icon></button></li>
-                  }
-                </ul>
+        <div class="pub-workbench">
+          <section class="pub-panel" aria-labelledby="features-heading">
+            <p class="eyebrow">Step 8 · Functionality · optional</p>
+            <h1 id="features-heading" tabindex="-1">What should {{ current.project.name }} be able to do?</h1>
+            <p class="pub-panel-lead">Capabilities, not pages. Each one becomes a feature in your product plan for building out later.</p>
+            <fieldset class="pub-feature-list">
+              <legend class="visually-hidden">Functionality</legend>
+              @for (item of featureEntries(); track item.id) {
+                <label class="pub-feature" [class.selected]="picks.has(item.id)">
+                  <input type="checkbox" [checked]="picks.has(item.id)" (change)="togglePick(item.id)">
+                  <mat-icon aria-hidden="true">{{ item.icon }}</mat-icon><span><strong>{{ item.label }}</strong><small>{{ item.summary }}</small></span>
+                </label>
               }
-              <mat-form-field appearance="outline" class="wide-field"><mat-label>Feature name</mat-label><input matInput name="newFeatureTitle" [(ngModel)]="newFeatureTitle" maxlength="90"></mat-form-field>
-              <mat-form-field appearance="outline" class="wide-field"><mat-label>What it does</mat-label><textarea matInput name="newFeatureSummary" [(ngModel)]="newFeatureSummary" rows="2" maxlength="600"></textarea></mat-form-field>
-              <button mat-stroked-button type="button" (click)="saveFeatures(false)" [disabled]="busy() || !newFeatureTitle.trim()"><mat-icon aria-hidden="true">add</mat-icon>Add feature</button>
-              <p class="field-hint">Have a requirements document? Upload it as Markdown or text on the Look & feel step with a note, and it goes into the repository's docs.</p>
-            </section>
-          }
-          <div class="pub-actions pub-footer-actions">
-            <button mat-button type="button" (click)="markAndNext('features')">Skip</button>
-            <button mat-flat-button type="button" (click)="saveFeatures()" [disabled]="busy()">Save and continue<mat-icon iconPositionEnd aria-hidden="true">arrow_forward</mat-icon></button>
-          </div>
-        </section>
+            </fieldset>
+            <label class="pub-toggle"><input type="checkbox" [checked]="details()" (change)="details.set(!details())"> More details</label>
+            @if (details()) {
+              <section class="pub-custom" aria-labelledby="custom-heading">
+                <h2 id="custom-heading">Your own</h2>
+                @if (customFeatures().length) {
+                  <ul class="pub-assets">
+                    @for (item of customFeatures(); track item.id) {
+                      <li><mat-icon aria-hidden="true">widgets</mat-icon><span><strong>{{ item.title }}</strong><small>{{ item.summary }}</small></span>
+                        <button mat-icon-button type="button" (click)="removeFeature(item.id)" [attr.aria-label]="'Remove ' + item.title"><mat-icon>delete</mat-icon></button></li>
+                    }
+                  </ul>
+                }
+                <mat-form-field appearance="outline" class="wide-field"><mat-label>Feature name</mat-label><input matInput name="newFeatureTitle" [(ngModel)]="newFeatureTitle" maxlength="90"></mat-form-field>
+                <mat-form-field appearance="outline" class="wide-field"><mat-label>What it does</mat-label><textarea matInput name="newFeatureSummary" [(ngModel)]="newFeatureSummary" rows="2" maxlength="600"></textarea></mat-form-field>
+                <button mat-stroked-button type="button" (click)="saveFeatures(false)" [disabled]="busy() || !newFeatureTitle.trim()"><mat-icon aria-hidden="true">add</mat-icon>Add feature</button>
+              </section>
+            }
+            <div class="pub-panel-actions">
+              <button mat-button type="button" (click)="markAndNext('features')">Skip</button>
+              <button mat-flat-button type="button" (click)="saveFeatures()" [disabled]="busy()">Save and continue<mat-icon iconPositionEnd aria-hidden="true">arrow_forward</mat-icon></button>
+            </div>
+          </section>
+          <ng-container *ngTemplateOutlet="stage; context: { mode: 'pages', current: current }" />
+        </div>
       }
     }
 
     @case ('stack') {
       @if (setup(); as current) {
-        <section class="pub-narrow" aria-labelledby="stack-heading">
-          <p class="eyebrow">Step 8 · Stack · optional</p>
-          <h1 id="stack-heading" tabindex="-1">How it's built</h1>
-          <p class="pub-lead">Aludel only offers stacks it has checked end to end. The recommended one is ready now.</p>
-          @for (item of stackEntries(); track item.id) {
-            @if (item.recommended || details()) {
-              <label class="pub-stack" [class.selected]="stackPreset === item.id" [class.unavailable]="!item.available">
-                <input type="radio" name="stack" [value]="item.id" [(ngModel)]="stackPreset" [disabled]="!item.available">
-                <span><strong>{{ item.label }}@if (item.recommended) { <em class="pub-badge">Recommended</em> }</strong>
-                  <small>{{ item.available ? item.summary : item.unavailableReason }}</small>
-                  @if (item.available) { <span class="pub-layers">@for (layer of layerEntries(item.id); track layer.layer) { <span><b>{{ layer.layer }}</b>{{ layer.value }}</span> }</span> }
-                </span>
-              </label>
+        <div class="pub-workbench">
+          <section class="pub-panel" aria-labelledby="stack-heading">
+            <p class="eyebrow">Step 9 · Build</p>
+            <h1 id="stack-heading" tabindex="-1">{{ current.preview.status === 'running' ? current.project.name + ' is built' : 'Build ' + current.project.name }}</h1>
+            @if (current.preview.status === 'running' || current.preview.status === 'stopped') {
+              <p class="pub-panel-lead">It's running at <code>{{ current.urls.app }}</code>, with the pages and design you shaped. Continue in Aludel to plan and build it out.</p>
+            } @else {
+              <p class="pub-panel-lead">Aludel generates exactly what the preview shows, commits it to your repository and starts it at <code>{{ current.urls.app }}</code>.</p>
             }
-          }
-          <label class="pub-toggle"><input type="checkbox" [checked]="details()" (change)="details.set(!details())"> More options</label>
-          @if (details()) {
-            <fieldset class="pub-options">
-              <legend>Options for {{ stackLabel(stackPreset) }}</legend>
-              @for (option of optionEntries(stackPreset); track option.key) {
-                <label class="pub-check"><input type="checkbox" [name]="option.key" [(ngModel)]="stackOptions[option.key]"> {{ option.label }}</label>
+            <h2 class="pub-panel-heading">Stack</h2>
+            @for (item of stackEntries(); track item.id) {
+              @if (item.recommended || details()) {
+                <label class="pub-stack" [class.selected]="stackPreset === item.id" [class.unavailable]="!item.available">
+                  <input type="radio" name="stack" [value]="item.id" [(ngModel)]="stackPreset" [disabled]="!item.available">
+                  <span><strong>{{ item.label }}@if (item.recommended) { <em class="pub-badge">Recommended</em> }</strong>
+                    <small>{{ item.available ? item.summary : item.unavailableReason }}</small>
+                    @if (item.available) { <span class="pub-layers">@for (layer of layerEntries(item.id); track layer.layer) { <span><b>{{ layer.layer }}</b>{{ layer.value }}</span> }</span> }
+                  </span>
+                </label>
               }
-            </fieldset>
-          }
-          <div class="pub-actions pub-footer-actions">
-            <button mat-flat-button type="button" (click)="saveStack()" [disabled]="busy()">{{ details() ? 'Save and continue' : 'Use the recommended setup' }}<mat-icon iconPositionEnd aria-hidden="true">arrow_forward</mat-icon></button>
-          </div>
-        </section>
-      }
-    }
-
-    @case ('build') {
-      @if (setup(); as current) {
-        <section aria-labelledby="build-heading">
-          <p class="eyebrow">Step 9 · Build</p>
-          <h1 id="build-heading" tabindex="-1">{{ current.preview.status === 'running' ? current.project.name + ' is ready to click around' : 'Build ' + current.project.name }}</h1>
-          <dl class="pub-summary">
-            <div><dt>Working style</dt><dd>{{ profileLabel(current.profile) }}</dd></div>
-            <div><dt>Feel</dt><dd><span class="pub-swatch" [style.background]="current.design.accent"></span>{{ feelLabel(current.design.feel) }} · {{ current.design.theme === 'system' ? 'matches device' : current.design.theme }}</dd></div>
-            <div><dt>Features</dt><dd>{{ current.features.records.length ? current.features.records.length + ' planned' : 'None yet (home page only)' }}</dd></div>
-            <div><dt>Stack</dt><dd>{{ stackLabel(current.stack.preset) }}</dd></div>
-            <div><dt>Address</dt><dd><code>{{ current.urls.app }}</code></dd></div>
-            <div><dt>Repository</dt><dd>{{ current.github.repository ? current.github.repository.owner + '/' + current.github.repository.name : 'Local only for now' }}</dd></div>
-          </dl>
-          <div class="pub-preview-bar" role="status">
-            <strong>{{ previewLabel() }}</strong>
-            @if (current.preview.status === 'running' || current.preview.status === 'stopped') { <a mat-flat-button [href]="current.urls.app" target="_blank" rel="noopener">Open {{ current.project.name }}<mat-icon iconPositionEnd aria-hidden="true">open_in_new</mat-icon></a> }
-            <button mat-stroked-button type="button" (click)="build()" [disabled]="busy() || current.preview.status === 'building' || current.preview.status === 'starting'">{{ current.preview.status === 'not-built' ? 'Build my app' : 'Rebuild from current setup' }}</button>
-            <a mat-button [href]="'/projects/' + current.project.id" (click)="go('/projects/' + current.project.id, $event)">Go to app page</a>
-          </div>
-          @if (current.preview.status === 'failed') {
-            <p class="error-message">{{ current.preview.error }}</p>
-            <details class="pub-log"><summary>Build log</summary><pre>{{ current.preview.log }}</pre></details>
-          }
+            }
+            <label class="pub-toggle"><input type="checkbox" [checked]="details()" (change)="details.set(!details())"> More options</label>
+            @if (details()) {
+              <fieldset class="pub-options">
+                <legend>Options for {{ stackLabel(stackPreset) }}</legend>
+                @for (option of optionEntries(stackPreset); track option.key) {
+                  <label class="pub-check"><input type="checkbox" [name]="option.key" [(ngModel)]="stackOptions[option.key]"> {{ option.label }}</label>
+                }
+              </fieldset>
+            }
+            <div class="pub-preview-status" role="status"><strong>{{ previewLabel() }}</strong>
+              @if (current.preview.status === 'running' || current.preview.status === 'stopped') {
+                <div class="pub-panel-actions start">
+                  <a mat-flat-button [href]="'/projects/' + current.project.id" (click)="go('/projects/' + current.project.id, $event)">Continue in Aludel<mat-icon iconPositionEnd aria-hidden="true">arrow_forward</mat-icon></a>
+                  <a mat-stroked-button [href]="current.urls.app" target="_blank" rel="noopener">Open {{ current.project.name }}<mat-icon iconPositionEnd aria-hidden="true">open_in_new</mat-icon></a>
+                </div>
+              }
+            </div>
+            @if (current.preview.status === 'failed') {
+              <p class="error-message">{{ current.preview.error }}</p>
+              <details class="pub-log"><summary>Build log</summary><pre>{{ current.preview.log }}</pre></details>
+            }
+            <div class="pub-panel-actions">
+              @if (current.preview.status === 'not-built' || current.preview.status === 'failed') {
+                <button mat-flat-button type="button" (click)="buildApp()" [disabled]="busy()">Build my app</button>
+              } @else {
+                <button mat-button type="button" (click)="buildApp()" [disabled]="busy() || current.preview.status === 'building' || current.preview.status === 'starting'">Rebuild from current setup</button>
+              }
+            </div>
+          </section>
           @if (current.preview.status === 'running') {
-            <iframe class="pub-preview-frame" [src]="current.urls.app | safeUrl" [title]="current.project.name + ' preview'"></iframe>
+            <div class="pub-stage">
+              <div class="pub-stage-bar"><span class="pub-live">Live</span><code>{{ current.urls.app }}</code></div>
+              <iframe class="pub-preview-frame" [src]="current.urls.app | safeUrl" [title]="current.project.name + ' preview'"></iframe>
+            </div>
+          } @else {
+            <ng-container *ngTemplateOutlet="stage; context: { mode: 'pages', current: current, building: current.preview.status === 'building' || current.preview.status === 'starting' }" />
           }
-        </section>
+        </div>
       }
     }
 
     @case ('projects') {
       <section aria-labelledby="projects-heading">
-        <div class="pub-split"><h1 id="projects-heading" tabindex="-1">Your apps</h1><a mat-flat-button href="/start" (click)="go('/start', $event)"><mat-icon aria-hidden="true">add</mat-icon>New app</a></div>
+        <div class="pub-workbench"><h1 id="projects-heading" tabindex="-1">Your apps</h1><a mat-flat-button href="/start" (click)="go('/start', $event)"><mat-icon aria-hidden="true">add</mat-icon>New app</a></div>
         @if (session()?.projects?.length) {
           <ul class="pub-project-list">
             @for (item of session()?.projects; track item.id) {
@@ -425,7 +455,7 @@
           <div class="pub-preview-bar">
             <strong>{{ previewLabel() }}</strong>
             @if (current.preview.status === 'running' || current.preview.status === 'stopped') { <a mat-flat-button [href]="current.urls.app" target="_blank" rel="noopener">Open app<mat-icon iconPositionEnd aria-hidden="true">open_in_new</mat-icon></a> }
-            <a mat-stroked-button [href]="stepPath('build')" (click)="go(stepPath('build'), $event)">{{ current.preview.status === 'not-built' ? 'Finish setup and build' : 'Rebuild' }}</a>
+            <a mat-stroked-button [href]="stepPath('stack')" (click)="go(stepPath('stack'), $event)">{{ current.preview.status === 'not-built' ? 'Finish setup and build' : 'Rebuild' }}</a>
             <code>{{ current.urls.app }}</code>
           </div>
           <div class="pub-project-grid">
@@ -469,3 +499,29 @@
     }
   }
 </main>
+
+<ng-template #stage let-mode="mode" let-current="current" let-building="building">
+  <div class="pub-stage" [class.building]="building">
+    <div class="pub-stage-bar" role="group" aria-label="Preview options">
+      @if (narrow()) { <span class="pub-stage-note">Phone preview · open on a larger screen for desktop</span> } @else {
+      <div class="pub-segmented small" role="radiogroup" aria-label="Device">
+        <label [class.selected]="device() === 'desktop'"><input type="radio" name="device" value="desktop" [checked]="device() === 'desktop'" (change)="device.set('desktop')"><mat-icon aria-hidden="true">desktop_windows</mat-icon>Desktop</label>
+        <label [class.selected]="device() === 'mobile'"><input type="radio" name="device" value="mobile" [checked]="device() === 'mobile'" (change)="device.set('mobile')"><mat-icon aria-hidden="true">mobile</mat-icon>Mobile</label>
+      </div>
+      @if (device() === 'desktop') {
+        <div class="pub-segmented small" role="radiogroup" aria-label="Desktop navigation">
+          <label [class.selected]="navigation === 'sidebar'"><input type="radio" name="navigation" value="sidebar" [checked]="navigation === 'sidebar'" (change)="setNavigation('sidebar')">Side nav</label>
+          <label [class.selected]="navigation === 'top'"><input type="radio" name="navigation" value="top" [checked]="navigation === 'top'" (change)="setNavigation('top')">Top nav</label>
+        </div>
+      } @else { <span class="pub-stage-note">Phones use a bottom tab bar</span> }
+      }
+    </div>
+    @if (previewFeel(); as feelValue) {
+      <aludel-proto-site [feel]="feelValue" [theme]="theme" [accent]="accent" [navigation]="navigation" [device]="previewDevice()" [mode]="mode"
+        [routes]="routes()" [appName]="current.project.name" [slug]="current.project.slug" [heroUrl]="heroUrl()"
+        [showSignIn]="!!stackOptions['auth']" [pageTypes]="catalog()?.pageTypes || {}" [icons]="catalog()?.routeIcons || []"
+        (routesChange)="routesChanged($event)"></aludel-proto-site>
+    }
+    @if (building) { <div class="pub-stage-overlay" role="status"><span class="pub-spinner" aria-hidden="true"></span>Building {{ current.project.name }}…</div> }
+  </div>
+</ng-template>
