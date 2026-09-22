@@ -19,7 +19,7 @@ try {
   } else await page.getByRole('button', { name: 'Open portal' }).click();
   await page.getByRole('heading', { name: 'Aludel', exact: true }).waitFor();
   assert.match(await page.locator('.brand-hero').getAttribute('style'), /url\(.+\.png/);
-  await page.getByRole('link', { name: 'Brand', exact: true }).click();
+  await page.getByRole('link', { name: 'Settings', exact: true }).click();
   await page.getByRole('heading', { name: 'Project brand' }).waitFor();
   await page.getByLabel('Project name').fill('Aludel');
   await page.getByLabel('Tagline').fill('Turn ideas into what’s next.');

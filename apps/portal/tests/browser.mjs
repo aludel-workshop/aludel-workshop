@@ -23,7 +23,7 @@ try {
   }
   await page.getByRole('heading', { name: 'Aludel', exact: true }).waitFor();
   assert.match(await page.locator('main').innerText(), /knowledge (records|sources)/i);
-  await page.getByRole('link', { name: 'Browse knowledge' }).click();
+  await page.getByRole('link', { name: 'Browse sources' }).click();
   await page.getByLabel('Search records').fill('architecture');
   await page.getByRole('button', { name: 'Search' }).click();
   await page.getByRole('link', { name: /Architecture proposal/ }).click();

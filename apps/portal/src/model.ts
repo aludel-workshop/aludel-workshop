@@ -95,3 +95,21 @@ export interface WorkTask {
 export interface OwnerRequest {
   id: string; body: string; status: 'new'|'deferred'|'linked'; created_at: string; updated_at?: string;
 }
+
+export interface ProductDirection {
+  id: string; kind: 'direction'; revision: number; title: string; summary: string; audience: string;
+  outcomes: string[]; constraints: string[]; success: string[]; source_path?: string; author: string; updated_at: string;
+}
+
+export interface ProductOutcome {
+  id: string; kind: 'outcome'; revision: number; title: string; summary: string; horizon: 'now'|'next'|'later';
+  status: 'proposed'|'active'|'achieved'|'deferred'; priority: number; feature_count: number; source_path?: string; author: string; updated_at: string;
+}
+
+export interface ProductFeature {
+  id: string; kind: 'feature'; revision: number; title: string; summary: string;
+  status: 'proposed'|'planned'|'active'|'available'|'retired'; outcome_id?: string | null; evidence: string[];
+  source_path?: string; author: string; updated_at: string;
+}
+
+export interface ProductWorkspace { direction: ProductDirection; outcomes: ProductOutcome[]; features: ProductFeature[]; }

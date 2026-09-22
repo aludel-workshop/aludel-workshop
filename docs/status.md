@@ -16,13 +16,13 @@ Turn the running local portal foundation into the first complete request → del
 
 ## Next action
 
-**B-03B — validate the supervised cycle, then integrate execution.** PW-01A now supplies the accepted Work shell and safe changed-input refresh. B-03B remains the next dependency for live worker transport, leases, recovery and immutable candidate review. It requires separate authorization before execution. [PW-01A evidence](evidence/pw-01a-work-implementation.md) · [execution packet](execution-plan.md#b-03b--validate-the-supervised-cycle-then-integrate-execution).
+**B-03B — validate the supervised cycle, then integrate execution.** PW-02 is complete and returns the pointer to the minimum real request → execution → immutable candidate review loop. Prepare the bounded implementation scope before authorization; no worker, deployment or external effect is authorized by PW-02. [PW-02 evidence](evidence/pw-02-product-workspace.md) · [execution packet](execution-plan.md#b-03b--validate-the-supervised-cycle-then-integrate-execution).
 
 ## Ready queue
 
-1. **B-03B** — prerequisites and accepted Work shell exist; prepare the bounded implementation scope before authorization.
+1. **B-03B** — Product and Work workspace prerequisites exist; requires separate implementation authorization.
 
-One packet at a time. B-03's worker/artifact/recovery work remains required; [proposed dependency order](design/project-workspace/v1/delivery-plan.md).
+One packet at a time. B-03's worker/artifact/recovery work remains required and must not be displaced by later workspace expansion. [Proposed dependency order](design/project-workspace/v1/delivery-plan.md).
 
 ## Active blockers
 
@@ -30,10 +30,12 @@ One packet at a time. B-03's worker/artifact/recovery work remains required; [pr
 - **Owner interface validation:** portal-only dispatch is suspended by DEC-029 after ready work became unstartable under stale/open decision checks. The replacement must prove recovery from changed decision inputs before portal-first dispatch returns. Prior request/proposal/authorization evidence remains historical.
 - **Automated execution/review:** full B-03 remains incomplete. B-03B must supply worker transport/leases/recovery and immutable candidate review, including DEC-026 review-bar migration.
 - **Candidate acceptance/external effects:** Q-005 and Q-008 remain gates; DEC-028 resolves Q-002 only for supervised local scope.
-- **External preview/provider use:** local waiver does not authorize external deployment or spending. The vendor GitHub App flow is locally/mocked verified, but no app registration, live authorization/installation, repository creation or GitHub push has occurred.
+- **External preview/provider use:** local waiver does not authorize external deployment or spending. The vendor GitHub App's organization path has now completed one owner-run live authorization, all-repositories installation, private repository creation and initial push. Personal-account creation, token refresh/revocation, recovery against live provider failures, hosted secrets and public deployment remain unverified.
 - **M3 generality:** Q-003 needs a representative second-product brief.
 
 ## Current facts and evidence
+
+- PW-02 adds revisioned Direction, outcome Roadmap and Features records, then migrates primary navigation to Overview / Product / Work with utility destinations. Its primary-source reference study changed the implemented composition; product edits retain provenance, stale only exact dependents and never authorize Work. Node 24 typecheck/build, six server/domain suites, Product wide/narrow axe/browser checks and the existing Work lifecycle regression pass. [Evidence/retrospective](evidence/pw-02-product-workspace.md) · [research and references](design/project-workspace/pw-02/research.md).
 
 - DEC-031 names the self-hosting product Aludel. Project-owned brand metadata and bounded raster uploads now drive the shell; the supplied alchemical workshop art is the current hero. Node 24 typecheck/build, five server/domain suites, and a disposable wide/narrow accessibility browser flow pass. [Evidence/post-hoc](design/process/aludel-brand-work-record.md).
 - D-02 audits 11 request concerns, proposes product-area vs change-centric organization, six owner journeys and phased records/preview/project-setup contracts. [Evidence/post-hoc](design/project-workspace/v1/work-record.md); no strategy features or historical migration implemented.
@@ -46,15 +48,16 @@ One packet at a time. B-03's worker/artifact/recovery work remains required; [pr
 - B-01 is complete for its local boundary. `./launch-machine` builds and serves the portal at `http://127.0.0.1:4310`; first-run owner setup happens in the browser without logging the key.
 - [B-01 evidence](evidence/b-01-local-foundation.md) records unauthenticated rejection; owner setup/login and restart persistence; 67-document real-corpus import; 435 source relationships; idempotent re-import; changed-source revision testing; durable requests; search/detail UI; Storybook; build/typecheck; axe; and 390px browser checks.
 - Angular 22 / Material 22 and explicit Storybook stories are now adopted for the portal implementation. SQLite is the tested zero-service local adapter; PostgreSQL remains the hosted-direction candidate. The database is authoritative for new mutable owner requests; Markdown remains seed/audit evidence and repository authority for code-adjacent contracts.
-- The Overview now exposes a vendor-owned GitHub App flow: deployment-managed app identity, owner OAuth/installation, eligible account selection, explicit repository confirmation, recoverable create/initialize/push, and a fresh repository-scoped installation token for every Git operation. Organization/personal endpoint-token behavior, state/PKCE, JWT signing, redaction, recovery, disposable bare-remote push, build/typecheck and responsive/axe browser checks pass locally. The workspace intentionally remains without usable Git history until the owner completes the live portal action. [Implementation evidence and retrospective](design/process/enterprise-github-app-work-record.md).
+- The vendor-owned GitHub App flow has completed its first live organization trial. The portal binding is `ready` for private `aludel-workshop/aludel-workshop`; the active installation has all-repository access plus Administration/Contents write; local `main`, the portal record and GitHub `main` all resolve to baseline commit `6c54d7a`; 404 tracked files agree; and the ignored `.env`/PEM plus client secret are absent from the commit. Baseline inspection found a dangling tracked `apps/portal/node_modules` symlink and legacy `the-machine[bot]` attribution for follow-up. Organization/personal endpoint-token behavior, state/PKCE, JWT signing, redaction and recovery retain their local/mocked coverage. [Implementation and live evidence](design/process/enterprise-github-app-work-record.md).
 - R-03, R-06B, and R-05 provide the bounded local Codex path, Symphony/Linear direction, and recovery protocol evidence for later B-03 integration.
 
 ## Completed packets
 
 | Packet | Result | Evidence |
 |---|---|---|
+| PW-02 | Revisioned Direction/Roadmap/Features, research-backed projections, responsibility-based navigation and legacy-route compatibility | [Evidence/retrospective](evidence/pw-02-product-workspace.md), [research](design/project-workspace/pw-02/research.md) |
 | BRAND-001 | Aludel name/art applied through reusable project brand data and upload contract; server and browser checks pass | [Evidence/retrospective](design/process/aludel-brand-work-record.md) |
-| Enterprise GitHub App | Vendor app configuration, owner authorization/installation, account selection, endpoint/token matrix, ephemeral installation-token Git, reusable Git profile and no-duplicate recovery agent-checked; live owner/provider trial pending | [Evidence/retrospective](design/process/enterprise-github-app-work-record.md) |
+| Enterprise GitHub App | Vendor app configuration, live organization authorization/all-repositories installation/private create/push, endpoint-token matrix, ephemeral installation-token Git and no-duplicate recovery agent-checked; remaining live variants explicit | [Evidence/retrospective](design/process/enterprise-github-app-work-record.md) |
 | Git bootstrap | Initial portal flow and reusable Git/recovery profile; provider onboarding/token architecture superseded by DEC-030 | [Historical evidence/retrospective](design/process/git-bootstrap-work-record.md) |
 | PW-01A | Accepted v9 Work shell, real work/request projections, safe changed-input refresh, responsive four-route browser proof | [Evidence/retrospective](evidence/pw-01a-work-implementation.md), [design QA](../apps/portal/design-qa.md) |
 | D-04 | Historical delivery; UI quality rejected and interaction evidence qualified by D-04R audit | [Evidence/post-hoc](design/project-workspace/v5/work-record.md), [prototype](design/project-workspace/v5/index.html) |
@@ -72,4 +75,6 @@ One packet at a time. B-03's worker/artifact/recovery work remains required; [pr
 
 ## Latest handoff
 
-2026-09-21: DEC-031 names the product Aludel and moves name, tagline, description, accent and hero art behind a reusable project brand contract with bounded upload. Local domain/build and responsive accessibility checks pass. [Evidence](design/process/aludel-brand-work-record.md). B-03B remains the single next planning pointer.
+2026-09-21: PW-02 is complete. The Product area now provides revisioned Direction, horizon Roadmap and feature comparison/detail over one product record set; route and authority boundaries survived desktop/narrow browser checks and the existing Work lifecycle regression. [Evidence](evidence/pw-02-product-workspace.md). B-03B is again the single next planning pointer and needs separate authorization.
+
+2026-09-21: the first live GitHub organization setup succeeded through the portal. Persisted binding, installation permissions, local baseline, tracked-file count and authenticated GitHub `main` were cross-checked; no real credential file or client secret is tracked. [Evidence](design/process/enterprise-github-app-work-record.md).

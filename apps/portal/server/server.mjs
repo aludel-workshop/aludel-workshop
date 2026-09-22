@@ -12,6 +12,7 @@ import { githubIntegration } from './github-integration.mjs';
 import { loadGitHubVendorConfig } from './github-vendor-config.mjs';
 import { initializeAndPush, inspectGitRepository, loadGitProfile } from './git-repository.mjs';
 import { getProjectBrand, updateProjectBrand } from './project-brand.mjs';
+import { ensureProductWorkspace, getProductWorkspace, saveProductRecord } from './product-workspace.mjs';
 
 const portalRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const repositoryRoot = resolve(portalRoot, '../..');
@@ -25,6 +26,7 @@ const publicBaseUrl = (process.env.MACHINE_PUBLIC_BASE_URL || `http://${host}:${
 const sessionMaxAge = 60 * 60 * 24 * 30;
 const db = openDatabase(databasePath);
 initWorkflow(db);
+ensureProductWorkspace(db);
 const secrets = openSecretStore(dataDirectory);
 const gitSetup = loadGitProfile(join(portalRoot, 'config', 'project-setup.json'), 'the-machine');
 const github = githubIntegration({
@@ -177,6 +179,13 @@ async function api(request, response, url) {
   if (url.pathname === '/api/work' && request.method === 'GET') return json(response, 200, { tasks: workList(db), requests: db.prepare('SELECT id, body, status, created_at FROM owner_requests ORDER BY created_at DESC').all() });
   if (/^\/api\/work\/(authorize|answer|resume|cancel|refresh)$/.test(url.pathname) && request.method === 'POST') return json(response, 200, workOperation(db, 'owner', url.pathname.split('/').pop(), await readJson(request)));
   if (url.pathname === '/api/overview' && request.method === 'GET') return json(response, 200, overview());
+  if (url.pathname === '/api/projects/the-machine/product' && request.method === 'GET') return json(response, 200, getProductWorkspace(db));
+  const productRecordMatch = /^\/api\/projects\/the-machine\/product\/(direction|outcome|feature)(?:\/([^/]+))?$/.exec(url.pathname);
+  if (productRecordMatch && request.method === 'PUT') {
+    const kind = productRecordMatch[1];
+    const id = productRecordMatch[2] ? decodeURIComponent(productRecordMatch[2]) : undefined;
+    return json(response, id ? 200 : 201, saveProductRecord(db, 'the-machine', kind, id, await readJson(request)));
+  }
   if (url.pathname === '/api/product-state' && request.method === 'GET') return json(response, 200, {
     proposals: listProposals(db), decisions: listDecisions(db), records: listDownstreamRecords(db)
   });

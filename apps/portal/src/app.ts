@@ -1,15 +1,16 @@
 import { ChangeDetectorRef, Component, computed, inject, signal } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule, MatIconRegistry } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { DependencyListComponent, RecordListComponent, StatusComponent } from './components';
-import { Decision, DownstreamRecord, GitHubIntegration, Overview, OwnerRequest, ProjectBrand, Proposal, RecordDetail, SourceRecord, WorkTask } from './model';
+import { Decision, DownstreamRecord, GitHubIntegration, Overview, OwnerRequest, ProductDirection, ProductFeature, ProductOutcome, ProductWorkspace, ProjectBrand, Proposal, RecordDetail, SourceRecord, WorkTask } from './model';
 
 @Component({
   selector: 'machine-app', standalone: true,
-  imports: [FormsModule, MatButtonModule, MatIconModule, MatFormFieldModule, MatInputModule, DependencyListComponent, RecordListComponent, StatusComponent],
+  imports: [FormsModule, NgTemplateOutlet, MatButtonModule, MatIconModule, MatFormFieldModule, MatInputModule, DependencyListComponent, RecordListComponent, StatusComponent],
   templateUrl: './app.html'
 })
 export class App {
@@ -31,6 +32,21 @@ export class App {
   downstream = signal<DownstreamRecord[]>([]);
   tasks = signal<WorkTask[]>([]);
   inbox = signal<OwnerRequest[]>([]);
+  product = signal<ProductWorkspace | null>(null);
+  productEditing = signal(false);
+  selectedProductId = signal('');
+  productMessage = signal('');
+  productTitle = '';
+  productSummary = '';
+  productAudience = '';
+  productOutcomes = '';
+  productConstraints = '';
+  productSuccess = '';
+  productHorizon: 'now'|'next'|'later' = 'now';
+  productStatus = 'proposed';
+  productPriority = 1;
+  productOutcomeId = '';
+  productEvidence = '';
   intakeFilter = signal<'new'|'deferred'>('new');
   selectedIntakeId = signal('');
   showDone = signal(false);
@@ -75,6 +91,9 @@ export class App {
     if (!segments[3] || ['plan', 'operations', 'intake'].includes(segments[3])) return '';
     return decodeURIComponent((segments[3] === 'item' ? segments.slice(4) : segments.slice(3)).join('/'));
   });
+  productView = computed(() => this.page() === 'product' ? (this.route().split('?')[0].split('/')[3] || 'direction') : '');
+  selectedOutcome = computed(() => this.product()?.outcomes.find(item => item.id === this.selectedProductId()) || null);
+  selectedFeature = computed(() => this.product()?.features.find(item => item.id === this.selectedProductId()) || null);
   selectedTasks = computed(() => this.tasks().filter(task => task.id === this.workId()));
   filteredIntake = computed(() => this.inbox().filter(item => item.status === this.intakeFilter()));
   selectedIntake = computed(() => this.inbox().find(item => item.id === this.selectedIntakeId()) || this.filteredIntake()[0] || null);
@@ -97,6 +116,7 @@ export class App {
       this.error.set('');
       if (this.page() === 'request') { this.requestSaved.set(false); this.requestText = ''; this.savedRequestId = ''; }
       this.saveMessage.set('');
+      this.productEditing.set(false); this.productMessage.set(''); this.selectedProductId.set('');
       void this.loadRoute();
       setTimeout(() => document.querySelector<HTMLElement>('main h1')?.focus({ preventScroll: true }), 20);
     });
@@ -156,7 +176,13 @@ export class App {
     if (!this.authenticated()) return;
     this.loading.set(true); this.error.set('');
     try {
-      if (this.page() === 'knowledge' && this.recordId()) {
+      if (this.page() === 'product') {
+        const product = await this.request<ProductWorkspace>('/api/projects/the-machine/product');
+        this.product.set(product);
+        if (this.productView() === 'direction') this.setProductDraft(product.direction);
+        else if (this.productView() === 'roadmap' && product.outcomes.length) this.selectProductRecord(product.outcomes[0]);
+        else if (this.productView() === 'features' && product.features.length) this.selectProductRecord(product.features[0]);
+      } else if (this.page() === 'knowledge' && this.recordId()) {
         this.detail.set(await this.request<RecordDetail>(`/api/records/${encodeURIComponent(this.recordId())}`));
       } else if (this.page() === 'knowledge') {
         await this.search();
@@ -379,6 +405,48 @@ export class App {
   }
 
   private lines(value: string) { return value.split('\n').map(item => item.trim()).filter(Boolean); }
+
+  selectProductRecord(record: ProductDirection|ProductOutcome|ProductFeature) {
+    this.selectedProductId.set(record.id); this.productEditing.set(false); this.setProductDraft(record);
+  }
+
+  startProductRecord(kind: 'outcome'|'feature') {
+    this.selectedProductId.set(''); this.productEditing.set(true); this.productTitle = ''; this.productSummary = '';
+    this.productStatus = 'proposed'; this.productHorizon = 'now'; this.productPriority = 1; this.productOutcomeId = ''; this.productEvidence = '';
+    if (kind === 'outcome') this.productOutcomeId = '__outcome__';
+  }
+
+  setProductDraft(record: ProductDirection|ProductOutcome|ProductFeature) {
+    this.productTitle = record.title; this.productSummary = record.summary;
+    if (record.kind === 'direction') {
+      this.productAudience = record.audience; this.productOutcomes = record.outcomes.join('\n');
+      this.productConstraints = record.constraints.join('\n'); this.productSuccess = record.success.join('\n');
+    } else if (record.kind === 'outcome') {
+      this.productHorizon = record.horizon; this.productStatus = record.status; this.productPriority = record.priority; this.productOutcomeId = '__outcome__';
+    } else {
+      this.productStatus = record.status; this.productOutcomeId = record.outcome_id || ''; this.productEvidence = record.evidence.join('\n');
+    }
+  }
+
+  productOutcomeTitle(id?: string|null) { return this.product()?.outcomes.find(item => item.id === id)?.title || 'No linked outcome'; }
+  outcomesFor(horizon: 'now'|'next'|'later') { return this.product()?.outcomes.filter(item => item.horizon === horizon) || []; }
+
+  async saveProduct(kind: 'direction'|'outcome'|'feature') {
+    const current = kind === 'direction' ? this.product()?.direction : kind === 'outcome' ? this.selectedOutcome() : this.selectedFeature();
+    this.loading.set(true); this.error.set(''); this.productMessage.set('');
+    try {
+      const body: Record<string, unknown> = { expectedRevision: current?.revision, title: this.productTitle, summary: this.productSummary };
+      if (kind === 'direction') Object.assign(body, { audience: this.productAudience, outcomes: this.lines(this.productOutcomes), constraints: this.lines(this.productConstraints), success: this.lines(this.productSuccess) });
+      else if (kind === 'outcome') Object.assign(body, { horizon: this.productHorizon, status: this.productStatus, priority: this.productPriority });
+      else Object.assign(body, { status: this.productStatus, outcome_id: this.productOutcomeId || null, evidence: this.lines(this.productEvidence) });
+      const path = `/api/projects/the-machine/product/${kind}${current ? `/${encodeURIComponent(current.id)}` : ''}`;
+      const saved = await this.request<ProductDirection|ProductOutcome|ProductFeature>(path, { method: 'PUT', body: JSON.stringify(body) });
+      const product = await this.request<ProductWorkspace>('/api/projects/the-machine/product'); this.product.set(product);
+      const refreshed = kind === 'direction' ? product.direction : kind === 'outcome' ? product.outcomes.find(item => item.id === saved.id)! : product.features.find(item => item.id === saved.id)!;
+      this.selectProductRecord(refreshed); this.productMessage.set((saved as ProductDirection & {unchanged?: boolean}).unchanged ? 'No changes to save.' : `Revision ${saved.revision} saved. No work was started.`);
+    } catch (error) { this.error.set(error instanceof Error ? error.message : String(error)); }
+    finally { this.loading.set(false); }
+  }
 
   async reviseProposal() {
     const proposal = this.proposal(); if (!proposal) return;

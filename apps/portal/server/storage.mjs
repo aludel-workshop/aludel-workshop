@@ -70,6 +70,20 @@ export function openDatabase(path) {
       consumed_decision_revision INTEGER NOT NULL, created_at TEXT NOT NULL,
       UNIQUE(decision_id, downstream_record_id)
     );
+    CREATE TABLE IF NOT EXISTS product_records (
+      id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id), kind TEXT NOT NULL CHECK(kind IN ('direction', 'outcome', 'feature')),
+      current_revision_id INTEGER, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS product_record_revisions (
+      id INTEGER PRIMARY KEY, record_id TEXT NOT NULL REFERENCES product_records(id), revision INTEGER NOT NULL,
+      title TEXT NOT NULL, summary TEXT NOT NULL, data_json TEXT NOT NULL, source_path TEXT,
+      author TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(record_id, revision)
+    );
+    CREATE TABLE IF NOT EXISTS product_dependencies (
+      id INTEGER PRIMARY KEY, product_record_id TEXT NOT NULL REFERENCES product_records(id),
+      downstream_record_id TEXT NOT NULL REFERENCES downstream_records(id), consumed_revision INTEGER NOT NULL,
+      created_at TEXT NOT NULL, UNIQUE(product_record_id, downstream_record_id)
+    );
     CREATE TABLE IF NOT EXISTS auth_config (
       id INTEGER PRIMARY KEY CHECK (id = 1), salt TEXT NOT NULL, key_hash TEXT NOT NULL, updated_at TEXT NOT NULL
     );
@@ -103,6 +117,8 @@ export function openDatabase(path) {
     CREATE INDEX IF NOT EXISTS idx_proposals_project ON change_proposals(project_id);
     CREATE INDEX IF NOT EXISTS idx_decisions_project ON decisions(project_id);
     CREATE INDEX IF NOT EXISTS idx_dependencies_decision ON record_dependencies(decision_id);
+    CREATE INDEX IF NOT EXISTS idx_product_records_project ON product_records(project_id, kind);
+    CREATE INDEX IF NOT EXISTS idx_product_dependencies_record ON product_dependencies(product_record_id);
   `);
   // Superseded per-owner app credentials are not retained after the vendor-app migration.
   db.exec('DROP TABLE IF EXISTS github_connections');

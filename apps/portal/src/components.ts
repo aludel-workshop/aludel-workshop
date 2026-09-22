@@ -20,7 +20,7 @@ export class StatusComponent {
   imports: [FormsModule, MatButtonModule, MatIconModule, MatInputModule, MatFormFieldModule, StatusComponent],
   template: `
     <section class="record-collection" aria-labelledby="records-heading">
-      <header class="section-heading"><div><h2 id="records-heading">Knowledge records</h2><p>{{records.length}} shown</p></div></header>
+      <header class="section-heading"><div><h2 id="records-heading">Source records</h2><p>{{records.length}} shown</p></div></header>
       @if(searchable){<mat-form-field appearance="outline" class="search-field"><mat-label>Search records</mat-label><mat-icon matPrefix>subject</mat-icon><input matInput [ngModel]="query" (ngModelChange)="queryChange.emit($event)" (keyup.enter)="search.emit()"><button mat-icon-button matSuffix aria-label="Search" (click)="search.emit()"><mat-icon>arrow_forward</mat-icon></button></mat-form-field>}
       @if(!records.length){<div class="empty-state"><mat-icon>subject</mat-icon><p>No records match this search.</p></div>}
       <div class="record-rows">@for(record of records; track record.id){
