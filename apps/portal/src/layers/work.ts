@@ -2,19 +2,11 @@ import { Component, computed, effect, inject, signal, untracked } from '@angular
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { AgentConnectionComponent } from '../agent-connection';
-import { AgentProfile, ProjectContext, Suggestion, WorkItem, layerLabel, lines, stateLabel } from './context';
+import { AgentProfile, ProjectContext, Suggestion, WorkItem, layerLabel, lines, modeLabel, stateLabel } from './context';
 
 interface ReconcileContext { recordId: string; fromRevision: number; toRevision: number; changes: { field: string; before: unknown; after: unknown }[];
   units: { id: string; symbol: string; path: string; kind: string; calls: string[]; calledBy: string[] }[]; tests: string[]; }
 
-const automation: [string, Record<string, string>][] = [
-  ['Vision and roadmap', { dreamer: 'Agent asks a few questions, then drafts', planner: 'You', tinkerer: 'You' }],
-  ['Stories and acceptance', { dreamer: 'Agent drafts · you review', planner: 'You', tinkerer: 'You' }],
-  ['Specs', { dreamer: 'Agent drafts · asks only blockers', planner: 'Agent drafts · you review', tinkerer: 'You' }],
-  ['Page designs', { dreamer: 'Agent · asks when options differ', planner: 'Agent · you choose', tinkerer: 'You' }],
-  ['Implementation', { dreamer: 'Template if possible, else agent', planner: 'Template if possible, else agent', tinkerer: 'Template if possible, else you' }],
-  ['Platform configuration', { dreamer: 'Agent · you approve effects', planner: 'Agent · you approve effects', tinkerer: 'You' }]
-];
 
 // Work: the shared bench. People, agents and templates act on items the same way (DEC-036).
 @Component({
@@ -27,6 +19,15 @@ const automation: [string, Record<string, string>][] = [
     <p class="lay-muted">{{ typeLabel(work.type) }} work from the {{ layerLabel[work.layer] }} layer</p>
     <div class="lay-grid lay-g-side">
       <div>
+        @if (work.state === 'review' && work.context?.run) {
+          <section class="lay-question" aria-labelledby="review-heading"><h2 id="review-heading"><mat-icon aria-hidden="true">rate_review</mat-icon> Review the {{ work.assignee?.label }}'s draft</h2>
+            <p class="small">The draft is saved in the {{ targetNoun(work) }} as a revision made from {{ work.ref }} ({{ work.context?.run?.model }}, {{ (work.context?.run?.usage?.input || 0) + (work.context?.run?.usage?.output || 0) }} tokens). Open it below to read or edit it, then accept it or send it back.</p>
+            <div class="lay-choices">@for (target of work.targets; track target.id) { <a class="lay-button ghost small" [href]="targetHref(target.kind, target.id)" (click)="openTarget(work, target.kind, target.id, $event)">Open {{ shortLabel(target) }}</a> }</div>
+            <label>Note for the agent (optional, if you send it back)<input name="reviewNote" [(ngModel)]="reviewNote"></label>
+            <div class="lay-row lay-wrap"><button type="button" class="lay-button small" (click)="move(work, 'done')">Accept</button><button type="button" class="lay-button ghost small" (click)="sendBack(work)">Send back</button></div>
+          </section>
+        }
+        @if (work.question?.recommendation && !work.question?.answer) { <p class="lay-note small">The {{ work.assignee?.label }} suggests <strong>{{ work.question?.recommendation }}</strong>: {{ work.question?.reasoning }}</p> }
         @if (work.question && !work.question.answer) {
           <form class="lay-question" (ngSubmit)="answer(work)"><h2><mat-icon aria-hidden="true">help</mat-icon> {{ work.question.text }}</h2>
             @if (work.question.options.length) { <div class="lay-choices" role="radiogroup" aria-label="Answer">@for (option of work.question.options; track option) { <label class="lay-choice" [class.selected]="answerDraft === option"><input type="radio" name="answer" [value]="option" [(ngModel)]="answerDraft">{{ option }}</label> }</div> }
@@ -34,7 +35,11 @@ const automation: [string, Record<string, string>][] = [
             <label>Why (saved with the decision)<textarea name="why" rows="2" [(ngModel)]="whyDraft"></textarea></label>
             <button type="submit" class="lay-button" [disabled]="!answerDraft.trim()">Answer</button></form>
         } @else if (work.question?.answer) {
-          <section class="lay-card"><h2>Decided</h2><p><strong>{{ work.question?.text }}</strong><br>{{ work.question?.answer }}{{ work.question?.rationale ? ' — ' + work.question?.rationale : '' }}</p><p class="lay-muted small">By {{ work.question?.answeredBy }}. Record it in the story or page this changes, with the same reason.</p></section>
+          <section class="lay-card lay-block"><h2>Decided</h2><p><strong>{{ work.question?.text }}</strong><br>{{ work.question?.answer }}{{ work.question?.rationale ? ' — ' + work.question?.rationale : '' }}</p>
+            <p class="lay-muted small">By {{ work.question?.answeredBy }}. The answer belongs in the record it changes, with the same reason.</p>
+            <div class="lay-row lay-wrap">@for (target of work.targets; track target.id) {
+              @if (work.question?.applied?.includes(target.id)) { <span class="lay-chip lay-ok">Applied to {{ shortLabel(target) }}</span> }
+              @else if (applicable(target.kind) && work.state !== 'done') { <button type="button" class="lay-button small" (click)="apply(work, target.id)">Apply to {{ shortLabel(target) }}</button> } }</div></section>
         }
         @if (work.type === 'reconcile' && reconcile(); as change) {
           <section class="lay-card lay-block" aria-labelledby="reconcile-heading"><h2 id="reconcile-heading"><mat-icon aria-hidden="true">difference</mat-icon> What changed</h2>
@@ -52,7 +57,8 @@ const automation: [string, Record<string, string>][] = [
         <section class="lay-card" aria-labelledby="context-heading"><h2 id="context-heading">Context</h2>
           <p class="lay-muted small">Compiled like a story file: a small set of facts, each citing its source record. Agents fetch more from the layers when they need it; you can read exactly the same.</p>
           <ol class="lay-bundle">@for (entry of bundle(work); track $index) { <li><strong>{{ entry[0] }}:</strong> {{ entry[1] }} <span class="lay-citation">· {{ entry[2] }}</span></li> }</ol>
-          <div class="lay-connected">@for (target of work.targets; track target.id) { <a [href]="targetHref(target.kind, target.id)" (click)="ctx.go(targetHref(target.kind, target.id), $event)"><span class="lay-chip lay-plain">{{ target.kind }}</span> {{ target.label }}</a> }</div>
+          <div class="lay-connected">@for (target of work.targets; track target.id) { <a [href]="targetHref(target.kind, target.id)" (click)="openTarget(work, target.kind, target.id, $event)"><span class="lay-chip lay-plain">{{ target.kind }}</span> {{ target.label }}</a> }</div>
+          @if (work.targets.length && work.state !== 'done' && verified.includes(work.type)) { <p class="lay-muted small">Edits you make after opening a target from here are saved as {{ work.ref }}'s output. Closing it checks that each target changed.</p> }
         </section>
         <form class="lay-card lay-form" (ngSubmit)="saveDocuments(work)"><h2>Will document</h2><p class="lay-muted small">Closing this item means these records were created or revised. The log is not documentation.</p>
           <label>One record per line<textarea name="documents" rows="3" [(ngModel)]="documentsDraft"></textarea></label><button type="submit" class="lay-button ghost small">Save</button></form>
@@ -63,7 +69,9 @@ const automation: [string, Record<string, string>][] = [
         @else {
           <div class="lay-toggle" role="group" aria-label="Assignee"><button type="button" [class.on]="work.assignee?.kind === 'agent'" [attr.aria-pressed]="work.assignee?.kind === 'agent'" (click)="assign(work, 'agent')"><mat-icon aria-hidden="true">smart_toy</mat-icon>Agent</button>
             <button type="button" [class.on]="work.assignee?.kind === 'person'" [attr.aria-pressed]="work.assignee?.kind === 'person'" (click)="assign(work, 'person')"><mat-icon aria-hidden="true">person</mat-icon>Me</button></div>
-          <p class="lay-muted small">{{ work.assignee ? 'On it: ' + work.assignee.label + '.' : 'Nobody yet.' }} Agents pick up assigned items once agent work arrives (LAY-04).</p>
+          <p class="lay-muted small">{{ work.assignee ? 'On it: ' + work.assignee.label + '.' : 'Nobody yet.' }}{{ work.assignee?.kind === 'agent' && (work.state === 'ready' || work.state === 'suggested') ? (work.context?.batch ? ' In the next agent batch: it runs when you press Go.' : ' It runs when you add it to an agent batch and press Go.') : '' }}</p>
+          @if (work.context?.automation; as automation) { <p class="lay-note small">Handed over by working style ({{ modeLabel[automation.mode] }}). <a [href]="ctx.link('work', 'style')" (click)="ctx.go(ctx.link('work', 'style'), $event)">Change what is automated</a></p> }
+          @if (work.context?.routine) { <p class="lay-muted small">Created by a <a [href]="ctx.link('work', 'routines')" (click)="ctx.go(ctx.link('work', 'routines'), $event)">routine</a>.</p> }
           @if (work.assignee?.kind === 'agent') {
             <label class="lay-inline-form">Profile<select (change)="assignProfile(work, $any($event.target).value)">@for (profile of profiles(); track profile.id) { <option [value]="profile.id" [selected]="profile.id === work.profileId">{{ profile.name }}</option> }</select></label>
             @if (work.instructions; as pins) { <p class="lay-muted small">Instructions pinned: principles {{ pins.principles ? 'rev ' + pins.principles.revision : 'none' }} · project rev {{ pins.project?.revision }} · <a [href]="ctx.link('work', 'agents', pins.role.id)" (click)="ctx.go(ctx.link('work', 'agents', pins.role.id), $event)">{{ ctx.profileById().get(pins.role.id)?.name }}</a> rev {{ pins.role.revision }} · {{ pins.guidance }} guidance</p> }
@@ -113,7 +121,7 @@ const automation: [string, Record<string, string>][] = [
           </div>
         } @else {
           <div class="lay-grid lay-g2">
-            <aludel-agent-connection class="lay-card" [projectId]="ctx.projectId()" heading="Accounts" description="Connections to AI providers. Profiles use the project's connection; swapping providers never rewrites instructions." (changed)="ctx.reload()" />
+            <aludel-agent-connection class="lay-card" [projectId]="ctx.projectId()" [projectName]="ctx.setup()?.project?.name || ''" heading="Accounts" description="Agents run on your own Anthropic or OpenAI account: paste an API key. Profiles use it; swapping providers never rewrites instructions." (changed)="ctx.reload()" />
             <form class="lay-card lay-form" (ngSubmit)="saveInstructions()" aria-labelledby="project-instructions"><h2 id="project-instructions">Project instructions</h2>
               <p class="lay-muted small">Every profile reads these after the product principles. Exported to <code>AGENTS.md</code> in the repository, so any coding tool reads the same rules.</p>
               <label>Instructions<textarea name="projectInstructions" rows="5" [(ngModel)]="instructionsDraft"></textarea></label>
@@ -128,23 +136,63 @@ const automation: [string, Record<string, string>][] = [
         }
       }
       @case ('routines') {
-        <div class="lay-card lay-quiet"><h2>Routines arrive with work automation (LAY-04)</h2><p class="lay-muted">Planned: a weekly product-drift check (Product), an accessibility sweep (Pages), monthly dependency updates and a security audit before each release (Platform). Each run creates ordinary work items here.</p></div>
+        <p class="lay-muted">Each run creates an ordinary work item, handed over like any other by working style. A routine never opens a second item while its last one is open.</p>
+        <div class="lay-table-wrap" tabindex="0" role="region" aria-label="Routines"><table><thead><tr><th>Routine</th><th>Layer</th><th>Runs</th><th>Next</th><th>Last item</th><th>On</th><th><span class="visually-hidden">Run</span></th></tr></thead><tbody>
+          @for (routine of routines(); track routine.id) { <tr><td><strong>{{ routine.title }}</strong><br><span class="lay-muted small">{{ typeLabel(routine.type) }} work</span></td><td><span [class]="'lay-chip lay-l-' + routine.layer">{{ layerLabel[routine.layer] }}</span></td>
+            <td>{{ cadenceLabel[routine.cadence] }}</td><td class="small">{{ !routine.enabled ? 'Off' : routine.cadence === 'before-release' ? 'Next build' : when(routine.nextRunAt) }}</td>
+            <td class="small">@if (routine.lastWorkId && workById().get(routine.lastWorkId); as last) { <a [href]="ctx.link('work', 'item', last.id)" (click)="ctx.go(ctx.link('work', 'item', last.id), $event)">{{ last.ref }}</a> {{ stateLabel[last.state] }} } @else { — }</td>
+            <td><input type="checkbox" [checked]="routine.enabled" (change)="toggleRoutine(routine.id, routine.revision, $any($event.target).checked)" [attr.aria-label]="(routine.enabled ? 'Turn off ' : 'Turn on ') + routine.title"></td>
+            <td><button type="button" class="lay-button ghost small" (click)="runRoutine(routine.id)" [attr.aria-label]="'Run ' + routine.title + ' now'">Run now</button></td></tr> }</tbody></table></div>
+        <form class="lay-card lay-form lay-gap-top" (ngSubmit)="addRoutine()" aria-labelledby="new-routine"><h2 id="new-routine">New routine</h2>
+          <div class="lay-row lay-wrap lay-fields"><label>Title<input name="routineTitle" [(ngModel)]="newRoutine.title" placeholder="Monthly roadmap review"></label>
+            <label>Layer<select name="routineLayer" [(ngModel)]="newRoutine.layer">@for (entry of layerEntries; track entry[0]) { <option [value]="entry[0]">{{ entry[1] }}</option> }</select></label>
+            <label>Work type<select name="routineType" [(ngModel)]="newRoutine.type">@for (type of ctx.data()?.workTypes || []; track type) { <option [value]="type">{{ typeLabel(type) }}</option> }</select></label>
+            <label>Runs<select name="routineCadence" [(ngModel)]="newRoutine.cadence">@for (entry of cadenceEntries; track entry[0]) { <option [value]="entry[0]">{{ entry[1] }}</option> }</select></label></div>
+          <label>Will document (one per line)<textarea name="routineDocuments" rows="2" [(ngModel)]="newRoutine.documents"></textarea></label>
+          <button type="submit" class="lay-button small">Add routine</button></form>
       }
       @case ('style') {
         <div class="lay-row lay-wrap"><span>Working style:</span><div class="lay-toggle" role="group" aria-label="Working style">@for (profile of workingStyles(); track profile.id) { <button type="button" [class.on]="ctx.setup()?.profile === profile.id" [attr.aria-pressed]="ctx.setup()?.profile === profile.id" (click)="switchProfile(profile.id)">{{ profile.label }}</button> }</div></div>
-        <p class="lay-muted">The style decides which kinds of work are staged and handed to agents automatically once automation arrives (LAY-04). It isn't stored on a task; any item can be reassigned.</p>
+        <p class="lay-muted">Working style decides which kinds of work are staged and handed to an agent profile automatically. Anything it doesn't automate stays a suggestion for you. Any item can be reassigned. Agents are queued only: running them needs your OK to use a provider.</p>
         <h2 class="lay-gap-top">Who takes each kind of work</h2>
-        <div class="lay-table-wrap" tabindex="0" role="region" aria-label="Work routing"><table><thead><tr><th>Work type</th><th>Agent profile</th><th>Guidance</th></tr></thead><tbody>
-          @for (type of ctx.data()?.workTypes || []; track type) { <tr><td><label [for]="'route-' + type">{{ typeLabel(type) }}</label></td>
+        <div class="lay-table-wrap" tabindex="0" role="region" aria-label="Work routing"><table><thead><tr><th>Work type</th><th>In this project</th><th>Agent profile</th><th>Dreamer</th><th>Planner</th><th>Tinkerer</th></tr></thead><tbody>
+          @for (type of ctx.data()?.workTypes || []; track type) { <tr><td><label [for]="'route-' + type">{{ typeLabel(type) }}</label><br><span class="lay-muted small">{{ ctx.data()?.guidance?.[type] }}</span></td>
+            <td><span class="lay-chip" [class.lay-l-work]="ctx.data()?.automation?.[type]?.mode !== 'you'" [class.lay-plain]="ctx.data()?.automation?.[type]?.mode === 'you'">{{ modeLabel[ctx.data()?.automation?.[type]?.mode || 'you'] }}</span></td>
             <td><select [id]="'route-' + type" (change)="route(type, $any($event.target).value)">@for (profile of profiles(); track profile.id) { <option [value]="profile.id" [selected]="profile.workTypes.includes(type)">{{ profile.name }}</option> }</select></td>
-            <td class="small">{{ ctx.data()?.guidance?.[type] }}</td></tr> }</tbody></table></div>
-        <div class="lay-table-wrap" tabindex="0" role="region" aria-label="Automation by working style"><table><thead><tr><th>Work type</th><th>Dreamer</th><th>Planner</th><th>Tinkerer</th></tr></thead><tbody>
-          @for (row of automation; track row[0]) { <tr><td>{{ row[0] }}</td>@for (profile of ['dreamer', 'planner', 'tinkerer']; track profile) { <td [class.lay-strong]="ctx.setup()?.profile === profile">{{ row[1][profile] }}</td> }</tr> }</tbody></table></div>
+            @for (style of ['dreamer', 'planner', 'tinkerer']; track style) { <td class="small" [class.lay-strong]="ctx.setup()?.profile === style">{{ modeLabel[styleMode(style, type)] }}</td> }</tr> }</tbody></table></div>
         <h2 class="lay-gap-top">Individual preferences</h2>
         <div class="lay-prefs">@for (pref of preferences(); track pref.id) { <label [for]="'pref-' + pref.id">{{ pref.label }}</label>
           <select [id]="'pref-' + pref.id" (change)="setPreference(pref.id, $any($event.target).value)">@for (option of pref.options; track option[0]) { <option [value]="option[0]" [selected]="ctx.setup()?.preferences?.[pref.id] === option[0]">{{ option[1] }}</option> }</select> }</div>
       }
       @default {
+        <section class="lay-card lay-batch" aria-labelledby="batch-heading">
+          @if (runningBatch(); as batch) {
+            <div class="lay-row lay-wrap"><h2 id="batch-heading" class="lay-flat"><mat-icon aria-hidden="true">smart_toy</mat-icon> {{ batch.ref }} is running</h2><span class="lay-chip lay-l-work">{{ doneCount(batch) }} of {{ batch.items.length }} done</span>
+              <button type="button" class="lay-button ghost small lay-push" (click)="stopBatch(batch.id)" [disabled]="batch.state === 'stopping'">{{ batch.state === 'stopping' ? 'Stopping after this item…' : 'Stop after this item' }}</button></div>
+            <p class="lay-muted small">Started by {{ batch.startedBy }}. Agents work through the items one at a time on your {{ accountLabel() }} key. Drafts come back to you in review.</p>
+            <ol class="lay-batch-items">@for (id of batch.items; track id) { @if (workById().get(id); as item) { <li><a [href]="ctx.link('work', 'item', item.id)" (click)="ctx.go(ctx.link('work', 'item', item.id), $event)">{{ item.title }}</a> <span class="lay-chip" [class.lay-ok]="item.state === 'review' || item.state === 'done' || item.state === 'needs-input'" [class.lay-plain]="item.state === 'claimed'">{{ item.state === 'claimed' ? (isWorking(item) ? 'Working…' : 'Waiting') : stateLabel[item.state] }}</span></li> } }</ol>
+          } @else {
+            <div class="lay-row lay-wrap"><h2 id="batch-heading" class="lay-flat"><mat-icon aria-hidden="true">smart_toy</mat-icon> Next agent batch</h2><span class="lay-count">{{ draftItems().length }} of {{ draftBatch()?.limit || 10 }}</span></div>
+            <p class="lay-muted small">Nothing runs until you press Go. Go locks these items for their agent profiles and spends on your {{ accountLabel() || 'connected' }} key.</p>
+            @if (draftItems().length) {
+              <ol class="lay-batch-items">@for (item of draftItems(); track item.id) { <li><a [href]="ctx.link('work', 'item', item.id)" (click)="ctx.go(ctx.link('work', 'item', item.id), $event)">{{ item.title }}</a> <small class="lay-muted">{{ item.assignee?.label }}</small>
+                <button type="button" class="lay-link-button" (click)="removeFromBatch(item.id)" [attr.aria-label]="'Take out: ' + item.title">Take out</button></li> }</ol>
+            } @else { <p class="lay-muted">Empty. Add work from the list below, or fill it with the highest-priority work.</p> }
+            <div class="lay-row lay-wrap">
+              <button type="button" class="lay-button ghost small" (click)="fillBatch()" [disabled]="!ctx.data()?.agentPool?.length || draftItems().length >= (draftBatch()?.limit || 10)"><mat-icon aria-hidden="true">playlist_add</mat-icon>Fill with the next {{ (draftBatch()?.limit || 10) - draftItems().length }}</button>
+              <button type="button" class="lay-button small" (click)="startBatch()" [disabled]="!draftItems().length || !ctx.setup()?.agentConnection"><mat-icon aria-hidden="true">play_arrow</mat-icon>Go: run {{ draftItems().length }} {{ draftItems().length === 1 ? 'item' : 'items' }}</button>
+              @if (!ctx.setup()?.agentConnection) { <a class="small" [href]="ctx.link('work', 'agents')" (click)="ctx.go(ctx.link('work', 'agents'), $event)">Connect a key first</a> }
+            </div>
+          }
+          @if (finishedBatches().length) {
+            <details class="lay-log-list"><summary>Earlier batches · {{ finishedBatches().length }}</summary><ul class="small lay-plain-list">@for (batch of finishedBatches(); track batch.id) { <li>{{ batch.ref }}: {{ batch.state === 'done' ? 'finished' : 'stopped' }} {{ when(batch.finishedAt) }} · {{ batch.items.length }} items · {{ batch.usage.input + batch.usage.output }} tokens{{ batch.note ? ' · ' + batch.note : '' }}</li> }</ul></details>
+          }
+        </section>
+        <details class="lay-suggested" [open]="!runningBatch() && !draftItems().length"><summary>Available for agents · {{ ctx.data()?.agentPool?.length || 0 }}</summary>
+          <p class="lay-muted small">Work your working style hands to agents, highest priority first: the current phase before later ones, then acceptance and clarifications, contracts, specs and designs. Nothing here runs by itself.</p>
+          <ul class="lay-list lay-card">@for (entry of ctx.data()?.agentPool || []; track entry.key) { <li class="lay-item"><span [class]="'lay-chip lay-l-' + entry.layer">{{ layerLabel[entry.layer] }}</span><span class="lay-body-text"><strong>{{ entry.title }}</strong><small>{{ typeLabel(entry.type) }} · {{ ctx.profileById().get(entry.profileId || '')?.name }}</small></span>
+            <button type="button" class="lay-button ghost small" (click)="addToBatch(entry)" [disabled]="!!runningBatch()" [attr.aria-label]="'Add to batch: ' + entry.title">Add to batch</button></li> }
+            @empty { <li class="lay-muted lay-pad">Nothing your working style hands to agents right now.</li> }</ul></details>
         @for (group of groups(); track group.state) {
           @if (group.items.length) {
             <div class="lay-section-title"><h2>{{ group.title }}</h2><span class="lay-count">{{ group.items.length }}</span></div>
@@ -153,7 +201,8 @@ const automation: [string, Record<string, string>][] = [
         }
         <details class="lay-suggested" [open]="!activeCount()"><summary>Suggested by the layers (not queued yet) · {{ ctx.suggestions().length }}</summary>
           <ul class="lay-list lay-card">@for (suggestion of ctx.suggestions(); track suggestion.key) { <li class="lay-item"><span [class]="'lay-chip lay-l-' + suggestion.layer">{{ layerLabel[suggestion.layer] }}</span><span class="lay-body-text"><strong>{{ suggestion.title }}</strong><small>{{ typeLabel(suggestion.type) }}</small></span>
-            <button type="button" class="lay-button small" (click)="start(suggestion)">Start now</button><button type="button" class="lay-button ghost small" (click)="queue(suggestion)">Add to queue</button></li> }
+            <button type="button" class="lay-button small" (click)="start(suggestion)">Start now</button><button type="button" class="lay-button ghost small" (click)="queue(suggestion)">Add to queue</button>
+            @if (agentCapable(suggestion.type)) { <button type="button" class="lay-link-button" (click)="addSuggestionToBatch(suggestion.key)" [disabled]="!!runningBatch()">Give to an agent</button> }</li> }
             @empty { <li class="lay-muted lay-pad">No gaps found. Nice.</li> }</ul></details>
       }
     }
@@ -164,12 +213,28 @@ export class WorkLayerComponent {
   readonly tabs = [['queue', 'Queue'], ['agents', 'Agents'], ['routines', 'Routines'], ['style', 'Working style']];
   readonly layerLabel = layerLabel;
   readonly stateLabel = stateLabel;
-  readonly automation = automation;
+  readonly modeLabel = modeLabel;
+  readonly verified = ['define', 'spec', 'plan', 'design', 'research', 'configure'];
+  readonly cadenceLabel: Record<string, string> = { weekly: 'Weekly', monthly: 'Monthly', 'before-release': 'Before each release' };
+  readonly cadenceEntries = Object.entries(this.cadenceLabel);
+  readonly layerEntries = Object.entries(layerLabel);
+  readonly routines = computed(() => this.ctx.data()?.routines || []);
+  readonly workById = computed(() => new Map((this.ctx.data()?.work || []).map(item => [item.id, item])));
+  newRoutine = { title: '', layer: 'product', type: 'audit', cadence: 'weekly', documents: '' };
+  reviewNote = '';
+  readonly batches = computed(() => this.ctx.data()?.batches || []);
+  readonly draftBatch = computed(() => this.batches().find(batch => batch.state === 'draft') || null);
+  readonly runningBatch = computed(() => this.batches().find(batch => batch.state === 'running' || batch.state === 'stopping') || null);
+  readonly finishedBatches = computed(() => this.batches().filter(batch => batch.state === 'done' || batch.state === 'stopped'));
+  readonly draftItems = computed(() => (this.draftBatch()?.items || []).map(id => this.workById().get(id)).filter((item): item is WorkItem => Boolean(item)));
+  readonly accountLabel = computed(() => this.ctx.setup()?.agentConnection?.label || '');
+  private poll: ReturnType<typeof setInterval> | null = null;
   readonly tab = computed(() => this.ctx.segments()[1] || 'queue');
   readonly item = computed(() => this.tab() === 'item' ? (this.ctx.data()?.work || []).find(work => work.id === this.ctx.segments()[2]) || null : null);
   readonly groups = computed(() => {
     const work = this.ctx.data()?.work || [];
-    return [['needs-input', 'Needs you'], ['review', 'In review'], ['claimed', 'In progress'], ['ready', 'Ready to pick up'], ['suggested', 'Staged as suggestions'], ['done', 'Done']].map(([state, title]) => ({ state, title, items: work.filter(item => item.state === state) }));
+    // Items waiting in the next batch show in the batch panel, not twice.
+    return [['needs-input', 'Needs you'], ['review', 'In review'], ['claimed', 'In progress'], ['ready', 'Ready to pick up'], ['suggested', 'Staged as suggestions'], ['done', 'Done']].map(([state, title]) => ({ state, title, items: work.filter(item => item.state === state && !(state === 'ready' && item.context?.batch)) }));
   });
   readonly activeCount = computed(() => (this.ctx.data()?.work || []).filter(item => item.state !== 'done').length);
   readonly workingStyles = computed(() => Object.entries(this.ctx.catalog()?.profiles || {}).map(([id, value]) => ({ id, label: value.label })));
@@ -185,6 +250,14 @@ export class WorkLayerComponent {
   instructionsDraft = ''; instructionsWhy = '';
 
   constructor() {
+    // While a batch runs, refresh every few seconds so progress shows without a reload.
+    effect(() => {
+      const running = Boolean(this.runningBatch());
+      untracked(() => {
+        if (running && !this.poll) this.poll = setInterval(() => void this.ctx.reload().catch(() => undefined), 3000);
+        if (!running && this.poll) { clearInterval(this.poll); this.poll = null; }
+      });
+    });
     // A Reconcile item's diff, units and tests are read live from the code links when it is opened.
     effect(() => {
       const work = this.item();
@@ -231,6 +304,35 @@ export class WorkLayerComponent {
   start(suggestion: Suggestion) {
     void this.ctx.write(async () => { const work = await this.ctx.stage(suggestion); await this.ctx.updateWork(work.id, { assignee: { kind: 'person' } }); this.ctx.go(this.ctx.link('work', 'item', work.id)); }, 'You picked this up.');
   }
+  // A style's mode for a type, from the style's own defaults (the current project's overrides show in "In this project").
+  styleMode(style: string, type: string) {
+    const rule = this.ctx.catalog()?.automation?.workTypes[type];
+    const defaults = (this.ctx.catalog()?.profiles[style] as { defaults?: Record<string, string> } | undefined)?.defaults || {};
+    return rule ? rule.modes[defaults[rule.preference]] || 'you' : 'you';
+  }
+  ngOnDestroy() { if (this.poll) clearInterval(this.poll); }
+  private batchApi(action: string, body: unknown) { return this.ctx.api(`/api/projects/${encodeURIComponent(this.ctx.projectId())}/batches/${action}`, 'POST', body); }
+  agentCapable(type: string) { return type === 'define' || type === 'plan'; }
+  doneCount(batch: { items: string[] }) { return batch.items.filter(id => { const state = this.workById().get(id)?.state; return state && state !== 'claimed' && state !== 'ready'; }).length; }
+  isWorking(item: WorkItem) { return /is working on it/.test(item.log.at(-1)?.text || ''); }
+  targetNoun(work: WorkItem) { return work.targets[0]?.kind === 'data_object' ? 'object' : work.targets[0]?.kind || 'record'; }
+  addToBatch(entry: { kind: string; key: string; workId: string | null }) { void this.ctx.write(() => this.batchApi('add', entry.kind === 'item' ? { workId: entry.workId } : { suggestion: entry.key }), 'Added to the batch.'); }
+  addSuggestionToBatch(key: string) { void this.ctx.write(() => this.batchApi('add', { suggestion: key }), 'Added to the batch.'); }
+  removeFromBatch(workId: string) { void this.ctx.write(() => this.batchApi('remove', { workId }), 'Taken out of the batch.'); }
+  fillBatch() { void this.ctx.write(async () => { const result = await this.batchApi('fill', { count: this.draftBatch()?.limit || 10 }) as { added: number }; this.ctx.notice.set(`Added ${result.added}.`); }, ''); }
+  startBatch() { const batch = this.draftBatch(); if (batch) void this.ctx.write(() => this.batchApi('start', { batchId: batch.id }), `${batch.ref} started. Drafts will appear in review.`); }
+  stopBatch(batchId: string) { void this.ctx.write(() => this.batchApi('stop', { batchId }), 'Stopping after the current item.'); }
+  sendBack(work: WorkItem) { void this.ctx.write(async () => { await this.ctx.updateWork(work.id, { state: 'ready', note: this.reviewNote || 'Sent back for another draft' }); this.reviewNote = ''; }, 'Sent back. Add it to a batch to have the agent try again.'); }
+  applicable(kind: string) { return ['story', 'spec', 'page'].includes(kind); }
+  shortLabel(target: { id: string; kind: string; label: string }) { return this.ctx.storyById().get(target.id)?.ref || target.label; }
+  openTarget(work: WorkItem, kind: string, id: string, event: Event) { if (work.state !== 'done') this.ctx.workOn(work); this.ctx.go(this.targetHref(kind, id), event); }
+  apply(work: WorkItem, targetId: string) { void this.ctx.write(() => this.ctx.updateWork(work.id, { apply: targetId }), 'Applied. The record has a new revision with your reason.'); }
+  when(at: string | null) { return at ? new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '—'; }
+  toggleRoutine(id: string, revision: number, enabled: boolean) { void this.ctx.write(() => this.ctx.change(id, { enabled }, revision, enabled ? 'Turned on' : 'Turned off'), enabled ? 'Routine on.' : 'Routine off.'); }
+  runRoutine(id: string) { void this.ctx.write(() => this.ctx.api(`/api/projects/${encodeURIComponent(this.ctx.projectId())}/routines/${encodeURIComponent(id)}`, 'POST', {}), 'Ran it. The new item is in the queue.'); }
+  addRoutine() {
+    void this.ctx.write(async () => { await this.ctx.record('routine', { ...this.newRoutine, documents: lines(this.newRoutine.documents) }, null, 'Added by you'); this.newRoutine = { title: '', layer: 'product', type: 'audit', cadence: 'weekly', documents: '' }; }, 'Routine added.');
+  }
   assign(work: WorkItem, kind: string) { void this.ctx.write(() => this.ctx.updateWork(work.id, { assignee: { kind } }), 'Assigned.'); }
   assignProfile(work: WorkItem, profileId: string) { void this.ctx.write(() => this.ctx.updateWork(work.id, { assignee: { kind: 'agent', profileId } }), 'Profile changed.'); }
   profileWork(profile: AgentProfile) { return (this.ctx.data()?.work || []).filter(item => item.profileId === profile.id); }
@@ -248,7 +350,9 @@ export class WorkLayerComponent {
     if (Array.isArray(value)) return value.map(item => typeof item === 'string' ? item : JSON.stringify(item)).join('; ');
     return typeof value === 'string' ? value : JSON.stringify(value);
   }
-  move(work: WorkItem, state: string) { void this.ctx.write(() => this.ctx.updateWork(work.id, { state }), `Moved to ${stateLabel[state]}.`); }
+  move(work: WorkItem, state: string) {
+    void this.ctx.write(async () => { await this.ctx.updateWork(work.id, { state }); if (state === 'done' && this.ctx.workingOn()?.id === work.id) this.ctx.workingOn.set(null); }, `Moved to ${stateLabel[state]}.`);
+  }
   answer(work: WorkItem) { void this.ctx.write(() => this.ctx.updateWork(work.id, { answer: this.answerDraft, rationale: this.whyDraft }), 'Answer saved.'); }
   saveDocuments(work: WorkItem) { void this.ctx.write(() => this.ctx.updateWork(work.id, { documents: lines(this.documentsDraft) }), 'Saved.'); }
   switchProfile(profile: string) { void this.ctx.write(() => this.ctx.api(`/api/projects/${encodeURIComponent(this.ctx.projectId())}/preferences`, 'PUT', { profile }), 'Working style changed. Your individual preferences were kept.'); }

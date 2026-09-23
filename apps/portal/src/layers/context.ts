@@ -3,6 +3,7 @@ import { PageType, ProjectSetup, Session } from '../onboarding-model';
 
 // Shapes returned by GET /api/projects/:id/knowledge (server/knowledge.mjs view()).
 export interface Scenario { given: string; when: string; then: string; }
+export interface Resolved { question: string; answer: string; work: string; }
 export interface RecordBase { id: string; kind: string; parentId: string | null; position: number; revision: number; updatedAt: string; }
 export interface Revision { revision: number; author: string; rationale: string; workItemId: string | null; createdAt: string; }
 export interface VisionSection extends RecordBase { key: string; title: string; body: string; items: string[]; }
@@ -10,8 +11,8 @@ export interface Persona extends RecordBase { name: string; role: string; note: 
 export interface Phase extends RecordBase { key: string; label: string; goal: string; appetite: string; exit: string; current: boolean; }
 export interface Step extends RecordBase { title: string; stories: string[]; }
 export interface Activity extends RecordBase { title: string; persona: string; pack: string | null; steps: Step[]; }
-export interface Story extends RecordBase { number: number; ref: string; title: string; phase: string; why: string; acceptance: Scenario[]; edges: string[]; clarifications: string[]; services: string[]; pack: string | null; template: boolean; status: string; pages: string[]; work: string[]; history: Revision[]; }
-export interface Spec extends RecordBase { number: number; ref: string; title: string; phase: string; status: string; stories: string[]; problem: string; appetite: string; solution: string; rabbitHoles: string[]; noGos: string[]; requirements: string[]; entities: string[]; success: string[]; assumptions: string[]; clarifications: string[]; }
+export interface Story extends RecordBase { number: number; ref: string; title: string; phase: string; why: string; acceptance: Scenario[]; edges: string[]; clarifications: string[]; services: string[]; resolved: Resolved[]; pack: string | null; template: boolean; status: string; pages: string[]; work: string[]; history: Revision[]; }
+export interface Spec extends RecordBase { number: number; ref: string; title: string; phase: string; status: string; stories: string[]; problem: string; appetite: string; solution: string; rabbitHoles: string[]; noGos: string[]; requirements: string[]; entities: string[]; success: string[]; assumptions: string[]; clarifications: string[]; resolved: Resolved[]; }
 export interface Research extends RecordBase { title: string; body: string; supports: string[]; }
 export interface Doc extends RecordBase { title: string; template: string; body: string; }
 export interface Page extends RecordBase { label: string; icon: string; pageType: string; description: string; inNav: boolean; origin: string; stories: string[]; status: string; notes: string; history: Revision[]; }
@@ -33,8 +34,13 @@ export interface CodeUnit { id: string; path: string; symbol: string; kind: stri
 export interface Service { key: string; label: string; icon: string; stories: string[]; }
 export interface WorkTarget { id: string; kind: string; label: string; }
 export interface WorkItem { id: string; number: number; ref: string; layer: string; type: string; title: string; state: string; assignee: { kind: string; label: string } | null; targets: WorkTarget[];
-  question: { text: string; options: string[]; answer?: string; rationale?: string; answeredBy?: string } | null; documents: string[]; log: { at: string; text: string }[]; createdAt: string; updatedAt: string;
-  profileId: string | null; instructions: InstructionPins | null; context: { reconcile?: { recordId: string; fromRevision: number; toRevision: number } } | null; }
+  question: { text: string; options: string[]; answer?: string; rationale?: string; answeredBy?: string; applied?: string[]; recommendation?: string; reasoning?: string } | null; documents: string[]; log: { at: string; text: string }[]; createdAt: string; updatedAt: string;
+  profileId: string | null; instructions: InstructionPins | null;
+  context: { reconcile?: { recordId: string; fromRevision: number; toRevision: number }; automation?: { mode: string }; routine?: string; suggestion?: string; batch?: string;
+    run?: { model: string; usage: { input: number; output: number }; at: string; provider: string } } | null; }
+// LAY-04: working style per work type, and routines.
+export interface AutomationPolicy { mode: 'you' | 'agent' | 'agent-review'; preference: string | null; profileId: string | null; }
+export interface Routine extends RecordBase { key: string | null; title: string; layer: string; type: string; cadence: string; documents: string[]; enabled: boolean; nextRunAt: string | null; lastRunAt: string | null; lastWorkId: string | null; history: Revision[]; }
 export interface Knowledge {
   vision: Record<string, VisionSection>; personas: Persona[]; phases: Phase[]; activities: Activity[]; stories: Story[]; specs: Spec[];
   research: Research[]; docs: Doc[]; pages: Page[]; work: WorkItem[]; selectedPacks: string[];
@@ -42,14 +48,21 @@ export interface Knowledge {
   objects: DataObject[]; operations: DataOperation[]; access: AccessRule[]; services: Service[];
   profiles: AgentProfile[]; projectInstructions: (RecordBase & { body: string }) | null; guidance: Record<string, string>; workTypes: string[];
   code: { indexedAt: string | null; units: CodeUnit[] };
+  suggestions: Suggestion[]; automation: Record<string, AutomationPolicy>; routines: Routine[];
+  agentPool: PoolEntry[]; batches: Batch[];
 }
+// DEC-040: what agents can take (best first) and the batches the owner starts.
+export interface PoolEntry { kind: 'item' | 'suggestion'; key: string; workId: string | null; title: string; type: string; layer: string; profileId: string | null; priority: number; }
+export interface Batch { id: string; number: number; ref: string; state: string; limit: number; createdAt: string; startedAt: string | null; finishedAt: string | null; startedBy: string | null; note: string | null; items: string[]; usage: { input: number; output: number }; }
 export interface Catalog { pageTypes: Record<string, PageType>; routeIcons: string[]; feels: Record<string, { label: string; summary: string; navigation: string; font: string; radius: number; surface: string; surfaceDark: string }>;
   preferences: Record<string, { label: string; values: Record<string, string> }>; profiles: Record<string, { label: string; summary: string }>;
-  stacks: { presets: Record<string, { label: string; layers?: Record<string, string> }> }; }
+  stacks: { presets: Record<string, { label: string; layers?: Record<string, string> }> };
+  automation?: { workTypes: Record<string, { preference: string; modes: Record<string, string> }> }; }
 export interface Suggestion { key: string; layer: string; type: string; title: string; targets: WorkTarget[]; question?: { text: string; options: string[] }; documents: string[]; }
 
 export const statusOrder = ['proposed', 'defined', 'designed', 'built', 'shipped'];
 export const statusLabel: Record<string, string> = { proposed: 'Proposed', defined: 'Defined', designed: 'Designed', built: 'Built', shipped: 'Shipped' };
+export const modeLabel: Record<string, string> = { you: 'You', agent: 'Agent', 'agent-review': 'Agent · you review' };
 export const stateLabel: Record<string, string> = { suggested: 'Suggested', ready: 'Ready', claimed: 'In progress', 'needs-input': 'Needs you', review: 'In review', done: 'Done' };
 export const layerLabel: Record<string, string> = { product: 'Product', design: 'Design', pages: 'Pages', data: 'Data', platform: 'Platform', work: 'Work' };
 export const dataStatusLabel: Record<string, string> = { proposed: 'Proposed', contracted: 'Contracted', built: 'Built', shipped: 'Shipped' };
@@ -105,20 +118,13 @@ export class ProjectContext {
     return [id, this.link(), 'work'];
   }
 
-  // Gaps each layer knows about, shown as quiet suggestions until someone stages them (DEC-036).
-  readonly suggestions = computed<Suggestion[]>(() => {
-    const data = this.data(); if (!data) return [];
-    const open = new Set(data.work.filter(item => item.state !== 'done').flatMap(item => item.targets.map(target => `${item.type}:${target.id}`)));
-    const list: Suggestion[] = [];
-    for (const story of data.stories) {
-      if (!story.acceptance.length && !open.has(`define:${story.id}`)) list.push({ key: `define:${story.id}`, layer: 'product', type: 'define', title: `Write acceptance for “${story.title}”`, targets: [{ id: story.id, kind: 'story', label: story.title }], documents: [`Product › ${story.ref} acceptance`] });
-      for (const text of story.clarifications) if (!open.has(`define:${story.id}`)) list.push({ key: `clarify:${story.id}:${text}`, layer: 'product', type: 'define', title: `Clarify: ${text}`, targets: [{ id: story.id, kind: 'story', label: story.title }], question: { text, options: [] }, documents: [`Product › ${story.ref} (clarified)`] });
-    }
-    for (const page of data.pages) {
-      if (page.status !== 'designed' && page.stories.length && !open.has(`design:${page.id}`)) list.push({ key: `design:${page.id}`, layer: 'pages', type: 'design', title: `Design the ${page.label} page`, targets: [{ id: page.id, kind: 'page', label: `${page.label} page` }], documents: [`Pages › ${page.label} (designed revision)`] });
-    }
-    return list;
-  });
+  // Gaps each layer knows about (computed on the server since LAY-04, so working style can stage them automatically).
+  readonly suggestions = computed<Suggestion[]>(() => this.data()?.suggestions || []);
+
+  // LAY-04A: following a work item's target makes later edits to its targets count as that item's output.
+  readonly workingOn = signal<{ id: string; ref: string; title: string; targets: string[] } | null>(null);
+  workOn(item: WorkItem) { this.workingOn.set({ id: item.id, ref: item.ref, title: item.title, targets: item.targets.map(target => target.id) }); }
+  private workFor(id: string) { const current = this.workingOn(); return current && current.targets.includes(id) ? current.id : null; }
 
   go(path: string, event?: Event) {
     event?.preventDefault();
@@ -155,11 +161,11 @@ export class ProjectContext {
     return this.api(`/api/projects/${encodeURIComponent(this.projectId())}/records`, 'POST', { kind, data, parentId, rationale: rationale || null });
   }
   change(id: string, data: unknown, expectedRevision?: number, rationale = '') {
-    return this.api(`/api/projects/${encodeURIComponent(this.projectId())}/records/${encodeURIComponent(id)}`, 'PUT', { data, expectedRevision, rationale: rationale || null });
+    return this.api(`/api/projects/${encodeURIComponent(this.projectId())}/records/${encodeURIComponent(id)}`, 'PUT', { data, expectedRevision, rationale: rationale || null, workItemId: this.workFor(id) });
   }
   delete(id: string) { return this.api(`/api/projects/${encodeURIComponent(this.projectId())}/records/${encodeURIComponent(id)}`, 'DELETE'); }
   stage(suggestion: Suggestion, state: 'ready' | 'suggested' = 'ready') {
-    return this.api<WorkItem>(`/api/projects/${encodeURIComponent(this.projectId())}/work`, 'POST', { layer: suggestion.layer, type: suggestion.type, title: suggestion.title, targets: suggestion.targets, documents: suggestion.documents, question: suggestion.question?.options.length ? suggestion.question : undefined, state });
+    return this.api<WorkItem>(`/api/projects/${encodeURIComponent(this.projectId())}/work`, 'POST', { layer: suggestion.layer, type: suggestion.type, title: suggestion.title, targets: suggestion.targets, documents: suggestion.documents, question: suggestion.question, suggestion: suggestion.key, state });
   }
   updateWork(id: string, body: unknown) { return this.api<WorkItem>(`/api/projects/${encodeURIComponent(this.projectId())}/work/${encodeURIComponent(id)}`, 'PUT', body); }
 }

@@ -234,7 +234,7 @@
           <p class="eyebrow">Step 5 · Agent · optional</p>
           <h1 id="agent-step-heading" tabindex="-1">{{ preferences()['agentSetup'] === 'optional' ? 'Want an agent on hand?' : 'Connect an agent' }}</h1>
           <p class="pub-lead">{{ preferences()['agentSetup'] === 'optional' ? 'No AI is required. Connect one now or later if you ever want to delegate a task.' : 'An agent does the implementation work you authorize. Aludel uses the same connection for every project, including itself.' }}</p>
-          <aludel-agent-connection [projectId]="current.project.id" heading="Agent for {{ current.project.name }}" description="Bring your own API key, or use Codex on this computer." (changed)="agentChanged($event)"></aludel-agent-connection>
+          <aludel-agent-connection [projectId]="current.project.id" [projectName]="current.project.name" heading="Agent for {{ current.project.name }}" description="Paste an API key from your Anthropic or OpenAI account. It takes about five minutes, and you can skip it for now." (changed)="agentChanged($event)"></aludel-agent-connection>
           <div class="pub-actions pub-footer-actions">
             <button mat-flat-button type="button" (click)="markAndNext('agent')" [disabled]="busy()">{{ current.agentConnection ? 'Continue' : 'Skip for now' }}<mat-icon iconPositionEnd aria-hidden="true">arrow_forward</mat-icon></button>
           </div>
@@ -462,52 +462,7 @@
       </section>
     }
 
-    @case ('project') {
-      @if (setup(); as current) {
-        <section aria-labelledby="project-heading">
-          <p class="eyebrow"><a href="/projects" (click)="go('/projects', $event)">Your apps</a></p>
-          <h1 id="project-heading" tabindex="-1">{{ current.project.name }}</h1>
-          <p class="pub-lead">{{ current.direction?.summary }}</p>
-          <div class="pub-preview-bar">
-            <strong>{{ previewLabel() }}</strong>
-            @if (current.preview.status === 'running' || current.preview.status === 'stopped') { <a mat-flat-button [href]="current.urls.app" target="_blank" rel="noopener">Open app<mat-icon iconPositionEnd aria-hidden="true">open_in_new</mat-icon></a> }
-            <a mat-stroked-button [href]="stepPath('stack')" (click)="go(stepPath('stack'), $event)">{{ current.preview.status === 'not-built' ? 'Finish setup and build' : 'Rebuild' }}</a>
-            <code>{{ current.urls.app }}</code>
-          </div>
-          <div class="pub-project-grid">
-            <section class="pub-card" aria-labelledby="style-heading">
-              <h2 id="style-heading">Working style</h2>
-              <fieldset class="pub-segmented">
-                <legend class="visually-hidden">Working style</legend>
-                @for (item of profileEntries(); track item.id) {
-                  <label [class.selected]="current.profile === item.id"><input type="radio" name="projectProfile" [value]="item.id" [checked]="current.profile === item.id" (change)="switchProfile(item.id)">{{ item.label }}</label>
-                }
-              </fieldset>
-              <div class="pub-preferences">
-                @for (item of preferenceEntries(); track item.id) {
-                  <label [for]="'pref-' + item.id">{{ item.label }}@if (isOverridden(item.id)) { <em class="pub-badge">changed</em> }</label>
-                  <select class="pub-select" [id]="'pref-' + item.id" [value]="current.preferences[item.id]" (change)="setPreference(item.id, $any($event.target).value)">
-                    @for (option of item.options; track option.key) { <option [value]="option.key" [selected]="current.preferences[item.id] === option.key">{{ option.label }}</option> }
-                  </select>
-                }
-              </div>
-              @if (current.overrides && (current.overrides | keyvalue).length) { <button mat-button type="button" (click)="resetPreferences()">Reset to {{ profileLabel(current.profile) }} defaults</button> }
-            </section>
-            <section class="pub-card" aria-labelledby="setup-heading">
-              <h2 id="setup-heading">Setup</h2>
-              <ul class="pub-setup-list">
-                @for (step of steps.slice(3); track step.id) {
-                  <li><mat-icon aria-hidden="true">{{ current.completedSteps.includes(step.id) ? 'check_circle' : 'radio_button_unchecked' }}</mat-icon>
-                    <a [href]="stepPath(step.id)" (click)="go(stepPath(step.id), $event)">{{ step.label }}</a></li>
-                }
-              </ul>
-              <p class="field-hint">Repository: {{ current.github.repository ? current.github.repository.owner + '/' + current.github.repository.name : 'local only' }}</p>
-            </section>
-          </div>
-          <aludel-agent-connection [projectId]="current.project.id" heading="Agent connection" (changed)="agentChanged($event)"></aludel-agent-connection>
-        </section>
-      }
-    }
+    @case ('moved') { <p>Opening your project…</p> }
 
     @default {
       <h1 tabindex="-1">Page not found</h1>

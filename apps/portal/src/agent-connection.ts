@@ -1,4 +1,5 @@
 import { Component, OnInit, input, output, signal } from '@angular/core';
+// LAY-04D: pasted API keys with in-place guidance (config/agent-providers.json, docs/guides/connect-an-agent.md).
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -16,10 +17,12 @@ import { AgentConnection, AgentProvider } from './onboarding-model';
     <div class="agent-connection-body">
       <h2 [id]="headingId()">{{ heading() }}</h2>
       @if (connection(); as current) {
-        <p class="agent-connected"><mat-icon aria-hidden="true">check_circle</mat-icon>
-          <span><strong>{{ current.label }}</strong>@if (current.hint) { · key ending {{ current.hint }} } · saved, not yet used by a run</span></p>
-        <p class="field-hint">{{ current.hint ? 'Aludel stores the key encrypted and never shows it again. ' : '' }}Nothing is sent to the provider until you authorize work.</p>
+        <p class="agent-connected"><mat-icon aria-hidden="true">{{ current.status === 'verified' ? 'check_circle' : 'error' }}</mat-icon>
+          <span><strong>{{ current.label }}</strong>@if (current.hint) { · key ending {{ current.hint }} } · {{ statusText(current.status) }}</span></p>
+        @if (current.retired) { <p class="field-hint">{{ current.retired }} Connect an Anthropic or OpenAI key to replace it.</p> }
+        @else { <p class="field-hint">Stored encrypted and never shown again. Agents use it only for work you've approved.@if (current.keyUrl) { <a [href]="current.keyUrl" target="_blank" rel="noopener"> Manage this key at the provider</a> }</p> }
         <div class="agent-actions">
+          @if (current.hint) { <button mat-stroked-button type="button" (click)="check()" [disabled]="busy()">Check again</button> }
           <button mat-stroked-button type="button" (click)="editing.set(true)" [disabled]="busy()">Replace</button>
           <button mat-button type="button" (click)="remove()" [disabled]="busy()">Disconnect</button>
         </div>
@@ -29,22 +32,29 @@ import { AgentConnection, AgentProvider } from './onboarding-model';
       }
       @if (editing()) {
         <fieldset class="provider-choice">
-          <legend>Agent provider</legend>
+          <legend>Your AI provider</legend>
           @for (entry of providerList(); track entry.id) {
             <label class="choice-row" [class.selected]="provider === entry.id">
               <input type="radio" name="{{ headingId() }}-provider" [value]="entry.id" [(ngModel)]="provider">
-              <span><strong>{{ entry.label }}</strong><small>{{ entry.secret ? 'Uses your own ' + entry.secret : 'Uses the Codex sign-in on this computer; nothing is stored' }}</small></span>
+              <span><strong>{{ entry.label }}</strong><small>Paste an API key from your {{ entry.label }} account. You pay the provider for what agents use.</small></span>
             </label>
           }
         </fieldset>
-        @if (providers()[provider]?.secret) {
+        @if (providers()[provider]; as chosen) {
+          <div class="agent-guide">
+            <h3>Create a key at {{ chosen.label }}</h3>
+            <ol>@for (step of chosen.steps; track $index) { <li>{{ fill(step) }}</li> }</ol>
+            <p><a mat-stroked-button [href]="chosen.keyUrl" target="_blank" rel="noopener"><mat-icon aria-hidden="true">open_in_new</mat-icon>Open {{ chosen.label }} API keys</a></p>
+            <p class="field-hint"><strong>Set a spend limit:</strong> {{ chosen.limits }} <a [href]="chosen.limitsUrl" target="_blank" rel="noopener">Limits</a></p>
+          </div>
           <mat-form-field appearance="outline" class="wide-field">
-            <mat-label>{{ providers()[provider].label }} {{ providers()[provider].secret }}</mat-label>
+            <mat-label>{{ chosen.label }} {{ chosen.secret }}</mat-label>
             <input matInput type="password" [(ngModel)]="secret" autocomplete="off" spellcheck="false">
           </mat-form-field>
+          <p class="field-hint">Aludel checks the key by asking {{ chosen.label }} for its list of models, which costs nothing, then stores it encrypted.</p>
         }
         <div class="agent-actions">
-          <button mat-flat-button type="button" (click)="save()" [disabled]="busy() || (!!providers()[provider]?.secret && !secret.trim())">Save connection</button>
+          <button mat-flat-button type="button" (click)="save()" [disabled]="busy() || !secret.trim()">{{ busy() ? 'Checking…' : 'Check and save' }}</button>
           <button mat-button type="button" (click)="editing.set(false); secret = ''">Cancel</button>
         </div>
       }
@@ -57,6 +67,7 @@ export class AgentConnectionComponent implements OnInit {
   readonly projectId = input.required<string>();
   readonly heading = input('Agent connection');
   readonly description = input('Connect an agent so Aludel can carry out work you authorize.');
+  readonly projectName = input('');
   readonly changed = output<AgentConnection | null>();
   readonly connection = signal<AgentConnection | null>(null);
   readonly providers = signal<Record<string, AgentProvider>>({});
@@ -75,9 +86,19 @@ export class AgentConnectionComponent implements OnInit {
   async save() {
     this.message.set('');
     if (await this.call('PUT', { provider: this.provider, secret: this.secret })) {
-      this.secret = ''; this.editing.set(false); this.message.set('Agent connection saved.');
+      this.secret = ''; this.editing.set(false); this.message.set(`Checked with ${this.connection()?.label}: the key works. Agent connection saved.`);
     }
   }
+
+  async check() {
+    this.message.set('');
+    const value = await this.call('POST') as { check?: string | null } | false;
+    if (value && !value.check) this.message.set('The key still works.');
+    else if (value && value.check) this.error.set(value.check);
+  }
+
+  statusText(status: string) { return status === 'verified' ? 'checked, works' : status === 'rejected' ? 'rejected by the provider: replace it' : status === 'unchecked' ? "couldn't be checked just now" : 'saved'; }
+  fill(step: string) { return step.replace('{project}', this.projectName() || 'your project'); }
 
   async remove() {
     this.message.set('');
@@ -93,8 +114,9 @@ export class AgentConnectionComponent implements OnInit {
       const value = await response.json();
       if (!response.ok) { this.error.set(value.error || 'The agent connection could not be saved.'); return false; }
       this.connection.set(value.connection); this.providers.set(value.providers);
+      if (!this.providers()[this.provider]) this.provider = Object.keys(this.providers())[0] || '';
       if (method !== 'GET') this.changed.emit(value.connection);
-      return true;
+      return value;
     } catch { this.error.set('Aludel could not be reached.'); return false; }
     finally { this.busy.set(false); }
   }

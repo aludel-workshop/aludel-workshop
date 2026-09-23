@@ -48,6 +48,21 @@
       }
     }
   },
+  "automation": {
+    "note": "LAY-04B: for each work type, the preference that decides it and the mode for each of that preference's values. Matches the working-style table shown in prototypes v2 and v3. you = stays a suggestion for you; agent-review = queued for the routed agent profile, and the result comes back to you; agent = queued for the agent profile with no review step. Nothing runs an agent until provider calls are authorized.",
+    "workTypes": {
+      "define": { "preference": "planning", "modes": { "agent": "agent-review", "collaborative": "you", "self": "you" } },
+      "research": { "preference": "planning", "modes": { "agent": "agent-review", "collaborative": "you", "self": "you" } },
+      "spec": { "preference": "planning", "modes": { "agent": "agent-review", "collaborative": "agent-review", "self": "you" } },
+      "plan": { "preference": "planning", "modes": { "agent": "agent", "collaborative": "agent", "self": "you" } },
+      "design": { "preference": "planning", "modes": { "agent": "agent", "collaborative": "agent-review", "self": "you" } },
+      "implement": { "preference": "implementation", "modes": { "agent": "agent", "agent-with-review": "agent-review", "self": "you" } },
+      "reconcile": { "preference": "implementation", "modes": { "agent": "agent-review", "agent-with-review": "agent-review", "self": "you" } },
+      "review": { "preference": "implementation", "modes": { "agent": "agent", "agent-with-review": "agent", "self": "you" } },
+      "audit": { "preference": "implementation", "modes": { "agent": "agent", "agent-with-review": "agent", "self": "you" } },
+      "configure": { "preference": "implementation", "modes": { "agent": "agent-review", "agent-with-review": "agent-review", "self": "you" } }
+    }
+  },
   "profiles": {
     "dreamer": {
       "label": "Dreamer",

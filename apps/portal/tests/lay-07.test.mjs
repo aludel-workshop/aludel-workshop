@@ -299,3 +299,22 @@ test('LAY-07B: releases record checks from the preview result and the stories th
   assert.deepEqual(failed.checks.map(check => check.state), ['failed', 'skipped'], 'an old build time does not count as this release building');
   assert.deepEqual(ops.releases.list(id).map(item => item.number), [2, 1]);
 });
+
+test('a project workspace inside another repository gets its own repository and never commits the parent', () => {
+  const parent = mkdtempSync(join(tmpdir(), 'aludel-parent-'));
+  git(parent, 'init', '-b', 'main');
+  git(parent, 'config', 'user.name', 'Owner'); git(parent, 'config', 'user.email', 'owner@example.com');
+  writeFileSync(join(parent, '.gitignore'), '.data\n');
+  writeFileSync(join(parent, 'aludel.txt'), 'Aludel itself\n');
+  git(parent, 'add', '-A'); git(parent, 'commit', '-m', 'aludel baseline');
+  writeFileSync(join(parent, 'aludel.txt'), 'Aludel itself, with uncommitted work\n');
+  const workspace = join(parent, '.data', 'workspaces', 'p-1');
+  mkdirSync(workspace, { recursive: true });
+  writeFileSync(join(workspace, 'README.md'), '# A project\n');
+  const result = commitWorkspace({ repository: workspace, profile: gitProfile, message: 'chore: start a project', name: 'Ada', email: 'ada@example.com' });
+  assert.ok(existsSync(join(workspace, '.git')), 'the workspace got its own repository');
+  assert.equal(git(workspace, 'log', '--format=%s').stdout.trim(), 'chore: start a project');
+  assert.equal(git(parent, 'log', '--format=%s').stdout.trim(), 'aludel baseline', 'the parent gained no commit');
+  assert.match(git(parent, 'status', '--porcelain').stdout, /M aludel\.txt/, 'the parent\'s uncommitted work is untouched');
+  assert.ok(result.trackedFiles >= 1);
+});

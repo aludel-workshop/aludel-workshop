@@ -31,7 +31,7 @@ The prototype is the visual and structural reference, not code to copy. The real
 | **LAY-02** Project shell | Route `/p/<slug>/<layer>[/<tab>[/<id>]]` for every project the user is a member of. Rail: Home, Product, Design, Pages, Platform, Work; Settings; account menu (account, your apps, sign out). Global search over the project's records. "Continue in Aludel" and `/projects` link here. Aludel's old hash workspace stays reachable until LAY-06 | Browser: a new user lands in `/p/<slug>` after building; every layer and tab renders; non-members get 404; axe and 390px clean |
 | **LAY-03** Knowledge records | Server module `server/knowledge.mjs`: project-scoped records for vision sections, personas, activities, steps, stories, phases, specs, research, docs, pages and work items, with revisions and rationale. Derived story status. Onboarding writes into them: idea → vision and a persona; **story packs** (replace functionality, before Pages) → activities, steps and stories; pages → page records linked to stories; look → design settings; build → template work items done and stories built. Layer screens with core editing (stories, vision, docs, specs, page descriptions; work item assign and answer) | Domain tests for validation, ownership, derivation and pack seeding; browser test from onboarding into every layer; the scaffold still builds from the page records |
 | **LAY-07** Data, Platform operations, agents, code links (DEC-038) | Done 2026-09-22 (owner asked for the build directly; the v3 review now covers the built layers). Sub-packets below | Done: 12 domain tests, `layers-browser.mjs` covers the new tabs, axe and 390px clean. [Evidence](../../evidence/lay-07-data-platform-agents.md) |
-| **LAY-04** Work automation | Working style → automation policy per work type; suggested items computed from gaps; routines; the Product agent drafting stories and specs through the agent connection (needs the owner's OK to spend on API keys) | Later |
+| **LAY-04** Work automation | Working style → automation policy per work type; suggested items computed from gaps; routines; the Product agent drafting stories and specs through the agent connection (needs the owner's OK to spend on API keys) | A–C done 2026-09-23; D done: pasted, checked keys (DEC-039) and agent batches with the runner (DEC-040). Next: ROADMAP-01 (action-based roadmap that batches draw from). [Evidence](../../evidence/lay-04-work-automation.md) |
 | **LAY-05** Coding agents | Implement items against stories with isolated runs and preview review (absorbs B-03B) | Later |
 | **LAY-06** Aludel inside itself | Migrate Aludel's own docs, decisions and plans into its layers; retire the hash workspace | Later; owner-led pass |
 
@@ -127,6 +127,10 @@ New `<mat-icon>` names need the font subset rebuilt: `python3 tools/subset-icons
 
 Newest first.
 
+- **2026-09-23: LAY-04A–C done and agent-checked** ([evidence](../../evidence/lay-04-work-automation.md)).
+  - Built: verified closing, applied answers, server-side suggestions, working-style automation and routines. The interim `/projects/<id>` page now redirects.
+  - **Next: LAY-04D, the Product agent. It is blocked on the owner's OK for provider use.** Items are already queued for profiles with pinned instructions; what's missing is a runner that takes a queued item, calls the account, writes drafts as revisions made from the item, and moves it to review.
+- **2026-09-23: V3-REVIEW closed.** Owner: "im happy with v3".
 - **2026-09-22: LAY-07 done and agent-checked** ([evidence](../../evidence/lay-07-data-platform-agents.md)).
   - Data layer, eight Platform tabs, Work › Agents and code links are real; server 44/44, all browser scripts pass except the known `browser.mjs` step.
   - **Next action: owner review of the built layers (V3-REVIEW)**, then LAY-04.

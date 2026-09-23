@@ -67,6 +67,10 @@ const layers = [{ id: 'home', icon: 'home', label: 'Home' }, { id: 'product', ic
         </div>
       </div>
       <main class="lay-main" id="lay-main" tabindex="-1">
+        @if (ctx.workingOn(); as current) {
+          <div class="lay-working" role="status"><mat-icon aria-hidden="true">assignment</mat-icon><span>Working on <strong>{{ current.ref }}</strong>: edits to its targets are saved as its output.</span>
+            <a [href]="ctx.link('work', 'item', current.id)" (click)="ctx.go(ctx.link('work', 'item', current.id), $event)">Back to {{ current.ref }}</a><button type="button" class="lay-link-button" (click)="ctx.workingOn.set(null)">Stop</button></div>
+        }
         @if (ctx.error()) { <p class="error-message" role="alert">{{ ctx.error() }}</p> }
         @if (ctx.notice()) { <p class="success-message" role="status">{{ ctx.notice() }}</p> }
         @if (missing()) {

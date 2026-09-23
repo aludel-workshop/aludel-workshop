@@ -2,10 +2,10 @@
 id: status-001
 kind: project-status
 status: active
-updated: 2026-09-22
+updated: 2026-09-23
 current_phase: M1
 phase_state: in-progress
-next_action: V3-REVIEW
+next_action: ROADMAP-01
 ---
 
 # Current project status
@@ -16,14 +16,13 @@ Turn the running local portal foundation into the first complete request → del
 
 ## Next action
 
-**V3-REVIEW: owner walkthrough of the built LAY-07 layers** (Data, the Platform operations tabs, Work › Agents and code links), with [prototype v3](design/portal-layers/v3/index.html) as the reference. Start `./launch-machine`, open a project and try Data, Platform › Code and Database, and Work › Agents. One question to answer: should editing a page (for example "mark as designed") open a Reconcile item, as it does now? A rebuild closes it. Then LAY-04. [LAY-07 evidence](evidence/lay-07-data-platform-agents.md).
+**ROADMAP-01: design an action-based roadmap and how agent batches come from it.** Owner (2026-09-23): "that roadmap should be all actions, not just restating the story phases", and asked whether batches should "tie them in to the roadmap". It needs an owner-reviewed direction or prototype before any build. Meanwhile the owner can run real agent batches (LAY-04D, DEC-040): Work › Queue › fill a batch › Go. [Evidence](evidence/lay-04-work-automation.md).
 
 ## Ready queue
 
-1. **V3-REVIEW**: owner review of the built LAY-07 layers.
-2. **LAY-04**: verified work outputs and applied answers, reusing LAY-07's revision-anchored links; then working-style automation, routines and the Product agent (spending needs owner OK).
-3. **LAY-05**: coding agents against stories (absorbs B-03B), committing with LAY-07's trailers.
-4. **LAY-06**: Aludel's own knowledge into its layers; retire the hash workspace.
+1. **ROADMAP-01**: an action-based roadmap that batches can be drawn from (design first).
+2. **LAY-05**: coding agents against stories (absorbs B-03B), committing with LAY-07's trailers.
+3. **LAY-06**: Aludel's own knowledge into its layers; retire the hash workspace.
 
 One packet at a time. B-03's worker/artifact/recovery work remains required and must not be displaced by later workspace expansion. [Proposed dependency order](design/project-workspace/v1/delivery-plan.md).
 
@@ -58,7 +57,10 @@ One packet at a time. B-03's worker/artifact/recovery work remains required and 
 
 | Packet | Result | Evidence |
 |---|---|---|
-| LAY-07 | Data layer (JSON Schema objects, OpenAPI operations and export, access), Platform Overview/Architecture/Code/Repository/Releases/Environments/Database/Domains, Work › Agents (profiles, pinned instructions, routing, AGENTS.md), revision-anchored code links with Reconcile items; agent-checked, owner review pending | [Evidence/retrospective](evidence/lay-07-data-platform-agents.md) |
+| LAY-04D | Pasted, checked agent keys with a user guide (DEC-039); agent pool, batches you start with Go, OpenAI/Anthropic runner for acceptance, clarification options and data contracts, review and accept (DEC-040); agent-checked with a provider stand-in | [Evidence/retrospective](evidence/lay-04-work-automation.md) |
+| LAY-04A–C | Verified closing, applied answers, server suggestions, working-style staging and routing, routines; interim project page redirected; agent-checked | [Evidence/retrospective](evidence/lay-04-work-automation.md) |
+| V3-REVIEW | Owner accepted the built LAY-07 layers ("im happy with v3") | [LAY-07 evidence](evidence/lay-07-data-platform-agents.md) |
+| LAY-07 | Data layer (JSON Schema objects, OpenAPI operations and export, access), Platform Overview/Architecture/Code/Repository/Releases/Environments/Database/Domains, Work › Agents (profiles, pinned instructions, routing, AGENTS.md), revision-anchored code links with Reconcile items; agent-checked, owner accepted (V3-REVIEW) | [Evidence/retrospective](evidence/lay-07-data-platform-agents.md) |
 | LAY-02/03 | Project shell at `/p/<slug>`; knowledge records, story packs, page records, work items, derived story status; every layer usable; onboarding writes into the layers | [Evidence/retrospective](evidence/lay-02-03-layers.md), [plan](design/portal-layers/implementation-plan.md) |
 | ONB-01–05 | Accounts/tenancy, pre-account working style and idea, account + per-user GitHub + local repository, optional agent/look/features/stack, deterministic skeleton at `<slug>.localhost`; agent-checked, owner review pending | [Evidence/retrospective](evidence/onb-01-05-onboarding.md), [work record](design/onboarding/work-record.md) |
 | PW-02 | Revisioned Direction/Roadmap/Features, research-backed projections, responsibility-based navigation and legacy-route compatibility | [Evidence/retrospective](evidence/pw-02-product-workspace.md), [research](design/project-workspace/pw-02/research.md) |
@@ -80,6 +82,19 @@ One packet at a time. B-03's worker/artifact/recovery work remains required and 
 | M0 research/design | Product loop, local agent path, runner choice, recovery model, product workflow, knowledge boundary, experience architecture, and design-system strategy | [Execution plan](execution-plan.md), [decision register](decisions.md) |
 
 ## Latest handoff
+
+2026-09-23: **Bug found and fixed at closeout:** creating or building a project committed Aludel's own repository (four mislabeled commits, three already pushed; no GitHub push of Aludel to a project happened). Workspaces must now be their own repository. [Details](evidence/lay-04-work-automation.md#found-at-closeout-project-creation-committed-aludels-own-repository-fixed-2026-09-23).
+
+2026-09-23: **Closed out LAY-07 and LAY-04.** The owner ran two real batches on OpenAI: one contract done (903 tokens) and one acceptance draft waiting in review (1,413 tokens). [Evidence](evidence/lay-04-work-automation.md#owner-use-2026-09-23). Next: ROADMAP-01 (design first).
+
+2026-09-23: **Agents run in batches you start (DEC-040).** Working style now marks work as available for agents instead of opening items; your untouched items go back to the pool on restart. In Work › Queue, fill a batch (by hand or "the next 10") and press Go. The runner drafts acceptance, clarification options and data contracts on the project's key (OpenAI `gpt-6-astra` by default), and drafts come back for review. Server tests pass 60/60; all browser scripts pass except the known step. No real provider was called by us. Next: ROADMAP-01 design.
+
+2026-09-23: **Agent accounts connect by pasted key (DEC-039).** The owner cares about hosting and declined a third-party broker. The guided Anthropic and OpenAI key panel checks each key for free, stores it encrypted, and links a [user guide](guides/connect-an-agent.md). "Codex on this machine" is retired. Server tests pass 54/54; all browser scripts pass except the known step. Next: the owner's OK for the Product agent to spend on runs.
+
+2026-09-23: **LAY-04A–C built and agent-checked** after the owner accepted v3.
+- Closing record-changing work now needs a revision made from it, and answers are applied to their records. Working style stages and routes suggestions (a Planner's plans go to the Architect, page designs to the Design lead for review). Four default routines run weekly, monthly or before each release.
+- Server tests pass 51/51. All browser scripts pass except the known `browser.mjs` step.
+- Next: the owner's decision on how the Product agent may run (LAY-04D). [Evidence](evidence/lay-04-work-automation.md).
 
 2026-09-22: **LAY-07 built and agent-checked** on the owner's instruction ("can you handle lay-07 for me?"), without the separate v3 review.
 - Server tests pass 44/44, including 12 new ones. Typecheck and build pass. `tests/layers-browser.mjs` drives every new tab, with axe clean on 23 views and 390px clean on 10 paths.

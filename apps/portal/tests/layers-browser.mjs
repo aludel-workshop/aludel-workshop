@@ -239,15 +239,108 @@ try {
   await page.getByRole('link', { name: 'Work', exact: true }).first().click();
   // Marking the Messages page designed changed a record with generated code, so a Reconcile item is open and suggestions start collapsed.
   await page.getByRole('link', { name: /Reconcile Messages page with its code/ }).waitFor();
-  if (!(await page.locator('.lay-suggested').evaluate(element => element.open))) await page.locator('.lay-suggested summary').click();
+  if (!(await page.locator('.lay-suggested').last().evaluate(element => element.open))) await page.locator('.lay-suggested summary').last().click();
+  // DEC-040 (revising LAY-04B): a Planner's working style makes plans available to the Architect; nothing is opened or run yet.
+  const pool = page.locator('.lay-suggested').first();
+  if (!(await pool.evaluate(element => element.open))) await pool.locator('summary').click();
+  const available = pool.locator('.lay-item', { hasText: 'Write the Conversation contract' });
+  await available.waitFor();
+  assert.match(await available.innerText(), /Architect/, 'plan work is routed to the Architect');
+  assert.equal(await page.getByRole('link', { name: /Write the Conversation contract/ }).count(), 0, 'no item is opened until it is batched');
+  // LAY-04A: a clarification's answer lands in the story it changes.
+  if (!(await page.locator('.lay-suggested').last().evaluate(element => element.open))) await page.locator('.lay-suggested summary').last().click();
+  await page.locator('.lay-suggested .lay-item', { hasText: /Clarify: Which record do conversations start from/ }).getByRole('button', { name: 'Start now' }).click();
+  await page.getByRole('heading', { name: /^Which record do conversations start from/, level: 2 }).waitFor();
+  await page.getByLabel('Answer', { exact: true }).fill('A tool listing');
+  await page.getByLabel('Why (saved with the decision)').fill('Tools are what neighbours talk about');
+  await page.getByRole('button', { name: 'Answer', exact: true }).click();
+  await page.getByText('Answer saved.').waitFor();
+  await page.getByRole('button', { name: /^Apply to S\d+/ }).click();
+  await page.getByText(/^Applied\. The record has a new revision/).waitFor();
+  await page.getByText(/^Applied to S\d+/).waitFor();
+  await check('work-answer-applied');
+  await page.getByRole('button', { name: 'Done' }).click();
+  await page.getByText('Moved to Done.').waitFor();
+  // LAY-04A: closing needs the target to have changed from this item; editing from the item makes it so.
+  await page.getByRole('link', { name: 'Work', exact: true }).first().click();
+  if (!(await page.locator('.lay-suggested').last().evaluate(element => element.open))) await page.locator('.lay-suggested summary').last().click();
   const suggestion = page.locator('.lay-suggested .lay-item', { hasText: /Write acceptance for “Someone can start a conversation/ });
   await suggestion.getByRole('button', { name: 'Start now' }).click();
   await page.getByRole('heading', { name: 'Who\'s on it' }).waitFor();
   await page.getByText('On it: Ada Lovelace.').waitFor();
   await page.getByText(/Story:/).waitFor();
   await page.getByRole('button', { name: 'Done' }).click();
+  await page.getByRole('alert').getByText(/has no change from W-\d+ yet/).waitFor();
+  await page.locator('.lay-connected').getByRole('link', { name: /Someone can start a conversation/ }).click();
+  await page.getByRole('status').getByText(/Working on/).waitFor();
+  const conversationDrawer = page.getByRole('dialog');
+  await conversationDrawer.getByText('A tool listing', { exact: true }).waitFor();
+  await conversationDrawer.getByRole('button', { name: 'Add scenario' }).click();
+  await conversationDrawer.getByLabel('Given').fill('a tool listing');
+  await conversationDrawer.getByLabel('When').fill('Sam chooses Message the lender');
+  await conversationDrawer.getByLabel('Then', { exact: true }).fill('a conversation about that tool opens');
+  await conversationDrawer.getByLabel('Why this change (saved with the revision)').fill('Acceptance for the Demo');
+  await conversationDrawer.getByRole('button', { name: 'Save story' }).click();
+  await conversationDrawer.getByText('Acceptance for the Demo').waitFor();
+  await page.getByRole('status').getByRole('link', { name: /Back to W-\d+/ }).click();
+  await page.getByRole('button', { name: 'Done' }).click();
   await page.getByText('Moved to Done.').waitFor();
   await check('work-item');
+
+  // LAY-04C: routines. The build already ran the security audit; running it again while it is open is refused.
+  await page.getByRole('link', { name: 'Work', exact: true }).first().click();
+  await page.getByRole('navigation', { name: 'Work sections' }).getByRole('link', { name: 'Routines' }).click();
+  const routines = page.getByRole('region', { name: 'Routines' });
+  await routines.getByRole('row', { name: /Security audit before release/ }).getByRole('link', { name: /W-\d+/ }).waitFor();
+  await routines.getByRole('button', { name: 'Run Product drift check now' }).click();
+  await page.getByText('Ran it. The new item is in the queue.').waitFor();
+  await routines.getByRole('row', { name: /Product drift check/ }).getByRole('link', { name: /W-\d+/ }).waitFor();
+  await routines.getByRole('button', { name: 'Run Security audit before release now' }).click();
+  await page.getByRole('alert').getByText(/is still open/).waitFor();
+  await routines.getByRole('checkbox', { name: 'Turn off Accessibility sweep' }).uncheck();
+  await page.getByText('Routine off.').waitFor();
+  await check('work-routines');
+  // DEC-040: agents run only in batches. Connect a key (checked against the provider stand-in), fill, Go, review.
+  await json('PUT', `/api/projects/${project.id}/connections/agent`, { provider: 'openai', secret: 'sk-proj-aludel-browser-test-key-good' });
+  await page.getByRole('navigation', { name: 'Work sections' }).getByRole('link', { name: 'Queue' }).click();
+  const batchPanel = page.getByRole('region', { name: 'Next agent batch' });
+  await batchPanel.getByText('Nothing runs until you press Go.').waitFor();
+  if (!(await page.locator('.lay-suggested').first().evaluate(element => element.open))) await page.locator('.lay-suggested summary').first().click();
+  await page.getByRole('button', { name: /^Add to batch: Write the Message contract/ }).click();
+  await page.getByText('Added to the batch.').waitFor();
+  await batchPanel.getByRole('link', { name: 'Write the Message contract' }).waitFor();
+  await batchPanel.getByRole('button', { name: /^Fill with the next/ }).click();
+  await page.getByText(/^Added \d+\./).waitFor();
+  await check('work-batch-draft');
+  await batchPanel.getByRole('button', { name: /^Go: run \d+ items?/ }).click();
+  await page.getByText(/B-1 started/).waitFor();
+  await until(async () => (await json('GET', `/api/projects/${project.id}/knowledge`)).knowledge.batches[0].state === 'done', 'the batch finishes against the stand-in');
+  await page.reload();
+  await page.locator('.lay-batch').getByText(/B-1: finished/).first().waitFor({ state: 'attached' });
+  const contract = page.getByRole('link', { name: /Write the Message contract/ }).first();
+  await contract.click();
+  await page.getByText(/Done by the Architect profile · \d+ tokens/).first().waitFor({ state: 'attached' });
+  // A Planner reviews acceptance drafts: give one to an agent by hand, run it, then accept it.
+  await page.getByRole('link', { name: 'Work', exact: true }).first().click();
+  if (!(await page.locator('.lay-suggested').last().evaluate(element => element.open))) await page.locator('.lay-suggested summary').last().click();
+  await page.locator('.lay-suggested .lay-item', { hasText: /Write acceptance for “Someone can block another person”/ }).getByRole('button', { name: 'Give to an agent' }).click();
+  await page.getByText('Added to the batch.').waitFor();
+  await page.getByRole('region', { name: 'Next agent batch' }).getByRole('button', { name: 'Go: run 1 item' }).click();
+  await until(async () => (await json('GET', `/api/projects/${project.id}/knowledge`)).knowledge.batches[0].state === 'done', 'the second batch finishes');
+  await page.reload();
+  await page.getByRole('link', { name: /Write acceptance for “Someone can block another person”/ }).first().click();
+  await page.getByRole('heading', { name: /Review the Product lead's draft/ }).waitFor();
+  await check('work-review');
+  await page.getByRole('button', { name: 'Accept' }).click();
+  await page.getByText('Moved to Done.').waitFor();
+
+  await page.getByRole('link', { name: 'Work', exact: true }).first().click();
+  await page.getByRole('navigation', { name: 'Work sections' }).getByRole('link', { name: 'Working style' }).click();
+  assert.equal(await page.getByRole('region', { name: 'Work routing' }).getByRole('row', { name: /^Spec/ }).getByRole('cell').nth(1).innerText(), 'Agent · you review', 'a Planner has agents draft specs for review');
+  assert.equal(await page.getByRole('region', { name: 'Work routing' }).getByRole('row', { name: /^Define/ }).getByRole('cell').nth(1).innerText(), 'You');
+  // The interim /projects/<id> page is gone; old links land in the project.
+  await page.goto(`${portal}/projects/${project.id}`);
+  await page.waitForURL(`${portal}/p/tool-share`);
 
   // Work › Agents (LAY-07C): profiles with revisioned instructions, AGENTS.md export, routing by work type.
   await page.getByRole('link', { name: 'Work', exact: true }).first().click();
@@ -325,5 +418,5 @@ try {
   await page.waitForURL(`${portal}/`);
 
   assert.deepEqual(errors, []);
-  console.log(`PASS: layers ${checked.join(' → ')}; pack stories and template work; story edits with rationale; spec, doc, research; page canvas, linking and designed status; Data objects, fields, relations, contracts, OpenAPI export and access; Platform release, binding, code units, repository, health, database backup/restore, masked browse and guarded query; agent profiles, AGENTS.md export and routing; suspect code to a Reconcile item and back; suggestions to done work; search; member isolation; 390px; sign out.`);
+  console.log(`PASS: layers ${checked.join(' → ')}; pack stories and template work; story edits with rationale; spec, doc, research; page canvas, linking and designed status; Data objects, fields, relations, contracts, OpenAPI export and access; Platform release, binding, code units, repository, health, database backup/restore, masked browse and guarded query; agent profiles, AGENTS.md export and routing; suspect code to a Reconcile item and back; agent batches (fill, Go, review), working-style routing, applied answers, verified closing, routines; suggestions to done work; search; member isolation; 390px; sign out.`);
 } finally { await browser.close(); }

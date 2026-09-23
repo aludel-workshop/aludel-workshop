@@ -67,10 +67,26 @@ try {
 
   await page.getByRole('heading', { name: 'Connect an agent' }).waitFor();
   await page.getByRole('button', { name: 'Connect an agent' }).click();
-  await page.getByRole('radio', { name: /Codex on this machine/ }).check();
+  // LAY-04D: a pasted key, with the provider's steps in place. The provider is a local stand-in (tests/provider-stub.mjs).
+  assert.equal(await page.getByRole('radio', { name: /Codex on this machine/ }).count(), 0, 'local-only Codex is not offered');
+  await page.getByRole('radio', { name: /Anthropic \(Claude\)/ }).check();
+  await page.getByText('Name it after this project so you can find it later, for example “Aludel · Tool Share”.').waitFor();
+  assert.equal(await page.getByRole('link', { name: /Open Anthropic \(Claude\) API keys/ }).getAttribute('href'), 'https://platform.claude.com/settings/keys');
+  await page.getByLabel('Anthropic (Claude) API key').fill('sk-ant-admin01-not-for-agents-xxxxxxxxxxxx');
+  await page.getByRole('button', { name: 'Check and save' }).click();
+  await page.getByRole('alert').getByText(/Admin API key/).waitFor();
+  await page.getByLabel('Anthropic (Claude) API key').fill('sk-ant-api03-mistyped-key-xxxxxxxxxxxxxx');
+  await page.getByRole('button', { name: 'Check and save' }).click();
+  await page.getByRole('alert').getByText(/rejected this key/).waitFor();
+  // The button just re-enabled; let Material's colour transition finish so axe measures the settled colours.
+  await page.getByRole('button', { name: 'Check and save' }).evaluate(element => Promise.all(element.getAnimations({ subtree: true }).map(animation => animation.finished)));
   await check('agent');
-  await page.getByRole('button', { name: 'Save connection' }).click();
-  await page.getByText('Agent connection saved.').waitFor();
+  await page.getByLabel('Anthropic (Claude) API key').fill('sk-ant-api03-aludel-browser-test-key-good');
+  await page.getByRole('button', { name: 'Check and save' }).click();
+  await page.getByText('Checked with Anthropic (Claude): the key works. Agent connection saved.').waitFor();
+  await page.getByText(/key ending good\s*·\s*checked, works/).waitFor();
+  await page.getByRole('button', { name: 'Check again' }).click();
+  await page.getByText('The key still works.').waitFor();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
 
   await page.getByRole('heading', { name: 'Choose a starting feel' }).waitFor();

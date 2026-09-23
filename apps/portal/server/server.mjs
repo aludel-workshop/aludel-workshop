@@ -10,6 +10,7 @@ import { previewManager } from './previews.mjs';
 import { agentsGuide, copyMedia, initialFiles, loadScaffoldSources, skeletonFiles, writeBinaries, writeFiles } from './scaffold.mjs';
 import { codeLinks, initCodeLinks, workspaceIsIndexable } from './code-links.mjs';
 import { initPlatformOps, platformOps } from './platform-ops.mjs';
+import { agentRuns, initAgentRuns } from './agent-runs.mjs';
 import { extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { importCorpus } from './importer.mjs';
@@ -40,6 +41,7 @@ initOnboarding(db);
 initKnowledge(db);
 initCodeLinks(db);
 initPlatformOps(db);
+initAgentRuns(db);
 const secrets = openSecretStore(dataDirectory);
 const topology = hostTopology(process.env, port);
 const setupConfigPath = join(portalRoot, 'config', 'project-setup.json');
@@ -66,12 +68,25 @@ for (const project of db.prepare(`SELECT p.id, p.description, s.feel FROM projec
   know.seedPages(project.id, project.feel);
 }
 // LAY-07: projects from before the Data layer and agent profiles get them (idempotent), before code links start listening.
-for (const project of db.prepare("SELECT p.id FROM projects p JOIN project_setup s ON s.project_id = p.id WHERE p.id <> 'the-machine'").all()) {
-  know.ensureAgents(project.id);
-  know.ensurePackData(project.id);
+const layerProjects = () => db.prepare("SELECT p.id FROM projects p JOIN project_setup s ON s.project_id = p.id WHERE p.id <> 'the-machine'").all().map(row => row.id);
+for (const projectId of layerProjects()) {
+  know.ensureAgents(projectId);
+  know.ensurePackData(projectId);
+  know.ensureRoutines(projectId);
+  // DEC-040: items LAY-04B opened for agents that nobody touched go back to the pool.
+  know.returnStagedToPool(projectId);
 }
 const links = codeLinks({ db, know });
 const ops = platformOps({ db, backupRoot: join(dataDirectory, 'backups') });
+const runs = agentRuns({ db, know, secrets, providers: catalogs.agentProviders.providers });
+// LAY-04: routines that are due create work, and working style stages what it automates. At start-up, then every ten minutes.
+function tickRoutines() {
+  for (const projectId of layerProjects()) {
+    try { know.runRoutines(projectId); know.automate(projectId); } catch (error) { console.error(`Routines for ${projectId}: ${error.message}`); }
+  }
+}
+tickRoutines();
+setInterval(tickRoutines, 10 * 60 * 1000).unref();
 const github = githubIntegration({
   db, secrets, config: loadGitHubVendorConfig(),
   callbackUrl: `${publicBaseUrl}/api/integrations/github/callback`,
@@ -171,6 +186,7 @@ async function generateSkeleton(user, projectId) {
   const built = links.builtBy(projectId);
   const release = ops.releases.start(projectId, { commit: result.commit, backup: backup?.name || null, stories: know.list(projectId, 'story').filter(story => built.has(story.id)).map(story => story.id) });
   void previews.build(projectId, setup.workspacePath, result.commit).then(status => ops.releases.finish(release.id, status));
+  know.runRoutines(projectId, { trigger: 'release' });
   return { commit: result.commit, trackedFiles: result.trackedFiles, pushed, pushError, release: release.number, unmatchedManifest: manifestResult.missing };
 }
 
@@ -305,19 +321,23 @@ async function api(request, response, url) {
     return json(response, 201, { project: setup.project }, { 'set-cookie': draftCookie('', 0) });
   }
   if (url.pathname === '/api/projects' && request.method === 'GET') return json(response, 200, { projects: userProjects(db, user.id) });
-  const projectRoute = /^\/api\/projects\/([^/]+)\/(setup|preferences|design|pages|assets|features|stack|connections\/agent|steps|repository|skeleton|preview|knowledge|records|work|openapi\.json|platform|database|code|reconcile|agents|routing)(?:\/([^/]+))?$/.exec(url.pathname);
+  const projectRoute = /^\/api\/projects\/([^/]+)\/(setup|preferences|design|pages|assets|features|stack|connections\/agent|steps|repository|skeleton|preview|knowledge|records|work|openapi\.json|platform|database|code|reconcile|agents|routing|routines|batches)(?:\/([^/]+))?$/.exec(url.pathname);
   if (projectRoute) {
     const [, rawId, section, rawItem] = projectRoute;
     const projectId = decodeURIComponent(rawId);
     const item = rawItem ? decodeURIComponent(rawItem) : null;
     requireMember(db, user, projectId);
     const method = request.method;
+    // LAY-04B: after any successful change to a project's layers, working style stages and routes what it automates.
+    if (method !== 'GET' && projectId !== aludelProjectId && ['records', 'work', 'preferences', 'routing', 'features', 'pages', 'skeleton', 'routines'].includes(section)) {
+      response.once('finish', () => { if (response.statusCode < 400) { try { know.automate(projectId); } catch (error) { console.error(`Automation for ${projectId}: ${error.message}`); } } });
+    }
     if (section === 'setup' && method === 'GET') return json(response, 200, projectView(user, projectId));
     // LAY-03: the layers read one project snapshot and write records and work items through the knowledge module.
     if (section === 'knowledge' && method === 'GET') {
       if (projectId === aludelProjectId) return json(response, 409, { error: 'Aludel’s own knowledge moves into its layers in LAY-06.' });
-      return json(response, 200, { setup: projectView(user, projectId), knowledge: { ...know.view(user, projectId, { builtBy: links.builtBy(projectId) }), code: links.snapshot(projectId) },
-        catalog: { pageTypes: catalogs.pageTypes, routeIcons: catalogs.routeIcons, feels: catalogs.feels, preferences: catalogs.preferences, profiles: catalogs.profiles, stacks: catalogs.stacks } });
+      return json(response, 200, { setup: projectView(user, projectId), knowledge: { ...know.view(user, projectId, { builtBy: links.builtBy(projectId) }), code: links.snapshot(projectId), batches: runs.view(projectId) },
+        catalog: { pageTypes: catalogs.pageTypes, routeIcons: catalogs.routeIcons, feels: catalogs.feels, preferences: catalogs.preferences, profiles: catalogs.profiles, stacks: catalogs.stacks, automation: catalogs.automation } });
     }
     // LAY-07A: the Data layer's contract as OpenAPI 3.1.
     if (section === 'openapi.json' && method === 'GET') {
@@ -371,11 +391,13 @@ async function api(request, response, url) {
     }
     if (section === 'records' && method === 'POST' && !item) {
       const input = await readJson(request);
-      return json(response, 201, know.insert(projectId, String(input.kind || ''), input.data || {}, { parentId: input.parentId || null, author: user.name, rationale: input.rationale || null }));
+      const work = know.openWorkItem(projectId, input.workItemId);
+      return json(response, 201, know.insert(projectId, String(input.kind || ''), input.data || {}, { parentId: input.parentId || null, author: user.name, rationale: input.rationale || null, workItemId: work?.id || null }));
     }
     if (section === 'records' && method === 'PUT' && item) {
       const input = await readJson(request);
-      return json(response, 200, know.update(projectId, item, input.data || {}, { expectedRevision: input.expectedRevision, author: user.name, rationale: input.rationale || null, position: input.position, parentId: input.parentId }));
+      const work = know.openWorkItem(projectId, input.workItemId);
+      return json(response, 200, know.update(projectId, item, input.data || {}, { expectedRevision: input.expectedRevision, author: user.name, rationale: input.rationale || null, position: input.position, parentId: input.parentId, workItemId: work?.id || null }));
     }
     if (section === 'records' && method === 'DELETE' && item) {
       const record = ['story', 'spec', 'doc', 'research', 'persona', 'activity', 'step', 'data_object', 'data_operation', 'access_rule'].flatMap(kind => know.list(projectId, kind)).find(entry => entry.id === item);
@@ -385,8 +407,27 @@ async function api(request, response, url) {
       know.remove(projectId, item);
       return json(response, 200, { deleted: item });
     }
-    if (section === 'work' && method === 'POST' && !item) return json(response, 201, know.createWork(projectId, await readJson(request), user.name));
-    if (section === 'work' && method === 'PUT' && item) return json(response, 200, know.updateWork(user, projectId, item, await readJson(request)));
+    if (section === 'work' && method === 'POST' && !item) {
+      // People stage suggestions; reconcile and routine contexts are only ever written by the server.
+      const input = await readJson(request);
+      return json(response, 201, know.createWork(projectId, { ...input, context: typeof input.suggestion === 'string' ? { suggestion: input.suggestion.slice(0, 400) } : null }, user.name));
+    }
+    if (section === 'work' && method === 'PUT' && item) {
+      const input = await readJson(request);
+      if (input.apply) return json(response, 200, know.applyAnswer(user, projectId, item, String(input.apply)));
+      if (typeof input.note === 'string' && input.note.trim()) know.appendLog(item, `${user.name}: ${input.note.trim().slice(0, 500)}`);
+      return json(response, 200, know.updateWork(user, projectId, item, input));
+    }
+    if (section === 'routines' && method === 'POST' && item) return json(response, 201, { created: know.runRoutines(projectId, { trigger: 'manual', routineId: item }) });
+    // DEC-040: agent batches. Start is the owner's authorization to spend on exactly the batch's items.
+    if (section === 'batches' && method === 'POST' && item) {
+      const input = await readJson(request);
+      if (item === 'add') return json(response, 200, runs.add(user, projectId, { suggestion: input.suggestion ? String(input.suggestion) : null, workId: input.workId ? String(input.workId) : null }));
+      if (item === 'remove') { runs.remove(user, projectId, String(input.workId || '')); return json(response, 200, { removed: input.workId }); }
+      if (item === 'fill') return json(response, 200, { added: runs.fill(user, projectId, input.count).length });
+      if (item === 'start') { const { batch } = runs.start(user, projectId, String(input.batchId || '')); return json(response, 202, { batch }); }
+      if (item === 'stop') return json(response, 200, { batch: runs.stop(user, projectId, String(input.batchId || '')) });
+    }
     if (section === 'preferences' && method === 'PUT') { flows.savePreferences(user, projectId, await readJson(request)); return json(response, 200, projectView(user, projectId)); }
     if (section === 'design' && method === 'PUT') { flows.saveDesign(user, projectId, await readJson(request)); return json(response, 200, projectView(user, projectId)); }
     if (section === 'assets' && method === 'POST' && !item) { flows.addAsset(user, projectId, await readJson(request, 12 * 1024 * 1024)); return json(response, 201, projectView(user, projectId)); }
@@ -402,7 +443,8 @@ async function api(request, response, url) {
     if (section === 'pages' && method === 'PUT') { flows.saveRoutes(user, projectId, await readJson(request)); return json(response, 200, projectView(user, projectId)); }
     if (section === 'stack' && method === 'PUT') { flows.saveStack(user, projectId, await readJson(request)); return json(response, 200, projectView(user, projectId)); }
     if (section === 'connections/agent' && method === 'GET') return json(response, 200, flows.agentConnection(user, projectId));
-    if (section === 'connections/agent' && method === 'PUT') return json(response, 200, flows.saveAgentConnection(user, projectId, await readJson(request)));
+    if (section === 'connections/agent' && method === 'PUT') return json(response, 200, await flows.saveAgentConnection(user, projectId, await readJson(request)));
+    if (section === 'connections/agent' && method === 'POST') return json(response, 200, await flows.checkAgentConnection(user, projectId));
     if (section === 'connections/agent' && method === 'DELETE') return json(response, 200, flows.removeAgentConnection(user, projectId));
     if (section === 'steps' && method === 'POST' && item) { flows.markStep(user, projectId, item); return json(response, 200, projectView(user, projectId)); }
     if (section === 'repository' && method === 'POST' && projectId !== aludelProjectId) {

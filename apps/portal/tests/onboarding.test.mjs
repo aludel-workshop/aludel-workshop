@@ -25,7 +25,9 @@ function fixture() {
   initWorkflow(db); ensureProductWorkspace(db); initAccounts(db); initOnboarding(db); initKnowledge(db);
   const created = [];
   const know = knowledge({ db, catalogs, packs: catalogs.packs });
-  const flows = onboarding({ db, catalogs, secrets: openSecretStore(root), workspaceRoot: join(root, 'workspaces'), assetRoot: join(root, 'assets'), createWorkspace: setup => created.push(setup.project.id), know });
+  // Key checks never leave the test: this stand-in accepts any key ending in 1234.
+  const checkAgentKey = async (provider, key) => key.endsWith('1234') ? { ok: true } : { ok: false, reason: 'rejected' };
+  const flows = onboarding({ db, catalogs, secrets: openSecretStore(root), workspaceRoot: join(root, 'workspaces'), assetRoot: join(root, 'assets'), createWorkspace: setup => created.push(setup.project.id), know, checkAgentKey });
   return { db, flows, created, know };
 }
 
@@ -191,19 +193,23 @@ test('a build marks template stories built with a done template work item and gi
   assert.deepEqual(view.phases.map(p => p.key), ['demo', 'mvp', 'later']);
 });
 
-test('agent connections are sealed, never returned, and work identically for Aludel itself', () => {
+test('agent connections are checked, sealed, never returned, and work identically for Aludel itself', async () => {
   const { db, flows } = fixture();
   const ada = createUser(db, { email: 'ada@example.com', name: 'Ada', password: 'correct-horse-battery' });
   const { setup } = startProject(flows, ada);
   const key = 'sk-ant-api03-abcdefghijklmnopqrstuvwxyz1234';
-  const saved = flows.saveAgentConnection(ada, setup.project.id, { provider: 'anthropic', secret: key });
+  const saved = await flows.saveAgentConnection(ada, setup.project.id, { provider: 'anthropic', secret: key });
   assert.equal(saved.connection.hint, '1234');
+  assert.equal(saved.connection.status, 'verified');
   assert.equal(JSON.stringify(saved).includes(key), false);
   assert.equal(JSON.stringify(db.prepare('SELECT * FROM project_connections').all()).includes(key), false);
-  assert.throws(() => flows.saveAgentConnection(ada, setup.project.id, { provider: 'anthropic', secret: 'not-a-key' }), /doesn't look like/);
+  await assert.rejects(flows.saveAgentConnection(ada, setup.project.id, { provider: 'anthropic', secret: 'not-a-key' }), /doesn't look like/);
+  await assert.rejects(flows.saveAgentConnection(ada, setup.project.id, { provider: 'anthropic', secret: 'sk-ant-api03-abcdefghijklmnopqrstuvwxyz9999' }), /rejected this key/);
+  assert.equal((await flows.agentConnection(ada, setup.project.id)).connection.hint, '1234', 'a rejected key replaces nothing');
   assert.throws(() => flows.agentConnection(ada, 'the-machine'), error => error.status === 404, 'non-members cannot see Aludel');
   const owner = { id: ownerUserId };
-  assert.equal(flows.saveAgentConnection(owner, 'the-machine', { provider: 'codex-local' }).connection.label, 'Codex on this machine');
+  await assert.rejects(flows.saveAgentConnection(owner, 'the-machine', { provider: 'codex-local' }), /not offered for new connections/);
+  assert.equal((await flows.saveAgentConnection(owner, 'the-machine', { provider: 'openai', secret: 'sk-proj-abcdefghijklmnopqrstuvwxyz1234' })).connection.label, 'OpenAI');
   assert.equal(flows.removeAgentConnection(owner, 'the-machine').connection, null);
 });
 

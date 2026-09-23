@@ -1,5 +1,4 @@
 import { ChangeDetectorRef, Component, OnDestroy, Pipe, PipeTransform, computed, inject, input, signal } from '@angular/core';
-import { KeyValuePipe } from '@angular/common';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -36,7 +35,7 @@ export class SafeUrlPipe implements PipeTransform {
 
 @Component({
   selector: 'aludel-public', standalone: true,
-  imports: [FormsModule, KeyValuePipe, NgTemplateOutlet, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, AgentConnectionComponent, ProtoSiteComponent, SafeUrlPipe],
+  imports: [FormsModule, NgTemplateOutlet, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, AgentConnectionComponent, ProtoSiteComponent, SafeUrlPipe],
   templateUrl: './public.html'
 })
 export class PublicComponent implements OnDestroy {
@@ -59,7 +58,7 @@ export class PublicComponent implements OnDestroy {
     const [first, second, third] = this.segments();
     if (!first) return 'landing';
     if (first === 'login') return 'login';
-    if (first === 'projects') return second ? 'project' : 'projects';
+    if (first === 'projects') return second ? 'moved' : 'projects';
     if (first === 'start') {
       if (!second) return 'profile';
       if (second === 'idea' || second === 'account') return second;
@@ -92,7 +91,6 @@ export class PublicComponent implements OnDestroy {
   readonly feelEntries = computed(() => Object.entries(this.catalog()?.feels || {}).map(([id, value]) => ({ id, ...value })));
   readonly featureEntries = computed(() => Object.entries(this.catalog()?.features || {}).map(([id, value]) => ({ id, ...value })));
   readonly stackEntries = computed(() => Object.entries(this.catalog()?.stacks.presets || {}).map(([id, value]) => ({ id, ...value })));
-  readonly preferenceEntries = computed(() => Object.entries(this.catalog()?.preferences || {}).map(([id, value]) => ({ id, ...value, options: Object.entries(value.values).map(([key, label]) => ({ key, label })) })));
   // Story ideas the person added themselves (stories without a pack).
   readonly customFeatures = computed(() => (this.setup()?.features.stories || []).filter(story => !story.pack));
   readonly pendingDelete = signal<{ id: string; label: string; stories: number } | null>(null);
@@ -192,6 +190,13 @@ export class PublicComponent implements OnDestroy {
       if (!this.catalog()) this.catalog.set(await this.api<Catalog>('/api/onboarding/catalog'));
       const session = this.session();
       const view = this.view();
+      // LAY-04: the interim /projects/<id> page is gone; every project lives at /p/<slug>. Old links still arrive.
+      if (view === 'moved') {
+        if (!session?.authenticated) { this.go('/login'); return; }
+        const project = session.projects.find(item => item.id === this.projectId());
+        location.replace(project ? (project.id === 'the-machine' ? '/#/the-machine/overview' : `/p/${encodeURIComponent(project.slug)}`) : '/projects');
+        return;
+      }
       document.title = view === 'landing' ? 'Aludel · Turn ideas into working apps' : 'Aludel';
       if (['profile', 'idea', 'account'].includes(view)) {
         const draft = session?.draft;
@@ -206,7 +211,7 @@ export class PublicComponent implements OnDestroy {
       if (this.projectId()) {
         const setup = await this.api<ProjectSetup>(`/api/projects/${encodeURIComponent(this.projectId())}/setup`);
         this.applySetup(setup, true);
-        if (view === 'stack' || view === 'project') this.pollPreview();
+        if (view === 'stack') this.pollPreview();
       } else this.setup.set(null);
       setTimeout(() => document.querySelector<HTMLElement>('main h1')?.focus({ preventScroll: true }), 30);
     } catch (error) {
@@ -518,29 +523,6 @@ export class PublicComponent implements OnDestroy {
     return 'Not built yet';
   }
 
-  // Working style can change at any time, as a whole profile or one preference at a time.
-  switchProfile(profile: string) {
-    return this.run(async () => {
-      this.applySetup(await this.api<ProjectSetup>(`/api/projects/${encodeURIComponent(this.projectId())}/preferences`, 'PUT', { profile }));
-      this.notice.set(`Working style changed to ${this.catalog()?.profiles[profile]?.label}. Your individual changes were kept.`);
-    });
-  }
-
-  setPreference(key: string, value: string) {
-    return this.run(async () => {
-      this.applySetup(await this.api<ProjectSetup>(`/api/projects/${encodeURIComponent(this.projectId())}/preferences`, 'PUT', { overrides: { [key]: value } }));
-      this.notice.set('Preference saved.');
-    });
-  }
-
-  resetPreferences() {
-    return this.run(async () => {
-      this.applySetup(await this.api<ProjectSetup>(`/api/projects/${encodeURIComponent(this.projectId())}/preferences`, 'PUT', { resetOverrides: true }));
-      this.notice.set('Preferences reset to the working style defaults.');
-    });
-  }
-
-  isOverridden(key: string) { return key in (this.setup()?.overrides || {}); }
   profileLabel(id?: string | null) { return (id && this.catalog()?.profiles[id]?.label) || ''; }
   feelLabel(id?: string | null) { return (id && this.catalog()?.feels[id]?.label) || 'Not chosen'; }
   stackLabel(id?: string | null) { return (id && this.catalog()?.stacks.presets[id]?.label) || 'Not chosen'; }

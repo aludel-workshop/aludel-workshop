@@ -11,6 +11,21 @@ This is the seed of the portal's decision workflow. Confirmed owner answers and 
 
 ## Confirmed
 
+2026-09-23 — **DEC-040: agents run only in batches the owner starts; working style marks work as available for agents instead of opening items.** Owner, after connecting an OpenAI key: "lets go ahead and link it up. i think that for all of those work itms, its a little much to have just 22+ tasks open for agents as soon as the api key lands, could be hundreds … click the buttons on a couple to add them to agent run batch, then click go on that to lock them all for the agents and tell them to go? maybe some kind of button on the batch container to grab the next 10 highest priority marked available for agents?"
+- **The pool:** gaps whose work type the working style hands to agents are listed as available for agents, by priority. Untouched items staged by LAY-04B return to that pool.
+- **A batch:** the owner adds items by hand or fills it with the next N by priority, then presses Go. Go locks the items to their profiles and the runner works through them one at a time on the project's key. Pressing Go is the owner's authorization to spend on those items (DEC-004, DEC-005).
+- **Results:** drafts land as revisions made from the item. In review mode they come back to the owner; otherwise the item closes.
+- **Supersedes:** LAY-04B's automatic staging.
+- **Still to decide:** tying batches to an action-based roadmap is a separate design packet (ROADMAP-01).
+
+2026-09-23 — **DEC-039: agents connect with the user's own pasted API key (Anthropic or OpenAI); no third-party broker, no subscription sign-in.** Owner: "hosting is what i care about here. im not trying to design a localhost app. if api key is all we've got, lets make that simple … make sure we have good documentation provided alongside"; on OpenRouter's redirect flow: "not a fan of the third party. lets go paste in a key for now."
+- Anthropic forbids claude.ai sign-in in third-party products, and neither Anthropic nor OpenAI lets another app create a key for a user.
+- Codex's ChatGPT sign-in works only on the user's own machine, so "Codex on this machine" is no longer offered.
+- Keys are checked by listing the provider's models (no spend), stored encrypted and shown by their last four characters, with in-app steps and a [user guide](guides/connect-an-agent.md).
+- Revisit if a provider launches an OAuth or partner program.
+- Running agents on a key spends money and still needs the owner's OK (DEC-004).
+- [Research](design/portal-layers/agent-connection-research.md).
+
 2026-09-22 — **DEC-038: a stack-neutral Data layer; Platform becomes the stack binding and operations; integrations sit where they are used; agents get profiles; code links to knowledge.** Owner, after LAY-REVIEW: "api first … openAPI spec backed … all above implementation"; on the name Data and its tabs, "i like the name and ideas. make it happen. i agree with the direction for platform as well. integrations under where they are actually used (… github under repository, agents under work/agents …)"; on the two traceability recommendations (a Platform › Code tab with "Built by" shown in the layers above; no inline code tags), "go go both recs". Rules:
 - Nothing above Platform references stack specifics.
 - Data holds Objects (JSON Schema 2020-12), API (OpenAPI 3.1), Access, and later Events.

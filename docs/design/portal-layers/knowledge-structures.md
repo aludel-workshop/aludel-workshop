@@ -174,6 +174,15 @@ Its **context bundle** is compiled like a story file. It contains the goal and s
 
 Routines create work on a schedule. Working style sets which work types are automated.
 
+**As built (LAY-04):**
+
+- Each work type has one governing preference and a mode per value (`you`, `agent`, `agent-review`) in `apps/portal/config/interaction-profiles.json › automation`. The modes match the v2/v3 table: a Planner writes stories and acceptance, and agents draft specs and designs for review.
+- Automated suggestions are staged once and routed to their profile. Nothing runs until provider use is authorized.
+- Closing record-changing work needs a revision made from it.
+- Answers are applied as revisions: a story's or spec's clarification moves to `resolved`.
+- Routines (`routine` records, `routine_runs`) are weekly, monthly or before-release, with one open item per routine.
+- [Evidence](../../evidence/lay-04-work-automation.md).
+
 | Tab | Holds |
 |---|---|
 | Queue | Work items by state, with suggestions |

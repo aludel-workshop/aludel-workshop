@@ -16,6 +16,8 @@ const text = (value, max, label, required = false) => {
   if (clean.length > max) fail(`${label} must be under ${max} characters.`);
   return clean;
 };
+// Clarifications answered through Work (LAY-04): the question, the answer and the work item that decided it.
+const resolvedList = value => (Array.isArray(value) ? value : []).map(item => ({ question: text(item?.question, 400, 'Question', true), answer: text(item?.answer, 400, 'Answer', true), work: text(item?.work, 20, 'Work item') }));
 const lines = (value, max, label) => (Array.isArray(value) ? value : []).map(item => text(item, max, label)).filter(Boolean);
 const ids = value => (Array.isArray(value) ? value : []).map(String).filter(item => /^[a-z]+-[a-z0-9]{6,12}$/.test(item));
 
@@ -108,6 +110,9 @@ export function initKnowledge(db) {
   if (!setupColumns.has('pages_customized')) db.exec('ALTER TABLE project_setup ADD COLUMN pages_customized INTEGER NOT NULL DEFAULT 0');
   if (!setupColumns.has('story_packs_json')) db.exec("ALTER TABLE project_setup ADD COLUMN story_packs_json TEXT NOT NULL DEFAULT '[]'");
   // LAY-07C: the profile an agent item runs as and the instruction revisions it ran with; LAY-07D: reconcile context.
+  db.exec(`CREATE TABLE IF NOT EXISTS routine_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, routine_id TEXT NOT NULL, project_id TEXT NOT NULL REFERENCES projects(id), ran_at TEXT NOT NULL, trigger TEXT NOT NULL, work_item_id TEXT
+  )`);
   const workColumns = new Set(db.prepare('PRAGMA table_info(layer_work_items)').all().map(column => column.name));
   for (const column of ['profile_id', 'instructions_json', 'context_json']) if (!workColumns.has(column)) db.exec(`ALTER TABLE layer_work_items ADD COLUMN ${column} TEXT`);
 }
@@ -133,7 +138,7 @@ const validators = {
     for (const item of acceptance) if (!item.given || !item.when || !item.then) fail('Each acceptance scenario needs Given, When and Then.');
     return { number: Number(data.number) || 0, title: text(data.title, 160, 'Story', true), phase: data.phase, why: text(data.why, 400, 'Why'), acceptance,
       edges: lines(data.edges, 300, 'Edge case'), clarifications: lines(data.clarifications, 300, 'Clarification'),
-      services: lines(data.services, 40, 'Service').filter(key => catalogs.services?.[key]),
+      services: lines(data.services, 40, 'Service').filter(key => catalogs.services?.[key]), resolved: resolvedList(data.resolved),
       pack: data.pack ? text(data.pack, 40, 'Pack') : null, template: Boolean(data.template) };
   },
   spec: data => {
@@ -143,7 +148,7 @@ const validators = {
       stories: ids(data.stories), problem: text(data.problem, 2000, 'Problem'), appetite: text(data.appetite, 80, 'Appetite'), solution: text(data.solution, 4000, 'Solution sketch'),
       rabbitHoles: lines(data.rabbitHoles, 400, 'Rabbit hole'), noGos: lines(data.noGos, 400, 'No-go'), requirements: lines(data.requirements, 600, 'Requirement'),
       entities: lines(data.entities, 200, 'Entity'), success: lines(data.success, 400, 'Success criterion'), assumptions: lines(data.assumptions, 400, 'Assumption'),
-      clarifications: lines(data.clarifications, 400, 'Clarification') };
+      clarifications: lines(data.clarifications, 400, 'Clarification'), resolved: resolvedList(data.resolved) };
   },
   research: data => ({ title: text(data.title, 120, 'Research title', true), body: text(data.body, 8000, 'Research notes'), supports: ids(data.supports) }),
   doc: data => ({ title: text(data.title, 120, 'Document title', true), template: text(data.template || 'Blank', 40, 'Template'), body: text(data.body, 40000, 'Document') }),
@@ -201,11 +206,24 @@ const validators = {
       role: text(data.role, 300, 'Role'), workTypes: [...new Set(types)], accountId: data.accountId === 'project-agent' ? 'project-agent' : null, model: text(data.model, 60, 'Model'),
       instructions: text(data.instructions, 8000, 'Instructions'), writes: [...new Set(writes)], approvalRequired: lines(data.approvalRequired, 200, 'Effect needing approval'), budget };
   },
-  project_instructions: data => ({ body: text(data.body, 8000, 'Project instructions') })
+  project_instructions: data => ({ body: text(data.body, 8000, 'Project instructions') }),
+  // Work › Routines (LAY-04C): a definition only; runs are recorded in routine_runs, not as revisions.
+  routine: data => {
+    if (!layers.includes(data.layer)) fail('Unknown layer.');
+    if (!workTypes.includes(data.type)) fail('Unknown work type.');
+    if (!cadences.includes(data.cadence)) fail(`Choose how often: ${cadences.join(', ')}.`);
+    return { key: data.key ? text(data.key, 40, 'Key') : null, title: text(data.title, 120, 'Routine', true), layer: data.layer, type: data.type, cadence: data.cadence,
+      documents: lines(data.documents, 300, 'Document'), enabled: data.enabled !== false };
+  }
 };
+export const cadences = ['weekly', 'monthly', 'before-release'];
+const cadenceDays = { weekly: 7, monthly: 30 };
+// Types whose output is a change to their target records, so closing them checks for a revision made from the item.
+// Implement, reconcile, review and audit produce code, links or findings; LAY-05 verifies those.
+const verifiedTypes = ['define', 'spec', 'plan', 'design', 'research', 'configure'];
 const kinds = Object.keys(validators);
 const prefixes = { vision_section: 'vis', persona: 'per', phase: 'pha', activity: 'act', step: 'stp', story: 'sto', spec: 'spc', research: 'res', doc: 'doc', page: 'pag',
-  data_object: 'obj', data_operation: 'opr', access_rule: 'acc', agent_profile: 'agt', project_instructions: 'ins' };
+  data_object: 'obj', data_operation: 'opr', access_rule: 'acc', agent_profile: 'agt', project_instructions: 'ins', routine: 'rtn' };
 // Records a kind points at must exist in the same project and be of the right kind.
 const references = {
   data_object: clean => [...clean.relations.map(relation => [relation.target, 'data_object']), ...clean.stories.map(id => [id, 'story']), ...clean.specs.map(id => [id, 'spec']), ...schemaRefs(clean.schema).map(id => [id, 'data_object'])],
@@ -301,6 +319,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
       for (const key of visionKeys) insert(projectId, 'vision_section', { key, body: key === 'statement' ? pitch : '', items: [] }, { rationale: key === 'statement' && pitch ? 'From the elevator pitch in onboarding' : null });
     }
     ensureAgents(projectId);
+    ensureRoutines(projectId);
   }
 
   // ---- Work › Agents: default profiles and project instructions (idempotent; older projects get them at start-up) ----
@@ -519,9 +538,10 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     const id = `wrk-${randomBytes(4).toString('hex')}`;
     const created = now();
     const assignee = input.assignee || null;
+    const question = input.question ? { text: text(input.question.text, 400, 'Question', true), options: lines(input.question.options, 200, 'Option') } : null;
     db.prepare(`INSERT INTO layer_work_items(id, project_id, number, layer, type, title, state, assignee_kind, assignee_label, targets_json, question_json, documents_json, log_json, created_at, updated_at, context_json)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(id, projectId, number, input.layer, input.type, text(input.title, 160, 'Work title', true), input.state || 'ready',
-      assignee?.kind || null, assignee?.label || null, JSON.stringify(targets), input.question ? JSON.stringify(input.question) : null,
+      assignee?.kind || null, assignee?.label || null, JSON.stringify(targets), question ? JSON.stringify(question) : null,
       JSON.stringify(lines(input.documents, 300, 'Document')), JSON.stringify([{ at: created, text: input.logText || `Created by ${author}` }]), created, created,
       input.context && typeof input.context === 'object' ? JSON.stringify(input.context) : null);
     return workRow(db.prepare('SELECT * FROM layer_work_items WHERE id = ?').get(id));
@@ -556,6 +576,10 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     if (state !== undefined) {
       if (!workStates.includes(state)) fail('Unknown work state.');
       if (state === 'done' && !outputs.length) fail('Name what this work documented before closing it (DEC-036: logs are not documentation).', 409);
+      if (state === 'done' && verifiedTypes.includes(item.type) && item.assignee?.kind !== 'template') {
+        const missing = item.targets.filter(target => !db.prepare('SELECT 1 FROM knowledge_revisions WHERE record_id = ? AND work_item_id = ?').get(target.id, item.id));
+        if (missing.length) fail(`${missing.map(target => `“${target.label}”`).join(', ')} ${missing.length === 1 ? 'has' : 'have'} no change from ${item.ref} yet. Edit ${missing.length === 1 ? 'it' : 'them'} from this item (or apply the answer), then close it.`, 409);
+      }
       nextState = state;
       log.push({ at: now(), text: `State: ${state}` });
     }
@@ -572,6 +596,163 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
       .run(JSON.stringify([...item.log, { at: now(), text: entry }]), changes.state || null, changes.context ? JSON.stringify(changes.context) : null, now(), workId);
     return workRow(db.prepare('SELECT * FROM layer_work_items WHERE id = ?').get(workId));
   }
+
+  // An edit made "from" a work item carries its id, so closing the item can verify the change happened (LAY-04A).
+  function openWorkItem(projectId, workItemId) {
+    if (!workItemId) return null;
+    const item = workRow(db.prepare('SELECT * FROM layer_work_items WHERE id = ? AND project_id = ?').get(workItemId, projectId));
+    if (!item) fail('Work item not found.', 404);
+    if (item.state === 'done') fail(`${item.ref} is done; reopen it to record more changes against it.`, 409);
+    return item;
+  }
+
+  // The answer lands in the record it changes, with the reason, as a revision linked to the item (DEC-036).
+  function applyAnswer(user, projectId, workId, targetId) {
+    const item = workRow(db.prepare('SELECT * FROM layer_work_items WHERE id = ? AND project_id = ?').get(workId, projectId));
+    if (!item) fail('Work item not found.', 404);
+    if (!item.question?.answer) fail('Answer the question before applying it.', 409);
+    if (!item.targets.some(target => target.id === targetId)) fail('That record is not a target of this work item.');
+    const record = get(projectId, targetId);
+    if (!record) fail('Record not found.', 404);
+    const { text: question, answer, rationale } = item.question;
+    const reason = `${question} → ${answer}${rationale ? `. ${rationale}` : ''}`.slice(0, 1000);
+    let changes;
+    if (record.kind === 'story' || record.kind === 'spec') {
+      changes = { clarifications: record.clarifications.filter(entry => entry.trim() !== question.trim()), resolved: [...(record.resolved || []), { question, answer, work: item.ref }] };
+    } else if (record.kind === 'page') {
+      changes = { notes: `${record.notes ? `${record.notes}\n\n` : ''}Decided in ${item.ref}: ${question} ${answer}`.slice(0, 4000) };
+    } else fail('Apply this answer by editing the record from this item.', 409);
+    const saved = update(projectId, record.id, changes, { author: user.name, rationale: reason, workItemId: item.id });
+    const applied = [...new Set([...(item.question.applied || []), record.id])];
+    const log = [...item.log, { at: now(), text: `Applied the answer to ${target(item, record.id)} (revision ${saved.revision})` }];
+    db.prepare('UPDATE layer_work_items SET question_json = ?, log_json = ?, updated_at = ? WHERE id = ?').run(JSON.stringify({ ...item.question, applied }), JSON.stringify(log), now(), item.id);
+    return workRow(db.prepare('SELECT * FROM layer_work_items WHERE id = ?').get(item.id));
+  }
+  const target = (item, id) => item.targets.find(entry => entry.id === id)?.label || id;
+
+  // ---- Suggestions: gaps each layer knows about (LAY-04B moved them to the server so automation can act on them) ----
+  function suggestions(projectId, { stories, pages, work }) {
+    const open = new Set(work.filter(item => item.state !== 'done').flatMap(item => item.targets.map(entry => `${item.type}:${entry.id}`)));
+    const found = [];
+    for (const story of stories) {
+      const ref = `S${story.number}`;
+      if (!story.acceptance.length && !open.has(`define:${story.id}`)) found.push({ key: `define:${story.id}`, layer: 'product', type: 'define', title: `Write acceptance for “${story.title}”`, targets: [{ id: story.id, kind: 'story', label: story.title }], documents: [`Product › ${ref} acceptance`] });
+      for (const question of story.clarifications) if (!open.has(`define:${story.id}`)) found.push({ key: `clarify:${story.id}:${question}`, layer: 'product', type: 'define', title: `Clarify: ${question}`.slice(0, 160), targets: [{ id: story.id, kind: 'story', label: story.title }], question: { text: question, options: [] }, documents: [`Product › ${ref} (clarified)`] });
+    }
+    for (const page of pages) {
+      if (page.status !== 'designed' && page.stories.length && !open.has(`design:${page.id}`)) found.push({ key: `design:${page.id}`, layer: 'pages', type: 'design', title: `Design the ${page.label} page`, targets: [{ id: page.id, kind: 'page', label: `${page.label} page` }], documents: [`Pages › ${page.label} (designed revision)`] });
+    }
+    // A proposed object that a Demo or MVP story needs gets its contract written (the Architect's plan work).
+    const needed = new Set(stories.filter(story => story.phase !== 'later').map(story => story.id));
+    for (const object of list(projectId, 'data_object')) {
+      if (object.contract !== 'accepted' && object.stories.some(id => needed.has(id)) && !open.has(`plan:${object.id}`)) found.push({ key: `plan:${object.id}`, layer: 'data', type: 'plan', title: `Write the ${object.name} contract`, targets: [{ id: object.id, kind: 'data_object', label: `${object.name} object` }], documents: [`Data › ${object.name} (accepted contract)`] });
+    }
+    return found;
+  }
+
+  // ---- Working-style automation (LAY-04B) ----
+  function preferences(projectId) {
+    const setup = db.prepare('SELECT profile, overrides_json FROM project_setup WHERE project_id = ?').get(projectId);
+    return setup ? { ...(catalogs.profiles?.[setup.profile]?.defaults || {}), ...parse(setup.overrides_json, {}) } : {};
+  }
+  function automationMode(projectId, type, prefs = preferences(projectId)) {
+    const rule = catalogs.automation?.workTypes?.[type];
+    return rule?.modes?.[prefs[rule.preference]] || 'you';
+  }
+  function automationPolicy(projectId) {
+    const prefs = preferences(projectId);
+    return Object.fromEntries(workTypes.map(type => [type, { mode: automationMode(projectId, type, prefs), preference: catalogs.automation?.workTypes?.[type]?.preference || null, profileId: profileFor(projectId, type)?.id || null }]));
+  }
+
+  // Hands an unassigned item to its routed profile when working style says agents take this type.
+  function assignByPolicy(projectId, item, reason) {
+    const mode = automationMode(projectId, item.type);
+    const profile = profileFor(projectId, item.type);
+    if (mode === 'you' || !profile || item.assignee || item.state === 'done') return item;
+    db.prepare('UPDATE layer_work_items SET assignee_kind = ?, assignee_label = ?, profile_id = ?, instructions_json = ?, context_json = ?, log_json = ?, updated_at = ? WHERE id = ?')
+      .run('agent', profile.name, profile.id, JSON.stringify(instructionPins(projectId, profile, item.type)), JSON.stringify({ ...(item.context || {}), automation: { mode } }),
+        JSON.stringify([...item.log, { at: now(), text: `${reason}: queued for the ${profile.name} profile${mode === 'agent-review' ? '; its result comes to you for review' : ''}` }]), now(), item.id);
+    return workRow(db.prepare('SELECT * FROM layer_work_items WHERE id = ?').get(item.id));
+  }
+
+  // DEC-040: working style no longer opens items for gaps; it marks them available for agents (see agentPool) and
+  // only routes unassigned reconcile and routine items to their profile. Agents run only in batches the owner starts.
+  function automate(projectId) {
+    for (const item of workList(projectId).filter(entry => !entry.assignee && entry.state !== 'done' && (entry.type === 'reconcile' || entry.context?.routine))) assignByPolicy(projectId, item, 'Working style');
+    return [];
+  }
+
+  // One-time (DEC-040): items LAY-04B staged that nobody touched go back to the pool; their gaps reappear as suggestions.
+  function returnStagedToPool(projectId) {
+    const untouched = workList(projectId).filter(item => item.context?.suggestion && item.state === 'ready' && !item.context?.batch && item.log.length <= 2
+      && /^Staged by working style/.test(item.log[0]?.text || '') && !db.prepare('SELECT 1 FROM knowledge_revisions WHERE work_item_id = ?').get(item.id));
+    for (const item of untouched) db.prepare('DELETE FROM layer_work_items WHERE id = ?').run(item.id);
+    return untouched.length;
+  }
+
+  // Lower runs first: the current phase before later ones, then the natural order of work (define and clarify, plan,
+  // spec, design, implement), then story order. A later roadmap can replace this (ROADMAP-01).
+  const typeRank = { define: 1, research: 1, plan: 2, spec: 3, design: 4, implement: 5, reconcile: 5, configure: 6, review: 7, audit: 8 };
+  function priorityFor(projectId, type, targets) {
+    const phases = list(projectId, 'phase');
+    const current = phases.findIndex(phase => phase.current);
+    const stories = list(projectId, 'story');
+    const storyIds = targets.flatMap(target => {
+      const record = get(projectId, target.id);
+      if (!record) return [];
+      if (record.kind === 'story') return [record];
+      if (record.kind === 'page' || record.kind === 'data_object' || record.kind === 'spec') return (record.stories || []).map(id => stories.find(story => story.id === id)).filter(Boolean);
+      return [];
+    });
+    if (!storyIds.length) return 5000 + (typeRank[type] || 9) * 100;
+    const phaseRank = Math.min(...storyIds.map(story => { const index = phases.findIndex(phase => phase.key === story.phase); return index < 0 ? 9 : Math.abs(index - Math.max(current, 0)) + (index < current ? 5 : 0); }));
+    return phaseRank * 1000 + (typeRank[type] || 9) * 100 + Math.min(99, Math.min(...storyIds.map(story => story.number || 99)));
+  }
+
+  // What agents can take, best first: open items routed to an agent profile and not in a batch, then gaps working style hands to agents.
+  const runnable = (type, question) => type === 'plan' || type === 'define';
+  function agentPool(projectId) {
+    const prefs = preferences(projectId);
+    const work = workList(projectId);
+    const items = work.filter(item => item.state === 'ready' && item.assignee?.kind === 'agent' && !item.context?.batch && runnable(item.type, item.question))
+      .map(item => ({ kind: 'item', key: item.id, workId: item.id, title: item.title, type: item.type, layer: item.layer, profileId: item.profileId, priority: priorityFor(projectId, item.type, item.targets) }));
+    const gaps = suggestions(projectId, { stories: list(projectId, 'story'), pages: pageList(projectId), work })
+      .filter(suggestion => runnable(suggestion.type, suggestion.question) && automationMode(projectId, suggestion.type, prefs) !== 'you' && profileFor(projectId, suggestion.type))
+      .map(suggestion => ({ kind: 'suggestion', key: suggestion.key, workId: null, title: suggestion.title, type: suggestion.type, layer: suggestion.layer, profileId: profileFor(projectId, suggestion.type).id, priority: priorityFor(projectId, suggestion.type, suggestion.targets) }));
+    return [...items, ...gaps].sort((a, b) => a.priority - b.priority || a.title.localeCompare(b.title));
+  }
+
+  // ---- Routines (LAY-04C) ----
+  function ensureRoutines(projectId) {
+    if (list(projectId, 'routine').length) return;
+    for (const routine of catalogs.routines || []) insert(projectId, 'routine', routine, { rationale: 'Default routine' });
+  }
+  const lastRun = routineId => db.prepare('SELECT * FROM routine_runs WHERE routine_id = ? ORDER BY id DESC LIMIT 1').get(routineId) || null;
+  function nextRunAt(routine) {
+    if (!routine.enabled || routine.cadence === 'before-release') return null;
+    const from = lastRun(routine.id)?.ran_at || db.prepare('SELECT created_at FROM knowledge_records WHERE id = ?').get(routine.id).created_at;
+    return new Date(Date.parse(from) + cadenceDays[routine.cadence] * 86400000).toISOString();
+  }
+  // Runs what is due (schedule), every before-release routine (release) or one routine now (manual). One open item per routine.
+  function runRoutines(projectId, { trigger = 'schedule', at = now(), routineId = null } = {}) {
+    const created = [];
+    for (const routine of list(projectId, 'routine')) {
+      if (routineId ? routine.id !== routineId : !routine.enabled) continue;
+      if (!routineId && trigger === 'schedule' && (routine.cadence === 'before-release' || nextRunAt(routine) > at)) continue;
+      if (!routineId && trigger === 'release' && routine.cadence !== 'before-release') continue;
+      const open = workList(projectId).find(item => item.context?.routine === routine.id && item.state !== 'done');
+      if (open) { if (routineId) fail(`${open.ref} from this routine is still open.`, 409); continue; }
+      const item = createWork(projectId, { layer: routine.layer, type: routine.type, state: 'ready', title: `${routine.title} · ${at.slice(0, 10)}`, targets: [], documents: routine.documents,
+        context: { routine: routine.id }, logText: `Created by the “${routine.title}” routine (${trigger === 'schedule' ? routine.cadence : trigger})` });
+      db.prepare('INSERT INTO routine_runs(routine_id, project_id, ran_at, trigger, work_item_id) VALUES (?, ?, ?, ?, ?)').run(routine.id, projectId, at, trigger, item.id);
+      created.push(assignByPolicy(projectId, item, 'Working style'));
+    }
+    return created;
+  }
+  const routineView = projectId => list(projectId, 'routine').map(routine => {
+    const run = lastRun(routine.id);
+    return { ...routine, nextRunAt: nextRunAt(routine), lastRunAt: run?.ran_at || null, lastWorkId: run?.work_item_id || null, history: history(routine.id) };
+  });
 
   // After a template build: template stories are built (a done work item says so) and every page has a skeleton.
   function recordBuild(projectId, commit, { auth }) {
@@ -621,6 +802,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
       profiles: list(projectId, 'agent_profile').map(profile => ({ ...profile, history: history(profile.id) })),
       projectInstructions: list(projectId, 'project_instructions')[0] || null,
       guidance: agentDefaults.guidance, workTypes,
+      suggestions: suggestions(projectId, { stories, pages, work }), automation: automationPolicy(projectId), routines: routineView(projectId), agentPool: agentPool(projectId),
       services: Object.entries(catalogs.services || {}).map(([key, service]) => ({ key, ...service, stories: stories.filter(story => story.services.includes(key)).map(story => story.id) }))
     };
   }
@@ -669,5 +851,6 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
   }
 
   return { ensureProject, ensureAgents, ensurePackData, insert, update, remove, list, get, view, navRoutes, seedPages, saveNavRoutes, applyPacks, createWork, updateWork, appendLog, workList, recordBuild,
-    history, revisionData, revisionAt, kinds, routeWorkType, openApi, referrers, profileFor, agentExport, onRevision: listener => revisionListeners.push(listener), onWorkDone: listener => doneListeners.push(listener) };
+    history, revisionData, revisionAt, kinds, routeWorkType, openApi, referrers, openWorkItem, applyAnswer, suggestions, automate, automationPolicy, ensureRoutines, runRoutines,
+    returnStagedToPool, priorityFor, agentPool, assignByPolicy, instructionPins, preferences, automationMode, profileFor, agentExport, onRevision: listener => revisionListeners.push(listener), onWorkDone: listener => doneListeners.push(listener) };
 }

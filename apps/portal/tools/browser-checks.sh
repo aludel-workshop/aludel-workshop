@@ -16,12 +16,17 @@ scripts=("$@")
 [ ${#scripts[@]} -eq 0 ] && scripts=(layers onboarding product brand github workflow browser)
 server=""
 stop() { [ -n "$server" ] && kill "$server" 2>/dev/null && wait "$server" 2>/dev/null; server=""; }
-trap 'stop; rm -rf "$work"' EXIT
+# Agent keys are checked against a local stand-in, never the real providers (tests/provider-stub.mjs).
+stub_port=$((port + 81))
+node tests/provider-stub.mjs "$stub_port" > "$work/provider-stub.log" 2>&1 &
+stub=$!
+trap 'stop; kill "$stub" 2>/dev/null; rm -rf "$work"' EXIT
 failed=0
 for name in "${scripts[@]}"; do
   file="tests/${name}-browser.mjs"; [ "$name" = browser ] && file="tests/browser.mjs"
   data="$work/$name"; mkdir -p "$data"
-  MACHINE_DATA_DIR="$data" MACHINE_PORT="$port" node server/server.mjs > "$work/$name-portal.log" 2>&1 &
+  MACHINE_DATA_DIR="$data" MACHINE_PORT="$port" MACHINE_ANTHROPIC_API_URL="http://127.0.0.1:$stub_port" MACHINE_OPENAI_API_URL="http://127.0.0.1:$stub_port" \
+    node server/server.mjs > "$work/$name-portal.log" 2>&1 &
   server=$!
   for _ in $(seq 1 50); do curl -s -o /dev/null "http://127.0.0.1:$port/api/session" && break; sleep 0.2; done
   if MACHINE_DATA_DIR="$data" MACHINE_PORT="$port" MACHINE_TEST_URL="http://127.0.0.1:$port" MACHINE_TEST_KEY="browser-check-owner-key-$$" \

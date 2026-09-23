@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -30,9 +30,16 @@ export function loadGitProfile(configPath, projectId) {
   return { repository: resolve(dirname(configPath), project.repositoryPath), profile, profileId };
 }
 
+// A folder is a repository only if it is the top of its own. Project workspaces live inside Aludel's repository (in the
+// ignored .data folder); without this check git ran in the parent, so starting a project committed and could push Aludel itself.
+function ownRepository(repository) {
+  if (!existsSync(repository)) return false;
+  const top = git(repository, ['rev-parse', '--show-toplevel'], { allowFailure: true, quiet: true });
+  return top.status === 0 && realpathSync(top.stdout.trim()) === realpathSync(repository);
+}
+
 export function inspectGitRepository(repository) {
-  const inside = git(repository, ['rev-parse', '--is-inside-work-tree'], { allowFailure: true, quiet: true });
-  if (inside.status !== 0) return { initialized: false, committed: false, remote: null, branch: null };
+  if (!ownRepository(repository)) return { initialized: false, committed: false, remote: null, branch: null };
   const head = git(repository, ['rev-parse', '--verify', 'HEAD'], { allowFailure: true, quiet: true });
   const branch = git(repository, ['branch', '--show-current'], { allowFailure: true, quiet: true }).stdout.trim() || null;
   const remote = git(repository, ['remote', 'get-url', 'origin'], { allowFailure: true, quiet: true });
@@ -78,6 +85,7 @@ function trackedPaths(repository) {
 export function commitWorkspace({ repository, profile, message, name, email, trailers = null }) {
   const before = inspectGitRepository(repository);
   if (!before.initialized) git(repository, ['init', '-b', profile.initialBranch]);
+  if (!ownRepository(repository)) throw new Error('Refusing to commit: the workspace is not its own repository.');
   git(repository, ['config', 'user.name', name]);
   git(repository, ['config', 'user.email', email]);
   git(repository, ['add', '-A']);
@@ -96,6 +104,7 @@ export function commitWorkspace({ repository, profile, message, name, email, tra
 }
 
 export function pushWorkspace({ repository, remoteUrl, token, branch }) {
+  if (!ownRepository(repository)) throw new Error('Refusing to push: the workspace is not its own repository.');
   const current = git(repository, ['remote', 'get-url', 'origin'], { allowFailure: true, quiet: true });
   if (current.status !== 0) git(repository, ['remote', 'add', 'origin', remoteUrl]);
   else if (current.stdout.trim() !== remoteUrl) git(repository, ['remote', 'set-url', 'origin', remoteUrl]);

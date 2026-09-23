@@ -16,6 +16,11 @@ const documentTypes = new Map([['text/markdown', 'md'], ['text/plain', 'txt']]);
 // Aludel's own project is operated like a Planner by default: the owner shapes intent and authorizes agent work.
 const aludelDefaultProfile = 'planner';
 
+const checkMessage = (definition, checked) => checked.reason === 'rejected'
+  ? `${definition.label} rejected this key. It may be mistyped, disabled, deleted or expired. Create a new one and paste it again.`
+  : checked.reason === 'unreachable' ? `Aludel couldn't reach ${definition.label} to check the key. Try again in a moment.`
+    : `${definition.label} answered with an error (${checked.status}) while checking the key. Try again, or check your account's billing and limits.`;
+
 export function loadCatalogs(configDirectory) {
   const read = name => JSON.parse(readFileSync(join(configDirectory, name), 'utf8'));
   const profiles = read('interaction-profiles.json');
@@ -33,8 +38,13 @@ export function loadCatalogs(configDirectory) {
     }
   }
   if (!stacks.presets[stacks.default]?.available) throw new Error('The default stack preset must be available.');
+  for (const [type, rule] of Object.entries(profiles.automation?.workTypes || {})) {
+    const values = Object.keys(profiles.preferences[rule.preference]?.values || {});
+    if (!values.length || values.some(value => !['you', 'agent', 'agent-review'].includes(rule.modes?.[value]))) throw new Error(`Automation for ${type} needs a mode for every ${rule.preference} value.`);
+  }
   return { preferences: profiles.preferences, profiles: profiles.profiles, feels: starter.feels, features: starter.features, packs: loadStoryPacks(configDirectory), stacks,
-    pageTypes: pages.types, routeIcons, defaultRoute: starter.defaultRoute, services: read('story-packs.json').services || {}, agentDefaults: loadAgentDefaults(configDirectory) };
+    pageTypes: pages.types, routeIcons, defaultRoute: starter.defaultRoute, services: read('story-packs.json').services || {}, agentDefaults: loadAgentDefaults(configDirectory),
+    automation: profiles.automation, routines: read('routines.json').routines, agentProviders: loadAgentProviders(configDirectory) };
 }
 
 export function initOnboarding(db) {
@@ -68,13 +78,35 @@ export function initOnboarding(db) {
   db.prepare('DELETE FROM onboarding_drafts WHERE claimed_project_id IS NULL AND expires_at < ?').run(now());
 }
 
-export const agentProviders = {
-  anthropic: { label: 'Anthropic (Claude)', secret: 'API key', pattern: /^sk-ant-[A-Za-z0-9_-]{20,}$/ },
-  openai: { label: 'OpenAI', secret: 'API key', pattern: /^sk-[A-Za-z0-9_-]{20,}$/ },
-  'codex-local': { label: 'Codex on this machine', secret: null, pattern: null }
-};
+// LAY-04D: people connect their own Anthropic or OpenAI API key (config/agent-providers.json). The owner chose pasted
+// keys over a third-party broker; Anthropic and OpenAI offer no way for another app to create a key for a user.
+export function loadAgentProviders(configDirectory) {
+  const { providers, retired } = JSON.parse(readFileSync(join(configDirectory, 'agent-providers.json'), 'utf8'));
+  for (const [id, provider] of Object.entries(providers)) {
+    if (!provider.keyPattern || !provider.check?.url || !provider.steps?.length || !/^https:\/\//.test(provider.keyUrl)) throw new Error(`Agent provider ${id} is incomplete.`);
+    provider.pattern = new RegExp(provider.keyPattern);
+    provider.rejections = (provider.reject || []).map(rule => ({ pattern: new RegExp(rule.pattern), message: rule.message }));
+  }
+  return { providers, retired: retired || {} };
+}
 
-export function onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot, createWorkspace, know }) {
+// A key is checked by listing the provider's models: it proves the key works and spends nothing. The key goes only to
+// the provider (never to logs or errors). MACHINE_*_API_URL points the check at a proxy or a test stand-in.
+export function agentKeyChecker(env = process.env, request = fetch) {
+  return async (provider, key) => {
+    const base = env[provider.check.env];
+    const url = base ? `${base.replace(/\/$/, '')}${provider.check.path}` : provider.check.url;
+    const headers = Object.fromEntries(Object.entries(provider.check.headers).map(([name, value]) => [name, value.replace('$KEY', key)]));
+    let response;
+    try { response = await request(url, { headers, signal: AbortSignal.timeout(10000) }); }
+    catch { return { ok: false, reason: 'unreachable' }; }
+    if (response.ok) return { ok: true };
+    return { ok: false, reason: [401, 403].includes(response.status) ? 'rejected' : 'error', status: response.status };
+  };
+}
+
+export function onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot, createWorkspace, know, checkAgentKey = agentKeyChecker() }) {
+  const agentProviders = catalogs.agentProviders.providers;
   const draftRow = token => token ? db.prepare('SELECT * FROM onboarding_drafts WHERE token_hash = ? AND expires_at > ?').get(digest(token), now()) : null;
   const draftView = row => row && { profile: row.profile, name: row.name, pitch: row.pitch, claimedProjectId: row.claimed_project_id };
 
@@ -131,7 +163,8 @@ export function onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot, cr
 
   function connectionView(projectId) {
     const row = db.prepare("SELECT provider, label, secret_hint, status, updated_at FROM project_connections WHERE project_id = ? AND kind = 'agent'").get(projectId);
-    return row ? { provider: row.provider, label: row.label, hint: row.secret_hint, status: row.status, updatedAt: row.updated_at } : null;
+    return row ? { provider: row.provider, label: row.label, hint: row.secret_hint, status: row.status, updatedAt: row.updated_at,
+      retired: catalogs.agentProviders.retired[row.provider]?.reason || null, keyUrl: agentProviders[row.provider]?.keyUrl || null } : null;
   }
 
   function assets(projectId) {
@@ -143,7 +176,7 @@ export function onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot, cr
     catalog() {
       return {
         preferences: catalogs.preferences, profiles: catalogs.profiles, feels: catalogs.feels, features: catalogs.packs,
-        stacks: catalogs.stacks, pageTypes: catalogs.pageTypes, routeIcons: catalogs.routeIcons, agentProviders: Object.fromEntries(Object.entries(agentProviders).map(([id, value]) => [id, { label: value.label, secret: value.secret }]))
+        stacks: catalogs.stacks, pageTypes: catalogs.pageTypes, routeIcons: catalogs.routeIcons, agentProviders: Object.fromEntries(Object.entries(agentProviders).map(([id, value]) => [id, { label: value.label, secret: value.secret, keyUrl: value.keyUrl, limitsUrl: value.limitsUrl, docsUrl: value.docsUrl, steps: value.steps, limits: value.limits }]))
       };
     },
 
@@ -354,23 +387,36 @@ export function onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot, cr
       return { connection: connectionView(projectId), providers: api.catalog().agentProviders };
     },
 
-    saveAgentConnection(user, projectId, { provider, secret }) {
+    async saveAgentConnection(user, projectId, { provider, secret }) {
       requireMember(db, user, projectId);
+      if (catalogs.agentProviders.retired[provider]) fail(catalogs.agentProviders.retired[provider].reason);
       const definition = agentProviders[provider];
-      if (!definition) fail('Choose an agent provider.');
-      let sealed = null; let hint = null;
-      if (definition.secret) {
-        const value = String(secret || '').trim();
-        if (!definition.pattern.test(value)) fail(`That doesn't look like a ${definition.label} ${definition.secret}.`);
-        sealed = secrets.seal(value); hint = value.slice(-4);
-      }
+      if (!definition) fail('Choose Anthropic or OpenAI.');
+      const value = String(secret || '').trim();
+      for (const rule of definition.rejections) if (rule.pattern.test(value)) fail(rule.message);
+      if (!definition.pattern.test(value)) fail(`That doesn't look like a ${definition.label} ${definition.secret}. Copy the whole key from the provider's API keys page.`);
+      const checked = await checkAgentKey(definition, value);
+      if (!checked.ok) fail(checkMessage(definition, checked), checked.reason === 'rejected' ? 400 : 502);
       const updated = now();
       db.prepare(`INSERT INTO project_connections(project_id, kind, provider, label, secret_encrypted, secret_hint, status, created_at, updated_at)
-        VALUES (?, 'agent', ?, ?, ?, ?, 'saved', ?, ?)
+        VALUES (?, 'agent', ?, ?, ?, ?, 'verified', ?, ?)
         ON CONFLICT(project_id, kind) DO UPDATE SET provider=excluded.provider, label=excluded.label, secret_encrypted=excluded.secret_encrypted,
-        secret_hint=excluded.secret_hint, status=excluded.status, updated_at=excluded.updated_at`).run(projectId, provider, definition.label, sealed, hint, updated, updated);
+        secret_hint=excluded.secret_hint, status=excluded.status, updated_at=excluded.updated_at`).run(projectId, provider, definition.label, secrets.seal(value), value.slice(-4), updated, updated);
       if (projectId !== aludelProjectId || db.prepare('SELECT 1 FROM project_setup WHERE project_id = ?').get(projectId)) markStep(projectId, 'agent');
       return api.agentConnection(user, projectId);
+    },
+
+    // "Check again": the stored key against the provider, updating its status (a revoked or expired key shows as such).
+    async checkAgentConnection(user, projectId) {
+      requireMember(db, user, projectId);
+      const row = db.prepare("SELECT provider, secret_encrypted FROM project_connections WHERE project_id = ? AND kind = 'agent'").get(projectId);
+      if (!row) fail('No agent account is connected.', 404);
+      const definition = agentProviders[row.provider];
+      if (!definition || !row.secret_encrypted) fail('This connection has no key to check.', 409);
+      const checked = await checkAgentKey(definition, secrets.open(row.secret_encrypted));
+      const status = checked.ok ? 'verified' : checked.reason === 'rejected' ? 'rejected' : 'unchecked';
+      db.prepare("UPDATE project_connections SET status = ?, updated_at = ? WHERE project_id = ? AND kind = 'agent'").run(status, now(), projectId);
+      return { ...api.agentConnection(user, projectId), check: checked.ok ? null : checkMessage(definition, checked) };
     },
 
     removeAgentConnection(user, projectId) {

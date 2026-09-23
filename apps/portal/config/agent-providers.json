@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "note": "Agent accounts people connect with their own API key (LAY-04D; owner chose pasted keys over any third-party broker). The steps are shown in Work › Agents and the onboarding agent step, and mirrored in docs/guides/connect-an-agent.md; tests/agent-keys.test.mjs checks that the two agree. URLs checked 2026-09-23 against the providers' docs.",
+  "providers": {
+    "anthropic": {
+      "label": "Anthropic (Claude)",
+      "secret": "API key",
+      "defaultModel": "claude-opus-5",
+      "keyPattern": "^sk-ant-[A-Za-z0-9_-]{20,}$",
+      "reject": [{ "pattern": "^sk-ant-admin", "message": "That is an Admin API key, which manages your whole organization. Create a regular API key instead." }],
+      "keyUrl": "https://platform.claude.com/settings/keys",
+      "limitsUrl": "https://platform.claude.com/settings/billing",
+      "docsUrl": "https://platform.claude.com/docs/en/manage-claude/authentication",
+      "check": { "url": "https://api.anthropic.com/v1/models?limit=1", "env": "MACHINE_ANTHROPIC_API_URL", "path": "/v1/models?limit=1", "headers": { "x-api-key": "$KEY", "anthropic-version": "2023-06-01" } },
+      "steps": [
+        "Sign in to the Claude Console. If you're new, add a payment method or credits under Settings › Billing.",
+        "Open Settings › API keys and choose Create key.",
+        "Name it after this project so you can find it later, for example “Aludel · {project}”.",
+        "Choose an expiration. 30 days is a good start; you'll get an email before it runs out.",
+        "Set Linked account to yourself (a personal key). Use a service account if a team will share this project.",
+        "Copy the key (it starts with sk-ant-) and paste it below. The Console shows it only once."
+      ],
+      "limits": "Set a monthly spend limit under Settings › Billing › Spend limits so a runaway agent can't overspend. Requests stop with an error when the limit is reached."
+    },
+    "openai": {
+      "label": "OpenAI",
+      "secret": "API key",
+      "defaultModel": "gpt-6-astra",
+      "keyPattern": "^sk-[A-Za-z0-9_-]{20,}$",
+      "reject": [{ "pattern": "^sk-admin", "message": "That is an Admin key, which manages your whole organization. Create a project API key instead." }],
+      "keyUrl": "https://platform.openai.com/api-keys",
+      "limitsUrl": "https://platform.openai.com/settings/organization/limits",
+      "docsUrl": "https://developers.openai.com/api/docs/guides/spend-limits",
+      "check": { "url": "https://api.openai.com/v1/models", "env": "MACHINE_OPENAI_API_URL", "path": "/v1/models", "headers": { "authorization": "Bearer $KEY" } },
+      "steps": [
+        "Sign in to the OpenAI platform. If you're new, add credits under Settings › Billing.",
+        "Create a project for this app (optional, but it keeps spending and keys separate).",
+        "Open API keys and choose Create new secret key, in that project.",
+        "Name it after this project, for example “Aludel · {project}”, with All permissions (agents need to call models).",
+        "Copy the key (it starts with sk-) and paste it below. OpenAI shows it only once."
+      ],
+      "limits": "In the project's settings, open Limits and set a monthly spend limit with Enforce a hard limit turned on. Requests fail with an error once the limit is reached."
+    }
+  },
+  "retired": {
+    "codex-local": { "label": "Codex on this machine", "reason": "Works only when Aludel runs on your own computer; not offered for new connections." }
+  }
+}

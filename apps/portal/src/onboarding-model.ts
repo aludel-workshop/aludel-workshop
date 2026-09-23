@@ -13,7 +13,7 @@ export interface PageType { label: string; summary: string; blocks: PageBlockSpe
 export interface PackStory { title: string; phase: string; template?: boolean; }
 export interface FeaturePick { label: string; summary: string; icon: string; stories: PackStory[]; }
 export interface StackPreset { label: string; summary: string; available: boolean; recommended?: boolean; unavailableReason?: string; layers?: Record<string, string>; options?: Record<string, { label: string; default: boolean }>; }
-export interface AgentProvider { label: string; secret: string | null; }
+export interface AgentProvider { label: string; secret: string | null; keyUrl: string; limitsUrl: string; docsUrl: string; steps: string[]; limits: string; }
 export interface Catalog {
   preferences: Record<string, PreferenceDefinition>;
   profiles: Record<string, Profile>;
@@ -25,7 +25,7 @@ export interface Catalog {
   agentProviders: Record<string, AgentProvider>;
 }
 
-export interface AgentConnection { provider: string; label: string; hint: string | null; status: string; updatedAt: string; }
+export interface AgentConnection { provider: string; label: string; hint: string | null; status: string; updatedAt: string; retired: string | null; keyUrl: string | null; }
 export interface ProjectAsset { id: string; kind: 'image' | 'document'; filename: string; mime: string; size: number; notes: string; url: string; }
 export interface GitHubInstallationSummary { installation_id: number; account_login: string; target_type: string; eligible: boolean; }
 export interface GitHubStatus {

@@ -430,3 +430,10 @@ aludel-project-shell{--lay-data:#0b5d86;--lay-data-bg:#dcf0fb}
 @media(max-width:1150px){.lay-api-grid{grid-template-columns:200px minmax(0,1fr)}.lay-api-example{grid-column:1/-1}}
 @media(max-width:800px){.lay-api-grid{grid-template-columns:1fr}.lay-api-example{grid-column:auto}.lay-toggle{flex-wrap:wrap;border-radius:14px}}
 .lay-full{flex-basis:100%}
+/* LAY-04: editing on behalf of a work item */
+.lay-working{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:0 0 14px;padding:10px 14px;border-radius:12px;background:var(--lay-work-bg);color:var(--lay-work)}.lay-working a{color:inherit;font-weight:700}
+/* LAY-04D: key guidance inside the agent connection */
+.agent-guide{margin:0 0 14px;padding:14px 16px;border-radius:12px;background:var(--machine-panel)}.agent-guide h3{margin:0 0 6px;font-size:16px}.agent-guide ol{margin:0 0 10px;padding-left:20px}.agent-guide li{margin:4px 0}
+/* DEC-040: agent batches */
+.lay-batch{margin-bottom:18px}.lay-batch h2{display:flex;align-items:center;gap:8px}
+.lay-batch-items{margin:10px 0 14px;padding-left:22px}.lay-batch-items li{margin:6px 0}.lay-batch-items li>*+*{margin-left:10px}

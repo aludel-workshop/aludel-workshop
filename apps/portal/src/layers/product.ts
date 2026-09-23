@@ -91,6 +91,7 @@ const docTemplates: Record<string, string> = {
             @for (pageId of story.pages; track pageId) { <a [href]="ctx.link('pages', 'tree', pageId)" (click)="ctx.go(ctx.link('pages', 'tree', pageId), $event)"><mat-icon aria-hidden="true">{{ ctx.pageById().get(pageId)?.icon }}</mat-icon>{{ ctx.pageById().get(pageId)?.label }}</a> } @empty { <p class="lay-muted">Not placed on a page yet.</p> }
             <h3>Specs</h3>
             @for (spec of specsFor(story); track spec.id) { <a [href]="ctx.link('product', 'specs', spec.id)" (click)="ctx.go(ctx.link('product', 'specs', spec.id), $event)">{{ spec.ref }} {{ spec.title }}</a> } @empty { <p class="lay-muted">Not in a spec yet.</p> }
+            @if (story.resolved.length) { <h3>Decided</h3><ul class="lay-plain-list small">@for (entry of story.resolved; track $index) { <li>{{ entry.question }} <strong>{{ entry.answer }}</strong> <span class="lay-muted">· {{ entry.work }}</span></li> }</ul> }
             <h3>Built by</h3>
             <aludel-built-by [recordId]="story.id" />
             <h3>Work</h3>
