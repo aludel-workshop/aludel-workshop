@@ -1,5 +1,5 @@
 import { Component, computed, inject } from '@angular/core';
-import { ProjectContext, layerLabel, stateLabel, statusLabel, statusOrder } from './context';
+import { ProjectContext, layerLabel, statusLabel, statusOrder, workStatusLabel } from './context';
 
 // Home: the project's pulse across every layer (current phase, what needs you, the app, recent changes).
 @Component({
@@ -19,8 +19,8 @@ import { ProjectContext, layerLabel, stateLabel, statusLabel, statusOrder } from
     </section>
     <section class="lay-card" aria-labelledby="home-needs"><h2 id="home-needs">Needs you <span class="lay-count">{{ needsYou().length }}</span></h2>
       @if (needsYou().length) {
-        <ul class="lay-list">@for (item of needsYou(); track item.id) { <li><a class="lay-item" [href]="ctx.link('work', 'item', item.id)" (click)="ctx.go(ctx.link('work', 'item', item.id), $event)"><span class="lay-body-text"><span class="lay-chip" [class]="'lay-chip lay-l-' + item.layer">{{ layerLabel[item.layer] }}</span><strong>{{ item.title }}</strong><small>{{ stateLabel[item.state] }}</small></span></a></li> }</ul>
-      } @else { <p class="lay-muted">Nothing is waiting on you. {{ ctx.suggestions().length }} suggestions in <a [href]="ctx.link('work')" (click)="ctx.go(ctx.link('work'), $event)">Work</a>.</p> }
+        <ul class="lay-list">@for (item of needsYou(); track item.id) { <li><a class="lay-item" [href]="ctx.link('work', 'item', item.id)" (click)="ctx.go(ctx.link('work', 'item', item.id), $event)"><span class="lay-body-text"><span class="lay-chip" [class]="'lay-chip lay-l-' + item.layer">{{ layerLabel[item.layer] }}</span><strong>{{ item.title }}</strong><small>{{ workStatusLabel[item.status] }}</small></span></a></li> }</ul>
+      } @else { <p class="lay-muted">Nothing is waiting on you. {{ backlog() }} in the backlog in <a [href]="ctx.link('work')" (click)="ctx.go(ctx.link('work'), $event)">Work</a>.</p> }
     </section>
     <section class="lay-card" aria-labelledby="home-app"><h2 id="home-app">Your app</h2>
       <dl class="lay-kv"><dt>Preview</dt><dd>{{ previewText() }} @if (ctx.setup()?.preview?.status === 'running' || ctx.setup()?.preview?.status === 'stopped') { · <a [href]="ctx.setup()?.urls?.app" target="_blank" rel="noopener">open</a> }</dd>
@@ -41,11 +41,12 @@ import { ProjectContext, layerLabel, stateLabel, statusLabel, statusOrder } from
 export class HomeLayerComponent {
   readonly ctx = inject(ProjectContext);
   readonly statusLabel = statusLabel;
-  readonly stateLabel = stateLabel;
+  readonly workStatusLabel = workStatusLabel;
   readonly layerLabel = layerLabel;
   readonly statusColor: Record<string, string> = { proposed: '#c1c8d8', defined: '#8e9ad0', designed: '#d9708f', built: '#3047b9', shipped: '#146446' };
   readonly currentPhase = computed(() => this.ctx.data()?.phases.find(phase => phase.current)?.label || 'Demo');
-  readonly needsYou = computed(() => (this.ctx.data()?.work || []).filter(item => ['needs-input', 'review'].includes(item.state)));
+  readonly needsYou = computed(() => (this.ctx.data()?.work || []).filter(item => item.status === 'needs' || item.status === 'review'));
+  readonly backlog = computed(() => (this.ctx.data()?.work || []).filter(item => item.status === 'backlog').length);
   readonly phaseStories = computed(() => { const data = this.ctx.data(); const phase = data?.phases.find(item => item.current)?.key || 'demo'; return (data?.stories || []).filter(story => story.phase === phase); });
   readonly phaseCounts = computed(() => statusOrder.map(status => ({ status, count: this.phaseStories().filter(story => story.status === status).length })));
   readonly recent = computed(() => {
@@ -53,7 +54,7 @@ export class HomeLayerComponent {
     const entries = [
       ...data.stories.flatMap(story => story.history.map(entry => ({ layer: 'product', text: `${story.ref} ${story.title}: ${entry.rationale}`, at: entry.createdAt, href: this.ctx.link('product', 'map', story.id) }))),
       ...data.pages.flatMap(page => page.history.map(entry => ({ layer: 'pages', text: `${page.label}: ${entry.rationale}`, at: entry.createdAt, href: this.ctx.link('pages', 'tree', page.id) }))),
-      ...data.work.map(item => ({ layer: item.layer, text: `${item.ref} ${item.title} · ${stateLabel[item.state]}`, at: item.updatedAt, href: this.ctx.link('work', 'item', item.id) }))
+      ...data.work.map(item => ({ layer: item.layer, text: `${item.ref} ${item.title} · ${workStatusLabel[item.status]}`, at: item.updatedAt, href: this.ctx.link('work', 'item', item.id) }))
     ];
     return entries.sort((a, b) => b.at.localeCompare(a.at)).slice(0, 6);
   });

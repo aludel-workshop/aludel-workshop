@@ -29,6 +29,10 @@ const specStatuses = ['draft', 'in-review', 'accepted', 'superseded'];
 export const workStates = ['suggested', 'ready', 'claimed', 'needs-input', 'review', 'done'];
 export const workTypes = ['define', 'spec', 'plan', 'design', 'implement', 'reconcile', 'review', 'research', 'audit', 'configure'];
 export const layers = ['product', 'design', 'pages', 'data', 'platform', 'work'];
+// WORK-UX-01: Jira's five priorities, highest first; agent effort levels; the unnamed metal tones agent avatars use.
+export const priorities = ['highest', 'high', 'medium', 'low', 'lowest'];
+export const efforts = ['low', 'medium', 'high'];
+export const botColors = ['#9aa3ad', '#56606b', '#7d7f95', '#4b6ea8', '#4d9585', '#b39a3d', '#c9a227', '#a8703a', '#b4633b', '#c28a7e'];
 // Data layer (DEC-038): stack-neutral contracts. JSON Schema 2020-12 for objects, OpenAPI 3.1 shape for operations.
 const schemaTypes = ['string', 'integer', 'number', 'boolean', 'array', 'object', 'null'];
 const methods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
@@ -115,6 +119,9 @@ export function initKnowledge(db) {
   )`);
   const workColumns = new Set(db.prepare('PRAGMA table_info(layer_work_items)').all().map(column => column.name));
   for (const column of ['profile_id', 'instructions_json', 'context_json']) if (!workColumns.has(column)) db.exec(`ALTER TABLE layer_work_items ADD COLUMN ${column} TEXT`);
+  // WORK-UX-01: the action an item is for, who it is assigned to (a user id or an agent profile id), Jira-style priority,
+  // the items it blocks, and the checks it is reviewed against (each with a verdict once reviewed).
+  for (const column of ['action', 'assignee_id', 'priority', 'blocks_json', 'checks_json']) if (!workColumns.has(column)) db.exec(`ALTER TABLE layer_work_items ADD COLUMN ${column} TEXT`);
 }
 
 // ---- Validators: one per kind, fields per knowledge-structures.md ----
@@ -194,17 +201,41 @@ const validators = {
       action: identifier(data.action, /^[a-z][a-zA-Z-]*$/, 'Action', 'read, create, update, delete or approve'), effect: data.effect, sentence: text(data.sentence, 300, 'Rule', true),
       pack: data.pack ? text(data.pack, 40, 'Pack') : null };
   },
-  // Work › Agents (DEC-038). A profile never authorizes a provider call or spending on its own (DEC-004).
+  // Work › Agents. WORK-UX-01: a profile is who does the work (model, effort, its own context and usage limits); what an
+  // action allows lives on the action. A profile never authorizes a provider call or spending on its own (DEC-004).
   agent_profile: data => {
-    const types = lines(data.workTypes, 20, 'Work type');
-    for (const type of types) if (!workTypes.includes(type)) fail(`Unknown work type “${type}”.`);
-    const writes = lines(data.writes, 20, 'Layer');
-    for (const layer of writes) if (!layers.includes(layer)) fail(`Unknown layer “${layer}”.`);
-    const budget = Number(data.budget ?? 0);
-    if (!Number.isFinite(budget) || budget < 0) fail('A budget is zero or more.');
-    return { key: data.key ? text(data.key, 40, 'Key') : null, name: text(data.name, 40, 'Profile name', true), icon: /^[a-z_]{1,30}$/.test(data.icon || '') ? data.icon : 'smart_toy',
-      role: text(data.role, 300, 'Role'), workTypes: [...new Set(types)], accountId: data.accountId === 'project-agent' ? 'project-agent' : null, model: text(data.model, 60, 'Model'),
-      instructions: text(data.instructions, 8000, 'Instructions'), writes: [...new Set(writes)], approvalRequired: lines(data.approvalRequired, 200, 'Effect needing approval'), budget };
+    const limits = data.limits && typeof data.limits === 'object' ? data.limits : {};
+    const count = (value, fallback, max, label) => {
+      const number = value === undefined || value === '' ? fallback : value === null ? null : Number(value);
+      if (number !== null && (!Number.isInteger(number) || number < 0 || number > max)) fail(`${label} must be a whole number up to ${max.toLocaleString('en')}.`);
+      return number;
+    };
+    const effort = data.effort || 'medium';
+    if (!efforts.includes(effort)) fail(`Choose an effort: ${efforts.join(', ')}.`);
+    const color = String(data.avatar?.color || '').toLowerCase();
+    return { key: data.key ? text(data.key, 40, 'Key') : null, name: text(data.name, 40, 'Profile name', true), description: text(data.description ?? data.role, 300, 'Description'),
+      avatar: { seed: text(data.avatar?.seed || data.name, 60, 'Avatar seed') || 'agent', color: botColors.includes(color) ? color : botColors[3] },
+      model: text(data.model, 100, 'Model'), effort, instructions: text(data.instructions, 8000, 'Instructions'), context: ids(data.context),
+      limits: { itemOutput: count(limits.itemOutput, 8000, 20000, 'Output tokens per item'), batchTokens: count(limits.batchTokens, 200000, 10000000, 'Tokens per batch run'),
+        monthlyTokens: count(limits.monthlyTokens, 2000000, 1000000000, 'Tokens per month') },
+      active: data.active !== false };
+  },
+  // WORK-UX-01: one role per layer; its instructions come before each action's own.
+  role: data => {
+    if (!layers.includes(data.layer)) fail('Unknown layer.');
+    return { layer: data.layer, instructions: text(data.instructions, 8000, 'Role instructions') };
+  },
+  // Each action a role performs: who takes it by default, and the setup anyone doing it works with.
+  work_action: (data, catalogs) => {
+    const definition = catalogs.roles?.actions.get(data.key);
+    if (!definition) fail('Unknown action.');
+    const assignee = data.assignee && ['person', 'agent'].includes(data.assignee.kind) ? { kind: data.assignee.kind, id: text(data.assignee.id, 80, 'Assignee', true) } : null;
+    const tools = lines(data.tools, 40, 'Tool');
+    for (const tool of tools) if (!catalogs.roles.tools[tool]) fail(`Unknown tool “${tool}”.`);
+    const phases = lines(data.phases, 60, 'Run phase');
+    if (!phases.length || phases.length > 8) fail('An action has one to eight run phases.');
+    return { key: data.key, assignee, instructions: text(data.instructions, 8000, 'Action instructions'), reads: ids(data.reads), changes: lines(data.changes, 120, 'What it may change'),
+      tools: [...new Set(tools)], asks: text(data.asks, 400, 'Asks you first'), phases, checks: lines(data.checks, 300, 'Check').slice(0, 12) };
   },
   project_instructions: data => ({ body: text(data.body, 8000, 'Project instructions') }),
   // Work › Routines (LAY-04C): a definition only; runs are recorded in routine_runs, not as revisions.
@@ -223,7 +254,7 @@ const cadenceDays = { weekly: 7, monthly: 30 };
 const verifiedTypes = ['define', 'spec', 'plan', 'design', 'research', 'configure'];
 const kinds = Object.keys(validators);
 const prefixes = { vision_section: 'vis', persona: 'per', phase: 'pha', activity: 'act', step: 'stp', story: 'sto', spec: 'spc', research: 'res', doc: 'doc', page: 'pag',
-  data_object: 'obj', data_operation: 'opr', access_rule: 'acc', agent_profile: 'agt', project_instructions: 'ins', routine: 'rtn' };
+  data_object: 'obj', data_operation: 'opr', access_rule: 'acc', agent_profile: 'agt', project_instructions: 'ins', routine: 'rtn', role: 'rol', work_action: 'wac' };
 // Records a kind points at must exist in the same project and be of the right kind.
 const references = {
   data_object: clean => [...clean.relations.map(relation => [relation.target, 'data_object']), ...clean.stories.map(id => [id, 'story']), ...clean.specs.map(id => [id, 'spec']), ...schemaRefs(clean.schema).map(id => [id, 'data_object'])],
@@ -234,9 +265,32 @@ const newId = kind => `${prefixes[kind]}-${randomBytes(4).toString('hex')}`;
 
 export function loadAgentDefaults(configDirectory) {
   const defaults = JSON.parse(readFileSync(join(configDirectory, 'agent-profiles.json'), 'utf8'));
-  const routed = defaults.profiles.flatMap(profile => profile.workTypes);
-  for (const type of workTypes) if (routed.filter(item => item === type).length !== 1) throw new Error(`Work type ${type} must go to exactly one default agent profile.`);
+  validators.agent_profile(defaults.defaultProfile);
+  for (const layer of Object.values(defaults.legacyRoles || {})) if (!layers.includes(layer)) throw new Error(`Legacy profile maps to unknown layer ${layer}.`);
   return defaults;
+}
+
+// WORK-UX-01: one role per layer and the actions it performs (config/roles.json). Action ids are "<layer>.<key>".
+export function loadRoles(configDirectory, { routines = [], styles = [] } = {}) {
+  const config = JSON.parse(readFileSync(join(configDirectory, 'roles.json'), 'utf8'));
+  if ([...config.roles.map(role => role.layer)].sort().join() !== [...layers].sort().join()) throw new Error('Every layer needs exactly one role.');
+  const actions = new Map();
+  for (const role of config.roles) for (const action of role.actions) {
+    const id = `${role.layer}.${action.key}`;
+    if (actions.has(id)) throw new Error(`Action ${id} is defined twice.`);
+    if (!workTypes.includes(action.type)) throw new Error(`Action ${id} has an unknown work type.`);
+    if ((action.tools || []).some(tool => !config.tools[tool])) throw new Error(`Action ${id} uses an unknown tool.`);
+    if (!action.phases?.length || !action.checks?.length) throw new Error(`Action ${id} needs run phases and checks.`);
+    if (action.routine && !routines.some(routine => routine.key === action.routine)) throw new Error(`Action ${id} names an unknown routine.`);
+    actions.set(id, { ...action, id, layer: role.layer, role: role.name });
+  }
+  for (const routine of routines) if (![...actions.values()].some(action => action.routine === routine.key)) throw new Error(`Routine ${routine.key} has no action to take it.`);
+  for (const style of styles) {
+    const preset = config.presets[style];
+    if (!preset || (!preset.you && !preset.agent)) throw new Error(`Working style ${style} needs a preset in roles.json.`);
+    for (const id of [...(preset.you || []), ...(preset.agent || [])]) if (!actions.has(id)) throw new Error(`Preset ${style} names unknown action ${id}.`);
+  }
+  return { ...config, actions };
 }
 
 export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentDefaults || { profiles: [], guidance: {}, projectInstructions: '' } }) {
@@ -322,38 +376,118 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     ensureRoutines(projectId);
   }
 
-  // ---- Work › Agents: default profiles and project instructions (idempotent; older projects get them at start-up) ----
+  // ---- Work › Agents and Roles (WORK-UX-01) ----
+  const profiles = projectId => list(projectId, 'agent_profile');
+  const defaultProfile = projectId => profiles(projectId).find(profile => profile.key === 'default') || null;
+  const ownerOf = projectId => db.prepare('SELECT created_by FROM project_setup WHERE project_id = ?').get(projectId)?.created_by
+    || db.prepare("SELECT user_id FROM project_members WHERE project_id = ? AND role = 'owner' ORDER BY created_at LIMIT 1").get(projectId)?.user_id || null;
+  const members = projectId => db.prepare(`SELECT u.id, u.display_name AS name, u.avatar_json, m.role FROM project_members m JOIN users u ON u.id = m.user_id
+    WHERE m.project_id = ? ORDER BY m.role = 'owner' DESC, u.display_name`).all(projectId).map(member => ({ id: member.id, name: member.name, role: member.role, avatar: parse(member.avatar_json, null) }));
+
+  // Idempotent; older projects get these at start-up. DEC-038's five role profiles give their edited instructions to
+  // their layer's role and are deactivated; open work they held moves to the Default agent.
   function ensureAgents(projectId) {
-    // One agent connection per project (DEC-034), so every default profile uses it; whether it is connected is shown, not stored.
-    if (!list(projectId, 'agent_profile').length) for (const profile of agentDefaults.profiles) insert(projectId, 'agent_profile', { ...profile, accountId: 'project-agent', budget: 0 }, { rationale: 'Default profile' });
+    if (!defaultProfile(projectId)) insert(projectId, 'agent_profile', agentDefaults.defaultProfile, { rationale: 'Default profile' });
     if (!list(projectId, 'project_instructions').length) insert(projectId, 'project_instructions', { body: agentDefaults.projectInstructions }, { rationale: 'Default project instructions' });
-  }
-
-  // Working style sends each work type to exactly one profile; moving it is a revision of both profiles.
-  function routeWorkType(projectId, type, profileId, author = 'You') {
-    if (!workTypes.includes(type)) fail('Unknown work type.');
-    const profiles = list(projectId, 'agent_profile');
-    const target = profiles.find(profile => profile.id === profileId);
-    if (!target) fail('Profile not found.', 404);
-    for (const profile of profiles) {
-      if (profile.id !== target.id && profile.workTypes.includes(type)) update(projectId, profile.id, { workTypes: profile.workTypes.filter(item => item !== type) }, { author, rationale: `${type} work moved to ${target.name}` });
+    ensureRoles(projectId);
+    const fallback = defaultProfile(projectId);
+    for (const legacy of profiles(projectId).filter(profile => Array.isArray(profile.workTypes))) {
+      const layer = agentDefaults.legacyRoles?.[legacy.key];
+      const role = layer && list(projectId, 'role').find(entry => entry.layer === layer);
+      if (role && legacy.revision > 1 && legacy.instructions && legacy.instructions !== role.instructions) update(projectId, role.id, { instructions: legacy.instructions }, { rationale: `Kept from the ${legacy.name} profile's instructions (WORK-UX-01)` });
+      update(projectId, legacy.id, { active: false }, { rationale: 'Replaced by roles and the Default agent (WORK-UX-01)' });
+      db.prepare("UPDATE layer_work_items SET profile_id = ?, assignee_id = ?, assignee_label = ? WHERE project_id = ? AND profile_id = ? AND state <> 'done'").run(fallback.id, fallback.id, fallback.name, projectId, legacy.id);
     }
-    if (!target.workTypes.includes(type)) update(projectId, target.id, { workTypes: [...target.workTypes, type] }, { author, rationale: `Takes ${type} work` });
+    // Open agent work whose profile is gone, deactivated or was never recorded (from before profiles) goes to the default agent.
+    const active = new Set(profiles(projectId).filter(profile => profile.active !== false).map(profile => profile.id));
+    for (const row of db.prepare("SELECT id, profile_id FROM layer_work_items WHERE project_id = ? AND assignee_kind = 'agent' AND state <> 'done'").all(projectId)) {
+      if (!active.has(row.profile_id)) db.prepare('UPDATE layer_work_items SET profile_id = ?, assignee_id = ?, assignee_label = ? WHERE id = ?').run(fallback.id, fallback.id, fallback.name, row.id);
+    }
   }
-  const profileFor = (projectId, type) => list(projectId, 'agent_profile').find(profile => profile.workTypes.includes(type)) || null;
 
-  // What an agent reads, in order (DEC-038): product principles, project instructions, role, work-type guidance.
-  function instructionPins(projectId, profile, type) {
+  // Each layer's role and its actions, with who takes each action by default. The onboarding working style is only a
+  // preset for those defaults (config/roles.json presets); it is not stored or shown anywhere else.
+  function ensureRoles(projectId) {
+    const roles = list(projectId, 'role');
+    const actions = list(projectId, 'work_action');
+    const style = db.prepare('SELECT profile FROM project_setup WHERE project_id = ?').get(projectId)?.profile;
+    const preset = catalogs.roles.presets[style] || catalogs.roles.presets.planner;
+    const owner = ownerOf(projectId);
+    const agent = defaultProfile(projectId);
+    for (const role of catalogs.roles.roles) {
+      const record = roles.find(entry => entry.layer === role.layer) || insert(projectId, 'role', { layer: role.layer, instructions: role.instructions }, { rationale: 'Default role' });
+      for (const action of role.actions) {
+        const id = `${role.layer}.${action.key}`;
+        if (actions.some(entry => entry.key === id)) continue;
+        const toAgent = preset.you ? !preset.you.includes(id) : (preset.agent || []).includes(id);
+        const assignee = toAgent && agent ? { kind: 'agent', id: agent.id } : owner ? { kind: 'person', id: owner } : null;
+        insert(projectId, 'work_action', { key: id, assignee, instructions: action.instructions, reads: [], changes: action.changes, tools: action.tools, asks: action.asks, phases: action.phases, checks: action.checks },
+          { parentId: record.id, rationale: 'Default action' });
+      }
+    }
+  }
+  const actionRecord = (projectId, id) => list(projectId, 'work_action').find(entry => entry.key === id) || null;
+  // Which action an item is for, from its layer and work type (and whether it asks a question, or which routine made it).
+  function actionIdFor(layer, type, { question = null, routineKey = null } = {}) {
+    const all = [...catalogs.roles.actions.values()];
+    const routed = routineKey && all.find(action => action.routine === routineKey);
+    if (routed) return routed.id;
+    const typed = all.filter(action => action.type === type && (type !== 'define' || (action.key === 'clarify') === Boolean(question && !question.answer)));
+    return (typed.find(action => action.layer === layer && !action.routine) || typed.find(action => action.layer === layer) || typed.find(action => !action.routine) || all.find(action => action.layer === layer) || all[0]).id;
+  }
+  // An assignee is a project member or an active agent profile, stored by id; the label is kept for history.
+  function resolveAssignee(projectId, assignee) {
+    if (!assignee) return null;
+    if (assignee.kind === 'template') return { kind: 'template', id: null, label: text(assignee.label, 80, 'Assignee') || 'Aludel template' };
+    if (assignee.kind === 'agent') {
+      const profile = profiles(projectId).find(entry => entry.id === assignee.id);
+      if (!profile) fail('Agent profile not found.', 404);
+      if (profile.active === false) fail(`${profile.name} is deactivated. Choose another profile.`, 409);
+      return { kind: 'agent', id: profile.id, label: profile.name };
+    }
+    if (assignee.kind === 'person') {
+      const member = members(projectId).find(entry => entry.id === assignee.id);
+      if (!member) fail('That person is not a member of this project.', 404);
+      return { kind: 'person', id: member.id, label: member.name };
+    }
+    fail('Assign the item to a person or an agent profile.');
+  }
+  function defaultAssignee(projectId, actionId) {
+    const assignee = actionRecord(projectId, actionId)?.assignee;
+    try { return resolveAssignee(projectId, assignee); } catch { return null; }
+  }
+
+  // What an agent reads, in order: product principles, project instructions, the role's, the action's, then its profile's
+  // own. Pinned when a run starts, so later edits never change a run in progress.
+  function instructionPins(projectId, profile, actionId) {
     const principles = list(projectId, 'vision_section').find(section => section.key === 'principles');
     const project = list(projectId, 'project_instructions')[0];
-    return { principles: principles ? { id: principles.id, revision: principles.revision } : null, project: project ? { id: project.id, revision: project.revision } : null,
-      role: { id: profile.id, revision: profile.revision }, guidance: type };
+    const action = actionRecord(projectId, actionId);
+    const role = action?.parentId ? get(projectId, action.parentId) : null;
+    const pin = record => record ? { id: record.id, revision: record.revision } : null;
+    return { principles: pin(principles), project: pin(project), role: pin(role), action: action ? { ...pin(action), key: action.key } : null, profile: pin(profile) };
+  }
+
+  // Roles with their actions as the Roles page and the runner see them: the catalog's names plus the project's setup.
+  function roleView(projectId) {
+    const actions = list(projectId, 'work_action');
+    return catalogs.roles.roles.map(role => {
+      const record = list(projectId, 'role').find(entry => entry.layer === role.layer);
+      return { id: record?.id || null, layer: role.layer, name: role.name, blurb: role.blurb, instructions: record?.instructions || '', revision: record?.revision || 0,
+        actions: role.actions.map(action => {
+          const id = `${role.layer}.${action.key}`;
+          const saved = actions.find(entry => entry.key === id);
+          return { id, recordId: saved?.id || null, revision: saved?.revision || 0, name: action.name, description: action.description, type: action.type, routine: action.routine || null,
+            assignee: saved?.assignee || null, instructions: saved?.instructions ?? action.instructions, reads: saved?.reads || [], changes: saved?.changes || action.changes, tools: saved?.tools || action.tools,
+            asks: saved?.asks ?? action.asks, phases: saved?.phases || action.phases, checks: saved?.checks || action.checks };
+        }) };
+    });
   }
 
   function agentExport(projectId) {
     return { instructions: list(projectId, 'project_instructions')[0]?.body || '', principles: list(projectId, 'vision_section').find(section => section.key === 'principles')?.items || [],
-      profiles: list(projectId, 'agent_profile').map(({ name, role, workTypes: types, writes, approvalRequired, instructions }) => ({ name, role, workTypes: types, writes, approvalRequired, instructions })),
-      guidance: agentDefaults.guidance };
+      roles: roleView(projectId).map(role => ({ name: role.name, layer: role.layer, instructions: role.instructions,
+        actions: role.actions.map(action => ({ name: action.name, instructions: action.instructions, changes: action.changes, tools: action.tools.map(tool => catalogs.roles.tools[tool]), asks: action.asks })) })) };
   }
 
   // ---- Pages (replace project_setup.routes_json) ----
@@ -519,82 +653,205 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
   }
 
   // ---- Work items ----
-  const workRow = item => item && { id: item.id, number: item.number, ref: `W-${item.number}`, layer: item.layer, type: item.type, title: item.title, state: item.state,
-    assignee: item.assignee_kind ? { kind: item.assignee_kind, label: item.assignee_label } : null, targets: parse(item.targets_json, []), question: parse(item.question_json, null),
-    documents: parse(item.documents_json, []), log: parse(item.log_json, []), createdAt: item.created_at, updatedAt: item.updated_at,
-    profileId: item.profile_id || null, instructions: parse(item.instructions_json, null), context: parse(item.context_json, null) };
-  const workList = projectId => db.prepare('SELECT * FROM layer_work_items WHERE project_id = ? ORDER BY number DESC').all(projectId).map(workRow);
+  // Status as people see it (WORK-UX-01): backlog, queued, staged (in an agent's batch or a person's list), working,
+  // needs you, review, done. The stored states stay as they were.
+  // A running batch locks all its items in (claimed); only the one the runner has started is working, the rest wait staged.
+  const statusOf = (state, context) => state === 'suggested' ? 'backlog' : state === 'ready' ? (context?.batch || context?.staged ? 'staged' : 'queued')
+    : state === 'claimed' ? (context?.run?.startedAt && !context.run.done ? 'working' : 'staged') : state === 'needs-input' ? 'needs' : state;
+  const workRow = item => {
+    if (!item) return null;
+    const context = parse(item.context_json, null);
+    return { id: item.id, number: item.number, ref: `W-${item.number}`, layer: item.layer, type: item.type, action: item.action || null, title: item.title, state: item.state,
+      status: statusOf(item.state, context), priority: priorities.includes(item.priority) ? item.priority : 'medium',
+      assignee: item.assignee_kind ? { kind: item.assignee_kind, id: item.assignee_id || (item.assignee_kind === 'agent' ? item.profile_id : null), label: item.assignee_label } : null,
+      targets: parse(item.targets_json, []), question: parse(item.question_json, null), documents: parse(item.documents_json, []), log: parse(item.log_json, []),
+      createdAt: item.created_at, updatedAt: item.updated_at, profileId: item.profile_id || null, instructions: parse(item.instructions_json, null), context,
+      blocks: parse(item.blocks_json, []), checks: parse(item.checks_json, []) };
+  };
+  const workById = (projectId, id) => workRow(db.prepare('SELECT * FROM layer_work_items WHERE id = ? AND project_id = ?').get(id, projectId));
+  function workList(projectId) {
+    const rows = db.prepare('SELECT * FROM layer_work_items WHERE project_id = ? ORDER BY number DESC').all(projectId).map(workRow);
+    // Jira's "is blocked by": the open items that list this one in their blocks.
+    for (const item of rows) item.blockedBy = rows.filter(other => other.state !== 'done' && other.blocks.includes(item.id)).map(other => other.id);
+    return rows;
+  }
+  const blockersOf = (projectId, id) => workList(projectId).find(item => item.id === id)?.blockedBy || [];
+  const checkList = (texts, targets) => (texts || []).map(entry => ({ text: text(entry, 300, 'Check'), source: targets[0] ? { id: targets[0].id } : null, verdict: null, note: '' })).filter(check => check.text);
+
+  // A starting priority: work on the current phase's stories comes first, later phases last (people change it freely).
+  function priorityLevel(projectId, type, targets) {
+    if (type === 'reconcile') return 'high';
+    const phases = list(projectId, 'phase');
+    const current = phases.find(phase => phase.current)?.key;
+    const stories = list(projectId, 'story');
+    const linked = targets.flatMap(target => {
+      const record = get(projectId, target.id);
+      if (!record) return [];
+      if (record.kind === 'story') return [record];
+      return (record.stories || []).map(id => stories.find(story => story.id === id)).filter(Boolean);
+    });
+    if (!linked.length) return 'medium';
+    if (linked.some(story => story.phase === current)) return ['define', 'plan'].includes(type) ? 'high' : 'medium';
+    return 'low';
+  }
 
   function createWork(projectId, input, author = 'Aludel') {
-    if (!layers.includes(input.layer)) fail('Unknown layer.');
-    if (!workTypes.includes(input.type)) fail('Unknown work type.');
-    if (!workStates.includes(input.state || 'ready')) fail('Unknown work state.');
     const targets = (Array.isArray(input.targets) ? input.targets : []).map(target => {
       const record = row(target.id);
       if (!record || record.project_id !== projectId) fail('A work target was not found.', 404);
       return { id: record.id, kind: record.kind, label: text(target.label, 160, 'Target') || record.kind };
     });
+    const question = input.question ? { text: text(input.question.text, 400, 'Question', true), options: lines(input.question.options, 200, 'Option') } : null;
+    const actionId = catalogs.roles.actions.has(input.action) ? input.action : actionIdFor(input.layer, input.type, { question, routineKey: input.routineKey });
+    const definition = catalogs.roles.actions.get(actionId);
+    const layer = input.layer ?? definition.layer;
+    const type = input.type ?? definition.type;
+    if (!layers.includes(layer)) fail('Unknown layer.');
+    if (!workTypes.includes(type)) fail('Unknown work type.');
+    if (!workStates.includes(input.state || 'ready')) fail('Unknown work state.');
+    if (input.priority !== undefined && !priorities.includes(input.priority)) fail(`Choose a priority: ${priorities.join(', ')}.`);
     const number = counter(projectId, 'work');
     const id = `wrk-${randomBytes(4).toString('hex')}`;
     const created = now();
-    const assignee = input.assignee || null;
-    const question = input.question ? { text: text(input.question.text, 400, 'Question', true), options: lines(input.question.options, 200, 'Option') } : null;
-    db.prepare(`INSERT INTO layer_work_items(id, project_id, number, layer, type, title, state, assignee_kind, assignee_label, targets_json, question_json, documents_json, log_json, created_at, updated_at, context_json)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(id, projectId, number, input.layer, input.type, text(input.title, 160, 'Work title', true), input.state || 'ready',
-      assignee?.kind || null, assignee?.label || null, JSON.stringify(targets), question ? JSON.stringify(question) : null,
-      JSON.stringify(lines(input.documents, 300, 'Document')), JSON.stringify([{ at: created, text: input.logText || `Created by ${author}` }]), created, created,
-      input.context && typeof input.context === 'object' ? JSON.stringify(input.context) : null);
-    return workRow(db.prepare('SELECT * FROM layer_work_items WHERE id = ?').get(id));
+    const assignee = input.assignee ? resolveAssignee(projectId, input.assignee) : defaultAssignee(projectId, actionId);
+    const checks = checkList(input.checks?.length ? input.checks : actionRecord(projectId, actionId)?.checks || definition.checks, targets);
+    db.prepare(`INSERT INTO layer_work_items(id, project_id, number, layer, type, title, state, assignee_kind, assignee_label, targets_json, question_json, documents_json, log_json, created_at, updated_at,
+      context_json, action, assignee_id, profile_id, priority, blocks_json, checks_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(id, projectId, number, layer, type, text(input.title, 160, 'Work title', true), input.state || 'ready',
+        assignee?.kind || null, assignee?.label || null, JSON.stringify(targets), question ? JSON.stringify(question) : null,
+        JSON.stringify(lines(input.documents, 300, 'Document')), JSON.stringify([{ at: created, text: input.logText || `Created by ${author}`, refs: targets.map(target => target.id) }]), created, created,
+        input.context && typeof input.context === 'object' ? JSON.stringify(input.context) : null, actionId, assignee?.id || null, assignee?.kind === 'agent' ? assignee.id : null,
+        input.priority || priorityLevel(projectId, type, targets), '[]', JSON.stringify(checks));
+    return workById(projectId, id);
   }
 
-  function updateWork(user, projectId, workId, { state, assignee, answer, rationale, documents }) {
-    const item = workRow(db.prepare('SELECT * FROM layer_work_items WHERE id = ? AND project_id = ?').get(workId, projectId));
+  // Blocking links (Jira's "blocks" / "is blocked by"): same project, never itself, never a cycle.
+  function validBlocks(projectId, item, blocks) {
+    const clean = [...new Set((Array.isArray(blocks) ? blocks : []).map(String))];
+    const all = workList(projectId);
+    for (const id of clean) {
+      if (id === item.id) fail(`${item.ref} can't block itself.`);
+      if (!all.some(other => other.id === id)) fail('A linked work item was not found.', 404);
+    }
+    const next = new Map(all.map(other => [other.id, other.id === item.id ? clean : other.blocks]));
+    const reaches = (from, goal, seen = new Set()) => (next.get(from) || []).some(id => id === goal || (!seen.has(id) && (seen.add(id), reaches(id, goal, seen))));
+    for (const id of clean) if (reaches(id, item.id)) fail(`That link would make ${item.ref} block itself through ${all.find(other => other.id === id)?.ref}.`, 409);
+    return clean;
+  }
+
+  function updateWork(user, projectId, workId, input) {
+    const { state, assignee, answer, rationale, documents, priority, blocks, verdict, sendBack } = input;
+    const item = workById(projectId, workId);
     if (!item) fail('Work item not found.', 404);
     const log = [...item.log];
+    const by = { kind: 'person', id: user.id };
+    const entry = (textValue, extra = {}) => log.push({ at: now(), text: textValue, by, ...extra });
     let outputs = item.documents;
-    if (documents !== undefined) { outputs = lines(documents, 300, 'Document'); log.push({ at: now(), text: 'Updated what this work will document' }); }
     let question = item.question;
     let nextState = item.state;
+    let checks = item.checks;
+    let context = item.context;
+    let answered = false;
+    if (documents !== undefined) { outputs = lines(documents, 300, 'Document'); entry('Updated what this work will document'); }
+    if (priority !== undefined && priority !== item.priority) {
+      if (!priorities.includes(priority)) fail(`Choose a priority: ${priorities.join(', ')}.`);
+      db.prepare('UPDATE layer_work_items SET priority = ? WHERE id = ?').run(priority, workId);
+      entry(`Set priority to ${priority}`);
+    }
+    if (blocks !== undefined) {
+      const clean = validBlocks(projectId, item, blocks);
+      db.prepare('UPDATE layer_work_items SET blocks_json = ? WHERE id = ?').run(JSON.stringify(clean), workId);
+      entry(clean.length ? 'Updated what this blocks' : 'Blocks nothing now', { refs: clean });
+    }
     if (answer !== undefined) {
       if (!question) fail('This work item has no open question.');
       const chosen = text(answer, 400, 'Answer', true);
       question = { ...question, answer: chosen, rationale: text(rationale, 1000, 'Reason'), answeredBy: user.name, answeredAt: now() };
-      log.push({ at: now(), text: `${user.name} answered: ${chosen}` });
-      if (item.state === 'needs-input') nextState = item.assignee?.kind === 'agent' ? 'claimed' : 'ready';
+      entry(`Answered: ${chosen}`);
+      answered = true;
     }
     if (assignee !== undefined) {
-      if (assignee !== null && !['agent', 'person'].includes(assignee.kind)) fail('Assign the item to an agent or a person.');
-      // An agent is always a profile: the one named, or the one working style sends this type of work to.
-      const profile = assignee?.kind === 'agent' ? (assignee.profileId ? list(projectId, 'agent_profile').find(entry => entry.id === assignee.profileId) : profileFor(projectId, item.type)) : null;
-      if (assignee?.kind === 'agent' && !profile) fail('Choose an agent profile in Work › Agents first.', 409);
-      const label = assignee === null ? null : assignee.kind === 'person' ? user.name : profile.name;
-      db.prepare('UPDATE layer_work_items SET assignee_kind = ?, assignee_label = ?, profile_id = ?, instructions_json = ? WHERE id = ?')
-        .run(assignee?.kind || null, label, profile?.id || null, profile ? JSON.stringify(instructionPins(projectId, profile, item.type)) : null, workId);
-      log.push({ at: now(), text: assignee === null ? 'Unassigned' : profile ? `Assigned to the ${label} profile (instructions pinned at revision ${profile.revision})` : `Assigned to ${label}` });
-      if (nextState === 'ready' && assignee) nextState = 'claimed';
+      if (item.state === 'claimed' || item.state === 'review') fail(`${item.ref} is ${item.state === 'review' ? 'ready for review' : 'being worked on'}; it can't be reassigned now.`, 409);
+      const next = assignee === null ? null : resolveAssignee(projectId, assignee);
+      db.prepare('UPDATE layer_work_items SET assignee_kind = ?, assignee_label = ?, assignee_id = ?, profile_id = ? WHERE id = ?')
+        .run(next?.kind || null, next?.label || null, next?.id || null, next?.kind === 'agent' ? next.id : null, workId);
+      entry(next ? `Assigned to ${next.label}` : 'Unassigned');
+    }
+    if (verdict !== undefined) {
+      if (item.state !== 'review') fail(`${item.ref} isn't waiting for review.`, 409);
+      const index = Number(verdict?.index);
+      if (!Number.isInteger(index) || !checks[index]) fail('Unknown check.');
+      if (![null, 'accept', 'reject'].includes(verdict.value ?? null)) fail('A check is accepted or rejected.');
+      checks = checks.map((check, position) => position === index ? { ...check, verdict: verdict.value ?? null, note: text(verdict.note ?? check.note, 1000, 'Note'), by: verdict.value ? user.name : null, at: verdict.value ? now() : null } : check);
+    }
+    if (sendBack) {
+      if (item.state !== 'review') fail(`${item.ref} isn't waiting for review.`, 409);
+      const rejected = checks.filter(check => check.verdict === 'reject');
+      if (!rejected.length) fail('Reject at least one check, with a note, to send it back.', 409);
+      if (rejected.some(check => !check.note)) fail('Say what is wrong with each rejected check.', 409);
+      const { batch, staged, ...rest } = context || {};
+      context = { ...rest, feedback: rejected.map(check => ({ check: check.text, note: check.note, by: user.name, at: now() })) };
+      entry(`Sent back: ${rejected.map(check => `“${check.text}”: ${check.note}`).join('; ')}`.slice(0, 1000));
+      checks = checks.map(check => ({ ...check, verdict: null, note: '', by: null, at: null }));
+      nextState = 'ready';
     }
     if (state !== undefined) {
       if (!workStates.includes(state)) fail('Unknown work state.');
-      if (state === 'done' && !outputs.length) fail('Name what this work documented before closing it (DEC-036: logs are not documentation).', 409);
-      if (state === 'done' && verifiedTypes.includes(item.type) && item.assignee?.kind !== 'template') {
-        const missing = item.targets.filter(target => !db.prepare('SELECT 1 FROM knowledge_revisions WHERE record_id = ? AND work_item_id = ?').get(target.id, item.id));
-        if (missing.length) fail(`${missing.map(target => `“${target.label}”`).join(', ')} ${missing.length === 1 ? 'has' : 'have'} no change from ${item.ref} yet. Edit ${missing.length === 1 ? 'it' : 'them'} from this item (or apply the answer), then close it.`, 409);
+      if (state === 'done') {
+        if (!outputs.length && !checks.length) fail('Name what this work checks or documents before closing it (DEC-036: logs are not documentation).', 409);
+        if (item.state === 'review' && checks.some(check => check.verdict !== 'accept')) fail('Accept every check before accepting the work, or send it back.', 409);
+        if (verifiedTypes.includes(item.type) && item.assignee?.kind !== 'template') {
+          const missing = item.targets.filter(target => !db.prepare('SELECT 1 FROM knowledge_revisions WHERE record_id = ? AND work_item_id = ?').get(target.id, item.id));
+          if (missing.length) fail(`${missing.map(target => `“${target.label}”`).join(', ')} ${missing.length === 1 ? 'has' : 'have'} no change from ${item.ref} yet. Edit ${missing.length === 1 ? 'it' : 'them'} from this item (or apply the answer), then close it.`, 409);
+        }
       }
       nextState = state;
-      log.push({ at: now(), text: `State: ${state}` });
+      const moved = { done: item.state === 'review' ? 'Accepted it' : 'Marked it done', ready: item.state === 'suggested' ? 'Queued it' : 'Moved it back to the queue', suggested: 'Moved it to the backlog' };
+      entry(moved[state] || `Moved it to ${state}`);
     }
-    db.prepare('UPDATE layer_work_items SET state = ?, question_json = ?, documents_json = ?, log_json = ?, updated_at = ? WHERE id = ?').run(nextState, question ? JSON.stringify(question) : null, JSON.stringify(outputs), JSON.stringify(log), now(), workId);
-    const saved = workRow(db.prepare('SELECT * FROM layer_work_items WHERE id = ?').get(workId));
+    db.prepare('UPDATE layer_work_items SET state = ?, question_json = ?, documents_json = ?, log_json = ?, checks_json = ?, context_json = ?, updated_at = ? WHERE id = ?')
+      .run(nextState, question ? JSON.stringify(question) : null, JSON.stringify(outputs), JSON.stringify(log), JSON.stringify(checks), context ? JSON.stringify(context) : null, now(), workId);
+    // An answer lands in the records it changes (DEC-036); once it has, the question's work is done.
+    if (answered) {
+      const applicable = item.targets.filter(target => ['story', 'spec', 'page'].includes(target.kind));
+      for (const target of applicable) applyAnswer(user, projectId, workId, target.id);
+      if (applicable.length) {
+        const current = workById(projectId, workId);
+        const { batch, staged, ...rest } = current.context || {};
+        db.prepare("UPDATE layer_work_items SET state = 'done', checks_json = ?, context_json = ?, log_json = ?, updated_at = ? WHERE id = ?")
+          .run(JSON.stringify(current.checks.map(check => ({ ...check, verdict: 'accept', by: user.name, at: now() }))), JSON.stringify(rest),
+            JSON.stringify([...current.log, { at: now(), text: 'Done: the answer is applied', by }]), now(), workId);
+        nextState = 'done';
+      }
+    }
+    const saved = workById(projectId, workId);
     if (nextState === 'done' && item.state !== 'done') for (const listener of doneListeners) listener({ projectId, item: saved, author: user.name });
     return saved;
   }
 
-  function appendLog(workId, entry, changes = {}) {
+  // Log entries can name the records and files they touched (refs) and who made them (by).
+  function appendLog(workId, entryText, changes = {}, { refs = [], by = null } = {}) {
     const item = workRow(db.prepare('SELECT * FROM layer_work_items WHERE id = ?').get(workId));
     if (!item) return null;
+    const entry = { at: now(), text: entryText, ...(refs.length ? { refs } : {}), ...(by ? { by } : {}) };
     db.prepare('UPDATE layer_work_items SET log_json = ?, state = COALESCE(?, state), context_json = COALESCE(?, context_json), updated_at = ? WHERE id = ?')
-      .run(JSON.stringify([...item.log, { at: now(), text: entry }]), changes.state || null, changes.context ? JSON.stringify(changes.context) : null, now(), workId);
+      .run(JSON.stringify([...item.log, entry]), changes.state || null, changes.context ? JSON.stringify(changes.context) : null, now(), workId);
     return workRow(db.prepare('SELECT * FROM layer_work_items WHERE id = ?').get(workId));
+  }
+  const setWorkContext = (workId, context) => db.prepare('UPDATE layer_work_items SET context_json = ?, updated_at = ? WHERE id = ?').run(context ? JSON.stringify(context) : null, now(), workId);
+
+  // What an item changed: every revision made from it, as field differences against the revision before (WORK-UX-01).
+  function workChanges(projectId, workId) {
+    const item = workById(projectId, workId);
+    if (!item) fail('Work item not found.', 404);
+    return db.prepare('SELECT record_id AS recordId, revision, author, rationale, created_at AS createdAt FROM knowledge_revisions WHERE work_item_id = ? ORDER BY created_at').all(workId).map(entry => {
+      const record = row(entry.recordId);
+      const after = revisionData(entry.recordId, entry.revision) || {};
+      const before = entry.revision > 1 ? revisionData(entry.recordId, entry.revision - 1) || {} : {};
+      const fields = [...new Set([...Object.keys(before), ...Object.keys(after)])].filter(key => JSON.stringify(before[key]) !== JSON.stringify(after[key]))
+        .map(field => ({ field, before: before[field] ?? null, after: after[field] ?? null }));
+      return { ...entry, kind: record?.kind || null, exists: Boolean(record), fields };
+    });
   }
 
   // An edit made "from" a work item carries its id, so closing the item can verify the change happened (LAY-04A).
@@ -612,6 +869,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     if (!item) fail('Work item not found.', 404);
     if (!item.question?.answer) fail('Answer the question before applying it.', 409);
     if (!item.targets.some(target => target.id === targetId)) fail('That record is not a target of this work item.');
+    if (item.question.applied?.includes(targetId)) return item;
     const record = get(projectId, targetId);
     if (!record) fail('Record not found.', 404);
     const { text: question, answer, rationale } = item.question;
@@ -650,76 +908,44 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     return found;
   }
 
-  // ---- Working-style automation (LAY-04B) ----
-  function preferences(projectId) {
-    const setup = db.prepare('SELECT profile, overrides_json FROM project_setup WHERE project_id = ?').get(projectId);
-    return setup ? { ...(catalogs.profiles?.[setup.profile]?.defaults || {}), ...parse(setup.overrides_json, {}) } : {};
-  }
-  function automationMode(projectId, type, prefs = preferences(projectId)) {
-    const rule = catalogs.automation?.workTypes?.[type];
-    return rule?.modes?.[prefs[rule.preference]] || 'you';
-  }
-  function automationPolicy(projectId) {
-    const prefs = preferences(projectId);
-    return Object.fromEntries(workTypes.map(type => [type, { mode: automationMode(projectId, type, prefs), preference: catalogs.automation?.workTypes?.[type]?.preference || null, profileId: profileFor(projectId, type)?.id || null }]));
-  }
-
-  // Hands an unassigned item to its routed profile when working style says agents take this type.
-  function assignByPolicy(projectId, item, reason) {
-    const mode = automationMode(projectId, item.type);
-    const profile = profileFor(projectId, item.type);
-    if (mode === 'you' || !profile || item.assignee || item.state === 'done') return item;
-    db.prepare('UPDATE layer_work_items SET assignee_kind = ?, assignee_label = ?, profile_id = ?, instructions_json = ?, context_json = ?, log_json = ?, updated_at = ? WHERE id = ?')
-      .run('agent', profile.name, profile.id, JSON.stringify(instructionPins(projectId, profile, item.type)), JSON.stringify({ ...(item.context || {}), automation: { mode } }),
-        JSON.stringify([...item.log, { at: now(), text: `${reason}: queued for the ${profile.name} profile${mode === 'agent-review' ? '; its result comes to you for review' : ''}` }]), now(), item.id);
-    return workRow(db.prepare('SELECT * FROM layer_work_items WHERE id = ?').get(item.id));
-  }
-
-  // DEC-040: working style no longer opens items for gaps; it marks them available for agents (see agentPool) and
-  // only routes unassigned reconcile and routine items to their profile. Agents run only in batches the owner starts.
-  function automate(projectId) {
-    for (const item of workList(projectId).filter(entry => !entry.assignee && entry.state !== 'done' && (entry.type === 'reconcile' || entry.context?.routine))) assignByPolicy(projectId, item, 'Working style');
-    return [];
-  }
-
-  // One-time (DEC-040): items LAY-04B staged that nobody touched go back to the pool; their gaps reappear as suggestions.
-  function returnStagedToPool(projectId) {
-    const untouched = workList(projectId).filter(item => item.context?.suggestion && item.state === 'ready' && !item.context?.batch && item.log.length <= 2
-      && /^Staged by working style/.test(item.log[0]?.text || '') && !db.prepare('SELECT 1 FROM knowledge_revisions WHERE work_item_id = ?').get(item.id));
-    for (const item of untouched) db.prepare('DELETE FROM layer_work_items WHERE id = ?').run(item.id);
-    return untouched.length;
-  }
-
-  // Lower runs first: the current phase before later ones, then the natural order of work (define and clarify, plan,
-  // spec, design, implement), then story order. A later roadmap can replace this (ROADMAP-01).
-  const typeRank = { define: 1, research: 1, plan: 2, spec: 3, design: 4, implement: 5, reconcile: 5, configure: 6, review: 7, audit: 8 };
-  function priorityFor(projectId, type, targets) {
-    const phases = list(projectId, 'phase');
-    const current = phases.findIndex(phase => phase.current);
-    const stories = list(projectId, 'story');
-    const storyIds = targets.flatMap(target => {
-      const record = get(projectId, target.id);
-      if (!record) return [];
-      if (record.kind === 'story') return [record];
-      if (record.kind === 'page' || record.kind === 'data_object' || record.kind === 'spec') return (record.stories || []).map(id => stories.find(story => story.id === id)).filter(Boolean);
-      return [];
-    });
-    if (!storyIds.length) return 5000 + (typeRank[type] || 9) * 100;
-    const phaseRank = Math.min(...storyIds.map(story => { const index = phases.findIndex(phase => phase.key === story.phase); return index < 0 ? 9 : Math.abs(index - Math.max(current, 0)) + (index < current ? 5 : 0); }));
-    return phaseRank * 1000 + (typeRank[type] || 9) * 100 + Math.min(99, Math.min(...storyIds.map(story => story.number || 99)));
-  }
-
-  // What agents can take, best first: open items routed to an agent profile and not in a batch, then gaps working style hands to agents.
-  const runnable = (type, question) => type === 'plan' || type === 'define';
-  function agentPool(projectId) {
-    const prefs = preferences(projectId);
+  // ---- Backlog (WORK-UX-01, DEC-041): each gap a layer finds becomes an ordinary backlog item, assigned by its action ----
+  const layerNames = { product: 'Product', design: 'Design', pages: 'Pages', data: 'Data', platform: 'Platform', work: 'Work' };
+  function syncBacklog(projectId) {
     const work = workList(projectId);
-    const items = work.filter(item => item.state === 'ready' && item.assignee?.kind === 'agent' && !item.context?.batch && runnable(item.type, item.question))
-      .map(item => ({ kind: 'item', key: item.id, workId: item.id, title: item.title, type: item.type, layer: item.layer, profileId: item.profileId, priority: priorityFor(projectId, item.type, item.targets) }));
-    const gaps = suggestions(projectId, { stories: list(projectId, 'story'), pages: pageList(projectId), work })
-      .filter(suggestion => runnable(suggestion.type, suggestion.question) && automationMode(projectId, suggestion.type, prefs) !== 'you' && profileFor(projectId, suggestion.type))
-      .map(suggestion => ({ kind: 'suggestion', key: suggestion.key, workId: null, title: suggestion.title, type: suggestion.type, layer: suggestion.layer, profileId: profileFor(projectId, suggestion.type).id, priority: priorityFor(projectId, suggestion.type, suggestion.targets) }));
-    return [...items, ...gaps].sort((a, b) => a.priority - b.priority || a.title.localeCompare(b.title));
+    const gaps = suggestions(projectId, { stories: list(projectId, 'story'), pages: pageList(projectId), work: [] });
+    const current = new Set(gaps.map(gap => gap.key));
+    const covered = new Set(work.filter(item => item.state !== 'done').flatMap(item => [item.context?.suggestion, ...item.targets.map(target => `${item.action}:${target.id}`)]).filter(Boolean));
+    const created = [];
+    for (const gap of gaps) {
+      const actionId = actionIdFor(gap.layer, gap.type, { question: gap.question });
+      if (covered.has(gap.key) || (!gap.question && gap.targets.some(target => covered.has(`${actionId}:${target.id}`)))) continue;
+      created.push(createWork(projectId, { ...gap, action: actionId, state: 'suggested', context: { suggestion: gap.key }, logText: `Created by the ${layerNames[gap.layer]} layer` }));
+      covered.add(gap.key);
+    }
+    // A gap filled some other way closes its backlog item: removed if nobody touched it, otherwise marked done.
+    for (const item of work.filter(entry => entry.state === 'suggested' && entry.context?.suggestion && !current.has(entry.context.suggestion))) {
+      const touched = item.log.length > 1 || db.prepare('SELECT 1 FROM knowledge_revisions WHERE work_item_id = ?').get(item.id);
+      if (!touched) db.prepare('DELETE FROM layer_work_items WHERE id = ?').run(item.id);
+      else appendLog(item.id, 'Done: the gap was filled outside this item', { state: 'done' });
+    }
+    return created;
+  }
+
+  // One-time (WORK-UX-01): items from before actions get an action, a priority, checks, an assignee id and, if a person
+  // held them, a place in that person's list.
+  function migrateWork(projectId) {
+    const owner = ownerOf(projectId);
+    const people = members(projectId);
+    const routineKeys = new Map(list(projectId, 'routine').map(routine => [routine.id, routine.key]));
+    for (const item of workList(projectId).filter(entry => !entry.action)) {
+      const actionId = actionIdFor(item.layer, item.type, { question: item.question, routineKey: routineKeys.get(item.context?.routine) });
+      const person = item.assignee?.kind === 'person' ? (people.find(member => member.name === item.assignee.label)?.id || owner) : null;
+      const context = item.state === 'claimed' && item.assignee?.kind === 'person' ? { ...(item.context || {}), staged: true } : item.context;
+      const checks = item.state === 'done' ? [] : checkList(actionRecord(projectId, actionId)?.checks || catalogs.roles.actions.get(actionId).checks, item.targets);
+      db.prepare(`UPDATE layer_work_items SET action = ?, priority = ?, blocks_json = '[]', checks_json = ?, assignee_id = COALESCE(assignee_id, ?), context_json = ?,
+        state = CASE WHEN state = 'claimed' AND assignee_kind = 'person' THEN 'ready' ELSE state END WHERE id = ?`)
+        .run(actionId, priorityLevel(projectId, item.type, item.targets), JSON.stringify(checks), person || item.profileId || null, context ? JSON.stringify(context) : null, item.id);
+    }
   }
 
   // ---- Routines (LAY-04C) ----
@@ -743,9 +969,9 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
       const open = workList(projectId).find(item => item.context?.routine === routine.id && item.state !== 'done');
       if (open) { if (routineId) fail(`${open.ref} from this routine is still open.`, 409); continue; }
       const item = createWork(projectId, { layer: routine.layer, type: routine.type, state: 'ready', title: `${routine.title} · ${at.slice(0, 10)}`, targets: [], documents: routine.documents,
-        context: { routine: routine.id }, logText: `Created by the “${routine.title}” routine (${trigger === 'schedule' ? routine.cadence : trigger})` });
+        context: { routine: routine.id }, routineKey: routine.key, logText: `Created by the “${routine.title}” routine (${trigger === 'schedule' ? routine.cadence : trigger})` });
       db.prepare('INSERT INTO routine_runs(routine_id, project_id, ran_at, trigger, work_item_id) VALUES (?, ?, ?, ?, ?)').run(routine.id, projectId, at, trigger, item.id);
-      created.push(assignByPolicy(projectId, item, 'Working style'));
+      created.push(item);
     }
     return created;
   }
@@ -799,10 +1025,9 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
       objects: list(projectId, 'data_object').map(object => ({ ...object, status: dataStatus(object, builtBy.get(object.id)), history: history(object.id) })),
       operations: list(projectId, 'data_operation').map(operation => ({ ...operation, status: dataStatus(operation, builtBy.get(operation.id)), history: history(operation.id) })),
       access: list(projectId, 'access_rule'),
-      profiles: list(projectId, 'agent_profile').map(profile => ({ ...profile, history: history(profile.id) })),
+      profiles: profiles(projectId).map(({ workTypes: legacyTypes, writes, approvalRequired, budget, icon, role, accountId, ...profile }) => ({ ...profile, history: history(profile.id) })),
       projectInstructions: list(projectId, 'project_instructions')[0] || null,
-      guidance: agentDefaults.guidance, workTypes,
-      suggestions: suggestions(projectId, { stories, pages, work }), automation: automationPolicy(projectId), routines: routineView(projectId), agentPool: agentPool(projectId),
+      roles: roleView(projectId), members: members(projectId), workTypes, routines: routineView(projectId),
       services: Object.entries(catalogs.services || {}).map(([key, service]) => ({ key, ...service, stories: stories.filter(story => story.services.includes(key)).map(story => story.id) }))
     };
   }
@@ -850,7 +1075,8 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     }
   }
 
-  return { ensureProject, ensureAgents, ensurePackData, insert, update, remove, list, get, view, navRoutes, seedPages, saveNavRoutes, applyPacks, createWork, updateWork, appendLog, workList, recordBuild,
-    history, revisionData, revisionAt, kinds, routeWorkType, openApi, referrers, openWorkItem, applyAnswer, suggestions, automate, automationPolicy, ensureRoutines, runRoutines,
-    returnStagedToPool, priorityFor, agentPool, assignByPolicy, instructionPins, preferences, automationMode, profileFor, agentExport, onRevision: listener => revisionListeners.push(listener), onWorkDone: listener => doneListeners.push(listener) };
+  return { ensureProject, ensureAgents, ensureRoles, ensurePackData, insert, update, remove, list, get, view, navRoutes, seedPages, saveNavRoutes, applyPacks, createWork, updateWork, appendLog,
+    setWorkContext, workList, workById, blockersOf, workChanges, recordBuild, history, revisionData, revisionAt, kinds, openApi, referrers, openWorkItem, applyAnswer, suggestions, syncBacklog,
+    migrateWork, ensureRoutines, runRoutines, instructionPins, actionRecord, actionIdFor, roleView, resolveAssignee, defaultProfile, members, agentExport,
+    onRevision: listener => revisionListeners.push(listener), onWorkDone: listener => doneListeners.push(listener) };
 }

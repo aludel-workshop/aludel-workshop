@@ -16,7 +16,7 @@ Turn the running local portal foundation into the first complete request → del
 
 ## Next action
 
-**ROADMAP-01: design an action-based roadmap and how agent batches come from it.** Owner (2026-09-23): "that roadmap should be all actions, not just restating the story phases", and asked whether batches should "tie them in to the roadmap". It needs an owner-reviewed direction or prototype before any build. Meanwhile the owner can run real agent batches (LAY-04D, DEC-040): Work › Queue › fill a batch › Go. [Evidence](evidence/lay-04-work-automation.md).
+**ROADMAP-01: design an action-based roadmap and how agent batches come from it.** Owner (2026-09-23): "that roadmap should be all actions, not just restating the story phases", and asked whether batches should "tie them in to the roadmap". It needs an owner-reviewed direction or prototype before any build. Meanwhile the owner can run real agent batches (DEC-041): Work › Board › stage items in an agent's batch › Go. [Evidence](evidence/lay-04-work-automation.md).
 
 ## Ready queue
 
@@ -57,6 +57,7 @@ One packet at a time. B-03's worker/artifact/recovery work remains required and 
 
 | Packet | Result | Evidence |
 |---|---|---|
+| WORK-UX-01 | Work layer redesign (DEC-041): roles and actions replace working style; flexible agent profiles with robots, models, effort and usage limits; batches per assignee with locking, skip and stop, and results held for review; review checklist with evidence; priority and blocking; backlog from gaps; hover cards; avatars. Agent-checked (server 63/63, layers and onboarding browser, migration on a copy of real data); owner review pending | [Evidence/retrospective](evidence/work-ux-01-work-redesign.md), [work record](design/work-redesign/work-record.md) |
 | LAY-04D | Pasted, checked agent keys with a user guide (DEC-039); agent pool, batches you start with Go, OpenAI/Anthropic runner for acceptance, clarification options and data contracts, review and accept (DEC-040); agent-checked with a provider stand-in | [Evidence/retrospective](evidence/lay-04-work-automation.md) |
 | LAY-04A–C | Verified closing, applied answers, server suggestions, working-style staging and routing, routines; interim project page redirected; agent-checked | [Evidence/retrospective](evidence/lay-04-work-automation.md) |
 | V3-REVIEW | Owner accepted the built LAY-07 layers ("im happy with v3") | [LAY-07 evidence](evidence/lay-07-data-platform-agents.md) |
@@ -82,6 +83,15 @@ One packet at a time. B-03's worker/artifact/recovery work remains required and 
 | M0 research/design | Product loop, local agent path, runner choice, recovery model, product workflow, knowledge boundary, experience architecture, and design-system strategy | [Execution plan](execution-plan.md), [decision register](decisions.md) |
 
 ## Latest handoff
+
+2026-09-23: **WORK-UX-01 built and agent-checked (DEC-041)** after the owner accepted prototype v2.
+- Work now has Board (batches per assignee; Queue, Backlog and Done), Roles, Agents and Routines. Items carry priority, blocking links and a review checklist.
+- Server tests pass 63/63. The layers and onboarding browser scripts pass. The migration was checked on a copy of the real database and three gaps were fixed.
+- Restart the portal to pick it up: existing projects migrate at start-up.
+- Limits: agents still run only acceptance, clarification options and contracts; there is no live token ticker; the agent reviewer's pre-check isn't built. [Evidence](evidence/work-ux-01-work-redesign.md).
+- Next: ROADMAP-01.
+
+2026-09-23: **WORK-UX-01 v2 for owner review.** The owner reviewed v1. Feedback is recorded as B1–B13 in the [work record](design/work-redesign/work-record.md#owner-review-of-v1-2026-09-23): per-action instructions and toolkit, one card everywhere, live agent runs, a review checklist, robot avatars per profile, priority and blocking. [v2](design/work-redesign/v2/index.html). Earlier the same day: **WORK-UX-01 prototype for owner review.** The owner asked in chat for a Work layer UI pass: items, per-assignee batches, Roles by layer, and flexible agent profiles. A preview comes first, before any code. [Work record and brief ledger](design/work-redesign/work-record.md) · [prototype v1](design/work-redesign/v1/index.html). No portal code has changed. Trial process change: multi-part chat briefs are itemised in a ledger ([operating procedure §1](design/process/operating-procedure.md#1-establish-the-task-and-improve-the-process)). ROADMAP-01 remains `next_action`.
 
 2026-09-23: **Bug found and fixed at closeout:** creating or building a project committed Aludel's own repository (four mislabeled commits, three already pushed; no GitHub push of Aludel to a project happened). Workspaces must now be their own repository. [Details](evidence/lay-04-work-automation.md#found-at-closeout-project-creation-committed-aludels-own-repository-fixed-2026-09-23).
 

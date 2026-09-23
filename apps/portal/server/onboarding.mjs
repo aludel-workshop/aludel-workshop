@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { aludelProjectId, requireMember } from './accounts.mjs';
 import { reservedSlugs, slugify } from './hosts.mjs';
 import { getProductWorkspace, saveProductRecord } from './product-workspace.mjs';
-import { loadAgentDefaults, loadStoryPacks } from './knowledge.mjs';
+import { loadAgentDefaults, loadRoles, loadStoryPacks } from './knowledge.mjs';
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const now = () => new Date().toISOString();
@@ -44,7 +44,8 @@ export function loadCatalogs(configDirectory) {
   }
   return { preferences: profiles.preferences, profiles: profiles.profiles, feels: starter.feels, features: starter.features, packs: loadStoryPacks(configDirectory), stacks,
     pageTypes: pages.types, routeIcons, defaultRoute: starter.defaultRoute, services: read('story-packs.json').services || {}, agentDefaults: loadAgentDefaults(configDirectory),
-    automation: profiles.automation, routines: read('routines.json').routines, agentProviders: loadAgentProviders(configDirectory) };
+    automation: profiles.automation, routines: read('routines.json').routines, agentProviders: loadAgentProviders(configDirectory),
+    roles: loadRoles(configDirectory, { routines: read('routines.json').routines, styles: Object.keys(profiles.profiles) }) };
 }
 
 export function initOnboarding(db) {

@@ -220,11 +220,12 @@ try {
   await page.waitForURL(`${portal}/p/tool-share`);
   await page.getByRole('heading', { name: 'Tool Share', level: 1 }).waitFor();
   await page.getByRole('navigation', { name: 'Layers' }).getByRole('link', { name: 'Work' }).click();
-  await page.getByRole('link', { name: 'Working style' }).click();
-  await page.getByRole('button', { name: 'Planner' }).click();
-  await page.getByText('Working style changed. Your individual preferences were kept.').waitFor();
-  await page.getByLabel('Who writes the code').selectOption('self');
-  await page.getByText('Preference saved.').waitFor();
+  // WORK-UX-01: the Dreamer style only preset who takes each action; it appears nowhere after onboarding.
+  await page.getByRole('navigation', { name: 'Work sections' }).getByRole('link', { name: 'Roles' }).click();
+  await page.getByRole('heading', { name: 'Product lead' }).waitFor();
+  assert.match(await page.locator('[id="action-product.define"]').innerText(), /Default agent/, 'a Dreamer hands acceptance to the default agent');
+  assert.match(await page.locator('[id="action-platform.configure"]').innerText(), /You/, 'anything that may cost money stays with the person');
+  assert.equal(await page.getByText(/Dreamer|Working style/).count(), 0, 'the style is not shown after onboarding');
   await check('project');
 
   await page.goto(`${portal}/#/the-machine/overview`);

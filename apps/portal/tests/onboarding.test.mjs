@@ -162,11 +162,16 @@ test('story status is derived from connected work, and work cannot close without
   assert.equal(status(), 'defined');
   assert.throws(() => know.update(id, story.id, { title: 'stale' }, { expectedRevision: 1 }), error => error.status === 409);
   const design = know.createWork(id, { layer: 'pages', type: 'design', title: 'Design the request page', targets: [{ id: story.id }] });
-  assert.throws(() => know.updateWork(ada, id, design.id, { state: 'done' }), /Name what this work documented/);
-  const implement = know.createWork(id, { layer: 'product', type: 'implement', title: 'Build the request', targets: [{ id: story.id }], documents: ['Product › story built'], question: { text: 'Dates or ASAP?', options: ['Dates', 'ASAP'] }, state: 'needs-input', assignee: { kind: 'agent', label: 'Coding agent' } });
+  // Every item carries its action's checks; a record-changing item still can't close until its target changed from it.
+  assert.ok(design.checks.length && design.action === 'pages.design');
+  assert.throws(() => know.updateWork(ada, id, design.id, { state: 'done' }), /has no change from W-1/);
+  const agent = know.defaultProfile(id);
+  const implement = know.createWork(id, { layer: 'product', type: 'implement', title: 'Build the request', targets: [{ id: story.id }], documents: ['Product › story built'], question: { text: 'Dates or ASAP?', options: ['Dates', 'ASAP'] }, state: 'needs-input', assignee: { kind: 'agent', id: agent.id } });
+  assert.throws(() => know.createWork(id, { layer: 'product', type: 'implement', title: 'x', assignee: { kind: 'agent', label: 'Coding agent' } }), error => error.status === 404);
+  // An answer lands in the story it changes, and that finishes the item.
   const answered = know.updateWork(ada, id, implement.id, { answer: 'Dates', rationale: 'Lenders plan ahead' });
-  assert.equal(answered.state, 'claimed'); assert.equal(answered.question.answeredBy, 'Ada');
-  know.updateWork(ada, id, implement.id, { state: 'done' });
+  assert.equal(answered.state, 'done'); assert.equal(answered.question.answeredBy, 'Ada');
+  assert.deepEqual(know.get(id, story.id).resolved.map(entry => entry.answer), ['Dates']);
   assert.equal(status(), 'built');
   assert.equal(implement.ref, 'W-2');
   const bob = createUser(db, { email: 'bob@example.com', name: 'Bob', password: 'correct-horse-battery' });

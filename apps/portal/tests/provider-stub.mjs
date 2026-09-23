@@ -1,6 +1,6 @@
 // A stand-in for the Anthropic and OpenAI APIs, so tests and browser scripts can connect an agent and run batches
-// without a real key, network or spending. Keys ending in "-good" work; "-limit" hits a spend limit on model calls;
-// anything else is rejected. Start: node tests/provider-stub.mjs <port>   (or import startProviderStub)
+// without a real key, network or spending. Keys ending in "-good" work; "-slow" work but answer after 1.5 s (to test
+// stopping); "-limit" hits a spend limit on model calls; anything else is rejected. Start: node tests/provider-stub.mjs <port>   (or import startProviderStub)
 import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
 
@@ -21,11 +21,22 @@ export function startProviderStub(port = 0) {
     request.on('end', () => {
       const key = request.headers['x-api-key'] || String(request.headers.authorization || '').replace(/^Bearer /, '');
       const input = body ? JSON.parse(body) : {};
+      request.body = input;
       calls.push({ method: request.method, url: request.url, body: input });
       const send = (status, value) => { response.writeHead(status, { 'content-type': 'application/json' }); response.end(JSON.stringify(value)); };
-      if (!key.endsWith('-good') && !key.endsWith('-limit')) return send(401, { type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key' } });
-      if (request.method === 'GET' && request.url.startsWith('/v1/models')) return send(200, { data: [{ id: 'stub-model' }] });
+      if (!['-good', '-slow', '-limit'].some(ending => key.endsWith(ending))) return send(401, { type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key' } });
+      // Model lists: Anthropic's shape (paginated, display names) when the anthropic-version header is sent, else OpenAI's.
+      if (request.method === 'GET' && request.url.startsWith('/v1/models')) {
+        if (request.headers['anthropic-version']) return send(200, { data: [{ type: 'model', id: 'claude-opus-5', display_name: 'Claude Opus 5', created_at: '2026-01-01T00:00:00Z' }, { type: 'model', id: 'claude-haiku-4-5', display_name: 'Claude Haiku 4.5', created_at: '2025-10-01T00:00:00Z' }], has_more: false, first_id: 'claude-opus-5', last_id: 'claude-haiku-4-5' });
+        return send(200, { object: 'list', data: ['gpt-6-astra', 'gpt-6-astra-mini', 'text-embedding-3-large', 'gpt-4o-realtime-preview', 'o4-mini'].map(id => ({ id, object: 'model', owned_by: 'openai' })) });
+      }
       if (key.endsWith('-limit')) return send(429, { type: 'error', error: { type: 'rate_limit_error', message: 'spend limit reached' } });
+      if (key.endsWith('-slow') && request.method === 'POST') { setTimeout(() => { if (!response.writableEnded && !response.destroyed) reply(); }, 1500); return; }
+      reply();
+    });
+    function reply() {
+      const input = request.body;
+      const send = (status, value) => { response.writeHead(status, { 'content-type': 'application/json' }); response.end(JSON.stringify(value)); };
       if (request.method === 'POST' && request.url === '/v1/responses') {
         const text = JSON.stringify(draftFor(input.text?.format?.schema));
         return send(200, { id: 'resp_stub', model: input.model, output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text }] }], usage: { input_tokens: 900, output_tokens: 150, total_tokens: 1050 } });
@@ -35,7 +46,7 @@ export function startProviderStub(port = 0) {
         return send(200, { id: 'msg_stub', type: 'message', role: 'assistant', model: input.model, content: [{ type: 'text', text }], stop_reason: 'end_turn', stop_sequence: null, usage: { input_tokens: 900, output_tokens: 150 } });
       }
       send(404, { error: { message: 'not found' } });
-    });
+    }
   });
   return new Promise(resolve => server.listen(port, '127.0.0.1', () => resolve({ server, calls, url: `http://127.0.0.1:${server.address().port}` })));
 }

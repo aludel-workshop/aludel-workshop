@@ -25,45 +25,66 @@ export interface Parameter { name: string; in: string; required: boolean; schema
 export interface DataOperation extends RecordBase { operationId: string; summary: string; method: string; path: string; objectId: string | null; parameters: Parameter[]; request: JsonSchema | null;
   response: { status: string; description: string; schema: JsonSchema | null }; errors: { status: string; description: string }[]; roles: string[]; stories: string[]; contract: string; pack: string | null; template: boolean; status: string; history: Revision[]; }
 export interface AccessRule extends RecordBase { role: string; objectId: string; action: string; effect: string; sentence: string; pack: string | null; }
-// Work › Agents (LAY-07C)
-export interface AgentProfile extends RecordBase { key: string | null; name: string; icon: string; role: string; workTypes: string[]; accountId: string | null; model: string; instructions: string; writes: string[]; approvalRequired: string[]; budget: number; history: Revision[]; }
-export interface InstructionPins { principles: { id: string; revision: number } | null; project: { id: string; revision: number } | null; role: { id: string; revision: number }; guidance: string; }
+// Work › Agents (WORK-UX-01): a profile is who does the work; what an action allows lives on the action.
+export interface ProfileLimits { itemOutput: number; batchTokens: number | null; monthlyTokens: number | null; }
+export interface AgentProfile extends RecordBase { key: string | null; name: string; description: string; avatar: { seed: string; color: string }; model: string; effort: string; instructions: string;
+  context: string[]; limits: ProfileLimits; active: boolean; history: Revision[]; }
+export interface Pin { id: string; revision: number; key?: string; }
+export interface InstructionPins { principles: Pin | null; project: Pin | null; role: Pin | null; action: Pin | null; profile: Pin | null; }
+// Work › Roles: one role per layer, and the actions it performs, each with its own setup.
+export interface Assignee { kind: 'person' | 'agent' | 'template'; id: string | null; label?: string; }
+export interface WorkAction { id: string; recordId: string | null; revision: number; name: string; description: string; type: string; routine: string | null; assignee: Assignee | null;
+  instructions: string; reads: string[]; changes: string[]; tools: string[]; asks: string; phases: string[]; checks: string[]; }
+export interface Role { id: string | null; layer: string; name: string; blurb: string; instructions: string; revision: number; actions: WorkAction[]; }
+export interface PersonAvatar { seed?: string; backgroundColor?: string; skinColor?: string; hair?: string; hairColor?: string; eyes?: string; mouth?: string; accessories?: string; accessoriesProbability?: number; }
+export interface Member { id: string; name: string; role: string; avatar: PersonAvatar | null; }
 // Code links (LAY-07D)
 export interface TraceLink { recordId: string; revision: number; currentRevision: number | null; kind: string; source: string; state: string; workRef: string | null; }
 export interface CodeUnit { id: string; path: string; symbol: string; kind: string; line: number; reachable: boolean; lastCommit: string | null; calls: string[]; calledBy: string[]; state: string; links: TraceLink[]; }
 export interface Service { key: string; label: string; icon: string; stories: string[]; }
 export interface WorkTarget { id: string; kind: string; label: string; }
-export interface WorkItem { id: string; number: number; ref: string; layer: string; type: string; title: string; state: string; assignee: { kind: string; label: string } | null; targets: WorkTarget[];
-  question: { text: string; options: string[]; answer?: string; rationale?: string; answeredBy?: string; applied?: string[]; recommendation?: string; reasoning?: string } | null; documents: string[]; log: { at: string; text: string }[]; createdAt: string; updatedAt: string;
+export type WorkStatus = 'backlog' | 'queued' | 'staged' | 'working' | 'needs' | 'review' | 'done';
+export interface WorkCheck { text: string; source: { id: string; revision?: number | null } | null; verdict: 'accept' | 'reject' | null; note: string; by?: string | null; at?: string | null; }
+export interface LogEntry { at: string; text: string; refs?: string[]; by?: { kind: string; id: string } | null; }
+export interface RunState { phases?: string[]; phase?: number; activity?: string; startedAt?: string; finishedAt?: string; model?: string; provider?: string; batch?: string; profileId?: string;
+  usage?: { input: number; output: number }; at?: string; done?: boolean; }
+export interface WorkItem { id: string; number: number; ref: string; layer: string; type: string; action: string | null; title: string; state: string; status: WorkStatus; priority: string;
+  assignee: Assignee | null; targets: WorkTarget[]; blocks: string[]; blockedBy: string[]; checks: WorkCheck[];
+  question: { text: string; options: string[]; answer?: string; rationale?: string; answeredBy?: string; applied?: string[]; recommendation?: string; reasoning?: string } | null; documents: string[]; log: LogEntry[]; createdAt: string; updatedAt: string;
   profileId: string | null; instructions: InstructionPins | null;
-  context: { reconcile?: { recordId: string; fromRevision: number; toRevision: number }; automation?: { mode: string }; routine?: string; suggestion?: string; batch?: string;
-    run?: { model: string; usage: { input: number; output: number }; at: string; provider: string } } | null; }
-// LAY-04: working style per work type, and routines.
-export interface AutomationPolicy { mode: 'you' | 'agent' | 'agent-review'; preference: string | null; profileId: string | null; }
+  context: { reconcile?: { recordId: string; fromRevision: number; toRevision: number }; routine?: string; suggestion?: string; batch?: string; staged?: boolean; skip?: boolean;
+    feedback?: { check: string; note: string; by: string; at: string }[]; run?: RunState } | null; }
+export interface FieldChange { field: string; before: unknown; after: unknown; }
+export interface WorkChange { recordId: string; revision: number; author: string; rationale: string | null; createdAt: string; kind: string | null; exists: boolean; fields: FieldChange[]; }
 export interface Routine extends RecordBase { key: string | null; title: string; layer: string; type: string; cadence: string; documents: string[]; enabled: boolean; nextRunAt: string | null; lastRunAt: string | null; lastWorkId: string | null; history: Revision[]; }
 export interface Knowledge {
   vision: Record<string, VisionSection>; personas: Persona[]; phases: Phase[]; activities: Activity[]; stories: Story[]; specs: Spec[];
   research: Research[]; docs: Doc[]; pages: Page[]; work: WorkItem[]; selectedPacks: string[];
   packs: Record<string, { label: string; summary: string; icon: string; stories: number; template: number }>;
   objects: DataObject[]; operations: DataOperation[]; access: AccessRule[]; services: Service[];
-  profiles: AgentProfile[]; projectInstructions: (RecordBase & { body: string }) | null; guidance: Record<string, string>; workTypes: string[];
+  profiles: AgentProfile[]; projectInstructions: (RecordBase & { body: string }) | null; workTypes: string[];
+  roles: Role[]; members: Member[];
   code: { indexedAt: string | null; units: CodeUnit[] };
-  suggestions: Suggestion[]; automation: Record<string, AutomationPolicy>; routines: Routine[];
-  agentPool: PoolEntry[]; batches: Batch[];
+  routines: Routine[]; batches: Batch[];
 }
-// DEC-040: what agents can take (best first) and the batches the owner starts.
-export interface PoolEntry { kind: 'item' | 'suggestion'; key: string; workId: string | null; title: string; type: string; layer: string; profileId: string | null; priority: number; }
-export interface Batch { id: string; number: number; ref: string; state: string; limit: number; createdAt: string; startedAt: string | null; finishedAt: string | null; startedBy: string | null; note: string | null; items: string[]; usage: { input: number; output: number }; }
+// Batches belong to one agent profile (WORK-UX-01); Go runs them.
+export interface Batch { id: string; number: number; ref: string; state: string; limit: number; profileId: string | null; createdAt: string; startedAt: string | null; finishedAt: string | null;
+  startedBy: string | null; note: string | null; items: string[]; usage: { input: number; output: number }; working: string | null; }
 export interface Catalog { pageTypes: Record<string, PageType>; routeIcons: string[]; feels: Record<string, { label: string; summary: string; navigation: string; font: string; radius: number; surface: string; surfaceDark: string }>;
-  preferences: Record<string, { label: string; values: Record<string, string> }>; profiles: Record<string, { label: string; summary: string }>;
-  stacks: { presets: Record<string, { label: string; layers?: Record<string, string> }> };
-  automation?: { workTypes: Record<string, { preference: string; modes: Record<string, string> }> }; }
-export interface Suggestion { key: string; layer: string; type: string; title: string; targets: WorkTarget[]; question?: { text: string; options: string[] }; documents: string[]; }
+  stacks: { presets: Record<string, { label: string; layers?: Record<string, string> }> }; tools: Record<string, string>; botColors: string[]; efforts: string[]; }
+// What a hover card shows for any referenced record (A3).
+export interface RefInfo { id: string; kind: string; kindLabel: string; icon: string; layer: string; label: string; title: string; status: string | null; note: string; facts: [string, string][]; where: string; href: string; }
 
 export const statusOrder = ['proposed', 'defined', 'designed', 'built', 'shipped'];
 export const statusLabel: Record<string, string> = { proposed: 'Proposed', defined: 'Defined', designed: 'Designed', built: 'Built', shipped: 'Shipped' };
-export const modeLabel: Record<string, string> = { you: 'You', agent: 'Agent', 'agent-review': 'Agent · you review' };
-export const stateLabel: Record<string, string> = { suggested: 'Suggested', ready: 'Ready', claimed: 'In progress', 'needs-input': 'Needs you', review: 'In review', done: 'Done' };
+export const stateLabel: Record<string, string> = { suggested: 'Backlog', ready: 'Queued', claimed: 'Working', 'needs-input': 'Needs you', review: 'Ready for review', done: 'Done' };
+export const workStatusLabel: Record<string, string> = { backlog: 'Backlog', queued: 'Queued', staged: 'Staged', working: 'Working', needs: 'Needs you', review: 'Ready for review', done: 'Done' };
+// Jira's five priorities, highest first.
+export const priorityOrder = ['highest', 'high', 'medium', 'low', 'lowest'];
+export const priorityLabel: Record<string, string> = { highest: 'Highest', high: 'High', medium: 'Medium', low: 'Low', lowest: 'Lowest' };
+// Icons chosen at runtime (record kinds, priorities), listed so tools/subset-icons.py keeps them in the font subset.
+export const runtimeIcons = [{ icon: 'bookmark' }, { icon: 'web' }, { icon: 'data_object' }, { icon: 'api' }, { icon: 'description' }, { icon: 'article' }, { icon: 'science' }, { icon: 'flag' }, { icon: 'shield_person' }, { icon: 'smart_toy' }, { icon: 'task_alt' }, { icon: 'menu_book' }, { icon: 'tune' }, { icon: 'code' }, { icon: 'keyboard_double_arrow_up' }, { icon: 'keyboard_arrow_up' }, { icon: 'drag_handle' }, { icon: 'keyboard_arrow_down' }, { icon: 'keyboard_double_arrow_down' }, { icon: 'lightbulb' }, { icon: 'palette' }, { icon: 'schema' }, { icon: 'dns' }, { icon: 'checklist' }];
+export const priorityIcon: Record<string, string> = { highest: 'keyboard_double_arrow_up', high: 'keyboard_arrow_up', medium: 'drag_handle', low: 'keyboard_arrow_down', lowest: 'keyboard_double_arrow_down' };
 export const layerLabel: Record<string, string> = { product: 'Product', design: 'Design', pages: 'Pages', data: 'Data', platform: 'Platform', work: 'Work' };
 export const dataStatusLabel: Record<string, string> = { proposed: 'Proposed', contracted: 'Contracted', built: 'Built', shipped: 'Shipped' };
 export const unitStateLabel: Record<string, string> = { healthy: 'Healthy', suspect: 'Suspect', untraced: 'Untraced', dead: 'Unused' };
@@ -87,6 +108,22 @@ export class ProjectContext {
   readonly operationById = computed(() => new Map((this.data()?.operations || []).map(operation => [operation.id, operation])));
   readonly profileById = computed(() => new Map((this.data()?.profiles || []).map(profile => [profile.id, profile])));
   readonly unitById = computed(() => new Map((this.data()?.code.units || []).map(unit => [unit.id, unit])));
+  readonly workById = computed(() => new Map((this.data()?.work || []).map(item => [item.id, item])));
+  readonly memberById = computed(() => new Map((this.data()?.members || []).map(member => [member.id, member])));
+  readonly actionById = computed(() => new Map((this.data()?.roles || []).flatMap(role => role.actions.map(action => [action.id, action] as [string, WorkAction]))));
+  readonly roleByLayer = computed(() => new Map((this.data()?.roles || []).map(role => [role.layer, role])));
+  readonly me = computed(() => this.session()?.user?.id || '');
+  readonly agentReady = computed(() => { const connection = this.setup()?.agentConnection; return Boolean(connection && connection.status !== 'rejected' && !connection.retired); });
+  // A clock the Work pages read for live elapsed times; ticks only while something is running.
+  readonly now = signal(Date.now());
+  // The board's assignee filter: set from an assignee chip or a profile's "its work" link, kept while moving around Work.
+  readonly boardFilter = signal<string | null>(null);
+  whoName(assignee: Assignee | null | undefined) {
+    if (!assignee) return 'Nobody';
+    if (assignee.kind === 'person') return assignee.id === this.me() ? 'You' : this.memberById().get(assignee.id || '')?.name || assignee.label || 'Someone';
+    if (assignee.kind === 'agent') return this.profileById().get(assignee.id || '')?.name || assignee.label || 'Agent';
+    return assignee.label || 'Aludel template';
+  }
   // "Built by" for any record: code units and tests linked to it, and whether any link is suspect (LAY-07D).
   readonly builtBy = computed(() => {
     const summary = new Map<string, { units: number; tests: number; suspect: boolean }>();
@@ -107,7 +144,59 @@ export class ProjectContext {
     if (kind === 'data_object') return this.link('data', 'objects', id);
     if (kind === 'data_operation') return this.link('data', 'api', id);
     if (kind === 'agent_profile') return this.link('work', 'agents', id);
+    if (kind === 'work_item') return this.link('work', 'item', id);
+    if (kind === 'role' || kind === 'work_action') return this.link('work', 'roles', id);
+    if (kind === 'project_instructions') return this.link('work', 'agents');
+    if (kind === 'doc') return this.link('product', 'docs', id);
+    if (kind === 'research') return this.link('product', 'research');
+    if (kind === 'vision_section' || kind === 'persona') return this.link('product', 'vision');
+    if (kind === 'access_rule') return this.link('data', 'access');
+    if (kind === 'code_unit') return this.link('platform', 'code', id);
     return this.link('product', 'map', id);
+  }
+
+  // Everything a hover card shows about a referenced record, or null for an id that isn't in this project (A3).
+  refInfo(id: string): RefInfo | null {
+    const data = this.data(); if (!data || !id) return null;
+    const info = (kind: string, kindLabel: string, icon: string, layer: string, label: string, title: string, rest: Partial<RefInfo> = {}): RefInfo =>
+      ({ id, kind, kindLabel, icon, layer, label, title, status: null, note: '', facts: [], where: `${layerLabel[layer]}`, href: this.recordHref(kind, id), ...rest });
+    const story = this.storyById().get(id);
+    if (story) return info('story', 'Story', 'bookmark', 'product', `${story.ref} ${story.title}`, story.title, { status: statusLabel[story.status], where: 'Product › Story map',
+      note: story.acceptance[0] ? `Given ${story.acceptance[0].given}, when ${story.acceptance[0].when}, then ${story.acceptance[0].then}.` : 'No acceptance yet.',
+      facts: [['Phase', phaseName(story.phase)], ['Revision', String(story.revision)], ['Pages', story.pages.map(page => this.pageById().get(page)?.label).filter(Boolean).join(', ') || '—']] });
+    const page = this.pageById().get(id);
+    if (page) return info('page', 'Page', 'web', 'pages', `${page.label} page`, page.label, { status: page.status, where: 'Pages', note: page.description,
+      facts: [['Type', this.catalog()?.pageTypes[page.pageType]?.label || page.pageType], ['Stories', page.stories.map(story => this.storyById().get(story)?.ref).filter(Boolean).join(', ') || '—']] });
+    const object = this.objectById().get(id);
+    if (object) return info('data_object', 'Object', 'data_object', 'data', `${object.name} object`, object.name, { status: dataStatusLabel[object.status], where: 'Data › Objects', note: object.description,
+      facts: [['Fields', Object.keys(object.schema.properties || {}).join(', ') || 'none yet'], ['Contract', object.contract]] });
+    const operation = this.operationById().get(id);
+    if (operation) return info('data_operation', 'Operation', 'api', 'data', `${operation.method} ${operation.path}`, operation.operationId, { status: dataStatusLabel[operation.status], where: 'Data › API', note: operation.summary });
+    const spec = data.specs.find(entry => entry.id === id);
+    if (spec) return info('spec', 'Spec', 'description', 'product', `${spec.ref} ${spec.title}`, spec.title, { status: spec.status, where: 'Product › Specs', note: spec.problem.slice(0, 240),
+      facts: [['Stories', spec.stories.map(story => this.storyById().get(story)?.ref).filter(Boolean).join(', ') || '—'], ['Appetite', spec.appetite || '—']] });
+    const doc = data.docs.find(entry => entry.id === id);
+    if (doc) return info('doc', 'Doc', 'article', 'product', doc.title, doc.title, { where: 'Product › Docs', note: doc.body.slice(0, 200) });
+    const research = data.research.find(entry => entry.id === id);
+    if (research) return info('research', 'Research', 'science', 'product', research.title, research.title, { where: 'Product › Research', note: research.body.slice(0, 200) });
+    const vision = Object.values(data.vision).find(entry => entry.id === id);
+    if (vision) return info('vision_section', 'Vision', 'flag', 'product', vision.title, vision.title, { where: 'Product › Vision', note: [vision.body, ...vision.items].filter(Boolean).join(' · ').slice(0, 240) });
+    const rule = data.access.find(entry => entry.id === id);
+    if (rule) return info('access_rule', 'Access rule', 'shield_person', 'data', rule.sentence, rule.sentence, { where: 'Data › Access', facts: [['Role', rule.role], ['Action', rule.action], ['Effect', rule.effect]] });
+    const profile = this.profileById().get(id);
+    if (profile) return info('agent_profile', 'Agent profile', 'smart_toy', 'work', profile.name, profile.name, { status: profile.active ? null : 'Deactivated', where: 'Work › Agents', note: profile.description,
+      facts: [['Model', profile.model || 'Account default'], ['Effort', profile.effort], ['Revision', String(profile.revision)]] });
+    const work = this.workById().get(id);
+    if (work) return info('work_item', 'Work item', 'task_alt', 'work', `${work.ref} ${work.title}`, work.title, { status: workStatusLabel[work.status], where: 'Work',
+      facts: [['Priority', priorityLabel[work.priority]], ['Assignee', this.whoName(work.assignee)], ...(work.blockedBy.length ? [['Blocked by', work.blockedBy.map(other => this.workById().get(other)?.ref).join(', ')] as [string, string]] : [])] });
+    const role = data.roles.find(entry => entry.id === id);
+    if (role) return info('role', 'Role instructions', 'menu_book', 'work', `${role.name} instructions`, `${role.name} instructions`, { where: 'Work › Roles', note: role.instructions, facts: [['Revision', String(role.revision)]] });
+    const action = data.roles.flatMap(entry => entry.actions).find(entry => entry.recordId === id);
+    if (action) return info('work_action', 'Action', 'tune', 'work', action.name, action.name, { where: 'Work › Roles', note: action.instructions || action.description, href: this.link('work', 'roles', action.id), facts: [['Revision', String(action.revision)]] });
+    if (data.projectInstructions?.id === id) return info('project_instructions', 'Project instructions', 'menu_book', 'work', 'Project instructions', 'Project instructions', { where: 'Work › Agents', note: data.projectInstructions.body.slice(0, 240) });
+    const unit = this.unitById().get(id);
+    if (unit) return info('code_unit', 'Code unit', 'code', 'platform', unit.symbol, unit.symbol, { status: unitStateLabel[unit.state], where: 'Platform › Code', facts: [['Path', unit.path], ['Kind', unit.kind]] });
+    return null;
   }
   recordLabel(id: string): [string, string, string] {
     const story = this.storyById().get(id); if (story) return [`${story.ref} ${story.title}`, this.recordHref('story', id), 'product'];
@@ -117,9 +206,6 @@ export class ProjectContext {
     const spec = this.data()?.specs.find(entry => entry.id === id); if (spec) return [`${spec.ref} ${spec.title}`, this.recordHref('spec', id), 'product'];
     return [id, this.link(), 'work'];
   }
-
-  // Gaps each layer knows about (computed on the server since LAY-04, so working style can stage them automatically).
-  readonly suggestions = computed<Suggestion[]>(() => this.data()?.suggestions || []);
 
   // LAY-04A: following a work item's target makes later edits to its targets count as that item's output.
   readonly workingOn = signal<{ id: string; ref: string; title: string; targets: string[] } | null>(null);
@@ -164,9 +250,6 @@ export class ProjectContext {
     return this.api(`/api/projects/${encodeURIComponent(this.projectId())}/records/${encodeURIComponent(id)}`, 'PUT', { data, expectedRevision, rationale: rationale || null, workItemId: this.workFor(id) });
   }
   delete(id: string) { return this.api(`/api/projects/${encodeURIComponent(this.projectId())}/records/${encodeURIComponent(id)}`, 'DELETE'); }
-  stage(suggestion: Suggestion, state: 'ready' | 'suggested' = 'ready') {
-    return this.api<WorkItem>(`/api/projects/${encodeURIComponent(this.projectId())}/work`, 'POST', { layer: suggestion.layer, type: suggestion.type, title: suggestion.title, targets: suggestion.targets, documents: suggestion.documents, question: suggestion.question, suggestion: suggestion.key, state });
-  }
   updateWork(id: string, body: unknown) { return this.api<WorkItem>(`/api/projects/${encodeURIComponent(this.projectId())}/work/${encodeURIComponent(id)}`, 'PUT', body); }
 }
 

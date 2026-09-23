@@ -1,34 +1,11 @@
 {
-  "schemaVersion": 1,
-  "note": "Default agent profiles seeded into every project's Work › Agents (DEC-038). Each work type goes to exactly one profile; working style can move it. Budgets start at 0 and nothing here calls a provider (DEC-004; provider calls arrive in LAY-04 with the owner's OK).",
+  "schemaVersion": 2,
+  "note": "WORK-UX-01: every project starts with one Default agent profile; people add others with their own model, effort, context and usage limits. What an action allows (tools, what it may change, what it asks first) lives on the action in config/roles.json, not on the profile. The five role profiles from DEC-038 are migrated: their layer's role takes any instructions the owner edited, and the old profile is deactivated. Nothing here calls a provider (DEC-004).",
   "projectInstructions": "Keep to the principles in Product › Vision. Answers and decisions land as revisions of the records they change, with a reason. Ask before anything that costs money, uses an external account or deploys.",
-  "profiles": [
-    { "key": "product-lead", "name": "Product lead", "icon": "lightbulb", "role": "Shapes what to build and why: stories, acceptance and specs.",
-      "workTypes": ["define", "spec", "research"], "writes": ["product"], "approvalRequired": ["Changing the vision or a phase"],
-      "instructions": "Write stories as \"Someone can …\" with Given/When/Then acceptance. Group related stories into specs with numbered requirements. Ask only questions whose answers change what gets built." },
-    { "key": "design-lead", "name": "Design lead", "icon": "palette", "role": "Applies the design system to pages and flows.",
-      "workTypes": ["design"], "writes": ["design", "pages"], "approvalRequired": ["Changing design tokens"],
-      "instructions": "Design from the stories a page realises. Use the project's tokens and components; propose new components rather than one-off styles. Offer options only when they differ in ways the owner cares about." },
-    { "key": "architect", "name": "Architect", "icon": "schema", "role": "Turns accepted specs into Data contracts and technical plans, and keeps the stack binding in Platform.",
-      "workTypes": ["plan", "configure"], "writes": ["data", "platform"], "approvalRequired": ["New runtime services", "Anything that costs money"],
-      "instructions": "Nothing above Platform names the stack. Write objects as JSON Schema 2020-12 and operations in OpenAPI 3.1 shape; put table, handler and service choices in Platform › Architecture." },
-    { "key": "coding-agent", "name": "Coding agent", "icon": "code", "role": "Implements and reconciles code against stories and contracts, one story per build.",
-      "workTypes": ["implement", "reconcile"], "writes": ["platform", "work"], "approvalRequired": ["Deleting data", "Changing access rules"],
-      "instructions": "Implement against the story's acceptance and the Data contract. Commit with the trailers Aludel-Work and Implements. Name tests after the acceptance they check (\"S4 · Given …\"). No tags in the code." },
-    { "key": "reviewer", "name": "Reviewer", "icon": "fact_check", "role": "Checks builds against acceptance, access rules and principles before they reach you.",
-      "workTypes": ["review", "audit"], "writes": ["work"], "approvalRequired": [],
-      "instructions": "Check each acceptance scenario and access rule against the preview. Report what failed with steps to reproduce; do not fix it yourself." }
-  ],
-  "guidance": {
-    "define": "Clarify the story until each acceptance scenario can be checked.",
-    "spec": "Cover an increment of related stories: problem, appetite, solution sketch, rabbit holes, no-gos, requirements.",
-    "plan": "Write or revise the Data contracts first, then the Platform binding.",
-    "design": "Mark the page designed only when every linked story has a place on it.",
-    "implement": "One story per build; the preview must pass its acceptance.",
-    "reconcile": "Classify each linked unit as create, modify or remove against the new revision, then relink.",
-    "review": "Accept or ask for changes with reasons tied to acceptance.",
-    "research": "Record sources and what they support.",
-    "audit": "List findings with severity and the record each one concerns.",
-    "configure": "Name the effect, its cost and whether it can be undone before asking."
-  }
+  "defaultProfile": {
+    "key": "default", "name": "Default agent", "description": "Reads the project, role and action instructions, nothing more.",
+    "avatar": { "seed": "aludel-default-agent", "color": "#4b6ea8" }, "model": "", "effort": "medium", "instructions": "", "context": [],
+    "limits": { "itemOutput": 8000, "batchTokens": 200000, "monthlyTokens": 2000000 }
+  },
+  "legacyRoles": { "product-lead": "product", "design-lead": "pages", "architect": "data", "coding-agent": "platform", "reviewer": "work" }
 }

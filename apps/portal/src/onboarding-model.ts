@@ -1,4 +1,4 @@
-export interface SessionUser { id: string; email: string | null; name: string; owner: boolean; }
+export interface SessionUser { id: string; email: string | null; name: string; owner: boolean; avatar?: Record<string, string | number> | null; }
 export interface ProjectSummary { id: string; slug: string; name: string; description: string; accent_color: string; role: string; updated_at: string; }
 export interface Draft { profile: string | null; name: string; pitch: string; claimedProjectId: string | null; }
 export interface Session { authenticated: boolean; user: SessionUser | null; setupRequired: boolean; aludelMember: boolean; githubSignIn: boolean; projects: ProjectSummary[]; draft: Draft | null; }

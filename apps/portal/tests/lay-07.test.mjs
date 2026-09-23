@@ -107,40 +107,49 @@ test('LAY-07A: unselecting a pack removes its untouched Data records only', () =
   assert.deepEqual(names, ['Account', 'Conversation', 'Session'], 'the edited Conversation stays; the untouched Message goes');
 });
 
-test('LAY-07C: default profiles route every work type once; assigning an agent pins the profile and instruction revisions', () => {
-  const { know, ada, id } = fixture();
+test('LAY-07C (as revised by WORK-UX-01): one default agent; profiles hold model, effort, context and limits; DEC-038 role profiles migrate', () => {
+  const { db, know, ada, id } = fixture();
   const profiles = know.list(id, 'agent_profile');
-  assert.deepEqual(profiles.map(profile => profile.name), ['Product lead', 'Design lead', 'Architect', 'Coding agent', 'Reviewer']);
-  assert.ok(profiles.every(profile => profile.budget === 0 && profile.accountId === 'project-agent'));
-  const routed = profiles.flatMap(profile => profile.workTypes).sort();
-  assert.deepEqual(routed, [...new Set(routed)], 'no work type goes to two profiles');
+  assert.deepEqual(profiles.map(profile => profile.name), ['Default agent']);
+  const agent = profiles[0];
+  assert.deepEqual(agent.limits, { itemOutput: 8000, batchTokens: 200000, monthlyTokens: 2000000 });
+  assert.equal(agent.effort, 'medium'); assert.equal(agent.active, true);
   assert.ok(know.list(id, 'project_instructions')[0].body.includes('principles'));
-  assert.throws(() => know.insert(id, 'agent_profile', { name: 'Spender', budget: -1 }), /zero or more/);
-  assert.throws(() => know.insert(id, 'agent_profile', { name: 'Odd', workTypes: ['dance'] }), /Unknown work type/);
+  assert.throws(() => know.insert(id, 'agent_profile', { name: 'Spender', limits: { batchTokens: -1 } }), /whole number/);
+  assert.throws(() => know.insert(id, 'agent_profile', { name: 'Odd', effort: 'maximum' }), /Choose an effort/);
+  const careful = know.insert(id, 'agent_profile', { name: 'Careful architect', effort: 'high', avatar: { seed: 'careful', color: '#a8703a' }, context: [know.list(id, 'story')[0].id], limits: { monthlyTokens: null } }, { rationale: 'For contracts' });
+  assert.equal(careful.limits.monthlyTokens, null, 'no monthly cap is allowed');
+  assert.equal(careful.avatar.color, '#a8703a');
+  assert.equal(know.insert(id, 'agent_profile', { name: 'Odd colour', avatar: { color: '#123456' } }).avatar.color, '#4b6ea8', 'only the metal tones');
 
-  const reviewer = profiles.find(profile => profile.name === 'Reviewer');
-  know.routeWorkType(id, 'design', reviewer.id, 'Ada');
-  const after = know.list(id, 'agent_profile');
-  assert.ok(!after.find(profile => profile.name === 'Design lead').workTypes.includes('design'));
-  assert.ok(after.find(profile => profile.name === 'Reviewer').workTypes.includes('design'));
-  assert.equal(know.history(reviewer.id)[0].rationale, 'Takes design work');
+  // Instructions are pinned in order: principles, project, role, action, profile.
+  const pins = know.instructionPins(id, careful, 'data.contract');
+  assert.equal(pins.action.key, 'data.contract');
+  assert.equal(pins.role.id, know.list(id, 'role').find(role => role.layer === 'data').id);
+  assert.deepEqual(pins.profile, { id: careful.id, revision: 1 });
+  // Deactivated profiles take no new work.
+  know.update(id, careful.id, { active: false }, { rationale: 'Paused' });
+  const story = know.list(id, 'story')[0];
+  assert.throws(() => know.createWork(id, { layer: 'product', type: 'define', title: 'x', targets: [{ id: story.id }], assignee: { kind: 'agent', id: careful.id } }), /deactivated/);
 
-  const story = know.list(id, 'story').find(entry => entry.title.startsWith('Someone can start a conversation'));
-  const work = know.createWork(id, { layer: 'product', type: 'define', title: 'Write acceptance', targets: [{ id: story.id, label: story.title }], documents: ['Product › story'] });
-  const assigned = know.updateWork(ada, id, work.id, { assignee: { kind: 'agent' } });
-  const productLead = after.find(profile => profile.name === 'Product lead');
-  assert.equal(assigned.profileId, productLead.id, 'working style picks the profile for the work type');
-  assert.equal(assigned.assignee.label, 'Product lead');
-  assert.deepEqual(assigned.instructions.role, { id: productLead.id, revision: productLead.revision });
-  assert.equal(assigned.instructions.project.revision, 1);
-  assert.equal(assigned.instructions.guidance, 'define');
-  const person = know.updateWork(ada, id, work.id, { assignee: { kind: 'person' } });
-  assert.equal(person.profileId, null);
+  // A project from before WORK-UX-01: its edited Product lead instructions move to the Product role, and it is deactivated.
+  const created = new Date().toISOString();
+  const legacy = { key: 'product-lead', name: 'Product lead', icon: 'lightbulb', role: 'Shapes what to build.', workTypes: ['define'], accountId: 'project-agent', model: '', instructions: 'Always name the persona.', writes: ['product'], approvalRequired: [], budget: 0 };
+  db.prepare("INSERT INTO knowledge_records(id, project_id, kind, parent_id, position, data_json, revision, created_at, updated_at) VALUES ('agt-legacy01', ?, 'agent_profile', NULL, 9, ?, 2, ?, ?)").run(id, JSON.stringify(legacy), created, created);
+  const held = know.createWork(id, { layer: 'product', type: 'define', title: 'Held', targets: [{ id: story.id }] });
+  db.prepare("UPDATE layer_work_items SET assignee_kind = 'agent', assignee_label = 'Product lead', profile_id = 'agt-legacy01', assignee_id = 'agt-legacy01' WHERE id = ?").run(held.id);
+  know.ensureAgents(id);
+  assert.equal(know.get(id, 'agt-legacy01').active, false);
+  assert.equal(know.get(id, 'agt-legacy01').workTypes, undefined, 'the old routing fields are gone');
+  assert.equal(know.list(id, 'role').find(role => role.layer === 'product').instructions, 'Always name the persona.');
+  assert.equal(know.workList(id).find(item => item.id === held.id).assignee.id, agent.id, 'open work moves to the default agent');
 
   const guide = agentsGuide({ ...{ project: { name: 'Tool Share' }, profile: 'planner', preferences: {}, stack: { preset: 'aludel-web-v1' } }, agents: know.agentExport(id) }, catalogs);
   assert.match(guide, /## Project instructions/);
-  assert.match(guide, /### Coding agent/);
+  assert.match(guide, /### Engineer \(platform\)/);
+  assert.match(guide, /#### Build stories/);
   assert.match(guide, /Aludel-Work: W-12/);
+  assert.doesNotMatch(guide, /Working style/);
 });
 
 test('LAY-07D: the index reads units, references and reachability from a generated skeleton', () => {

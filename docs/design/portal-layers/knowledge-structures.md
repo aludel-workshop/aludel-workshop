@@ -2,7 +2,7 @@
 id: portal-layers-knowledge-structures
 kind: domain-model-proposal
 status: proposed
-updated: 2026-09-22
+updated: 2026-09-23
 depends_on: [portal-layers-model, portal-layers-knowledge-research, portal-layers-data-platform-research]
 ---
 
@@ -214,6 +214,26 @@ A work item records the profile and instruction revisions it ran with. Default p
 - Each work type, including the new `reconcile`, goes to exactly one profile. Working style moves a type as a revision of both profiles.
 - Every profile uses the project's single agent connection (DEC-034).
 - Assignment pins the revisions of the principles, project instructions and role, plus the work-type guidance key. LAY-04 re-pins when a run actually starts.
+
+**As revised by WORK-UX-01 (DEC-041).** This supersedes the tab table, the profile shape and the working-style rows above; they are kept as history.
+
+- **Roles and actions** (`apps/portal/config/roles.json`; kinds `role` and `work_action`, both revisioned). There is one role per layer (Product lead, Design lead, Experience designer, Data architect, Engineer, Reviewer) with its own instructions.
+  - Each action (`<layer>.<key>`, for example `product.define` or `data.contract`) has: a work type; a default assignee (a person or an agent profile); instructions; records it always reads; what it may change; tools; what it asks first; run phases; and the checks its work is reviewed against.
+  - The onboarding style only presets the assignees (`roles.json › presets`).
+- **Agent profile** (`agent_profile`): name, description, avatar (seed and metal tone; DiceBear Bottts Neutral), model (listed from the connected account), effort (low, medium or high), its own instructions, context records, and usage limits:
+  - output tokens per item;
+  - tokens per batch run;
+  - tokens per month.
+
+  A profile is also active or deactivated. The five DEC-038 profiles are migrated: they are deactivated, and any instructions the owner edited move to their layer's role.
+- **Instructions are layered:** principles, project, role, action, profile. The revisions are pinned when a run starts.
+- **Work item** adds: an action; an assignee by id (user or profile); a priority (highest, high, medium, low or lowest); `blocks` (links to other items, with no cycles; "is blocked by" is derived); and checks (text, a source record and its revision, a verdict with a note).
+  - Status shown to people: backlog (suggested), queued (ready), staged (in an agent's batch or a person's list), working, needs you, review, done.
+  - Items keep `context.feedback` from a send-back, and `context.run` for phases and usage.
+- **Gaps** each layer finds become backlog items immediately, assigned by their action. A gap filled some other way closes its item.
+- **Batches:** one per agent profile; Go runs it. Items stay in the batch until cleared. Agent results always come back for review.
+- **Tabs:** Board (batches, then Queue, Backlog and Done), Roles, Agents, Routines. `/work/style` and `/work/queue` redirect.
+- [Work record](../work-redesign/work-record.md) · [evidence](../../evidence/work-ux-01-work-redesign.md).
 
 ## Onboarding against these structures
 

@@ -2,7 +2,7 @@
 id: decisions-001
 kind: decision-register
 status: active
-updated: 2026-09-22
+updated: 2026-09-23
 ---
 
 # Decision inbox
@@ -10,6 +10,16 @@ updated: 2026-09-22
 This is the seed of the portal's decision workflow. Confirmed owner answers and proposed defaults are distinct. No unanswered question silently becomes an owner decision.
 
 ## Confirmed
+
+2026-09-23 — **DEC-041: Work is organised by roles and actions, with a batch per assignee; working style only presets who takes each action.** The owner reviewed prototypes v1 and v2 of WORK-UX-01 and then authorized the build: "i back you for these changes … get started". Recorded per ask in [the work record](design/work-redesign/work-record.md).
+- **Roles and actions:** one role per layer. Each action carries who takes it (a person or an agent profile), its instructions, what it always reads, what it may change, its tools, what it asks first, its run phases and its review checks. The exact tools and permissions are a first cut: "more thought to be done in the future".
+- **Working style:** the onboarding choice (Dreamer, Planner, Tinkerer) only presets action assignees. It is not shown or used anywhere else. The preferences table and the routing by work type are gone.
+- **Agent profiles:** a profile is who does the work: a robot avatar, a model from the connected account, an effort level, its own instructions and context, usage limits, and active or not. Five role profiles from DEC-038 are deactivated, and any instructions the owner had edited move to their layer's role.
+- **Backlog:** gaps the layers find become ordinary backlog items straight away. A gap filled some other way closes its item. **Supersedes** DEC-040's "nothing is opened until batched" and its available-for-agents pool.
+- **Batches:** one per agent profile, plus each person's own list. Go runs an agent's batch and locks its items (skip a waiting item, stop the working one). Agent results always wait in their batch as *ready for review* until someone clears them. DEC-040's review mode and no-review mode merge.
+- **Review:** each item's checks are its review checklist, and each check is reviewed against the record revision the draft made. Accepting needs every check accepted. Sending back needs a rejected check with a note, and the notes go to the next run.
+- **Priority and blocking:** Jira's five priorities and "blocks / is blocked by" links. A blocked item can't be staged.
+- **Unchanged:** Go remains the owner's authorization to spend (DEC-004, DEC-005). Agents still run only acceptance, clarification options and data contracts until LAY-05.
 
 2026-09-23 — **DEC-040: agents run only in batches the owner starts; working style marks work as available for agents instead of opening items.** Owner, after connecting an OpenAI key: "lets go ahead and link it up. i think that for all of those work itms, its a little much to have just 22+ tasks open for agents as soon as the api key lands, could be hundreds … click the buttons on a couple to add them to agent run batch, then click go on that to lock them all for the agents and tell them to go? maybe some kind of button on the batch container to grab the next 10 highest priority marked available for agents?"
 - **The pool:** gaps whose work type the working style hands to agents are listed as available for agents, by priority. Untouched items staged by LAY-04B return to that pool.

@@ -2,7 +2,7 @@
 id: portal-layers-implementation-plan
 kind: implementation-plan
 status: active
-updated: 2026-09-22
+updated: 2026-09-23
 depends_on: [portal-layers-model, portal-layers-knowledge-structures, portal-layers-data-platform-research]
 ---
 
@@ -121,11 +121,22 @@ PLAYWRIGHT_MODULE=<path to playwright/index.mjs> tools/browser-checks.sh        
 
 Playwright is not a portal dependency. Install it anywhere (`npm i playwright`, then `npx playwright install chromium-headless-shell`) and point `PLAYWRIGHT_MODULE` at its `index.mjs`. `tests/browser-support.mjs` resolves `*.localhost` to loopback for the test process, because Node's resolver does not on every machine. Known pre-existing failure: `tests/browser.mjs` fails on the baseline commit too (decision-conflict step).
 
+Before handing off UI work:
+- Run `node tools/css-collisions.mjs "<your section's marker>"`. `lay-` prefixes don't stop collisions between layers; WORK-UX-01 hit five.
+- Give list grids `grid-template-columns: minmax(0, 1fr)` so they shrink at 390px.
+
+Before handing off a start-up migration, run it against a **copy** of `.data/machine.sqlite` (with its `-wal` and `-shm` files) under `MACHINE_DATA_DIR`, and inspect the result read-only.
+
 New `<mat-icon>` names need the font subset rebuilt: `python3 tools/subset-icons.py` needs fontTools (`pip install fonttools brotli`, a venv is fine). If `templates/aludel-web-v1/icons.ttf` changes while its icon list did not, restore it with `git checkout`, because a different fontTools version only re-encodes it. Icons chosen at runtime must appear somewhere as `icon: '…'` so the tool finds them.
 
 ## Current state
 
 Newest first.
+
+- **2026-09-23: WORK-UX-01, the Work layer redesign, built and agent-checked** ([work record](../work-redesign/work-record.md), [evidence](../../evidence/work-ux-01-work-redesign.md), DEC-041).
+  - Roles and actions replace working style. Agent profiles are who does the work; batches are per assignee; a review checklist; priority and blocking; avatars.
+  - Entry points: `config/roles.json`; in `server/knowledge.mjs`, `ensureRoles`, `roleView`, `syncBacklog`, `migrateWork` and `updateWork` (verdicts, send back, blocks); in `server/agent-runs.mjs`, `stage`, `skip`, `stopItem`, `reassign`, the usage limits and `runnableActions`; `src/layers/work-*.ts`; `src/avatars.ts`.
+  - **Next: ROADMAP-01.** LAY-05 adds runnable actions to `runnableActions` and must enforce each action's "may change" and tools.
 
 - **2026-09-23: LAY-04A–C done and agent-checked** ([evidence](../../evidence/lay-04-work-automation.md)).
   - Built: verified closing, applied answers, server-side suggestions, working-style automation and routines. The interim `/projects/<id>` page now redirects.

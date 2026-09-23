@@ -2,10 +2,10 @@ import { initWorkflow, workList, workOperation } from './workflow.mjs';
 import { createServer } from 'node:http';
 import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
-import { aludelProjectId, createExternalUser, createLoginTicket, createSession, createUser, endSession, getUser, redeemLoginTicket, initAccounts, isMember, ownerUserId, requireMember, sessionUser, userProjects, verifyUser } from './accounts.mjs';
+import { aludelProjectId, createExternalUser, createLoginTicket, createSession, createUser, endSession, getUser, redeemLoginTicket, initAccounts, isMember, ownerUserId, requireMember, saveAvatar, sessionUser, userProjects, verifyUser } from './accounts.mjs';
 import { hostTopology } from './hosts.mjs';
 import { initOnboarding, loadCatalogs, onboarding } from './onboarding.mjs';
-import { initKnowledge, knowledge } from './knowledge.mjs';
+import { botColors, efforts, initKnowledge, knowledge } from './knowledge.mjs';
 import { previewManager } from './previews.mjs';
 import { agentsGuide, copyMedia, initialFiles, loadScaffoldSources, skeletonFiles, writeBinaries, writeFiles } from './scaffold.mjs';
 import { codeLinks, initCodeLinks, workspaceIsIndexable } from './code-links.mjs';
@@ -73,16 +73,16 @@ for (const projectId of layerProjects()) {
   know.ensureAgents(projectId);
   know.ensurePackData(projectId);
   know.ensureRoutines(projectId);
-  // DEC-040: items LAY-04B opened for agents that nobody touched go back to the pool.
-  know.returnStagedToPool(projectId);
+  // WORK-UX-01: roles and actions replace working style; existing items get actions, priorities, checks and assignee ids.
+  know.migrateWork(projectId);
 }
 const links = codeLinks({ db, know });
 const ops = platformOps({ db, backupRoot: join(dataDirectory, 'backups') });
 const runs = agentRuns({ db, know, secrets, providers: catalogs.agentProviders.providers });
-// LAY-04: routines that are due create work, and working style stages what it automates. At start-up, then every ten minutes.
+// LAY-04: routines that are due create work, and each layer's gaps become backlog items (DEC-041). At start-up, then every ten minutes.
 function tickRoutines() {
   for (const projectId of layerProjects()) {
-    try { know.runRoutines(projectId); know.automate(projectId); } catch (error) { console.error(`Routines for ${projectId}: ${error.message}`); }
+    try { know.runRoutines(projectId); know.syncBacklog(projectId); } catch (error) { console.error(`Routines for ${projectId}: ${error.message}`); }
   }
 }
 tickRoutines();
@@ -219,6 +219,11 @@ async function api(request, response, url) {
     projects: user ? userProjects(db, user.id) : [],
     draft: flows.getDraft(cookie(request).aludel_draft)
   });
+  // WORK-UX-01: each person's avatar (DiceBear Big Smile options), shown wherever work is assigned to them.
+  if (url.pathname === '/api/account/avatar' && request.method === 'PUT') {
+    if (!user) return json(response, 401, { error: 'Sign in to continue.' });
+    return json(response, 200, { user: saveAvatar(db, user.id, (await readJson(request)).avatar ?? null) });
+  }
   if (url.pathname === '/api/onboarding/catalog' && request.method === 'GET') return json(response, 200, flows.catalog());
   if (url.pathname === '/api/onboarding/draft' && request.method === 'GET') return json(response, 200, { draft: flows.getDraft(cookie(request).aludel_draft) });
   if (url.pathname === '/api/onboarding/draft' && request.method === 'PUT') {
@@ -321,23 +326,23 @@ async function api(request, response, url) {
     return json(response, 201, { project: setup.project }, { 'set-cookie': draftCookie('', 0) });
   }
   if (url.pathname === '/api/projects' && request.method === 'GET') return json(response, 200, { projects: userProjects(db, user.id) });
-  const projectRoute = /^\/api\/projects\/([^/]+)\/(setup|preferences|design|pages|assets|features|stack|connections\/agent|steps|repository|skeleton|preview|knowledge|records|work|openapi\.json|platform|database|code|reconcile|agents|routing|routines|batches)(?:\/([^/]+))?$/.exec(url.pathname);
+  const projectRoute = /^\/api\/projects\/([^/]+)\/(setup|preferences|design|pages|assets|features|stack|connections\/agent|steps|repository|skeleton|preview|knowledge|records|work|openapi\.json|platform|database|code|reconcile|agents|changes|routines|batches)(?:\/([^/]+))?$/.exec(url.pathname);
   if (projectRoute) {
     const [, rawId, section, rawItem] = projectRoute;
     const projectId = decodeURIComponent(rawId);
     const item = rawItem ? decodeURIComponent(rawItem) : null;
     requireMember(db, user, projectId);
     const method = request.method;
-    // LAY-04B: after any successful change to a project's layers, working style stages and routes what it automates.
-    if (method !== 'GET' && projectId !== aludelProjectId && ['records', 'work', 'preferences', 'routing', 'features', 'pages', 'skeleton', 'routines'].includes(section)) {
-      response.once('finish', () => { if (response.statusCode < 400) { try { know.automate(projectId); } catch (error) { console.error(`Automation for ${projectId}: ${error.message}`); } } });
+    // After any successful change to a project's layers, the gaps they reveal become backlog items (DEC-041).
+    if (method !== 'GET' && projectId !== aludelProjectId && ['records', 'work', 'features', 'pages', 'skeleton', 'routines'].includes(section)) {
+      response.once('finish', () => { if (response.statusCode < 400) { try { know.syncBacklog(projectId); } catch (error) { console.error(`Backlog for ${projectId}: ${error.message}`); } } });
     }
     if (section === 'setup' && method === 'GET') return json(response, 200, projectView(user, projectId));
     // LAY-03: the layers read one project snapshot and write records and work items through the knowledge module.
     if (section === 'knowledge' && method === 'GET') {
       if (projectId === aludelProjectId) return json(response, 409, { error: 'Aludel’s own knowledge moves into its layers in LAY-06.' });
       return json(response, 200, { setup: projectView(user, projectId), knowledge: { ...know.view(user, projectId, { builtBy: links.builtBy(projectId) }), code: links.snapshot(projectId), batches: runs.view(projectId) },
-        catalog: { pageTypes: catalogs.pageTypes, routeIcons: catalogs.routeIcons, feels: catalogs.feels, preferences: catalogs.preferences, profiles: catalogs.profiles, stacks: catalogs.stacks, automation: catalogs.automation } });
+        catalog: { pageTypes: catalogs.pageTypes, routeIcons: catalogs.routeIcons, feels: catalogs.feels, stacks: catalogs.stacks, tools: catalogs.roles.tools, botColors, efforts } });
     }
     // LAY-07A: the Data layer's contract as OpenAPI 3.1.
     if (section === 'openapi.json' && method === 'GET') {
@@ -377,12 +382,9 @@ async function api(request, response, url) {
       const work = know.workList(projectId).find(entry => entry.id === item);
       return work ? json(response, 200, links.reconcileContext(projectId, work) || {}) : json(response, 404, { error: 'Work item not found.' });
     }
-    // LAY-07C: working style routes each work type to one profile; AGENTS.md carries the instructions into the repository.
-    if (section === 'routing' && method === 'PUT') {
-      const input = await readJson(request);
-      know.routeWorkType(projectId, String(input.type || ''), String(input.profileId || ''), user.name);
-      return json(response, 200, { profiles: know.list(projectId, 'agent_profile') });
-    }
+    // WORK-UX-01: what an item changed, as revision diffs.
+    if (section === 'changes' && item && method === 'GET') return json(response, 200, { changes: know.workChanges(projectId, item) });
+    // AGENTS.md carries the project, role and action instructions into the repository.
     if (section === 'agents' && item === 'export' && method === 'POST') {
       const setup = scaffoldSetup(user, projectId);
       if (!inspectGitRepository(setup.workspacePath).committed) return json(response, 409, { error: 'The repository does not exist yet. Finish setup first.' });
@@ -415,16 +417,19 @@ async function api(request, response, url) {
     if (section === 'work' && method === 'PUT' && item) {
       const input = await readJson(request);
       if (input.apply) return json(response, 200, know.applyAnswer(user, projectId, item, String(input.apply)));
-      if (typeof input.note === 'string' && input.note.trim()) know.appendLog(item, `${user.name}: ${input.note.trim().slice(0, 500)}`);
+      // Staging, skipping, stopping and reassigning go through the batches, which keep running batches locked.
+      if (input.stage === true) return json(response, 200, runs.stage(user, projectId, item));
+      if (input.stage === false) return json(response, 200, runs.unstage(user, projectId, item));
+      if (typeof input.skip === 'boolean') return json(response, 200, runs.skip(user, projectId, item, input.skip));
+      if (input.stop === true) return json(response, 200, runs.stopItem(user, projectId, item));
+      if (input.assignee !== undefined) return json(response, 200, runs.reassign(user, projectId, item, input.assignee));
+      if (typeof input.note === 'string' && input.note.trim()) know.appendLog(item, input.note.trim().slice(0, 500), {}, { by: { kind: 'person', id: user.id } });
       return json(response, 200, know.updateWork(user, projectId, item, input));
     }
     if (section === 'routines' && method === 'POST' && item) return json(response, 201, { created: know.runRoutines(projectId, { trigger: 'manual', routineId: item }) });
     // DEC-040: agent batches. Start is the owner's authorization to spend on exactly the batch's items.
     if (section === 'batches' && method === 'POST' && item) {
       const input = await readJson(request);
-      if (item === 'add') return json(response, 200, runs.add(user, projectId, { suggestion: input.suggestion ? String(input.suggestion) : null, workId: input.workId ? String(input.workId) : null }));
-      if (item === 'remove') { runs.remove(user, projectId, String(input.workId || '')); return json(response, 200, { removed: input.workId }); }
-      if (item === 'fill') return json(response, 200, { added: runs.fill(user, projectId, input.count).length });
       if (item === 'start') { const { batch } = runs.start(user, projectId, String(input.batchId || '')); return json(response, 202, { batch }); }
       if (item === 'stop') return json(response, 200, { batch: runs.stop(user, projectId, String(input.batchId || '')) });
     }
@@ -442,6 +447,7 @@ async function api(request, response, url) {
     if (section === 'features' && method === 'DELETE' && item) { flows.removeFeature(user, projectId, item); return json(response, 200, projectView(user, projectId)); }
     if (section === 'pages' && method === 'PUT') { flows.saveRoutes(user, projectId, await readJson(request)); return json(response, 200, projectView(user, projectId)); }
     if (section === 'stack' && method === 'PUT') { flows.saveStack(user, projectId, await readJson(request)); return json(response, 200, projectView(user, projectId)); }
+    if (section === 'connections/agent' && method === 'GET' && item === 'models') return json(response, 200, await runs.models(projectId));
     if (section === 'connections/agent' && method === 'GET') return json(response, 200, flows.agentConnection(user, projectId));
     if (section === 'connections/agent' && method === 'PUT') return json(response, 200, await flows.saveAgentConnection(user, projectId, await readJson(request)));
     if (section === 'connections/agent' && method === 'POST') return json(response, 200, await flows.checkAgentConnection(user, projectId));

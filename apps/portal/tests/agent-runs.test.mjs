@@ -1,11 +1,11 @@
-// LAY-04D / DEC-040: agent batches and the runner, against a provider stand-in (never a real provider).
+// LAY-04D / DEC-040, revised by WORK-UX-01: per-assignee batches and the runner, against a provider stand-in (never a real provider).
 import assert from 'node:assert/strict';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { createUser, initAccounts } from '../server/accounts.mjs';
-import { agentRuns, initAgentRuns, modelCaller } from '../server/agent-runs.mjs';
+import { agentRuns, initAgentRuns, modelCaller, modelLister } from '../server/agent-runs.mjs';
 import { initCodeLinks } from '../server/code-links.mjs';
 import { initKnowledge, knowledge } from '../server/knowledge.mjs';
 import { initOnboarding, loadCatalogs, onboarding } from '../server/onboarding.mjs';
@@ -28,135 +28,227 @@ async function fixture({ profile = 'dreamer', provider = 'openai', key = 'sk-pro
   const know = knowledge({ db, catalogs, packs: catalogs.packs });
   const flows = onboarding({ db, catalogs, secrets, workspaceRoot: join(root, 'workspaces'), assetRoot: join(root, 'assets'), createWorkspace: () => {}, know,
     checkAgentKey: async () => ({ ok: true }) });
-  const runs = agentRuns({ db, know, secrets, providers, callModel: modelCaller({ env }) });
+  const runs = agentRuns({ db, know, secrets, providers, callModel: modelCaller({ env }), listModels: modelLister({ env }) });
   const ada = createUser(db, { email: 'ada@example.com', name: 'Ada', password: 'correct-horse-battery' });
   const { token } = flows.saveDraft(null, { profile });
   flows.saveDraft(token, { name: 'Tool Share', pitch: 'Neighbours lend and borrow tools they rarely use.' });
   const { project } = flows.claimDraft(token, ada, ada);
   flows.saveFeatures(ada, project.id, { picks: ['accounts', 'messaging'] });
   await flows.saveAgentConnection(ada, project.id, { provider, secret: key });
-  return { db, know, runs, ada, id: project.id, stub, close: () => stub.server.close() };
+  know.syncBacklog(project.id);
+  return { db, know, runs, ada, id: project.id, stub, env, secrets, close: () => { stub.server.closeAllConnections(); stub.server.close(); } };
 }
 
-test('working style marks gaps as available for agents instead of opening items; the pool is ordered by priority', async () => {
-  const { know, ada, id, close } = await fixture();
-  try {
-    assert.deepEqual(know.automate(id), [], 'no items are opened for agents');
-    assert.equal(know.workList(id).filter(item => item.state !== 'done').length, 0);
-    const pool = know.view(ada, id).agentPool;
-    assert.ok(pool.length >= 5 && pool.every(entry => entry.kind === 'suggestion' && ['define', 'plan'].includes(entry.type)));
-    assert.deepEqual(pool.map(entry => entry.priority), [...pool.map(entry => entry.priority)].sort((a, b) => a - b), 'best first');
-    const demo = know.list(id, 'story').filter(story => story.phase === 'demo').map(story => story.id);
-    const firstLater = pool.findIndex(entry => entry.priority >= 1000);
-    assert.ok(firstLater === -1 || pool.slice(0, firstLater).length > 0, 'current-phase work comes before later phases');
-    assert.ok(demo.length);
-  } finally { close(); }
-});
 
-test('LAY-04B items nobody touched go back to the pool', async () => {
-  const { know, id, close } = await fixture();
-  try {
-    const suggestion = know.agentPool(id)[0];
-    const source = know.suggestions(id, { stories: know.list(id, 'story'), pages: know.list(id, 'page'), work: know.workList(id) }).find(entry => entry.key === suggestion.key);
-    const staged = know.createWork(id, { ...source, state: 'ready', context: { suggestion: source.key }, logText: 'Staged by working style' });
-    know.assignByPolicy(id, staged, 'Working style');
-    assert.equal(know.returnStagedToPool(id), 1);
-    assert.equal(know.workList(id).length, 0);
-    assert.ok(know.agentPool(id).some(entry => entry.key === suggestion.key));
-  } finally { close(); }
-});
+const backlog = (know, id, action, match = () => true) => know.workList(id).find(item => item.action === action && item.state === 'suggested' && match(item));
+// Queue a backlog item, then stage it, as the board's two buttons do.
+function queueAndStage(know, runs, ada, id, item) {
+  know.updateWork(ada, id, item.id, { state: 'ready' });
+  return runs.stage(ada, id, item.id);
+}
+const idle = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-test('a batch fills by priority, locks on Go, drafts through the provider, and hands drafts back for review', async () => {
-  const { know, runs, ada, id, stub, close } = await fixture({ profile: 'planner' });
+test('staging puts agent work in its profile\'s batch and people\'s work in their list; blocked and unrunnable work stays out', async () => {
+  const { know, runs, ada, id, close } = await fixture({ profile: 'dreamer' });
   try {
-    // A Planner writes acceptance themselves, so the pool holds contracts; the owner can still batch acceptance by hand.
-    const story = know.list(id, 'story').find(entry => entry.title.startsWith('Someone can see their conversations'));
-    const defineKey = `define:${story.id}`;
-    assert.ok(!know.agentPool(id).some(entry => entry.key === defineKey));
-    const manual = runs.add(ada, id, { suggestion: defineKey });
-    assert.equal(manual.assignee.label, 'Product lead');
-    assert.equal(manual.context.automation.mode, 'agent-review');
-    const added = runs.fill(ada, id, 3);
-    assert.equal(added.length, 2, 'fill tops the batch up to the count asked for');
-    assert.ok(added.every(item => item.type === 'plan' && item.assignee.label === 'Architect'));
+    const define = backlog(know, id, 'product.define');
+    assert.equal(define.assignee.kind, 'agent', 'a Dreamer hands acceptance to the default agent');
+    assert.throws(() => runs.stage(ada, id, define.id), /Queue W-\d+ before staging/);
+    const staged = queueAndStage(know, runs, ada, id, define);
     const batch = runs.view(id)[0];
+    assert.equal(staged.status, 'staged');
+    assert.equal(staged.context.batch, batch.id);
+    assert.equal(batch.profileId, define.assignee.id);
     assert.equal(batch.state, 'draft');
-    assert.equal(batch.items.length, 3);
-    assert.equal(stub.calls.filter(call => call.method === 'POST').length, 0, 'nothing runs before Go');
 
+    // A person's own work goes in their list; nothing runs it.
+    const configure = know.createWork(id, { layer: 'platform', type: 'configure', title: 'Choose an email provider', documents: ['Platform › email'] });
+    assert.equal(configure.assignee.id, ada.id);
+    const mine = runs.stage(ada, id, configure.id);
+    assert.equal(mine.status, 'staged'); assert.equal(mine.context.staged, true); assert.equal(mine.context.batch, undefined);
+    assert.equal(runs.unstage(ada, id, configure.id).status, 'queued');
+
+    // Agents can't run page designs yet; a blocked item can't be staged at all.
+    const design = backlog(know, id, 'pages.design');
+    know.updateWork(ada, id, design.id, { state: 'ready' });
+    assert.throws(() => runs.stage(ada, id, design.id), /Agents can't run “Design pages” yet/);
+    const contract = backlog(know, id, 'data.contract');
+    know.updateWork(ada, id, contract.id, { state: 'ready' });
+    know.updateWork(ada, id, configure.id, { blocks: [contract.id] });
+    assert.throws(() => runs.stage(ada, id, contract.id), error => error.status === 409 && /blocked by W-\d+/.test(error.message));
+    know.updateWork(ada, id, configure.id, { blocks: [] });
+
+    // Reassigning a staged item moves it to the new assignee's batch.
+    const careful = know.insert(id, 'agent_profile', { name: 'Careful architect', effort: 'high' });
+    const moved = runs.reassign(ada, id, define.id, { kind: 'agent', id: careful.id });
+    assert.equal(moved.status, 'staged');
+    assert.notEqual(moved.context.batch, batch.id);
+    assert.equal(runs.view(id).find(entry => entry.id === moved.context.batch).profileId, careful.id);
+    const toMe = runs.reassign(ada, id, define.id, { kind: 'person', id: ada.id });
+    assert.equal(toMe.context.staged, true, 'to a person: into their list');
+  } finally { close(); }
+});
+
+test('Go locks the batch, drafts with the profile\'s model, effort and output limit, and drafts wait in the batch for review', async () => {
+  const { know, runs, ada, id, stub, close } = await fixture({ profile: 'dreamer' });
+  try {
+    const agent = know.defaultProfile(id);
+    know.update(id, agent.id, { effort: 'high', limits: { ...agent.limits, itemOutput: 5000 } }, { rationale: 'Thorough' });
+    const define = backlog(know, id, 'product.define', item => item.targets[0].label.startsWith('Someone can see their conversations'));
+    const contract = backlog(know, id, 'data.contract');
+    queueAndStage(know, runs, ada, id, define);
+    queueAndStage(know, runs, ada, id, contract);
+    const batch = runs.view(id)[0];
+    assert.equal(stub.calls.filter(call => call.method === 'POST').length, 0, 'nothing runs before Go');
     const { job } = runs.start(ada, id, batch.id);
-    assert.ok(know.workList(id).filter(item => batch.items.includes(item.id)).every(item => item.state === 'claimed' || item.state === 'review'), 'Go locks the items');
+    assert.throws(() => runs.unstage(ada, id, contract.id), /locked in while its batch runs/);
+    assert.throws(() => runs.reassign(ada, id, contract.id, { kind: 'person', id: ada.id }), /locked in/);
     await job;
     assert.equal(runs.view(id)[0].state, 'done');
-    const items = know.workList(id).filter(item => batch.items.includes(item.id));
-    // A Planner reviews acceptance drafts; plans go to the Architect with no review step (the v3 working-style table).
-    assert.equal(items.find(item => item.id === manual.id).state, 'review');
-    assert.ok(items.filter(item => item.type === 'plan').every(item => item.state === 'done' && /Done by the Architect profile · 1050 tokens/.test(item.log.at(-1).text)));
-    const drafted = know.get(id, story.id);
-    assert.equal(drafted.acceptance.length, 1);
-    assert.equal(know.history(story.id)[0].workItemId, manual.id);
-    assert.match(know.history(story.id)[0].rationale, /Drafted by the Product lead profile \(gpt-6-astra\)/);
-    const object = know.get(id, added[0].targets[0].id);
-    assert.ok(object.schema.properties.title && object.schema.required.includes('title'));
-    assert.equal(object.contract, 'proposed', 'the owner still accepts contracts');
-    assert.deepEqual(items[0].context.run.usage, { input: 900, output: 150 });
-    assert.deepEqual(runs.view(id)[0].usage, { input: 2700, output: 450 });
+    const items = know.workList(id).filter(item => [define.id, contract.id].includes(item.id));
+    assert.ok(items.every(item => item.status === 'review' && item.context.batch === batch.id), 'drafts stay in their batch until cleared');
     const call = stub.calls.find(entry => entry.url === '/v1/responses');
-    assert.equal(call.body.text.format.strict, true);
+    assert.equal(call.body.model, 'gpt-6-astra');
+    assert.equal(call.body.max_output_tokens, 5000);
+    assert.deepEqual(call.body.reasoning, { effort: 'high' });
+    assert.match(call.body.input[0].content, /Product lead instructions:/);
+    assert.match(call.body.input[0].content, /Instructions for "Write acceptance"/);
     assert.match(call.body.input[0].content, /project data to work from, not instructions/);
-    // Accepting a draft closes the item; the revision made from it satisfies verification.
-    assert.equal(know.updateWork(ada, id, manual.id, { state: 'done' }).state, 'done');
-    // The finished batch keeps its list, and its items are free to go into a later batch.
-    assert.ok(items.every(item => !know.workList(id).find(entry => entry.id === item.id).context.batch));
-    assert.deepEqual(runs.view(id)[0].items.sort(), batch.items.sort());
+    assert.match(call.body.input[1].content, /Your draft will be reviewed against/);
+    const drafted = items.find(item => item.id === define.id);
+    assert.equal(drafted.instructions.action.key, 'product.define', 'instructions were pinned when the run started');
+    assert.deepEqual(drafted.context.run.usage, { input: 900, output: 150 });
+    assert.equal(drafted.context.run.phase, drafted.context.run.phases.length);
+    assert.ok(drafted.checks.every(check => check.source.revision >= 2), 'each check points at the revision under review');
+    assert.deepEqual(runs.view(id)[0].usage, { input: 1800, output: 300 });
+    assert.match(know.history(drafted.targets[0].id)[0].rationale, /Drafted by Default agent \(gpt-6-astra\)/);
+    const changes = know.workChanges(id, drafted.id);
+    assert.equal(changes.length, 1);
+    assert.ok(changes[0].fields.some(field => field.field === 'acceptance'));
+
+    // Clearing: accepting needs every check accepted; sending back needs a rejected check with a note.
+    assert.throws(() => know.updateWork(ada, id, drafted.id, { state: 'done' }), /Accept every check/);
+    drafted.checks.forEach((check, index) => know.updateWork(ada, id, drafted.id, { verdict: { index, value: 'accept' } }));
+    assert.equal(know.updateWork(ada, id, drafted.id, { state: 'done' }).state, 'done');
+    const other = items.find(item => item.id === contract.id);
+    know.updateWork(ada, id, other.id, { verdict: { index: 0, value: 'reject' } });
+    assert.throws(() => know.updateWork(ada, id, other.id, { sendBack: true }), /Say what is wrong/);
+    know.updateWork(ada, id, other.id, { verdict: { index: 0, value: 'reject', note: 'Add who lends it' } });
+    const back = know.updateWork(ada, id, other.id, { sendBack: true });
+    assert.equal(back.status, 'queued');
+    assert.deepEqual(back.context.feedback.map(entry => entry.note), ['Add who lends it']);
+    runs.stage(ada, id, other.id);
+    await runs.start(ada, id, runs.view(id)[0].id).job;
+    const retry = stub.calls.filter(entry => entry.url === '/v1/responses').at(-1);
+    assert.match(retry.body.input[1].content, /Your last draft was sent back[\s\S]*Add who lends it/);
   } finally { close(); }
 });
 
-test('clarifications come back as answer options for the owner, not as answers', async () => {
-  const { know, runs, ada, id, close } = await fixture({ profile: 'dreamer', provider: 'anthropic', key: 'sk-ant-api03-aludel-test-key-good' });
+test('clarifications come back as answer options; answering applies the answer and clears the item', async () => {
+  const { know, runs, ada, id, stub, close } = await fixture({ profile: 'dreamer', provider: 'anthropic', key: 'sk-ant-api03-aludel-test-key-good' });
   try {
-    const story = know.list(id, 'story').find(entry => entry.title.startsWith('Someone can start a conversation'));
-    const key = `clarify:${story.id}:${story.clarifications[0]}`;
-    const item = runs.add(ada, id, { suggestion: key });
-    const { job } = runs.start(ada, id, runs.view(id)[0].id);
-    await job;
-    const after = know.workList(id).find(entry => entry.id === item.id);
-    assert.equal(after.state, 'needs-input');
+    const clarify = backlog(know, id, 'product.clarify', item => item.targets[0].label.startsWith('Someone can start a conversation'));
+    queueAndStage(know, runs, ada, id, clarify);
+    await runs.start(ada, id, runs.view(id)[0].id).job;
+    const after = know.workById(id, clarify.id);
+    assert.equal(after.status, 'needs');
     assert.deepEqual(after.question.options, ['A tool listing', 'A person\'s profile', 'A borrow request']);
     assert.equal(after.question.recommendation, 'A tool listing');
-    assert.equal(after.question.answer, undefined);
-    assert.deepEqual(know.get(id, story.id).clarifications, story.clarifications, 'nothing changes until the owner answers');
+    const call = stub.calls.find(entry => entry.url.startsWith('/v1/messages'));
+    assert.equal(call.body.model, 'claude-opus-5');
+    assert.equal(call.body.output_config.effort, 'medium');
+    assert.equal(call.body.max_tokens, 8000);
+    const story = know.get(id, clarify.targets[0].id);
+    assert.deepEqual(story.clarifications.includes(clarify.question.text), true, 'nothing changes until the owner answers');
+    const answered = know.updateWork(ada, id, clarify.id, { answer: 'A tool listing', rationale: 'Most talk is about one tool' });
+    assert.equal(answered.state, 'done');
+    assert.ok(!know.get(id, story.id).clarifications.includes(clarify.question.text));
   } finally { close(); }
 });
 
-test('a spend limit or a rejected key stops the batch and returns unstarted items to the pool', async () => {
+test('a spend limit or a rejected key stops the batch; unfinished work stays staged in the next batch', async () => {
   const { know, runs, ada, id, close } = await fixture({ key: 'sk-proj-aludel-test-key-limit' });
   try {
-    runs.fill(ada, id, 3);
+    const items = [backlog(know, id, 'product.define'), backlog(know, id, 'data.contract')];
+    for (const item of items) queueAndStage(know, runs, ada, id, item);
     const batch = runs.view(id)[0];
-    const { job } = runs.start(ada, id, batch.id);
-    await job;
-    const after = runs.view(id)[0];
+    await runs.start(ada, id, batch.id).job;
+    const after = runs.view(id).find(entry => entry.id === batch.id);
     assert.equal(after.state, 'stopped');
     assert.match(after.note, /rate or spend limit/);
-    const items = know.workList(id).filter(item => batch.items.includes(item.id));
-    assert.ok(items.every(item => item.state === 'ready' && !item.context.batch), 'unlocked and back in the pool');
-    assert.ok(know.agentPool(id).length >= 3);
+    const next = runs.view(id).find(entry => entry.state === 'draft');
+    const now = know.workList(id).filter(item => items.some(entry => entry.id === item.id));
+    assert.ok(now.every(item => item.status === 'staged' && item.context.batch === next.id), 'still staged, in the next batch');
   } finally { close(); }
 });
 
-test('batches refuse work agents cannot do, full batches, starting twice, and running without a key', async () => {
-  const { db, know, runs, ada, id, close } = await fixture();
+test('usage limits stop a run before the next item and refuse Go once the month\'s budget is spent', async () => {
+  const { know, runs, ada, id, close } = await fixture({ profile: 'dreamer' });
   try {
-    const page = know.list(id, 'page').find(entry => entry.stories.length);
-    const design = know.createWork(id, { layer: 'pages', type: 'design', title: 'Design', targets: [{ id: page.id }], documents: ['Pages'] });
-    assert.throws(() => runs.add(ada, id, { workId: design.id }), /can't do design work yet/);
-    runs.fill(ada, id, 2);
+    const agent = know.defaultProfile(id);
+    know.update(id, agent.id, { limits: { ...agent.limits, batchTokens: 1000 } }, { rationale: 'Small runs' });
+    const items = [backlog(know, id, 'product.define'), backlog(know, id, 'data.contract')];
+    for (const item of items) queueAndStage(know, runs, ada, id, item);
     const batch = runs.view(id)[0];
-    runs.remove(ada, id, runs.view(id)[0].items[0]);
-    assert.equal(runs.view(id)[0].items.length, 1);
-    db.prepare("DELETE FROM project_connections WHERE project_id = ?").run(id);
-    assert.throws(() => runs.start(ada, id, batch.id), /Connect an Anthropic or OpenAI key/);
-    assert.throws(() => runs.stop(ada, id, batch.id), /not running/);
+    await runs.start(ada, id, batch.id).job;
+    const after = runs.view(id).find(entry => entry.id === batch.id);
+    assert.equal(after.state, 'stopped');
+    assert.match(after.note, /limit per batch \(1,000 tokens\)/);
+    assert.equal(know.workList(id).filter(item => item.status === 'review').length, 1, 'one item ran, the next waited');
+    know.update(id, agent.id, { limits: { ...agent.limits, batchTokens: 200000, monthlyTokens: 1000 } }, { rationale: 'Tight month' });
+    assert.throws(() => runs.start(ada, id, runs.view(id).find(entry => entry.state === 'draft').id), /monthly limit \(1,000 tokens\)/);
+    assert.equal(runs.usage(id, { profileId: agent.id }), 1050);
+  } finally { close(); }
+});
+
+test('while a batch runs, a waiting item can be skipped and the working item stopped; both stay staged', async () => {
+  const { know, runs, ada, id, stub, close } = await fixture({ profile: 'dreamer', key: 'sk-proj-aludel-test-key-slow' });
+  try {
+    const items = [backlog(know, id, 'product.define'), backlog(know, id, 'data.contract')];
+    know.updateWork(ada, id, items[0].id, { priority: 'highest' });
+    for (const item of items) queueAndStage(know, runs, ada, id, item);
+    const { job } = runs.start(ada, id, runs.view(id)[0].id);
+    await idle(100);
+    const working = know.workList(id).find(item => item.id === items[0].id);
+    assert.equal(working.status, 'working', 'highest priority first');
+    assert.ok(working.context.run.phase >= 1 && working.context.run.activity);
+    assert.throws(() => runs.skip(ada, id, items[0].id), /stop it instead/);
+    runs.skip(ada, id, items[1].id);
+    runs.stopItem(ada, id, items[0].id);
+    await job;
+    const after = know.workList(id).filter(item => items.some(entry => entry.id === item.id));
+    assert.ok(after.every(item => item.status === 'staged' && !item.context.skip), 'both wait in the next batch');
+    assert.match(after.find(item => item.id === items[0].id).log.map(entry => entry.text).join('\n'), /Stopped by you/);
+    assert.equal(stub.calls.filter(call => call.method === 'POST').length, 1, 'the skipped item was never sent');
+  } finally { close(); }
+});
+
+test('models are listed from the connected key for the profile\'s model picker', async () => {
+  const openai = await fixture();
+  try {
+    const listed = await openai.runs.models(openai.id);
+    assert.deepEqual(listed.models.map(model => model.id), ['o4-mini', 'gpt-6-astra-mini', 'gpt-6-astra'], 'chat models only');
+    assert.equal(listed.defaultModel, 'gpt-6-astra');
+  } finally { openai.close(); }
+  const anthropic = await fixture({ provider: 'anthropic', key: 'sk-ant-api03-aludel-test-key-good' });
+  try {
+    const listed = await anthropic.runs.models(anthropic.id);
+    assert.deepEqual(listed.models, [{ id: 'claude-opus-5', label: 'Claude Opus 5' }, { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' }]);
+  } finally { anthropic.close(); }
+});
+
+test('a restart keeps unfinished staged work staged', async () => {
+  const { db, know, runs, ada, id, secrets, env, close } = await fixture({ profile: 'dreamer', key: 'sk-proj-aludel-test-key-slow' });
+  try {
+    const item = backlog(know, id, 'product.define');
+    queueAndStage(know, runs, ada, id, item);
+    const { batch } = runs.start(ada, id, runs.view(id)[0].id);
+    assert.equal(batch.state, 'running');
+    const restarted = agentRuns({ db, know, secrets, providers, callModel: modelCaller({ env }) });
+    const after = know.workById(id, item.id);
+    assert.equal(restarted.view(id).find(entry => entry.id === batch.id).state, 'stopped');
+    assert.equal(after.status, 'staged');
+    assert.notEqual(after.context.batch, batch.id);
+    await idle(1700);
   } finally { close(); }
 });

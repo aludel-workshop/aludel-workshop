@@ -1,0 +1,1116 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Aludel Work redesign</title>
+<!-- WORK-UX-01 prototype v1: static, clickable. Illustrative Tool Share data from portal-layers v3. See ../work-record.md for the owner brief ledger. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0&display=block">
+<style>
+:root{
+  --bg:#fafbff;--surface:#ffffff;--rail:#f0f4fc;--panel:#f3f6fd;--hover:#e3e9f7;--line:#dce2ef;--line-strong:#c5cee2;--ink:#141727;--muted:#52617d;
+  --primary:#3047b9;--on-primary:#ffffff;--container:#dfe5ff;--on-container:#163698;
+  --product:#6b35c9;--product-bg:#efe7ff;--design:#b3245f;--design-bg:#ffe4ee;--pages:#1f4fb8;--pages-bg:#e6eefe;--data:#0b5d86;--data-bg:#dcf0fb;
+  --platform:#0f7465;--platform-bg:#d9f3ec;--work:#8a5300;--work-bg:#fff0d4;
+  --ok:#146446;--ok-bg:#d9f3e7;--warn:#6b4b00;--warn-bg:#fff0c9;--warn-line:#e0a100;--bad:#842321;--bad-bg:#fce1e0;
+  --shadow:0 18px 50px #1c2a5a26;--shadow-sm:0 1px 2px #1c2a5a14;--code-bg:#141727;--code-ink:#e8ebf7;--code-add:#1d4b35;--code-del:#5a2022;
+  --agent:#3a4a8f;--agent-bg:#e4e8fb;--person:#2f3a57;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#10121a;--surface:#181b26;--rail:#141722;--panel:#1f2331;--hover:#262b3c;--line:#2b3144;--line-strong:#3a4259;--ink:#e6e9f5;--muted:#9da8c2;
+  --primary:#a3b3ff;--on-primary:#0f1a55;--container:#2b3670;--on-container:#e0e6ff;
+  --product:#cdb1ff;--product-bg:#2d2150;--design:#ffa3c6;--design-bg:#461a2e;--pages:#a6c2ff;--pages-bg:#1c2b52;--data:#8fd3f5;--data-bg:#10334a;
+  --platform:#86e0cb;--platform-bg:#0f3932;--work:#ffc774;--work-bg:#3d2b0c;
+  --ok:#94e2bc;--ok-bg:#12392a;--warn:#ffd680;--warn-bg:#3b2d0b;--warn-line:#b88400;--bad:#ffaca7;--bad-bg:#491a1a;
+  --shadow:0 18px 50px #00000080;--shadow-sm:0 1px 2px #00000060;--code-bg:#0b0d14;--code-ink:#dfe3f2;--code-add:#16402c;--code-del:#4d1b1d;
+  --agent:#c2cbff;--agent-bg:#262f5c;--person:#4a5577;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10121a;--surface:#181b26;--rail:#141722;--panel:#1f2331;--hover:#262b3c;--line:#2b3144;--line-strong:#3a4259;--ink:#e6e9f5;--muted:#9da8c2;
+  --primary:#a3b3ff;--on-primary:#0f1a55;--container:#2b3670;--on-container:#e0e6ff;
+  --product:#cdb1ff;--product-bg:#2d2150;--design:#ffa3c6;--design-bg:#461a2e;--pages:#a6c2ff;--pages-bg:#1c2b52;--data:#8fd3f5;--data-bg:#10334a;
+  --platform:#86e0cb;--platform-bg:#0f3932;--work:#ffc774;--work-bg:#3d2b0c;
+  --ok:#94e2bc;--ok-bg:#12392a;--warn:#ffd680;--warn-bg:#3b2d0b;--warn-line:#b88400;--bad:#ffaca7;--bad-bg:#491a1a;
+  --shadow:0 18px 50px #00000080;--shadow-sm:0 1px 2px #00000060;--code-bg:#0b0d14;--code-ink:#dfe3f2;--code-add:#16402c;--code-del:#4d1b1d;
+  --agent:#c2cbff;--agent-bg:#262f5c;--person:#4a5577;color-scheme:dark}
+
+*{box-sizing:border-box}
+body{margin:0;font-family:Roboto,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;font-size:15px;line-height:1.5;color:var(--ink);background:var(--bg)}
+a{color:var(--primary)}button,input,select,textarea{font:inherit;color:inherit}
+h1,h2,h3{text-wrap:balance}
+.icon{font-family:'Material Symbols Rounded';font-weight:normal;font-style:normal;font-size:20px;line-height:1;letter-spacing:normal;text-transform:none;white-space:nowrap;direction:ltr;display:inline-block;vertical-align:middle;font-feature-settings:'liga';-webkit-font-smoothing:antialiased;flex:none}
+:focus-visible{outline:3px solid var(--primary);outline-offset:2px}
+.visually-hidden{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+code,.mono{font-family:"Roboto Mono",ui-monospace,monospace;font-size:.9em}
+
+/* Shell (same as the portal) */
+.shell{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh;background:linear-gradient(90deg,var(--rail) 232px,transparent 232px)}
+.rail{background:var(--rail);border-right:1px solid var(--line);padding:16px 12px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:19px;padding:4px 10px 12px;color:var(--ink);text-decoration:none}.brand .icon{color:var(--primary);font-size:28px}
+.project{display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;background:var(--surface);border:1px solid var(--line);margin-bottom:10px;color:var(--ink);text-decoration:none}
+.project .mark{display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:#ca3e6f;color:#fff;font-weight:700;font-size:13px}.project small{display:block;color:var(--muted);font-size:12px}
+.nav a{display:flex;align-items:center;gap:12px;padding:9px 12px;border-radius:999px;color:var(--ink);text-decoration:none;font-weight:500}
+.nav a:hover{background:var(--hover)}.nav a.active{background:var(--container);color:var(--on-container);font-weight:700}
+.nav .badge{margin-left:auto;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:var(--primary);color:var(--on-primary);font-size:12px;display:grid;place-items:center}
+.rail .spacer{flex:1}
+.topbar{display:flex;align-items:center;gap:16px;padding:12px 32px;border-bottom:1px solid var(--line);background:var(--bg);position:sticky;top:env(safe-area-inset-top,0px);z-index:10}
+.search{position:relative;flex:1;max-width:520px}.search input{width:100%;padding:9px 14px 9px 40px;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
+.search .icon{position:absolute;left:12px;top:9px;color:var(--muted)}
+.content{padding:26px 32px 96px;max-width:1320px}
+.eyebrow{font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin:0 0 4px}
+.eyebrow a{color:inherit;text-decoration:none}.eyebrow a:hover{color:var(--primary);text-decoration:underline}
+h1{font-size:30px;line-height:1.15;margin:0 0 6px}h2{font-size:18px;margin:0}h3{font-size:15px;margin:0}
+.lead{color:var(--muted);font-size:16px;margin:0 0 20px;max-width:720px}
+.muted{color:var(--muted)}.small{font-size:13.5px}.tiny{font-size:12px}
+.row{display:flex;align-items:center;gap:10px}.wrap{flex-wrap:wrap}.push{margin-left:auto}
+
+/* Tabs: layer tabs (existing) and the small underline sub-tabs */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:0 0 22px;overflow-x:auto}
+.tabs a{padding:10px 16px;color:var(--muted);text-decoration:none;font-weight:500;border-bottom:3px solid transparent;margin-bottom:-1px;white-space:nowrap}
+.tabs a.active{color:var(--ink);border-color:var(--primary)}
+.subtabs{display:flex;gap:18px;border-bottom:1px solid var(--line);margin:0 0 4px}
+.subtabs button{border:0;background:none;padding:6px 0;margin-bottom:-1px;border-bottom:2px solid transparent;color:var(--muted);font-size:13.5px;font-weight:500;cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.subtabs button:hover{color:var(--ink)}
+.subtabs button[aria-selected="true"]{color:var(--ink);border-color:var(--primary)}
+.subtabs .n{font-size:11.5px;min-width:20px;padding:0 6px;border-radius:999px;background:var(--panel);color:var(--muted);text-align:center;font-variant-numeric:tabular-nums}
+
+/* Chips */
+.chip{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap;line-height:18px}
+.chip .icon{font-size:15px}
+.l-product{background:var(--product-bg);color:var(--product)}.l-design{background:var(--design-bg);color:var(--design)}.l-pages{background:var(--pages-bg);color:var(--pages)}
+.l-data{background:var(--data-bg);color:var(--data)}.l-platform{background:var(--platform-bg);color:var(--platform)}.l-work{background:var(--work-bg);color:var(--work)}
+.s-ok{background:var(--ok-bg);color:var(--ok)}.s-warn{background:var(--warn-bg);color:var(--warn)}.s-bad{background:var(--bad-bg);color:var(--bad)}.s-plain{background:var(--panel);color:var(--muted)}
+.s-info{background:var(--container);color:var(--on-container)}
+a.chip{text-decoration:none}a.chip:hover{filter:brightness(.96)}
+
+/* Reference chips: every knowledge reference is one of these (A3) */
+.ref{display:inline-flex;align-items:center;gap:4px;max-width:100%;padding:1px 8px 1px 5px;border-radius:7px;border:1px solid var(--line);background:var(--surface);color:var(--ink);text-decoration:none;font-size:13px;font-weight:500;line-height:20px;vertical-align:baseline;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ref .icon{font-size:15px}
+.ref:hover,.ref:focus-visible{border-color:var(--primary);background:var(--panel)}
+.ref.k-product .icon{color:var(--product)}.ref.k-design .icon{color:var(--design)}.ref.k-pages .icon{color:var(--pages)}.ref.k-data .icon{color:var(--data)}.ref.k-platform .icon{color:var(--platform)}.ref.k-work .icon{color:var(--work)}
+.ref .rid{color:var(--muted);font-weight:700;font-size:12px}
+.refs{display:flex;flex-wrap:wrap;gap:6px}
+.prose .ref{margin:0 1px}
+
+/* Hover card */
+.hovercard{position:fixed;z-index:60;width:320px;max-width:calc(100vw - 24px);background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:12px 14px;font-size:13.5px}
+.hovercard[hidden]{display:none}
+.hc-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.hc-head .rid{font-weight:700;color:var(--muted);font-size:12px}
+.hovercard strong{display:block;font-size:14.5px;line-height:1.35;margin-bottom:4px}
+.hovercard p{margin:0 0 8px;color:var(--muted)}
+.hovercard dl{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin:0 0 8px}.hovercard dt{color:var(--muted)}.hovercard dd{margin:0}
+.hc-foot{display:flex;align-items:center;gap:8px;border-top:1px solid var(--line);padding-top:8px;margin-top:4px;color:var(--muted);font-size:12.5px}
+.hc-foot a{margin-left:auto;font-weight:500;text-decoration:none;display:inline-flex;align-items:center;gap:2px}
+
+/* People and agents */
+.avatar{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--person);color:#fff;font-size:10.5px;font-weight:700;flex:none}
+.avatar.agent{border-radius:7px;background:var(--agent-bg);color:var(--agent)}.avatar.agent .icon{font-size:16px}
+.avatar.template{border-radius:7px;background:var(--work-bg);color:var(--work)}.avatar.template .icon{font-size:16px}
+.avatar.lg{width:34px;height:34px;font-size:13px}.avatar.lg .icon{font-size:22px}
+
+/* Split assignee chip (A11) */
+.split{display:inline-flex;align-items:stretch;border:1px solid var(--line-strong);border-radius:999px;background:var(--surface);overflow:hidden;height:28px;vertical-align:middle}
+.split button{border:0;background:none;cursor:pointer;display:inline-flex;align-items:center;gap:6px;color:var(--ink)}
+.split .who{padding:0 10px 0 3px;font-size:13px;font-weight:500;max-width:170px}
+.split .who span.name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.split .drop{padding:0 6px;border-left:1px solid var(--line)}.split .drop .icon{font-size:18px;color:var(--muted)}
+.split button:hover{background:var(--panel)}
+.split.disabled{opacity:.72}.split.disabled .drop{cursor:not-allowed}
+.split.follows .who{color:var(--muted)}
+.split.warn{border-color:var(--warn-line)}
+
+/* Role chip */
+.role{display:inline-flex;align-items:center;gap:4px;padding:2px 9px 2px 6px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap;text-decoration:none;line-height:20px}
+.role .icon{font-size:15px}
+
+/* Menus */
+.menu{position:fixed;z-index:70;min-width:240px;max-width:calc(100vw - 24px);background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:6px}
+.menu[hidden]{display:none}
+.menu h4{margin:8px 10px 4px;font-size:11px;letter-spacing:.7px;text-transform:uppercase;color:var(--muted)}
+.menu button{display:flex;align-items:center;gap:10px;width:100%;padding:7px 10px;border:0;background:none;border-radius:8px;text-align:left;cursor:pointer;font-size:14px}
+.menu button:hover:not(:disabled),.menu button:focus-visible{background:var(--panel)}
+.menu button:disabled{cursor:not-allowed;opacity:.55}
+.menu button small{display:block;color:var(--muted);font-size:12px}
+.menu .check{margin-left:auto;color:var(--primary)}
+.menu .note{margin:4px 10px 6px;font-size:12px;color:var(--warn)}
+.menu hr{border:0;border-top:1px solid var(--line);margin:6px 4px}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 15px;border-radius:999px;border:1px solid var(--primary);background:var(--primary);color:var(--on-primary);font-weight:500;cursor:pointer;text-decoration:none;font-size:13.5px;white-space:nowrap}
+.btn .icon{font-size:18px}
+.btn.ghost{background:transparent;color:var(--primary)}.btn.small{padding:4px 12px;font-size:13px}.btn.small .icon{font-size:16px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.quiet{border-color:var(--line-strong);color:var(--ink);background:var(--surface)}
+.linkbtn{border:0;background:none;color:var(--primary);cursor:pointer;padding:0;font-size:13px}
+
+/* Board: batch lanes (A8, A9) */
+.section-head{display:flex;align-items:baseline;gap:10px;margin:0 0 10px}
+.section-head h2{font-size:16px}
+.lanes{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;margin:0 0 30px}
+.lane{background:var(--surface);border:1px solid var(--line);border-radius:16px;display:flex;flex-direction:column;min-width:0}
+.lane.running{border-color:var(--primary)}
+.lane-head{display:flex;align-items:center;gap:10px;padding:12px 14px 10px}
+.lane-head strong{font-size:15px}.lane-head small{display:block;color:var(--muted);font-size:12px;line-height:1.3}
+.lane-summary{display:flex;gap:6px;flex-wrap:wrap;padding:0 14px 10px}
+.lane ol{list-style:none;margin:0;padding:0 6px 6px;border-top:1px solid var(--line)}
+.lane li{display:grid;grid-template-columns:40px minmax(0,1fr) auto;align-items:center;gap:4px 10px;padding:8px;border-radius:10px}
+.lane li .tt{min-width:0;display:grid;gap:3px;justify-items:start}
+.lane li .acts{display:flex;align-items:center;gap:4px}
+.lane li:hover{background:var(--panel)}
+.lane li a.t{color:var(--ink);text-decoration:none;font-weight:500;font-size:14px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.lane li a.t:hover{color:var(--primary);text-decoration:underline}
+.lane li .rid{font-size:12px;color:var(--muted);font-weight:700;align-self:start;padding-top:2px}
+.lane li .move{border:0;background:none;color:var(--muted);border-radius:50%;padding:4px;cursor:pointer;display:inline-grid;place-items:center}.lane li .move:hover{background:var(--hover);color:var(--ink)}
+.lane-foot{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid var(--line);margin-top:auto;flex-wrap:wrap}
+.lane-empty{padding:14px;border-top:1px solid var(--line);color:var(--muted);font-size:13.5px}
+.st{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.st .icon{font-size:15px}
+.st-waiting{background:var(--panel);color:var(--muted)}.st-working{background:var(--container);color:var(--on-container)}
+.st-review{background:var(--ok-bg);color:var(--ok)}.st-needs{background:var(--warn-bg);color:var(--warn)}.st-todo{background:var(--panel);color:var(--ink)}
+.st-done{background:var(--ok-bg);color:var(--ok)}.st-queued{background:var(--panel);color:var(--ink)}.st-backlog{background:var(--panel);color:var(--muted)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spin{animation:spin 1.4s linear infinite}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+
+/* Item cards in Queue / Backlog / Done (A10, A11) */
+.cards{list-style:none;margin:0;padding:0}
+.wcard{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 16px;align-items:center;padding:12px 6px;border-bottom:1px solid var(--line)}
+.wcard:hover{background:color-mix(in srgb,var(--panel) 60%,transparent)}
+.wtop{display:flex;align-items:baseline;gap:8px;min-width:0}
+.wtop .rid{font-size:12px;font-weight:700;color:var(--muted);flex:none}
+.wtitle{color:var(--ink);text-decoration:none;font-weight:500;font-size:15px}
+.wtitle:hover{color:var(--primary);text-decoration:underline}
+.wmeta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px;font-size:12.5px;color:var(--muted)}
+.wside{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.wside .btn{min-width:108px;justify-content:center}
+.empty{padding:22px 6px;color:var(--muted)}
+.batches-history{margin-top:22px}
+.batches-history summary{cursor:pointer;color:var(--muted);font-weight:500;padding:6px 0}
+.batches-history ul{margin:6px 0 0;padding-left:18px;font-size:13.5px;color:var(--muted)}
+
+/* Item detail (A1, A2) */
+.item-head{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;margin-bottom:16px}
+.item-head .titles{flex:1;min-width:280px}
+.item-head .meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;color:var(--muted);font-size:13.5px}
+.track{display:flex;align-items:center;gap:0;margin:0 0 22px;overflow-x:auto;padding-bottom:2px}
+.track .stp{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;font-size:13px;font-weight:500;color:var(--muted);white-space:nowrap}
+.track .stp .icon{font-size:17px}
+.track .stp.past{color:var(--ok)}
+.track .stp.now{background:var(--container);color:var(--on-container);font-weight:700}
+.track .stp.now.needs{background:var(--warn-bg);color:var(--warn)}
+.track .stp.now.review{background:var(--ok-bg);color:var(--ok)}
+.track .sep{width:22px;height:2px;background:var(--line);flex:none}
+.track .sep.past{background:var(--ok)}
+.detail{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:28px;align-items:start}
+.detail>*{min-width:0}
+.block{padding:0 0 22px;margin:0 0 22px;border-bottom:1px solid var(--line)}
+.block:last-child{border-bottom:0}
+.block>h2{display:flex;align-items:center;gap:8px;font-size:15px;margin:0 0 10px;color:var(--ink)}
+.block>h2 .icon{color:var(--muted);font-size:19px}
+.block>h2 .count{font-weight:400;color:var(--muted);font-size:13px}
+.prose{margin:0;max-width:72ch;line-height:1.75}
+.checks{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.checks li{display:flex;gap:10px;align-items:flex-start;line-height:1.7}
+.checks .icon{font-size:20px;margin-top:2px}
+.checks .met .icon{color:var(--ok)}.checks .unmet .icon{color:var(--muted)}
+.callout{border-radius:14px;padding:14px 16px;margin:0 0 22px}
+.callout h2{font-size:16px;display:flex;align-items:center;gap:8px;margin:0 0 6px}
+.callout.review{background:var(--ok-bg);border:1px solid color-mix(in srgb,var(--ok) 35%,transparent)}
+.callout.review h2{color:var(--ok)}
+.callout.needs{background:var(--warn-bg);border:1px solid var(--warn-line)}
+.callout.needs h2{color:var(--warn)}
+.callout.working{background:var(--container);color:var(--on-container)}
+.callout p{margin:0 0 10px}
+.callout .actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.callout input[type=text]{flex:1;min-width:200px;padding:6px 12px;border-radius:999px;border:1px solid var(--line-strong);background:var(--surface)}
+.options{display:grid;gap:8px;margin:10px 0}
+.option{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line-strong);border-radius:12px;background:var(--surface);cursor:pointer}
+.option:has(input:checked){border-color:var(--primary);outline:1px solid var(--primary)}
+.option input{margin-top:4px;accent-color:var(--primary)}
+.option small{display:block;color:var(--muted)}
+.option .rec{margin-left:auto}
+textarea.why{width:100%;min-height:52px;padding:8px 12px;border-radius:12px;border:1px solid var(--line-strong);background:var(--surface);resize:vertical;margin:0 0 10px}
+
+/* What changed (A7) */
+.changes{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--surface)}
+.changes h3{font-size:11.5px;letter-spacing:.7px;text-transform:uppercase;color:var(--muted);padding:10px 14px 4px;margin:0}
+.change{border-top:1px solid var(--line)}
+.changes h3+.change{border-top:0}
+.change summary{display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;list-style:none}
+.change summary::-webkit-details-marker{display:none}
+.change summary .chev{color:var(--muted);transition:transform .15s}
+.change[open] summary .chev{transform:rotate(90deg)}
+.change summary .what{flex:1;min-width:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.verb{flex:none;min-width:58px;text-align:center;font-size:10.5px;font-weight:700;padding:2px 6px;border-radius:6px;text-transform:uppercase;letter-spacing:.5px}
+.v-create{background:var(--ok-bg);color:var(--ok)}.v-modify{background:var(--warn-bg);color:var(--warn)}.v-remove{background:var(--bad-bg);color:var(--bad)}.v-revise{background:var(--container);color:var(--on-container)}
+.stat{font-family:"Roboto Mono",monospace;font-size:12px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.stat .a{color:var(--ok)}.stat .d{color:var(--bad)}
+.diff{margin:0 14px 12px;border-radius:10px;overflow:auto;background:var(--code-bg);color:var(--code-ink);font-family:"Roboto Mono",monospace;font-size:12.5px;line-height:1.6}
+.diff div{padding:0 12px;white-space:pre}
+.diff .add{background:var(--code-add)}.diff .del{background:var(--code-del)}.diff .hunk{color:#8e9ac0;background:#ffffff0a}
+.fieldiff{margin:0 14px 12px;display:grid;grid-template-columns:110px 1fr;gap:4px 12px;font-size:13.5px}
+.fieldiff dt{color:var(--muted)}.fieldiff dd{margin:0}
+.fieldiff del{background:var(--bad-bg);color:var(--bad);text-decoration:line-through;padding:0 3px;border-radius:3px}
+.fieldiff ins{background:var(--ok-bg);color:var(--ok);text-decoration:none;padding:0 3px;border-radius:3px;font-weight:500}
+.changes .foot{display:flex;gap:14px;flex-wrap:wrap;align-items:center;padding:10px 14px;border-top:1px solid var(--line);background:var(--panel);font-size:13px;color:var(--muted)}
+.changes .foot .icon{font-size:17px;color:var(--ok)}
+
+/* Activity (A5) */
+.activity{list-style:none;margin:0;padding:0;position:relative}
+.activity::before{content:"";position:absolute;left:10px;top:6px;bottom:6px;width:2px;background:var(--line)}
+.activity>li{position:relative;display:grid;grid-template-columns:22px minmax(0,1fr);gap:12px;padding:0 0 14px}
+.activity .body{min-width:0}
+.activity .line{font-size:14px}
+.activity .when{color:var(--muted);font-size:12px;margin-left:6px;font-variant-numeric:tabular-nums}
+.activity .refs{margin-top:6px}
+.activity details{margin-top:6px}
+.activity details summary{cursor:pointer;color:var(--muted);font-size:12.5px;display:inline-flex;align-items:center;gap:4px}
+.activity details .diff{margin:6px 0 0}
+.comment{display:flex;gap:8px;margin-top:4px}
+.comment input{flex:1;padding:7px 12px;border-radius:999px;border:1px solid var(--line-strong);background:var(--surface)}
+
+/* Side panel */
+.side{position:sticky;top:76px;display:grid;gap:16px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px}
+.panel h2{font-size:12px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin:0 0 10px}
+.fields{display:grid;grid-template-columns:92px minmax(0,1fr);gap:10px 12px;align-items:center;margin:0;font-size:13.5px}
+.fields dt{color:var(--muted)}.fields dd{margin:0;min-width:0;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.linked h3{font-size:12.5px;color:var(--muted);font-weight:500;margin:12px 0 6px;display:flex;align-items:center;gap:6px}
+.linked h3:first-of-type{margin-top:0}
+.linked .refs{flex-direction:column;align-items:flex-start}
+.pins{margin:0;padding:0;list-style:none;display:grid;gap:6px;font-size:13px}
+.pins li{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+/* Roles (A13-A15) */
+.banner{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:14px;margin:0 0 20px;font-size:14px}
+.banner.warn{background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-line)}
+.banner.info{background:var(--panel);color:var(--muted)}
+.banner .icon{font-size:22px}
+.banner p{margin:0}.banner strong{color:inherit}
+.roles{display:grid;gap:18px}
+.role-sec{display:grid;grid-template-columns:260px minmax(0,1fr);gap:0;background:var(--surface);border:1px solid var(--line);border-radius:18px;overflow:hidden}
+.role-sec>header{padding:16px 18px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+.role-sec>header .lay{align-self:flex-start}
+.role-sec>header h2{font-size:18px;display:flex;align-items:center;gap:8px}
+.role-sec>header p{margin:0;color:var(--muted);font-size:13.5px}
+.role-sec>header .def{margin-top:auto;padding-top:8px;display:grid;gap:4px;justify-items:start}
+.role-sec>header .def label{font-size:12px;color:var(--muted)}
+.actions-list{list-style:none;margin:0;padding:6px 0}
+.actions-list li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 16px;align-items:center;padding:10px 18px}
+.actions-list li+li{border-top:1px solid var(--line)}
+.actions-list strong{font-weight:500}
+.actions-list small{display:block;color:var(--muted);font-size:12.5px}
+.actions-list .right{display:flex;align-items:center;gap:8px;justify-content:flex-end}
+.tag{font-size:11px;font-weight:700;color:var(--muted);padding:1px 7px;border-radius:6px;background:var(--panel);white-space:nowrap}
+
+/* Agents (A16) */
+.grid{display:grid;gap:16px}
+.g-profiles{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
+.pcard{display:flex;flex-direction:column;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;color:var(--ink);text-decoration:none}
+.pcard:hover{border-color:var(--primary)}
+.pcard.new{border-style:dashed;align-items:center;justify-content:center;color:var(--primary);font-weight:500;background:transparent;cursor:pointer;font-size:14px;min-height:150px}
+.pcard .top{display:flex;align-items:center;gap:10px}
+.pcard p{margin:0;color:var(--muted);font-size:13.5px}
+.pcard .foot{margin-top:auto;display:flex;gap:6px;flex-wrap:wrap}
+.form{display:grid;gap:14px}
+.form label{display:grid;gap:4px;font-size:13px;color:var(--muted);font-weight:500}
+.form input,.form select,.form textarea{padding:8px 12px;border-radius:10px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);font-size:14px}
+.form textarea{min-height:90px;resize:vertical}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.switch{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--ink)!important;font-weight:400!important;grid-template-columns:none!important}
+.switch input{appearance:none;width:36px;height:20px;border-radius:999px;background:var(--line-strong);position:relative;cursor:pointer;flex:none;margin:0;padding:0!important;border:0!important}
+.switch input::after{content:"";position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .15s}
+.switch input:checked{background:var(--primary)}.switch input:checked::after{left:18px}
+.layer-toggles{display:flex;gap:6px;flex-wrap:wrap}
+.layer-toggles label{display:inline-flex!important;align-items:center;gap:4px;cursor:pointer}
+.layer-toggles input{accent-color:var(--primary)}
+
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:10px 8px;border-top:1px solid var(--line);vertical-align:middle}
+th{font-size:11.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);border-top:0}
+.table-wrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:4px 10px}
+
+/* Prototype controls and the brief ledger */
+.proto{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:50;display:flex;gap:8px;align-items:center;background:var(--code-bg);color:var(--code-ink);padding:6px 6px 6px 14px;border-radius:999px;box-shadow:var(--shadow);font-size:12.5px;flex-wrap:wrap;max-width:calc(100vw - 32px)}
+.proto label{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.proto input{accent-color:#a3b3ff}
+.proto button{border:0;border-radius:999px;padding:5px 12px;background:#ffffff1f;color:inherit;cursor:pointer;font-size:12.5px}
+.proto button:hover{background:#ffffff33}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(520px,100vw);background:var(--surface);border-left:1px solid var(--line);box-shadow:var(--shadow);z-index:80;overflow:auto;padding:22px 22px calc(40px + env(safe-area-inset-bottom,0px))}
+.drawer[hidden]{display:none}
+.drawer h2{font-size:20px;margin:0 0 4px}
+.drawer .x{position:absolute;right:14px;top:14px;border:0;background:none;cursor:pointer;color:var(--muted);padding:6px;border-radius:50%}
+.drawer .x:hover{background:var(--panel)}
+.ledger{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:2px}
+.ledger li{display:grid;grid-template-columns:38px minmax(0,1fr);gap:10px;padding:10px 6px;border-top:1px solid var(--line);font-size:13.5px}
+.ledger .n{font-weight:700;color:var(--muted)}
+.ledger p{margin:0}.ledger .ans{color:var(--muted);margin-top:4px}
+.ledger a{font-weight:500}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(72px + env(safe-area-inset-bottom,0px));z-index:90;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:13.5px;box-shadow:var(--shadow);max-width:min(560px,calc(100vw - 32px))}
+.toast[hidden]{display:none}
+.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 3px var(--primary)}100%{box-shadow:0 0 0 3px transparent}}
+
+@media (max-width:1100px){.detail{grid-template-columns:1fr}.side{position:static}}
+@media (max-width:860px){
+  .shell{grid-template-columns:1fr;background:none}
+  .rail{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;gap:6px;padding:10px 16px}
+  .rail .spacer,.project{display:none}.nav{display:flex;flex-wrap:wrap;gap:2px}.nav a{padding:6px 10px}
+  .content,.topbar{padding-left:16px;padding-right:16px}
+  .role-sec{grid-template-columns:1fr}.role-sec>header{border-right:0;border-bottom:1px solid var(--line)}
+  .wcard{grid-template-columns:1fr}.wside{justify-content:flex-start}
+  .actions-list li{grid-template-columns:1fr}.actions-list .right{justify-content:flex-start}
+  .two{grid-template-columns:1fr}
+  .lanes{grid-template-columns:1fr}
+}
+</style>
+
+<a class="visually-hidden" href="#main">Skip to content</a>
+<div class="shell">
+  <aside class="rail">
+    <a class="brand" href="#/board"><span class="icon" aria-hidden="true">deployed_code</span>Aludel</a>
+    <a class="project" href="#/board"><span class="mark" aria-hidden="true">TS</span><span><strong>Tool Share</strong><small>Demo phase</small></span></a>
+    <nav class="nav" aria-label="Layers">
+      <a href="#/board" data-layer="home"><span class="icon" aria-hidden="true">home</span>Home</a>
+      <a href="#/board" data-layer="product"><span class="icon" aria-hidden="true">lightbulb</span>Product</a>
+      <a href="#/board" data-layer="design"><span class="icon" aria-hidden="true">palette</span>Design</a>
+      <a href="#/board" data-layer="pages"><span class="icon" aria-hidden="true">web</span>Pages</a>
+      <a href="#/board" data-layer="data"><span class="icon" aria-hidden="true">schema</span>Data</a>
+      <a href="#/board" data-layer="platform"><span class="icon" aria-hidden="true">dns</span>Platform</a>
+      <a href="#/board" class="active" aria-current="page"><span class="icon" aria-hidden="true">checklist</span>Work<span class="badge" id="needs-badge"></span></a>
+    </nav>
+    <div class="spacer"></div>
+  </aside>
+  <div>
+    <div class="topbar"><div class="search" role="search"><span class="icon" aria-hidden="true">search</span><label class="visually-hidden" for="q">Search every layer</label><input id="q" type="search" placeholder="Search stories, pages, data, code, work…" autocomplete="off"></div></div>
+    <main class="content" id="main" tabindex="-1"></main>
+  </div>
+</div>
+
+<div class="hovercard" id="hovercard" role="tooltip" hidden></div>
+<div class="menu" id="menu" role="menu" hidden></div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<div class="proto" aria-label="Prototype controls">
+  <span>Prototype</span>
+  <label for="agents-on"><input type="checkbox" id="agents-on" checked> Agent account connected</label>
+  <button type="button" id="open-brief">Your brief, item by item</button>
+  <button type="button" id="reset">Reset</button>
+</div>
+
+<aside class="drawer" id="brief" hidden aria-labelledby="brief-title" tabindex="-1">
+  <button type="button" class="x" id="close-brief" aria-label="Close"><span class="icon" aria-hidden="true">close</span></button>
+  <p class="eyebrow">WORK-UX-01 · owner brief ledger</p>
+  <h2 id="brief-title">What you asked for, and where it is</h2>
+  <p class="muted small">Each row is one ask from your message. "Show me" opens the screen that answers it. Accept or reject rows separately.</p>
+  <ol class="ledger" id="ledger"></ol>
+</aside>
+
+<script>
+/* ---------- Reference data (illustrative Tool Share project) ---------- */
+const LAYER = { product:{label:'Product',icon:'lightbulb'}, design:{label:'Design',icon:'palette'}, pages:{label:'Pages',icon:'web'}, data:{label:'Data',icon:'schema'}, platform:{label:'Platform',icon:'dns'}, work:{label:'Work',icon:'checklist'} };
+const KIND = { story:['Story','bookmark','product'], spec:['Spec','description','product'], principle:['Principle','flag','product'], doc:['Doc','article','product'],
+  page:['Page','web','pages'], token:['Design token','format_paint','design'], object:['Object','data_object','data'], operation:['Operation','api','data'], rule:['Access rule','shield_person','data'],
+  file:['File','draft','platform'], unit:['Code unit','function','platform'], build:['Preview build','rocket_launch','platform'], service:['Service','hub','platform'],
+  item:['Work item','task_alt','work'], routine:['Routine','event_repeat','work'], instructions:['Instructions','menu_book','work'] };
+
+const REFS = {
+  S3:{kind:'story',label:'S3 Reset a password',title:'Someone can reset a forgotten password',status:['Defined','s-plain'],where:'Product › Story map',facts:[['Phase','MVP'],['Needs','Email service (not connected)']]},
+  S4:{kind:'story',label:'S4 Browse tools near me',title:'Sam can browse tools near him, closest first',status:['Designed','s-info'],where:'Product › Story map',note:'Given Sam is signed in with a location, when he opens Browse, then he sees tools within the distance he chose (1, 2 or 5 km), closest first.',facts:[['Phase','Demo'],['Revision','3 · Sep 22'],['Pages','Browse']]},
+  S5:{kind:'story',label:'S5 Search tools by name',title:'Sam can search tools by name',status:['Defined','s-plain'],where:'Product › Story map',note:'Given “ladder” and “step ladder” nearby, when Sam searches “ladder”, both appear, closest first.',facts:[['Phase','Demo'],['Open edge','What happens when nothing matches?']]},
+  S7:{kind:'story',label:'S7 See a tool’s details',title:'Sam can see a tool’s photos, condition and lender',status:['Defined','s-plain'],where:'Product › Story map',facts:[['Phase','Demo'],['Pages','Tool detail']]},
+  S8:{kind:'story',label:'S8 Ask to borrow for dates',title:'Sam can ask to borrow a tool for specific dates',status:['Defined','s-plain'],where:'Product › Story map',facts:[['Phase','Demo'],['Clarifying','“As soon as possible” requests?']]},
+  S11:{kind:'story',label:'S11 Message the lender',title:'Sam can message the lender from a tool page',status:['Defined','s-plain'],where:'Product › Story map',facts:[['Pack','Messaging'],['Pages','Tool detail, Thread']]},
+  S12:{kind:'story',label:'S12 Conversations list',title:'Someone can see their conversations with unread counts',status:['Defined','s-plain'],where:'Product › Story map',facts:[['Pack','Messaging']]},
+  S13:{kind:'story',label:'S13 Read and reply',title:'Someone can read a conversation and reply',status:['Defined','s-plain'],where:'Product › Story map',facts:[['Pack','Messaging']]},
+  S16:{kind:'story',label:'S16 Mark as handed back',title:'Priya can mark a tool as handed back',status:['Proposed','s-plain'],where:'Product › Story map',facts:[['Phase','MVP'],['Acceptance','None yet']]},
+  S19:{kind:'story',label:'S19 List a tool',title:'Priya can list a tool with photos and condition',status:['Proposed','s-plain'],where:'Product › Story map',facts:[['Phase','Demo'],['Acceptance','None yet']]},
+  'SPEC-01':{kind:'spec',label:'SPEC-01 Ask to borrow',title:'Ask to borrow',status:['Draft','s-plain'],where:'Product › Specs',note:'Requests for dates, lender accepts or declines, both see the loan.',facts:[['Stories','S8, S9, S10'],['Appetite','1 week']]},
+  'SPEC-02':{kind:'spec',label:'SPEC-02 Browse and search',title:'Browse and search',status:['Accepted','s-ok'],where:'Product › Specs',facts:[['Stories','S4, S5, S7'],['Requirements','6']]},
+  principles:{kind:'principle',label:'Principles',title:'Product principles',where:'Product › Vision',note:'Neighbours first · photos over text · never show exact addresses.',facts:[['Revision','2']]},
+  voice:{kind:'doc',label:'Voice and tone',title:'Voice and tone',where:'Product › Docs',note:'Friendly, plain, first names. No marketing words.',facts:[['Template','Guide']]},
+  'page:browse':{kind:'page',label:'Browse page',title:'Browse',status:['Designed','s-info'],where:'Pages › Tree',note:'Card grid of nearby tools with a distance picker.',facts:[['Type','Collection'],['Stories','S4, S5'],['Revision','2']]},
+  'page:tool':{kind:'page',label:'Tool detail page',title:'Tool detail',status:['Placed','s-plain'],where:'Pages › Tree',facts:[['Type','Detail'],['Stories','S7, S8, S11']]},
+  'page:messages':{kind:'page',label:'Messages page',title:'Messages',status:['Placed','s-plain'],where:'Pages › Tree',facts:[['Stories','S12, S13']]},
+  'page:list':{kind:'page',label:'List a tool page',title:'List a tool',status:['Placed','s-plain'],where:'Pages › Tree',facts:[['Stories','S19']]},
+  'token:radius':{kind:'token',label:'radius.card',title:'radius.card',where:'Design › Tokens',facts:[['Value','16px']]},
+  Tool:{kind:'object',label:'Tool object',title:'Tool',status:['Contracted','s-info'],where:'Data › Objects',note:'name, photos[], condition, lenderId, location',facts:[['Relations','Lender (one), Loans (many)'],['Stories','S4, S5, S7, S19']]},
+  Location:{kind:'object',label:'Location object',title:'Location',status:['Proposed','s-plain'],where:'Data › Objects',facts:[['Fields','lat, lng, precision']]},
+  Conversation:{kind:'object',label:'Conversation object',title:'Conversation',status:['Proposed','s-plain'],where:'Data › Objects',facts:[['Pack','Messaging']]},
+  listNearbyTools:{kind:'operation',label:'GET /tools/nearby',title:'listNearbyTools',status:['Contracted','s-info'],where:'Data › API',note:'Tools within radius km of the caller, closest first.',facts:[['Returns','Tool[] with distance'],['Roles','Member']]},
+  searchTools:{kind:'operation',label:'GET /tools/search',title:'searchTools',status:['Proposed','s-plain'],where:'Data › API',facts:[['Stories','S5']]},
+  'rule:tool-read':{kind:'rule',label:'Members read tools',title:'Member · Tool · read · allow',where:'Data › Access',note:'Any signed-in member can see listed tools, never exact addresses.'},
+  'file:browse':{kind:'file',label:'src/pages/browse.ts',title:'src/pages/browse.ts',where:'Platform › Code',facts:[['Units','BrowsePage'],['Last commit','7c1e2a4']]},
+  'file:tools-api':{kind:'file',label:'server/tools.mjs',title:'server/tools.mjs',where:'Platform › Code',facts:[['Units','listNearbyTools'],['Last commit','7c1e2a4']]},
+  'file:tool-card':{kind:'file',label:'src/components/tool-card.ts',title:'src/components/tool-card.ts',where:'Platform › Code',facts:[['Units','ToolCard']]},
+  'file:browse-test':{kind:'file',label:'tests/browse.test.mjs',title:'tests/browse.test.mjs',where:'Platform › Code',facts:[['Tests','3 · named after S4 acceptance']]},
+  'unit:ToolCard':{kind:'unit',label:'ToolCard',title:'ToolCard component',status:['Healthy','s-ok'],where:'Platform › Code',facts:[['Path','src/components/tool-card.ts'],['Implements','S4']]},
+  'unit:listNearbyTools':{kind:'unit',label:'listNearbyTools()',title:'listNearbyTools handler',status:['Healthy','s-ok'],where:'Platform › Code',facts:[['Path','server/tools.mjs'],['Implements','S4 · GET /tools/nearby']]},
+  'unit:RatingStars':{kind:'unit',label:'RatingStars',title:'RatingStars component',status:['Unused','s-warn'],where:'Platform › Code',facts:[['Path','src/components/rating-stars.ts'],['Reachable','No']]},
+  'build:7c1e2a4':{kind:'build',label:'Preview 7c1e2a4',title:'Preview build 7c1e2a4',status:['Checks pass','s-ok'],where:'Platform › Releases',facts:[['Environment','Preview'],['Stories','S4']]},
+  email:{kind:'service',label:'Email service',title:'Email service',status:['Not connected','s-warn'],where:'Platform › Architecture',facts:[['Needed by','S3']]},
+  'inst:project':{kind:'instructions',label:'Project instructions r4',title:'Project instructions · revision 4',where:'Work › Agents',note:'Answers land as revisions of the records they change, with a reason.'},
+  'inst:engineer':{kind:'instructions',label:'Engineer role r2',title:'Engineer role instructions · revision 2',where:'Work › Roles',note:'Implement against acceptance and the Data contract. Commit with Aludel-Work and Implements trailers.'},
+  'inst:experience':{kind:'instructions',label:'Experience designer role r1',title:'Experience designer role instructions · revision 1',where:'Work › Roles'},
+  'inst:data':{kind:'instructions',label:'Data architect role r3',title:'Data architect role instructions · revision 3',where:'Work › Roles'},
+  'routine:a11y':{kind:'routine',label:'Accessibility sweep',title:'Accessibility sweep',where:'Work › Routines',facts:[['Runs','Weekly'],['Next','Sep 29']]},
+};
+
+const PEOPLE = {
+  you:{kind:'person',name:'Henry',label:'You',initials:'H'},
+  dana:{kind:'person',name:'Dana Ortiz',label:'Dana Ortiz',initials:'DO'},
+};
+const PROFILES = {
+  default:{kind:'agent',name:'Default agent',icon:'smart_toy',isDefault:true,model:'Account default',blurb:'Uses the account’s default model and reads only the project and role instructions.',context:[],writes:['product','design','pages','data','platform','work'],asks:'Anything that costs money, uses an external account or deploys'},
+  careful:{kind:'agent',name:'Careful architect',icon:'architecture',model:'Account default · high effort',blurb:'For contracts and access: slower, reads the whole Data layer first and asks before new objects.',context:['principles','Tool','rule:tool-read','SPEC-02'],writes:['data'],asks:'Creating a new object; changing an access rule',extra:'Read every existing object before proposing a new one. Prefer extending Tool to adding objects.'},
+  copy:{kind:'agent',name:'Copy editor',icon:'edit_note',model:'Account default · short answers',blurb:'Rewrites microcopy on pages to the voice and tone guide.',context:['voice','principles'],writes:['pages'],asks:'Changing a page’s structure'},
+};
+const TEMPLATE = {kind:'template',name:'Aludel template'};
+function who(id){ return PEOPLE[id] || PROFILES[id] || (id === 'template' ? TEMPLATE : null); }
+
+/* One role per layer; each role lists its actions (A13). who: null means "follows the role default". */
+const ROLES0 = [
+  {layer:'product',name:'Product lead',blurb:'Shapes what to build and why: stories, acceptance and specs.',def:'default',actions:[
+    {key:'define',name:'Write acceptance',desc:'Given/When/Then for stories that have none',who:null},
+    {key:'clarify',name:'Draft answers to open questions',desc:'Options and a recommendation; the decision stays with a person',who:null},
+    {key:'spec',name:'Write specs',desc:'Problem, appetite, solution and numbered requirements',who:null},
+    {key:'research',name:'Research',desc:'Sources and what they support',who:'you'},
+    {key:'drift',name:'Product drift check',desc:'Built behaviour against acceptance',who:null,routine:'Weekly'}]},
+  {layer:'design',name:'Design lead',blurb:'Keeps the design system coherent across every page.',def:'you',actions:[
+    {key:'tokens',name:'Evolve tokens and components',desc:'New components rather than one-off styles',who:null},
+    {key:'ds-audit',name:'Design system audit',desc:'One-off styles and drift from tokens',who:'default',routine:'Monthly'}]},
+  {layer:'pages',name:'Experience designer',blurb:'Turns stories into pages and the flows between them.',def:'default',actions:[
+    {key:'design',name:'Design pages',desc:'Every linked story gets a place on the page',who:null},
+    {key:'flows',name:'Map flows',desc:'How pages connect for each activity',who:null},
+    {key:'copy',name:'Write page copy',desc:'Labels, empty states and errors',who:'copy'},
+    {key:'a11y',name:'Accessibility sweep',desc:'Contrast, focus and labelling',who:null,routine:'Weekly'}]},
+  {layer:'data',name:'Data architect',blurb:'Owns objects, operations and who may use them.',def:'careful',actions:[
+    {key:'plan',name:'Write object contracts',desc:'JSON Schema, no stack names',who:null},
+    {key:'ops',name:'Write API operations',desc:'OpenAPI 3.1 shape, errors and roles',who:null},
+    {key:'access',name:'Set access rules',desc:'Who may read and change each object',who:'you'}]},
+  {layer:'platform',name:'Engineer',blurb:'Builds stories and keeps the code in step with the layers.',def:'default',actions:[
+    {key:'implement',name:'Build stories',desc:'One story per build; the preview must pass its acceptance',who:null},
+    {key:'reconcile',name:'Reconcile changed code',desc:'Create, modify or remove against the new revision',who:null},
+    {key:'configure',name:'Configure services',desc:'Names the effect, its cost and whether it can be undone',who:'you'},
+    {key:'security',name:'Security audit',desc:'Findings for this release',who:null,routine:'Before each release'}]},
+  {layer:'work',name:'Reviewer',blurb:'Checks work against acceptance before it reaches you.',def:'default',actions:[
+    {key:'review',name:'Check builds against acceptance',desc:'Steps to reproduce anything that fails',who:null},
+    {key:'triage',name:'Rank the backlog',desc:'By phase, then by what it unblocks',who:null}]},
+];
+const roleFor = layer => state.roles.find(r => r.layer === layer);
+const actionFor = (layer, key) => roleFor(layer)?.actions.find(a => a.key === key);
+
+/* Items. status: backlog | queued | batched | working | needs | review | done. {ref} in text becomes a reference chip. */
+const ITEMS0 = [
+  { id:'W-12', title:'Build “Browse tools near me”', layer:'platform', action:'implement', status:'review', assignee:'default', batch:'B-4', order:1, source:'Queued by you from the S4 gap',
+    desc:'Build {S4} so Sam sees nearby tools, closest first, on the {page:browse}. Read tools through {listNearbyTools} from the {Tool} contract, and keep to {rule:tool-read}: never show exact addresses.',
+    done:[{t:'The preview passes every S4 acceptance scenario',refs:['S4'],met:true},{t:'A preview build is recorded',refs:['build:7c1e2a4'],met:true},{t:'S4 becomes Built once you accept',refs:['S4'],met:false}],
+    changes:'w12', reads:['S4','SPEC-02','page:browse','Tool','listNearbyTools','rule:tool-read','principles'], targets:['S4','page:browse'],
+    run:{tokens:'2,314',at:'14:32',pins:['inst:project','inst:engineer']},
+    log:[
+      {at:'Sep 23 · 14:02',who:'you',text:'Added it to the Default agent’s batch {item:B-4}'},
+      {at:'14:05',who:'default',text:'Started with pinned instructions',refs:['inst:project','inst:engineer']},
+      {at:'14:09',who:'default',text:'Read its context',refs:['S4','page:browse','Tool','listNearbyTools']},
+      {at:'14:18',who:'default',text:'Created the handler for {listNearbyTools}',refs:['file:tools-api','unit:listNearbyTools'],diff:'tools'},
+      {at:'14:24',who:'default',text:'Changed the Browse page to load nearby tools',refs:['file:browse'],diff:'browse'},
+      {at:'14:27',who:'default',text:'Created a ToolCard component',refs:['file:tool-card','unit:ToolCard']},
+      {at:'14:29',who:'default',text:'Added 3 tests named after S4’s acceptance',refs:['file:browse-test']},
+      {at:'14:31',who:'default',text:'Built a preview. Checks pass: 3 of 3 tests, accessibility clean',refs:['build:7c1e2a4']},
+      {at:'14:32',who:'default',text:'Ready for your review · 2,314 tokens'}]},
+  { id:'W-14', title:'Search results layout for Browse', layer:'pages', action:'design', status:'needs', assignee:'default', batch:'B-4', order:2, source:'Gap found by Pages: S5 has no place on Browse',
+    desc:'Give {S5} a place on the {page:browse}. Results must stay closest first, like {S4}.',
+    done:[{t:'Browse has a designed revision that includes search',refs:['page:browse'],met:false},{t:'S5’s open edge (no matches) has an empty state',refs:['S5'],met:false}],
+    question:{text:'Which layout should search results use?',options:[['A · Card grid, distance on each card','Same cards as Browse; photos drive the choice (principle).'],['B · Map above a compact list','Good for “how far”, weaker for photos.']],rec:0,reason:'Browse already uses cards, and the principles say photos over text.'},
+    reads:['S5','S4','page:browse','principles','token:radius'], targets:['page:browse','S5'], run:{tokens:'1,102',at:'14:40',pins:['inst:project','inst:experience']},
+    log:[{at:'Sep 23 · 14:02',who:'you',text:'Added it to the Default agent’s batch'},{at:'14:34',who:'default',text:'Read its context',refs:['S5','page:browse','principles']},{at:'14:40',who:'default',text:'Needs your answer: two layouts differ in ways you care about'}]},
+  { id:'W-10', title:'Design the Tool detail page', layer:'pages', action:'design', status:'working', assignee:'default', batch:'B-4', order:3, source:'Gap found by Pages',
+    desc:'Design the {page:tool} so {S7}, {S8} and {S11} each have a place: photos first, then condition, the lender’s first name and rough distance.',
+    done:[{t:'Tool detail has its first designed revision',refs:['page:tool'],met:false}], reads:['S7','S8','S11','page:tool','principles','voice'], targets:['page:tool'],
+    log:[{at:'Sep 23 · 14:02',who:'you',text:'Added it to the Default agent’s batch'},{at:'14:41',who:'default',text:'Started'}]},
+  { id:'W-15', title:'Write the Tool and Location contracts', layer:'data', action:'plan', status:'batched', assignee:'careful', batch:'B-5', order:1, source:'Gap found by Data: SPEC-02 accepted, contracts proposed',
+    desc:'{SPEC-02} is accepted. Write the {Tool} and {Location} contracts so {listNearbyTools} can be built. No stack names above Platform.',
+    done:[{t:'Tool has an accepted contract',refs:['Tool'],met:false},{t:'Location has an accepted contract',refs:['Location'],met:false}], reads:['SPEC-02','Tool','Location','listNearbyTools','rule:tool-read'], targets:['Tool','Location'],
+    log:[{at:'Sep 23 · 13:50',who:'you',text:'Added it to the Careful architect’s batch'}]},
+  { id:'W-13', title:'Can people ask to borrow “as soon as possible”?', layer:'product', action:'clarify', status:'needs', assignee:'you', batch:null, order:1, source:'Asked by the Product lead while writing SPEC-01',
+    desc:'{S8} asks for specific dates. The Product lead needs to know whether a request can be “as soon as possible” before finishing {SPEC-01}.',
+    done:[{t:'SPEC-01 records the decision and its reason',refs:['SPEC-01'],met:false}],
+    question:{text:'Can people ask to borrow “as soon as possible”, or only for specific dates?',options:[['Specific dates only','Simplest; lenders plan around dates.'],['Dates or “as soon as possible”','Lender proposes the dates in reply.']],rec:0,reason:'Keeps SPEC-01 inside its one-week appetite.'},
+    reads:['S8','SPEC-01','principles'], targets:['SPEC-01','S8'], log:[{at:'Sep 22 · 16:10',who:'default',text:'Asked while writing {SPEC-01}'},{at:'Sep 23 · 09:12',who:'you',text:'Added it to your batch'}]},
+  { id:'W-20', title:'Choose an email provider', layer:'platform', action:'configure', status:'batched', assignee:'you', batch:null, order:2, source:'Gap found by Platform: S3 needs email',
+    desc:'{S3} needs to send a reset link, and the {email} is not connected. Pick a provider and note its cost and whether it can be undone.',
+    done:[{t:'Architecture names the email service',refs:['email'],met:false}], reads:['S3','email'], targets:['email'], log:[{at:'Sep 23 · 09:14',who:'you',text:'Added it to your batch'}]},
+  { id:'W-02', title:'Build conversations and threads', layer:'platform', action:'implement', status:'queued', assignee:'default', order:0, source:'Messaging pack',
+    desc:'Build {S12} and {S13} on the {page:messages} with the {Conversation} object.', done:[{t:'S12 and S13 pass in the preview',refs:['S12','S13'],met:false}], reads:['S12','S13','page:messages','Conversation'], targets:['S12','S13','page:messages'], log:[{at:'Sep 21 · 11:00',who:'template',text:'Created by the Messaging pack'}]},
+  { id:'W-19', title:'Write acceptance for “List a tool”', layer:'product', action:'define', status:'queued', assignee:'default', order:0, source:'Gap found by Product: S19 has no acceptance',
+    desc:'{S19} has no acceptance yet. Write Given/When/Then that the {page:list} can be checked against.', done:[{t:'S19 has at least one scenario',refs:['S19'],met:false}], reads:['S19','page:list','principles'], targets:['S19'], log:[{at:'Sep 23 · 08:30',who:'you',text:'Queued from the backlog'}]},
+  { id:'W-21', title:'Accessibility sweep', layer:'pages', action:'a11y', status:'queued', assignee:'default', order:0, source:'Weekly routine',
+    desc:'Check every page for contrast, focus and labelling. Record findings on the pages they concern.', done:[{t:'Each finding is recorded on its page',refs:['page:browse','page:tool'],met:false}], reads:['routine:a11y','page:browse','page:tool'], targets:[], log:[{at:'Sep 22 · 06:00',who:'template',text:'Created by the {routine:a11y} routine'}]},
+  { id:'W-22', title:'Rewrite empty states on Browse', layer:'pages', action:'copy', status:'queued', assignee:'copy', order:0, source:'Queued by Dana Ortiz',
+    desc:'The {page:browse} empty states still read like placeholders. Rewrite them to the {voice} guide.', done:[{t:'Browse has a revision with new copy',refs:['page:browse'],met:false}], reads:['page:browse','voice'], targets:['page:browse'], log:[{at:'Sep 23 · 10:02',who:'dana',text:'Queued it'}]},
+  { id:'W-23', title:'Design the “List a tool” page', layer:'pages', action:'design', status:'backlog', assignee:'default', source:'Gap found by Pages: page placed, not designed',
+    desc:'The {page:list} is placed but not designed. It realises {S19}.', done:[{t:'List a tool has a designed revision',refs:['page:list'],met:false}], reads:['page:list','S19'], targets:['page:list'], log:[{at:'Sep 23 · 06:00',who:'template',text:'Found by Pages'}]},
+  { id:'W-24', title:'Define the “Give it back” activity', layer:'product', action:'define', status:'backlog', assignee:'default', source:'Gap found by Product: MVP activity has no acceptance',
+    desc:'{S16} has no acceptance. It belongs to the MVP phase.', done:[{t:'S16 has acceptance',refs:['S16'],met:false}], reads:['S16'], targets:['S16'], log:[{at:'Sep 23 · 06:00',who:'template',text:'Found by Product'}]},
+  { id:'W-25', title:'Remove the unused RatingStars component', layer:'platform', action:'reconcile', status:'backlog', assignee:'default', source:'Gap found by Platform: unreachable code',
+    desc:'{unit:RatingStars} is not reachable from any page. Remove it or link it to a story.', done:[{t:'The unit is removed or linked',refs:['unit:RatingStars'],met:false}], reads:['unit:RatingStars'], targets:['unit:RatingStars'], log:[{at:'Sep 23 · 06:00',who:'template',text:'Found by Platform'}]},
+  { id:'W-26', title:'Write the searchTools operation', layer:'data', action:'ops', status:'backlog', assignee:'careful', source:'Gap found by Data: S5 needs an operation',
+    desc:'{S5} needs {searchTools}. Write it in OpenAPI shape against the {Tool} object.', done:[{t:'searchTools is contracted',refs:['searchTools'],met:false}], reads:['S5','searchTools','Tool'], targets:['searchTools'], log:[{at:'Sep 23 · 06:00',who:'template',text:'Found by Data'}]},
+  { id:'W-08', title:'Design the Browse page', layer:'pages', action:'design', status:'done', assignee:'default', batch:'B-3', doneAt:'Sep 21', source:'Gap found by Pages',
+    desc:'Design the {page:browse} for {S4}.', done:[{t:'Browse has a designed revision',refs:['page:browse'],met:true}], reads:['S4','page:browse'], targets:['page:browse'], changes:'w08', log:[{at:'Sep 21 · 10:10',who:'default',text:'Ready for your review'},{at:'Sep 21 · 12:02',who:'you',text:'Accepted: “Cards rather than a table: photos drive the choice.”'}]},
+  { id:'W-18', title:'Let Sam choose how far to look', layer:'product', action:'clarify', status:'done', assignee:'you', doneAt:'Sep 22', source:'Asked by the Product lead',
+    desc:'Decide how {S4} handles distance.', done:[{t:'S4 revision 3 records the decision',refs:['S4'],met:true}], reads:['S4'], targets:['S4'], log:[{at:'Sep 22 · 15:40',who:'you',text:'Answered: 1, 2 or 5 km, 2 km at first. Applied to {S4} revision 3'}]},
+  { id:'W-01', title:'Sign up, sign in and sign out', layer:'platform', action:'implement', status:'done', assignee:'template', doneAt:'Sep 20', source:'Accounts pack',
+    desc:'Built by the Aludel template.', done:[{t:'S1 and S2 built',refs:[],met:true}], reads:[], targets:[], log:[{at:'Sep 20 · 09:00',who:'template',text:'Built with the project'}]},
+];
+
+/* What changed, per item (A7). Records show field diffs; files show code diffs. */
+const DIFFS = {
+  tools:['@@ server/tools.mjs (new file) @@','+export function listNearbyTools(db, { lat, lng, radiusKm = 2 }) {','+  const rows = db.prepare(NEARBY_SQL).all({ lat, lng, radiusKm });','+  return rows.map(row => ({ ...toTool(row), distanceKm: round(row.distance, 1) }))','+    .sort((a, b) => a.distanceKm - b.distanceKm);','+}'],
+  browse:['@@ src/pages/browse.ts:18 @@',' export class BrowsePage {','-  tools = signal<Tool[]>(PLACEHOLDER_TOOLS);','+  radius = signal<1 | 2 | 5>(2);','+  tools = resource(() => api.listNearbyTools({ radiusKm: this.radius() }));',' ','-  // TODO: sort by distance','+  // Closest first comes from the operation (S4).'],
+  card:['@@ src/components/tool-card.ts (new file) @@','+@Component({ selector: \'ts-tool-card\', template: `','+  <img [src]="tool().photos[0]" alt="">','+  <strong>{{ tool().name }}</strong>','+  <small>{{ tool().lender }} · {{ tool().distanceKm }} km</small>`})'],
+  tests:['@@ tests/browse.test.mjs (new file) @@','+test(\'S4 · Given Sam is signed in with a location, when he opens Browse, then closest is first\', …)','+test(\'S4 · distance choice 1, 2 or 5 km, 2 km at first\', …)','+test(\'S4 · each card has photo, name, lender and distance\', …)'],
+};
+const CHANGES = {
+  w12:{records:[
+      {ref:'page:browse',verb:'revise',what:'revision 2 → 3',fields:[['status','Designed','Built (after you accept)'],['code','—','BrowsePage, ToolCard']]},
+      {ref:'listNearbyTools',verb:'revise',what:'status',fields:[['status','Contracted','Built']]}],
+    code:[{ref:'file:tools-api',verb:'create',a:64,d:0,diff:'tools'},{ref:'file:browse',verb:'modify',a:48,d:12,diff:'browse'},{ref:'file:tool-card',verb:'create',a:37,d:0,diff:'card'},{ref:'file:browse-test',verb:'create',a:41,d:0,diff:'tests'}],
+    units:['unit:listNearbyTools','unit:ToolCard'],checks:'3 of 3 S4 tests pass · accessibility clean · preview 7c1e2a4'},
+  w08:{records:[{ref:'page:browse',verb:'revise',what:'revision 1 → 2',fields:[['layout','—','Card grid, distance picker'],['status','Placed','Designed']]}],code:[],units:[],checks:'Accepted by you on Sep 21'},
+  w10:{records:[{ref:'page:tool',verb:'revise',what:'revision 1 → 2',fields:[['layout','—','Photo carousel, condition, lender, “Ask to borrow”'],['status','Placed','Designed (after you accept)']]}],code:[],units:[],checks:'Each linked story (S7, S8, S11) has a place'},
+  w15:{records:[{ref:'Tool',verb:'revise',what:'revision 2 → 3',fields:[['contract','Proposed','Accepted (after you accept)'],['required','name','name, photos, condition, lenderId']]},{ref:'Location',verb:'revise',what:'revision 1 → 2',fields:[['precision','—','Rounded to 200 m (principle: no exact addresses)']]}],code:[],units:[],checks:'Contracts validate as JSON Schema 2020-12'},
+};
+
+const BATCHES0 = { default:{ref:'B-4',state:'running',started:'14:02'}, careful:{ref:'B-5',state:'draft'} };
+const HISTORY0 = [{ref:'B-3',who:'default',text:'Default agent · Sep 21 · 4 items · 5,880 tokens · all accepted'},{ref:'B-2',who:'default',text:'Default agent · Sep 20 · 2 items · 1,413 tokens · 1 sent back'}];
+
+/* ---------- State ---------- */
+let state;
+function reset(){
+  state = { agentsOn:true, items:structuredClone(ITEMS0), batches:structuredClone(BATCHES0), history:structuredClone(HISTORY0), roles:structuredClone(ROLES0), nextBatch:6, sub:'queue', workingSince:{'W-10':Date.now()}, newProfile:null };
+  document.getElementById('agents-on').checked = true;
+}
+reset();
+const byId = id => state.items.find(i => i.id === id);
+const inBatch = s => ['batched','working','needs','review'].includes(s);
+const isAgent = id => who(id)?.kind === 'agent';
+
+/* ---------- Small renderers ---------- */
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const icon = (name, extra = '') => `<span class="icon ${extra}" aria-hidden="true">${name}</span>`;
+function refChip(id){
+  if (id.startsWith('item:')) { const b = id.slice(5); return `<span class="chip s-plain">${icon('smart_toy')}${esc(b)}</span>`; }
+  const itemRef = byId(id);
+  if (itemRef) return `<a class="ref k-work" href="#/item/${id}" data-ref="${id}">${icon('task_alt')}<span class="rid">${id}</span> ${esc(itemRef.title)}</a>`;
+  const r = REFS[id]; if (!r) return esc(id);
+  const [, ic, layer] = KIND[r.kind];
+  return `<a class="ref k-${layer}" href="#" data-ref="${esc(id)}" data-nav="${esc(r.where)}">${icon(ic)}${esc(r.label)}</a>`;
+}
+const lowerFirst = t => /^[A-Z][a-z]/.test(t) ? t[0].toLowerCase() + t.slice(1) : t;
+const rich = text => esc(text).replace(/\{([^}]+)\}/g, (_, id) => refChip(id.replace(/&amp;/g,'&')));
+function avatar(id, lg = false){
+  const w = who(id); if (!w) return '';
+  if (w.kind === 'person') return `<span class="avatar ${lg ? 'lg' : ''}" aria-hidden="true">${w.initials}</span>`;
+  if (w.kind === 'template') return `<span class="avatar template ${lg ? 'lg' : ''}" aria-hidden="true">${icon('magic_button')}</span>`;
+  return `<span class="avatar agent ${lg ? 'lg' : ''}" aria-hidden="true">${icon(w.icon)}</span>`;
+}
+const whoName = id => id === 'you' ? 'You' : (who(id)?.name || id);
+function roleChip(layer){
+  const r = roleFor(layer);
+  return `<a class="role l-${layer}" href="#/roles" data-flash="role-${layer}" title="${esc(LAYER[layer].label)} layer role">${icon(LAYER[layer].icon)}${esc(r.name)}</a>`;
+}
+/* Split chip: left opens the assignee, right changes it. */
+function splitChip(id, ctx, opts = {}){
+  const w = who(id); const locked = opts.locked;
+  const agentOff = isAgent(id) && !state.agentsOn;
+  const href = isAgent(id) ? `#/agents/${id}` : '#/roles';
+  return `<span class="split ${locked ? 'disabled' : ''} ${opts.follows ? 'follows' : ''} ${agentOff ? 'warn' : ''}" ${agentOff ? 'title="No agent account: this agent can’t run until one is connected"' : ''}>
+    <button type="button" class="who" data-go="${href}" aria-label="${esc(whoName(id))}${opts.follows ? ' (role default)' : ''}">${avatar(id)}<span class="name">${esc(whoName(id))}</span></button>
+    <button type="button" class="drop" data-menu="${esc(ctx)}" aria-haspopup="menu" aria-label="Change assignee" ${locked ? `disabled title="${esc(locked)}"` : ''}>${icon('expand_more')}</button></span>`;
+}
+const STATUS = {
+  backlog:['Backlog','st-backlog','inventory_2'], queued:['Queued','st-queued','schedule'], batched:['Waiting','st-waiting','hourglass_empty'],
+  working:['Working','st-working','progress_activity'], needs:['Needs you','st-needs','help'], review:['Ready for review','st-review','rate_review'], done:['Done','st-done','check_circle'] };
+function statusPill(item){
+  let [label, cls, ic] = STATUS[item.status];
+  if (item.status === 'batched' && item.assignee && !isAgent(item.assignee)) { label = 'To do'; cls = 'st-todo'; ic = 'radio_button_unchecked'; }
+  return `<span class="st ${cls}">${icon(ic, item.status === 'working' ? 'spin' : '')}${label}</span>`;
+}
+function lockReason(item){
+  if (item.status === 'working') return 'Working now. Stop the batch to reassign.';
+  if (item.status === 'review') return 'Ready for review. Accept or send it back first.';
+  if (item.assignee === 'template') return 'Built by the template';
+  if (item.status === 'done') return 'Done';
+  return null;
+}
+
+/* ---------- Board ---------- */
+function lanes(){
+  const map = new Map([['you', []]]);
+  for (const [whoId, b] of Object.entries(state.batches)) if (b) map.set(whoId, []);
+  for (const it of state.items) if (inBatch(it.status)) { if (!map.has(it.assignee)) map.set(it.assignee, []); map.get(it.assignee).push(it); }
+  for (const [k, v] of map) { v.sort((a, b) => (a.order || 0) - (b.order || 0)); if (k !== 'you' && !v.length) { if (state.batches[k] && state.batches[k].state !== 'draft') { state.history.unshift({ref:state.batches[k].ref,who:k,text:`${whoName(k)} · today · cleared`}); delete state.batches[k]; } map.delete(k); } }
+  return [...map].sort((a, b) => a[0] === 'you' ? -1 : b[0] === 'you' ? 1 : 0);
+}
+function laneView([whoId, items]){
+  const agent = isAgent(whoId); const b = state.batches[whoId];
+  const count = s => items.filter(i => i.status === s).length;
+  const waiting = count('batched');
+  const bits = [];
+  if (agent) {
+    if (count('working')) bits.push(`<span class="st st-working">${icon('progress_activity','spin')}1 working</span>`);
+    if (waiting) bits.push(`<span class="st st-waiting">${waiting} waiting</span>`);
+  } else if (waiting) bits.push(`<span class="st st-todo">${waiting} to do</span>`);
+  if (count('needs')) bits.push(`<span class="st st-needs">${count('needs')} needs you</span>`);
+  if (count('review')) bits.push(`<span class="st st-review">${count('review')} ready for review</span>`);
+  const stateText = !agent ? 'Your work, in your order' : !b ? '' : { draft:'Not started', running:`Running since ${b.started || 'now'}`, stopping:'Stopping after this item', finished:'Finished: clear each item to close it', stopped:'Stopped' }[b.state];
+  let foot = '';
+  if (agent && b) {
+    if ((b.state === 'draft' || b.state === 'stopped' || b.state === 'finished') && waiting) foot = `<button type="button" class="btn small" data-act="go" data-who="${whoId}" ${state.agentsOn ? '' : 'disabled'}>${icon('play_arrow')}Go: run ${waiting} ${waiting === 1 ? 'item' : 'items'}</button>${state.agentsOn ? '<span class="muted tiny">Spends on your agent account</span>' : '<a class="small" href="#/agents">Connect an agent account first</a>'}`;
+    else if (b.state === 'running') foot = `<button type="button" class="btn small quiet" data-act="stop" data-who="${whoId}">${icon('pause')}Stop after this item</button>`;
+    else if (b.state === 'stopping') foot = `<span class="muted small">Stopping after the current item…</span>`;
+    else if (count('review') || count('needs')) foot = `<span class="muted small">${icon('info')} Batch closes when you clear the last item.</span>`;
+  }
+  return `<section class="lane ${b?.state === 'running' ? 'running' : ''}" aria-label="${esc(whoName(whoId))} batch" id="lane-${whoId}">
+    <div class="lane-head">${avatar(whoId, true)}<div><strong>${agent ? esc(whoName(whoId)) : 'Your batch'}</strong><small>${agent && b ? `${b.ref} · ` : ''}${stateText}</small></div></div>
+    ${bits.length ? `<div class="lane-summary">${bits.join('')}</div>` : ''}
+    ${items.length ? `<ol>${items.map(i => `<li><span class="rid">${i.id}</span><span class="tt"><a class="t" href="#/item/${i.id}" data-ref="${i.id}">${esc(i.title)}</a>${statusPill(i)}</span><span class="acts">
+      ${i.status === 'review' ? `<a class="btn small ghost" href="#/item/${i.id}">Review</a>` : ''}
+      ${i.status === 'needs' ? `<a class="btn small ghost" href="#/item/${i.id}">Answer</a>` : ''}
+      ${!agent && i.status === 'batched' ? `<button type="button" class="btn small ghost" data-act="done" data-id="${i.id}">Mark done</button>` : ''}
+      ${lockReason(i) ? '' : `<button type="button" class="move" data-menu="item:${i.id}" aria-haspopup="menu" aria-label="Reassign ${esc(i.title)}" title="Reassign: moves it to that assignee’s batch">${icon('swap_horiz')}</button>`}</span></li>`).join('')}</ol>`
+      : `<div class="lane-empty">${agent ? 'Empty.' : 'Nothing in your batch. Add items assigned to you from the queue.'}</div>`}
+    ${foot ? `<div class="lane-foot">${foot}</div>` : ''}
+  </section>`;
+}
+function card(item){
+  const locked = lockReason(item);
+  let act = '';
+  if (item.status === 'queued') act = `<button type="button" class="btn small" data-act="batch" data-id="${item.id}">${icon('playlist_add')}Add to batch</button>`;
+  else if (item.status === 'backlog') act = `<button type="button" class="btn small ghost" data-act="queue" data-id="${item.id}">${icon('add')}Queue</button>`;
+  const targets = (item.targets || []).slice(0, 3).map(refChip).join('');
+  const meta = item.status === 'done' ? `Done ${item.doneAt || 'today'}${item.batch ? ` · batch ${item.batch}` : ''}` : esc(item.source || '');
+  return `<li class="wcard" id="card-${item.id}">
+    <div><div class="wtop"><span class="rid">${item.id}</span><a class="wtitle" href="#/item/${item.id}">${esc(item.title)}</a></div>
+      <div class="wmeta">${targets}<span>${meta}</span></div></div>
+    <div class="wside">${roleChip(item.layer)}${splitChip(item.assignee, 'item:' + item.id, { locked })}${act}</div></li>`;
+}
+function board(){
+  const L = lanes();
+  const q = state.items.filter(i => i.status === 'queued'), bl = state.items.filter(i => i.status === 'backlog'), dn = state.items.filter(i => i.status === 'done');
+  const list = { queue:q, backlog:bl, done:dn }[state.sub];
+  const empty = { queue:'Nothing queued. Queue items from the backlog.', backlog:'No gaps found. Nice.', done:'Nothing done yet.' }[state.sub];
+  const hint = { queue:'Adding to a batch puts the item in its assignee’s batch: yours, or that agent’s.', backlog:'Gaps the layers found and routine work not queued yet. Queue what you want done.', done:'Cleared items. The records they changed keep the history.' }[state.sub];
+  return `<p class="eyebrow">Work</p><h1 tabindex="-1">Board</h1>
+    <p class="lead">Batches are what’s being worked on now, by you and by agents. Everything else waits in the queue or the backlog.</p>
+    ${workTabs('board')}
+    <div class="section-head"><h2>Batches</h2><span class="muted small">Agent results stay here until you clear them</span></div>
+    <div class="lanes">${L.map(laneView).join('')}</div>
+    <div class="subtabs" role="tablist" aria-label="Items">
+      ${[['queue','Queue',q.length],['backlog','Backlog',bl.length],['done','Done',dn.length]].map(([k, l, n]) => `<button type="button" role="tab" id="sub-${k}" aria-selected="${state.sub === k}" data-sub="${k}">${l}<span class="n">${n}</span></button>`).join('')}
+    </div>
+    <p class="muted small" style="margin:8px 0 2px">${hint}</p>
+    ${list.length ? `<ul class="cards" role="tabpanel" aria-labelledby="sub-${state.sub}">${list.map(card).join('')}</ul>` : `<p class="empty">${empty}</p>`}
+    ${state.sub === 'done' ? `<details class="batches-history"><summary>Earlier batches · ${state.history.length}</summary><ul>${state.history.map(h => `<li><strong>${h.ref}</strong> · ${esc(h.text)}</li>`).join('')}</ul></details>` : ''}`;
+}
+function workTabs(active){
+  return `<nav class="tabs" aria-label="Work sections">${[['board','Board','#/board'],['roles','Roles','#/roles'],['agents','Agents','#/agents'],['routines','Routines','#/routines']].map(([k, l, h]) => `<a href="${h}" class="${active === k ? 'active' : ''}" ${active === k ? 'aria-current="page"' : ''}>${l}</a>`).join('')}</nav>`;
+}
+
+/* ---------- Item detail ---------- */
+function track(item){
+  const steps = [['backlog','Backlog'],['queued','Queued'],['batch','In batch'],['review','Review'],['done','Done']];
+  const pos = { backlog:0, queued:1, batched:2, working:2, needs:2, review:3, done:4 }[item.status];
+  const nowLabel = { batched: isAgent(item.assignee) ? 'In batch · waiting' : 'In your batch', working:'In batch · working', needs:'In batch · needs you' }[item.status];
+  const person = !isAgent(item.assignee);
+  return `<div class="track" aria-label="Status">${steps.map(([k, l], i) => {
+    if (person && k === 'review') return '';
+    const cls = i < pos ? 'past' : i === pos ? `now ${item.status === 'needs' ? 'needs' : item.status === 'review' ? 'review' : ''}` : '';
+    const ic = i < pos ? 'check' : i === pos ? (STATUS[item.status][2]) : 'circle';
+    return `${i ? `<span class="sep ${i <= pos ? 'past' : ''}"></span>` : ''}<span class="stp ${cls}" ${i === pos ? 'aria-current="step"' : ''}>${icon(ic, item.status === 'working' && i === pos ? 'spin' : '')}${i === pos && nowLabel ? nowLabel : l}</span>`;
+  }).join('')}</div>`;
+}
+function changesView(key, item){
+  const c = CHANGES[key]; if (!c) return '';
+  const nRec = c.records.length, nCode = c.code.length;
+  const records = c.records.map(r => `<details class="change"><summary>${icon('chevron_right','chev')}<span class="verb v-${r.verb}">${r.verb === 'revise' ? 'Revised' : r.verb}</span><span class="what">${refChip(r.ref)}<span class="muted small">${esc(r.what)}</span></span></summary>
+    <dl class="fieldiff">${r.fields.map(([f, a, b]) => `<dt>${esc(f)}</dt><dd><del>${esc(a)}</del> → <ins>${esc(b)}</ins></dd>`).join('')}</dl></details>`).join('');
+  const code = c.code.map(f => `<details class="change"><summary>${icon('chevron_right','chev')}<span class="verb v-${f.verb}">${f.verb === 'create' ? 'Created' : 'Changed'}</span><span class="what">${refChip(f.ref)}</span><span class="stat"><span class="a">+${f.a}</span> <span class="d">−${f.d}</span></span></summary>
+    <div class="diff" role="region" aria-label="Diff" tabindex="0">${DIFFS[f.diff].map(line => `<div class="${line.startsWith('@@') ? 'hunk' : line[0] === '+' ? 'add' : line[0] === '-' ? 'del' : ''}">${esc(line)}</div>`).join('')}</div></details>`).join('');
+  return `<section class="block" aria-labelledby="changed-h"><h2 id="changed-h">${icon('difference')}What changed <span class="count">${nRec} ${nRec === 1 ? 'record' : 'records'}${nCode ? ` · ${nCode} files` : ''}</span></h2>
+    <div class="changes">${nRec ? `<h3>Knowledge</h3>${records}` : ''}${nCode ? `<h3>Code</h3>${code}` : ''}
+      ${c.units.length ? `<h3>New code units</h3><div class="refs" style="padding:4px 14px 12px">${c.units.map(refChip).join('')}</div>` : ''}
+      <div class="foot">${icon('verified')}${esc(c.checks)}</div></div></section>`;
+}
+function logView(item){
+  return `<ol class="activity">${item.log.map(e => `<li>${avatar(e.who)}<div class="body"><div class="line"><strong>${esc(whoName(e.who))}</strong> ${rich(lowerFirst(e.text))}<span class="when">${esc(e.at)}</span></div>
+    ${e.refs?.length ? `<div class="refs">${e.refs.map(refChip).join('')}</div>` : ''}
+    ${e.diff ? `<details><summary>${icon('code')}Show the change</summary><div class="diff" tabindex="0" role="region" aria-label="Diff">${DIFFS[e.diff].map(line => `<div class="${line.startsWith('@@') ? 'hunk' : line[0] === '+' ? 'add' : line[0] === '-' ? 'del' : ''}">${esc(line)}</div>`).join('')}</div></details>` : ''}
+  </div></li>`).join('')}</ol>
+  <div class="comment"><label class="visually-hidden" for="comment">Add a note</label><input id="comment" placeholder="Add a note to the log…"><button type="button" class="btn small quiet" data-act="note" data-id="${item.id}">Add</button></div>`;
+}
+function itemView(item){
+  if (!item) return `<h1 tabindex="-1">Item not found</h1><p><a href="#/board">Back to the board</a></p>`;
+  const agent = isAgent(item.assignee);
+  const action = actionFor(item.layer, item.action);
+  let callout = '';
+  if (item.status === 'review') {
+    callout = `<section class="callout review" aria-labelledby="rev-h"><h2 id="rev-h">${icon('rate_review')}${esc(whoName(item.assignee))} finished this. Ready for your review</h2>
+      <p class="small">It stays in batch ${item.batch} until you clear it. Accept to close it and keep its changes, or send it back with a note.</p>
+      <div class="actions"><button type="button" class="btn" data-act="accept" data-id="${item.id}">${icon('check')}Accept</button>
+      <label class="visually-hidden" for="sendback-note">Note for the agent</label><input type="text" id="sendback-note" placeholder="Note for the agent, if you send it back">
+      <button type="button" class="btn ghost" data-act="sendback" data-id="${item.id}">Send back</button></div></section>`;
+  } else if (item.status === 'working') {
+    callout = `<section class="callout working"><p style="margin:0" class="row">${icon('progress_activity','spin')}<span><strong>${esc(whoName(item.assignee))}</strong> is working on this in batch ${item.batch}. The log updates as it goes.</span></p></section>`;
+  }
+  const q = item.question;
+  const question = q ? `<section class="${item.status === 'needs' ? 'callout needs' : 'block'}" aria-labelledby="q-h"><h2 id="q-h">${icon('help')}${esc(q.text)}</h2>
+    ${item.status === 'needs' ? `${agent || q.rec !== undefined ? `<p class="small">${agent ? `${esc(whoName(item.assignee))} paused here. ` : ''}Recommended: <strong>${esc(q.options[q.rec][0])}</strong>. ${esc(q.reason)}</p>` : ''}
+      <div class="options" role="radiogroup" aria-labelledby="q-h">${q.options.map(([o, s], i) => `<label class="option" for="opt-${i}"><input type="radio" name="answer" id="opt-${i}" value="${i}" ${i === q.rec ? 'checked' : ''}><span><strong>${esc(o)}</strong><small>${esc(s)}</small></span>${i === q.rec ? '<span class="chip s-info rec">Recommended</span>' : ''}</label>`).join('')}</div>
+      <label class="visually-hidden" for="why">Why</label><textarea class="why" id="why" placeholder="Why (saved with the decision in ${esc(REFS[item.targets[0]]?.label || 'the record')})"></textarea>
+      <div class="actions"><button type="button" class="btn" data-act="answer" data-id="${item.id}">Answer${agent ? ' and let it continue' : ''}</button></div>`
+      : `<p class="prose">${q.answer ? `<strong>${esc(q.answer)}</strong>` : 'Answered.'}</p>`}</section>` : '';
+  const locked = lockReason(item);
+  const primary = item.status === 'queued' ? `<button type="button" class="btn" data-act="batch" data-id="${item.id}">${icon('playlist_add')}Add to ${agent ? `${esc(whoName(item.assignee))}’s` : 'your'} batch</button>`
+    : item.status === 'backlog' ? `<button type="button" class="btn" data-act="queue" data-id="${item.id}">${icon('add')}Queue</button>`
+    : item.status === 'batched' && agent ? `<button type="button" class="btn quiet" data-act="unbatch" data-id="${item.id}">Take out of batch</button>`
+    : item.status === 'batched' ? `<button type="button" class="btn" data-act="done" data-id="${item.id}">${icon('check')}Mark done</button>` : '';
+  const changeKey = item.changes || (item.status === 'review' || item.status === 'done' ? item.finishedChanges : null);
+  return `<p class="eyebrow"><a href="#/board">Work</a> › <a href="#/board">Board</a> › ${item.id}</p>
+    <div class="item-head"><div class="titles"><h1 tabindex="-1">${esc(item.title)}</h1>
+      <div class="meta">${roleChip(item.layer)}<span>${esc(action?.name || item.action)}</span><span aria-hidden="true">·</span><span>${esc(item.source || '')}</span></div></div>
+      <div class="row wrap">${primary}</div></div>
+    ${track(item)}
+    <div class="detail"><div>
+      ${callout}
+      ${item.status === 'needs' ? question : ''}
+      <section class="block" aria-labelledby="desc-h"><h2 id="desc-h">${icon('notes')}Description</h2><p class="prose">${rich(item.desc)}</p></section>
+      <section class="block" aria-labelledby="done-h"><h2 id="done-h">${icon('task_alt')}Done when <span class="count">${item.done.filter(d => d.met).length} of ${item.done.length}</span></h2>
+        <ul class="checks">${item.done.map(d => `<li class="${d.met ? 'met' : 'unmet'}">${icon(d.met ? 'check_circle' : 'radio_button_unchecked')}<span>${esc(d.t)} ${d.refs.map(refChip).join(' ')}</span></li>`).join('')}</ul>
+        <p class="muted small" style="margin:10px 0 0">Closing checks each record here has a revision made from ${item.id}. The log is not documentation.</p></section>
+      ${item.status !== 'needs' ? question : ''}
+      ${changeKey ? changesView(changeKey, item) : ''}
+      <section class="block" aria-labelledby="log-h"><h2 id="log-h">${icon('history')}Activity <span class="count">${item.log.length}</span></h2>${logView(item)}</section>
+    </div>
+    <aside class="side">
+      <section class="panel" aria-labelledby="details-h"><h2 id="details-h">Details</h2><dl class="fields">
+        <dt>Status</dt><dd>${statusPill(item)}</dd>
+        <dt>Assignee</dt><dd>${splitChip(item.assignee, 'item:' + item.id, { locked })}</dd>
+        <dt>Role</dt><dd>${roleChip(item.layer)}</dd>
+        <dt>Action</dt><dd>${esc(action?.name || item.action)}</dd>
+        ${item.batch && item.status !== 'queued' && item.status !== 'backlog' ? `<dt>Batch</dt><dd><a href="#/board" data-flash="lane-${item.assignee}">${item.batch}</a></dd>` : ''}
+        ${item.run ? `<dt>Run</dt><dd class="small">${item.run.tokens} tokens · ${item.run.at}</dd>` : ''}
+      </dl></section>
+      <section class="panel linked" aria-labelledby="linked-h"><h2 id="linked-h">Linked knowledge</h2>
+        ${item.targets.length ? `<h3>${icon('edit')}Changes</h3><div class="refs">${item.targets.map(refChip).join('')}</div>` : ''}
+        ${item.reads.filter(r => !item.targets.includes(r)).length ? `<h3>${icon('visibility')}Reads</h3><div class="refs">${item.reads.filter(r => !item.targets.includes(r)).map(refChip).join('')}</div>` : ''}
+        ${!item.reads.length && !item.targets.length ? '<p class="muted small">Nothing linked.</p>' : ''}
+      </section>
+      ${agent ? `<section class="panel" aria-labelledby="runs-h"><h2 id="runs-h">Runs with</h2><ul class="pins">
+        <li>${avatar(item.assignee)}<a href="#/agents/${item.assignee}">${esc(whoName(item.assignee))}</a><span class="muted tiny">${esc(PROFILES[item.assignee].model)}</span></li>
+        ${(item.run?.pins || ['inst:project']).map(p => `<li>${refChip(p)}</li>`).join('')}
+        ${PROFILES[item.assignee].context.length ? `<li class="muted tiny">Plus the profile’s own context: ${PROFILES[item.assignee].context.map(refChip).join(' ')}</li>` : ''}
+      </ul><p class="muted tiny" style="margin:8px 0 0">Pinned when it starts, so later edits don’t change a run.</p></section>` : ''}
+    </aside></div>`;
+}
+
+/* ---------- Roles (A13–A15, A17) ---------- */
+function rolesView(){
+  const off = !state.agentsOn;
+  return `<p class="eyebrow">Work</p><h1 tabindex="-1">Roles</h1>
+    <p class="lead">Each layer has a role that owns its work. Choose who takes each kind of action by default: you, a teammate or an agent profile. New items are assigned to them, and any item can still be reassigned. Agent results always come back to you for review.</p>
+    ${workTabs('roles')}
+    ${off ? `<div class="banner warn">${icon('power_off')}<p><strong>Agents can’t take work yet.</strong> There’s no agent account connected, so agent choices are unavailable and actions set to an agent wait for one. <a href="#/agents">Connect an account</a></p></div>` : ''}
+    <div class="roles">${state.roles.map(r => `<section class="role-sec" id="role-${r.layer}" aria-labelledby="rh-${r.layer}">
+      <header><span class="chip l-${r.layer} lay">${icon(LAYER[r.layer].icon)}${LAYER[r.layer].label}</span>
+        <h2 id="rh-${r.layer}">${esc(r.name)}</h2><p>${esc(r.blurb)}</p>
+        <a class="small" href="#" data-nav="Work › Roles › ${esc(r.name)} instructions">${icon('menu_book')} Role instructions</a>
+        <div class="def"><label>Default for this role</label>${splitChip(r.def, 'role:' + r.layer)}</div></header>
+      <ul class="actions-list">${r.actions.map(a => { const eff = a.who || r.def; const blocked = off && isAgent(eff);
+        return `<li><div><strong>${esc(a.name)}</strong>${a.routine ? ` <span class="tag">${icon('event_repeat')} ${esc(a.routine)}</span>` : ''}<small>${esc(a.desc)}</small></div>
+          <div class="right">${a.who ? `<button type="button" class="linkbtn tiny" data-act="follow" data-layer="${r.layer}" data-key="${a.key}">Use role default</button>` : '<span class="tag">Role default</span>'}
+          ${splitChip(eff, `action:${r.layer}:${a.key}`, { follows: !a.who })}</div>
+          ${blocked ? `<small style="grid-column:1/-1;color:var(--warn)">${icon('schedule')} Waits until an agent account is connected</small>` : ''}</li>`; }).join('')}</ul>
+    </section>`).join('')}</div>`;
+}
+
+/* ---------- Agents (A16) ---------- */
+function agentsView(id){
+  const p = id && (PROFILES[id] || (id === 'new' && state.newProfile));
+  if (p) return profileView(id, p);
+  const uses = pid => state.roles.flatMap(r => r.actions.filter(a => (a.who || r.def) === pid).map(a => a.name));
+  return `<p class="eyebrow">Work</p><h1 tabindex="-1">Agents</h1>
+    <p class="lead">Agent profiles are who does the work: a model, an account and extra context. Roles decide what each profile takes. Start with the default agent; add a profile when some work needs different context or settings.</p>
+    ${workTabs('agents')}
+    <section class="panel" style="margin-bottom:20px"><h2>Account</h2>
+      ${state.agentsOn ? `<p class="row wrap" style="margin:0">${icon('check_circle')}<strong>OpenAI</strong><span class="muted small">Key checked Sep 23 · stored encrypted · agents spend only when you press Go</span><button type="button" class="btn small quiet push" data-act="disconnect">Disconnect</button></p>`
+        : `<p class="row wrap" style="margin:0">${icon('power_off')}<strong>No account connected.</strong><span class="muted small">Paste an Anthropic or OpenAI key. It’s checked for free before it’s saved.</span><button type="button" class="btn small push" data-act="connect">Connect an account</button></p>`}
+    </section>
+    <div class="section-head"><h2>Profiles</h2></div>
+    <div class="grid g-profiles">${Object.entries(PROFILES).map(([pid, pr]) => { const u = uses(pid); return `<a class="pcard" href="#/agents/${pid}">
+      <div class="top">${avatar(pid, true)}<div><strong>${esc(pr.name)}</strong>${pr.isDefault ? ' <span class="chip s-info">Default</span>' : ''}<div class="muted tiny">${esc(pr.model)}</div></div></div>
+      <p>${esc(pr.blurb)}</p>
+      <div class="foot">${pr.context.length ? `<span class="chip s-plain">${icon('attach_file')}${pr.context.length} context</span>` : ''}<span class="chip s-plain">${u.length} ${u.length === 1 ? 'action' : 'actions'} by default</span></div></a>`; }).join('')}
+      <button type="button" class="pcard new" data-act="newprofile">${icon('add')}New profile</button></div>
+    <section class="panel" style="margin-top:20px"><h2>Project instructions</h2><p class="small" style="margin:0 0 8px">Every profile reads these first, then its role’s instructions, then its own context. Exported to <code>AGENTS.md</code> so any coding tool reads the same rules.</p>
+      <p class="prose small muted" style="margin:0">Keep to the principles in Product › Vision. Answers and decisions land as revisions of the records they change, with a reason. Ask before anything that costs money, uses an external account or deploys.</p></section>`;
+}
+function profileView(id, p){
+  const uses = state.roles.flatMap(r => r.actions.filter(a => (a.who || r.def) === id).map(a => ({ r, a })));
+  const work = state.items.filter(i => i.assignee === id && i.status !== 'done');
+  return `<p class="eyebrow"><a href="#/board">Work</a> › <a href="#/agents">Agents</a> › ${esc(p.name)}</p>
+    <div class="item-head"><div class="titles"><h1 tabindex="-1" class="row">${avatar(id, true)} ${esc(p.name)}</h1><div class="meta">${p.isDefault ? '<span class="chip s-info">Default</span>' : '<span class="chip s-plain">Custom profile</span>'}<span>${esc(p.blurb)}</span></div></div></div>
+    <div class="detail"><div>
+      <form class="form panel" onsubmit="return false" aria-labelledby="set-h"><h2 id="set-h">Settings</h2>
+        <div class="two"><label for="pf-name">Name<input id="pf-name" value="${esc(p.name)}" ${p.isDefault ? 'disabled' : ''}></label>
+          <label for="pf-model">Model<select id="pf-model"><option>Account default</option><option ${p.model.includes('high') ? 'selected' : ''}>Account default · high effort</option><option ${p.model.includes('short') ? 'selected' : ''}>Account default · short answers</option></select></label></div>
+        <label for="pf-extra">Extra instructions (read after the role’s)<textarea id="pf-extra" placeholder="${p.isDefault ? 'The default agent adds nothing to the role instructions.' : ''}">${esc(p.extra || '')}</textarea></label>
+        <div><span class="small muted" style="font-weight:500">Attached context</span><p class="muted tiny" style="margin:2px 0 8px">Records this profile always reads, on top of each item’s own links.</p>
+          <div class="refs">${p.context.map(refChip).join('')}<button type="button" class="btn small quiet" data-nav="Pick a record to attach">${icon('add')}Attach</button></div></div>
+        <div><span class="small muted" style="font-weight:500">May change</span><div class="layer-toggles" style="margin-top:6px">${Object.entries(LAYER).map(([k, l]) => `<label class="chip l-${k}" for="w-${k}"><input type="checkbox" id="w-${k}" ${p.writes.includes(k) ? 'checked' : ''}>${l.label}</label>`).join('')}</div></div>
+        <label for="pf-asks">Asks you first<input id="pf-asks" value="${esc(p.asks)}"></label>
+        <label class="switch" for="pf-budget"><input type="checkbox" id="pf-budget" checked> Stop a batch if one item uses more than 20,000 tokens</label>
+        <div class="row"><button type="button" class="btn" data-act="saveprofile">Save profile</button><span class="muted tiny">Saved as a new revision. Running items keep the revision they started with.</span></div>
+      </form></div>
+    <aside class="side">
+      <section class="panel"><h2>Takes by default</h2>${uses.length ? `<ul class="pins">${uses.map(({ r, a }) => `<li>${roleChip(r.layer)}<span class="small">${esc(a.name)}</span></li>`).join('')}</ul>` : '<p class="muted small" style="margin:0">Nothing yet. Set it as the default for an action in <a href="#/roles">Roles</a>.</p>'}</section>
+      <section class="panel"><h2>Open work</h2>${work.length ? `<ul class="pins">${work.map(i => `<li>${refChip(i.id)}${statusPill(i)}</li>`).join('')}</ul>` : '<p class="muted small" style="margin:0">None.</p>'}</section>
+    </aside></div>`;
+}
+
+/* ---------- Routines (unchanged structure; assignee follows the role) ---------- */
+function routinesView(){
+  const rows = state.roles.flatMap(r => r.actions.filter(a => a.routine).map(a => ({ r, a })));
+  return `<p class="eyebrow">Work</p><h1 tabindex="-1">Routines</h1><p class="lead">Each run creates an ordinary item, assigned like any other by its role. A routine never opens a second item while its last one is open.</p>${workTabs('routines')}
+    <div class="table-wrap" tabindex="0" role="region" aria-label="Routines"><table><thead><tr><th>Routine</th><th>Role</th><th>Runs</th><th>Goes to</th></tr></thead><tbody>
+    ${rows.map(({ r, a }) => `<tr><td><strong>${esc(a.name)}</strong><br><span class="muted small">${esc(a.desc)}</span></td><td>${roleChip(r.layer)}</td><td>${esc(a.routine)}</td><td>${splitChip(a.who || r.def, `action:${r.layer}:${a.key}`, { follows: !a.who })}</td></tr>`).join('')}</tbody></table></div>`;
+}
+
+/* ---------- Router and render ---------- */
+function route(){ const h = location.hash.replace(/^#\/?/, '').split('/'); return { view: h[0] || 'board', id: h[1] }; }
+function render(focus){
+  const { view, id } = route();
+  const main = document.getElementById('main');
+  hideCard();
+  main.innerHTML = view === 'item' ? itemView(byId(id)) : view === 'roles' ? rolesView() : view === 'agents' ? agentsView(id) : view === 'routines' ? routinesView() : board();
+  const needs = state.items.filter(i => i.status === 'needs' || i.status === 'review').length;
+  const badge = document.getElementById('needs-badge'); badge.textContent = needs || ''; badge.hidden = !needs; badge.setAttribute('aria-label', `${needs} need you`);
+  document.title = `${view === 'item' ? id : view[0].toUpperCase() + view.slice(1)} · Work · Tool Share`;
+  if (focus) { const el = document.getElementById(focus); el?.focus(); }
+}
+let lastHash = location.hash;
+window.addEventListener('hashchange', () => {
+  const changedPage = location.hash !== lastHash; lastHash = location.hash;
+  render(); if (changedPage) { window.scrollTo(0, 0); document.querySelector('#main h1')?.focus({ preventScroll:true }); }
+  const f = pendingFlash; pendingFlash = null; if (f) flash(f);
+});
+let pendingFlash = null;
+function flash(id){ const el = document.getElementById(id); if (!el) return; el.scrollIntoView({ block:'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
+
+/* ---------- Toast ---------- */
+let toastTimer;
+function toast(text){ const t = document.getElementById('toast'); t.textContent = text; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, 3600); }
+
+/* ---------- Hover cards (A3) ---------- */
+const hc = document.getElementById('hovercard'); let hcTimer, hcAnchor = null, hcHide;
+function cardHTML(id){
+  const item = byId(id);
+  if (item) return `<div class="hc-head"><span class="chip l-work">${icon('task_alt')}Work item</span><span class="rid">${id}</span>${statusPill(item)}</div><strong>${esc(item.title)}</strong>
+    <dl><dt>Role</dt><dd>${esc(roleFor(item.layer).name)}</dd><dt>Assignee</dt><dd>${esc(whoName(item.assignee))}</dd><dt>Changes</dt><dd>${item.targets.map(t => esc(REFS[t]?.label || t)).join(', ') || '—'}</dd></dl>
+    <div class="hc-foot">Work › Board<a href="#/item/${id}">Open ${icon('arrow_forward')}</a></div>`;
+  const r = REFS[id]; if (!r) return '';
+  const [kl, ic, layer] = KIND[r.kind];
+  return `<div class="hc-head"><span class="chip l-${layer}">${icon(ic)}${kl}</span>${r.status ? `<span class="chip ${r.status[1]}">${esc(r.status[0])}</span>` : ''}</div>
+    <strong>${esc(r.title)}</strong>${r.note ? `<p>${esc(r.note)}</p>` : ''}
+    ${r.facts ? `<dl>${r.facts.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>` : ''}
+    <div class="hc-foot">${esc(r.where)}<a href="#" data-nav="${esc(r.where)}">Open ${icon('arrow_forward')}</a></div>`;
+}
+function showCard(anchor){
+  const html = cardHTML(anchor.dataset.ref); if (!html) return;
+  hc.innerHTML = html; hc.hidden = false; hcAnchor = anchor;
+  const a = anchor.getBoundingClientRect(), w = hc.offsetWidth, h = hc.offsetHeight;
+  let left = Math.min(Math.max(12, a.left), innerWidth - w - 12), top = a.bottom + 6;
+  if (top + h > innerHeight - 12) top = Math.max(12, a.top - h - 6);
+  hc.style.left = left + 'px'; hc.style.top = top + 'px';
+  anchor.setAttribute('aria-describedby', 'hovercard');
+}
+function hideCard(){ clearTimeout(hcTimer); hc.hidden = true; hcAnchor?.removeAttribute('aria-describedby'); hcAnchor = null; }
+document.addEventListener('mouseover', e => {
+  const a = e.target.closest('[data-ref]');
+  if (a) { clearTimeout(hcHide); if (a !== hcAnchor) { clearTimeout(hcTimer); hcTimer = setTimeout(() => showCard(a), 260); } return; }
+  if (e.target.closest('#hovercard')) { clearTimeout(hcHide); return; }
+  clearTimeout(hcTimer); if (hcAnchor) hcHide = setTimeout(hideCard, 180);
+});
+document.addEventListener('focusin', e => { const a = e.target.closest('[data-ref]'); if (a) showCard(a); else if (!e.target.closest('#hovercard')) hideCard(); });
+window.addEventListener('scroll', hideCard, { passive:true });
+
+/* ---------- Assignee menu (A11, A14) ---------- */
+const menu = document.getElementById('menu'); let menuCtx = null, menuBtn = null;
+function openMenu(btn){
+  menuCtx = btn.dataset.menu; menuBtn = btn;
+  const current = currentFor(menuCtx);
+  const off = !state.agentsOn;
+  const opt = (id, sub) => { const agentOpt = isAgent(id); const dis = agentOpt && off;
+    return `<button type="button" role="menuitemradio" aria-checked="${id === current}" data-pick="${id}" ${dis ? 'disabled' : ''}>${avatar(id)}<span>${esc(id === 'you' ? 'You (Henry)' : whoName(id))}${sub ? `<small>${esc(sub)}</small>` : ''}</span>${id === current ? `<span class="check">${icon('check')}</span>` : ''}</button>`; };
+  let hint = '';
+  if (menuCtx.startsWith('item:')) { const it = byId(menuCtx.slice(5)); if (it && inBatch(it.status)) hint = `<p class="note" style="color:var(--muted)">${icon('swap_horiz')} Moves it to the new assignee’s batch</p>`; }
+  menu.innerHTML = `${hint}<h4>People</h4>${opt('you')}${opt('dana', 'Member')}<h4>Agent profiles</h4>${Object.keys(PROFILES).map(id => opt(id, PROFILES[id].model)).join('')}
+    ${off ? `<p class="note">${icon('power_off')} Connect an agent account to choose an agent.</p>` : ''}<hr><button type="button" data-go="#/agents">${icon('tune')}<span>Manage agent profiles</span></button>`;
+  menu.hidden = false;
+  const r = btn.getBoundingClientRect(), w = menu.offsetWidth, h = menu.offsetHeight;
+  menu.style.left = Math.min(Math.max(12, r.right - w), innerWidth - w - 12) + 'px';
+  menu.style.top = (r.bottom + 6 + h > innerHeight - 12 ? Math.max(12, r.top - h - 6) : r.bottom + 6) + 'px';
+  btn.setAttribute('aria-expanded', 'true');
+  (menu.querySelector('[aria-checked="true"]:not(:disabled)') || menu.querySelector('button:not(:disabled)'))?.focus();
+}
+function closeMenu(){ if (menu.hidden) return; menu.hidden = true; menuBtn?.setAttribute('aria-expanded', 'false'); menuBtn = null; }
+function currentFor(ctx){
+  const [kind, a, b] = ctx.split(':');
+  if (kind === 'item') return byId(a)?.assignee;
+  if (kind === 'role') return roleFor(a).def;
+  if (kind === 'action') { const r = roleFor(a); const act = r.actions.find(x => x.key === b); return act.who || r.def; }
+}
+function pick(ctx, whoId){
+  const [kind, a, b] = ctx.split(':');
+  if (kind === 'item') return reassign(byId(a), whoId);
+  if (kind === 'role') { const r = roleFor(a); r.def = whoId; const n = r.actions.filter(x => !x.who).length;
+    const queued = state.items.filter(i => i.layer === a && ['queued','backlog'].includes(i.status) && !actionFor(a, i.action)?.who && i.assignee !== whoId).length;
+    render(); toast(`${n} ${r.name} ${n === 1 ? 'action now goes' : 'actions now go'} to ${whoName(whoId)}. ${queued ? `${queued} existing ${queued === 1 ? 'item keeps' : 'items keep'} its assignee.` : ''}`); return; }
+  if (kind === 'action') { const r = roleFor(a); const act = r.actions.find(x => x.key === b); act.who = whoId === r.def ? null : whoId; render(); toast(`New “${act.name}” items go to ${whoName(whoId)}.`); }
+}
+function reassign(item, whoId){
+  if (!item || item.assignee === whoId) return;
+  const from = item.assignee; item.assignee = whoId;
+  item.log.push({ at:'Now', who:'you', text:`Reassigned from ${whoName(from)} to ${whoName(whoId)}` });
+  if (inBatch(item.status)) {
+    if (item.status === 'needs' && isAgent(whoId) && !isAgent(from)) item.status = 'batched';
+    placeInBatch(item);
+    toast(`${item.id} moved to ${whoId === 'you' ? 'your batch' : `${whoName(whoId)}’s batch ${state.batches[whoId]?.ref || ''}`}.`);
+    pendingFlash = `lane-${whoId}`;
+  } else toast(`${item.id} is now assigned to ${whoName(whoId)}.`);
+  render(); if (pendingFlash && route().view === 'board') { flash(pendingFlash); pendingFlash = null; }
+}
+function placeInBatch(item){
+  const lane = state.items.filter(i => i.assignee === item.assignee && inBatch(i.status) && i !== item);
+  item.order = Math.max(0, ...lane.map(i => i.order || 0)) + 1;
+  if (isAgent(item.assignee)) {
+    let b = state.batches[item.assignee];
+    if (!b) b = state.batches[item.assignee] = { ref:`B-${state.nextBatch++}`, state:'draft' };
+    else if (b.state === 'finished' || b.state === 'stopped') { b.ref = b.state === 'finished' ? `B-${state.nextBatch++}` : b.ref; b.state = 'draft'; }
+    item.batch = b.ref;
+  } else item.batch = null;
+}
+
+/* ---------- Actions ---------- */
+function act(name, el){
+  const item = el.dataset.id && byId(el.dataset.id);
+  switch (name) {
+    case 'queue': item.status = 'queued'; item.log.push({ at:'Now', who:'you', text:'Queued it' }); toast(`${item.id} queued.`); break;
+    case 'batch': item.status = 'batched'; placeInBatch(item); item.log.push({ at:'Now', who:'you', text: isAgent(item.assignee) ? `Added it to ${whoName(item.assignee)}’s batch ${item.batch}` : 'Added it to your batch' });
+      toast(`${item.id} added to ${isAgent(item.assignee) ? `${whoName(item.assignee)}’s batch ${item.batch}` : 'your batch'}.`); pendingFlash = `lane-${item.assignee}`; break;
+    case 'unbatch': item.status = 'queued'; item.batch = null; toast(`${item.id} is back in the queue.`); break;
+    case 'go': { const b = state.batches[el.dataset.who]; b.state = 'running'; b.started = new Date().toTimeString().slice(0, 5); toast(`${b.ref} started. Results will wait here for your review.`); break; }
+    case 'stop': state.batches[el.dataset.who].state = 'stopping'; break;
+    case 'accept': item.status = 'done'; item.doneAt = 'today'; item.done.forEach(d => d.met = true); item.log.push({ at:'Now', who:'you', text:'Accepted. Its changes are kept as revisions made from ' + item.id }); toast(`${item.id} accepted and cleared from ${item.batch}.`); break;
+    case 'sendback': { const note = document.getElementById('sendback-note')?.value.trim() || 'Sent back for another try'; item.status = 'queued'; item.log.push({ at:'Now', who:'you', text:`Sent back: “${note}”` }); toast(`${item.id} sent back to the queue. Add it to a batch to try again.`); break; }
+    case 'done': item.status = 'done'; item.doneAt = 'today'; item.done.forEach(d => d.met = true); item.log.push({ at:'Now', who:'you', text:'Marked it done' }); toast(`${item.id} done.`); break;
+    case 'answer': { const i = +document.querySelector('input[name=answer]:checked')?.value; const o = item.question.options[i]?.[0]; if (!o) return;
+      const why = document.getElementById('why').value.trim(); item.question.answer = o;
+      item.log.push({ at:'Now', who:'you', text:`Answered “${o}”${why ? ` because ${why}` : ''}. Applied to {${item.targets[0]}}` });
+      if (isAgent(item.assignee)) { item.status = 'batched'; const b = state.batches[item.assignee]; if (b && b.state === 'finished') b.state = 'draft'; toast(`Answered. ${whoName(item.assignee)} continues when its batch runs.`); }
+      else { item.status = 'done'; item.doneAt = 'today'; item.done.forEach(d => d.met = true); toast(`Answered and applied to ${REFS[item.targets[0]]?.label}.`); }
+      break; }
+    case 'note': { const v = document.getElementById('comment').value.trim(); if (!v) return; item.log.push({ at:'Now', who:'you', text:`noted: “${v}”` }); break; }
+    case 'follow': { const r = roleFor(el.dataset.layer); r.actions.find(a => a.key === el.dataset.key).who = null; toast('Follows the role default again.'); break; }
+    case 'disconnect': setAgents(false); return;
+    case 'connect': setAgents(true); return;
+    case 'newprofile': PROFILES.custom = PROFILES.custom || { kind:'agent', name:'New profile', icon:'person_edit', model:'Account default', blurb:'Describe what this profile is for.', context:[], writes:['product'], asks:'Anything that costs money' }; location.hash = '#/agents/custom'; return;
+    case 'saveprofile': toast('Saved as revision 2. New work uses it.'); return;
+  }
+  render();
+  if (pendingFlash && route().view === 'board') { flash(pendingFlash); pendingFlash = null; }
+}
+function setAgents(on){ state.agentsOn = on; document.getElementById('agents-on').checked = on; render(); toast(on ? 'Agent account connected.' : 'No agent account: agent choices are unavailable.'); }
+
+document.addEventListener('click', e => {
+  const t = e.target;
+  const pickBtn = t.closest('[data-pick]'); if (pickBtn) { const ctx = menuCtx; closeMenu(); pick(ctx, pickBtn.dataset.pick); return; }
+  const menuTrigger = t.closest('[data-menu]'); if (menuTrigger) { e.preventDefault(); if (menuBtn === menuTrigger) closeMenu(); else openMenu(menuTrigger); return; }
+  if (!t.closest('#menu')) closeMenu();
+  const go = t.closest('[data-go]'); if (go) { closeMenu(); location.hash = go.dataset.go; return; }
+  const nav = t.closest('[data-nav]'); if (nav) { e.preventDefault(); hideCard(); toast(`Opens ${nav.dataset.nav} (outside this prototype).`); return; }
+  const refEl = t.closest('a.ref[data-ref]'); if (refEl && !byId(refEl.dataset.ref)) { e.preventDefault(); return; }
+  const fl = t.closest('[data-flash]'); if (fl) { if (fl.getAttribute('href') === location.hash) { e.preventDefault(); flash(fl.dataset.flash); return; } pendingFlash = fl.dataset.flash; }
+  const sub = t.closest('[data-sub]'); if (sub) { state.sub = sub.dataset.sub; render(`sub-${state.sub}`); return; }
+  const a = t.closest('[data-act]'); if (a) { act(a.dataset.act, a); return; }
+  const layerLink = t.closest('.nav a[data-layer]'); if (layerLink) { e.preventDefault(); toast(`${layerLink.textContent.trim()} isn’t part of this prototype.`); }
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { if (!menu.hidden) { const b = menuBtn; closeMenu(); b?.focus(); } hideCard(); if (!brief.hidden) closeBrief(); }
+  if (!menu.hidden && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+    e.preventDefault(); const opts = [...menu.querySelectorAll('button:not(:disabled)')]; const i = opts.indexOf(document.activeElement);
+    opts[(i + (e.key === 'ArrowDown' ? 1 : -1) + opts.length) % opts.length]?.focus();
+  }
+  const sub = e.target.closest?.('[data-sub]');
+  if (sub && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) { const k = ['queue','backlog','done']; state.sub = k[(k.indexOf(state.sub) + (e.key === 'ArrowRight' ? 1 : 2)) % 3]; render(`sub-${state.sub}`); }
+});
+
+/* ---------- Batch simulation: one item at a time per running batch ---------- */
+const FINISH = { 'W-10':'w10', 'W-15':'w15' };
+setInterval(() => {
+  let changed = false;
+  for (const [whoId, b] of Object.entries(state.batches)) {
+    if (!b || !['running','stopping'].includes(b.state)) continue;
+    const lane = state.items.filter(i => i.assignee === whoId && inBatch(i.status)).sort((x, y) => x.order - y.order);
+    const working = lane.find(i => i.status === 'working');
+    if (working) {
+      if (Date.now() - (state.workingSince[working.id] || 0) > 7000) {
+        working.status = 'review'; working.finishedChanges = FINISH[working.id] || null; working.run = working.run || { tokens:'1,6' + (working.order || 0) + '8', at:'now', pins:['inst:project', working.layer === 'data' ? 'inst:data' : working.layer === 'pages' ? 'inst:experience' : 'inst:engineer'] };
+        if (working.finishedChanges) working.log.push({ at:'Now', who:whoId, text:'Revised its targets', refs:[...working.targets] });
+        working.log.push({ at:'Now', who:whoId, text:'Ready for your review' });
+        if (b.state === 'stopping') b.state = 'stopped';
+        changed = true;
+      }
+    } else if (b.state === 'running') {
+      const next = lane.find(i => i.status === 'batched');
+      if (next) { next.status = 'working'; next.batch = b.ref; state.workingSince[next.id] = Date.now(); next.log.push({ at:'Now', who:whoId, text:'Started', refs:(next.run?.pins) || ['inst:project'] }); }
+      else b.state = 'finished';
+      changed = true;
+    } else if (b.state === 'stopping') { b.state = 'stopped'; changed = true; }
+  }
+  if (changed && menu.hidden && !document.activeElement?.matches('input,textarea,select')) render();
+}, 1000);
+
+/* ---------- Prototype controls and brief ledger ---------- */
+const LEDGER = [
+  ['A1','Items in the queue had no detail; one consistent view for all','Every row opens the same item page, backlog included.','#/item/W-23'],
+  ['A2','Clear structure, like a Jira item with deeper context','Header and status track; Description, Done when, Decision, What changed, Activity; Details panel.','#/item/W-12'],
+  ['A3','Every knowledge reference: hover card, click through','Reference chips across Work. Hover or focus one; “Open” goes to its layer.','#/item/W-12'],
+  ['A4','Context: own section or part of the structure?','Both: inline where it means something, and collected under Linked knowledge as Changes and Reads.','#/item/W-12'],
+  ['A5','Log entries show files and records as chips, with a collapsed diff','Activity entries carry chips; “Show the change” opens the diff.','#/item/W-12'],
+  ['A6','Version control on knowledge might be a bigger push','Not in this pass. Record diffs reuse existing revisions.',null],
+  ['A7','A clear “here’s what changed” when the agent finishes','What changed: records with field diffs, files with code diffs, new code units, checks.','#/item/W-12'],
+  ['A8','Finished items stay in the batch as ready for review until cleared; no Review or In progress sections','Batch lanes keep each item with its state. Accept or send back to clear it.','#/board'],
+  ['A9','A user batch; adding to batch goes to the assignee’s batch','One lane per assignee: yours first, then each agent profile with work.','#/board'],
+  ['A10','Queue / Backlog / Done as small underline tabs, with Add to batch and Queue actions','Under the batches.','#/board'],
+  ['A11','Role chip and a split assignee chip; a batched item hops batches when reassigned','On the board, use ⇄ next to W-15 (or its assignee chip) and pick Default agent: it moves into that batch.','#/board'],
+  ['A12','Status, role and assignee are separate','Separate on every card, the item page and Roles.','#/item/W-14'],
+  ['A13','/work/roles: sections by layer, each role’s action types below','One section per layer.','#/roles'],
+  ['A14','Default assignee per action as the same chip; agents disabled with no account','Untick “Agent account connected” below to see it.','#/roles'],
+  ['A15','Preferences and “who takes each kind of work” driven by this one system','Both tables are gone; Roles is the only setting.','#/roles'],
+  ['A16','Flexible agent profiles: default, or custom with their own context and settings','Default agent plus two custom profiles and New profile.','#/agents/careful'],
+  ['A17','Styles only preset Roles at onboarding; never shown again','No style anywhere. The rail says “Demo phase” only.',null],
+];
+const brief = document.getElementById('brief');
+document.getElementById('ledger').innerHTML = LEDGER.map(([n, ask, ans, href]) => `<li><span class="n">${n}</span><div><p>${esc(ask)}</p><p class="ans">${esc(ans)}${href ? ` <a href="${href}" data-close-brief>Show me</a>` : ''}</p></div></li>`).join('');
+function closeBrief(){ brief.hidden = true; document.getElementById('open-brief').focus(); }
+document.getElementById('open-brief').onclick = () => { brief.hidden = false; brief.focus(); };
+document.getElementById('close-brief').onclick = closeBrief;
+brief.addEventListener('click', e => { if (e.target.closest('[data-close-brief]')) brief.hidden = true; });
+document.getElementById('agents-on').onchange = e => setAgents(e.target.checked);
+document.getElementById('reset').onclick = () => { reset(); render(); toast('Prototype reset.'); };
+
+if (!location.hash) history.replaceState(null, '', '#/board');
+render();
+</script>

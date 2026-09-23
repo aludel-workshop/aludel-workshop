@@ -1,0 +1,124 @@
+{
+  "schemaVersion": 1,
+  "note": "WORK-UX-01: one role per layer, and the actions each role performs. An action carries its own setup (instructions, what it always reads, what it may change, tools, what it asks first, run phases) and the checks its work is reviewed against. Projects copy these defaults into revisioned `role` and `work_action` records and change them from Work › Roles. `type` is the work type the runner and guidance know. `routine` names the config/routines.json routine whose items this action takes. The exact tools and permissions per action are a first cut; the owner expects to refine them.",
+  "tools": {
+    "read": "Read every layer",
+    "revise": "Revise records",
+    "ask": "Ask you questions",
+    "code": "Write code",
+    "test": "Run tests",
+    "preview": "Build a preview",
+    "commit": "Commit",
+    "open-preview": "Open the preview",
+    "validate": "Validate schemas"
+  },
+  "presets": {
+    "note": "Onboarding working styles only seed who takes each action. `agent` means the default agent profile; anything else goes to the person who created the project. They are never shown again.",
+    "dreamer": { "you": ["product.research", "data.access", "platform.configure", "platform.dependencies"] },
+    "planner": { "you": ["product.define", "product.research", "product.spec", "design.tokens", "pages.design", "pages.flows", "data.access", "platform.configure", "platform.dependencies"] },
+    "tinkerer": { "agent": [] }
+  },
+  "roles": [
+    {
+      "layer": "product", "name": "Product lead", "blurb": "Shapes what to build and why: stories, acceptance and specs.",
+      "instructions": "Write for the personas in Product › Vision. Ask only questions whose answers change what gets built.",
+      "actions": [
+        { "key": "define", "type": "define", "name": "Write acceptance", "description": "Given/When/Then for stories that have none",
+          "instructions": "Each scenario must be checkable in a preview. Cover the open edges listed on the story.",
+          "tools": ["read", "revise", "ask"], "changes": ["Product › story acceptance"], "asks": "Changing a story's title or phase",
+          "phases": ["Read context", "Draft scenarios", "Save draft"],
+          "checks": ["Each scenario can be checked in a preview", "The scenarios cover the story's open edges"] },
+        { "key": "clarify", "type": "define", "name": "Draft answers to open questions", "description": "Options and a recommendation; a person decides",
+          "instructions": "Offer two to four answers that differ in ways the owner cares about, and recommend one.",
+          "tools": ["read", "ask"], "changes": [], "asks": "Always: the decision is a person's",
+          "phases": ["Read context", "Draft options", "Save options"],
+          "checks": ["The answer is applied to the record it changes"] },
+        { "key": "spec", "type": "spec", "name": "Write specs", "description": "Problem, appetite, solution and numbered requirements",
+          "instructions": "One spec per increment of related stories. Number requirements; use WHEN clauses where a requirement is conditional.",
+          "tools": ["read", "revise", "ask"], "changes": ["Product › specs"], "asks": "Changing a phase or the roadmap",
+          "phases": ["Read context", "Draft", "Check stories"], "checks": ["Every requirement traces to a story", "The appetite is stated"] },
+        { "key": "research", "type": "research", "name": "Research", "description": "Sources and what they support",
+          "instructions": "Cite primary sources with the date you read them.", "tools": ["read", "revise"], "changes": ["Product › research"], "asks": "",
+          "phases": ["Search", "Summarise"], "checks": ["Each claim cites a source"] },
+        { "key": "drift", "type": "audit", "routine": "product-drift", "name": "Product drift check", "description": "Built behaviour against acceptance",
+          "instructions": "List stories whose built behaviour and acceptance disagree.", "tools": ["read", "open-preview"], "changes": [], "asks": "",
+          "phases": ["Read context", "Compare", "Report"], "checks": ["Each finding names the story it concerns"] }
+      ]
+    },
+    {
+      "layer": "design", "name": "Design lead", "blurb": "Keeps the design system coherent across every page.",
+      "instructions": "Propose new components rather than one-off styles.",
+      "actions": [
+        { "key": "tokens", "type": "design", "name": "Evolve tokens and components", "description": "New components rather than one-off styles",
+          "instructions": "", "tools": ["read", "revise"], "changes": ["Design › tokens", "Design › components"], "asks": "Changing a token more than one page uses",
+          "phases": ["Read context", "Draft", "Check pages"], "checks": ["Every page still reads well with the change"] },
+        { "key": "audit", "type": "audit", "name": "Design system audit", "description": "One-off styles and drift from tokens",
+          "instructions": "", "tools": ["read", "open-preview"], "changes": [], "asks": "",
+          "phases": ["Read context", "Audit", "Report"], "checks": ["Each finding names the page it concerns"] }
+      ]
+    },
+    {
+      "layer": "pages", "name": "Experience designer", "blurb": "Turns stories into pages and the flows between them.",
+      "instructions": "Design from the stories a page realises; every linked story gets a place.",
+      "actions": [
+        { "key": "design", "type": "design", "name": "Design pages", "description": "Every linked story gets a place on the page",
+          "instructions": "Use the project's tokens and components. Offer options only when they differ in ways the owner cares about.",
+          "tools": ["read", "revise", "ask"], "changes": ["Pages › page designs"], "asks": "Removing a story from a page",
+          "phases": ["Read context", "Explore options", "Draft page", "Check stories"], "checks": ["Every linked story has a place on the page"] },
+        { "key": "flows", "type": "design", "name": "Map flows", "description": "How pages connect for each activity",
+          "instructions": "", "tools": ["read", "revise"], "changes": ["Pages › navigation"], "asks": "",
+          "phases": ["Read context", "Draft", "Check"], "checks": ["Every activity can be completed through the pages"] },
+        { "key": "a11y", "type": "audit", "routine": "accessibility", "name": "Accessibility sweep", "description": "Contrast, focus and labelling",
+          "instructions": "", "tools": ["read", "open-preview"], "changes": [], "asks": "",
+          "phases": ["Open preview", "Check", "Report"], "checks": ["Each finding is recorded on its page"] }
+      ]
+    },
+    {
+      "layer": "data", "name": "Data architect", "blurb": "Owns objects, operations and who may use them.",
+      "instructions": "Nothing above Platform names the stack. Objects are JSON Schema 2020-12; operations follow OpenAPI 3.1.",
+      "actions": [
+        { "key": "contract", "type": "plan", "name": "Write object contracts", "description": "Fields, required fields and states, with no stack names",
+          "instructions": "Required fields follow the stories that need them.", "tools": ["read", "revise", "validate", "ask"], "changes": ["Data › objects"], "asks": "Creating a new object",
+          "phases": ["Read context", "Draft schema", "Save draft"], "checks": ["The fields cover every story that needs the object", "The contract names no tables, frameworks or languages"] },
+        { "key": "operations", "type": "plan", "name": "Write API operations", "description": "OpenAPI shape, errors and roles",
+          "instructions": "", "tools": ["read", "revise", "validate"], "changes": ["Data › operations"], "asks": "",
+          "phases": ["Read context", "Draft", "Validate"], "checks": ["Each operation serves a story"] },
+        { "key": "access", "type": "plan", "name": "Set access rules", "description": "Who may read and change each object",
+          "instructions": "", "tools": ["read", "revise"], "changes": ["Data › access rules"], "asks": "Always",
+          "phases": ["Read context", "Draft"], "checks": ["Every object has a rule for each role"] }
+      ]
+    },
+    {
+      "layer": "platform", "name": "Engineer", "blurb": "Builds stories and keeps the code in step with the layers.",
+      "instructions": "Implement against the story's acceptance and the Data contract.",
+      "actions": [
+        { "key": "implement", "type": "implement", "name": "Build stories", "description": "One story per build; the preview must pass its acceptance",
+          "instructions": "One story per build. Name tests after the acceptance they check (\"S4 · Given …\"). Commit with the Aludel-Work and Implements trailers.",
+          "tools": ["read", "code", "test", "preview", "commit", "ask"], "changes": ["Platform › code", "Pages › page status"], "asks": "Deleting data; changing access rules",
+          "phases": ["Read context", "Plan", "Write code", "Run tests", "Build preview"], "checks": ["The preview passes every acceptance scenario of the story"] },
+        { "key": "reconcile", "type": "reconcile", "name": "Reconcile changed code", "description": "Create, modify or remove code against the new revision",
+          "instructions": "Classify each linked unit as create, modify or remove against the new revision, then relink.", "tools": ["read", "code", "test", "commit"], "changes": ["Platform › code"], "asks": "Removing a unit something still calls",
+          "phases": ["Read context", "Classify", "Write code", "Run tests"], "checks": ["The code matches the record's new revision"] },
+        { "key": "configure", "type": "configure", "name": "Configure services", "description": "Name the effect, its cost and whether it can be undone",
+          "instructions": "", "tools": ["read", "revise"], "changes": ["Platform › architecture"], "asks": "Anything that costs money",
+          "phases": ["Read context", "Propose"], "checks": ["The cost and how to undo it are stated"] },
+        { "key": "dependencies", "type": "configure", "routine": "dependencies", "name": "Update dependencies", "description": "Versions and what changed",
+          "instructions": "", "tools": ["read", "code", "test", "commit"], "changes": ["Platform › code"], "asks": "Major version upgrades",
+          "phases": ["Read context", "Update", "Run tests"], "checks": ["Tests pass after the update"] },
+        { "key": "security", "type": "audit", "routine": "security", "name": "Security audit", "description": "Findings for this release",
+          "instructions": "", "tools": ["read", "test", "open-preview"], "changes": [], "asks": "",
+          "phases": ["Read context", "Test", "Report"], "checks": ["Each finding has a severity and the record it concerns"] }
+      ]
+    },
+    {
+      "layer": "work", "name": "Reviewer", "blurb": "Checks work against acceptance before it reaches you.",
+      "instructions": "Verify; don't assume. Flag anything you could not check.",
+      "actions": [
+        { "key": "review", "type": "review", "name": "Check work against acceptance", "description": "Pre-checks each criterion; a person makes the call",
+          "instructions": "For each check: look at its evidence, compare it with the check's source record, and say pass or flag with the evidence you used.",
+          "tools": ["read", "test", "open-preview"], "changes": [], "asks": "Nothing: it only suggests",
+          "phases": ["Open evidence", "Check each criterion", "Summarise"], "checks": ["Each verdict quotes its evidence"] }
+      ]
+    }
+  ]
+}

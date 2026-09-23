@@ -24,6 +24,8 @@ export function initAccounts(db) {
       token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), expires_at TEXT NOT NULL
     );
   `);
+  // WORK-UX-01: each person's avatar (DiceBear Big Smile options they chose), shown wherever they are assigned.
+  if (!db.prepare('PRAGMA table_info(users)').all().some(column => column.name === 'avatar_json')) db.exec('ALTER TABLE users ADD COLUMN avatar_json TEXT');
   const sessionColumns = new Set(db.prepare('PRAGMA table_info(sessions)').all().map(column => column.name));
   // Sessions created before accounts existed all belonged to the single local owner.
   if (!sessionColumns.has('user_id')) db.exec(`ALTER TABLE sessions ADD COLUMN user_id TEXT NOT NULL DEFAULT '${ownerUserId}'`);
@@ -34,7 +36,26 @@ export function initAccounts(db) {
     ON CONFLICT(project_id, user_id) DO NOTHING`).run(aludelProjectId, ownerUserId, created);
 }
 
-const publicUser = row => row && ({ id: row.id, email: row.email, name: row.display_name, owner: row.id === ownerUserId });
+const parseAvatar = value => { try { return value ? JSON.parse(value) : null; } catch { return null; } };
+const publicUser = row => row && ({ id: row.id, email: row.email, name: row.display_name, owner: row.id === ownerUserId, avatar: parseAvatar(row.avatar_json) });
+
+// The avatar is a seed plus Big Smile option values; the editor offers only the style's own choices, so the server keeps
+// the shape small and plain (short tokens and hex colours) rather than mirroring the style's catalogue.
+const avatarKeys = ['seed', 'backgroundColor', 'skinColor', 'hair', 'hairColor', 'eyes', 'mouth', 'accessories', 'accessoriesProbability'];
+export function saveAvatar(db, userId, avatar) {
+  if (avatar === null) { db.prepare('UPDATE users SET avatar_json = NULL, updated_at = ? WHERE id = ?').run(now(), userId); return getUser(db, userId); }
+  if (!avatar || typeof avatar !== 'object' || Array.isArray(avatar)) fail('Choose an avatar.');
+  const clean = {};
+  for (const [key, value] of Object.entries(avatar)) {
+    if (!avatarKeys.includes(key)) fail(`Unknown avatar option ${key}.`);
+    if (key === 'accessoriesProbability') { const number = Number(value); if (![0, 100].includes(number)) fail('Accessories are on or off.'); clean[key] = number; continue; }
+    const token = String(value ?? '');
+    if (key === 'seed' ? !/^[\w -]{1,40}$/.test(token) : !/^(#?[0-9a-f]{6}|[a-zA-Z0-9]{1,30})$/.test(token)) fail(`Choose a valid ${key}.`);
+    clean[key] = token.replace(/^#/, '');
+  }
+  db.prepare('UPDATE users SET avatar_json = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(clean), now(), userId);
+  return getUser(db, userId);
+}
 
 export function createUser(db, { email, name, password }) {
   const normalized = String(email || '').trim().toLowerCase();

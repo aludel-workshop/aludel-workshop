@@ -24,6 +24,8 @@ Classify by uncertainty and consequences, not requested medium. “Make a protot
 
 Missing evidence may raise the class. A narrow request does not establish that its parent pattern is accepted.
 
+When the owner gives a multi-part brief in chat, number each distinct ask in the work record before building. Record the owner's final position where the brief reverses itself, and mark open questions as such rather than choosing silently. Name where the artifact answers each ask, so review can accept or reject per ask. First trial: [WORK-UX-01](../work-redesign/work-record.md#owner-brief-ledger); unproven until its review.
+
 ## 2. Inventory evidence for the proposed scope
 
 For cross-cutting work, identify shared contracts versus project-specific choices using the [capability framework](../../product-system-framework.md). Aludel uses the same project contract as its managed products; self-development is an explicit service relationship, not an exception. Inspect current coverage and producer/consumer boundaries before assigning tools.
