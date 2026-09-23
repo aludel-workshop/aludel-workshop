@@ -30,6 +30,7 @@ try {
   const page = await context.newPage();
   page.on('pageerror', error => errors.push(error.message));
   const layerNav = () => page.getByRole('navigation', { name: 'Layers' });
+  const tab = (section, name) => page.getByRole('navigation', { name: `${section} sections` }).getByRole('link', { name, exact: true });
   const checked = [];
   const check = async name => { assert.deepEqual(await axe(page), [], `${name} has accessibility violations`); await page.screenshot({ path: `test-results/layers/${name}.png`, fullPage: true }); checked.push(name); };
 
@@ -130,11 +131,104 @@ try {
   assert.match(await page.locator('table').innerText(), /#ca3e6f/, 'tokens use the same readable primary as the scaffold');
   await check('design-foundations');
   for (const tab of ['Components', 'Patterns', 'Guidelines', 'Sources & changes']) { await page.getByRole('link', { name: tab }).click(); await page.waitForTimeout(100); assert.deepEqual(await axe(page), [], `design ${tab}`); }
+  // Data (LAY-07A): the Accounts pack's contract is built by the template; new objects start proposed.
+  await layerNav().getByRole('link', { name: 'Data' }).click();
+  await page.getByRole('heading', { name: /knows, and how it's asked for/ }).waitFor();
+  const erMap = page.getByRole('region', { name: 'Relationship map' });
+  await erMap.getByRole('link', { name: /^Account/ }).click();
+  await page.getByRole('heading', { name: 'Account', level: 2 }).waitFor();
+  await page.locator('article').getByText('Built', { exact: true }).first().waitFor();
+  assert.match(await page.getByRole('complementary', { name: 'Connected to Account' }).innerText(), /code units?/, 'the object shows what built it');
+  await check('data-objects');
+  const newObject = page.locator('form', { has: page.getByRole('heading', { name: 'New object' }) });
+  await newObject.getByLabel('Name').fill('Tool');
+  await newObject.getByLabel('Description').fill('Something a neighbour lends');
+  await newObject.getByRole('button', { name: 'Add object' }).click();
+  await page.getByRole('heading', { name: 'Tool', level: 2 }).waitFor();
+  const addField = page.locator('form', { has: page.getByRole('heading', { name: 'Add a field' }) });
+  await addField.getByLabel('Name').fill('title');
+  await addField.getByLabel('Required').check();
+  await addField.getByRole('button', { name: 'Add field' }).click();
+  await page.getByText('Added title.').waitFor();
+  const addRelation = page.locator('form', { has: page.getByRole('heading', { name: 'Add a relationship' }) });
+  await addRelation.getByLabel('Name').fill('lender');
+  await addRelation.getByLabel('To').selectOption({ label: 'Account' });
+  await addRelation.getByRole('button', { name: 'Add relationship' }).click();
+  await page.getByText('Relationship added.').waitFor();
+  await page.getByRole('button', { name: 'Accept this contract' }).click();
+  await page.getByText('The Tool contract is accepted.').waitFor();
+  await page.locator('article').getByText('Contracted', { exact: true }).waitFor();
+  await tab('Data', 'API').click();
+  await page.getByRole('navigation', { name: 'Operations' }).getByRole('link', { name: /Create an account and sign in/ }).click();
+  await page.getByRole('heading', { name: 'Create an account and sign in' }).waitFor();
+  assert.match(await page.getByRole('complementary', { name: 'Example' }).innerText(), /POST \/api\/sign-up[\s\S]*"email": "sam@example.com"/);
+  const openapi = await json('GET', `/api/projects/${project.id}/openapi.json`);
+  assert.equal(openapi.openapi, '3.1.0');
+  assert.equal(openapi.paths['/api/sign-up'].post.operationId, 'signUp');
+  assert.ok(openapi.components.schemas.Tool.required.includes('title'));
+  await check('data-api');
+  await tab('Data', 'Access').click();
+  await page.getByRole('cell', { name: 'People see only their own account.', exact: true }).waitFor();
+  await check('data-access');
+
+  // Platform (LAY-07B): overview, binding, code, repository, releases, environments, database, domains.
   await layerNav().getByRole('link', { name: 'Platform' }).click();
+  await page.getByRole('heading', { name: 'Last release' }).waitFor();
+  await until(async () => (await page.getByRole('heading', { name: 'Last release' }).locator('..').innerText()).includes('Passed'), 'the build became a passed release');
+  await check('platform-overview');
+  await tab('Platform', 'Architecture').click();
   await page.getByText('Angular 22 + Vite').waitFor();
-  await page.getByRole('link', { name: 'Environments' }).click();
+  await page.getByRole('cell', { name: 'Route handler POST /api/sign-up', exact: true }).waitFor();
+  await page.getByRole('cell', { name: 'Table accounts', exact: true }).waitFor();
+  assert.match(await page.getByText(/^Needed by/).first().innerText(), /S\d+/, 'email delivery lists the stories that need it');
+  await check('platform-architecture');
+  await tab('Platform', 'Code').click();
+  await page.getByRole('region', { name: 'Coverage' }).waitFor();
+  await page.getByRole('link', { name: /POST \/api\/sign-up/ }).click();
+  await page.getByRole('heading', { name: 'Why it exists' }).waitFor();
+  await page.getByRole('link', { name: 'signUp operation' }).waitFor();
+  await page.getByRole('heading', { name: 'References' }).locator('..').getByText('table accounts').waitFor();
+  await check('platform-code-unit');
+  await tab('Platform', 'Repository').click();
+  await page.getByText('feat: generate Tool Share skeleton').waitFor();
+  await tab('Platform', 'Releases').click();
+  await page.getByRole('region', { name: 'Releases' }).getByText('Passed', { exact: true }).waitFor();
+  await check('platform-releases');
+  await tab('Platform', 'Environments').click();
   await page.getByText('Running').first().waitFor();
+  await until(async () => /\/api\/health 200/.test(await page.getByRole('region', { name: 'Environments' }).innerText()), 'the preview answers its health check');
   await check('platform-environments');
+  // The preview database appears once the app stores something: sign up in the generated app itself.
+  const app = `http://tool-share.localhost:${port}`;
+  const signUp = await api.fetch(`${app}/api/sign-up`, { method: 'POST', data: { email: 'sam@example.com', name: 'Sam', password: 'borrow-a-ladder' }, headers: { 'content-type': 'application/json' } });
+  assert.equal(signUp.status(), 201, 'the generated app signs Sam up');
+  await tab('Platform', 'Database').click();
+  await page.reload();
+  await page.getByRole('heading', { name: 'Health' }).waitFor();
+  await page.getByText('accounts 1').waitFor();
+  await page.getByRole('button', { name: 'Back up now' }).click();
+  await page.getByText('Backed up.').waitFor();
+  await page.getByRole('button', { name: /^Restore the backup from/ }).first().click();
+  await page.getByText('This replaces the preview database').waitFor();
+  await check('platform-database-restore');
+  await page.getByRole('button', { name: 'Restore it' }).click();
+  await page.getByText(/^Restored\./).waitFor();
+  await page.getByRole('link', { name: 'Browse' }).click();
+  await page.getByRole('region', { name: 'accounts' }).getByRole('cell', { name: 'Sam', exact: true }).waitFor();
+  assert.equal(await page.getByRole('region', { name: 'accounts' }).getByText('hidden').count(), 2, 'salt and hash are hidden');
+  const browsed = await json('GET', `/api/projects/${project.id}/database/browse?table=sessions`);
+  assert.ok(browsed.rows.every(row => row[browsed.columns.indexOf('token_hash')] === null), 'session tokens never leave the server');
+  await check('platform-database-browse');
+  await page.getByRole('link', { name: 'Query' }).click();
+  await page.getByLabel(/Read-only query/).fill('SELECT name, email FROM accounts');
+  await page.getByRole('button', { name: 'Run' }).click();
+  await page.getByRole('region', { name: 'Query result' }).getByRole('cell', { name: 'sam@example.com' }).waitFor();
+  await page.getByLabel(/Read-only query/).fill('DELETE FROM accounts');
+  await page.getByRole('button', { name: 'Run' }).click();
+  await page.getByRole('alert').getByText(/Only SELECT/).waitFor();
+  await check('platform-database-query');
+  await tab('Platform', 'Domains').click();
+  await page.getByText(`tool-share.localhost:${port}`).waitFor();
 
   // Work
   await layerNav().getByRole('link', { name: 'Work' }).click();
@@ -143,6 +237,9 @@ try {
   await templateItem.click();
   await page.getByText('Built by the Aludel template.').waitFor();
   await page.getByRole('link', { name: 'Work', exact: true }).first().click();
+  // Marking the Messages page designed changed a record with generated code, so a Reconcile item is open and suggestions start collapsed.
+  await page.getByRole('link', { name: /Reconcile Messages page with its code/ }).waitFor();
+  if (!(await page.locator('.lay-suggested').evaluate(element => element.open))) await page.locator('.lay-suggested summary').click();
   const suggestion = page.locator('.lay-suggested .lay-item', { hasText: /Write acceptance for “Someone can start a conversation/ });
   await suggestion.getByRole('button', { name: 'Start now' }).click();
   await page.getByRole('heading', { name: 'Who\'s on it' }).waitFor();
@@ -151,6 +248,56 @@ try {
   await page.getByRole('button', { name: 'Done' }).click();
   await page.getByText('Moved to Done.').waitFor();
   await check('work-item');
+
+  // Work › Agents (LAY-07C): profiles with revisioned instructions, AGENTS.md export, routing by work type.
+  await page.getByRole('link', { name: 'Work', exact: true }).first().click();
+  await page.getByRole('navigation', { name: 'Work sections' }).getByRole('link', { name: 'Agents' }).click();
+  await page.getByRole('region', { name: 'Profiles' }).getByRole('link', { name: 'Coding agent' }).click();
+  await page.getByRole('heading', { name: /Coding agent/, level: 2 }).waitFor();
+  await page.getByLabel('Role instructions').fill('Implement against the story and the Data contract. Commit with Aludel-Work and Implements trailers.');
+  await page.getByLabel('Why this change (saved with the revision)').fill('Shorter, same rules');
+  await page.getByRole('button', { name: 'Save profile' }).click();
+  await page.getByText('Profile saved.').waitFor();
+  await page.getByText('Shorter, same rules').waitFor();
+  await check('work-agents-profile');
+  await page.getByRole('link', { name: 'Agents', exact: true }).first().click();
+  await page.getByRole('heading', { name: 'Project instructions' }).waitFor();
+  await page.getByRole('button', { name: 'Export AGENTS.md' }).click();
+  await page.getByText(/AGENTS.md written to the workspace/).waitFor();
+  await check('work-agents');
+  await page.getByRole('navigation', { name: 'Work sections' }).getByRole('link', { name: 'Working style' }).click();
+  await page.getByLabel('Design', { exact: true }).selectOption({ label: 'Reviewer' });
+  await page.getByText('Design work now goes to Reviewer.').waitFor();
+  await check('work-style-routing');
+
+  // Code links (LAY-07D): changing a template story makes its code suspect and opens one Reconcile item.
+  await page.goto(`${portal}/p/tool-share/product/map`);
+  await page.getByRole('region', { name: 'Story map' }).getByRole('link', { name: /Someone can sign up with email and password/ }).click();
+  const signUpDrawer = page.getByRole('dialog');
+  await signUpDrawer.getByText(/code units? · /).waitFor();
+  await signUpDrawer.getByLabel('Edge cases (one per line)').fill('The email already has an account');
+  await signUpDrawer.getByLabel('Why this change (saved with the revision)').fill('Found in testing');
+  await signUpDrawer.getByRole('button', { name: 'Save story' }).click();
+  await signUpDrawer.getByText('Suspect').waitFor();
+  await layerNav().getByRole('link', { name: 'Home' }).click();
+  const codeCard = page.getByRole('heading', { name: 'Code' }).locator('..');
+  await codeCard.getByText(/\d+ suspect/).waitFor();
+  const suspectBefore = Number(/(\d+) suspect/.exec(await codeCard.innerText())[1]);
+  await layerNav().getByRole('link', { name: 'Work' }).click();
+  await page.getByRole('link', { name: /Reconcile S1 Someone can sign up/ }).click();
+  await page.getByRole('heading', { name: 'What changed' }).waitFor();
+  await page.getByRole('cell', { name: 'edges' }).waitFor();
+  await page.getByRole('link', { name: 'POST /api/sign-up' }).waitFor();
+  await page.getByRole('button', { name: 'Agent', exact: true }).click();
+  await page.getByText('Assigned.').waitFor();
+  assert.equal(await page.getByLabel('Profile').locator('option:checked').innerText(), 'Coding agent', 'reconcile work goes to the Coding agent');
+  await page.getByText(/Instructions pinned/).waitFor();
+  await check('work-reconcile');
+  await page.getByRole('button', { name: 'Done' }).click();
+  await page.getByText('Moved to Done.').waitFor();
+  await layerNav().getByRole('link', { name: 'Home' }).click();
+  // The Messages page's own Reconcile item is still open, so fewer suspect units rather than none.
+  await until(async () => { const found = /(\d+) suspect/.exec(await page.getByRole('heading', { name: 'Code' }).locator('..').innerText()); return !found || Number(found[1]) < suspectBefore; }, 'closing the Reconcile item makes its code current again');
 
   // Search, isolation, sign out
   await page.getByLabel('Search every layer').fill('conversation');
@@ -166,7 +313,7 @@ try {
   await stranger.close();
 
   await page.setViewportSize({ width: 390, height: 844 });
-  for (const path of ['', '/product/map', '/pages/tree', '/work']) {
+  for (const path of ['', '/product/map', '/pages/tree', '/data/objects', '/data/api', '/platform', '/platform/code', '/platform/database', '/work', '/work/agents']) {
     await page.goto(`${portal}/p/tool-share${path}`);
     await page.locator('.lay-main h1').waitFor();
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `${path || 'home'} overflows at 390px`);
@@ -178,5 +325,5 @@ try {
   await page.waitForURL(`${portal}/`);
 
   assert.deepEqual(errors, []);
-  console.log(`PASS: layers ${checked.join(' → ')}; pack stories and template work; story edits with rationale; spec, doc, research; page canvas, linking and designed status; suggestions to done work; search; member isolation; 390px; sign out.`);
+  console.log(`PASS: layers ${checked.join(' → ')}; pack stories and template work; story edits with rationale; spec, doc, research; page canvas, linking and designed status; Data objects, fields, relations, contracts, OpenAPI export and access; Platform release, binding, code units, repository, health, database backup/restore, masked browse and guarded query; agent profiles, AGENTS.md export and routing; suspect code to a Reconcile item and back; suggestions to done work; search; member isolation; 390px; sign out.`);
 } finally { await browser.close(); }

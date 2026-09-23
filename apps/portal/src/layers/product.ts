@@ -2,6 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { Activity, ProjectContext, Scenario, Spec, Story, VisionSection, lines, phaseName, stateLabel, statusLabel } from './context';
+import { BuiltByComponent } from './built-by';
 
 const docTemplates: Record<string, string> = {
   Blank: '',
@@ -14,7 +15,7 @@ const docTemplates: Record<string, string> = {
 // Product: the founder and product lead. What we're building and why (knowledge-structures.md › Product).
 @Component({
   selector: 'aludel-product-layer', standalone: true,
-  imports: [FormsModule, MatIconModule],
+  imports: [FormsModule, MatIconModule, BuiltByComponent],
   template: `
   <p class="lay-eyebrow">Product · founder and product lead</p>
   <h1 tabindex="-1">What we're building, and why</h1>
@@ -90,6 +91,8 @@ const docTemplates: Record<string, string> = {
             @for (pageId of story.pages; track pageId) { <a [href]="ctx.link('pages', 'tree', pageId)" (click)="ctx.go(ctx.link('pages', 'tree', pageId), $event)"><mat-icon aria-hidden="true">{{ ctx.pageById().get(pageId)?.icon }}</mat-icon>{{ ctx.pageById().get(pageId)?.label }}</a> } @empty { <p class="lay-muted">Not placed on a page yet.</p> }
             <h3>Specs</h3>
             @for (spec of specsFor(story); track spec.id) { <a [href]="ctx.link('product', 'specs', spec.id)" (click)="ctx.go(ctx.link('product', 'specs', spec.id), $event)">{{ spec.ref }} {{ spec.title }}</a> } @empty { <p class="lay-muted">Not in a spec yet.</p> }
+            <h3>Built by</h3>
+            <aludel-built-by [recordId]="story.id" />
             <h3>Work</h3>
             @for (item of workFor(story); track item.id) { <a [href]="ctx.link('work', 'item', item.id)" (click)="ctx.go(ctx.link('work', 'item', item.id), $event)">{{ item.ref }} {{ item.title }} <span class="lay-chip lay-plain">{{ stateLabel[item.state] }}</span></a> } @empty { <p class="lay-muted">No work yet.</p> }
             <h3>Why it is this way</h3>

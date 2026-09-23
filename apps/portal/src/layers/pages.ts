@@ -4,12 +4,13 @@ import { MatIconModule } from '@angular/material/icon';
 import { PageBlocksComponent } from '../page-blocks';
 import { readableAccent } from '../color';
 import { Page, ProjectContext, statusLabel } from './context';
+import { BuiltByComponent } from './built-by';
 
 // Pages: where the product happens (knowledge-structures.md › Pages). The canvas uses the same
 // page-blocks the generated app renders, so a skeleton page here is the skeleton page there.
 @Component({
   selector: 'aludel-pages-layer', standalone: true,
-  imports: [FormsModule, MatIconModule, PageBlocksComponent],
+  imports: [FormsModule, MatIconModule, PageBlocksComponent, BuiltByComponent],
   template: `
   <p class="lay-eyebrow">Pages · where the product happens</p>
   <h1 tabindex="-1">{{ ctx.setup()?.project?.name }}'s pages</h1>
@@ -55,6 +56,8 @@ import { Page, ProjectContext, statusLabel } from './context';
             <button type="button" class="lay-link-button lay-push" (click)="unlink(page, id)" [attr.aria-label]="'Unlink ' + ctx.storyById().get(id)?.title">Unlink</button></div> }
           @empty { <p class="lay-muted">None linked.</p> }
           <label class="lay-inline-form">Link a story<select #pick (change)="link(page, pick.value); pick.value = ''"><option value="">Choose…</option>@for (story of unlinked(page); track story.id) { <option [value]="story.id">{{ story.ref }} {{ story.title }}</option> }</select></label>
+          <h3>Built by</h3>
+          <aludel-built-by [recordId]="page.id" />
           <h3>Why it is this way</h3>
           @if (page.history.length) { <div class="lay-history">@for (entry of page.history; track entry.revision) { <p>{{ entry.rationale }}<br><small>Revision {{ entry.revision }} · {{ entry.author }} · {{ entry.createdAt.slice(0, 10) }}</small></p> }</div> }
           @else { <p class="lay-muted">No recorded decisions yet.</p> }

@@ -74,7 +74,8 @@ function trackedPaths(repository) {
 }
 
 // Generated project workspaces commit locally first and publish to a remote later, so onboarding never depends on GitHub being reachable.
-export function commitWorkspace({ repository, profile, message, name, email }) {
+// trailers (LAY-07D): { 'Aludel-Work': 'W-12', Implements: 'S4, SPEC-02/FR-001' } end the message so code links can be declared without tags.
+export function commitWorkspace({ repository, profile, message, name, email, trailers = null }) {
   const before = inspectGitRepository(repository);
   if (!before.initialized) git(repository, ['init', '-b', profile.initialBranch]);
   git(repository, ['config', 'user.name', name]);
@@ -87,7 +88,8 @@ export function commitWorkspace({ repository, profile, message, name, email }) {
     throw new Error(`Sensitive local files would be committed: ${blocked.join(', ')}`);
   }
   const changed = git(repository, ['diff', '--cached', '--quiet'], { allowFailure: true, quiet: true }).status !== 0;
-  if (changed) git(repository, ['commit', '-m', message]);
+  const trailerLines = Object.entries(trailers || {}).filter(([key, value]) => /^[A-Za-z-]+$/.test(key) && String(value || '').trim()).map(([key, value]) => `${key}: ${String(value).replace(/\s+/g, ' ').trim()}`);
+  if (changed) git(repository, ['commit', '-m', message, ...(trailerLines.length ? ['-m', trailerLines.join('\n')] : [])]);
   const head = git(repository, ['rev-parse', 'HEAD']).stdout.trim();
   const trackedFiles = git(repository, ['ls-files', '-z']).stdout.split('\0').filter(Boolean).length;
   return { branch: profile.initialBranch, commit: head, trackedFiles, changed };

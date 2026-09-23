@@ -18,7 +18,8 @@ depends_on: [portal-layers-model, portal-layers-knowledge-structures, portal-lay
 | Which frameworks the structures follow, and the evidence | [knowledge-research.md](knowledge-research.md) |
 | Exact record types and fields; story-pack catalog; onboarding order | [knowledge-structures.md](knowledge-structures.md) (DEC-037, DEC-038) |
 | Data layer, Platform operations, agent profiles, code links: evidence and references | [data-platform-research.md](data-platform-research.md) (DEC-038) |
-| What it should look and feel like | [prototype v2](v2/index.html) (owner-approved 2026-09-22: "this looks awesome … make it real"); [prototype v3](v3/index.html) for Data, Platform, Work › Agents and code links (**awaiting owner review**) |
+| What it should look and feel like | [prototype v2](v2/index.html) (owner-approved 2026-09-22: "this looks awesome … make it real"); [prototype v3](v3/index.html) for Data, Platform, Work › Agents and code links (built in LAY-07; owner review of the built layers pending) |
+| LAY-07 as built | [evidence and retrospective](../../evidence/lay-07-data-platform-agents.md) |
 | Onboarding as built so far | [onboarding work record](../onboarding/work-record.md), [evidence](../../evidence/onb-01-05-onboarding.md) |
 
 The prototype is the visual and structural reference, not code to copy. The real UI uses the portal's Angular/Material stack and the `page-blocks` and `proto-site` components.
@@ -29,15 +30,15 @@ The prototype is the visual and structural reference, not code to copy. The real
 |---|---|---|
 | **LAY-02** Project shell | Route `/p/<slug>/<layer>[/<tab>[/<id>]]` for every project the user is a member of. Rail: Home, Product, Design, Pages, Platform, Work; Settings; account menu (account, your apps, sign out). Global search over the project's records. "Continue in Aludel" and `/projects` link here. Aludel's old hash workspace stays reachable until LAY-06 | Browser: a new user lands in `/p/<slug>` after building; every layer and tab renders; non-members get 404; axe and 390px clean |
 | **LAY-03** Knowledge records | Server module `server/knowledge.mjs`: project-scoped records for vision sections, personas, activities, steps, stories, phases, specs, research, docs, pages and work items, with revisions and rationale. Derived story status. Onboarding writes into them: idea → vision and a persona; **story packs** (replace functionality, before Pages) → activities, steps and stories; pages → page records linked to stories; look → design settings; build → template work items done and stories built. Layer screens with core editing (stories, vision, docs, specs, page descriptions; work item assign and answer) | Domain tests for validation, ownership, derivation and pack seeding; browser test from onboarding into every layer; the scaffold still builds from the page records |
-| **LAY-07** Data, Platform operations, agents, code links (DEC-038) | Before LAY-04, after the owner reviews v3. Sub-packets below | Domain tests per sub-packet; `layers-browser.mjs` covers the new tabs; axe and 390px clean |
+| **LAY-07** Data, Platform operations, agents, code links (DEC-038) | Done 2026-09-22 (owner asked for the build directly; the v3 review now covers the built layers). Sub-packets below | Done: 12 domain tests, `layers-browser.mjs` covers the new tabs, axe and 390px clean. [Evidence](../../evidence/lay-07-data-platform-agents.md) |
 | **LAY-04** Work automation | Working style → automation policy per work type; suggested items computed from gaps; routines; the Product agent drafting stories and specs through the agent connection (needs the owner's OK to spend on API keys) | Later |
 | **LAY-05** Coding agents | Implement items against stories with isolated runs and preview review (absorbs B-03B) | Later |
 | **LAY-06** Aludel inside itself | Migrate Aludel's own docs, decisions and plans into its layers; retire the hash workspace | Later; owner-led pass |
 
 
-## LAY-07 in detail (for the session that builds it)
+## LAY-07 in detail (built 2026-09-22)
 
-Build in this order. Each sub-packet is shippable on its own.
+This was the build brief. It is kept for reference. What differs in the built version, and why, is in the [evidence](../../evidence/lay-07-data-platform-agents.md#deviations-from-the-plan). The main difference is that backups live in `<data>/backups/<projectId>/`, not in the workspace, because the workspace is the git repository.
 
 **LAY-07A Data layer.**
 - New record kinds in `server/knowledge.mjs`, each with a validator:
@@ -114,17 +115,22 @@ Build in this order. Each sub-packet is shippable on its own.
 cd apps/portal
 npm run test:server                    # domain tests
 npm run typecheck && npm run build
-# browser: start a fresh portal, then
-MACHINE_PORT=<port> PLAYWRIGHT_MODULE=<path to playwright/index.mjs> node tests/onboarding-browser.mjs
-MACHINE_PORT=<port> PLAYWRIGHT_MODULE=<…> node tests/layers-browser.mjs
+# browser: every script, each against its own fresh portal (build first)
+PLAYWRIGHT_MODULE=<path to playwright/index.mjs> tools/browser-checks.sh            # or: … tools/browser-checks.sh layers
 ```
 
-Playwright is not a portal dependency. Install it anywhere (`npm i playwright`, then `npx playwright install chromium-headless-shell`) and point `PLAYWRIGHT_MODULE` at its `index.mjs`. Known pre-existing failure: `tests/browser.mjs` fails on the baseline commit too (decision-conflict step).
+Playwright is not a portal dependency. Install it anywhere (`npm i playwright`, then `npx playwright install chromium-headless-shell`) and point `PLAYWRIGHT_MODULE` at its `index.mjs`. `tests/browser-support.mjs` resolves `*.localhost` to loopback for the test process, because Node's resolver does not on every machine. Known pre-existing failure: `tests/browser.mjs` fails on the baseline commit too (decision-conflict step).
+
+New `<mat-icon>` names need the font subset rebuilt: `python3 tools/subset-icons.py` needs fontTools (`pip install fonttools brotli`, a venv is fine). If `templates/aludel-web-v1/icons.ttf` changes while its icon list did not, restore it with `git checkout`, because a different fontTools version only re-encodes it. Icons chosen at runtime must appear somewhere as `icon: '…'` so the tool finds them.
 
 ## Current state
 
 Newest first.
 
+- **2026-09-22: LAY-07 done and agent-checked** ([evidence](../../evidence/lay-07-data-platform-agents.md)).
+  - Data layer, eight Platform tabs, Work › Agents and code links are real; server 44/44, all browser scripts pass except the known `browser.mjs` step.
+  - **Next action: owner review of the built layers (V3-REVIEW)**, then LAY-04.
+  - Open question for that review: a page edit (for example "mark as designed") opens a Reconcile item because the page has generated code. A rebuild closes it. Is that useful or noise?
 - **2026-09-22: DEC-038 documented; prototype v3 built** ([v3](v3/index.html)).
   - v3 adds the Data layer, the Platform operations tabs, Work › Agents and code links.
   - **Next action: owner review of v3.** Then build LAY-07A → D (above), then LAY-04.
@@ -133,12 +139,13 @@ Newest first.
 - **2026-09-22: LAY-02 and LAY-03 done and agent-checked.**
   - [Evidence and retrospective](../../evidence/lay-02-03-layers.md): server 32/32, onboarding and layers browser tests pass, existing workspace scripts pass.
 - **LAY-04** (after LAY-07). Its first job:
-  1. Link revisions to work items: pass `workItemId` when a work item's answer or output edits a record, and let `updateWork(... state: 'done')` verify that each target has a revision with that `work_item_id`.
+  1. Link revisions to work items: pass `workItemId` when a work item's answer or output edits a record, and let `updateWork(... state: 'done')` verify that each target has a revision with that `work_item_id`. Revision anchoring already exists: `trace_links.record_revision`, the `onRevision`/`onWorkDone` hooks in `knowledge.mjs` and Reconcile relinking in `code-links.mjs`. Build on those rather than a second mechanism.
   2. Write a question's answer into the target record with the rationale (a UI action on the item page: "Apply to S6").
   3. Remove the interim `/projects/<id>` page from `src/public.*`.
 
   Then working-style automation (stage suggestions and auto-assign per profile), routines, and the Product agent. Spending on API keys needs the owner's explicit OK (DEC-004).
 - **Useful entry points**
   - `server/knowledge.mjs`: `view()` is the snapshot every layer reads; `seedPack`, `saveNavRoutes`, `recordBuild`, `storyStatus`.
-  - `src/layers/context.ts`: `suggestions` computes gaps.
+  - `src/layers/context.ts`: `suggestions` computes gaps; `builtBy`, `recordLabel` and `recordHref` serve every layer.
+  - `server/code-links.mjs`: `indexWorkspace` (TypeScript parser), `recordManifest`, the propagation hooks and `reconcileContext`. `server/platform-ops.mjs`: releases, the preview database and commits. `server/scaffold.mjs`: `accountsBinding` and the generation manifest.
   - `tests/layers-browser.mjs` shows the expected UI behaviour step by step.

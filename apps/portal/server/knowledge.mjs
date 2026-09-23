@@ -25,13 +25,60 @@ const visionTitles = { statement: 'Vision', needs: 'Needs and opportunities', ca
 const pageStatuses = ['planned', 'skeleton', 'designed'];
 const specStatuses = ['draft', 'in-review', 'accepted', 'superseded'];
 export const workStates = ['suggested', 'ready', 'claimed', 'needs-input', 'review', 'done'];
-export const workTypes = ['define', 'spec', 'plan', 'design', 'implement', 'review', 'research', 'audit', 'configure'];
-const layers = ['product', 'design', 'pages', 'platform', 'work'];
+export const workTypes = ['define', 'spec', 'plan', 'design', 'implement', 'reconcile', 'review', 'research', 'audit', 'configure'];
+export const layers = ['product', 'design', 'pages', 'data', 'platform', 'work'];
+// Data layer (DEC-038): stack-neutral contracts. JSON Schema 2020-12 for objects, OpenAPI 3.1 shape for operations.
+const schemaTypes = ['string', 'integer', 'number', 'boolean', 'array', 'object', 'null'];
+const methods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
+const effects = ['allow', 'owner', 'deny'];
+const contracts = ['proposed', 'accepted'];
+const identifier = (value, pattern, label, example) => {
+  const clean = text(value, 60, label, true);
+  if (!pattern.test(clean)) fail(`${label} “${clean}” should look like ${example}.`);
+  return clean;
+};
+
+// Structural only: which keywords, which types, required names exist. Whether a contract suits the product is review's job.
+function schemaNode(node, label, depth = 0) {
+  if (!node || typeof node !== 'object' || Array.isArray(node)) fail(`${label} must be a JSON Schema object.`);
+  if (depth > 6) fail(`${label} is nested too deeply.`);
+  if (node.$ref !== undefined) {
+    if (!/^obj-[a-z0-9]{6,12}$/.test(String(node.$ref))) fail(`${label} refers to an unknown object.`);
+    return { $ref: node.$ref, ...(node.description ? { description: text(node.description, 300, 'Description') } : {}) };
+  }
+  const type = Array.isArray(node.type) ? node.type : [node.type];
+  if (!type.length || type.some(item => !schemaTypes.includes(item))) fail(`${label} needs a type: ${schemaTypes.join(', ')}.`);
+  const clean = { type: Array.isArray(node.type) ? type : type[0] };
+  if (node.format) clean.format = text(node.format, 40, 'Format');
+  if (node.description) clean.description = text(node.description, 300, 'Description');
+  if (Array.isArray(node.enum)) clean.enum = lines(node.enum, 80, 'Allowed value');
+  for (const key of ['maxLength', 'minLength', 'minimum', 'maximum']) if (node[key] !== undefined) {
+    if (!Number.isFinite(Number(node[key]))) fail(`${label} ${key} must be a number.`);
+    clean[key] = Number(node[key]);
+  }
+  for (const key of ['readOnly', 'writeOnly']) if (node[key]) clean[key] = true;
+  if (type.includes('array') && node.items) clean.items = schemaNode(node.items, `${label} items`, depth + 1);
+  if (type.includes('object')) {
+    const properties = node.properties && typeof node.properties === 'object' ? node.properties : {};
+    if (Object.keys(properties).length > 60) fail(`${label} has too many fields.`);
+    clean.properties = Object.fromEntries(Object.entries(properties).map(([name, value]) => [identifier(name, /^[A-Za-z_][A-Za-z0-9_]*$/, 'Field name', 'a name like startedAt'), schemaNode(value, `Field “${name}”`, depth + 1)]));
+    const required = lines(node.required, 60, 'Required field');
+    for (const name of required) if (!clean.properties[name]) fail(`“${name}” is required but is not a field.`);
+    if (required.length) clean.required = required;
+  }
+  return clean;
+}
+const schemaRefs = node => !node || typeof node !== 'object' ? [] : [...(node.$ref ? [node.$ref] : []), ...Object.values(node.properties || {}).flatMap(schemaRefs), ...schemaRefs(node.items)];
 
 export function loadStoryPacks(configDirectory) {
-  const { packs } = JSON.parse(readFileSync(join(configDirectory, 'story-packs.json'), 'utf8'));
+  const { packs, services = {} } = JSON.parse(readFileSync(join(configDirectory, 'story-packs.json'), 'utf8'));
   for (const [id, pack] of Object.entries(packs)) {
-    for (const story of pack.stories) if (!pack.steps[story.step] || !phaseKeys.includes(story.phase)) throw new Error(`Story pack ${id} has an invalid story.`);
+    for (const story of pack.stories) if (!pack.steps[story.step] || !phaseKeys.includes(story.phase) || (story.services || []).some(key => !services[key])) throw new Error(`Story pack ${id} has an invalid story.`);
+    const names = new Set((pack.objects || []).map(object => object.name));
+    const known = index => index >= 0 && index < pack.stories.length;
+    for (const object of pack.objects || []) if (!(object.stories || []).every(known) || (object.relations || []).some(relation => !names.has(relation.target))) throw new Error(`Story pack ${id} has an invalid object ${object.name}.`);
+    for (const operation of pack.operations || []) if (!(operation.stories || []).every(known) || (operation.object && !names.has(operation.object))) throw new Error(`Story pack ${id} has an invalid operation ${operation.operationId}.`);
+    for (const rule of pack.access || []) if (!names.has(rule.object)) throw new Error(`Story pack ${id} has an access rule for an unknown object.`);
   }
   return packs;
 }
@@ -60,6 +107,9 @@ export function initKnowledge(db) {
   const setupColumns = new Set(db.prepare('PRAGMA table_info(project_setup)').all().map(column => column.name));
   if (!setupColumns.has('pages_customized')) db.exec('ALTER TABLE project_setup ADD COLUMN pages_customized INTEGER NOT NULL DEFAULT 0');
   if (!setupColumns.has('story_packs_json')) db.exec("ALTER TABLE project_setup ADD COLUMN story_packs_json TEXT NOT NULL DEFAULT '[]'");
+  // LAY-07C: the profile an agent item runs as and the instruction revisions it ran with; LAY-07D: reconcile context.
+  const workColumns = new Set(db.prepare('PRAGMA table_info(layer_work_items)').all().map(column => column.name));
+  for (const column of ['profile_id', 'instructions_json', 'context_json']) if (!workColumns.has(column)) db.exec(`ALTER TABLE layer_work_items ADD COLUMN ${column} TEXT`);
 }
 
 // ---- Validators: one per kind, fields per knowledge-structures.md ----
@@ -75,7 +125,7 @@ const validators = {
   },
   activity: data => ({ title: text(data.title, 60, 'Activity', true), persona: text(data.persona, 60, 'Persona'), pack: data.pack ? text(data.pack, 40, 'Pack') : null }),
   step: data => ({ title: text(data.title, 60, 'Step', true) }),
-  story: data => {
+  story: (data, catalogs) => {
     if (!phaseKeys.includes(data.phase)) fail('Choose a phase for the story.');
     const acceptance = (Array.isArray(data.acceptance) ? data.acceptance : []).map(item => ({
       given: text(item?.given, 400, 'Given'), when: text(item?.when, 400, 'When'), then: text(item?.then, 400, 'Then')
@@ -83,6 +133,7 @@ const validators = {
     for (const item of acceptance) if (!item.given || !item.when || !item.then) fail('Each acceptance scenario needs Given, When and Then.');
     return { number: Number(data.number) || 0, title: text(data.title, 160, 'Story', true), phase: data.phase, why: text(data.why, 400, 'Why'), acceptance,
       edges: lines(data.edges, 300, 'Edge case'), clarifications: lines(data.clarifications, 300, 'Clarification'),
+      services: lines(data.services, 40, 'Service').filter(key => catalogs.services?.[key]),
       pack: data.pack ? text(data.pack, 40, 'Pack') : null, template: Boolean(data.template) };
   },
   spec: data => {
@@ -102,13 +153,77 @@ const validators = {
     if (!pageStatuses.includes(data.status || 'planned')) fail('Unknown page status.');
     return { label: text(data.label, 30, 'Page name', true), icon: data.icon, pageType: data.pageType, description: text(data.description, 1000, 'Page description'),
       inNav: Boolean(data.inNav), origin: text(data.origin || 'You', 60, 'Origin'), stories: ids(data.stories), status: data.status || 'planned', notes: text(data.notes, 4000, 'Notes') };
-  }
+  },
+  data_object: data => {
+    if (!contracts.includes(data.contract || 'proposed')) fail('Unknown contract state.');
+    const schema = schemaNode({ type: 'object', properties: {}, ...data.schema, type: 'object' }, 'The object');
+    const relations = (Array.isArray(data.relations) ? data.relations : []).map(relation => {
+      if (!['one', 'many'].includes(relation?.cardinality)) fail('A relationship is to one or to many.');
+      return { name: identifier(relation.name, /^[a-z][A-Za-z0-9]*$/, 'Relationship name', 'lender'), target: ids([relation.target])[0] || fail('Choose the object a relationship points to.'),
+        cardinality: relation.cardinality, owner: Boolean(relation.owner) };
+    });
+    return { name: identifier(data.name, /^[A-Z][A-Za-z0-9]*$/, 'Object name', 'BorrowRequest'), description: text(data.description, 1000, 'Description'), schema, relations,
+      states: lines(data.states, 200, 'Lifecycle state'), stories: ids(data.stories), specs: ids(data.specs), contract: data.contract || 'proposed',
+      origin: text(data.origin || 'You', 60, 'Origin'), pack: data.pack ? text(data.pack, 40, 'Pack') : null, template: Boolean(data.template) };
+  },
+  data_operation: data => {
+    if (!methods.includes(data.method)) fail(`Choose a method: ${methods.join(', ')}.`);
+    if (!contracts.includes(data.contract || 'proposed')) fail('Unknown contract state.');
+    const status = (value, label) => { const clean = String(value || '').trim(); if (!/^[1-5][0-9]{2}$/.test(clean)) fail(`${label} needs an HTTP status like 200.`); return clean; };
+    const response = data.response || { status: '200', description: 'Success' };
+    return { operationId: identifier(data.operationId, /^[a-z][A-Za-z0-9]*$/, 'operationId', 'listNearbyTools'), summary: text(data.summary, 160, 'Summary', true), method: data.method,
+      path: identifier(data.path, /^\/[A-Za-z0-9/_{}.-]*$/, 'Path', '/tools/{toolId}'), objectId: data.objectId ? (ids([data.objectId])[0] || fail('Unknown object.')) : null,
+      parameters: (Array.isArray(data.parameters) ? data.parameters : []).map(parameter => {
+        if (!['path', 'query', 'header'].includes(parameter?.in)) fail('A parameter is in the path, query or header.');
+        return { name: identifier(parameter.name, /^[A-Za-z_][A-Za-z0-9_-]*$/, 'Parameter', 'toolId'), in: parameter.in, required: parameter.in === 'path' || Boolean(parameter.required),
+          schema: schemaNode(parameter.schema || { type: 'string' }, `Parameter “${parameter.name}”`), description: text(parameter.description, 300, 'Description') };
+      }),
+      request: data.request ? schemaNode(data.request, 'The request body') : null,
+      response: { status: status(response.status, 'The response'), description: text(response.description, 300, 'Response description'), schema: response.schema ? schemaNode(response.schema, 'The response') : null },
+      errors: (Array.isArray(data.errors) ? data.errors : []).map(error => ({ status: status(error?.status, 'An error'), description: text(error?.description, 300, 'Error description', true) })),
+      roles: lines(data.roles, 40, 'Role'), stories: ids(data.stories), contract: data.contract || 'proposed', pack: data.pack ? text(data.pack, 40, 'Pack') : null, template: Boolean(data.template) };
+  },
+  access_rule: data => {
+    if (!effects.includes(data.effect)) fail('A rule allows, allows the owner only, or denies.');
+    return { role: identifier(data.role, /^[a-z][a-z0-9-]*$/, 'Role', 'member'), objectId: ids([data.objectId])[0] || fail('Choose the object this rule covers.'),
+      action: identifier(data.action, /^[a-z][a-zA-Z-]*$/, 'Action', 'read, create, update, delete or approve'), effect: data.effect, sentence: text(data.sentence, 300, 'Rule', true),
+      pack: data.pack ? text(data.pack, 40, 'Pack') : null };
+  },
+  // Work › Agents (DEC-038). A profile never authorizes a provider call or spending on its own (DEC-004).
+  agent_profile: data => {
+    const types = lines(data.workTypes, 20, 'Work type');
+    for (const type of types) if (!workTypes.includes(type)) fail(`Unknown work type “${type}”.`);
+    const writes = lines(data.writes, 20, 'Layer');
+    for (const layer of writes) if (!layers.includes(layer)) fail(`Unknown layer “${layer}”.`);
+    const budget = Number(data.budget ?? 0);
+    if (!Number.isFinite(budget) || budget < 0) fail('A budget is zero or more.');
+    return { key: data.key ? text(data.key, 40, 'Key') : null, name: text(data.name, 40, 'Profile name', true), icon: /^[a-z_]{1,30}$/.test(data.icon || '') ? data.icon : 'smart_toy',
+      role: text(data.role, 300, 'Role'), workTypes: [...new Set(types)], accountId: data.accountId === 'project-agent' ? 'project-agent' : null, model: text(data.model, 60, 'Model'),
+      instructions: text(data.instructions, 8000, 'Instructions'), writes: [...new Set(writes)], approvalRequired: lines(data.approvalRequired, 200, 'Effect needing approval'), budget };
+  },
+  project_instructions: data => ({ body: text(data.body, 8000, 'Project instructions') })
 };
 const kinds = Object.keys(validators);
-const prefixes = { vision_section: 'vis', persona: 'per', phase: 'pha', activity: 'act', step: 'stp', story: 'sto', spec: 'spc', research: 'res', doc: 'doc', page: 'pag' };
+const prefixes = { vision_section: 'vis', persona: 'per', phase: 'pha', activity: 'act', step: 'stp', story: 'sto', spec: 'spc', research: 'res', doc: 'doc', page: 'pag',
+  data_object: 'obj', data_operation: 'opr', access_rule: 'acc', agent_profile: 'agt', project_instructions: 'ins' };
+// Records a kind points at must exist in the same project and be of the right kind.
+const references = {
+  data_object: clean => [...clean.relations.map(relation => [relation.target, 'data_object']), ...clean.stories.map(id => [id, 'story']), ...clean.specs.map(id => [id, 'spec']), ...schemaRefs(clean.schema).map(id => [id, 'data_object'])],
+  data_operation: clean => [...(clean.objectId ? [[clean.objectId, 'data_object']] : []), ...clean.stories.map(id => [id, 'story']), ...[clean.request, clean.response.schema].flatMap(schemaRefs).map(id => [id, 'data_object'])],
+  access_rule: clean => [[clean.objectId, 'data_object']]
+};
 const newId = kind => `${prefixes[kind]}-${randomBytes(4).toString('hex')}`;
 
-export function knowledge({ db, catalogs, packs }) {
+export function loadAgentDefaults(configDirectory) {
+  const defaults = JSON.parse(readFileSync(join(configDirectory, 'agent-profiles.json'), 'utf8'));
+  const routed = defaults.profiles.flatMap(profile => profile.workTypes);
+  for (const type of workTypes) if (routed.filter(item => item === type).length !== 1) throw new Error(`Work type ${type} must go to exactly one default agent profile.`);
+  return defaults;
+}
+
+export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentDefaults || { profiles: [], guidance: {}, projectInstructions: '' } }) {
+  const revisionListeners = [];
+  const doneListeners = [];
   const row = id => db.prepare('SELECT * FROM knowledge_records WHERE id = ?').get(id);
   const hydrate = record => record && { id: record.id, kind: record.kind, parentId: record.parent_id, position: record.position, revision: record.revision, updatedAt: record.updated_at, ...parse(record.data_json, {}) };
   const list = (projectId, kind) => db.prepare('SELECT * FROM knowledge_records WHERE project_id = ? AND kind = ? ORDER BY position, created_at').all(projectId, kind).map(hydrate);
@@ -121,6 +236,7 @@ export function knowledge({ db, catalogs, packs }) {
   function insert(projectId, kind, data, { parentId = null, position, author = 'Aludel', rationale = null, workItemId = null } = {}) {
     if (!kinds.includes(kind)) fail('Unknown record kind.');
     const clean = validators[kind](data, catalogs);
+    checkReferences(projectId, kind, clean);
     if ((kind === 'story' || kind === 'spec') && !clean.number) clean.number = counter(projectId, kind);
     if (parentId && !db.prepare('SELECT 1 FROM knowledge_records WHERE id = ? AND project_id = ?').get(parentId, projectId)) fail('Parent record not found.', 404);
     const id = newId(kind);
@@ -133,12 +249,21 @@ export function knowledge({ db, catalogs, packs }) {
     return hydrate(row(id));
   }
 
+  function checkReferences(projectId, kind, clean) {
+    for (const [id, expected] of references[kind]?.(clean) || []) {
+      const target = row(id);
+      if (!target || target.project_id !== projectId || target.kind !== expected) fail(`A linked ${expected.replace('_', ' ')} was not found.`, 404);
+    }
+  }
+
   function update(projectId, id, changes, { expectedRevision, author = 'Aludel', rationale = null, workItemId = null, position, parentId } = {}) {
     const current = row(id);
     if (!current || current.project_id !== projectId) fail('Record not found.', 404);
     if (expectedRevision !== undefined && Number(expectedRevision) !== current.revision) fail('This record changed since you opened it. Reload to see the latest; your edit is kept.', 409);
     const merged = validators[current.kind]({ ...parse(current.data_json, {}), ...changes }, catalogs);
-    const same = JSON.stringify(merged) === current.data_json && position === undefined && parentId === undefined;
+    checkReferences(projectId, current.kind, merged);
+    const contentChanged = JSON.stringify(merged) !== current.data_json;
+    const same = !contentChanged && position === undefined && parentId === undefined;
     if (same) return hydrate(current);
     const revision = current.revision + 1;
     const updated = now();
@@ -146,6 +271,8 @@ export function knowledge({ db, catalogs, packs }) {
       .run(JSON.stringify(merged), revision, updated, position ?? null, parentId !== undefined ? 1 : 0, parentId ?? null, id);
     db.prepare('INSERT INTO knowledge_revisions(record_id, revision, data_json, author, rationale, work_item_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
       .run(id, revision, JSON.stringify(merged), author, rationale, workItemId, updated);
+    // Moving a record is not a change to what it says; only content changes reach code links (LAY-07D).
+    if (contentChanged) for (const listener of revisionListeners) listener({ projectId, record: hydrate(row(id)), fromRevision: current.revision, toRevision: revision, author });
     return hydrate(row(id));
   }
 
@@ -158,6 +285,10 @@ export function knowledge({ db, catalogs, packs }) {
   }
 
   const history = id => db.prepare('SELECT revision, author, rationale, work_item_id AS workItemId, created_at AS createdAt FROM knowledge_revisions WHERE record_id = ? AND rationale IS NOT NULL ORDER BY revision DESC').all(id);
+  const revisionData = (id, revision) => parse(db.prepare('SELECT data_json FROM knowledge_revisions WHERE record_id = ? AND revision = ?').get(id, revision)?.data_json, null);
+  // The record's revision at a moment in time, for links declared by a past commit.
+  const revisionAt = (id, at) => db.prepare('SELECT MAX(revision) AS revision FROM knowledge_revisions WHERE record_id = ? AND created_at <= ?').get(id, at)?.revision || null;
+  const get = (projectId, id) => { const record = row(id); return record && record.project_id === projectId ? hydrate(record) : null; };
 
   // ---- Seeds ----
   function ensureProject(projectId, { pitch = '' } = {}) {
@@ -169,6 +300,41 @@ export function knowledge({ db, catalogs, packs }) {
     if (!list(projectId, 'vision_section').length) {
       for (const key of visionKeys) insert(projectId, 'vision_section', { key, body: key === 'statement' ? pitch : '', items: [] }, { rationale: key === 'statement' && pitch ? 'From the elevator pitch in onboarding' : null });
     }
+    ensureAgents(projectId);
+  }
+
+  // ---- Work › Agents: default profiles and project instructions (idempotent; older projects get them at start-up) ----
+  function ensureAgents(projectId) {
+    // One agent connection per project (DEC-034), so every default profile uses it; whether it is connected is shown, not stored.
+    if (!list(projectId, 'agent_profile').length) for (const profile of agentDefaults.profiles) insert(projectId, 'agent_profile', { ...profile, accountId: 'project-agent', budget: 0 }, { rationale: 'Default profile' });
+    if (!list(projectId, 'project_instructions').length) insert(projectId, 'project_instructions', { body: agentDefaults.projectInstructions }, { rationale: 'Default project instructions' });
+  }
+
+  // Working style sends each work type to exactly one profile; moving it is a revision of both profiles.
+  function routeWorkType(projectId, type, profileId, author = 'You') {
+    if (!workTypes.includes(type)) fail('Unknown work type.');
+    const profiles = list(projectId, 'agent_profile');
+    const target = profiles.find(profile => profile.id === profileId);
+    if (!target) fail('Profile not found.', 404);
+    for (const profile of profiles) {
+      if (profile.id !== target.id && profile.workTypes.includes(type)) update(projectId, profile.id, { workTypes: profile.workTypes.filter(item => item !== type) }, { author, rationale: `${type} work moved to ${target.name}` });
+    }
+    if (!target.workTypes.includes(type)) update(projectId, target.id, { workTypes: [...target.workTypes, type] }, { author, rationale: `Takes ${type} work` });
+  }
+  const profileFor = (projectId, type) => list(projectId, 'agent_profile').find(profile => profile.workTypes.includes(type)) || null;
+
+  // What an agent reads, in order (DEC-038): product principles, project instructions, role, work-type guidance.
+  function instructionPins(projectId, profile, type) {
+    const principles = list(projectId, 'vision_section').find(section => section.key === 'principles');
+    const project = list(projectId, 'project_instructions')[0];
+    return { principles: principles ? { id: principles.id, revision: principles.revision } : null, project: project ? { id: project.id, revision: project.revision } : null,
+      role: { id: profile.id, revision: profile.revision }, guidance: type };
+  }
+
+  function agentExport(projectId) {
+    return { instructions: list(projectId, 'project_instructions')[0]?.body || '', principles: list(projectId, 'vision_section').find(section => section.key === 'principles')?.items || [],
+      profiles: list(projectId, 'agent_profile').map(({ name, role, workTypes: types, writes, approvalRequired, instructions }) => ({ name, role, workTypes: types, writes, approvalRequired, instructions })),
+      guidance: agentDefaults.guidance };
   }
 
   // ---- Pages (replace project_setup.routes_json) ----
@@ -254,6 +420,7 @@ export function knowledge({ db, catalogs, packs }) {
           else if (page.stories.some(story => storyIds.has(story))) update(projectId, page.id, { stories: page.stories.filter(story => !storyIds.has(story)) });
         }
         remove(projectId, activity.id);
+        for (const kind of ['access_rule', 'data_operation', 'data_object']) for (const record of list(projectId, kind)) if (record.pack === packs[id].label && record.revision === 1) remove(projectId, record.id);
       }
     }
     for (const id of selected.filter(id => !previous.includes(id))) seedPack(projectId, id);
@@ -274,7 +441,7 @@ export function knowledge({ db, catalogs, packs }) {
     const activity = insert(projectId, 'activity', { title: pack.activity.title, persona: pack.activity.persona, pack: pack.label }, { rationale: `Seeded by the ${pack.label} story pack` });
     const steps = pack.steps.map(title => insert(projectId, 'step', { title }, { parentId: activity.id }));
     const stories = pack.stories.map(story => insert(projectId, 'story', {
-      title: story.title, phase: story.phase, acceptance: story.acceptance || [], clarifications: story.clarifications || [], pack: pack.label, template: Boolean(story.template)
+      title: story.title, phase: story.phase, acceptance: story.acceptance || [], clarifications: story.clarifications || [], services: story.services || [], pack: pack.label, template: Boolean(story.template)
     }, { parentId: steps[story.step].id, rationale: `Seeded by the ${pack.label} story pack` }));
     const existing = pageList(projectId);
     const placePage = (page, parentId) => {
@@ -292,12 +459,51 @@ export function knowledge({ db, catalogs, packs }) {
       return created;
     };
     for (const page of pack.pages) placePage(page, null);
+    seedPackData(projectId, packId, stories);
+  }
+
+  // A pack's Data contract: objects, then operations and access rules that refer to them by name. Template packs arrive
+  // accepted, because the template is the contract; everything else is proposed until someone accepts it.
+  function seedPackData(projectId, packId, stories = null) {
+    const pack = packs[packId];
+    if (!pack.objects?.length && !pack.operations?.length) return;
+    if (list(projectId, 'data_object').some(object => object.pack === pack.label) || list(projectId, 'data_operation').some(operation => operation.pack === pack.label)) return;
+    const storyIds = stories ? stories.map(story => story.id) : pack.stories.map(item => list(projectId, 'story').find(story => story.pack === pack.label && story.title === item.title)?.id || null);
+    const pick = indexes => (indexes || []).map(index => storyIds[index]).filter(Boolean);
+    const rationale = `Seeded by the ${pack.label} story pack`;
+    const byName = new Map(list(projectId, 'data_object').map(object => [object.name, object.id]));
+    const refs = node => node && JSON.parse(JSON.stringify(node), (key, value) => key === '$ref' ? (byName.get(value) || fail(`Pack ${packId} refers to an unknown object ${value}.`)) : value);
+    const created = [];
+    for (const object of pack.objects || []) {
+      if (byName.has(object.name)) continue;
+      const record = insert(projectId, 'data_object', { name: object.name, description: object.description, schema: object.schema, relations: [], states: object.states || [], stories: pick(object.stories),
+        contract: object.template ? 'accepted' : 'proposed', origin: `${pack.label} pack`, pack: pack.label, template: Boolean(object.template) }, { rationale });
+      byName.set(object.name, record.id); created.push([record, object]);
+    }
+    // Relations and $refs need every object in place first.
+    for (const [record, object] of created) {
+      const relations = (object.relations || []).filter(relation => byName.has(relation.target)).map(relation => ({ ...relation, target: byName.get(relation.target) }));
+      const schema = refs(object.schema);
+      if (!relations.length && JSON.stringify(schema) === JSON.stringify(record.schema)) continue;
+      const data = JSON.stringify(validators.data_object({ ...record, relations, schema }));
+      // Still the record's first revision: it is completed, not changed.
+      db.prepare('UPDATE knowledge_records SET data_json = ? WHERE id = ?').run(data, record.id);
+      db.prepare('UPDATE knowledge_revisions SET data_json = ? WHERE record_id = ? AND revision = 1').run(data, record.id);
+    }
+    const templatePack = Boolean(pack.objects?.some(object => object.template));
+    for (const operation of pack.operations || []) {
+      const template = operation.template ?? templatePack;
+      insert(projectId, 'data_operation', { ...operation, objectId: operation.object ? byName.get(operation.object) : null, request: refs(operation.request), response: refs(operation.response),
+        stories: pick(operation.stories), contract: template ? 'accepted' : 'proposed', pack: pack.label, template }, { rationale });
+    }
+    for (const rule of pack.access || []) insert(projectId, 'access_rule', { ...rule, objectId: byName.get(rule.object), pack: pack.label }, { rationale });
   }
 
   // ---- Work items ----
   const workRow = item => item && { id: item.id, number: item.number, ref: `W-${item.number}`, layer: item.layer, type: item.type, title: item.title, state: item.state,
     assignee: item.assignee_kind ? { kind: item.assignee_kind, label: item.assignee_label } : null, targets: parse(item.targets_json, []), question: parse(item.question_json, null),
-    documents: parse(item.documents_json, []), log: parse(item.log_json, []), createdAt: item.created_at, updatedAt: item.updated_at };
+    documents: parse(item.documents_json, []), log: parse(item.log_json, []), createdAt: item.created_at, updatedAt: item.updated_at,
+    profileId: item.profile_id || null, instructions: parse(item.instructions_json, null), context: parse(item.context_json, null) };
   const workList = projectId => db.prepare('SELECT * FROM layer_work_items WHERE project_id = ? ORDER BY number DESC').all(projectId).map(workRow);
 
   function createWork(projectId, input, author = 'Aludel') {
@@ -313,10 +519,11 @@ export function knowledge({ db, catalogs, packs }) {
     const id = `wrk-${randomBytes(4).toString('hex')}`;
     const created = now();
     const assignee = input.assignee || null;
-    db.prepare(`INSERT INTO layer_work_items(id, project_id, number, layer, type, title, state, assignee_kind, assignee_label, targets_json, question_json, documents_json, log_json, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(id, projectId, number, input.layer, input.type, text(input.title, 160, 'Work title', true), input.state || 'ready',
+    db.prepare(`INSERT INTO layer_work_items(id, project_id, number, layer, type, title, state, assignee_kind, assignee_label, targets_json, question_json, documents_json, log_json, created_at, updated_at, context_json)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(id, projectId, number, input.layer, input.type, text(input.title, 160, 'Work title', true), input.state || 'ready',
       assignee?.kind || null, assignee?.label || null, JSON.stringify(targets), input.question ? JSON.stringify(input.question) : null,
-      JSON.stringify(lines(input.documents, 300, 'Document')), JSON.stringify([{ at: created, text: input.logText || `Created by ${author}` }]), created, created);
+      JSON.stringify(lines(input.documents, 300, 'Document')), JSON.stringify([{ at: created, text: input.logText || `Created by ${author}` }]), created, created,
+      input.context && typeof input.context === 'object' ? JSON.stringify(input.context) : null);
     return workRow(db.prepare('SELECT * FROM layer_work_items WHERE id = ?').get(id));
   }
 
@@ -337,9 +544,13 @@ export function knowledge({ db, catalogs, packs }) {
     }
     if (assignee !== undefined) {
       if (assignee !== null && !['agent', 'person'].includes(assignee.kind)) fail('Assign the item to an agent or a person.');
-      const label = assignee === null ? null : assignee.kind === 'person' ? user.name : text(assignee.label || 'Agent', 60, 'Agent');
-      db.prepare('UPDATE layer_work_items SET assignee_kind = ?, assignee_label = ? WHERE id = ?').run(assignee?.kind || null, label, workId);
-      log.push({ at: now(), text: assignee === null ? 'Unassigned' : `Assigned to ${label}` });
+      // An agent is always a profile: the one named, or the one working style sends this type of work to.
+      const profile = assignee?.kind === 'agent' ? (assignee.profileId ? list(projectId, 'agent_profile').find(entry => entry.id === assignee.profileId) : profileFor(projectId, item.type)) : null;
+      if (assignee?.kind === 'agent' && !profile) fail('Choose an agent profile in Work › Agents first.', 409);
+      const label = assignee === null ? null : assignee.kind === 'person' ? user.name : profile.name;
+      db.prepare('UPDATE layer_work_items SET assignee_kind = ?, assignee_label = ?, profile_id = ?, instructions_json = ? WHERE id = ?')
+        .run(assignee?.kind || null, label, profile?.id || null, profile ? JSON.stringify(instructionPins(projectId, profile, item.type)) : null, workId);
+      log.push({ at: now(), text: assignee === null ? 'Unassigned' : profile ? `Assigned to the ${label} profile (instructions pinned at revision ${profile.revision})` : `Assigned to ${label}` });
       if (nextState === 'ready' && assignee) nextState = 'claimed';
     }
     if (state !== undefined) {
@@ -349,6 +560,16 @@ export function knowledge({ db, catalogs, packs }) {
       log.push({ at: now(), text: `State: ${state}` });
     }
     db.prepare('UPDATE layer_work_items SET state = ?, question_json = ?, documents_json = ?, log_json = ?, updated_at = ? WHERE id = ?').run(nextState, question ? JSON.stringify(question) : null, JSON.stringify(outputs), JSON.stringify(log), now(), workId);
+    const saved = workRow(db.prepare('SELECT * FROM layer_work_items WHERE id = ?').get(workId));
+    if (nextState === 'done' && item.state !== 'done') for (const listener of doneListeners) listener({ projectId, item: saved, author: user.name });
+    return saved;
+  }
+
+  function appendLog(workId, entry, changes = {}) {
+    const item = workRow(db.prepare('SELECT * FROM layer_work_items WHERE id = ?').get(workId));
+    if (!item) return null;
+    db.prepare('UPDATE layer_work_items SET log_json = ?, state = COALESCE(?, state), context_json = COALESCE(?, context_json), updated_at = ? WHERE id = ?')
+      .run(JSON.stringify([...item.log, { at: now(), text: entry }]), changes.state || null, changes.context ? JSON.stringify(changes.context) : null, now(), workId);
     return workRow(db.prepare('SELECT * FROM layer_work_items WHERE id = ?').get(workId));
   }
 
@@ -374,7 +595,10 @@ export function knowledge({ db, catalogs, packs }) {
     return 'proposed';
   }
 
-  function view(user, projectId) {
+  // proposed (named) → contracted (accepted) → built (linked code) → shipped (in a production release; none locally yet).
+  const dataStatus = (record, built) => built?.shipped ? 'shipped' : built?.units ? 'built' : record.contract === 'accepted' ? 'contracted' : 'proposed';
+
+  function view(user, projectId, { builtBy = new Map() } = {}) {
     requireMember(db, user, projectId);
     const work = workList(projectId);
     const pages = pageList(projectId);
@@ -390,9 +614,60 @@ export function knowledge({ db, catalogs, packs }) {
       research: list(projectId, 'research'), docs: list(projectId, 'doc'),
       pages: pages.map(page => ({ ...page, history: history(page.id) })), work,
       packs: Object.fromEntries(Object.entries(packs).map(([id, pack]) => [id, { label: pack.label, summary: pack.summary, icon: pack.icon, stories: pack.stories.length, template: pack.stories.filter(story => story.template).length }])),
-      selectedPacks: parse(db.prepare('SELECT story_packs_json FROM project_setup WHERE project_id = ?').get(projectId)?.story_packs_json, [])
+      selectedPacks: parse(db.prepare('SELECT story_packs_json FROM project_setup WHERE project_id = ?').get(projectId)?.story_packs_json, []),
+      objects: list(projectId, 'data_object').map(object => ({ ...object, status: dataStatus(object, builtBy.get(object.id)), history: history(object.id) })),
+      operations: list(projectId, 'data_operation').map(operation => ({ ...operation, status: dataStatus(operation, builtBy.get(operation.id)), history: history(operation.id) })),
+      access: list(projectId, 'access_rule'),
+      profiles: list(projectId, 'agent_profile').map(profile => ({ ...profile, history: history(profile.id) })),
+      projectInstructions: list(projectId, 'project_instructions')[0] || null,
+      guidance: agentDefaults.guidance, workTypes,
+      services: Object.entries(catalogs.services || {}).map(([key, service]) => ({ key, ...service, stories: stories.filter(story => story.services.includes(key)).map(story => story.id) }))
     };
   }
 
-  return { ensureProject, insert, update, remove, list, view, navRoutes, seedPages, saveNavRoutes, applyPacks, createWork, updateWork, workList, recordBuild, history, kinds };
+  // The Data layer as one OpenAPI 3.1 document; object ids become component references.
+  function openApi(projectId, { title = 'App', version = '0.1.0' } = {}) {
+    const objects = list(projectId, 'data_object');
+    const names = new Map(objects.map(object => [object.id, object.name]));
+    const convert = node => node && JSON.parse(JSON.stringify(node), (key, value) => key === '$ref' ? `#/components/schemas/${names.get(value) || value}` : value);
+    const paths = {};
+    for (const operation of list(projectId, 'data_operation')) {
+      const content = schema => schema ? { content: { 'application/json': { schema: convert(schema) } } } : {};
+      paths[operation.path] ||= {};
+      paths[operation.path][operation.method.toLowerCase()] = {
+        operationId: operation.operationId, summary: operation.summary, tags: [names.get(operation.objectId) || 'General'],
+        ...(operation.parameters.length ? { parameters: operation.parameters.map(({ name, in: where, required, schema, description }) => ({ name, in: where, required, schema: convert(schema), ...(description ? { description } : {}) })) } : {}),
+        ...(operation.request ? { requestBody: { required: true, ...content(operation.request) } } : {}),
+        responses: { [operation.response.status]: { description: operation.response.description || 'Success', ...content(operation.response.schema) },
+          ...Object.fromEntries(operation.errors.map(error => [error.status, { description: error.description }])) },
+        'x-aludel-roles': operation.roles, 'x-aludel-contract': operation.contract, 'x-aludel-revision': operation.revision
+      };
+    }
+    const schemas = Object.fromEntries(objects.map(object => [object.name, { ...convert(object.schema), ...(object.description ? { description: object.description } : {}),
+      ...(object.relations.length ? { 'x-aludel-relations': object.relations.map(relation => ({ ...relation, target: `#/components/schemas/${names.get(relation.target)}` })) } : {}),
+      ...(object.states.length ? { 'x-aludel-states': object.states } : {}), 'x-aludel-contract': object.contract, 'x-aludel-revision': object.revision }]));
+    return { openapi: '3.1.0', info: { title, version }, jsonSchemaDialect: 'https://json-schema.org/draft/2020-12/schema', paths, components: { schemas } };
+  }
+
+  // Deleting a record others point at would leave dangling contracts; name what still uses it.
+  function referrers(projectId, id) {
+    return ['data_object', 'data_operation', 'access_rule'].flatMap(kind => list(projectId, kind).filter(record => record.id !== id && (references[kind]?.(record) || []).some(([target]) => target === id)))
+      .map(record => record.name || record.operationId || record.sentence);
+  }
+
+  // Start-up: projects that chose packs before LAY-07 get their Data contract and runtime-service needs.
+  function ensurePackData(projectId) {
+    const selected = parse(db.prepare('SELECT story_packs_json FROM project_setup WHERE project_id = ?').get(projectId)?.story_packs_json, []);
+    for (const packId of selected.filter(id => packs[id])) {
+      seedPackData(projectId, packId);
+      for (const item of packs[packId].stories.filter(entry => entry.services?.length)) {
+        const story = list(projectId, 'story').find(entry => entry.pack === packs[packId].label && entry.title === item.title);
+        // Only stories saved before services existed: an empty list someone chose stays empty.
+        if (story && story.services === undefined) update(projectId, story.id, { services: item.services }, { rationale: `Needs ${item.services.join(', ')} (from the ${packs[packId].label} pack)` });
+      }
+    }
+  }
+
+  return { ensureProject, ensureAgents, ensurePackData, insert, update, remove, list, get, view, navRoutes, seedPages, saveNavRoutes, applyPacks, createWork, updateWork, appendLog, workList, recordBuild,
+    history, revisionData, revisionAt, kinds, routeWorkType, openApi, referrers, profileFor, agentExport, onRevision: listener => revisionListeners.push(listener), onWorkDone: listener => doneListeners.push(listener) };
 }

@@ -15,6 +15,12 @@ const devDependencies = {
   sass: '1.104.1', typescript: '6.0.3', vite: '8.3.0'
 };
 const reservedPaths = new Set(['', 'sign-in', 'api', 'media', 'assets']);
+// What aludel-web-v1 builds for the Accounts contract (LAY-07): Data records to the handlers and tables that realise them.
+// The Platform binding and the generation manifest both read this, so they cannot disagree.
+export const accountsBinding = {
+  objects: { Account: 'table accounts', Session: 'table sessions' },
+  operations: { getSession: '/api/session', signUp: 'POST /api/sign-up', signIn: 'POST /api/sign-in', signOut: 'POST /api/sign-out', health: '/api/health' }
+};
 
 const html = value => String(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
 const json = value => `${JSON.stringify(value, null, 2)}\n`;
@@ -76,10 +82,35 @@ export function initialFiles(setup, catalogs, gitProfile, appUrl) {
   };
 }
 
-function agentsGuide(setup, catalogs) {
+// setup.agents (LAY-07C) carries the project instructions and profiles from Work › Agents, so any coding tool reads the same rules.
+export function agentsGuide(setup, catalogs) {
   const preset = catalogs.stacks.presets[setup.stack.preset];
   const preferences = Object.entries(setup.preferences).map(([key, value]) => `- ${catalogs.preferences[key]?.label || key}: ${catalogs.preferences[key]?.values[value] || value}`);
-  return `# Agent guide for ${setup.project.name}\n\nRead [docs/product.md](docs/product.md) for the product intent and [aludel.json](aludel.json) for the setup choices before changing anything.\n\n## Working style\n\nThe owner chose the **${catalogs.profiles[setup.profile]?.label || setup.profile}** working style:\n\n${preferences.join('\n')}\n\nRespect these preferences: do not implement work the owner chose to do themselves, and only ask the kinds of questions they asked to see.\n\n## Stack\n\n${Object.entries(preset?.layers || {}).map(([layer, value]) => `- ${layer}: ${value}`).join('\n')}\n\nCommands: \`npm install\`, \`npm run build\`, \`npm start\` (serves on \`PORT\`, default 3000).\n\n## Rules\n\n- This app is independent of Aludel. Do not import Aludel code or call Aludel services at runtime.\n- Never commit secrets, \`.env\` files or the \`.data/\` directory.\n- Keep the pages in \`src/site.ts\` in step with the Pages section of \`docs/product.md\`. \`src/page-blocks.ts\` holds the placeholder layouts; replace a page's blocks with real UI as it is built.\n`;
+  const agents = setup.agents;
+  const agentSections = agents ? `\n## Project instructions\n\n${agents.instructions || '_None yet._'}\n${agents.principles.length ? `\nProduct principles:\n\n${agents.principles.map(item => `- ${item}`).join('\n')}\n` : ''}\n## Agent profiles\n\nEach kind of work goes to one profile. Read the project instructions first, then the profile's.\n\n${agents.profiles.map(profile => `### ${profile.name}\n\n${profile.role}\n\n- Takes: ${profile.workTypes.join(', ') || 'nothing yet'}\n- May write: ${profile.writes.join(', ') || 'nothing'}\n- Asks first: ${profile.approvalRequired.join('; ') || 'nothing beyond the rules below'}\n\n${profile.instructions}\n`).join('\n')}\n## Commits and tests\n\n- End each commit message with trailers: \`Aludel-Work: W-12\` and \`Implements: S4, SPEC-02/FR-001\`.\n- Start test names with the acceptance they check: \`S4 · Given …\`.\n- Do not put tags or IDs in the code; Aludel links code to stories from these.\n` : '';
+  return `# Agent guide for ${setup.project.name}\n\nRead [docs/product.md](docs/product.md) for the product intent and [aludel.json](aludel.json) for the setup choices before changing anything.\n\n## Working style\n\nThe owner chose the **${catalogs.profiles[setup.profile]?.label || setup.profile}** working style:\n\n${preferences.join('\n')}\n\nRespect these preferences: do not implement work the owner chose to do themselves, and only ask the kinds of questions they asked to see.\n${agentSections}\n## Stack\n\n${Object.entries(preset?.layers || {}).map(([layer, value]) => `- ${layer}: ${value}`).join('\n')}\n\nCommands: \`npm install\`, \`npm run build\`, \`npm start\` (serves on \`PORT\`, default 3000).\n\n## Rules\n\n- This app is independent of Aludel. Do not import Aludel code or call Aludel services at runtime.\n- Never commit secrets, \`.env\` files or the \`.data/\` directory.\n- Keep the pages in \`src/site.ts\` in step with the Pages section of \`docs/product.md\`. \`src/page-blocks.ts\` holds the placeholder layouts; replace a page's blocks with real UI as it is built.\n`;
+}
+
+// The generation manifest (LAY-07D): every unit the template wrote and the records it realises. Pages are derived:
+// their skeleton is regenerated from the page record, so a rebuild makes their links current again.
+function generationManifest(setup, pages) {
+  const manifest = (setup.pages?.routes || []).map((route, index) => route.id ? { path: 'src/site.ts', symbol: `route ${pages[index].path}`, recordIds: [route.id], derived: true } : null).filter(Boolean);
+  const data = setup.data || { objects: [], operations: [] };
+  const operation = operationId => data.operations.find(item => item.operationId === operationId);
+  const health = operation('health');
+  if (health) manifest.push({ path: 'server/server.mjs', symbol: accountsBinding.operations.health, recordIds: [health.id, ...health.stories] });
+  if (!setup.stack.options?.auth) return manifest;
+  const templateStories = (setup.features?.stories || []).filter(story => story.template).map(story => story.id);
+  if (templateStories.length) manifest.push({ path: 'src/app.ts', symbol: 'App', recordIds: templateStories });
+  for (const [operationId, symbol] of Object.entries(accountsBinding.operations)) {
+    const record = operation(operationId);
+    if (record && operationId !== 'health') manifest.push({ path: 'server/server.mjs', symbol, recordIds: [record.id, ...(record.objectId ? [record.objectId] : []), ...record.stories] });
+  }
+  for (const [name, symbol] of Object.entries(accountsBinding.objects)) {
+    const record = data.objects.find(item => item.name === name);
+    if (record) manifest.push({ path: 'server/server.mjs', symbol, recordIds: [record.id] });
+  }
+  return manifest;
 }
 
 export function skeletonFiles(setup, catalogs, gitProfile, appUrl, assets, sources) {
@@ -126,7 +157,7 @@ export function skeletonFiles(setup, catalogs, gitProfile, appUrl, assets, sourc
     'server/server.mjs': serverSource(Boolean(options.auth)),
     'licenses/Material-Symbols-LICENSE': sources.iconLicense
   };
-  return { files, media, binaries: { 'public/fonts/icons.ttf': sources.iconFont } };
+  return { files, media, binaries: { 'public/fonts/icons.ttf': sources.iconFont }, manifest: generationManifest(setup, pages) };
 }
 
 function styles({ feel, theme, accent, surface }) {

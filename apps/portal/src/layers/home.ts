@@ -28,6 +28,13 @@ import { ProjectContext, layerLabel, stateLabel, statusLabel, statusOrder } from
     <section class="lay-card" aria-labelledby="home-recent"><h2 id="home-recent">Recent changes</h2>
       @if (recent().length) { <ul class="lay-list">@for (entry of recent(); track $index) { <li><a class="lay-item" [href]="entry.href" (click)="ctx.go(entry.href, $event)"><span class="lay-body-text"><span [class]="'lay-chip lay-l-' + entry.layer">{{ layerLabel[entry.layer] }}</span><span>{{ entry.text }}</span></span></a></li> }</ul> }
       @else { <p class="lay-muted">No changes yet.</p> }</section>
+    <section class="lay-card" aria-labelledby="home-code"><h2 id="home-code">Code</h2>
+      @if (ctx.data()?.code?.units?.length) {
+        <p class="lay-flat"><span class="lay-chip" [class.lay-warn]="ctx.suspectUnits().length" [class.lay-ok]="!ctx.suspectUnits().length">{{ ctx.suspectUnits().length ? ctx.suspectUnits().length + ' suspect' : 'All current' }}</span></p>
+        <p class="lay-muted small">{{ ctx.suspectUnits().length ? 'Records changed after their code was written. Each has a Reconcile item in Work.' : 'Every linked record matches the code built for it.' }}</p>
+        <a class="small" [href]="ctx.link('platform', 'code')" (click)="ctx.go(ctx.link('platform', 'code'), $event)">Platform › Code</a>
+      } @else { <p class="lay-muted">Read after the first build.</p> }
+    </section>
     <section class="lay-card lay-quiet" aria-labelledby="home-insights"><h2 id="home-insights">Insights</h2><p class="lay-muted">Usage, feedback and experiments get their own layer once the app has users.</p></section>
   </div>`
 })

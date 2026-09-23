@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { aludelProjectId, requireMember } from './accounts.mjs';
 import { reservedSlugs, slugify } from './hosts.mjs';
 import { getProductWorkspace, saveProductRecord } from './product-workspace.mjs';
-import { loadStoryPacks } from './knowledge.mjs';
+import { loadAgentDefaults, loadStoryPacks } from './knowledge.mjs';
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const now = () => new Date().toISOString();
@@ -34,7 +34,7 @@ export function loadCatalogs(configDirectory) {
   }
   if (!stacks.presets[stacks.default]?.available) throw new Error('The default stack preset must be available.');
   return { preferences: profiles.preferences, profiles: profiles.profiles, feels: starter.feels, features: starter.features, packs: loadStoryPacks(configDirectory), stacks,
-    pageTypes: pages.types, routeIcons, defaultRoute: starter.defaultRoute };
+    pageTypes: pages.types, routeIcons, defaultRoute: starter.defaultRoute, services: read('story-packs.json').services || {}, agentDefaults: loadAgentDefaults(configDirectory) };
 }
 
 export function initOnboarding(db) {

@@ -153,6 +153,28 @@ export function previewManager({ db, portalRoot, workspaceRoot, logRoot }) {
       request.pipe(upstream);
     },
 
+    // Stops the preview and waits for it to exit, so its database file can be replaced safely.
+    async stop(projectId) {
+      const child = processes.get(projectId);
+      if (!child) return;
+      const exited = new Promise(resolveExit => child.once('exit', resolveExit));
+      stop(projectId);
+      await Promise.race([exited, new Promise(resolveWait => setTimeout(resolveWait, 3000))]);
+    },
+
+    // A live GET /api/health against the running preview, with its response time.
+    async probe(projectId) {
+      const value = row(projectId);
+      if (!processes.has(projectId) || value?.status !== 'running' || !value.port) return { ok: false, status: null, ms: null, checkedAt: now() };
+      const started = Date.now();
+      const status = await new Promise(resolveProbe => {
+        const probe = httpRequest({ host: '127.0.0.1', port: value.port, path: '/api/health', timeout: 2000 }, response => { response.resume(); resolveProbe(response.statusCode); });
+        probe.on('error', () => resolveProbe(null)); probe.on('timeout', () => { probe.destroy(); resolveProbe(null); });
+        probe.end();
+      });
+      return { ok: status === 200, status, ms: Date.now() - started, checkedAt: now() };
+    },
+
     stopAll() { for (const projectId of [...processes.keys()]) stop(projectId); }
   };
   return api;

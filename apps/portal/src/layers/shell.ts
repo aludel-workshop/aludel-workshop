@@ -3,20 +3,21 @@ import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { Session } from '../onboarding-model';
 import { contrastText, readableAccent } from '../color';
-import { ProjectContext, stateLabel, statusLabel } from './context';
+import { ProjectContext, dataStatusLabel, stateLabel, statusLabel, unitStateLabel } from './context';
 import { DesignLayerComponent } from './design';
 import { PagesLayerComponent } from './pages';
+import { DataLayerComponent } from './data';
 import { PlatformLayerComponent } from './platform';
 import { ProductLayerComponent } from './product';
 import { WorkLayerComponent } from './work';
 import { HomeLayerComponent } from './home';
 
-const layers = [{ id: 'home', icon: 'home', label: 'Home' }, { id: 'product', icon: 'lightbulb', label: 'Product' }, { id: 'design', icon: 'palette', label: 'Design' }, { id: 'pages', icon: 'web', label: 'Pages' }, { id: 'platform', icon: 'dns', label: 'Platform' }, { id: 'work', icon: 'checklist', label: 'Work' }];
+const layers = [{ id: 'home', icon: 'home', label: 'Home' }, { id: 'product', icon: 'lightbulb', label: 'Product' }, { id: 'design', icon: 'palette', label: 'Design' }, { id: 'pages', icon: 'web', label: 'Pages' }, { id: 'data', icon: 'schema', label: 'Data' }, { id: 'platform', icon: 'dns', label: 'Platform' }, { id: 'work', icon: 'checklist', label: 'Work' }];
 
 // LAY-02: every project's workspace at /p/<slug>/<layer>/<tab>/<id>. The layer comes first (DEC-036).
 @Component({
   selector: 'aludel-project-shell', standalone: true,
-  imports: [FormsModule, MatIconModule, HomeLayerComponent, ProductLayerComponent, DesignLayerComponent, PagesLayerComponent, PlatformLayerComponent, WorkLayerComponent],
+  imports: [FormsModule, MatIconModule, HomeLayerComponent, ProductLayerComponent, DesignLayerComponent, PagesLayerComponent, DataLayerComponent, PlatformLayerComponent, WorkLayerComponent],
   providers: [ProjectContext],
   template: `
   <a class="skip-link" href="#lay-main">Skip to content</a>
@@ -54,7 +55,7 @@ const layers = [{ id: 'home', icon: 'home', label: 'Home' }, { id: 'product', ic
         <div class="lay-search" role="search">
           <mat-icon aria-hidden="true">search</mat-icon>
           <label class="visually-hidden" for="lay-q">Search every layer</label>
-          <input id="lay-q" type="search" [(ngModel)]="query" (ngModelChange)="q.set($event)" placeholder="Search stories, specs, docs, pages, work…" autocomplete="off">
+          <input id="lay-q" type="search" [(ngModel)]="query" (ngModelChange)="q.set($event)" placeholder="Search stories, pages, data, code, work…" autocomplete="off">
           @if (q().trim()) {
             <div class="lay-results">
               @for (group of results(); track group.label) {
@@ -75,6 +76,7 @@ const layers = [{ id: 'home', icon: 'home', label: 'Home' }, { id: 'product', ic
             @case ('product') { <aludel-product-layer /> }
             @case ('design') { <aludel-design-layer /> }
             @case ('pages') { <aludel-pages-layer /> }
+            @case ('data') { <aludel-data-layer /> }
             @case ('platform') { <aludel-platform-layer /> }
             @case ('work') { <aludel-work-layer /> }
             @case ('settings') {
@@ -116,6 +118,9 @@ export class ProjectShellComponent implements OnInit {
       { label: 'Specs', hits: data.specs.map(spec => ({ text: `${spec.ref} ${spec.title}`, sub: spec.status, href: this.ctx.link('product', 'specs', spec.id) })) },
       { label: 'Docs and research', hits: [...data.docs.map(doc => ({ text: doc.title, sub: doc.template, href: this.ctx.link('product', 'docs', doc.id) })), ...data.research.map(item => ({ text: item.title, sub: 'Research', href: this.ctx.link('product', 'research') }))] },
       { label: 'Pages', hits: data.pages.map(page => ({ text: `${page.label} page`, sub: page.origin, href: this.ctx.link('pages', 'tree', page.id) })) },
+      { label: 'Data', hits: [...data.objects.map(object => ({ text: `${object.name} object`, sub: dataStatusLabel[object.status], href: this.ctx.link('data', 'objects', object.id) })),
+        ...data.operations.map(op => ({ text: `${op.method} ${op.path}`, sub: `${op.operationId} · ${op.summary}`, href: this.ctx.link('data', 'api', op.id) }))] },
+      { label: 'Code', hits: data.code.units.filter(unit => unit.kind !== 'const').map(unit => ({ text: unit.symbol, sub: `${unit.path} · ${unitStateLabel[unit.state]}`, href: this.ctx.link('platform', 'code', unit.id) })) },
       { label: 'Work', hits: data.work.map(item => ({ text: `${item.ref} ${item.title}`, sub: stateLabel[item.state], href: this.ctx.link('work', 'item', item.id) })) }
     ];
     return groups.map(group => ({ ...group, hits: group.hits.filter(hit => `${hit.text} ${hit.sub}`.toLowerCase().includes(term)).slice(0, 5) })).filter(group => group.hits.length);

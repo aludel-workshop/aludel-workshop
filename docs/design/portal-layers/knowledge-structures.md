@@ -115,6 +115,12 @@ Follows the R-08 [design-system strategy](../design-system-strategy.md) and [pro
 - An accepted spec's "Key entities" propose objects. A technical-plan work item writes the contracts, and its answers land as revisions with a rationale.
 - Object and operation status is derived like story status: **proposed** (named in a spec) → **contracted** (schema accepted) → **built** (linked code) → **shipped**.
 - Story packs bring their objects and operations (the Accounts pack brings `User`, `Session` and the sign-in operations).
+- **As built (LAY-07A):**
+  - Kinds are `data_object` (JSON Schema, relations by object id, states, stories, specs, `contract: proposed|accepted`), `data_operation` (OpenAPI-shaped; `$ref` holds an object id and becomes `#/components/schemas/<Name>` on export) and `access_rule` (role, object, action, `allow|owner|deny`, sentence).
+  - Validation is structural only.
+  - The Accounts object is called `Account {email, name}`, matching what aludel-web-v1 stores. Its operations are `getSession`, `signUp`, `signIn`, `signOut` and `health`.
+  - Events are not built.
+  - Evidence: [LAY-07](../../evidence/lay-07-data-platform-agents.md).
 
 ## Platform: engineering and operations (the stack binding)
 
@@ -150,6 +156,15 @@ Integrations sit where they are used (DEC-038): GitHub in Repository, hosting in
   - *dead*: unreachable, with no live trace
 - **Propagation:** a new revision of a linked record makes its links suspect and creates one **Reconcile** work item. The item's context holds the revision diff, the linked units with their callers and callees, and the linked tests. Its plan classifies each unit as create, modify or remove. Closing it re-links against the new revision.
 - Layers above Platform show only the "Built by" summary: count of units, tests passing and suspect state.
+- **As built (LAY-07B/D):**
+  - Tables are `code_units` and `trace_links`, and each link also records the `work_ref` from its trailer.
+  - Only content changes suspect links; moving a record does not.
+  - Page links are *derived*: a rebuild regenerates the page from its record, relinks it and closes its Reconcile item.
+  - Trailer links anchor at the record's revision when the commit was made.
+  - The extractor knows aludel-web-v1 shapes. Other stacks need their own extractor.
+  - Tests pass/fail is not yet recorded (the count is of linked tests).
+  - Database: the preview's schema is read live, since the preset creates tables at start-up and has no numbered migrations yet. Backups go to `<data>/backups/<project>/`, outside the repository.
+  - Settings' read-only list of connections is not built.
 
 ## Work: the bench
 
@@ -183,6 +198,13 @@ Instructions are layered:
 4. work-type guidance
 
 A work item records the profile and instruction revisions it ran with. Default profiles: Product lead, Design lead, Architect, Coding agent, Reviewer.
+
+**As built (LAY-07C):**
+
+- Kinds are `agent_profile` and `project_instructions`, seeded from `apps/portal/config/agent-profiles.json`.
+- Each work type, including the new `reconcile`, goes to exactly one profile. Working style moves a type as a revision of both profiles.
+- Every profile uses the project's single agent connection (DEC-034).
+- Assignment pins the revisions of the principles, project instructions and role, plus the work-type guidance key. LAY-04 re-pins when a run actually starts.
 
 ## Onboarding against these structures
 

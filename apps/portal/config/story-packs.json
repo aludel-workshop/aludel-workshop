@@ -1,6 +1,11 @@
 {
   "schemaVersion": 1,
-  "note": "Story packs seed ordinary stories into a project's story map (DEC-037). template: true only where the aludel-web-v1 scaffold really builds the story today; everything else becomes work.",
+  "note": "Story packs seed ordinary stories into a project's story map (DEC-037). template: true only where the aludel-web-v1 scaffold really builds the story today; everything else becomes work. Objects, operations and access rules seed the Data layer (DEC-038): stack-neutral JSON Schema and OpenAPI shapes; $ref names an object in the same pack; story numbers index this pack's stories.",
+  "services": {
+    "email": { "label": "Email delivery", "icon": "mail" },
+    "storage": { "label": "File storage", "icon": "photo_library" },
+    "payments": { "label": "Payment provider", "icon": "payments" }
+  },
   "packs": {
     "accounts": {
       "label": "Accounts", "icon": "person", "summary": "Sign up, sign in and manage an account.",
@@ -10,10 +15,43 @@
         { "title": "Someone can sign up with email and password", "step": 0, "phase": "demo", "template": true, "acceptance": [{ "given": "a visitor on the sign-in page", "when": "they enter a name, email and a password of 8+ characters", "then": "an account exists and they are signed in" }] },
         { "title": "Someone can sign in", "step": 1, "phase": "demo", "template": true, "acceptance": [{ "given": "a registered person", "when": "they enter their email and password", "then": "they are signed in and see their name in the header" }] },
         { "title": "Someone can sign out", "step": 1, "phase": "demo", "template": true, "acceptance": [{ "given": "a signed-in person", "when": "they choose Sign out", "then": "they are signed out and the header offers Sign in" }] },
-        { "title": "Someone can reset a forgotten password", "step": 2, "phase": "mvp", "clarifications": ["Needs an email delivery provider (Platform › Connections)"] },
+        { "title": "Someone can reset a forgotten password", "step": 2, "phase": "mvp", "services": ["email"], "clarifications": ["Needs an email delivery provider (Platform › Architecture)"] },
         { "title": "Someone can change their name and password", "step": 3, "phase": "mvp" }
       ],
-      "pages": [{ "label": "Sign in", "icon": "person", "pageType": "form", "inNav": false, "stories": [0, 1, 2, 3] }]
+      "pages": [{ "label": "Sign in", "icon": "person", "pageType": "form", "inNav": false, "stories": [0, 1, 2, 3] }],
+      "objects": [
+        { "name": "Account", "description": "A person who can sign in.", "template": true, "stories": [0, 1, 2, 4],
+          "schema": { "type": "object", "required": ["email", "name"], "properties": {
+            "email": { "type": "string", "format": "email", "description": "Unique, stored lower-case" },
+            "name": { "type": "string", "maxLength": 200, "description": "Shown in the header when signed in" } } } },
+        { "name": "Session", "description": "A signed-in browser. Lasts 30 days or until sign-out.", "template": true, "stories": [1, 2],
+          "schema": { "type": "object", "required": ["expiresAt"], "properties": {
+            "expiresAt": { "type": "string", "format": "date-time", "readOnly": true } } },
+          "relations": [{ "name": "account", "target": "Account", "cardinality": "one", "owner": false }] }
+      ],
+      "operations": [
+        { "operationId": "getSession", "summary": "Who is signed in", "method": "GET", "path": "/api/session", "object": "Session", "roles": ["visitor", "member"], "stories": [1],
+          "response": { "status": "200", "description": "The signed-in account, or null", "schema": { "type": "object", "properties": { "account": { "$ref": "Account", "description": "null when signed out" } } } } },
+        { "operationId": "signUp", "summary": "Create an account and sign in", "method": "POST", "path": "/api/sign-up", "object": "Account", "roles": ["visitor"], "stories": [0],
+          "request": { "type": "object", "required": ["email", "name", "password"], "properties": { "email": { "type": "string", "format": "email" }, "name": { "type": "string" }, "password": { "type": "string", "minLength": 8, "writeOnly": true } } },
+          "response": { "status": "201", "description": "Signed in; sets the session cookie", "schema": { "type": "object", "properties": { "account": { "$ref": "Account" } } } },
+          "errors": [{ "status": "400", "description": "Missing name, invalid email or a password under 8 characters" }, { "status": "409", "description": "That email already has an account" }] },
+        { "operationId": "signIn", "summary": "Sign in", "method": "POST", "path": "/api/sign-in", "object": "Session", "roles": ["visitor"], "stories": [1],
+          "request": { "type": "object", "required": ["email", "password"], "properties": { "email": { "type": "string", "format": "email" }, "password": { "type": "string", "writeOnly": true } } },
+          "response": { "status": "200", "description": "Signed in; sets the session cookie", "schema": { "type": "object", "properties": { "account": { "$ref": "Account" } } } },
+          "errors": [{ "status": "401", "description": "That email and password do not match" }] },
+        { "operationId": "signOut", "summary": "Sign out", "method": "POST", "path": "/api/sign-out", "object": "Session", "roles": ["member"], "stories": [2],
+          "response": { "status": "200", "description": "Signed out; clears the session cookie" } },
+        { "operationId": "health", "summary": "Is the app up", "method": "GET", "path": "/api/health", "roles": ["visitor"], "stories": [],
+          "response": { "status": "200", "description": "The app is running", "schema": { "type": "object", "properties": { "ok": { "type": "boolean" } } } } }
+      ],
+      "access": [
+        { "role": "visitor", "object": "Account", "action": "create", "effect": "allow", "sentence": "Anyone can create an account." },
+        { "role": "member", "object": "Account", "action": "read", "effect": "owner", "sentence": "People see only their own account." },
+        { "role": "member", "object": "Account", "action": "update", "effect": "owner", "sentence": "Only you can change your account." },
+        { "role": "visitor", "object": "Session", "action": "create", "effect": "allow", "sentence": "Anyone with the right email and password can sign in." },
+        { "role": "member", "object": "Session", "action": "delete", "effect": "owner", "sentence": "Signing out ends only your own session." }
+      ]
     },
     "messaging": {
       "label": "Messaging", "icon": "chat", "summary": "People message each other one to one.",
@@ -26,7 +64,14 @@
         { "title": "Someone is notified of new messages", "step": 2, "phase": "mvp" },
         { "title": "Someone can block another person", "step": 2, "phase": "later" }
       ],
-      "pages": [{ "label": "Messages", "icon": "chat", "pageType": "messages", "inNav": true, "stories": [1, 2], "children": [{ "label": "Conversation", "icon": "forum", "pageType": "messages", "stories": [0, 2] }] }]
+      "pages": [{ "label": "Messages", "icon": "chat", "pageType": "messages", "inNav": true, "stories": [1, 2], "children": [{ "label": "Conversation", "icon": "forum", "pageType": "messages", "stories": [0, 2] }] }],
+      "objects": [
+        { "name": "Conversation", "description": "Two people talking about one record in this app.", "stories": [0, 1, 2],
+          "schema": { "type": "object", "required": ["startedAt"], "properties": { "startedAt": { "type": "string", "format": "date-time", "readOnly": true }, "unread": { "type": "integer", "readOnly": true, "description": "For the person asking" } } } },
+        { "name": "Message", "description": "One message in a conversation.", "stories": [2, 3],
+          "schema": { "type": "object", "required": ["body", "sentAt"], "properties": { "body": { "type": "string", "maxLength": 4000 }, "sentAt": { "type": "string", "format": "date-time", "readOnly": true } } },
+          "relations": [{ "name": "conversation", "target": "Conversation", "cardinality": "one", "owner": true }] }
+      ]
     },
     "search": {
       "label": "Search", "icon": "search", "summary": "Find things by keyword and narrow the results.",
@@ -44,7 +89,7 @@
       "activity": { "title": "Stay informed", "persona": "Everyone" },
       "steps": ["See what's new", "Choose what to hear about"],
       "stories": [
-        { "title": "Someone can see what needs their attention", "step": 0, "phase": "mvp" },
+        { "title": "Someone can see what needs their attention", "step": 0, "phase": "mvp", "services": ["email"] },
         { "title": "Someone can choose what they are notified about", "step": 1, "phase": "later" }
       ],
       "pages": [{ "label": "Notifications", "icon": "notifications", "pageType": "list", "inNav": false, "stories": [0, 1] }]
@@ -57,14 +102,18 @@
         { "title": "Someone can view another person's profile", "step": 0, "phase": "demo" },
         { "title": "Someone can edit their public profile", "step": 1, "phase": "mvp" }
       ],
-      "pages": [{ "label": "Profile", "icon": "person", "pageType": "detail", "inNav": true, "stories": [0, 1] }]
+      "pages": [{ "label": "Profile", "icon": "person", "pageType": "detail", "inNav": true, "stories": [0, 1] }],
+      "objects": [
+        { "name": "Profile", "description": "What others can see about a person.", "stories": [0, 1],
+          "schema": { "type": "object", "required": ["displayName"], "properties": { "displayName": { "type": "string", "maxLength": 80 }, "bio": { "type": "string", "maxLength": 1000 } } } }
+      ]
     },
     "uploads": {
       "label": "Photo and file uploads", "icon": "upload", "summary": "People attach photos or files.",
       "activity": { "title": "Share media", "persona": "Everyone" },
       "steps": ["Upload", "Manage"],
       "stories": [
-        { "title": "Someone can attach a photo", "step": 0, "phase": "mvp" },
+        { "title": "Someone can attach a photo", "step": 0, "phase": "mvp", "services": ["storage"] },
         { "title": "Someone can remove something they uploaded", "step": 1, "phase": "mvp" }
       ],
       "pages": []
@@ -74,7 +123,7 @@
       "activity": { "title": "Pay", "persona": "Customer" },
       "steps": ["Check out", "History"],
       "stories": [
-        { "title": "Someone can pay for [something in this app]", "step": 0, "phase": "mvp", "clarifications": ["What is being paid for, and which payment provider?"] },
+        { "title": "Someone can pay for [something in this app]", "step": 0, "phase": "mvp", "services": ["payments"], "clarifications": ["What is being paid for, and which payment provider?"] },
         { "title": "Someone can see their payment history", "step": 1, "phase": "later" }
       ],
       "pages": [{ "label": "Checkout", "icon": "payments", "pageType": "form", "inNav": false, "stories": [0] }]

@@ -16,15 +16,14 @@ Turn the running local portal foundation into the first complete request → del
 
 ## Next action
 
-**V3-REVIEW: owner review of [prototype v3](design/portal-layers/v3/index.html).** It shows the Data layer, the Platform operations tabs, Work › Agents and code links (DEC-038). After review, build **LAY-07** before LAY-04; see the [implementation plan](design/portal-layers/implementation-plan.md#lay-07-in-detail-for-the-session-that-builds-it).
+**V3-REVIEW: owner walkthrough of the built LAY-07 layers** (Data, the Platform operations tabs, Work › Agents and code links), with [prototype v3](design/portal-layers/v3/index.html) as the reference. Start `./launch-machine`, open a project and try Data, Platform › Code and Database, and Work › Agents. One question to answer: should editing a page (for example "mark as designed") open a Reconcile item, as it does now? A rebuild closes it. Then LAY-04. [LAY-07 evidence](evidence/lay-07-data-platform-agents.md).
 
 ## Ready queue
 
-1. **V3-REVIEW**: owner review of prototype v3.
-2. **LAY-07**: Data layer (A), Platform operations tabs (B), Work › Agents (C), code links (D).
-3. **LAY-04**: verified work outputs and applied answers, then working-style automation, routines and the Product agent (spending needs owner OK).
-4. **LAY-05**: coding agents against stories (absorbs B-03B).
-5. **LAY-06**: Aludel's own knowledge into its layers; retire the hash workspace.
+1. **V3-REVIEW**: owner review of the built LAY-07 layers.
+2. **LAY-04**: verified work outputs and applied answers, reusing LAY-07's revision-anchored links; then working-style automation, routines and the Product agent (spending needs owner OK).
+3. **LAY-05**: coding agents against stories (absorbs B-03B), committing with LAY-07's trailers.
+4. **LAY-06**: Aludel's own knowledge into its layers; retire the hash workspace.
 
 One packet at a time. B-03's worker/artifact/recovery work remains required and must not be displaced by later workspace expansion. [Proposed dependency order](design/project-workspace/v1/delivery-plan.md).
 
@@ -59,6 +58,7 @@ One packet at a time. B-03's worker/artifact/recovery work remains required and 
 
 | Packet | Result | Evidence |
 |---|---|---|
+| LAY-07 | Data layer (JSON Schema objects, OpenAPI operations and export, access), Platform Overview/Architecture/Code/Repository/Releases/Environments/Database/Domains, Work › Agents (profiles, pinned instructions, routing, AGENTS.md), revision-anchored code links with Reconcile items; agent-checked, owner review pending | [Evidence/retrospective](evidence/lay-07-data-platform-agents.md) |
 | LAY-02/03 | Project shell at `/p/<slug>`; knowledge records, story packs, page records, work items, derived story status; every layer usable; onboarding writes into the layers | [Evidence/retrospective](evidence/lay-02-03-layers.md), [plan](design/portal-layers/implementation-plan.md) |
 | ONB-01–05 | Accounts/tenancy, pre-account working style and idea, account + per-user GitHub + local repository, optional agent/look/features/stack, deterministic skeleton at `<slug>.localhost`; agent-checked, owner review pending | [Evidence/retrospective](evidence/onb-01-05-onboarding.md), [work record](design/onboarding/work-record.md) |
 | PW-02 | Revisioned Direction/Roadmap/Features, research-backed projections, responsibility-based navigation and legacy-route compatibility | [Evidence/retrospective](evidence/pw-02-product-workspace.md), [research](design/project-workspace/pw-02/research.md) |
@@ -80,6 +80,13 @@ One packet at a time. B-03's worker/artifact/recovery work remains required and 
 | M0 research/design | Product loop, local agent path, runner choice, recovery model, product workflow, knowledge boundary, experience architecture, and design-system strategy | [Execution plan](execution-plan.md), [decision register](decisions.md) |
 
 ## Latest handoff
+
+2026-09-22: **LAY-07 built and agent-checked** on the owner's instruction ("can you handle lay-07 for me?"), without the separate v3 review.
+- Server tests pass 44/44, including 12 new ones. Typecheck and build pass. `tests/layers-browser.mjs` drives every new tab, with axe clean on 23 views and 390px clean on 10 paths.
+- `tools/browser-checks.sh` now runs every browser script against a fresh portal each. All pass except the known `tests/browser.mjs` step.
+- Deviation: backups live in `<data>/backups/<project>/`, not in the workspace, because the workspace is the git repository.
+- Process: the browser runner and a `*.localhost` resolver in the test support.
+- Next: owner walkthrough (V3-REVIEW), then LAY-04, which reuses the code links' revision anchoring. [Evidence](evidence/lay-07-data-platform-agents.md).
 
 2026-09-22: **LAY-REVIEW done.** Owner: "a decent direction … a solid enough base to work with"; each layer gets a later refinement pass. New owner input: a stack-neutral **data and API** layer (objects, OpenAPI-backed exploration) above Platform, plus Platform operations (database health, backups, querying, servers, CI/CD, domains, provider handoffs). Owner approved the name **Data**, the Platform direction, integrations where they are used, Work › Agents with profiles, and code links (Platform › Code, no inline tags): DEC-038. Documented in [data-platform-research](design/portal-layers/data-platform-research.md) and [knowledge-structures](design/portal-layers/knowledge-structures.md); prototype v3 built for review.
 

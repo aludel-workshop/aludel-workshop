@@ -7,7 +7,9 @@ import { hostTopology } from './hosts.mjs';
 import { initOnboarding, loadCatalogs, onboarding } from './onboarding.mjs';
 import { initKnowledge, knowledge } from './knowledge.mjs';
 import { previewManager } from './previews.mjs';
-import { copyMedia, initialFiles, loadScaffoldSources, skeletonFiles, writeBinaries, writeFiles } from './scaffold.mjs';
+import { agentsGuide, copyMedia, initialFiles, loadScaffoldSources, skeletonFiles, writeBinaries, writeFiles } from './scaffold.mjs';
+import { codeLinks, initCodeLinks, workspaceIsIndexable } from './code-links.mjs';
+import { initPlatformOps, platformOps } from './platform-ops.mjs';
 import { extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { importCorpus } from './importer.mjs';
@@ -36,6 +38,8 @@ initAccounts(db);
 initGithubIdentities(db);
 initOnboarding(db);
 initKnowledge(db);
+initCodeLinks(db);
+initPlatformOps(db);
 const secrets = openSecretStore(dataDirectory);
 const topology = hostTopology(process.env, port);
 const setupConfigPath = join(portalRoot, 'config', 'project-setup.json');
@@ -61,6 +65,13 @@ for (const project of db.prepare(`SELECT p.id, p.description, s.feel FROM projec
   know.ensureProject(project.id, { pitch: project.description });
   know.seedPages(project.id, project.feel);
 }
+// LAY-07: projects from before the Data layer and agent profiles get them (idempotent), before code links start listening.
+for (const project of db.prepare("SELECT p.id FROM projects p JOIN project_setup s ON s.project_id = p.id WHERE p.id <> 'the-machine'").all()) {
+  know.ensureAgents(project.id);
+  know.ensurePackData(project.id);
+}
+const links = codeLinks({ db, know });
+const ops = platformOps({ db, backupRoot: join(dataDirectory, 'backups') });
 const github = githubIntegration({
   db, secrets, config: loadGitHubVendorConfig(),
   callbackUrl: `${publicBaseUrl}/api/integrations/github/callback`,
@@ -126,9 +137,15 @@ function continueWithDraft(request, user, headers) {
   return setup.project;
 }
 
-async function generateSkeleton(user, projectId) {
+// Everything the scaffold needs from the layers: the Data contract for its manifest and Work › Agents for AGENTS.md.
+function scaffoldSetup(user, projectId) {
   const setup = flows.projectSetup(user, projectId);
-  const { files, media, binaries } = skeletonFiles(setup, catalogs, projectGitProfile, appUrls(setup.project.slug), flows.projectAssets(projectId), scaffoldSources);
+  return { ...setup, data: { objects: know.list(projectId, 'data_object'), operations: know.list(projectId, 'data_operation') }, agents: know.agentExport(projectId) };
+}
+
+async function generateSkeleton(user, projectId) {
+  const setup = scaffoldSetup(user, projectId);
+  const { files, media, binaries, manifest } = skeletonFiles(setup, catalogs, projectGitProfile, appUrls(setup.project.slug), flows.projectAssets(projectId), scaffoldSources);
   createWorkspace(setup, user);
   writeFiles(setup.workspacePath, files);
   writeBinaries(setup.workspacePath, binaries);
@@ -145,8 +162,16 @@ async function generateSkeleton(user, projectId) {
   }
   flows.markStep(user, projectId, 'build');
   know.recordBuild(projectId, result.commit, { auth: Boolean(setup.stack.options?.auth) });
-  void previews.build(projectId, setup.workspacePath, result.commit);
-  return { commit: result.commit, trackedFiles: result.trackedFiles, pushed, pushError };
+  // LAY-07D: read the code and attach the manifest, so template-built records have code links from the start.
+  let manifestResult = { missing: [] };
+  try { links.index(projectId, setup.workspacePath); manifestResult = links.recordManifest(projectId, manifest, result.commit); }
+  catch (error) { console.error(`Code index failed for ${projectId}: ${error.message}`); }
+  // LAY-07B: every preview build is a release; the preview database is backed up before the app restarts.
+  const backup = await ops.backup(projectId, setup.workspacePath, 'before release').catch(() => null);
+  const built = links.builtBy(projectId);
+  const release = ops.releases.start(projectId, { commit: result.commit, backup: backup?.name || null, stories: know.list(projectId, 'story').filter(story => built.has(story.id)).map(story => story.id) });
+  void previews.build(projectId, setup.workspacePath, result.commit).then(status => ops.releases.finish(release.id, status));
+  return { commit: result.commit, trackedFiles: result.trackedFiles, pushed, pushError, release: release.number, unmatchedManifest: manifestResult.missing };
 }
 
 function overview() {
@@ -280,7 +305,7 @@ async function api(request, response, url) {
     return json(response, 201, { project: setup.project }, { 'set-cookie': draftCookie('', 0) });
   }
   if (url.pathname === '/api/projects' && request.method === 'GET') return json(response, 200, { projects: userProjects(db, user.id) });
-  const projectRoute = /^\/api\/projects\/([^/]+)\/(setup|preferences|design|pages|assets|features|stack|connections\/agent|steps|repository|skeleton|preview|knowledge|records|work)(?:\/([^/]+))?$/.exec(url.pathname);
+  const projectRoute = /^\/api\/projects\/([^/]+)\/(setup|preferences|design|pages|assets|features|stack|connections\/agent|steps|repository|skeleton|preview|knowledge|records|work|openapi\.json|platform|database|code|reconcile|agents|routing)(?:\/([^/]+))?$/.exec(url.pathname);
   if (projectRoute) {
     const [, rawId, section, rawItem] = projectRoute;
     const projectId = decodeURIComponent(rawId);
@@ -291,7 +316,58 @@ async function api(request, response, url) {
     // LAY-03: the layers read one project snapshot and write records and work items through the knowledge module.
     if (section === 'knowledge' && method === 'GET') {
       if (projectId === aludelProjectId) return json(response, 409, { error: 'Aludel’s own knowledge moves into its layers in LAY-06.' });
-      return json(response, 200, { setup: projectView(user, projectId), knowledge: know.view(user, projectId), catalog: { pageTypes: catalogs.pageTypes, routeIcons: catalogs.routeIcons, feels: catalogs.feels, preferences: catalogs.preferences, profiles: catalogs.profiles, stacks: catalogs.stacks } });
+      return json(response, 200, { setup: projectView(user, projectId), knowledge: { ...know.view(user, projectId, { builtBy: links.builtBy(projectId) }), code: links.snapshot(projectId) },
+        catalog: { pageTypes: catalogs.pageTypes, routeIcons: catalogs.routeIcons, feels: catalogs.feels, preferences: catalogs.preferences, profiles: catalogs.profiles, stacks: catalogs.stacks } });
+    }
+    // LAY-07A: the Data layer's contract as OpenAPI 3.1.
+    if (section === 'openapi.json' && method === 'GET') {
+      const setup = flows.projectSetup(user, projectId);
+      const body = JSON.stringify(know.openApi(projectId, { title: setup.project.name }), null, 2);
+      response.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'content-length': Buffer.byteLength(body), 'content-disposition': `inline; filename="${setup.project.slug}-openapi.json"` });
+      return response.end(body);
+    }
+    // LAY-07B: Platform operations for the local preview environment.
+    if (section === 'platform' && method === 'GET') {
+      const setup = flows.projectSetup(user, projectId);
+      const workspace = setup.workspacePath;
+      return json(response, 200, { releases: ops.releases.list(projectId), repository: ops.commits(workspace), database: ops.health(workspace), backups: ops.listBackups(projectId),
+        health: await previews.probe(projectId), domains: { preview: appUrls(setup.project.slug).app, base: topology.baseDomain || 'localhost' } });
+    }
+    if (section === 'database') {
+      const workspace = flows.projectSetup(user, projectId).workspacePath;
+      if (item === 'schema' && method === 'GET') return json(response, 200, { schema: ops.schema(workspace) });
+      if (item === 'browse' && method === 'GET') return json(response, 200, ops.browse(workspace, url.searchParams.get('table') || ''));
+      if (item === 'query' && method === 'POST') return json(response, 200, ops.query(workspace, (await readJson(request)).sql));
+      if (item === 'backups' && method === 'POST') {
+        const created = await ops.backup(projectId, workspace, 'manual');
+        return created ? json(response, 201, { backup: created, backups: ops.listBackups(projectId) }) : json(response, 404, { error: 'The preview has no database to back up yet.' });
+      }
+      if (item === 'restore' && method === 'POST') {
+        const input = await readJson(request);
+        return json(response, 200, await ops.restore(projectId, workspace, input.name, { confirm: input.confirm, stopPreview: () => previews.stop(projectId) }));
+      }
+    }
+    // LAY-07D: re-read the workspace; and the context a Reconcile item needs.
+    if (section === 'code' && item === 'index' && method === 'POST') {
+      const workspace = flows.projectSetup(user, projectId).workspacePath;
+      if (!workspaceIsIndexable(workspace)) return json(response, 409, { error: 'Build the app first; there is no code to read yet.' });
+      return json(response, 200, links.index(projectId, workspace));
+    }
+    if (section === 'reconcile' && item && method === 'GET') {
+      const work = know.workList(projectId).find(entry => entry.id === item);
+      return work ? json(response, 200, links.reconcileContext(projectId, work) || {}) : json(response, 404, { error: 'Work item not found.' });
+    }
+    // LAY-07C: working style routes each work type to one profile; AGENTS.md carries the instructions into the repository.
+    if (section === 'routing' && method === 'PUT') {
+      const input = await readJson(request);
+      know.routeWorkType(projectId, String(input.type || ''), String(input.profileId || ''), user.name);
+      return json(response, 200, { profiles: know.list(projectId, 'agent_profile') });
+    }
+    if (section === 'agents' && item === 'export' && method === 'POST') {
+      const setup = scaffoldSetup(user, projectId);
+      if (!inspectGitRepository(setup.workspacePath).committed) return json(response, 409, { error: 'The repository does not exist yet. Finish setup first.' });
+      writeFiles(setup.workspacePath, { 'AGENTS.md': agentsGuide(setup, catalogs) });
+      return json(response, 200, { written: 'AGENTS.md', committed: false });
     }
     if (section === 'records' && method === 'POST' && !item) {
       const input = await readJson(request);
@@ -302,8 +378,10 @@ async function api(request, response, url) {
       return json(response, 200, know.update(projectId, item, input.data || {}, { expectedRevision: input.expectedRevision, author: user.name, rationale: input.rationale || null, position: input.position, parentId: input.parentId }));
     }
     if (section === 'records' && method === 'DELETE' && item) {
-      const record = know.list(projectId, 'story').concat(know.list(projectId, 'spec'), know.list(projectId, 'doc'), know.list(projectId, 'research'), know.list(projectId, 'persona'), know.list(projectId, 'activity'), know.list(projectId, 'step')).find(entry => entry.id === item);
+      const record = ['story', 'spec', 'doc', 'research', 'persona', 'activity', 'step', 'data_object', 'data_operation', 'access_rule'].flatMap(kind => know.list(projectId, kind)).find(entry => entry.id === item);
       if (!record) return json(response, 409, { error: 'That record cannot be deleted here.' });
+      const users = know.referrers(projectId, item);
+      if (users.length) return json(response, 409, { error: `Still used by ${users.slice(0, 3).join(', ')}${users.length > 3 ? ` and ${users.length - 3} more` : ''}. Change those first.` });
       know.remove(projectId, item);
       return json(response, 200, { deleted: item });
     }
