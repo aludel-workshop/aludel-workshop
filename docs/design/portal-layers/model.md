@@ -19,12 +19,13 @@ Owner direction, 2026-09-22, recorded as DEC-036. Each layer of a project is a s
 | **Product** | Founder / product lead | Vision, audience and problems, **features and their stories** (functional description, acceptance), **roadmap phases** | Draft or refine a brief, split a feature into stories, check product drift |
 | **Design** | Creative lead | Design system: foundations and tokens, components, patterns, guidelines, sources and changes | Extend the system, propose a component |
 | **Pages** | Creative lead, applied | The **page tree**, where each page has concept art, notes, options and a live prototype built from real tokens and components; flows across pages | Design a page for a story, propose layout options |
-| **Platform** | Engineering / operations | Stack, repositories, environments, deployment, integrations, agent connections | Configure an environment, connect a provider |
-| **Work** | The shared bench | One stack of work items from every layer, **routines** that create work on a schedule, and the **working style** that decides what is automated | — |
+| **Data** | Back-end design (stack-neutral) | Objects (JSON Schema), API contracts (OpenAPI 3.1), access rules, later events. Nothing here names a stack (DEC-038) | Contract the objects a spec needs, check access rules |
+| **Platform** | Engineering / operations | The stack binding (architecture, runtime services), code links, repository and GitHub, releases (CI/CD), environments, database operations, domains | Configure an environment, reconcile suspect code links |
+| **Work** | The shared bench | One stack of work items from every layer, **agents** (provider accounts and role profiles), **routines** that create work on a schedule, and the **working style** that decides what is automated | — |
 
 Later: an **Insights** layer (usage analytics, feedback, experiments), which feeds observations back to Product.
 
-Navigation is layer-first: Home, Product, Design, Pages, Platform, Work (DEC-037), plus global search, with Settings and an account button at the bottom. The old *Decisions*, *Sources/Knowledge* and *Intake* destinations dissolve into the layers they belong to.
+Navigation is layer-first: Home, Product, Design, Pages, Data, Platform, Work (DEC-037, DEC-038), plus global search, with Settings and an account button at the bottom. The old *Decisions*, *Sources/Knowledge* and *Intake* destinations dissolve into the layers they belong to.
 
 ## The unit of progress is the story
 
@@ -86,3 +87,5 @@ What each layer holds, grounded in story mapping, the Product Vision Board, Oppo
 3. **LAY-03** Layers in the app: onboarding writes into Product, Design and Platform; stories and pages become records; Home dashboard.
 4. **LAY-04** Work items, routines, working-style automation, and document agents (product manager first; no code sandbox needed).
 5. **LAY-05** Coding agents against stories (absorbs B-03B's isolation, recovery and review).
+
+**LAY-07** (Data layer, Platform operations tabs, Work › Agents, code links; DEC-038) comes before LAY-04: agents need contracts, profiles and code links to act on.

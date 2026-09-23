@@ -3,16 +3,18 @@ id: portal-layers-knowledge-structures
 kind: domain-model-proposal
 status: proposed
 updated: 2026-09-22
-depends_on: [portal-layers-model, portal-layers-knowledge-research]
+depends_on: [portal-layers-model, portal-layers-knowledge-research, portal-layers-data-platform-research]
 ---
 
 # Knowledge structures by layer
 
-The record types, their fields, and how they connect, for every project, Aludel included. Grounded in the [knowledge research](knowledge-research.md) and decided in DEC-037. This is the source for the later pass that brings these structures into the portal. The [LAY-02 prototype](v2/index.html) shows them with Tool Share data.
+The record types, their fields, and how they connect, for every project, Aludel included. Grounded in the [knowledge research](knowledge-research.md) (DEC-037) and the [data, platform and traceability research](data-platform-research.md) (DEC-038). [Prototype v2](v2/index.html) shows Product, Design, Pages and Work; [prototype v3](v3/index.html) adds Data, the Platform operations tabs, Work › Agents and code links, all with Tool Share data.
+
+**Stack rule (DEC-038):** nothing above Platform references stack specifics. Product, Design, Pages and Data are written so any stack could implement them; Platform holds the binding.
 
 ## Navigation
 
-**Home · Product · Design · Pages · Platform · Work** in the rail, then **Settings** and an **account button** (profile, sign out) at the bottom. Each layer uses tabs. Global search spans every record.
+**Home · Product · Design · Pages · Data · Platform · Work** in the rail, then **Settings** and an **account button** (profile, sign out) at the bottom. Each layer uses tabs. Global search spans every record.
 
 ## Product: founder and product lead
 
@@ -101,14 +103,53 @@ Follows the R-08 [design-system strategy](../design-system-strategy.md) and [pro
 | Page | Live prototype built from tokens and components, concept art and inspiration, notes, stories realised, options and versions, state matrix (empty, loading, error…), decision history |
 | Flows | Journeys across pages, one per story-map activity |
 
-## Platform: engineering and operations
+## Data: objects and contracts (stack-neutral)
 
 | Tab | Holds |
 |---|---|
-| Architecture | Stack preset, system data model (entities and relationships), APIs and contracts, technical decisions (ADR-style) |
-| Repository | Repository, branches, commit history |
-| Environments | Preview and production, deploys, health |
-| Connections | GitHub, agent providers, other integrations, access |
+| Objects | Relationship map, plus one record per object: description; fields as **JSON Schema 2020-12** (type, format, required, enum, description); relationships (`$ref`, cardinality, ownership: "a Tool belongs to one lender"); lifecycle states and transitions; example; stories and specs that need it; "Built by" |
+| API | Operations grouped by object, in **OpenAPI 3.1** shape: `operationId`, summary, method and path, parameters, request and response schemas (referencing Objects), errors, the roles allowed, stories and specs, "Built by". Exportable as one `openapi.json` |
+| Access | Roles × objects × actions (read, create, update, delete, plus named transitions), each cell either allowed, owner-only, or denied, with a rule sentence ("Only the lender can approve a request") |
+| Events | Later: named domain events (`BorrowRequest.approved`) with payload schemas, for notifications and integrations |
+
+- An accepted spec's "Key entities" propose objects. A technical-plan work item writes the contracts, and its answers land as revisions with a rationale.
+- Object and operation status is derived like story status: **proposed** (named in a spec) → **contracted** (schema accepted) → **built** (linked code) → **shipped**.
+- Story packs bring their objects and operations (the Accounts pack brings `User`, `Session` and the sign-in operations).
+
+## Platform: engineering and operations (the stack binding)
+
+| Tab | Holds |
+|---|---|
+| Overview | Health at a glance: environments, last release, database, backups, domains, suspect code links |
+| Architecture | Stack preset; **binding** from Data to the stack (object → table, operation → handler); runtime **Services** the app calls (email, payments, storage), each linked to the stories that need it; technical decisions (ADR-style) |
+| Code | **Code links** (below): coverage matrix of stories × built/tested/suspect; code units with why they exist, references in and out, tests and state |
+| Repository | Repository and branches, commits with their work-item trailers, **GitHub** connection |
+| Releases | CI/CD: each build's checks, preview, promotion to production and rollback. A release names its commits and therefore the stories it ships (the **shipped** status) |
+| Environments | Preview and production: services, deploy history, health and logs, hosting provider |
+| Database | Per environment: health (size, connections, slow queries), backups and restore points, migrations (applied and pending, each linked to the object revision it realises), browse data, read-only query |
+| Domains | Addresses per environment, DNS records to set, verification and TLS state |
+
+Integrations sit where they are used (DEC-038): GitHub in Repository, hosting in Environments, DNS in Domains, runtime services in Architecture, agent accounts in Work › Agents. Settings keeps a read-only list of every connection for audit.
+
+### Code links
+
+| Record | Fields |
+|---|---|
+| Code unit | Path, symbol (component, route, operation handler, table, migration, exported function, test), kind, content hash, last commit; reachable (from the structure index) |
+| Trace link | From a knowledge record **at a revision** (story, page, object, operation, spec requirement) to a code unit; kind (generated, implements, tests); source (manifest, commit trailer, test name, later coverage); state (current or suspect) |
+
+- **Declared links come from three sources, never inline tags:**
+  - the scaffold's generation manifest
+  - commit trailers on closed work (`Aludel-Work: W-12`, `Implements: S4, SPEC-02/FR-001`)
+  - test names that start with an acceptance ID (`S4 · Given …`)
+- **Derived links** (callers and callees, reachability) are computed from the code on each commit (TypeScript compiler API first; SCIP for other stacks; Knip-style reachability).
+- **Unit state:**
+  - *healthy*: reachable and traced
+  - *suspect*: its upstream record has a newer revision
+  - *untraced*: reachable with no link
+  - *dead*: unreachable, with no live trace
+- **Propagation:** a new revision of a linked record makes its links suspect and creates one **Reconcile** work item. The item's context holds the revision diff, the linked units with their callers and callees, and the linked tests. Its plan classifies each unit as create, modify or remove. Closing it re-links against the new revision.
+- Layers above Platform show only the "Built by" summary: count of units, tests passing and suspect state.
 
 ## Work: the bench
 
@@ -117,6 +158,31 @@ A work item has: ID, type (define, spec, plan, design, implement, review, resear
 Its **context bundle** is compiled like a story file. It contains the goal and story, acceptance, principles, relevant page, tokens and components, technical-context excerpt, decisions, file scope and outputs. Each part cites its source record, and more is retrieved on demand.
 
 Routines create work on a schedule. Working style sets which work types are automated.
+
+| Tab | Holds |
+|---|---|
+| Queue | Work items by state, with suggestions |
+| Agents | **Accounts** (provider connections: Codex on this machine, an Anthropic or OpenAI key) and **profiles** |
+| Routines | Scheduled work |
+| Working style | Which work types go to which profile automatically |
+
+An **agent profile** has:
+
+- name and role, and when it's used (work types)
+- account and model
+- instructions (revisioned)
+- layers it may write
+- effects that need approval
+- a budget (off by default, DEC-004)
+
+Instructions are layered:
+
+1. Product principles (every profile)
+2. project instructions (exported to `AGENTS.md` in the repository)
+3. role instructions
+4. work-type guidance
+
+A work item records the profile and instruction revisions it ran with. Default profiles: Product lead, Design lead, Architect, Coding agent, Reviewer.
 
 ## Onboarding against these structures
 
@@ -127,7 +193,9 @@ Revised order: working style → idea → account → GitHub → agent → look 
 - **Story packs** seed the story map and propose pages.
 - **Pages** seeds the page tree (pack pages arrive placed, labelled with their pack, and fully editable; deleting one asks which page takes its stories).
 - **Stack** seeds Platform Architecture.
-- **Build** runs template work items. Anything a template builds is shown as a completed work item; anything that needs judgement becomes a suggested or ready item.
+- **Agent** connects an account in Work › Agents; default profiles use it.
+- **Story packs** also seed their Data objects and operations (Accounts: `User`, `Session`, sign-up, sign-in and sign-out).
+- **Build** runs template work items. Anything a template builds is shown as a completed work item; anything that needs judgement becomes a suggested or ready item. The build writes the generation manifest, so template-built stories have code links from the start.
 
 ## Story pack catalog (first pass)
 

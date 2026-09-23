@@ -3,7 +3,7 @@ id: portal-layers-implementation-plan
 kind: implementation-plan
 status: active
 updated: 2026-09-22
-depends_on: [portal-layers-model, portal-layers-knowledge-structures]
+depends_on: [portal-layers-model, portal-layers-knowledge-structures, portal-layers-data-platform-research]
 ---
 
 # Making the layers real: implementation plan and handoff
@@ -16,8 +16,9 @@ depends_on: [portal-layers-model, portal-layers-knowledge-structures]
 |---|---|
 | Why layers, and what each layer is for | [model.md](model.md) (DEC-036) |
 | Which frameworks the structures follow, and the evidence | [knowledge-research.md](knowledge-research.md) |
-| Exact record types and fields; story-pack catalog; onboarding order | [knowledge-structures.md](knowledge-structures.md) (DEC-037) |
-| What it should look and feel like | [prototype v2](v2/index.html) (owner-approved 2026-09-22: "this looks awesome … make it real") |
+| Exact record types and fields; story-pack catalog; onboarding order | [knowledge-structures.md](knowledge-structures.md) (DEC-037, DEC-038) |
+| Data layer, Platform operations, agent profiles, code links: evidence and references | [data-platform-research.md](data-platform-research.md) (DEC-038) |
+| What it should look and feel like | [prototype v2](v2/index.html) (owner-approved 2026-09-22: "this looks awesome … make it real"); [prototype v3](v3/index.html) for Data, Platform, Work › Agents and code links (**awaiting owner review**) |
 | Onboarding as built so far | [onboarding work record](../onboarding/work-record.md), [evidence](../../evidence/onb-01-05-onboarding.md) |
 
 The prototype is the visual and structural reference, not code to copy. The real UI uses the portal's Angular/Material stack and the `page-blocks` and `proto-site` components.
@@ -28,9 +29,68 @@ The prototype is the visual and structural reference, not code to copy. The real
 |---|---|---|
 | **LAY-02** Project shell | Route `/p/<slug>/<layer>[/<tab>[/<id>]]` for every project the user is a member of. Rail: Home, Product, Design, Pages, Platform, Work; Settings; account menu (account, your apps, sign out). Global search over the project's records. "Continue in Aludel" and `/projects` link here. Aludel's old hash workspace stays reachable until LAY-06 | Browser: a new user lands in `/p/<slug>` after building; every layer and tab renders; non-members get 404; axe and 390px clean |
 | **LAY-03** Knowledge records | Server module `server/knowledge.mjs`: project-scoped records for vision sections, personas, activities, steps, stories, phases, specs, research, docs, pages and work items, with revisions and rationale. Derived story status. Onboarding writes into them: idea → vision and a persona; **story packs** (replace functionality, before Pages) → activities, steps and stories; pages → page records linked to stories; look → design settings; build → template work items done and stories built. Layer screens with core editing (stories, vision, docs, specs, page descriptions; work item assign and answer) | Domain tests for validation, ownership, derivation and pack seeding; browser test from onboarding into every layer; the scaffold still builds from the page records |
+| **LAY-07** Data, Platform operations, agents, code links (DEC-038) | Before LAY-04, after the owner reviews v3. Sub-packets below | Domain tests per sub-packet; `layers-browser.mjs` covers the new tabs; axe and 390px clean |
 | **LAY-04** Work automation | Working style → automation policy per work type; suggested items computed from gaps; routines; the Product agent drafting stories and specs through the agent connection (needs the owner's OK to spend on API keys) | Later |
 | **LAY-05** Coding agents | Implement items against stories with isolated runs and preview review (absorbs B-03B) | Later |
 | **LAY-06** Aludel inside itself | Migrate Aludel's own docs, decisions and plans into its layers; retire the hash workspace | Later; owner-led pass |
+
+
+## LAY-07 in detail (for the session that builds it)
+
+Build in this order. Each sub-packet is shippable on its own.
+
+**LAY-07A Data layer.**
+- New record kinds in `server/knowledge.mjs`, each with a validator:
+  - `data_object`: name, description, `schema` (a JSON Schema 2020-12 object: `type: object`, `properties`, `required`), `relations` (`[{ name, target, cardinality: one|many, owner: boolean }]`), `states` (optional lifecycle), `stories`, `specs`
+  - `data_operation`: `operationId`, summary, method, path, `objectId`, request and response schemas (JSON Schema; `$ref` to objects by id), errors, roles, stories
+  - `access_rule`: role, `objectId`, action, effect (`allow` | `owner` | `deny`), sentence
+- Validation stays structural. The stack rule is enforced by review and by the Architect profile's instructions, not by string matching.
+- Story packs gain `objects` and `operations` in `config/story-packs.json`. Accounts must describe exactly what aludel-web-v1 generates:
+  - `Account {email, name}` and `Session`
+  - `getSession`, `signUp`, `signIn`, `signOut`, `health`
+  - Those are template-built. Other packs' objects are proposed.
+- `view()` adds `objects`, `operations` and `access`. `GET /api/projects/:id/openapi.json` exports the contract (OpenAPI 3.1, `components.schemas` from objects).
+- UI: `src/layers/data.ts` with tabs Objects (relationship map plus detail panel), API (Scalar-style three panes), Access (matrix). Rail order: Home, Product, Design, Pages, **Data**, Platform, Work.
+- Derived status: proposed → contracted → built → shipped.
+
+**LAY-07B Platform tabs.**
+- Tabs: Overview, Architecture, Code, Repository, Releases, Environments, Database, Domains. Move GitHub from Connections into Repository and remove the Connections tab.
+- Architecture shows the binding: for aludel-web-v1, objects map to tables and operations map to handlers in `server.mjs`. Runtime Services list what stories need (email for "reset password"), marked "not connected".
+- Releases: record each preview build in a `releases` table (`commit`, `environment`, `state`, `checks`, `startedAt`, `stories` via code links). Promotion to production is shown as unavailable locally.
+- Database (local, for the preview environment's `data/app.sqlite`):
+  - health: file size, table row counts, `PRAGMA integrity_check`
+  - backups: copy to `workspaces/<id>/backups/` with a timestamp; restore needs a confirm step
+  - migrations: the schema read from `sqlite_master`
+  - browse: first 50 rows per table, with password hashes and session tokens masked
+  - read-only query: open with `readOnly: true` plus a single-statement `SELECT`-only guard and a row limit
+  - Never show or log secrets. Column names matching `hash|salt|token|secret|password` are masked.
+- Domains: `<slug>.<base>` per environment; custom domains are shown as needing hosting (unavailable state, no DNS calls).
+
+**LAY-07C Work › Agents.**
+- Tabs: Queue, Agents, Routines, Working style. Move the shared agent-connection component from Platform to Agents as **Accounts**.
+- New record kind `agent_profile`:
+  - name, role, work types, `accountId`, model
+  - instructions (text, revisioned like any record)
+  - writable layers (`product|design|pages|data|platform|work`)
+  - `approvalRequired` effects
+  - `budget` (0 by default)
+- Seed the defaults: Product lead, Design lead, Architect, Coding agent, Reviewer.
+- Working style maps work types to profiles (replaces the free-text "agent" label).
+- Work items store `profileId` plus the instruction revisions used.
+- "Export AGENTS.md" writes project instructions into the workspace on the next commit.
+- No provider calls: that stays LAY-04 with the owner's OK to spend.
+
+**LAY-07D Code links.**
+- Tables:
+  - `code_units` (project, path, symbol, kind, hash, reachable, lastCommit)
+  - `trace_links` (project, recordId, recordRevision, unitId, kind `generated|implements|tests`, source `manifest|trailer|test`, state `current|suspect`)
+- Sources:
+  1. `skeletonFiles` returns a manifest of `{ path, symbol, recordIds }` for every generated page, pack feature and operation handler. The build stores it (template stories link at their current revision).
+  2. `commitWorkspace` adds trailers `Aludel-Work:` and `Implements:` from the work item. The indexer reads trailers from `git log` and links the units changed in that commit.
+  3. Test names starting with a story ref.
+- Index: TypeScript compiler API over the workspace (exported symbols, Angular components, route entries, handlers), references between them, and reachability from `main.ts` and `server.mjs`. Run it after each build.
+- Propagation: `knowledge.update` marks links on the old revision `suspect` and creates or updates one `reconcile` work item per record. Its context holds the revision diff, units, callers and callees, and tests.
+- UI: Platform › Code (matrix, unit list with state filter, unit detail); "Built by" sections in the story drawer, page aside and Data object; suspect count on Home.
 
 ## Design choices already made (do not reopen without the owner)
 
@@ -65,10 +125,14 @@ Playwright is not a portal dependency. Install it anywhere (`npm i playwright`, 
 
 Newest first.
 
+- **2026-09-22: DEC-038 documented; prototype v3 built** ([v3](v3/index.html)).
+  - v3 adds the Data layer, the Platform operations tabs, Work › Agents and code links.
+  - **Next action: owner review of v3.** Then build LAY-07A → D (above), then LAY-04.
+  - LAY-04's "verify closures against revisions" reuses LAY-07D's revision-anchored links: build it once.
+- **2026-09-22: LAY-REVIEW done.** The owner called the real layers "a decent direction"; each layer gets a later refinement pass.
 - **2026-09-22: LAY-02 and LAY-03 done and agent-checked.**
   - [Evidence and retrospective](../../evidence/lay-02-03-layers.md): server 32/32, onboarding and layers browser tests pass, existing workspace scripts pass.
-  - The owner has not yet walked through the real layers.
-- **Next action: owner walkthrough of `/p/<slug>`.** Then **LAY-04**, whose first job is:
+- **LAY-04** (after LAY-07). Its first job:
   1. Link revisions to work items: pass `workItemId` when a work item's answer or output edits a record, and let `updateWork(... state: 'done')` verify that each target has a revision with that `work_item_id`.
   2. Write a question's answer into the target record with the rationale (a UI action on the item page: "Apply to S6").
   3. Remove the interim `/projects/<id>` page from `src/public.*`.

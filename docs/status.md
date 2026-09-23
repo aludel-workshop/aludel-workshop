@@ -5,7 +5,7 @@ status: active
 updated: 2026-09-22
 current_phase: M1
 phase_state: in-progress
-next_action: LAY-REVIEW
+next_action: V3-REVIEW
 ---
 
 # Current project status
@@ -16,14 +16,15 @@ Turn the running local portal foundation into the first complete request → del
 
 ## Next action
 
-**LAY-REVIEW: owner walkthrough of the real layers** at `/p/<slug>` (start a new app via **Get started**, then **Continue in Aludel**). LAY-02 and LAY-03 are built and agent-checked ([evidence](evidence/lay-02-03-layers.md)). After review, **LAY-04** starts with verified outputs and applied answers; see the [implementation plan](design/portal-layers/implementation-plan.md#current-state).
+**V3-REVIEW: owner review of [prototype v3](design/portal-layers/v3/index.html).** It shows the Data layer, the Platform operations tabs, Work › Agents and code links (DEC-038). After review, build **LAY-07** before LAY-04; see the [implementation plan](design/portal-layers/implementation-plan.md#lay-07-in-detail-for-the-session-that-builds-it).
 
 ## Ready queue
 
-1. **LAY-REVIEW**: owner walkthrough.
-2. **LAY-04**: verified work outputs and applied answers, then working-style automation, routines and the Product agent (spending needs owner OK).
-3. **LAY-05**: coding agents against stories (absorbs B-03B).
-4. **LAY-06**: Aludel's own knowledge into its layers; retire the hash workspace.
+1. **V3-REVIEW**: owner review of prototype v3.
+2. **LAY-07**: Data layer (A), Platform operations tabs (B), Work › Agents (C), code links (D).
+3. **LAY-04**: verified work outputs and applied answers, then working-style automation, routines and the Product agent (spending needs owner OK).
+4. **LAY-05**: coding agents against stories (absorbs B-03B).
+5. **LAY-06**: Aludel's own knowledge into its layers; retire the hash workspace.
 
 One packet at a time. B-03's worker/artifact/recovery work remains required and must not be displaced by later workspace expansion. [Proposed dependency order](design/project-workspace/v1/delivery-plan.md).
 
@@ -79,6 +80,8 @@ One packet at a time. B-03's worker/artifact/recovery work remains required and 
 | M0 research/design | Product loop, local agent path, runner choice, recovery model, product workflow, knowledge boundary, experience architecture, and design-system strategy | [Execution plan](execution-plan.md), [decision register](decisions.md) |
 
 ## Latest handoff
+
+2026-09-22: **LAY-REVIEW done.** Owner: "a decent direction … a solid enough base to work with"; each layer gets a later refinement pass. New owner input: a stack-neutral **data and API** layer (objects, OpenAPI-backed exploration) above Platform, plus Platform operations (database health, backups, querying, servers, CI/CD, domains, provider handoffs). Owner approved the name **Data**, the Platform direction, integrations where they are used, Work › Agents with profiles, and code links (Platform › Code, no inline tags): DEC-038. Documented in [data-platform-research](design/portal-layers/data-platform-research.md) and [knowledge-structures](design/portal-layers/knowledge-structures.md); prototype v3 built for review.
 
 2026-09-22: the layers are real (LAY-02/03). A new session should read [the layers implementation plan](design/portal-layers/implementation-plan.md) first; its "Current state" section names the next concrete steps and entry points. Server 32/32; onboarding and layers browser tests pass.
 
