@@ -2,7 +2,7 @@
 id: decisions-001
 kind: decision-register
 status: active
-updated: 2026-09-23
+updated: 2026-09-24
 ---
 
 # Decision inbox
@@ -10,6 +10,19 @@ updated: 2026-09-23
 This is the seed of the portal's decision workflow. Confirmed owner answers and proposed defaults are distinct. No unanswered question silently becomes an owner decision.
 
 ## Confirmed
+
+2026-09-24 — **DEC-045: Design layer prototype v1 accepted; build authorized.** The owner reviewed [DESIGN-UX-01 v1](design/design-layer/v1/index.html): "like it. build it". Accepted:
+- Design's tabs become **Tokens · Components · Brand · Docs**. Sources and Guidelines go: references and documents live in the Library.
+- Tokens are one revisioned token set in three tiers (raw values, roles, rules), exported as W3C design tokens. Editing happens in a tree beside a live preview you can page through, with no inspector.
+- Components are stack-neutral contracts: properties, slots, anatomy with token links, accessibility, references and revisions. Their status is needed, specified or built. The binding to code ("Built with") belongs to Platform's stack.
+- Brand assets are starter examples, not required fields, and text counts as an asset.
+- References can point straight at a Library source or finding. Documents gain a "shows in" setting for layers.
+- Contrast is checked at WCAG AA. There is no setting yet.
+- Deviation tracking against the base system is out of scope ("we can handle that another time").
+
+**Authorized:** a local build in the portal and the aludel-web-v1 scaffold, plus tests. No provider calls, spending or external writes. Build brief: [work record §5](design/design-layer/work-record.md#5-build-brief).
+
+2026-09-24 — **DEC-044: ROADMAP-01 accepted; UX passes continue layer by layer.** The owner reviewed the built Vision, Library and Work plan: "alright, i like it. mark done." Next come further UX passes, "probably design oriented next, then pages, then perhaps data/platform." Each pass follows ROADMAP-01's pattern: a brief ledger, research with real reference screens, prototype rounds reviewed ask by ask, then a build once the owner accepts. LAY-05 and LAY-06 wait behind these passes.
 
 2026-09-23 — **DEC-043: ROADMAP-01 prototype v3 accepted with final tweaks; build authorized.** The owner reviewed v3: "looks good, no final prototype, you can go ahead and build." Accepted: W1 (evidence chip), W2 (insights), W6 (roles setup with an elevated toggle and a review action per role), W7 (the Next split chip), W8 ("better, we can work with that") and the tile nav (W9). Final tweaks, recorded in [the work record](design/product-and-plan/work-record.md#owner-acceptance-of-v3-and-build-brief-2026-09-23):
 - A story's why is just "Why" and the chip, in the Vision colour (v3 had lost it).

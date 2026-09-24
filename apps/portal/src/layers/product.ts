@@ -151,7 +151,7 @@ export function markdownBlocks(body: string): Block[] {
           <span class="lay-push lay-row lay-wrap"><button type="button" class="lay-button ghost small" (click)="generate('prfaq')"><mat-icon aria-hidden="true">auto_awesome</mat-icon>Generate PR/FAQ</button>
             <button type="button" class="lay-button ghost small" (click)="generate('onepager')"><mat-icon aria-hidden="true">auto_awesome</mat-icon>Generate one-pager</button></span></div>
         <div class="lay-doclist">
-          @for (doc of data().docs; track doc.id) {
+          @for (doc of visionDocs(); track doc.id) {
             <a class="lay-docrow" [href]="ctx.link('product', 'docs', doc.id)" (click)="ctx.go(ctx.link('product', 'docs', doc.id), $event)"><span class="lay-docicon"><mat-icon aria-hidden="true">{{ doc.form === 'generated' ? 'auto_awesome' : 'description' }}</mat-icon></span>
               <span class="lay-body-text"><strong>{{ doc.title }}</strong><small>{{ doc.form === 'generated' ? 'Generated from the Brief' : 'Written' }} · revision {{ doc.revision }}{{ doc.agents ? ' · agents read this' : '' }}</small></span>
               @if (stale(doc)) { <span class="lay-chip lay-warn"><mat-icon aria-hidden="true">update</mat-icon>{{ stale(doc) }} change{{ stale(doc) === 1 ? '' : 's' }}</span> }</a>
@@ -246,6 +246,8 @@ export class ProductLayerComponent {
   readonly tab = computed(() => { const tab = this.ctx.segments()[1] || 'brief'; return tab === 'vision' ? 'brief' : ['specs', 'roadmap', 'research'].includes(tab) ? 'moved' : tab; });
   readonly selectedId = computed(() => this.tab() === 'map' ? this.ctx.segments()[2] || '' : '');
   readonly selected = computed(() => this.ctx.storyById().get(this.selectedId()) || null);
+  // DESIGN-UX-01: documents live in the Library; Vision lists the ones that show here.
+  readonly visionDocs = computed(() => this.data().docs.filter(doc => (doc.showsIn || ['product']).includes('product')));
   readonly selectedDoc = computed(() => this.tab() === 'docs' ? this.data().docs.find(doc => doc.id === this.ctx.segments()[2]) || null : null);
   readonly focusClaim = computed(() => this.tab() === 'brief' ? this.ctx.segments()[2] || '' : '');
   readonly blocks = computed(() => markdownBlocks(this.selectedDoc()?.body || ''));

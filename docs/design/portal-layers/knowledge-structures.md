@@ -103,17 +103,20 @@ Interviews, observations, competitor notes and analytics excerpts. Each links to
 
 Free-form documents, which vary by organization, with optional templates (PR/FAQ, positioning, pricing, launch plan). A doc can mention any record, and those mentions become links in both directions.
 
+DESIGN-UX-01: documents live in the Library (Library › Documents). Each has `showsIn`, the layers whose Docs tab lists it; older documents show in Vision. Agents read the ones marked for agents.
+
 ## Design: creative lead, the system
+
+Rebuilt by DESIGN-UX-01 (DEC-045); [work record](../design-layer/work-record.md).
 
 | Tab | Holds |
 |---|---|
-| Foundations | Design principles; **tokens in DTCG form** (`$value`, `$type`, references, themes and modes): colour roles, type scale, spacing, shape, elevation, motion |
-| Components | Catalog: purpose, anatomy, variants, states, accessibility, maturity (proposed → incubating → stable → deprecated), pages that use it |
-| Patterns | Interaction rules (placement, disclosure, navigation), layouts and **page types** (the archetypes the page tree and scaffold use) |
-| Guidelines | Content and voice, accessibility baseline, free-form guidance |
-| Sources & changes | Adopted systems and versions, the deviation ledger, proposed and released changes |
+| Tokens | One `design_tokens` record per project, revisioned as a whole, in three tiers. **Raw values:** palettes (seed colour and tone, pinned tones), two type faces (font stacks), corners, spacing. **Roles:** colour roles pointing at palette tones for light and dark; the 15 type roles. **Rules:** elevation levels (a fill role plus a shadow; fixed or relative to what is below), motion (easings, durations, a spring), behaviours (drag and drop, state layers). Exported as W3C design tokens (DTCG 2025.10). Edited in a tree beside a live preview of the stack's real components |
+| Components | `component` records: stack-neutral contracts (purpose, properties of kind variant, boolean, text or swap, slots accepting other components with counts, anatomy parts with token links, accessibility). Nesting uses the record's parent. `binding` is how the stack builds it (library, selector, property map); status is derived: needed → specified → built |
+| Brand | `brand_asset` records: image (upload), text, mark (a monogram on colour roles) or banner (generated), with an optional key the scaffold reads (`name`, `tagline`, `description`, `mark`). Starter assets and templates, never required fields. "Used in" is read from the workspace |
+| Docs | Library documents whose `showsIn` lists Design |
 
-Follows the R-08 [design-system strategy](../design-system-strategy.md) and [profile template](../process/design-system-profile-template.md).
+References to Library sources and findings (`evidence_link` with direction `references`) attach to components, brand assets and the token set. Content and voice, the accessibility baseline and design direction are documents. Deviation from the base system is not tracked yet (owner: later).
 
 ## Pages: applying the system to the product
 

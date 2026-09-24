@@ -5,6 +5,7 @@ import { aludelProjectId, requireMember } from './accounts.mjs';
 import { reservedSlugs, slugify } from './hosts.mjs';
 import { getProductWorkspace, saveProductRecord } from './product-workspace.mjs';
 import { loadAgentDefaults, loadRoles, loadStoryPacks } from './knowledge.mjs';
+import { loadBrandTemplates } from './design.mjs';
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const now = () => new Date().toISOString();
@@ -45,7 +46,7 @@ export function loadCatalogs(configDirectory) {
   return { preferences: profiles.preferences, profiles: profiles.profiles, feels: starter.feels, features: starter.features, packs: loadStoryPacks(configDirectory), stacks,
     pageTypes: pages.types, routeIcons, defaultRoute: starter.defaultRoute, services: read('story-packs.json').services || {}, agentDefaults: loadAgentDefaults(configDirectory),
     automation: profiles.automation, routines: read('routines.json').routines, playbooks: read('playbooks.json'), agentProviders: loadAgentProviders(configDirectory),
-    roles: loadRoles(configDirectory, { routines: read('routines.json').routines, styles: Object.keys(profiles.profiles) }) };
+    roles: loadRoles(configDirectory, { routines: read('routines.json').routines, styles: Object.keys(profiles.profiles) }), brandTemplates: loadBrandTemplates(configDirectory) };
 }
 
 export function initOnboarding(db) {
@@ -76,6 +77,9 @@ export function initOnboarding(db) {
   const setupColumns = new Set(db.prepare('PRAGMA table_info(project_setup)').all().map(column => column.name));
   if (!setupColumns.has('routes_json')) db.exec('ALTER TABLE project_setup ADD COLUMN routes_json TEXT');
   if (!setupColumns.has('navigation')) db.exec('ALTER TABLE project_setup ADD COLUMN navigation TEXT');
+  // DESIGN-UX-01: what an upload is for. Reference media (onboarding) and brand images go into the generated app; Library images do not.
+  const assetColumns = new Set(db.prepare('PRAGMA table_info(project_assets)').all().map(column => column.name));
+  if (!assetColumns.has('purpose')) db.exec("ALTER TABLE project_assets ADD COLUMN purpose TEXT NOT NULL DEFAULT 'reference'");
   db.prepare('DELETE FROM onboarding_drafts WHERE claimed_project_id IS NULL AND expires_at < ?').run(now());
 }
 
@@ -169,7 +173,7 @@ export function onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot, cr
   }
 
   function assets(projectId) {
-    return db.prepare('SELECT id, kind, filename, mime, size, notes, created_at FROM project_assets WHERE project_id = ? ORDER BY created_at').all(projectId)
+    return db.prepare("SELECT id, kind, filename, mime, size, notes, purpose, created_at FROM project_assets WHERE project_id = ? AND purpose = 'reference' ORDER BY created_at").all(projectId)
       .map(asset => ({ ...asset, url: `/api/projects/${encodeURIComponent(projectId)}/assets/${asset.id}` }));
   }
 
@@ -297,11 +301,13 @@ export function onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot, cr
         .run(feel, theme, String(notes).trim(), navigation || null, updated, projectId);
       db.prepare('UPDATE projects SET accent_color = ?, updated_at = ? WHERE id = ?').run(accentColor, updated, projectId);
       know.seedPages(projectId, feel);
+      know.syncDesignFromLook?.(projectId);
       markStep(projectId, 'look');
       return api.projectSetup(user, projectId);
     },
 
-    addAsset(user, projectId, { filename, dataUrl, notes }) {
+    addAsset(user, projectId, { filename, dataUrl, notes, purpose = 'reference' }) {
+      if (!['reference', 'library', 'brand'].includes(purpose)) fail('Unknown upload purpose.');
       requireMember(db, user, projectId);
       const match = /^data:([^;,]+)(?:;charset=[^;,]+)?;base64,([a-z0-9+/=]+)$/i.exec(String(dataUrl || ''));
       const mime = match?.[1].toLowerCase();
@@ -319,9 +325,9 @@ export function onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot, cr
       const directory = join(assetRoot, projectId);
       mkdirSync(directory, { recursive: true });
       if (!existsSync(join(directory, storedName))) writeFileSync(join(directory, storedName), bytes, { flag: 'wx' });
-      db.prepare(`INSERT INTO project_assets(id, project_id, kind, filename, mime, size, stored_name, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-        .run(id, projectId, kind, safeName, mime, bytes.length, storedName, cleanNotes, now());
-      return api.projectSetup(user, projectId);
+      db.prepare(`INSERT INTO project_assets(id, project_id, kind, filename, mime, size, stored_name, notes, purpose, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(id, projectId, kind, safeName, mime, bytes.length, storedName, cleanNotes, purpose, now());
+      return { ...api.projectSetup(user, projectId), uploaded: id };
     },
 
     removeAsset(user, projectId, assetId) {
@@ -341,9 +347,15 @@ export function onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot, cr
       return { path: join(assetRoot, projectId, asset.stored_name), mime: asset.mime };
     },
 
-    projectAssets(projectId) {
-      return db.prepare('SELECT id, kind, filename, mime, stored_name, notes FROM project_assets WHERE project_id = ? ORDER BY created_at').all(projectId)
+    // Reference media the scaffold copies into the app (brand images are copied by the Design layer; Library images never are).
+    projectAssets(projectId, purpose = 'reference') {
+      return db.prepare('SELECT id, kind, filename, mime, stored_name, notes FROM project_assets WHERE project_id = ? AND purpose = ? ORDER BY created_at').all(projectId, purpose)
         .map(asset => ({ ...asset, path: join(assetRoot, projectId, asset.stored_name) }));
+    },
+    // Every upload, for the layers (Library images, brand images, reference media).
+    uploads(projectId) {
+      return db.prepare('SELECT id, kind, filename, mime, size, notes, purpose FROM project_assets WHERE project_id = ? ORDER BY created_at').all(projectId)
+        .map(asset => ({ ...asset, url: `/api/projects/${encodeURIComponent(projectId)}/assets/${asset.id}` }));
     },
 
     saveFeatures(user, projectId, { picks = [], custom = [] }) {

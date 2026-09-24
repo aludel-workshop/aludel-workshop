@@ -1,18 +1,19 @@
 import { Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
-import { Finding, Insight, ProjectContext, Source, layerLabel, sourceTypeIcon } from './context';
+import { Finding, Insight, ProjectContext, Region, Source, layerLabel, sourceTypeIcon } from './context';
+import { DocsComponent } from './doc-view';
 import { FindingComponent } from './evidence';
 import { RefChipComponent } from './work-shared';
 
 type Segment = { text: string; finding?: Finding };
-const layerOf: Record<string, string> = { brief_claim: 'product', persona: 'product', activity: 'product', story: 'product', page: 'pages', data_object: 'data', data_operation: 'data', project: 'work' };
+const layerOf: Record<string, string> = { brief_claim: 'product', persona: 'product', activity: 'product', story: 'product', page: 'pages', data_object: 'data', data_operation: 'data', project: 'work', component: 'design', brand_asset: 'design', design_tokens: 'design' };
 
 // Library (ROADMAP-01, DEC-042/043): everything learned, as atomic research. Sources hold the raw material; findings are
 // passages highlighted in them (or facts and data noted from them); insights interpret findings and are attached as
 // evidence to records in every layer. A utility beside Settings, not a layer.
 @Component({
-  selector: 'aludel-library', standalone: true, imports: [FormsModule, MatIconModule, RefChipComponent, FindingComponent],
+  selector: 'aludel-library', standalone: true, imports: [FormsModule, MatIconModule, RefChipComponent, FindingComponent, DocsComponent],
   template: `
   @switch (view()) {
     @case ('insight') {
@@ -63,6 +64,14 @@ const layerOf: Record<string, string> = { brief_claim: 'product', persona: 'prod
         <p class="lay-muted">{{ meta(s) }}@if (s.url) { · <a [href]="s.url" target="_blank" rel="noopener noreferrer">{{ s.url }}</a> }</p>
         <div class="lay-grid lay-g-side">
           <div class="lay-srcmain">
+            @if (imageOf(s); as url) {
+              <p class="lay-muted small">Drag across the image to mark the part a finding is about.</p>
+              <div class="lay-ds-srcimg" (pointerdown)="regionStart($event)" (pointermove)="regionMove($event)" (pointerup)="regionEnd()" (pointerleave)="regionEnd()">
+                <img [src]="url" [alt]="s.title" draggable="false">
+                @for (f of sourceFindings(); track f.id) { @if (f.region; as r) { <i class="lay-ds-region" [style.left.%]="r.x * 100" [style.top.%]="r.y * 100" [style.width.%]="r.w * 100" [style.height.%]="r.h * 100" [title]="f.text"></i> } }
+                @if (drawing(); as r) { <i class="lay-ds-region lay-ds-drawing" [style.left.%]="r.x * 100" [style.top.%]="r.y * 100" [style.width.%]="r.w * 100" [style.height.%]="r.h * 100"></i> }
+              </div>
+            }
             @if (s.body.trim()) {
               <p class="lay-muted small">Select a passage to make it a finding. Highlighted passages are findings already.</p>
               <div class="lay-transcript" #transcript (mouseup)="selected()" (keyup)="selected()">
@@ -71,13 +80,16 @@ const layerOf: Record<string, string> = { brief_claim: 'product', persona: 'prod
                 }
               </div>
               @if (selection()) { <div class="lay-selpop" [style.top.px]="selection()!.top" [style.left.px]="selection()!.left"><button type="button" (mousedown)="$event.preventDefault()" (click)="startFinding(selection()!.text)"><mat-icon aria-hidden="true">format_ink_highlighter</mat-icon>Make finding</button></div> }
-            } @else { <div class="lay-card lay-quiet"><p class="lay-muted">No text on this source. Add findings on the right: quotes, facts or data.</p></div> }
+            } @else if (!imageOf(s)) { <div class="lay-card lay-quiet"><p class="lay-muted">No text on this source. Add findings on the right: quotes, facts or data.</p></div> }
+            @if (ctx.referencedBy(s.id).length) { <section class="lay-card lay-gap-top"><h2>Referenced by</h2><p class="lay-muted small">Records that point straight at this source or its findings, for whoever builds them.</p>
+              <div class="lay-row lay-wrap">@for (link of ctx.referencedBy(s.id); track link.id) { <aludel-ref [id]="link.recordId" /> }</div></section> }
           </div>
           <aside class="lay-stackv lay-sticky" aria-label="Findings">
             <section class="lay-card"><h2>Findings <span class="lay-count">{{ sourceFindings().length }}</span></h2>
               <form class="lay-newfind" (ngSubmit)="saveFinding(s)">
                 <label>Finding<textarea name="ftext" rows="3" [(ngModel)]="finding.text" placeholder="A quote, a fact, or what a chart shows" maxlength="2000"></textarea></label>
-                <div class="lay-row lay-wrap"><label class="lay-inline-label">Type <select name="ftype" [(ngModel)]="finding.type"><option value="quote">Quote</option><option value="fact">Fact</option><option value="data">Data</option></select></label></div>
+                <div class="lay-row lay-wrap"><label class="lay-inline-label">Type <select name="ftype" [(ngModel)]="finding.type"><option value="quote">Quote</option><option value="fact">Fact</option><option value="data">Data</option>@if (imageOf(s)) { <option value="image">About the image</option> }</select></label>
+                  @if (finding.type === 'image') { <small class="lay-muted">{{ region() ? 'Marks the region you drew.' : 'Drag on the image to mark a region (optional).' }}</small> }</div>
                 @if (finding.type === 'data') { <label>Data (one “label, number” per line)<textarea name="fdata" rows="3" [(ngModel)]="finding.data" placeholder="10 min, 18"></textarea></label> }
                 <label>Add to insight<select name="finsight" [(ngModel)]="finding.insight"><option value="">No insight yet</option>@for (option of ctx.data()?.insights || []; track option.id) { <option [value]="option.id">{{ option.text }}</option> }<option value="new">New insight…</option></select></label>
                 @if (finding.insight === 'new') { <label>New insight<input name="fnew" [(ngModel)]="finding.newInsight" placeholder="What this tells us, in one sentence" maxlength="300"></label> }
@@ -100,8 +112,10 @@ const layerOf: Record<string, string> = { brief_claim: 'product', persona: 'prod
       <nav class="lay-tabs" aria-label="Library sections">
         <a [href]="ctx.link('library')" (click)="ctx.go(ctx.link('library'), $event)" [class.active]="view() === 'insights'" [attr.aria-current]="view() === 'insights' ? 'page' : null"><mat-icon aria-hidden="true">insights</mat-icon>Insights</a>
         <a [href]="ctx.link('library', 'sources')" (click)="ctx.go(ctx.link('library', 'sources'), $event)" [class.active]="view() === 'sources'" [attr.aria-current]="view() === 'sources' ? 'page' : null"><mat-icon aria-hidden="true">article</mat-icon>Sources</a>
+        <a [href]="ctx.link('library', 'docs')" (click)="ctx.go(ctx.link('library', 'docs'), $event)" [class.active]="view() === 'docs'" [attr.aria-current]="view() === 'docs' ? 'page' : null"><mat-icon aria-hidden="true">description</mat-icon>Documents</a>
       </nav>
-      @if (view() === 'sources') {
+      @if (view() === 'docs') { <aludel-docs layer="library" [base]="['library', 'docs']" /> }
+      @else if (view() === 'sources') {
         <div class="lay-grid lay-g-side">
           <ul class="lay-list lay-card">
             @for (s of ctx.data()?.sources || []; track s.id) {
@@ -115,7 +129,7 @@ const layerOf: Record<string, string> = { brief_claim: 'product', persona: 'prod
             <label>Link (optional)<input name="surl" [(ngModel)]="newSource.url" placeholder="https://…" maxlength="1000"></label>
             <label>Date (optional)<input name="sdate" type="date" [(ngModel)]="newSource.date"></label>
             <label>Text (a transcript, notes or an article; optional)<textarea name="sbody" rows="6" [(ngModel)]="newSource.body" placeholder="Dana: I lent my drill to a neighbour in March…"></textarea></label>
-            <p class="lay-muted small">Screenshots and files come later; for now, link to them.</p>
+            <label>Image (a screenshot or concept; optional)<input type="file" accept="image/png,image/jpeg,image/webp" (change)="pickImage($event)"></label>
             <button type="submit" class="lay-button small" [disabled]="!newSource.title.trim()">Add source</button></form>
         </div>
       } @else {
@@ -147,8 +161,8 @@ export class LibraryComponent {
   readonly icons = sourceTypeIcon;
   readonly types = Object.keys(sourceTypeIcon);
   readonly strengths = ['weak', 'moderate', 'strong'];
-  readonly layers = ['product', 'pages', 'data', 'work'];
-  readonly view = computed(() => { const segment = this.ctx.segments()[1] || 'insights'; return ['insight', 'source', 'sources'].includes(segment) ? segment : 'insights'; });
+  readonly layers = ['product', 'design', 'pages', 'data', 'work'];
+  readonly view = computed(() => { const segment = this.ctx.segments()[1] || 'insights'; return ['insight', 'source', 'sources', 'docs'].includes(segment) ? segment : 'insights'; });
   readonly insight = computed(() => this.view() === 'insight' ? this.ctx.insightById().get(this.ctx.segments()[2] || '') || null : null);
   readonly source = computed(() => this.view() === 'source' ? this.ctx.sourceById().get(this.ctx.segments()[2] || '') || null : null);
   readonly q = signal(''); readonly layer = signal(''); readonly tag = signal(''); readonly sort = signal('used');
@@ -184,6 +198,30 @@ export class LibraryComponent {
   });
   readonly selection = signal<{ text: string; top: number; left: number } | null>(null);
   newTag = ''; newComment = '';
+  // DESIGN-UX-01: image sources, and findings that mark a region of the image.
+  private imageFile: File | null = null;
+  readonly region = signal<Region | null>(null);
+  readonly drawing = signal<Region | null>(null);
+  private anchor: { x: number; y: number; box: DOMRect } | null = null;
+  imageOf(source: Source) { const upload = source.assetId ? this.ctx.data()?.uploads?.find(entry => entry.id === source.assetId) : null; return upload?.kind === 'image' ? upload.url : ''; }
+  pickImage(event: Event) { this.imageFile = (event.target as HTMLInputElement).files?.[0] || null; if (this.imageFile && !this.newSource.title.trim()) this.newSource.title = this.imageFile.name.replace(/\.[^.]+$/, ''); if (this.imageFile) this.newSource.type = 'screenshot'; }
+  regionStart(event: PointerEvent) {
+    const box = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    this.anchor = { x: (event.clientX - box.left) / box.width, y: (event.clientY - box.top) / box.height, box };
+    this.drawing.set({ x: this.anchor.x, y: this.anchor.y, w: 0, h: 0 }); event.preventDefault();
+  }
+  regionMove(event: PointerEvent) {
+    if (!this.anchor) return;
+    const { box } = this.anchor; const clamp = (value: number) => Math.min(1, Math.max(0, value));
+    const x = clamp((event.clientX - box.left) / box.width), y = clamp((event.clientY - box.top) / box.height);
+    this.drawing.set({ x: Math.min(x, this.anchor.x), y: Math.min(y, this.anchor.y), w: Math.abs(x - this.anchor.x), h: Math.abs(y - this.anchor.y) });
+  }
+  regionEnd() {
+    if (!this.anchor) return; this.anchor = null;
+    const r = this.drawing(); this.drawing.set(null);
+    if (r && r.w > 0.02 && r.h > 0.02) { const round = (value: number) => Math.round(value * 1000) / 1000; this.region.set({ x: round(r.x), y: round(r.y), w: round(r.w), h: round(r.h) }); this.finding = { ...this.finding, type: 'image' };
+      this.drawing.set(this.region()); setTimeout(() => document.querySelector<HTMLTextAreaElement>('.lay-newfind textarea')?.focus()); }
+  }
   newSource = { type: 'interview', title: '', url: '', date: '', body: '' };
   finding = { text: '', type: 'quote', data: '', insight: '', newInsight: '' };
 
@@ -207,7 +245,8 @@ export class LibraryComponent {
     const draft = this.finding; if (!draft.text.trim()) return;
     const data = draft.type === 'data' ? draft.data.split('\n').map(line => line.split(',')).filter(parts => parts.length >= 2).map(([label, value]) => [label.trim(), Number(value)]) : [];
     void this.ctx.write(async () => {
-      const created = await this.ctx.record('finding', { sourceId: source.id, type: draft.type, text: draft.text.trim(), data }) as Finding;
+      const created = await this.ctx.record('finding', { sourceId: source.id, type: draft.type, text: draft.text.trim(), data, region: draft.type === 'image' ? this.region() : null }) as Finding;
+      this.region.set(null); this.drawing.set(null);
       if (draft.insight === 'new' && draft.newInsight.trim()) await this.ctx.record('insight', { text: draft.newInsight.trim(), findings: [created.id] });
       else if (draft.insight && draft.insight !== 'new') { const insight = this.ctx.insightById().get(draft.insight); if (insight) await this.ctx.change(insight.id, { findings: [...insight.findings, created.id] }, insight.revision); }
       this.finding = { text: '', type: 'quote', data: '', insight: '', newInsight: '' };
@@ -215,7 +254,8 @@ export class LibraryComponent {
   }
   addSource() {
     const draft = this.newSource;
-    void this.ctx.write(async () => { const created = await this.ctx.record('source', { ...draft, date: draft.date || null }) as Source; this.newSource = { type: 'interview', title: '', url: '', date: '', body: '' }; this.ctx.go(this.ctx.link('library', 'source', created.id)); }, 'Source added. Highlight what matters to make findings.');
+    const image = this.imageFile; this.imageFile = null;
+    void this.ctx.write(async () => { const assetId = image ? await this.ctx.upload(image, 'library') : null; const created = await this.ctx.record('source', { ...draft, date: draft.date || null, assetId }) as Source; this.newSource = { type: 'interview', title: '', url: '', date: '', body: '' }; this.ctx.go(this.ctx.link('library', 'source', created.id)); }, 'Source added. Highlight what matters to make findings.');
   }
   saveInsight(insight: Insight, changes: Partial<Insight>) { void this.ctx.write(() => this.ctx.change(insight.id, changes, insight.revision), 'Saved.'); }
   addTag(insight: Insight) { const tag = this.newTag.trim().toLowerCase(); if (!tag) return; this.newTag = ''; if (!insight.tags.includes(tag)) this.saveInsight(insight, { tags: [...insight.tags, tag] }); }

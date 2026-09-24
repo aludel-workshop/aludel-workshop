@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "templates": {
+    "email": {
+      "label": "Email header",
+      "summary": "A 600 × 200 banner and a sign-off line for emails the app sends.",
+      "icon": "mail",
+      "assets": [
+        { "name": "Email header", "type": "banner", "banner": { "width": 600, "height": 200, "headline": "", "subline": "", "background": "primary", "accent": "tertiary" }, "notes": "Top of every email. The headline is the product name unless you change it." },
+        { "name": "Email sign-off", "type": "text", "text": "Thanks for being part of it.", "notes": "The last line of every email." }
+      ]
+    },
+    "social": {
+      "label": "Social profile",
+      "summary": "A 1500 × 500 profile banner and a short bio.",
+      "icon": "campaign",
+      "assets": [
+        { "name": "Profile banner", "type": "banner", "banner": { "width": 1500, "height": 500, "headline": "", "subline": "", "background": "primary", "accent": "secondary" } },
+        { "name": "Profile bio", "type": "text", "text": "What we do, in one line.", "notes": "Keep it under 160 characters." }
+      ]
+    },
+    "launch": {
+      "label": "Launch announcement",
+      "summary": "A headline, a short post and a wide banner for announcing a release.",
+      "icon": "rocket_launch",
+      "assets": [
+        { "name": "Launch headline", "type": "text", "text": "Now open to everyone" },
+        { "name": "Launch post", "type": "text", "text": "Two sentences: what it does, and who it is for. Then where to try it." },
+        { "name": "Launch banner", "type": "banner", "banner": { "width": 1600, "height": 900, "headline": "", "subline": "", "background": "tertiary", "accent": "primary" } }
+      ]
+    }
+  }
+}

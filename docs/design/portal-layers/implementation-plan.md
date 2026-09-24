@@ -2,7 +2,7 @@
 id: portal-layers-implementation-plan
 kind: implementation-plan
 status: active
-updated: 2026-09-23
+updated: 2026-09-24
 depends_on: [portal-layers-model, portal-layers-knowledge-structures, portal-layers-data-platform-research]
 ---
 
@@ -122,6 +122,8 @@ PLAYWRIGHT_MODULE=<path to playwright/index.mjs> tools/browser-checks.sh        
 Playwright is not a portal dependency. Install it anywhere (`npm i playwright`, then `npx playwright install chromium-headless-shell`) and point `PLAYWRIGHT_MODULE` at its `index.mjs`. `tests/browser-support.mjs` resolves `*.localhost` to loopback for the test process, because Node's resolver does not on every machine. Known pre-existing failure: `tests/browser.mjs` fails on the baseline commit too (decision-conflict step).
 
 Before handing off UI work:
+- Check a new section in `projectRoute` (server.mjs) against the routes after it. DESIGN-UX-01's `brand` section captured the older `GET /api/projects/:id/brand` and broke three browser suites that only a full run caught.
+- Wait for the preview canvas's mode fade (about 0.3s) before running axe on it; a mid-transition colour fails contrast.
 - Run `node tools/css-collisions.mjs "<your section's marker>"`. `lay-` prefixes don't stop collisions between layers; WORK-UX-01 hit five.
 - Give list grids `grid-template-columns: minmax(0, 1fr)` so they shrink at 390px.
 
@@ -135,6 +137,16 @@ New `<mat-icon>` names need the font subset rebuilt: `python3 tools/subset-icons
 ## Current state
 
 Newest first.
+
+- **2026-09-24: DESIGN-UX-01, the Design layer, built and agent-checked** (DEC-045; [work record](../design-layer/work-record.md), [evidence](../../evidence/design-ux-01-design-layer.md)).
+  - Design tabs: Tokens (tree beside a live preview you can page through), Components, Brand, Docs. Library gets Documents and image sources with region findings.
+  - Entry points:
+    - `src/design-tokens.js`: the token maths, shared by portal and scaffold.
+    - `server/design.mjs`: validators, seeds, scaffold files and brand usage.
+    - `server/knowledge.mjs`: kinds `design_tokens`, `component`, `brand_asset`; references; `ensureDesign`.
+    - `src/layers/design-*.ts` and `doc-view.ts`.
+    - `tests/design.test.mjs` and `tests/design-browser.mjs`.
+  - **Next:** owner review of the built Design layer, then PAGES-UX-01.
 
 - **2026-09-24: ROADMAP-01 built and agent-checked** (DEC-042, DEC-043; [work record](../product-and-plan/work-record.md), [evidence](../../evidence/roadmap-01-product-and-plan.md)).
   - Product shows as **Vision** (`/vision`; the internal key stays `product`): Brief, Story map, Documents. **Library** is a rail utility. Work tabs: Board, Items, Projects, Roles, Team, Routines.

@@ -1,7 +1,7 @@
 ---
 id: roadmap-01-evidence
 kind: evidence
-status: agent-checked
+status: accepted
 updated: 2026-09-24
 depends_on: [roadmap-01]
 ---
@@ -101,3 +101,7 @@ All checks are agent-run. Owner acceptance of the built layers is pending.
    - The purpose test (with its overlap question) and "borrowed or invented" were applied through v3 and this build, in the operating procedure. The v3 review had no "what's the point of this?" feedback, and the Linear-based screens were accepted ("better, we can work with that").
    - Still a hypothesis: that these checks prevent the same misses on a different kind of task.
    - **Applied now:** the implementation plan's pre-handoff checklist gains the reserved-names check and PID-only server stops. It is untested beyond this task.
+
+## Owner acceptance (2026-09-24)
+
+Owner, after using the build: "alright, i like it. mark done." (DEC-044.) Accepted for this stage. Later UX passes may still refine these screens.

@@ -5,7 +5,7 @@ status: active
 updated: 2026-09-24
 current_phase: M1
 phase_state: in-progress
-next_action: ROADMAP-01R
+next_action: DESIGN-UX-01
 ---
 
 # Current project status
@@ -16,18 +16,18 @@ Turn the running local portal foundation into the first complete request → del
 
 ## Next action
 
-**ROADMAP-01R: owner review of the built Vision, Library and Work plan.**
-- DEC-043 accepted v3 with final tweaks and authorized the build, which is done and agent-checked.
-- Restart the portal (`./launch-machine`). Start-up migrates each project once: vision sections become Brief claims, research becomes Library sources, and specs and the story map become projects.
-- Then look at Vision › Brief, the Library, Work › Projects (timeline), Items, Next on the Board, Roles (the shield) and Team.
-
-[Evidence and retrospective](evidence/roadmap-01-product-and-plan.md).
+**DESIGN-UX-01 owner review** (DEC-045).
+- The Design layer is built and agent-checked: [work record](design/design-layer/work-record.md), [evidence](evidence/design-ux-01-design-layer.md).
+- Needed: the owner reviews it in the portal (restart it first so existing projects get their token set, contracts, brand and documents). Accept it, or give feedback ask by ask (D1–D22).
+- Then PAGES-UX-01, which starts by re-running the purpose test on Pages' tabs (operating procedure §2).
 
 ## Ready queue
 
-1. **ROADMAP-01R**: owner review of the built layers (and any follow-ups it finds).
-2. **LAY-05**: coding agents against stories (absorbs B-03B), committing with LAY-07's trailers.
-3. **LAY-06**: Aludel's own knowledge into its layers; retire the hash workspace.
+1. **DESIGN-UX-01**: owner review of the built Design layer.
+2. **PAGES-UX-01**: Pages layer UX pass.
+3. **DATA-PLATFORM-UX-01**: Data and Platform UX pass (owner: "perhaps").
+4. **LAY-05**: coding agents against stories (absorbs B-03B), committing with LAY-07's trailers.
+5. **LAY-06**: Aludel's own knowledge into its layers; retire the hash workspace.
 
 One packet at a time. B-03's worker/artifact/recovery work remains required and must not be displaced by later workspace expansion. [Proposed dependency order](design/project-workspace/v1/delivery-plan.md).
 
@@ -62,7 +62,7 @@ One packet at a time. B-03's worker/artifact/recovery work remains required and 
 
 | Packet | Result | Evidence |
 |---|---|---|
-| ROADMAP-01 | Product became **Vision**: the Brief (claims with confidence from evidence; riskiest assumptions), Story map, and Documents generated from the Brief. **Library**: sources, highlighted findings, insights, and evidence attached anywhere. **Work**: Items (Linear list with a side panel), Projects (Linear-style timeline, project briefs that replace specs, milestones with target dates, budgets), Next, Roles with the elevated shield and a review action per role, and Team. Rainbow layer colours with a tile nav; chips with quick views everywhere. Agent-checked (server 69/69, layers browser with axe and 390px, migration trial on a copy of real data); owner review pending | [Evidence/retrospective](evidence/roadmap-01-product-and-plan.md), [work record](design/product-and-plan/work-record.md) |
+| ROADMAP-01 | Product became **Vision**: the Brief (claims with confidence from evidence; riskiest assumptions), Story map, and Documents generated from the Brief. **Library**: sources, highlighted findings, insights, and evidence attached anywhere. **Work**: Items (Linear list with a side panel), Projects (Linear-style timeline, project briefs that replace specs, milestones with target dates, budgets), Next, Roles with the elevated shield and a review action per role, and Team. Rainbow layer colours with a tile nav; chips with quick views everywhere. Agent-checked (server 69/69, layers browser with axe and 390px, migration trial on a copy of real data); **owner accepted** (DEC-044) | [Evidence/retrospective](evidence/roadmap-01-product-and-plan.md), [work record](design/product-and-plan/work-record.md) |
 | WORK-UX-01 | Work layer redesign (DEC-041): roles and actions replace working style; flexible agent profiles with robots, models, effort and usage limits; batches per assignee with locking, skip and stop, and results held for review; review checklist with evidence; priority and blocking; backlog from gaps; hover cards; avatars. Agent-checked (server 63/63, layers and onboarding browser, migration on a copy of real data); owner review pending | [Evidence/retrospective](evidence/work-ux-01-work-redesign.md), [work record](design/work-redesign/work-record.md) |
 | LAY-04D | Pasted, checked agent keys with a user guide (DEC-039); agent pool, batches you start with Go, OpenAI/Anthropic runner for acceptance, clarification options and data contracts, review and accept (DEC-040); agent-checked with a provider stand-in | [Evidence/retrospective](evidence/lay-04-work-automation.md) |
 | LAY-04A–C | Verified closing, applied answers, server suggestions, working-style staging and routing, routines; interim project page redirected; agent-checked | [Evidence/retrospective](evidence/lay-04-work-automation.md) |
@@ -89,6 +89,12 @@ One packet at a time. B-03's worker/artifact/recovery work remains required and 
 | M0 research/design | Product loop, local agent path, runner choice, recovery model, product workflow, knowledge boundary, experience architecture, and design-system strategy | [Execution plan](execution-plan.md), [decision register](decisions.md) |
 
 ## Latest handoff
+
+2026-09-24: **DESIGN-UX-01 built and agent-checked** (DEC-045; [evidence](evidence/design-ux-01-design-layer.md)). Design is now Tokens · Components · Brand · Docs. The preview renders real Angular Material components in the project's theme, and saved design changes reach the generated app (checked end to end). Library gains Documents and image sources with region findings. Server 75/75; the design, layers, onboarding, product, brand, github and workflow browser suites pass. `browser` fails as on the baseline. **Restart the portal** to seed Design for existing projects. Next: owner review of the built Design layer, then PAGES-UX-01.
+
+2026-09-24: **DESIGN-UX-01 prototype v1 ready for owner review** ([work record](design/design-layer/work-record.md), [prototype](design/design-layer/v1/index.html), [screenshots](design/design-layer/v1/shots/)). Tabs become Tokens · Components · Brand · Docs. Sources and Guidelines move into the Library: references can point straight at sources and findings, and documents get a "shows in" setting. Tokens are a two-pane tree and live preview in three tiers (raw values, roles, rules). Components get a tree, a preview and a properties panel, with slots and placeholders for components that are needed. Brand assets are starter examples, not required fields. Agent-checked: no console errors, edits propagate, keyboard and mouse drag and drop, nested selection, 390px. Next: owner review ask by ask (D1–D22).
+
+2026-09-24: **ROADMAP-01 accepted** ("alright, i like it. mark done"; DEC-044). Next: UX passes, starting with Design (DESIGN-UX-01), then Pages, then perhaps Data and Platform.
 
 2026-09-24: **ROADMAP-01 built** after the owner accepted v3 (DEC-043). Details are in [the evidence](evidence/roadmap-01-product-and-plan.md). Three things matter for the next session:
 - **Restart the portal to migrate.** The migration was run against a copy of real data: repeatable, and no item changed its project.

@@ -1,7 +1,7 @@
 ---
 id: roadmap-01
 kind: work-record
-status: built-agent-checked
+status: accepted
 updated: 2026-09-23
 depends_on: [portal-layers-model, portal-layers-knowledge-research, portal-layers-knowledge-structures, work-ux-01]
 ---
@@ -546,3 +546,6 @@ Owner: "w1, good, w2 good … w6,7, great. w8, better. we can work with that. w9
 - **Task outcome:** built and agent-checked. 69/69 server tests, the updated layers browser script (axe and 390px), the other browser scripts (except the known `browser.mjs` step), a real-app timeline drag, and a start-up migration trial on a copy of real data. Owner review of the built layers is next. [Evidence and retrospective](../../evidence/roadmap-01-product-and-plan.md).
 - **Process outcome:** the purpose test and "borrowed or invented" held through v3 and the build. The build added a reserved-names note, PID-only server stops, and "look at every screen" with the two Angular traps to the [implementation plan](../portal-layers/implementation-plan.md#how-to-run-and-check). These are untested beyond this task.
 
+## Owner acceptance (2026-09-24)
+
+Owner, after using the build: "alright, i like it. mark done." (DEC-044.) Accepted for this stage. Later UX passes may still refine these screens.

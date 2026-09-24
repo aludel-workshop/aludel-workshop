@@ -8,6 +8,7 @@ import { initOnboarding, loadCatalogs, onboarding } from './onboarding.mjs';
 import { botColors, efforts, initKnowledge, knowledge } from './knowledge.mjs';
 import { previewManager } from './previews.mjs';
 import { agentsGuide, copyMedia, initialFiles, loadScaffoldSources, skeletonFiles, writeBinaries, writeFiles } from './scaffold.mjs';
+import { brandUsage, componentStatus } from './design.mjs';
 import { codeLinks, initCodeLinks, workspaceIsIndexable } from './code-links.mjs';
 import { initPlatformOps, platformOps } from './platform-ops.mjs';
 import { agentRuns, initAgentRuns } from './agent-runs.mjs';
@@ -79,6 +80,8 @@ for (const projectId of layerProjects()) {
   know.ensureBrief(projectId);
   know.ensureLibrary(projectId);
   know.ensurePlan(projectId);
+  // DESIGN-UX-01: the token set, template component contracts, starter brand assets and documents.
+  know.ensureDesign(projectId);
 }
 const links = codeLinks({ db, know });
 const ops = platformOps({ db, backupRoot: join(dataDirectory, 'backups') });
@@ -159,7 +162,12 @@ function continueWithDraft(request, user, headers) {
 // Everything the scaffold needs from the layers: the Data contract for its manifest and Work › Agents for AGENTS.md.
 function scaffoldSetup(user, projectId) {
   const setup = flows.projectSetup(user, projectId);
-  return { ...setup, data: { objects: know.list(projectId, 'data_object'), operations: know.list(projectId, 'data_operation') }, agents: know.agentExport(projectId) };
+  know.ensureDesign(projectId);
+  // DESIGN-UX-01: the Design layer's tokens, contracts and brand drive the generated styles, token files and brand.
+  const brandUploads = new Map(flows.projectAssets(projectId, 'brand').map(asset => [asset.id, asset]));
+  const designSystem = { tokens: know.list(projectId, 'design_tokens')[0] || null,
+    components: know.list(projectId, 'component').map(component => ({ ...component, status: componentStatus(component) })), brand: know.list(projectId, 'brand_asset').map(asset => ({ ...asset, upload: asset.assetId ? brandUploads.get(asset.assetId) || null : null })) };
+  return { ...setup, data: { objects: know.list(projectId, 'data_object'), operations: know.list(projectId, 'data_operation') }, agents: know.agentExport(projectId), designSystem };
 }
 
 async function generateSkeleton(user, projectId) {
@@ -330,7 +338,7 @@ async function api(request, response, url) {
     return json(response, 201, { project: setup.project }, { 'set-cookie': draftCookie('', 0) });
   }
   if (url.pathname === '/api/projects' && request.method === 'GET') return json(response, 200, { projects: userProjects(db, user.id) });
-  const projectRoute = /^\/api\/projects\/([^/]+)\/(setup|preferences|design|pages|assets|features|stack|connections\/agent|steps|repository|skeleton|preview|knowledge|records|work|openapi\.json|platform|database|code|reconcile|agents|changes|routines|batches|docs|comments)(?:\/([^/]+))?$/.exec(url.pathname);
+  const projectRoute = /^\/api\/projects\/([^/]+)\/(setup|preferences|design|pages|assets|features|stack|connections\/agent|steps|repository|skeleton|preview|knowledge|records|work|openapi\.json|platform|database|code|reconcile|agents|changes|routines|batches|docs|comments|brand-templates)(?:\/([^/]+))?$/.exec(url.pathname);
   if (projectRoute) {
     const [, rawId, section, rawItem] = projectRoute;
     const projectId = decodeURIComponent(rawId);
@@ -347,8 +355,13 @@ async function api(request, response, url) {
       if (projectId === aludelProjectId) return json(response, 409, { error: 'Aludel’s own knowledge moves into its layers in LAY-06.' });
       // A project made after start-up plans itself the first time its layers are opened (after onboarding chose its story packs).
       know.ensurePlan(projectId);
-      return json(response, 200, { setup: projectView(user, projectId), knowledge: { ...know.view(user, projectId, { builtBy: links.builtBy(projectId) }), code: links.snapshot(projectId), batches: runs.view(projectId) },
-        catalog: { pageTypes: catalogs.pageTypes, routeIcons: catalogs.routeIcons, feels: catalogs.feels, stacks: catalogs.stacks, tools: catalogs.roles.tools, botColors, efforts } });
+      know.ensureDesign(projectId);
+      const view = know.view(user, projectId, { builtBy: links.builtBy(projectId) });
+      const workspace = flows.projectSetup(user, projectId).workspacePath;
+      return json(response, 200, { setup: projectView(user, projectId), knowledge: { ...view, code: links.snapshot(projectId), batches: runs.view(projectId),
+        uploads: flows.uploads(projectId), brandUsage: workspaceIsIndexable(workspace) ? brandUsage(workspace, view.brand) : {} },
+        catalog: { pageTypes: catalogs.pageTypes, routeIcons: catalogs.routeIcons, feels: catalogs.feels, stacks: catalogs.stacks, tools: catalogs.roles.tools, botColors, efforts,
+          brandTemplates: Object.fromEntries(Object.entries(catalogs.brandTemplates).map(([id, template]) => [id, { label: template.label, summary: template.summary, icon: template.icon, assets: template.assets.length }])) } });
     }
     // LAY-07A: the Data layer's contract as OpenAPI 3.1.
     if (section === 'openapi.json' && method === 'GET') {
@@ -408,7 +421,7 @@ async function api(request, response, url) {
       return json(response, 200, know.update(projectId, item, input.data || {}, { expectedRevision: input.expectedRevision, author: user.name, rationale: input.rationale || null, position: input.position, parentId: input.parentId, workItemId: work?.id || null }));
     }
     if (section === 'records' && method === 'DELETE' && item) {
-      const record = ['story', 'spec', 'doc', 'research', 'persona', 'activity', 'step', 'data_object', 'data_operation', 'access_rule', 'brief_claim', 'source', 'finding', 'insight', 'evidence_link', 'project'].flatMap(kind => know.list(projectId, kind)).find(entry => entry.id === item);
+      const record = ['story', 'spec', 'doc', 'research', 'persona', 'activity', 'step', 'data_object', 'data_operation', 'access_rule', 'brief_claim', 'source', 'finding', 'insight', 'evidence_link', 'project', 'component', 'brand_asset'].flatMap(kind => know.list(projectId, kind)).find(entry => entry.id === item);
       if (!record) return json(response, 409, { error: 'That record cannot be deleted here.' });
       const users = know.referrers(projectId, item);
       if (users.length) return json(response, 409, { error: `Still used by ${users.slice(0, 3).join(', ')}${users.length > 3 ? ` and ${users.length - 3} more` : ''}. Change those first.` });
@@ -443,9 +456,11 @@ async function api(request, response, url) {
     // ROADMAP-01: documents generated from the Brief, and comments on insights.
     if (section === 'docs' && method === 'POST') return json(response, item ? 200 : 201, know.generateDoc(user, projectId, { generator: String((await readJson(request)).generator || ''), id: item }));
     if (section === 'comments' && method === 'POST' && item) return json(response, 201, know.addComment(user, projectId, item, (await readJson(request)).text));
+    // DESIGN-UX-01: a brand template adds its stock assets; each can be changed or deleted like any other.
+    if (section === 'brand-templates' && method === 'POST' && item) return json(response, 201, { added: know.addBrandTemplate(user, projectId, item) });
     if (section === 'preferences' && method === 'PUT') { flows.savePreferences(user, projectId, await readJson(request)); return json(response, 200, projectView(user, projectId)); }
     if (section === 'design' && method === 'PUT') { flows.saveDesign(user, projectId, await readJson(request)); return json(response, 200, projectView(user, projectId)); }
-    if (section === 'assets' && method === 'POST' && !item) { flows.addAsset(user, projectId, await readJson(request, 12 * 1024 * 1024)); return json(response, 201, projectView(user, projectId)); }
+    if (section === 'assets' && method === 'POST' && !item) { const { uploaded } = flows.addAsset(user, projectId, await readJson(request, 12 * 1024 * 1024)); return json(response, 201, { ...projectView(user, projectId), uploaded }); }
     if (section === 'assets' && method === 'GET' && item) {
       const asset = flows.assetFile(user, projectId, item);
       const body = readFileSync(asset.path);

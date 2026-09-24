@@ -1,5 +1,6 @@
 import { Injectable, computed, signal } from '@angular/core';
 import { PageType, ProjectSetup, Session } from '../onboarding-model';
+import { Tokens } from '../design-tokens';
 
 // Shapes returned by GET /api/projects/:id/knowledge (server/knowledge.mjs view()).
 export interface Scenario { given: string; when: string; then: string; }
@@ -14,14 +15,28 @@ export interface Activity extends RecordBase { title: string; persona: string; p
 export interface Story extends RecordBase { number: number; ref: string; title: string; phase: string; why: string; acceptance: Scenario[]; edges: string[]; clarifications: string[]; services: string[]; resolved: Resolved[]; pack: string | null; template: boolean; status: string; pages: string[]; work: string[]; history: Revision[]; claim?: string | null; }
 export interface Spec extends RecordBase { number: number; ref: string; title: string; phase: string; status: string; stories: string[]; problem: string; appetite: string; solution: string; rabbitHoles: string[]; noGos: string[]; requirements: string[]; entities: string[]; success: string[]; assumptions: string[]; clarifications: string[]; resolved: Resolved[]; }
 export interface Research extends RecordBase { title: string; body: string; supports: string[]; }
-export interface Doc extends RecordBase { title: string; template: string; body: string; form?: 'written' | 'generated'; generator?: string | null; briefRevision?: number | null; agents?: boolean; }
+export interface Doc extends RecordBase { title: string; template: string; body: string; form?: 'written' | 'generated'; generator?: string | null; briefRevision?: number | null; agents?: boolean; showsIn: string[]; }
 // ROADMAP-01 (DEC-042/043): the Brief, the Library's evidence records and the plan's projects.
 export interface Claim extends RecordBase { section: string; text: string; note: string; history: Revision[]; }
-export interface Source extends RecordBase { type: string; title: string; url: string; date: string | null; by: string; body: string; }
-export interface Finding extends RecordBase { sourceId: string; type: string; text: string; data: [string, number][]; }
+export interface Source extends RecordBase { type: string; title: string; url: string; date: string | null; by: string; body: string; assetId?: string | null; }
+export interface Region { x: number; y: number; w: number; h: number; }
+export interface Finding extends RecordBase { sourceId: string; type: string; text: string; data: [string, number][]; region?: Region | null; }
 export interface Comment { by: string; text: string; at: string; }
 export interface Insight extends RecordBase { text: string; strength: string; tags: string[]; findings: string[]; comments: Comment[]; }
-export interface EvidenceLink extends RecordBase { insightId: string; recordId: string; direction: 'supports' | 'contradicts'; }
+// DESIGN-UX-01: a reference points straight at a source or finding (sourceRef) instead of an insight.
+export interface EvidenceLink extends RecordBase { insightId: string; recordId: string; direction: 'supports' | 'contradicts' | 'references'; sourceRef?: string | null; }
+// Design (DESIGN-UX-01): the token set, component contracts and brand assets.
+export interface TokenSet extends RecordBase, Tokens { fromLook?: boolean; history: Revision[]; }
+export interface PropSpec { key: string; kind: 'variant' | 'boolean' | 'text' | 'swap'; options: string[]; default: string | boolean; }
+export interface SlotSpec { name: string; accepts: string[]; anything?: boolean; min: number; max: number | null; }
+export interface Part { part: string; tokens: string[]; note: string; }
+export interface Binding { library: string; selector: string; map: { prop: string; code: string }[]; }
+export interface DesignComponent extends RecordBase { name: string; group: string; purpose: string; note: string; props: PropSpec[]; slots: SlotSpec[]; anatomy: Part[]; a11y: string[];
+  binding: Binding | null; preview: string | null; origin: string; status: 'needed' | 'specified' | 'built'; history: Revision[]; }
+export interface BrandAsset extends RecordBase { name: string; type: 'image' | 'text' | 'mark' | 'banner'; key: string | null; text: string; assetId: string | null;
+  mark: { text: string; background: string; foreground: string } | null; banner: { width: number; height: number; headline: string; subline: string; background: string; accent: string } | null;
+  notes: string; starter: boolean; template: string | null; history: Revision[]; }
+export interface Upload { id: string; kind: string; filename: string; mime: string; size: number; notes: string; purpose: string; url: string; }
 export interface Checkpoint { id: string; title: string; date: string | null; }
 export interface PlanProject extends RecordBase { number: number; ref: string; title: string; summary: string; milestone: string; status: string; health: string | null; lead: string | null;
   start: string | null; target: string | null; deps: string[]; budget: number | null; stories: string[]; problem: string; solution: string; rabbitHoles: string[]; noGos: string[];
@@ -78,12 +93,14 @@ export interface Knowledge {
   code: { indexedAt: string | null; units: CodeUnit[] };
   routines: Routine[]; batches: Batch[];
   claims: Claim[]; briefRevision: number; sources: Source[]; findings: Finding[]; insights: Insight[]; evidence: EvidenceLink[]; projects: PlanProject[];
+  tokens: TokenSet | null; components: DesignComponent[]; brand: BrandAsset[]; uploads: Upload[]; brandUsage: Record<string, { path: string; line: number }[]>;
 }
 // Batches belong to one agent profile (WORK-UX-01); Go runs them.
 export interface Batch { id: string; number: number; ref: string; state: string; limit: number; profileId: string | null; createdAt: string; startedAt: string | null; finishedAt: string | null;
   startedBy: string | null; note: string | null; items: string[]; usage: { input: number; output: number }; working: string | null; }
 export interface Catalog { pageTypes: Record<string, PageType>; routeIcons: string[]; feels: Record<string, { label: string; summary: string; navigation: string; font: string; radius: number; surface: string; surfaceDark: string }>;
-  stacks: { presets: Record<string, { label: string; layers?: Record<string, string> }> }; tools: Record<string, string>; botColors: string[]; efforts: string[]; }
+  stacks: { presets: Record<string, { label: string; layers?: Record<string, string> }> }; tools: Record<string, string>; botColors: string[]; efforts: string[];
+  brandTemplates: Record<string, { label: string; summary: string; icon: string; assets: number }>; }
 // What a hover card shows for any referenced record (A3).
 export interface RefInfo { id: string; kind: string; kindLabel: string; icon: string; layer: string; label: string; title: string; status: string | null; note: string; facts: [string, string][]; where: string; href: string; }
 
@@ -148,7 +165,7 @@ export class ProjectContext {
   readonly currentMilestone = computed(() => this.data()?.phases.find(phase => phase.current) || null);
   // Evidence (ROADMAP-01): what is attached to a record. A story also carries its problem's evidence ("via"), once.
   evidenceFor(id: string): (EvidenceLink & { via?: string })[] {
-    const all = this.data()?.evidence || [];
+    const all = (this.data()?.evidence || []).filter(link => link.direction !== 'references');
     const own = all.filter(link => link.recordId === id);
     const claim = this.storyById().get(id)?.claim;
     if (!claim) return own;
@@ -156,6 +173,19 @@ export class ProjectContext {
   }
   confidence(id: string) { const links = this.evidenceFor(id); return links.some(link => link.direction === 'contradicts') ? 'contradicted' : links.length ? 'supported' : 'assumed'; }
   usedIn(insightId: string) { return (this.data()?.evidence || []).filter(link => link.insightId === insightId); }
+  // DESIGN-UX-01: sources and findings referenced by a record, and the records that reference a source or its findings.
+  referencesFor(id: string) { return (this.data()?.evidence || []).filter(link => link.direction === 'references' && link.recordId === id); }
+  referencedBy(sourceId: string) {
+    const findings = new Set((this.data()?.findings || []).filter(finding => finding.sourceId === sourceId).map(finding => finding.id));
+    return (this.data()?.evidence || []).filter(link => link.direction === 'references' && (link.sourceRef === sourceId || findings.has(link.sourceRef || '')));
+  }
+  uploadUrl(assetId: string | null | undefined) { return assetId ? `/api/projects/${encodeURIComponent(this.projectId())}/assets/${encodeURIComponent(assetId)}` : ''; }
+  readonly componentById = computed(() => new Map((this.data()?.components || []).map(component => [component.id, component])));
+  async upload(file: File, purpose: 'library' | 'brand' | 'reference', notes = '') {
+    const dataUrl = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(new Error('Could not read the file.')); reader.readAsDataURL(file); });
+    const result = await this.api<{ uploaded: string }>(`/api/projects/${encodeURIComponent(this.projectId())}/assets`, 'POST', { filename: file.name, dataUrl, notes, purpose });
+    return result.uploaded;
+  }
   // The evidence panel is one drawer for the whole project; any chip opens it on its record.
   readonly evidenceOpen = signal<string | null>(null);
   readonly me = computed(() => this.session()?.user?.id || '');
@@ -200,7 +230,10 @@ export class ProjectContext {
     if (kind === 'work_item') return this.link('work', 'item', id);
     if (kind === 'role' || kind === 'work_action') return this.link('work', 'roles', id);
     if (kind === 'project_instructions') return this.link('work', 'agents');
-    if (kind === 'doc') return this.link('product', 'docs', id);
+    if (kind === 'doc') return this.link('library', 'docs', id);
+    if (kind === 'component') return this.link('design', 'components', id);
+    if (kind === 'brand_asset') return this.link('design', 'brand', id);
+    if (kind === 'design_tokens') return this.link('design', 'tokens');
     if (kind === 'research') return this.link('library', 'sources');
     if (kind === 'vision_section' || kind === 'persona') return this.link('product', 'brief');
     if (kind === 'access_rule') return this.link('data', 'access');
@@ -248,8 +281,13 @@ export class ProjectContext {
     const spec = data.specs.find(entry => entry.id === id);
     if (spec) return info('spec', 'Spec', 'description', 'product', `${spec.ref} ${spec.title}`, spec.title, { status: spec.status, where: 'Product › Specs', note: spec.problem.slice(0, 240),
       facts: [['Stories', spec.stories.map(story => this.storyById().get(story)?.ref).filter(Boolean).join(', ') || '—'], ['Appetite', spec.appetite || '—']] });
+    const component = this.componentById().get(id);
+    if (component) return info('component', 'Component', 'widgets', 'design', component.name, component.name, { status: component.status, where: 'Design › Components', note: component.purpose,
+      facts: [['Group', component.group], ['Revision', String(component.revision)]] });
+    const asset = (data.brand || []).find(entry => entry.id === id);
+    if (asset) return info('brand_asset', 'Brand asset', 'verified', 'design', asset.name, asset.name, { where: 'Design › Brand', note: asset.text || asset.notes });
     const doc = data.docs.find(entry => entry.id === id);
-    if (doc) return info('doc', 'Document', 'description', 'product', doc.title, doc.title, { where: 'Vision › Documents', status: doc.form === 'generated' ? 'Generated' : null, note: doc.body.replace(/\[\[[a-z]+-[a-z0-9]+\]\]|[#*_]/g, '').slice(0, 200) });
+    if (doc) return info('doc', 'Document', 'description', 'library', doc.title, doc.title, { where: 'Library › Documents', status: doc.form === 'generated' ? 'Generated' : null, note: doc.body.replace(/\[\[[a-z]+-[a-z0-9]+\]\]|[#*_]/g, '').slice(0, 200) });
     const research = data.research.find(entry => entry.id === id);
     if (research) return info('research', 'Research', 'science', 'product', research.title, research.title, { where: 'Product › Research', note: research.body.slice(0, 200) });
     const vision = Object.values(data.vision).find(entry => entry.id === id);

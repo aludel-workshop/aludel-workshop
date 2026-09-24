@@ -9,6 +9,7 @@ import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { requireMember } from './accounts.mjs';
+import { cleanBrandAsset, cleanComponent, cleanTokens, componentStatus, ensureDesign as seedDesign, syncTokensFromLook } from './design.mjs';
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const now = () => new Date().toISOString();
@@ -30,9 +31,10 @@ export const briefSections = ['problem', 'customers', 'diagnosis', 'value', 'app
 const sourceKinds = ['interview', 'observation', 'survey', 'link', 'article', 'competitor', 'screenshot', 'analytics', 'note'];
 const findingTypes = ['quote', 'fact', 'data', 'image'];
 const strengths = ['weak', 'moderate', 'strong'];
-const directions = ['supports', 'contradicts'];
+// DESIGN-UX-01: a reference points at a source or finding directly (a concept image for a component), not an insight.
+const directions = ['supports', 'contradicts', 'references'];
 // Records evidence can be attached to.
-export const evidenceKinds = ['brief_claim', 'persona', 'activity', 'story', 'page', 'data_object', 'data_operation', 'project'];
+export const evidenceKinds = ['brief_claim', 'persona', 'activity', 'story', 'page', 'data_object', 'data_operation', 'project', 'component', 'brand_asset', 'design_tokens'];
 export const projectStatuses = ['backlog', 'planned', 'progress', 'completed', 'canceled'];
 const healths = ['on', 'risk', 'off'];
 const docKinds = ['written', 'generated'];
@@ -199,7 +201,9 @@ const validators = {
     if (!docKinds.includes(form)) fail('A document is written or generated.');
     if (form === 'generated' && !docTemplates[data.generator]) fail('Unknown document template.');
     return { title: text(data.title, 120, 'Document title', true), template: text(data.template || 'Blank', 40, 'Template'), body: text(data.body, 40000, 'Document'), form,
-      generator: form === 'generated' ? data.generator : null, briefRevision: form === 'generated' ? Number(data.briefRevision) || 0 : null, agents: Boolean(data.agents) };
+      generator: form === 'generated' ? data.generator : null, briefRevision: form === 'generated' ? Number(data.briefRevision) || 0 : null, agents: Boolean(data.agents),
+      // DESIGN-UX-01: documents live in the Library and show in the layers listed here (older documents belong to Vision).
+      showsIn: Array.isArray(data.showsIn) ? [...new Set(data.showsIn.map(String).filter(layer => layers.includes(layer)))] : ['product'] };
   },
   // Vision › Brief: one short claim in one section. Its confidence comes from the evidence attached to it.
   brief_claim: data => {
@@ -210,12 +214,18 @@ const validators = {
   source: data => {
     const type = data.type || 'note';
     if (!sourceKinds.includes(type)) fail(`Choose a kind of source: ${sourceKinds.join(', ')}.`);
-    return { type, title: text(data.title, 160, 'Source title', true), url: webUrl(data.url), date: isoDate(data.date, 'Date'), by: text(data.by, 80, 'By'), body: text(data.body, 100000, 'Text') };
+    return { type, title: text(data.title, 160, 'Source title', true), url: webUrl(data.url), date: isoDate(data.date, 'Date'), by: text(data.by, 80, 'By'), body: text(data.body, 100000, 'Text'),
+      assetId: data.assetId ? (/^asset-[0-9a-f-]{36}$/.test(String(data.assetId)) ? data.assetId : fail('Unknown upload.')) : null };
   },
   finding: data => {
     const type = data.type || 'quote';
     if (!findingTypes.includes(type)) fail(`A finding is a ${findingTypes.join(', ')}.`);
-    return { sourceId: ids([data.sourceId])[0] || fail('Choose the source this finding comes from.'), type, text: text(data.text, 2000, 'Finding', true), data: type === 'data' ? tableRows(data.data) : [] };
+    // An image finding can mark the part of the image it is about, as fractions of its width and height.
+    const r = data.region;
+    const fraction = value => { const clean = Number(value); if (!Number.isFinite(clean) || clean < 0 || clean > 1) fail('A region is inside the image.'); return Math.round(clean * 1000) / 1000; };
+    const region = type === 'image' && r ? { x: fraction(r.x), y: fraction(r.y), w: fraction(r.w), h: fraction(r.h) } : null;
+    if (region && (region.w < 0.01 || region.h < 0.01 || region.x + region.w > 1.001 || region.y + region.h > 1.001)) fail('A region is inside the image.');
+    return { sourceId: ids([data.sourceId])[0] || fail('Choose the source this finding comes from.'), type, text: text(data.text, 2000, 'Finding', true), data: type === 'data' ? tableRows(data.data) : [], region };
   },
   insight: data => {
     const strength = data.strength || 'weak';
@@ -224,9 +234,16 @@ const validators = {
     return { text: text(data.text, 300, 'Insight', true), strength, tags: [...new Set(lines(data.tags, 40, 'Tag').map(tag => tag.toLowerCase()))].slice(0, 20), findings: [...new Set(ids(data.findings))], comments };
   },
   evidence_link: data => {
-    if (!directions.includes(data.direction || 'supports')) fail('Evidence supports or contradicts.');
-    return { insightId: ids([data.insightId])[0] || fail('Choose an insight.'), recordId: ids([data.recordId])[0] || fail('Choose what it is evidence for.'), direction: data.direction || 'supports' };
+    const direction = data.direction || 'supports';
+    if (!directions.includes(direction)) fail('Evidence supports, contradicts or is a reference.');
+    const recordId = ids([data.recordId])[0] || fail('Choose what it is evidence for.');
+    if (direction === 'references') return { insightId: null, sourceRef: ids([data.sourceRef])[0] || fail('Choose a source or finding to reference.'), recordId, direction };
+    return { insightId: ids([data.insightId])[0] || fail('Choose an insight.'), sourceRef: null, recordId, direction };
   },
+  // Design (DESIGN-UX-01, DEC-045): the token set, component contracts and brand assets. Validators live in design.mjs.
+  design_tokens: data => cleanTokens(data),
+  component: data => cleanComponent(data),
+  brand_asset: data => cleanBrandAsset(data),
   // Work › Projects (ROADMAP-01, Linear's model): a bounded outcome in one milestone; its brief is what a spec was.
   project: data => {
     const status = data.status || 'backlog';
@@ -344,7 +361,7 @@ const verifiedTypes = ['define', 'spec', 'plan', 'design', 'research', 'configur
 const kinds = Object.keys(validators);
 const prefixes = { vision_section: 'vis', persona: 'per', phase: 'pha', activity: 'act', step: 'stp', story: 'sto', spec: 'spc', research: 'res', doc: 'doc', page: 'pag',
   data_object: 'obj', data_operation: 'opr', access_rule: 'acc', agent_profile: 'agt', project_instructions: 'ins', routine: 'rtn', role: 'rol', work_action: 'wac',
-  brief_claim: 'clm', source: 'src', finding: 'fnd', insight: 'isg', evidence_link: 'evl', project: 'prj' };
+  brief_claim: 'clm', source: 'src', finding: 'fnd', insight: 'isg', evidence_link: 'evl', project: 'prj', design_tokens: 'tok', component: 'cmp', brand_asset: 'bra' };
 // Records a kind points at must exist in the same project and be of the right kind.
 const references = {
   data_object: clean => [...clean.relations.map(relation => [relation.target, 'data_object']), ...clean.stories.map(id => [id, 'story']), ...clean.specs.map(id => [id, 'spec']), ...schemaRefs(clean.schema).map(id => [id, 'data_object'])],
@@ -353,7 +370,8 @@ const references = {
   story: clean => clean.claim ? [[clean.claim, 'brief_claim']] : [],
   finding: clean => [[clean.sourceId, 'source']],
   insight: clean => clean.findings.map(id => [id, 'finding']),
-  evidence_link: clean => [[clean.insightId, 'insight'], [clean.recordId, evidenceKinds]],
+  evidence_link: clean => [clean.direction === 'references' ? [clean.sourceRef, ['source', 'finding']] : [clean.insightId, 'insight'], [clean.recordId, evidenceKinds]],
+  component: clean => clean.slots.flatMap(slot => slot.accepts.map(id => [id, 'component'])),
   project: clean => [...clean.deps.map(id => [id, 'project']), ...clean.stories.map(id => [id, 'story'])]
 };
 const newId = kind => `${prefixes[kind]}-${randomBytes(4).toString('hex')}`;
@@ -404,6 +422,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     if (!kinds.includes(kind)) fail('Unknown record kind.');
     const clean = validators[kind](data, catalogs);
     checkReferences(projectId, kind, clean);
+    checkDesign(projectId, kind, clean, { parentId });
     if (['story', 'spec', 'project'].includes(kind) && !clean.number) clean.number = counter(projectId, kind);
     if (kind === 'brief_claim') counter(projectId, 'brief');
     if (parentId && !db.prepare('SELECT 1 FROM knowledge_records WHERE id = ? AND project_id = ?').get(parentId, projectId)) fail('Parent record not found.', 404);
@@ -424,6 +443,17 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
       if (!target || target.project_id !== projectId || !allowed.includes(target.kind)) fail(`A linked ${Array.isArray(expected) ? 'record' : expected.replace('_', ' ')} was not found.`, 404);
     }
   }
+  // Design records (DESIGN-UX-01): uploads belong to the project, colour roles exist, one token set, one asset per brand key.
+  function checkDesign(projectId, kind, clean, { id = null, parentId = null } = {}) {
+    if (clean.assetId && !db.prepare('SELECT 1 FROM project_assets WHERE id = ? AND project_id = ?').get(clean.assetId, projectId)) fail('That upload was not found.', 404);
+    if (kind === 'design_tokens' && !id && list(projectId, 'design_tokens').length) fail('The project already has a token set. Change it instead.', 409);
+    if (kind === 'component' && parentId && row(parentId)?.kind !== 'component') fail('A component nests inside another component.');
+    if (kind === 'brand_asset') {
+      const tokens = list(projectId, 'design_tokens')[0];
+      if (tokens) cleanBrandAsset(clean, new Set(tokens.roles.map(role => role.id)));
+      if (clean.key && list(projectId, 'brand_asset').some(asset => asset.key === clean.key && asset.id !== id)) fail(`Another asset is already the app's ${clean.key}. Change that one, or clear its key first.`, 409);
+    }
+  }
 
   function update(projectId, id, changes, { expectedRevision, author = 'Aludel', rationale = null, workItemId = null, position, parentId } = {}) {
     const current = row(id);
@@ -431,6 +461,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     if (expectedRevision !== undefined && Number(expectedRevision) !== current.revision) fail('This record changed since you opened it. Reload to see the latest; your edit is kept.', 409);
     const merged = validators[current.kind]({ ...parse(current.data_json, {}), ...changes }, catalogs);
     checkReferences(projectId, current.kind, merged);
+    checkDesign(projectId, current.kind, merged, { id, parentId: parentId ?? current.parent_id });
     if (current.kind === 'project') checkProjectDeps(projectId, id, merged.deps);
     const contentChanged = JSON.stringify(merged) !== current.data_json;
     const same = !contentChanged && position === undefined && parentId === undefined;
@@ -455,7 +486,10 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     db.prepare('DELETE FROM knowledge_records WHERE id = ?').run(id);
     // ROADMAP-01: evidence and plans that point at the record let go of it rather than dangle.
     const kind = current.kind;
-    for (const link of list(projectId, 'evidence_link').filter(entry => entry.recordId === id || entry.insightId === id)) db.prepare('DELETE FROM knowledge_records WHERE id = ?').run(link.id);
+    for (const link of list(projectId, 'evidence_link').filter(entry => entry.recordId === id || entry.insightId === id || entry.sourceRef === id)) db.prepare('DELETE FROM knowledge_records WHERE id = ?').run(link.id);
+    if (kind === 'component') for (const other of list(projectId, 'component').filter(entry => entry.slots.some(slot => slot.accepts.includes(id)))) {
+      update(projectId, other.id, { slots: other.slots.map(slot => ({ ...slot, accepts: slot.accepts.filter(entry => entry !== id) })) }, { rationale: 'A component it accepted was deleted' });
+    }
     if (kind === 'source') for (const finding of list(projectId, 'finding').filter(entry => entry.sourceId === id)) remove(projectId, finding.id);
     if (kind === 'finding') for (const insight of list(projectId, 'insight').filter(entry => entry.findings.includes(id))) update(projectId, insight.id, { findings: insight.findings.filter(entry => entry !== id) }, { rationale: 'Its finding was deleted' });
     if (kind === 'brief_claim') {
@@ -532,6 +566,17 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     if (insight?.kind !== 'insight') fail('Insight not found.', 404);
     return update(projectId, insightId, { comments: [...insight.comments, { by: user.name, text: text(value, 2000, 'Comment', true), at: now() }] }, { author: user.name });
   }
+
+  // ---- Design (DESIGN-UX-01): the token set, component contracts, starter brand assets and documents ----
+  function ensureDesign(projectId) { seedDesign({ projectId, list, insert, update, once, db, catalogs }); }
+  function addBrandTemplate(user, projectId, templateId) {
+    const template = catalogs.brandTemplates?.[templateId];
+    if (!template) fail('Unknown brand template.', 404);
+    const name = db.prepare('SELECT name FROM projects WHERE id = ?').get(projectId)?.name || '';
+    return template.assets.map(asset => insert(projectId, 'brand_asset', { ...asset, banner: asset.banner ? { ...asset.banner, headline: asset.banner.headline || name } : undefined, template: templateId },
+      { author: user.name, rationale: `From the ${template.label} template` }).id);
+  }
+  function syncDesignFromLook(projectId) { syncTokensFromLook({ projectId, list, update, db, catalogs }); }
 
   // ---- Vision › Documents (ROADMAP-01): generated from the Brief's claims, and out of date when the Brief changes ----
   function composeDoc(projectId, generator) {
@@ -1299,7 +1344,11 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
       sources: list(projectId, 'source'), findings: list(projectId, 'finding'), insights: list(projectId, 'insight'), evidence: list(projectId, 'evidence_link'),
       projects: list(projectId, 'project').map(project => ({ ...project, ref: `P-${project.number}`, spent: projectSpend(work, project.id), history: history(project.id) })),
       specs: list(projectId, 'spec').map(spec => ({ ...spec, ref: `SPEC-${String(spec.number).padStart(2, '0')}` })),
-      research: list(projectId, 'research'), docs: list(projectId, 'doc'),
+      research: list(projectId, 'research'), docs: list(projectId, 'doc').map(doc => ({ ...doc, showsIn: doc.showsIn || ['product'] })),
+      // DESIGN-UX-01: Design's records, each with its revisions.
+      tokens: (() => { const record = list(projectId, 'design_tokens')[0]; return record ? { ...record, history: history(record.id) } : null; })(),
+      components: list(projectId, 'component').map(component => ({ ...component, status: componentStatus(component), history: history(component.id) })),
+      brand: list(projectId, 'brand_asset').map(asset => ({ ...asset, history: history(asset.id) })),
       pages: pages.map(page => ({ ...page, history: history(page.id) })), work,
       packs: Object.fromEntries(Object.entries(packs).map(([id, pack]) => [id, { label: pack.label, summary: pack.summary, icon: pack.icon, stories: pack.stories.length, template: pack.stories.filter(story => story.template).length }])),
       selectedPacks: parse(db.prepare('SELECT story_packs_json FROM project_setup WHERE project_id = ?').get(projectId)?.story_packs_json, []),
@@ -1356,7 +1405,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     }
   }
 
-  return { ensureProject, ensureAgents, ensureRoles, ensurePackData, ensureBrief, ensurePlan, ensureLibrary, addComment, generateDoc, briefRevision, mayDo, projectFor, insert, update, remove, list, get, view, navRoutes, seedPages, saveNavRoutes, applyPacks, createWork, updateWork, appendLog,
+  return { ensureDesign, syncDesignFromLook, addBrandTemplate, ensureProject, ensureAgents, ensureRoles, ensurePackData, ensureBrief, ensurePlan, ensureLibrary, addComment, generateDoc, briefRevision, mayDo, projectFor, insert, update, remove, list, get, view, navRoutes, seedPages, saveNavRoutes, applyPacks, createWork, updateWork, appendLog,
     setWorkContext, workList, workById, blockersOf, workChanges, recordBuild, history, revisionData, revisionAt, kinds, openApi, referrers, openWorkItem, applyAnswer, suggestions, syncBacklog,
     migrateWork, ensureRoutines, runRoutines, instructionPins, actionRecord, actionIdFor, roleView, resolveAssignee, defaultProfile, members, agentExport,
     onRevision: listener => revisionListeners.push(listener), onWorkDone: listener => doneListeners.push(listener) };

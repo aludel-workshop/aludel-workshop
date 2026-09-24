@@ -160,10 +160,11 @@ try {
 
   // Design and Platform
   await layerNav().getByRole('link', { name: 'Design' }).click();
-  await page.getByRole('cell', { name: 'color.primary' }).waitFor();
-  assert.match(await page.locator('table').innerText(), /#ca3e6f/, 'tokens use the same readable primary as the scaffold');
-  await check('design-foundations');
-  for (const tab of ['Components', 'Patterns', 'Guidelines', 'Sources & changes']) { await page.getByRole('link', { name: tab }).click(); await page.waitForTimeout(100); assert.deepEqual(await axe(page), [], `design ${tab}`); }
+  // DESIGN-UX-01: tokens in a tree beside a live preview (tests/design-browser.mjs drives the Design layer in depth).
+  await page.getByRole('complementary', { name: 'Token tree' }).getByRole('button', { name: 'primary', exact: true }).waitFor();
+  assert.match(await page.locator('.lay-ds-canvas').evaluate(element => element.style.getPropertyValue('--mat-sys-primary')), /^#[0-9a-f]{6}$/, 'the preview carries the project\'s theme');
+  await check('design-tokens');
+  for (const name of ['Components', 'Brand', 'Docs']) { await tab('Design', name).click(); await page.waitForTimeout(150); assert.deepEqual(await axe(page), [], `design ${name}`); }
   // Data (LAY-07A): the Accounts pack's contract is built by the template; new objects start proposed.
   await layerNav().getByRole('link', { name: 'Data' }).click();
   await page.getByRole('heading', { name: /knows, and how it's asked for/ }).waitFor();
@@ -543,7 +544,7 @@ try {
   await stranger.close();
 
   await page.setViewportSize({ width: 390, height: 844 });
-  for (const path of ['', '/vision', '/vision/map', '/vision/docs', '/library', '/library/sources', '/pages/tree', '/data/objects', '/data/api', '/platform', '/platform/code', '/platform/database', '/work', '/work/items', '/work/projects', '/work/roles', '/work/team', `/work/item/${blocker.id}`]) {
+  for (const path of ['', '/vision', '/vision/map', '/vision/docs', '/library', '/library/sources', '/library/docs', '/design', '/design/components', '/design/brand', '/pages/tree', '/data/objects', '/data/api', '/platform', '/platform/code', '/platform/database', '/work', '/work/items', '/work/projects', '/work/roles', '/work/team', `/work/item/${blocker.id}`]) {
     await page.goto(`${portal}/p/tool-share${path}`);
     await page.locator('.lay-main h1').waitFor();
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `${path || 'home'} overflows at 390px`);

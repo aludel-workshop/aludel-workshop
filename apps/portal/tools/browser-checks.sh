@@ -13,7 +13,7 @@ cd "$(dirname "$0")/.."
 port="${BROWSER_CHECK_PORT:-4318}"
 work="$(mktemp -d "${TMPDIR:-/tmp}/aludel-browser-checks-XXXXXX")"
 scripts=("$@")
-[ ${#scripts[@]} -eq 0 ] && scripts=(layers onboarding product brand github workflow browser)
+[ ${#scripts[@]} -eq 0 ] && scripts=(layers design onboarding product brand github workflow browser)
 server=""
 stop() { [ -n "$server" ] && kill "$server" 2>/dev/null && wait "$server" 2>/dev/null; server=""; }
 # Agent keys are checked against a local stand-in, never the real providers (tests/provider-stub.mjs).
