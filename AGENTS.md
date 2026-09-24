@@ -21,9 +21,9 @@ The portal may still hold requests, proposals, work history, and evidence, but i
 
 Read `docs/status.md` for the selected packet, engineering context, and limitations. Preserve packet prerequisites, evidence, retrospective, and durable-document closeout requirements. Exactly one `next_action` remains the planning/handoff pointer. Chat authorization does not authorize spending, external accounts or writes, public deployment, release, acceptance, or other effects outside the stated local scope.
 
-## Current focus (2026-09-22)
+## Current focus (2026-09-24)
 
-The portal is being rebuilt around project **layers** (Home, Product, Design, Pages, Platform, Work). Start from [the layers implementation plan and handoff](docs/design/portal-layers/implementation-plan.md) before touching the portal UI or onboarding.
+The portal is being rebuilt around project **layers** (Home, Vision, Design, Pages, Data, Platform, Work). Start from [the layers implementation plan and handoff](docs/design/portal-layers/implementation-plan.md) before touching the portal UI or onboarding. The next pass, PLATFORM-PIPELINE-01 (owner-owned repositories, app-defined environments, containers per subdomain, multi-instance sync), starts from [its brief](docs/design/platform-pipeline/work-record.md).
 
 ## Required reading
 

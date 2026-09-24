@@ -1,14 +1,14 @@
 ---
 id: evidence-design-ux-01
 kind: evidence
-status: agent-checked
+status: accepted
 updated: 2026-09-24
 depends_on: [design-ux-01]
 ---
 
 # DESIGN-UX-01: the Design layer, built
 
-The owner accepted prototype v1 ("like it. build it", DEC-045). This is the evidence for the build, followed by the retrospective. It has been agent-checked; owner review is pending.
+The owner accepted prototype v1 ("like it. build it", DEC-045). This is the evidence for the build, followed by the retrospective. It has been agent-checked and accepted by the owner ("looks good", DEC-046).
 
 ## What was built
 

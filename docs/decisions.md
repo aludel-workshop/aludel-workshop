@@ -11,6 +11,22 @@ This is the seed of the portal's decision workflow. Confirmed owner answers and 
 
 ## Confirmed
 
+2026-09-24 — **DEC-047: Platform pipeline direction: GitHub first, Docker for previews, knowledge location deferred.** The owner answered the PLATFORM-PIPELINE-01 brief's questions ([work record §5–§8](design/platform-pipeline/work-record.md)):
+- **Where knowledge lives: deferred.** The owner: "lets defer this for now … might make sense to have a second repo? it seems like knowledge base evolves rapidly and organically, not following code dev cycles, and i don't want it blowing up app repo." GitHub wikis were considered and rejected ("alright, no wiki"): private wikis need a paid plan, and they offer no review step. A **companion knowledge repository** per project is the provisional direction. P10 (instance sync) waits on this.
+- **Containers: Docker.** "lets get started with docker for containers". Docker Desktop's WSL integration was already installed.
+- **GitHub is required before creating an app.** "yes, i think having a github account connected is a pre-req for creating an app." Onboarding must stay simple: "authenticate with github, then just let them okay the recipe … i don't want them to have to be a github expert".
+- **Both personal accounts and organizations** are supported; requiring an organization was rejected because users would have to create one first. The owner asked for a live proof: "lets prove personals".
+- The local-only test workspaces were deleted after their briefs were saved to the [test project rotation](design/process/test-project-rotation.md), except Henry's Gate.
+
+Consequences:
+- Previews run one container per project, built from the app's own `Dockerfile`, under limits the host sets (PP-01A).
+- Local previews and the future server share one model (P8).
+
+2026-09-24 — **DEC-046: Design layer accepted; icons and fonts shelved behind the deployment pipeline; Platform next.** The owner reviewed the built Design layer: "looks good". Icon and font libraries (a package or uploaded files, with parameters read from the format) are needed. They depend on each generated app managing its own dependencies, and today apps borrow the portal's `node_modules`. The owner: "this is highlighting … a gap in our deployment pipeline (platform layer) … shelve further design changes, and next up we can iron out more of what that looks like. been long enough without proper git repos for this app." Consequences:
+- DESIGN-UX-01 is complete.
+- The icon and font proposal is kept in the [work record](design/design-layer/work-record.md#6-shelved-icons-and-fonts) as ICONS-FONTS-01, blocked by the pipeline work.
+- The next pass is PLATFORM-PIPELINE-01: repositories, dependencies, builds and deployment. PAGES-UX-01 follows.
+
 2026-09-24 — **DEC-045: Design layer prototype v1 accepted; build authorized.** The owner reviewed [DESIGN-UX-01 v1](design/design-layer/v1/index.html): "like it. build it". Accepted:
 - Design's tabs become **Tokens · Components · Brand · Docs**. Sources and Guidelines go: references and documents live in the Library.
 - Tokens are one revisioned token set in three tiers (raw values, roles, rules), exported as W3C design tokens. Editing happens in a tree beside a live preview you can page through, with no inspector.

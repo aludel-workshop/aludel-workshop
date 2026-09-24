@@ -25,7 +25,7 @@ failed=0
 for name in "${scripts[@]}"; do
   file="tests/${name}-browser.mjs"; [ "$name" = browser ] && file="tests/browser.mjs"
   data="$work/$name"; mkdir -p "$data"
-  MACHINE_DATA_DIR="$data" MACHINE_PORT="$port" MACHINE_ANTHROPIC_API_URL="http://127.0.0.1:$stub_port" MACHINE_OPENAI_API_URL="http://127.0.0.1:$stub_port" \
+  MACHINE_PREVIEW_RUNTIME="${MACHINE_PREVIEW_RUNTIME:-process}" MACHINE_DATA_DIR="$data" MACHINE_PORT="$port" MACHINE_ANTHROPIC_API_URL="http://127.0.0.1:$stub_port" MACHINE_OPENAI_API_URL="http://127.0.0.1:$stub_port" \
     node server/server.mjs > "$work/$name-portal.log" 2>&1 &
   server=$!
   for _ in $(seq 1 50); do curl -s -o /dev/null "http://127.0.0.1:$port/api/session" && break; sleep 0.2; done

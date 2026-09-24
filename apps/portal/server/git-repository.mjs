@@ -5,6 +5,12 @@ import { fileURLToPath } from 'node:url';
 
 const sensitivePath = /(^|\/)(\.env(?:\.|$)|[^/]+\.(?:pem|key|p12|sqlite|sqlite3|db)$|\.data(?:\/|$))/i;
 
+// Pushes authenticate only with the short-lived installation token. An empty credential.helper clears every helper from the
+// user's and system git config (for example the gh CLI's), which git would otherwise try first, pushing as that person.
+const tokenOnly = ['-c', 'credential.helper='];
+const tokenEnvironment = token => ({ GIT_ASKPASS: fileURLToPath(new URL('./git-askpass.mjs', import.meta.url)),
+  GIT_TERMINAL_PROMPT: '0', GCM_INTERACTIVE: 'never', MACHINE_GITHUB_PUSH_TOKEN: token });
+
 function git(repository, args, options = {}) {
   const result = spawnSync('git', args, {
     cwd: repository,
@@ -68,10 +74,7 @@ export function initializeAndPush({ repository, profile, remoteUrl, login, userI
   if (!tracked.length) throw new Error('No project files are available for the initial commit.');
   git(repository, ['commit', '-m', profile.initialCommitMessage]);
   git(repository, ['remote', 'add', 'origin', remoteUrl]);
-  const askpass = fileURLToPath(new URL('./git-askpass.mjs', import.meta.url));
-  git(repository, ['push', '--set-upstream', 'origin', profile.initialBranch], {
-    env: { GIT_ASKPASS: askpass, GIT_ASKPASS_REQUIRE: 'force', GIT_TERMINAL_PROMPT: '0', MACHINE_GITHUB_PUSH_TOKEN: token }
-  });
+  git(repository, [...tokenOnly, 'push', '--set-upstream', 'origin', profile.initialBranch], { env: tokenEnvironment(token) });
   const head = git(repository, ['rev-parse', 'HEAD']).stdout.trim();
   return { branch: profile.initialBranch, commit: head, trackedFiles: tracked.length };
 }
@@ -108,10 +111,7 @@ export function pushWorkspace({ repository, remoteUrl, token, branch }) {
   const current = git(repository, ['remote', 'get-url', 'origin'], { allowFailure: true, quiet: true });
   if (current.status !== 0) git(repository, ['remote', 'add', 'origin', remoteUrl]);
   else if (current.stdout.trim() !== remoteUrl) git(repository, ['remote', 'set-url', 'origin', remoteUrl]);
-  const askpass = fileURLToPath(new URL('./git-askpass.mjs', import.meta.url));
-  git(repository, ['push', '--set-upstream', 'origin', branch], {
-    env: { GIT_ASKPASS: askpass, GIT_ASKPASS_REQUIRE: 'force', GIT_TERMINAL_PROMPT: '0', MACHINE_GITHUB_PUSH_TOKEN: token }
-  });
+  git(repository, [...tokenOnly, 'push', '--set-upstream', 'origin', branch], { env: tokenEnvironment(token) });
   const head = git(repository, ['rev-parse', 'HEAD']).stdout.trim();
   const trackedFiles = git(repository, ['ls-files', '-z']).stdout.split('\0').filter(Boolean).length;
   return { branch, commit: head, trackedFiles };

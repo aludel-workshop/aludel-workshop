@@ -1,0 +1,6 @@
+{
+  "$comment": "The vendor GitHub App's public identifiers. Not secret: they appear in GitHub URLs. The client secret and private key never go here; set MACHINE_GITHUB_CLIENT_SECRET and MACHINE_GITHUB_PRIVATE_KEY_PATH in the environment (.env locally). MACHINE_GITHUB_APP_ID, MACHINE_GITHUB_APP_SLUG and MACHINE_GITHUB_CLIENT_ID override these values.",
+  "appId": "5025942",
+  "appSlug": "aludel-workshop",
+  "clientId": "Iv23ligLQ9tHaNaO2mwc"
+}

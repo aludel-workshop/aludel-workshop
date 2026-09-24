@@ -89,7 +89,7 @@ export function agentsGuide(setup, catalogs) {
   // WORK-UX-01: instructions are layered project → role → action; each action says what it may change and use.
   const roleSections = agents ? agents.roles.map(role => `### ${role.name} (${role.layer})\n\n${role.instructions || '_No role instructions yet._'}\n\n${role.actions.map(action => `#### ${action.name}\n\n${action.instructions ? `${action.instructions}\n\n` : ''}- May change: ${action.changes.join('; ') || 'nothing (suggestions only)'}\n- Tools: ${action.tools.join(', ') || 'none'}\n- Asks first: ${action.asks || 'nothing beyond the rules below'}\n`).join('\n')}`).join('\n') : '';
   const agentSections = agents ? `\n## Project instructions\n\n${agents.instructions || '_None yet._'}\n${agents.principles.length ? `\nProduct principles:\n\n${agents.principles.map(item => `- ${item}`).join('\n')}\n` : ''}\n## Roles and actions\n\nEvery layer has a role, and each role performs actions. Read the project instructions first, then the role's, then the action's.\n\n${roleSections}\n## Commits and tests\n\n- End each commit message with trailers: \`Aludel-Work: W-12\` and \`Implements: S4, SPEC-02/FR-001\`.\n- Start test names with the acceptance they check: \`S4 · Given …\`.\n- Do not put tags or IDs in the code; Aludel links code to stories from these.\n` : '';
-  return `# Agent guide for ${setup.project.name}\n\nRead [docs/product.md](docs/product.md) for the product intent and [aludel.json](aludel.json) for the setup choices before changing anything.\n\nWork is assigned per action in Aludel (Work › Roles). Do not pick up work assigned to a person.\n${agentSections}\n## Stack\n\n${Object.entries(preset?.layers || {}).map(([layer, value]) => `- ${layer}: ${value}`).join('\n')}\n\nCommands: \`npm install\`, \`npm run build\`, \`npm start\` (serves on \`PORT\`, default 3000).\n\n## Rules\n\n- This app is independent of Aludel. Do not import Aludel code or call Aludel services at runtime.\n- Never commit secrets, \`.env\` files or the \`.data/\` directory.\n- Keep the pages in \`src/site.ts\` in step with the Pages section of \`docs/product.md\`. \`src/page-blocks.ts\` holds the placeholder layouts; replace a page's blocks with real UI as it is built.\n`;
+  return `# Agent guide for ${setup.project.name}\n\nRead [docs/product.md](docs/product.md) for the product intent and [aludel.json](aludel.json) for the setup choices before changing anything.\n\nWork is assigned per action in Aludel (Work › Roles). Do not pick up work assigned to a person.\n${agentSections}\n## Stack\n\n${Object.entries(preset?.layers || {}).map(([layer, value]) => `- ${layer}: ${value}`).join('\n')}\n\nCommands: \`npm install\`, \`npm run build\`, \`npm start\` (serves on \`PORT\`, default 3000), or \`docker compose up --build\` to run it in its container. \`Dockerfile\` and \`.env.example\` declare how the app runs and every variable it reads; keep them current when that changes.\n\n## Rules\n\n- This app is independent of Aludel. Do not import Aludel code or call Aludel services at runtime.\n- Never commit secrets, \`.env\` files or the \`.data/\` directory.\n- Keep the pages in \`src/site.ts\` in step with the Pages section of \`docs/product.md\`. \`src/page-blocks.ts\` holds the placeholder layouts; replace a page's blocks with real UI as it is built.\n`;
 }
 
 // The generation manifest (LAY-07D): every unit the template wrote and the records it realises. Pages are derived:
@@ -168,6 +168,7 @@ export function skeletonFiles(setup, catalogs, gitProfile, appUrl, assets, sourc
     'src/styles.scss': styles({ feel, theme, accent, surface, tokens: design?.tokens || null }),
     ...(design ? designFiles(design, site.name) : {}),
     'server/server.mjs': serverSource(Boolean(options.auth)),
+    ...containerFiles(),
     'licenses/Material-Symbols-LICENSE': sources.iconLicense
   };
   return { files, media, binaries: { 'public/fonts/icons.ttf': sources.iconFont }, manifest: generationManifest(setup, pages) };
@@ -357,6 +358,49 @@ const appTemplate = `<a class="skip-link" href="#main">Skip to content</a>
   </nav>
 </div>
 `;
+
+// PLATFORM-PIPELINE-01: the app declares how it builds and runs, so any container host (and Aludel's previews) runs it the
+// same way. Limits are not declared here: the host that runs the app sets them.
+function containerFiles() {
+  return {
+    'Dockerfile': `# syntax=docker/dockerfile:1
+# How this app builds and runs. Aludel's previews use this same file; nothing here depends on Aludel.
+FROM node:24-bookworm-slim AS build
+WORKDIR /app
+COPY package.json package-lock.json* ./
+RUN if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi
+COPY . .
+RUN npm run build
+
+# The server has no runtime dependencies, so the running image holds only the server and the built app.
+FROM node:24-bookworm-slim
+ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000 DATA_DIR=/data NODE_NO_WARNINGS=1
+WORKDIR /app
+COPY --from=build /app/package.json ./
+COPY --from=build /app/server ./server
+COPY --from=build /app/dist ./dist
+RUN mkdir -p /data && chown node:node /data
+USER node
+VOLUME /data
+EXPOSE 3000
+HEALTHCHECK --interval=10s --timeout=2s --start-period=5s CMD ["node", "-e", "fetch('http://127.0.0.1:' + process.env.PORT + '/api/health').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+CMD ["node", "server/server.mjs"]
+`,
+    '.dockerignore': 'node_modules\ndist\n.data\n.git\n.env\n.env.*\n*.sqlite\n',
+    'compose.yaml': `# Run this app on its own: docker compose up --build, then open http://localhost:3000
+services:
+  app:
+    build: .
+    ports: ["3000:3000"]
+    env_file: { path: .env, required: false }
+    volumes: ["app-data:/data"]
+    restart: unless-stopped
+volumes:
+  app-data:
+`,
+    '.env.example': '# Every variable this app reads, with the values its container uses. For docker compose, copy to .env to change them; never commit .env.\n# Port the server listens on.\nPORT=3000\n# Interface to listen on (0.0.0.0 inside a container).\nHOST=0.0.0.0\n# Folder for the app database and uploads.\nDATA_DIR=/data\n'
+  };
+}
 
 function serverSource(auth) {
   return `// Generated by Aludel (aludel-web-v1). A small, dependency-free server for the built app.

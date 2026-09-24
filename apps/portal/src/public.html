@@ -199,6 +199,7 @@
                 <span>{{ repository.status === 'ready' ? 'On GitHub with your first commit.' : 'Created on GitHub; the first push needs attention: ' + (repository.last_error || 'unknown error') }}</span>
                 <a [href]="repository.html_url" target="_blank" rel="noopener">Open on GitHub<mat-icon aria-hidden="true" class="inline-icon">open_in_new</mat-icon></a></div>
             </div>
+            @if (repository.status !== 'ready') { <div class="pub-actions"><button mat-stroked-button type="button" (click)="retryPush()" [disabled]="busy()">{{ busy() ? 'Pushing…' : 'Retry the push' }}</button></div> }
             <div class="pub-actions pub-footer-actions"><button mat-flat-button type="button" (click)="markAndNext('github')" [disabled]="busy()">Continue<mat-icon iconPositionEnd aria-hidden="true">arrow_forward</mat-icon></button></div>
           } @else if (!current.github.configured) {
             <div class="pub-status-card warn">
@@ -219,6 +220,8 @@
               <select id="installation" name="installation" class="pub-select" [(ngModel)]="installationId">
                 @for (item of eligibleInstallations(); track item.installation_id) { <option [value]="item.installation_id">{{ item.account_login }} ({{ item.target_type === 'User' ? 'personal' : 'organization' }})</option> }
               </select>
+              <p class="field-hint">Account not listed? The Aludel app has to be installed there first.</p>
+              <div class="pub-actions"><button mat-stroked-button type="button" (click)="installGithub()">Install on another account</button><button mat-button type="button" (click)="refreshInstallations()" [disabled]="busy()">Check again</button></div>
               <mat-form-field appearance="outline" class="wide-field"><mat-label>Repository name</mat-label><input matInput name="repositoryName" [(ngModel)]="repositoryName" pattern="[A-Za-z0-9._-]+"></mat-form-field>
               <label class="pub-check"><input type="checkbox" name="private" [(ngModel)]="repositoryPrivate"> Private repository</label>
               <div class="pub-actions pub-footer-actions"><button mat-flat-button type="submit" [disabled]="busy() || !repositoryName || !installationId">{{ busy() ? 'Creating…' : 'Create repository' }}</button></div>

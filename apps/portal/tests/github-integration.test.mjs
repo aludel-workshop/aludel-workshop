@@ -1,15 +1,15 @@
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, verify } from 'node:crypto';
-import { mkdtempSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import test from 'node:test';
 import { createAppJwt, mintInstallationToken } from '../server/github-app-auth.mjs';
 import { githubIntegration, initGithubIdentities } from '../server/github-integration.mjs';
 import { createExternalUser, createLoginTicket, createUser, initAccounts, redeemLoginTicket } from '../server/accounts.mjs';
 import { loadGitHubVendorConfig } from '../server/github-vendor-config.mjs';
-import { initializeAndPush, inspectGitRepository } from '../server/git-repository.mjs';
+import { initializeAndPush, inspectGitRepository, pushWorkspace } from '../server/git-repository.mjs';
 import { openSecretStore } from '../server/secret-store.mjs';
 import { openDatabase } from '../server/storage.mjs';
 
@@ -203,4 +203,60 @@ test('continue with GitHub creates or finds one account, never takes over by ema
   assert.equal(redeemLoginTicket(db, ticket).id, first.userId);
   assert.throws(() => redeemLoginTicket(db, ticket), error => error.status === 401, 'tickets are single use');
   db.close();
+});
+
+test('the App\'s public identifiers are committed config; secrets come only from the environment', () => {
+  const pem = generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey.export({ type: 'pkcs1', format: 'pem' });
+  const committed = { appId: '13579', appSlug: 'aludel-app', clientId: 'Iv23committed', clientSecret: 'a-secret-that-must-be-ignored', privateKeyPath: '/ignored.pem' };
+  const secrets = { MACHINE_GITHUB_CLIENT_SECRET: 'a-very-long-vendor-client-secret', MACHINE_GITHUB_PRIVATE_KEY_PATH: '/managed/github-app.pem' };
+  const fromFile = loadGitHubVendorConfig(secrets, () => pem, committed);
+  assert.equal(fromFile.configured, true, fromFile.issues.join());
+  assert.deepEqual([fromFile.appId, fromFile.appSlug, fromFile.clientId], ['13579', 'aludel-app', 'Iv23committed']);
+  const noSecrets = loadGitHubVendorConfig({}, () => pem, committed);
+  assert.equal(noSecrets.configured, false, 'secrets in the committed file are never read');
+  assert.deepEqual(noSecrets.issues, ['MACHINE_GITHUB_CLIENT_SECRET', 'MACHINE_GITHUB_PRIVATE_KEY_PATH']);
+  const overridden = loadGitHubVendorConfig({ ...secrets, MACHINE_GITHUB_APP_SLUG: 'other-app' }, () => pem, committed);
+  assert.equal(overridden.appSlug, 'other-app', 'the environment overrides committed identifiers');
+  const empty = loadGitHubVendorConfig({}, () => pem, {});
+  assert.ok(empty.issues[0].includes('config/github-app.json'), 'a missing identifier points at the committed file');
+  const shipped = JSON.parse(readFileSync(new URL('../config/github-app.json', import.meta.url), 'utf8'));
+  assert.deepEqual(Object.keys(shipped).filter(key => !key.startsWith('$')).sort(), ['appId', 'appSlug', 'clientId'], 'the committed file holds only public identifiers');
+});
+
+test('pushes use only the installation token, never a credential helper from the person\'s git config', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'aludel-push-identity-'));
+  // A stand-in for GitHub's smart-HTTP endpoint: it demands credentials and records what arrives, then refuses.
+  const seen = join(root, 'seen.txt');
+  const server = spawn(process.execPath, ['-e', `
+    const { appendFileSync } = require('node:fs');
+    require('node:http').createServer((request, response) => {
+      const auth = request.headers.authorization;
+      if (auth) appendFileSync(${JSON.stringify(seen)}, Buffer.from(auth.replace(/^Basic /, ''), 'base64').toString() + '\\n');
+      response.writeHead(401, { 'www-authenticate': 'Basic realm="GitHub"' }); response.end();
+    }).listen(0, '127.0.0.1', function () { console.log(this.address().port); });`], { stdio: ['ignore', 'pipe', 'inherit'] });
+  const port = await new Promise(resolve => server.stdout.once('data', chunk => resolve(Number(String(chunk).trim()))));
+  // The person's own git config has a helper (like `gh auth git-credential`) that would answer with their login.
+  const marker = join(root, 'helper-used');
+  const globalConfig = join(root, 'gitconfig');
+  writeFileSync(globalConfig, `[credential]\n\thelper = "!f() { echo used > '${marker}'; echo username=person; echo password=personal-token; }; f"\n`);
+  const previous = process.env.GIT_CONFIG_GLOBAL;
+  process.env.GIT_CONFIG_GLOBAL = globalConfig;
+  try {
+    const repository = join(root, 'app');
+    mkdirSync(repository);
+    for (const args of [['init', '-b', 'main'], ['config', 'user.name', 'Ada'], ['config', 'user.email', 'ada@example.com'], ['commit', '--allow-empty', '-m', 'start']]) spawnSync('git', args, { cwd: repository });
+    const remoteUrl = `http://127.0.0.1:${port}/owner/app.git`;
+    // Control: a plain push asks the helper, which is how the first live push went out as the person.
+    spawnSync('git', ['push', remoteUrl, 'main'], { cwd: repository, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
+    assert.ok(existsSync(marker), 'control: without the fix, git uses the configured helper');
+    assert.match(readFileSync(seen, 'utf8'), /^person:personal-token$/m);
+    writeFileSync(seen, ''); spawnSync('rm', ['-f', marker]);
+
+    assert.throws(() => pushWorkspace({ repository, remoteUrl, token: 'ghs_installation-token', branch: 'main' }));
+    assert.equal(existsSync(marker), false, 'the helper is never asked');
+    assert.deepEqual(readFileSync(seen, 'utf8').trim().split('\n'), ['x-access-token:ghs_installation-token'], 'only the installation token is sent');
+  } finally {
+    if (previous === undefined) delete process.env.GIT_CONFIG_GLOBAL; else process.env.GIT_CONFIG_GLOBAL = previous;
+    server.kill();
+  }
 });

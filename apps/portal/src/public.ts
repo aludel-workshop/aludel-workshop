@@ -235,7 +235,9 @@ export class PublicComponent implements OnDestroy {
     this.stackPreset = setup.stack.preset || this.catalog()?.stacks.default || 'aludel-web-v1';
     this.stackOptions = { ...setup.stack.options };
     this.repositoryName ||= setup.project.slug;
-    this.installationId ||= String(setup.github.installations.find(item => item.eligible)?.installation_id || '');
+    // Default to the account the person signed in with, then any other eligible account.
+    const eligible = setup.github.installations.filter(item => item.eligible);
+    this.installationId ||= String((eligible.find(item => item.target_type === 'User' && item.account_login === setup.github.login) || eligible[0])?.installation_id || '');
     this.details.set(setup.preferences['setupDetail'] === 'detailed');
   }
 
@@ -320,6 +322,13 @@ export class PublicComponent implements OnDestroy {
       await this.api('/api/github/installations/refresh', 'POST', {});
       await this.load();
       this.notice.set('GitHub installations refreshed.');
+    });
+  }
+
+  retryPush() {
+    return this.run(async () => {
+      this.applySetup(await this.api<ProjectSetup>(`/api/projects/${encodeURIComponent(this.projectId())}/repository/finish`, 'POST', {}));
+      this.notice.set('Pushed to GitHub.');
     });
   }
 

@@ -1,7 +1,7 @@
 ---
 id: design-ux-01
 kind: work-record
-status: built-agent-checked
+status: accepted
 updated: 2026-09-24
 depends_on: [portal-layers-knowledge-structures, design-system-strategy-001, roadmap-01]
 ---
@@ -153,3 +153,21 @@ The build doesn't wait on this. It's a list for LAY-05:
 ## Build result
 
 2026-09-24: built and agent-checked. [Evidence and retrospective](../../evidence/design-ux-01-design-layer.md). Owner review of the built layer is pending.
+
+## Owner acceptance
+
+2026-09-24: "looks good" (DEC-046). Further Design changes are shelved until the deployment pipeline is worked out.
+
+## 6. Shelved: icons and fonts
+
+ICONS-FONTS-01, blocked by PLATFORM-PIPELINE-01. The proposal, as discussed with the owner:
+- **A Library record in Design (raw values)** for a font or an icon set.
+  - Its source is a package at an exact version, or uploaded files.
+  - Its format is detected: variable font, static font with weight files, stroke-drawn SVG set, or fill-drawn SVG set.
+  - Its parameters come from the format: axes read from the font, stroke width for stroke-drawn sets, a style choice for sets that ship styles as separate files.
+  - The settings are saved in the token set.
+- **An icon page:** one icon, searched for and shown large, with real components using it and controls for its parameters. No full grid of the set.
+- **Type faces** point at font libraries, and the Type page gets axis sliders when the font is variable.
+- **The generated app** gets the package in its `package.json` or the files in `public/fonts/` or `src/assets/icons/`, plus CSS for the settings. The browser applies variable-font axes at runtime, so no per-project font rebuild is needed.
+- **Open question, blocked by the pipeline:** generated apps borrow the portal's `node_modules`, so packages need per-project installs. The options were uploads first, a list of packages at checked versions (recommended), or any npm package.
+- **Reference to verify before use:** Iconify's JSON icon-set format.

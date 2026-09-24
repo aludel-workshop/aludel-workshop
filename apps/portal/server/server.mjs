@@ -6,7 +6,7 @@ import { aludelProjectId, createExternalUser, createLoginTicket, createSession, 
 import { hostTopology } from './hosts.mjs';
 import { initOnboarding, loadCatalogs, onboarding } from './onboarding.mjs';
 import { botColors, efforts, initKnowledge, knowledge } from './knowledge.mjs';
-import { previewManager } from './previews.mjs';
+import { previewManager, previewRuntime } from './previews.mjs';
 import { agentsGuide, copyMedia, initialFiles, loadScaffoldSources, skeletonFiles, writeBinaries, writeFiles } from './scaffold.mjs';
 import { brandUsage, componentStatus } from './design.mjs';
 import { codeLinks, initCodeLinks, workspaceIsIndexable } from './code-links.mjs';
@@ -51,7 +51,7 @@ const projectGitProfile = (config => config.sourceControlProfiles[config.default
 const catalogs = loadCatalogs(join(portalRoot, 'config'));
 const scaffoldSources = loadScaffoldSources(portalRoot);
 const workspaceRoot = join(dataDirectory, 'workspaces');
-const previews = previewManager({ db, portalRoot, workspaceRoot, logRoot: join(dataDirectory, 'preview-logs') });
+const previews = previewManager({ db, portalRoot, workspaceRoot, logRoot: join(dataDirectory, 'preview-logs'), runtime: previewRuntime() });
 const appUrls = slug => ({ portal: topology.portalOrigin, app: topology.appOrigin(slug) });
 const commitIdentity = user => ({ name: user?.name || 'Aludel', email: user?.email || 'owner@aludel.invalid' });
 // A new project's repository starts local; GitHub publishing is a later, separate step.
@@ -478,7 +478,13 @@ async function api(request, response, url) {
     if (section === 'connections/agent' && method === 'POST') return json(response, 200, await flows.checkAgentConnection(user, projectId));
     if (section === 'connections/agent' && method === 'DELETE') return json(response, 200, flows.removeAgentConnection(user, projectId));
     if (section === 'steps' && method === 'POST' && item) { flows.markStep(user, projectId, item); return json(response, 200, projectView(user, projectId)); }
-    if (section === 'repository' && method === 'POST' && projectId !== aludelProjectId) {
+    // Retries the first push after a failure (the repository already exists on GitHub, so nothing is created twice).
+    if (section === 'repository' && item === 'finish' && method === 'POST' && projectId !== aludelProjectId) {
+      const workspace = flows.projectSetup(user, projectId).workspacePath;
+      await github.finishLocalSetup(projectId, ({ remoteUrl, token }) => pushWorkspace({ repository: workspace, remoteUrl, token, branch: projectGitProfile.initialBranch }));
+      return json(response, 200, projectView(user, projectId));
+    }
+    if (section === 'repository' && !item && method === 'POST' && projectId !== aludelProjectId) {
       const input = await readJson(request);
       const workspace = flows.projectSetup(user, projectId).workspacePath;
       await github.createRepository(user.id, projectId, input, ({ remoteUrl, token }) => pushWorkspace({ repository: workspace, remoteUrl, token, branch: projectGitProfile.initialBranch }));
@@ -651,7 +657,7 @@ async function serveApp(request, response, slug) {
     const status = previews.status(project.id).status;
     return appPage(response, 503, `${project.name.replace(/[<>&"]/g, '')} is not built yet`, status === 'building' ? 'The skeleton is building. Refresh in a few seconds.' : 'Finish setup in Aludel to generate and build this app.');
   }
-  previews.proxy(request, response, port);
+  previews.proxy(request, response, port, project.id);
 }
 
 const server = createServer(async (request, response) => {

@@ -5,7 +5,7 @@ status: active
 updated: 2026-09-24
 current_phase: M1
 phase_state: in-progress
-next_action: DESIGN-UX-01
+next_action: PLATFORM-PIPELINE-01
 ---
 
 # Current project status
@@ -16,18 +16,28 @@ Turn the running local portal foundation into the first complete request → del
 
 ## Next action
 
-**DESIGN-UX-01 owner review** (DEC-045).
-- The Design layer is built and agent-checked: [work record](design/design-layer/work-record.md), [evidence](evidence/design-ux-01-design-layer.md).
-- Needed: the owner reviews it in the portal (restart it first so existing projects get their token set, contracts, brand and documents). Accept it, or give feedback ask by ask (D1–D22).
-- Then PAGES-UX-01, which starts by re-running the purpose test on Pages' tabs (operating procedure §2).
+**PLATFORM-PIPELINE-01: projects owned by their owners, run the way Aludel runs** (DEC-046, DEC-047). **Brief and progress:** [work record](design/platform-pipeline/work-record.md).
+- The owner decided (DEC-047):
+  - knowledge location deferred, with a companion repository provisional;
+  - Docker for containers;
+  - GitHub required before creating an app, on a personal account or an organization.
+- **PP-01A done, agent-checked:** previews build from each app's own `Dockerfile` and run one limited container per project. Server tests pass 77/77, and onboarding passes in the browser under Docker. [Evidence §9](design/platform-pipeline/work-record.md#9-pp-01a-container-previews-built-2026-09-24-agent-checked-owner-review-pending).
+- **PP-01B passed (live, 2026-09-24):**
+  - `henrydker/browser-buddy` was created on the personal account with the user token.
+  - The App's push identity (`aludel-workshop[bot]`) was proven with an installation token.
+  - A defect was fixed: pushes had used the person's `gh` credential helper. The portal needs a restart to pick up the fix.
+  - [Evidence §13](design/platform-pipeline/work-record.md#13-pp-01b-verified-2026-09-24-agent-checked-against-live-github).
+- **Next: PP-01C** (GitHub-first onboarding), then PP-01D (Environments), PP-01E (quotas, idle stop, egress).
+- Not authorized: GitHub writes beyond the one throwaway proof, DNS, servers, public hosting or spending.
 
 ## Ready queue
 
-1. **DESIGN-UX-01**: owner review of the built Design layer.
-2. **PAGES-UX-01**: Pages layer UX pass.
-3. **DATA-PLATFORM-UX-01**: Data and Platform UX pass (owner: "perhaps").
-4. **LAY-05**: coding agents against stories (absorbs B-03B), committing with LAY-07's trailers.
-5. **LAY-06**: Aludel's own knowledge into its layers; retire the hash workspace.
+1. **PLATFORM-PIPELINE-01**: PP-01C onboarding (GitHub required, recipe approval) → PP-01D environments → PP-01E guards ([work record](design/platform-pipeline/work-record.md)).
+2. **ICONS-FONTS-01**: icon and font libraries in Design (unblocked in principle by PP-01A; waits behind PLATFORM-PIPELINE-01).
+3. **PAGES-UX-01**: Pages layer UX pass.
+4. **DATA-PLATFORM-UX-01**: the rest of Data and Platform (owner: "perhaps").
+5. **LAY-05**: coding agents against stories (absorbs B-03B), committing with LAY-07's trailers.
+6. **LAY-06**: Aludel's own knowledge into its layers; retire the hash workspace.
 
 One packet at a time. B-03's worker/artifact/recovery work remains required and must not be displaced by later workspace expansion. [Proposed dependency order](design/project-workspace/v1/delivery-plan.md).
 
@@ -62,6 +72,7 @@ One packet at a time. B-03's worker/artifact/recovery work remains required and 
 
 | Packet | Result | Evidence |
 |---|---|---|
+| DESIGN-UX-01 | Design as Tokens (a tree beside a live preview of real Angular Material components in the project's theme; three tiers; W3C design tokens), Components (contracts with slots, nesting, needed → specified → built, references, revisions), Brand (starter assets, templates) and Docs (Library documents shown in layers). Saved changes reach the generated app. Agent-checked (server 75/75, design browser suite); **owner accepted** (DEC-046) | [Evidence/retrospective](evidence/design-ux-01-design-layer.md), [work record](design/design-layer/work-record.md) |
 | ROADMAP-01 | Product became **Vision**: the Brief (claims with confidence from evidence; riskiest assumptions), Story map, and Documents generated from the Brief. **Library**: sources, highlighted findings, insights, and evidence attached anywhere. **Work**: Items (Linear list with a side panel), Projects (Linear-style timeline, project briefs that replace specs, milestones with target dates, budgets), Next, Roles with the elevated shield and a review action per role, and Team. Rainbow layer colours with a tile nav; chips with quick views everywhere. Agent-checked (server 69/69, layers browser with axe and 390px, migration trial on a copy of real data); **owner accepted** (DEC-044) | [Evidence/retrospective](evidence/roadmap-01-product-and-plan.md), [work record](design/product-and-plan/work-record.md) |
 | WORK-UX-01 | Work layer redesign (DEC-041): roles and actions replace working style; flexible agent profiles with robots, models, effort and usage limits; batches per assignee with locking, skip and stop, and results held for review; review checklist with evidence; priority and blocking; backlog from gaps; hover cards; avatars. Agent-checked (server 63/63, layers and onboarding browser, migration on a copy of real data); owner review pending | [Evidence/retrospective](evidence/work-ux-01-work-redesign.md), [work record](design/work-redesign/work-record.md) |
 | LAY-04D | Pasted, checked agent keys with a user guide (DEC-039); agent pool, batches you start with Go, OpenAI/Anthropic runner for acceptance, clarification options and data contracts, review and accept (DEC-040); agent-checked with a provider stand-in | [Evidence/retrospective](evidence/lay-04-work-automation.md) |
@@ -89,6 +100,10 @@ One packet at a time. B-03's worker/artifact/recovery work remains required and 
 | M0 research/design | Product loop, local agent path, runner choice, recovery model, product workflow, knowledge boundary, experience architecture, and design-system strategy | [Execution plan](execution-plan.md), [decision register](decisions.md) |
 
 ## Latest handoff
+
+2026-09-24: **PLATFORM-PIPELINE-01 brief written** for a fresh session ([work record](design/platform-pipeline/work-record.md)). It has the owner's ask ledger (P1–P11), verified facts about repos, previews and knowledge today, the decisions those force, a research plan and three questions for the owner. It flags a conflict: full ownership and multi-instance sync probably mean product knowledge moves into each project's repository, which revises the knowledge strategy. The owner committed and pushed DESIGN-UX-01 as `36dcb0c`.
+
+2026-09-24: **DESIGN-UX-01 accepted** ("looks good", DEC-046). Icons and fonts are shelved as ICONS-FONTS-01: they need per-project dependencies. Next: PLATFORM-PIPELINE-01.
 
 2026-09-24: **DESIGN-UX-01 built and agent-checked** (DEC-045; [evidence](evidence/design-ux-01-design-layer.md)). Design is now Tokens · Components · Brand · Docs. The preview renders real Angular Material components in the project's theme, and saved design changes reach the generated app (checked end to end). Library gains Documents and image sources with region findings. Server 75/75; the design, layers, onboarding, product, brand, github and workflow browser suites pass. `browser` fails as on the baseline. **Restart the portal** to seed Design for existing projects. Next: owner review of the built Design layer, then PAGES-UX-01.
 
