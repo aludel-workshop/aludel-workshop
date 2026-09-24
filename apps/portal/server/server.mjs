@@ -7,7 +7,7 @@ import { hostTopology } from './hosts.mjs';
 import { initOnboarding, loadCatalogs, onboarding } from './onboarding.mjs';
 import { botColors, efforts, initKnowledge, knowledge } from './knowledge.mjs';
 import { previewManager, previewRuntime } from './previews.mjs';
-import { agentsGuide, copyMedia, initialFiles, loadScaffoldSources, skeletonFiles, writeBinaries, writeFiles } from './scaffold.mjs';
+import { agentsGuide, copyMedia, initialFiles, loadScaffoldSources, sitePages, skeletonFiles, writeBinaries, writeFiles } from './scaffold.mjs';
 import { brandUsage, componentStatus } from './design.mjs';
 import { codeLinks, initCodeLinks, workspaceIsIndexable } from './code-links.mjs';
 import { initPlatformOps, platformOps } from './platform-ops.mjs';
@@ -167,7 +167,8 @@ function scaffoldSetup(user, projectId) {
   const brandUploads = new Map(flows.projectAssets(projectId, 'brand').map(asset => [asset.id, asset]));
   const designSystem = { tokens: know.list(projectId, 'design_tokens')[0] || null,
     components: know.list(projectId, 'component').map(component => ({ ...component, status: componentStatus(component) })), brand: know.list(projectId, 'brand_asset').map(asset => ({ ...asset, upload: asset.assetId ? brandUploads.get(asset.assetId) || null : null })) };
-  return { ...setup, data: { objects: know.list(projectId, 'data_object'), operations: know.list(projectId, 'data_operation') }, agents: know.agentExport(projectId), designSystem };
+  return { ...setup, data: { objects: know.list(projectId, 'data_object'), operations: know.list(projectId, 'data_operation') }, agents: know.agentExport(projectId), designSystem,
+    pageRecords: know.list(projectId, 'page') };
 }
 
 async function generateSkeleton(user, projectId) {
@@ -356,9 +357,12 @@ async function api(request, response, url) {
       // A project made after start-up plans itself the first time its layers are opened (after onboarding chose its story packs).
       know.ensurePlan(projectId);
       know.ensureDesign(projectId);
+      know.ensureFlows(projectId);
       const view = know.view(user, projectId, { builtBy: links.builtBy(projectId) });
+      // PAGES-UX-01: each page's address in the generated app, so Pages › Built opens the right one.
+      const pagePaths = Object.fromEntries(sitePages(know.navRoutes(projectId), know.list(projectId, 'page')).filter(page => page.id).map(page => [page.id, page.path]));
       const workspace = flows.projectSetup(user, projectId).workspacePath;
-      return json(response, 200, { setup: projectView(user, projectId), knowledge: { ...view, code: links.snapshot(projectId), batches: runs.view(projectId),
+      return json(response, 200, { setup: projectView(user, projectId), knowledge: { ...view, pagePaths, code: links.snapshot(projectId), batches: runs.view(projectId),
         uploads: flows.uploads(projectId), brandUsage: workspaceIsIndexable(workspace) ? brandUsage(workspace, view.brand) : {} },
         catalog: { pageTypes: catalogs.pageTypes, routeIcons: catalogs.routeIcons, feels: catalogs.feels, stacks: catalogs.stacks, tools: catalogs.roles.tools, botColors, efforts,
           brandTemplates: Object.fromEntries(Object.entries(catalogs.brandTemplates).map(([id, template]) => [id, { label: template.label, summary: template.summary, icon: template.icon, assets: template.assets.length }])) } });
@@ -421,8 +425,10 @@ async function api(request, response, url) {
       return json(response, 200, know.update(projectId, item, input.data || {}, { expectedRevision: input.expectedRevision, author: user.name, rationale: input.rationale || null, position: input.position, parentId: input.parentId, workItemId: work?.id || null }));
     }
     if (section === 'records' && method === 'DELETE' && item) {
-      const record = ['story', 'spec', 'doc', 'research', 'persona', 'activity', 'step', 'data_object', 'data_operation', 'access_rule', 'brief_claim', 'source', 'finding', 'insight', 'evidence_link', 'project', 'component', 'brand_asset'].flatMap(kind => know.list(projectId, kind)).find(entry => entry.id === item);
+      const record = ['story', 'spec', 'doc', 'research', 'persona', 'activity', 'step', 'data_object', 'data_operation', 'access_rule', 'brief_claim', 'source', 'finding', 'insight', 'evidence_link', 'project', 'component', 'brand_asset', 'flow', 'page'].flatMap(kind => know.list(projectId, kind)).find(entry => entry.id === item);
       if (!record) return json(response, 409, { error: 'That record cannot be deleted here.' });
+      // PAGES-UX-01: only page blanks go from the Map. Pages in the navigation change in the navigation editor; built pages change through a change request.
+      if (record.kind === 'page' && (record.inNav || record.status !== 'planned' || links.builtBy(projectId).get(record.id)?.units)) return json(response, 409, { error: `“${record.label}” has a build or is in the navigation, so it can't be deleted from the Map.` });
       const users = know.referrers(projectId, item);
       if (users.length) return json(response, 409, { error: `Still used by ${users.slice(0, 3).join(', ')}${users.length > 3 ? ` and ${users.length - 3} more` : ''}. Change those first.` });
       know.remove(projectId, item);
@@ -470,6 +476,8 @@ async function api(request, response, url) {
     if (section === 'assets' && method === 'DELETE' && item) { flows.removeAsset(user, projectId, item); return json(response, 200, projectView(user, projectId)); }
     if (section === 'features' && method === 'PUT' && !item) { flows.saveFeatures(user, projectId, await readJson(request)); return json(response, 200, projectView(user, projectId)); }
     if (section === 'features' && method === 'DELETE' && item) { flows.removeFeature(user, projectId, item); return json(response, 200, projectView(user, projectId)); }
+    if (section === 'pages' && item === 'change' && method === 'POST') return json(response, 201, know.requestPageChange(projectId, await readJson(request), user.name));
+    if (section === 'pages' && item === 'review' && method === 'POST') return json(response, 200, know.reviewFlow(projectId, { ...(await readJson(request)), assignee: { kind: 'person', id: user.id } }, user.name));
     if (section === 'pages' && method === 'PUT') { flows.saveRoutes(user, projectId, await readJson(request)); return json(response, 200, projectView(user, projectId)); }
     if (section === 'stack' && method === 'PUT') { flows.saveStack(user, projectId, await readJson(request)); return json(response, 200, projectView(user, projectId)); }
     if (section === 'connections/agent' && method === 'GET' && item === 'models') return json(response, 200, await runs.models(projectId));

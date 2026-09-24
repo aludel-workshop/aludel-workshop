@@ -126,6 +126,8 @@ Before handing off UI work:
 - Wait for the preview canvas's mode fade (about 0.3s) before running axe on it; a mid-transition colour fails contrast.
 - Run `node tools/css-collisions.mjs "<your section's marker>"`. `lay-` prefixes don't stop collisions between layers; WORK-UX-01 hit five.
 - Give list grids `grid-template-columns: minmax(0, 1fr)` so they shrink at 390px.
+- A preview of an app inside the portal (thumbnails, the Pages canvas) must not add headings, landmarks or focus stops to the portal page. Mark thumbnails `inert`, and keep preview headings below the layer's `h1`. PAGES-UX-01 found both through axe (colour contrast on dimmed thumbnails, a second `h1`). In browser tests, pick canvas nodes by their own title (`:text-is`), not `has-text`: thumbnails repeat the app's navigation labels.
+- Angular templates reserve `as`: an input named `as` fails to parse. The icon subset rejects names missing from Material Symbols' font (`draft`, `smartphone`), so run `tools/subset-icons.py` before relying on a new icon.
 
 Before handing off a start-up migration, run it against a **copy** of `.data/machine.sqlite` (with its `-wal` and `-shm` files) under `MACHINE_DATA_DIR`, and inspect the result read-only.
 - New record fields and table columns: check the reserved names at the top of `server/knowledge.mjs`. ROADMAP-01 reused `kind` and `project_id`, and the second would have moved items between projects.

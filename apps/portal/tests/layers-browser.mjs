@@ -143,20 +143,20 @@ try {
   await page.goto(`${portal}/p/tool-share/product/specs`);
   await page.getByRole('heading', { name: 'This moved' }).waitFor();
 
-  // Pages
+  // Pages (PAGES-UX-01 rebuilt the layer; tests/pages-browser.mjs drives it in depth)
   await layerNav().getByRole('link', { name: 'Pages' }).click();
+  await page.locator('.lay-pg-node').first().waitFor();
+  await tab('Pages', 'Pages').click();
   const tree = page.getByRole('navigation', { name: 'Page tree' });
-  await tree.getByRole('link', { name: 'Messages' }).click();
-  await page.getByRole('heading', { name: 'Messages', level: 2 }).waitFor();
-  await tree.getByRole('link', { name: 'Conversation' }).waitFor();
-  assert.ok(await page.locator('.lay-canvas page-blocks .block').count() > 0, 'the canvas renders the same page blocks as the app');
+  await tree.getByRole('link', { name: /^Messages/ }).click();
+  await page.locator('.lay-pg-right h2', { hasText: 'Messages' }).waitFor();
+  await tree.getByRole('link', { name: /^Conversation/ }).waitFor();
+  assert.ok(await page.locator('.lay-pg-app page-blocks .block').count() > 0, 'a page without sections shows the same page blocks as the app');
   await page.getByLabel('Link a story').selectOption({ label: await page.getByLabel('Link a story').locator('option', { hasText: 'Sam can ask to borrow' }).innerText() });
   await page.getByText('Story linked.').waitFor();
-  await page.getByRole('button', { name: 'Mark as designed' }).click();
-  await page.getByText(/is designed/).waitFor();
   await check('pages-tree');
-  await page.getByRole('link', { name: 'Flows' }).click();
-  await page.getByRole('heading', { name: 'Talk it over' }).waitFor();
+  await tab('Pages', 'Flows').click();
+  await page.locator('.lay-pg-flowpick select option', { hasText: 'Talk it over' }).waitFor({ state: 'attached' });
 
   // Design and Platform
   await layerNav().getByRole('link', { name: 'Design' }).click();

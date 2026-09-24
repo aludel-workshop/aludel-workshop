@@ -57,6 +57,21 @@ const tableRows = value => (Array.isArray(value) ? value : []).slice(0, 50).map(
 export const visionKeys = ['statement', 'needs', 'capabilities', 'outcomes', 'principles', 'nogos'];
 const visionTitles = { statement: 'Vision', needs: 'Needs and opportunities', capabilities: 'Standout capabilities', outcomes: 'Outcomes and measures', principles: 'Principles', nogos: 'No-gos' };
 const pageStatuses = ['planned', 'skeleton', 'designed'];
+// PAGES-UX-01: a page's spec is sections chosen from the design system, the states it handles and where it leads.
+export const pageStates = ['ready', 'empty', 'loading', 'error'];
+const flowNoteTypes = ['looks-right', 'content', 'change', 'question'];
+const oneId = value => value ? ids([value])[0] || null : null;
+function cleanSection(section) {
+  if (section?.state && !pageStates.includes(section.state)) fail('Unknown page state.');
+  if (section?.region && !['main', 'side'].includes(section.region)) fail('A section sits in the main column or at the side.');
+  if (section?.phase && !phaseKeys.includes(section.phase)) fail('Unknown milestone.');
+  const content = section?.content || {};
+  return { id: /^sec-[a-z0-9]{4,10}$/.test(String(section?.id || '')) ? section.id : `sec-${randomBytes(3).toString('hex')}`,
+    name: text(section?.name, 40, 'Section name', true), component: oneId(section?.component), region: section?.region || 'main',
+    stories: ids(section?.stories), data: ids(section?.data), leadsTo: oneId(section?.leadsTo), audience: oneId(section?.audience),
+    state: section?.state || 'ready', phase: section?.phase || null, note: text(section?.note, 400, 'Section note'),
+    content: { title: text(content.title, 120, 'Section title'), body: text(content.body, 600, 'Section text'), action: text(content.action, 40, 'Button label'), image: oneId(content.image) } };
+}
 const specStatuses = ['draft', 'in-review', 'accepted', 'superseded'];
 export const workStates = ['suggested', 'ready', 'claimed', 'needs-input', 'review', 'done'];
 export const workTypes = ['define', 'spec', 'plan', 'design', 'implement', 'reconcile', 'review', 'research', 'audit', 'configure'];
@@ -266,8 +281,36 @@ const validators = {
     if (!catalogs.routeIcons.includes(data.icon)) fail(`Choose an icon from the list for “${data.label}”.`);
     if (!catalogs.pageTypes[data.pageType]) fail(`Choose a page type for “${data.label}”.`);
     if (!pageStatuses.includes(data.status || 'planned')) fail('Unknown page status.');
+    const sections = (Array.isArray(data.sections) ? data.sections : []).slice(0, 40).map(cleanSection);
+    if (new Set(sections.map(section => section.id)).size !== sections.length) fail('Two sections share an id.');
+    const links = [];
+    for (const link of Array.isArray(data.links) ? data.links : []) {
+      const to = oneId(link?.to) || fail('A link needs a page to go to.');
+      if (!links.some(entry => entry.to === to)) links.push({ to, label: text(link?.label, 60, 'Link label') || 'Go' });
+    }
+    // A section that leads somewhere is also a link on the map.
+    for (const section of sections) if (section.leadsTo && !links.some(link => link.to === section.leadsTo)) links.push({ to: section.leadsTo, label: section.content.action || section.name });
+    const states = Object.fromEntries(pageStates.filter(key => typeof data.states?.[key] === 'string').map(key => [key, text(data.states[key], 400, 'State')]));
     return { label: text(data.label, 30, 'Page name', true), icon: data.icon, pageType: data.pageType, description: text(data.description, 1000, 'Page description'),
-      inNav: Boolean(data.inNav), origin: text(data.origin || 'You', 60, 'Origin'), stories: ids(data.stories), status: data.status || 'planned', notes: text(data.notes, 4000, 'Notes') };
+      inNav: Boolean(data.inNav), origin: text(data.origin || 'You', 60, 'Origin'), stories: ids(data.stories), status: data.status || 'planned', notes: text(data.notes, 4000, 'Notes'),
+      sections, links: links.slice(0, 40), states };
+  },
+  // Where each page sits on the Pages › Map grid: one record per project, so moving pages doesn't add page revisions.
+  page_map: data => ({ places: Object.fromEntries(Object.entries(data.places && typeof data.places === 'object' ? data.places : {}).slice(0, 500)
+    .filter(([id, place]) => /^pag-[a-z0-9]{6,12}$/.test(id) && [place?.col, place?.row].every(value => Number.isInteger(value) && value >= 0 && value < 200))
+    .map(([id, place]) => [id, { col: place.col, row: place.row }])) }),
+  // PAGES-UX-01: a journey through pages for one story-map activity. A step without a page is a gap in the flow.
+  flow: data => {
+    const review = data.review || {};
+    if (review.state && !['none', 'progress', 'done'].includes(review.state)) fail('Unknown review state.');
+    return { title: text(data.title, 60, 'Flow name', true), activity: oneId(data.activity), persona: oneId(data.persona),
+      steps: (Array.isArray(data.steps) ? data.steps : []).slice(0, 40).map(step => ({ page: oneId(step?.page), persona: oneId(step?.persona), story: oneId(step?.story),
+        name: text(step?.name, 60, 'Step name'), trigger: text(step?.trigger, 80, 'What they do next'), why: text(step?.why, 300, 'Why there is no page') })),
+      review: { state: review.state || 'none', verdict: review.verdict ? text(review.verdict, 40, 'Verdict') : null, work: review.work ? text(review.work, 20, 'Work item') : null,
+        notes: (Array.isArray(review.notes) ? review.notes : []).slice(0, 200).map(note => {
+          if (!flowNoteTypes.includes(note?.type)) fail('Unknown kind of review note.');
+          return { step: Number.isInteger(note.step) && note.step >= 0 ? note.step : 0, type: note.type, text: text(note.text, 600, 'Note', true), link: text(note.link, 40, 'Link'), at: text(note.at, 30, 'Time') || now() };
+        }) } };
   },
   data_object: data => {
     if (!contracts.includes(data.contract || 'proposed')) fail('Unknown contract state.');
@@ -359,7 +402,7 @@ const cadenceDays = { weekly: 7, monthly: 30 };
 // Implement, reconcile, review and audit produce code, links or findings; LAY-05 verifies those.
 const verifiedTypes = ['define', 'spec', 'plan', 'design', 'research', 'configure'];
 const kinds = Object.keys(validators);
-const prefixes = { vision_section: 'vis', persona: 'per', phase: 'pha', activity: 'act', step: 'stp', story: 'sto', spec: 'spc', research: 'res', doc: 'doc', page: 'pag',
+const prefixes = { vision_section: 'vis', persona: 'per', phase: 'pha', activity: 'act', step: 'stp', story: 'sto', spec: 'spc', research: 'res', doc: 'doc', page: 'pag', flow: 'flw', page_map: 'pmp',
   data_object: 'obj', data_operation: 'opr', access_rule: 'acc', agent_profile: 'agt', project_instructions: 'ins', routine: 'rtn', role: 'rol', work_action: 'wac',
   brief_claim: 'clm', source: 'src', finding: 'fnd', insight: 'isg', evidence_link: 'evl', project: 'prj', design_tokens: 'tok', component: 'cmp', brand_asset: 'bra' };
 // Records a kind points at must exist in the same project and be of the right kind.
@@ -372,7 +415,13 @@ const references = {
   insight: clean => clean.findings.map(id => [id, 'finding']),
   evidence_link: clean => [clean.direction === 'references' ? [clean.sourceRef, ['source', 'finding']] : [clean.insightId, 'insight'], [clean.recordId, evidenceKinds]],
   component: clean => clean.slots.flatMap(slot => slot.accepts.map(id => [id, 'component'])),
-  project: clean => [...clean.deps.map(id => [id, 'project']), ...clean.stories.map(id => [id, 'story'])]
+  project: clean => [...clean.deps.map(id => [id, 'project']), ...clean.stories.map(id => [id, 'story'])],
+  // Page stories predate reference checks (story deletion left some behind), so only the spec's references are checked.
+  page: clean => [...clean.links.map(link => [link.to, 'page']), ...clean.sections.flatMap(section => [
+    ...(section.component ? [[section.component, 'component']] : []), ...section.stories.map(id => [id, 'story']), ...section.data.map(id => [id, ['data_object', 'data_operation']]),
+    ...(section.leadsTo ? [[section.leadsTo, 'page']] : []), ...(section.audience ? [[section.audience, 'persona']] : []), ...(section.content.image ? [[section.content.image, 'brand_asset']] : [])])],
+  flow: clean => [...(clean.activity ? [[clean.activity, 'activity']] : []), ...(clean.persona ? [[clean.persona, 'persona']] : []),
+    ...clean.steps.flatMap(step => [...(step.page ? [[step.page, 'page']] : []), ...(step.persona ? [[step.persona, 'persona']] : []), ...(step.story ? [[step.story, 'story']] : [])])]
 };
 const newId = kind => `${prefixes[kind]}-${randomBytes(4).toString('hex')}`;
 
@@ -497,6 +546,25 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
       for (const story of list(projectId, 'story').filter(entry => entry.claim === id)) update(projectId, story.id, { claim: null }, { rationale: 'Its Brief claim was deleted' });
     }
     if (kind === 'story') for (const project of list(projectId, 'project').filter(entry => entry.stories.includes(id))) update(projectId, project.id, { stories: project.stories.filter(entry => entry !== id) });
+    // PAGES-UX-01: pages and flows let go of what was deleted, so their next edit still passes the reference checks.
+    if (['story', 'persona', 'page', 'component', 'data_object', 'data_operation', 'brand_asset', 'activity'].includes(kind)) {
+      for (const page of list(projectId, 'page')) {
+        const sections = page.sections || [];
+        const touched = page.stories.includes(id) || (page.links || []).some(link => link.to === id) || sections.some(section => section.component === id || section.leadsTo === id || section.audience === id || section.stories.includes(id) || section.data.includes(id) || section.content.image === id);
+        if (!touched) continue;
+        update(projectId, page.id, { stories: page.stories.filter(entry => entry !== id), links: (page.links || []).filter(link => link.to !== id),
+          sections: sections.map(section => ({ ...section, component: section.component === id ? null : section.component, leadsTo: section.leadsTo === id ? null : section.leadsTo, audience: section.audience === id ? null : section.audience,
+            stories: section.stories.filter(entry => entry !== id), data: section.data.filter(entry => entry !== id), content: { ...section.content, image: section.content.image === id ? null : section.content.image } })) },
+        { rationale: `A linked ${kind.replace('_', ' ')} was deleted` });
+      }
+      for (const flow of list(projectId, 'flow')) {
+        const touched = flow.activity === id || flow.persona === id || flow.steps.some(step => step.page === id || step.story === id || step.persona === id);
+        if (!touched) continue;
+        update(projectId, flow.id, { activity: flow.activity === id ? null : flow.activity, persona: flow.persona === id ? null : flow.persona,
+          steps: flow.steps.map(step => ({ ...step, page: step.page === id ? null : step.page, why: step.page === id ? 'Its page was deleted.' : step.why, story: step.story === id ? null : step.story, persona: step.persona === id ? null : step.persona })) },
+        { rationale: `A linked ${kind.replace('_', ' ')} was deleted` });
+      }
+    }
     if (kind === 'project') {
       for (const other of list(projectId, 'project').filter(entry => entry.deps.includes(id))) update(projectId, other.id, { deps: other.deps.filter(entry => entry !== id) });
       db.prepare('UPDATE layer_work_items SET plan_project_id = NULL, checkpoint = NULL WHERE project_id = ? AND plan_project_id = ?').run(projectId, id);
@@ -1349,7 +1417,9 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
       tokens: (() => { const record = list(projectId, 'design_tokens')[0]; return record ? { ...record, history: history(record.id) } : null; })(),
       components: list(projectId, 'component').map(component => ({ ...component, status: componentStatus(component), history: history(component.id) })),
       brand: list(projectId, 'brand_asset').map(asset => ({ ...asset, history: history(asset.id) })),
-      pages: pages.map(page => ({ ...page, history: history(page.id) })), work,
+      pages: pages.map(page => ({ ...page, sections: page.sections || [], links: page.links || [], states: page.states || {}, history: history(page.id) })), work,
+      pageMap: list(projectId, 'page_map')[0] || null,
+      flows: list(projectId, 'flow').map(flow => ({ ...flow, history: history(flow.id) })),
       packs: Object.fromEntries(Object.entries(packs).map(([id, pack]) => [id, { label: pack.label, summary: pack.summary, icon: pack.icon, stories: pack.stories.length, template: pack.stories.filter(story => story.template).length }])),
       selectedPacks: parse(db.prepare('SELECT story_packs_json FROM project_setup WHERE project_id = ?').get(projectId)?.story_packs_json, []),
       objects: list(projectId, 'data_object').map(object => ({ ...object, status: dataStatus(object, builtBy.get(object.id)), history: history(object.id) })),
@@ -1387,6 +1457,65 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
   }
 
   // Deleting a record others point at would leave dangling contracts; name what still uses it.
+  // ---- Pages (PAGES-UX-01) ----
+  // Once per project: one flow per story-map activity, through the pages that realise its stories in story-map order.
+  function ensureFlows(projectId) {
+    if (list(projectId, 'flow').length || !once(projectId, 'flows-seeded')) return;
+    const pages = pageList(projectId), personas = list(projectId, 'persona'), steps = list(projectId, 'step'), stories = list(projectId, 'story');
+    for (const activity of list(projectId, 'activity')) {
+      const persona = personas.find(entry => entry.name && activity.persona && entry.name.toLowerCase() === activity.persona.toLowerCase()) || null;
+      const flowSteps = [];
+      for (const step of steps.filter(entry => entry.parentId === activity.id)) for (const story of stories.filter(entry => entry.parentId === step.id)) {
+        for (const page of pages.filter(entry => entry.stories.includes(story.id))) {
+          // Each page once, where the journey first reaches it; a page that returns later is added by hand.
+          if (flowSteps.some(entry => entry.page === page.id)) continue;
+          flowSteps.push({ page: page.id, story: story.id, persona: persona?.id || null, name: step.title });
+        }
+      }
+      insert(projectId, 'flow', { title: activity.title, activity: activity.id, persona: persona?.id || null, steps: flowSteps }, { author: 'Aludel', rationale: 'One flow per story-map activity' });
+    }
+  }
+
+  // A change to a page's layout or behaviour: the spec is revised with the reason, and an Engineer implement item carries
+  // the revision to the code. With no spec changes it asks for the build to be brought back to the spec.
+  function requestPageChange(projectId, input, author = 'Aludel') {
+    const page = get(projectId, String(input.pageId || ''));
+    if (!page || page.kind !== 'page') fail('Page not found.', 404);
+    const title = text(input.title, 160, 'Title', true), why = text(input.why, 2000, 'What should change');
+    const summary = lines(input.summary, 200, 'Change');
+    const allowed = ['sections', 'states', 'links', 'pageType'];
+    const changes = Object.fromEntries(Object.entries(input.changes || {}).filter(([key]) => allowed.includes(key)));
+    const updated = Object.keys(changes).length ? update(projectId, page.id, changes, { expectedRevision: input.expectedRevision, author, rationale: why ? `${title}: ${why}` : title }) : page;
+    const stories = [...new Set([...page.stories, ...(updated.sections || []).flatMap(section => section.stories)])].filter(id => get(projectId, id)?.kind === 'story');
+    const item = createWork(projectId, { action: 'platform.implement', title, state: 'ready', assignee: input.assignee || undefined,
+      targets: [{ id: page.id, label: `${page.label} page` }, ...stories.map(id => ({ id, label: `S${get(projectId, id).number}` }))],
+      context: { change: { pageId: page.id, fromRevision: page.revision, toRevision: updated.revision, summary, why } },
+      logText: `Change request from Pages by ${author}${why ? `: ${why}` : ''}` }, author);
+    if (updated.revision !== page.revision) db.prepare('UPDATE knowledge_revisions SET work_item_id = ? WHERE record_id = ? AND revision = ?').run(item.id, page.id, updated.revision);
+    return { page: get(projectId, page.id), work: item };
+  }
+
+  // Reviewing a flow is Experience designer work: starting opens a review item on the flow; finishing records the verdict and closes it.
+  function reviewFlow(projectId, input, author = 'Aludel') {
+    const flow = get(projectId, String(input.flowId || ''));
+    if (!flow || flow.kind !== 'flow') fail('Flow not found.', 404);
+    if (input.action === 'start') {
+      if (flow.review.state === 'progress') fail('This flow is already being reviewed.', 409);
+      const item = createWork(projectId, { action: 'pages.review', title: `Review the ${flow.title} flow`, state: 'claimed', assignee: input.assignee || undefined,
+        targets: [{ id: flow.id, label: `${flow.title} flow` }], logText: `Review started by ${author}` }, author);
+      update(projectId, flow.id, { review: { state: 'progress', verdict: null, work: item.id, notes: [] } }, { author, rationale: 'Review started', workItemId: item.id });
+      return { flow: get(projectId, flow.id), work: item };
+    }
+    if (input.action === 'finish') {
+      if (flow.review.state !== 'progress') fail('Start a review first.', 409);
+      const verdict = flow.review.notes.some(note => note.type !== 'looks-right') ? 'Needs changes' : 'Works';
+      update(projectId, flow.id, { review: { ...flow.review, state: 'done', verdict } }, { author, rationale: `Review finished: ${verdict.toLowerCase()}`, workItemId: flow.review.work });
+      if (flow.review.work) appendLog(flow.review.work, `Review finished: ${verdict.toLowerCase()}. ${flow.review.notes.length} ${flow.review.notes.length === 1 ? 'note' : 'notes'} on the flow.`, { state: 'done' }, { refs: [flow.id] });
+      return { flow: get(projectId, flow.id) };
+    }
+    fail('Start or finish a review.');
+  }
+
   function referrers(projectId, id) {
     return ['data_object', 'data_operation', 'access_rule'].flatMap(kind => list(projectId, kind).filter(record => record.id !== id && (references[kind]?.(record) || []).some(([target]) => target === id)))
       .map(record => record.name || record.operationId || record.sentence);
@@ -1405,7 +1534,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     }
   }
 
-  return { ensureDesign, syncDesignFromLook, addBrandTemplate, ensureProject, ensureAgents, ensureRoles, ensurePackData, ensureBrief, ensurePlan, ensureLibrary, addComment, generateDoc, briefRevision, mayDo, projectFor, insert, update, remove, list, get, view, navRoutes, seedPages, saveNavRoutes, applyPacks, createWork, updateWork, appendLog,
+  return { ensureFlows, requestPageChange, reviewFlow, ensureDesign, syncDesignFromLook, addBrandTemplate, ensureProject, ensureAgents, ensureRoles, ensurePackData, ensureBrief, ensurePlan, ensureLibrary, addComment, generateDoc, briefRevision, mayDo, projectFor, insert, update, remove, list, get, view, navRoutes, seedPages, saveNavRoutes, applyPacks, createWork, updateWork, appendLog,
     setWorkContext, workList, workById, blockersOf, workChanges, recordBuild, history, revisionData, revisionAt, kinds, openApi, referrers, openWorkItem, applyAnswer, suggestions, syncBacklog,
     migrateWork, ensureRoutines, runRoutines, instructionPins, actionRecord, actionIdFor, roleView, resolveAssignee, defaultProfile, members, agentExport,
     onRevision: listener => revisionListeners.push(listener), onWorkDone: listener => doneListeners.push(listener) };

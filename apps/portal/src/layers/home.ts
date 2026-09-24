@@ -55,7 +55,7 @@ export class HomeLayerComponent {
     const data = this.ctx.data(); if (!data) return [];
     const entries = [
       ...data.stories.flatMap(story => story.history.map(entry => ({ layer: 'product', text: `${story.ref} ${story.title}: ${entry.rationale}`, at: entry.createdAt, href: this.ctx.link('product', 'map', story.id) }))),
-      ...data.pages.flatMap(page => page.history.map(entry => ({ layer: 'pages', text: `${page.label}: ${entry.rationale}`, at: entry.createdAt, href: this.ctx.link('pages', 'tree', page.id) }))),
+      ...data.pages.flatMap(page => page.history.map(entry => ({ layer: 'pages', text: `${page.label}: ${entry.rationale}`, at: entry.createdAt, href: this.ctx.link('pages', 'page', page.id) }))),
       ...data.work.map(item => ({ layer: item.layer, text: `${item.ref} ${item.title} · ${workStatusLabel[item.status]}`, at: item.updatedAt, href: this.ctx.link('work', 'item', item.id) }))
     ];
     return entries.sort((a, b) => b.at.localeCompare(a.at)).slice(0, 6);

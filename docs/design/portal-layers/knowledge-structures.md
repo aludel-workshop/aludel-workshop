@@ -126,6 +126,21 @@ References to Library sources and findings (`evidence_link` with direction `refe
 | Page | Live prototype built from tokens and components, concept art and inspiration, notes, stories realised, options and versions, state matrix (empty, loading, error…), decision history |
 | Flows | Journeys across pages, one per story-map activity |
 
+- **As built (PAGES-UX-01, DEC-048):**
+  - Tabs are **Map · Pages · Flows**.
+  - `page` gains:
+    - `sections[]`: name; a Design `component`; stories; data (objects or operations); `leadsTo` a page; `audience` (a persona); `state` (ready, empty, loading, error); `region` (main or side); `phase`; a note; and `content` (title, body, action, image as a brand asset);
+    - `states` (what each state shows);
+    - `links[]` (to, label). A section's `leadsTo` is also a link.
+  - `notes` is the page blank's planning note.
+  - `flow` records: activity, persona, ordered `steps[]` (page, persona, story, name, trigger; a step without a page is a gap), and `review` (state, verdict, the work item, notes of type looks right, content fix, change request or question). One flow per activity is seeded once.
+  - `page_map` holds grid places, so moving pages adds no page revisions.
+  - Page status shown: **built** comes from code links; **specified** is the stored `designed` (spec accepted); anything else is **planned**.
+  - Deleting a story, persona, page, component, data record, brand asset or activity lets go of it in pages and flows.
+  - **Routing:** a spec gap goes to the Experience designer (`pages.design`, `pages.review`); a build that differs from its spec goes to the Engineer (`platform.implement`, through `POST /pages/change`).
+  - The scaffold routes every page, renders Ready sections as marked skeletons (`data-aludel-section`, `data-aludel-skeleton`), and ships `src/aludel-bridge.ts`.
+  - Evidence: [PAGES-UX-01](../../evidence/pages-ux-01-pages-layer.md).
+
 ## Data: objects and contracts (stack-neutral)
 
 | Tab | Holds |

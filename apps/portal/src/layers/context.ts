@@ -41,7 +41,17 @@ export interface Checkpoint { id: string; title: string; date: string | null; }
 export interface PlanProject extends RecordBase { number: number; ref: string; title: string; summary: string; milestone: string; status: string; health: string | null; lead: string | null;
   start: string | null; target: string | null; deps: string[]; budget: number | null; stories: string[]; problem: string; solution: string; rabbitHoles: string[]; noGos: string[];
   requirements: string[]; clarifications: string[]; resolved: Resolved[]; checkpoints: Checkpoint[]; origin: string; spent: number; history: Revision[]; }
-export interface Page extends RecordBase { label: string; icon: string; pageType: string; description: string; inNav: boolean; origin: string; stories: string[]; status: string; notes: string; history: Revision[]; }
+// PAGES-UX-01: a page's spec is sections chosen from the design system, the states it handles and the links out of it.
+export interface SectionContent { title: string; body: string; action: string; image: string | null; }
+export interface PageSection { id: string; name: string; component: string | null; region: 'main' | 'side'; stories: string[]; data: string[]; leadsTo: string | null; audience: string | null;
+  state: string; phase: string | null; note: string; content: SectionContent; }
+export interface PageLink { to: string; label: string; }
+export interface Page extends RecordBase { label: string; icon: string; pageType: string; description: string; inNav: boolean; origin: string; stories: string[]; status: string; notes: string;
+  sections: PageSection[]; links: PageLink[]; states: Record<string, string>; history: Revision[]; }
+export interface FlowStep { page: string | null; persona: string | null; story: string | null; name: string; trigger: string; why: string; }
+export interface FlowNote { step: number; type: 'looks-right' | 'content' | 'change' | 'question'; text: string; link: string; at: string; }
+export interface Flow extends RecordBase { title: string; activity: string | null; persona: string | null; steps: FlowStep[];
+  review: { state: 'none' | 'progress' | 'done'; verdict: string | null; work: string | null; notes: FlowNote[] }; history: Revision[]; }
 // Data layer (LAY-07A): JSON Schema objects and OpenAPI-shaped operations; status is derived on the server.
 export interface JsonSchema { type?: string | string[]; format?: string; description?: string; enum?: string[]; properties?: Record<string, JsonSchema>; required?: string[]; items?: JsonSchema; $ref?: string;
   maxLength?: number; minLength?: number; minimum?: number; maximum?: number; readOnly?: boolean; writeOnly?: boolean; }
@@ -86,6 +96,7 @@ export interface Routine extends RecordBase { key: string | null; title: string;
 export interface Knowledge {
   vision: Record<string, VisionSection>; personas: Persona[]; phases: Phase[]; activities: Activity[]; stories: Story[]; specs: Spec[];
   research: Research[]; docs: Doc[]; pages: Page[]; work: WorkItem[]; selectedPacks: string[];
+  flows: Flow[]; pageMap: (RecordBase & { places: Record<string, { col: number; row: number }> }) | null; pagePaths: Record<string, string>;
   packs: Record<string, { label: string; summary: string; icon: string; stories: number; template: number }>;
   objects: DataObject[]; operations: DataOperation[]; access: AccessRule[]; services: Service[];
   profiles: AgentProfile[]; projectInstructions: (RecordBase & { body: string }) | null; workTypes: string[];
@@ -112,7 +123,7 @@ export const workStatusLabel: Record<string, string> = { backlog: 'Backlog', que
 export const priorityOrder = ['highest', 'high', 'medium', 'low', 'lowest'];
 export const priorityLabel: Record<string, string> = { highest: 'Highest', high: 'High', medium: 'Medium', low: 'Low', lowest: 'Lowest' };
 // Icons chosen at runtime (record kinds, priorities), listed so tools/subset-icons.py keeps them in the font subset.
-export const runtimeIcons = [{ icon: 'view_kanban' }, { icon: 'badge' }, { icon: 'group' }, { icon: 'event_repeat' }, { icon: 'shield' }, { icon: 'view_timeline' }, { icon: 'person' }, { icon: 'cancel' }, { icon: 'fact_check' }, { icon: 'insights' }, { icon: 'format_quote' }, { icon: 'deployed_code_history' }, { icon: 'local_library' }, { icon: 'help' }, { icon: 'report' }, { icon: 'check_circle' }, { icon: 'record_voice_over' }, { icon: 'ballot' }, { icon: 'image' }, { icon: 'link' }, { icon: 'storefront' }, { icon: 'visibility' }, { icon: 'query_stats' }, { icon: 'edit_note' }, { icon: 'bookmark' }, { icon: 'web' }, { icon: 'data_object' }, { icon: 'api' }, { icon: 'description' }, { icon: 'article' }, { icon: 'science' }, { icon: 'flag' }, { icon: 'shield_person' }, { icon: 'smart_toy' }, { icon: 'task_alt' }, { icon: 'menu_book' }, { icon: 'tune' }, { icon: 'code' }, { icon: 'keyboard_double_arrow_up' }, { icon: 'keyboard_arrow_up' }, { icon: 'drag_handle' }, { icon: 'keyboard_arrow_down' }, { icon: 'keyboard_double_arrow_down' }, { icon: 'lightbulb' }, { icon: 'palette' }, { icon: 'schema' }, { icon: 'dns' }, { icon: 'checklist' }];
+export const runtimeIcons = [{ icon: 'view_kanban' }, { icon: 'badge' }, { icon: 'group' }, { icon: 'event_repeat' }, { icon: 'shield' }, { icon: 'view_timeline' }, { icon: 'person' }, { icon: 'cancel' }, { icon: 'fact_check' }, { icon: 'insights' }, { icon: 'format_quote' }, { icon: 'deployed_code_history' }, { icon: 'local_library' }, { icon: 'help' }, { icon: 'report' }, { icon: 'check_circle' }, { icon: 'record_voice_over' }, { icon: 'ballot' }, { icon: 'image' }, { icon: 'link' }, { icon: 'storefront' }, { icon: 'visibility' }, { icon: 'query_stats' }, { icon: 'edit_note' }, { icon: 'bookmark' }, { icon: 'web' }, { icon: 'data_object' }, { icon: 'api' }, { icon: 'description' }, { icon: 'article' }, { icon: 'science' }, { icon: 'flag' }, { icon: 'shield_person' }, { icon: 'smart_toy' }, { icon: 'task_alt' }, { icon: 'menu_book' }, { icon: 'tune' }, { icon: 'code' }, { icon: 'keyboard_double_arrow_up' }, { icon: 'keyboard_arrow_up' }, { icon: 'drag_handle' }, { icon: 'keyboard_arrow_down' }, { icon: 'keyboard_double_arrow_down' }, { icon: 'lightbulb' }, { icon: 'palette' }, { icon: 'schema' }, { icon: 'dns' }, { icon: 'checklist' }, { icon: 'edit_document' }, { icon: 'view_sidebar' }, { icon: 'view_agenda' }, { icon: 'text_fields' }, { icon: 'image' }, { icon: 'warning' }, { icon: 'route' }, { icon: 'dock_to_bottom' }, { icon: 'dashboard' }, { icon: 'layers' }, { icon: 'help' }, { icon: 'desktop_windows' }, { icon: 'mobile' }, { icon: 'devices' }, { icon: 'arrow_selector_tool' }, { icon: 'pan_tool' }, { icon: 'fit_screen' }, { icon: 'open_in_new' }, { icon: 'add_box' }, { icon: 'hide_image' }, { icon: 'add_photo_alternate' }, { icon: 'help_center' }, { icon: 'widgets' }, { icon: 'deployed_code' }, { icon: 'difference' }, { icon: 'notes' }, { icon: 'cloud_off' }, { icon: 'play_circle' }, { icon: 'touch_app' }, { icon: 'south' }, { icon: 'rate_review' }, { icon: 'done_all' }, { icon: 'account_tree' }, { icon: 'segment' }, { icon: 'verified' }, { icon: 'refresh' }, { icon: 'bolt' }, { icon: 'add_task' }, { icon: 'arrow_upward' }, { icon: 'arrow_downward' }, { icon: 'lock' }, { icon: 'article' }];
 export const priorityIcon: Record<string, string> = { highest: 'keyboard_double_arrow_up', high: 'keyboard_arrow_up', medium: 'drag_handle', low: 'keyboard_arrow_down', lowest: 'keyboard_double_arrow_down' };
 // The Brief's sections, in Lean Canvas order (ROADMAP-01).
 export const briefSections: { key: string; title: string; hint: string }[] = [
@@ -215,7 +226,8 @@ export class ProjectContext {
 
   // Where a record lives, for links from Work and Platform › Code.
   recordHref(kind: string, id: string) {
-    if (kind === 'page') return this.link('pages', 'tree', id);
+    if (kind === 'page') return this.link('pages', 'page', id);
+    if (kind === 'flow') return this.link('pages', 'flows', id);
     if (kind === 'brief_claim') return this.link('product', 'brief', id);
     if (kind === 'insight') return this.link('library', 'insight', id);
     if (kind === 'source') return this.link('library', 'source', id);

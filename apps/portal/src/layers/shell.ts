@@ -139,7 +139,7 @@ export class ProjectShellComponent implements OnInit {
       { label: 'Projects', hits: data.projects.map(project => ({ text: `${project.ref} ${project.title}`, sub: phaseName(project.milestone), href: this.ctx.link('work', 'projects', project.id) })) },
       { label: 'Story map', hits: data.stories.map(story => ({ text: `${story.ref} ${story.title}`, sub: statusLabel[story.status], href: this.ctx.link('product', 'map', story.id) })) },
       { label: 'Documents', hits: data.docs.map(doc => ({ text: doc.title, sub: doc.form === 'generated' ? 'Generated' : 'Written', href: this.ctx.link('product', 'docs', doc.id) })) },
-      { label: 'Pages', hits: data.pages.map(page => ({ text: `${page.label} page`, sub: page.origin, href: this.ctx.link('pages', 'tree', page.id) })) },
+      { label: 'Pages', hits: data.pages.map(page => ({ text: `${page.label} page`, sub: page.origin, href: this.ctx.link('pages', 'page', page.id) })) },
       { label: 'Data', hits: [...data.objects.map(object => ({ text: `${object.name} object`, sub: dataStatusLabel[object.status], href: this.ctx.link('data', 'objects', object.id) })),
         ...data.operations.map(op => ({ text: `${op.method} ${op.path}`, sub: `${op.operationId} · ${op.summary}`, href: this.ctx.link('data', 'api', op.id) }))] },
       { label: 'Code', hits: data.code.units.filter(unit => unit.kind !== 'const').map(unit => ({ text: unit.symbol, sub: `${unit.path} · ${unitStateLabel[unit.state]}`, href: this.ctx.link('platform', 'code', unit.id) })) },

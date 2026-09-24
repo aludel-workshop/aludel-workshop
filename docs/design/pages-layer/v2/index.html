@@ -1,0 +1,1346 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aludel Pages Layer</title>
+<!-- PAGES-UX-01 prototype v2 (round-1 ledger M1-M11 in ../work-record.md; v1 ledger P1-P10). Static; illustrative Tool Share data; nothing is saved. The canvas imitates the generated app with HTML styled by the project's tokens; the build would render the spec with the real components and show the running preview in an iframe. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block">
+<style>
+:root{
+  --bg:#fbfbfd;--surface:#fff;--rail:#f3f5f9;--panel:#f4f6fa;--hover:#e9edf5;--line:#dfe3ec;--line-strong:#c8cfdc;--ink:#1b1f2a;--muted:#5d6679;--faint:#8a93a6;
+  --accent:#3047b9;--accent-bg:#e3e8ff;
+  --lc:#2a7230;--lb:#e2f4e3;--hl:#e39b00;--sel:#2a7230;
+  --ok:#146446;--ok-bg:#d9f3e7;--bad:#a1231f;--bad-bg:#fce1e0;--warn:#8a5a00;--warn-bg:#fff0cc;--info:#1a5fb4;--info-bg:#e2ecfb;--work:#5b3cc4;--work-bg:#ece7fd;--plat:#1a5fb4;--plat-bg:#e2ecfb;
+  --shadow:0 18px 50px #1c2a5a2e;
+  /* Tool Share's tokens (from its Design layer) */
+  --t-primary:#2e6b4f;--t-on-primary:#fff;--t-primary-c:#c9ecd7;--t-on-primary-c:#0c3a25;--t-surface:#f8faf6;--t-c-low:#f1f5f0;--t-c:#ebf0ea;--t-c-high:#e4ebe4;--t-on:#191c1a;--t-muted:#56605a;--t-outline:#c2cbc4;--t-error:#ba1a1a;--t-error-c:#ffdad6;--t-tertiary-c:#ffe0b2;--t-r:16px;--t-font:'DM Sans',Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:Roboto,system-ui,sans-serif;font-size:14.5px;line-height:1.45;color:var(--ink);background:var(--bg)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:var(--accent)}
+.icon{font-family:'Material Symbols Rounded';font-weight:normal;font-style:normal;font-size:20px;line-height:1;letter-spacing:normal;text-transform:none;white-space:nowrap;display:inline-block;vertical-align:middle;font-feature-settings:'liga';-webkit-font-smoothing:antialiased;flex:none;font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.mono,code{font-family:"Roboto Mono",ui-monospace,monospace;font-size:.88em}
+.muted{color:var(--muted)}.faint{color:var(--faint)}.small{font-size:13px}.tiny{font-size:11.5px}
+.row{display:flex;align-items:center;gap:8px}.push{margin-left:auto}.wrap{flex-wrap:wrap}
+.vh{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* Shell: matches the built portal */
+.shell{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:100vh}
+.rail{background:var(--rail);border-right:1px solid var(--line);padding:14px 10px;display:flex;flex-direction:column;gap:2px;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:18px;padding:2px 8px 12px}
+.brand .icon{color:var(--accent);font-size:26px}
+.proj{display:flex;align-items:center;gap:9px;padding:8px;border-radius:12px;background:var(--surface);border:1px solid var(--line);margin-bottom:10px}
+.proj .mk{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:#2e7d5b;color:#fff;font-weight:700;font-size:12px}
+.proj small{display:block;color:var(--muted);font-size:11.5px}
+.nav a{display:flex;align-items:center;gap:10px;padding:5px 10px 5px 6px;border-radius:12px;color:var(--ink);text-decoration:none;font-weight:500}
+.nav a:hover{background:color-mix(in srgb,var(--nb) 70%,transparent)}
+.nav a.active{background:var(--nb);font-weight:700}
+.tile{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:var(--nb);color:var(--nc)}
+.tile .icon{font-size:19px}
+.nav a.active .tile{background:var(--nc);color:#fff}
+.rail .sp{flex:1}
+.n-home{--nc:#c62828;--nb:#fde8e8}.n-vision{--nc:#b93c0a;--nb:#ffeddc}.n-design{--nc:#8a6100;--nb:#fff3cc}.n-pages{--nc:#2a7230;--nb:#e2f4e3}.n-data{--nc:#00766c;--nb:#d6f3ee}.n-platform{--nc:#1a5fb4;--nb:#e2ecfb}.n-work{--nc:#5b3cc4;--nb:#ece7fd}.n-library{--nc:#9c27b0;--nb:#f5e2f8}.n-settings{--nc:#5f6368;--nb:#eceff3}
+.top{display:flex;align-items:center;gap:14px;padding:10px 24px;border-bottom:1px solid var(--line);background:var(--bg);position:sticky;top:0;z-index:20}
+.search{position:relative;flex:1;max-width:480px}.search input{width:100%;padding:8px 14px 8px 38px;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
+.search .icon{position:absolute;left:11px;top:8px;color:var(--muted)}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:var(--surface);font-weight:500;font-size:13.5px;white-space:nowrap}
+.btn:hover{background:var(--hover)}.btn .icon{font-size:18px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}.btn.primary:hover{background:#2539a0}
+.btn.ghost{border-color:transparent;background:none}.btn.ghost:hover{background:var(--hover)}
+.btn.sm{padding:3px 9px;font-size:12.5px}.btn.sm .icon{font-size:16px}
+.btn:disabled{opacity:.5;cursor:default}
+.main{padding:14px 24px 12px;min-width:0}
+.eyebrow{display:inline-flex;align-items:center;gap:6px;font-size:12px;letter-spacing:.8px;text-transform:uppercase;color:var(--lc);font-weight:700;margin:0 0 2px}
+.eyebrow .icon{font-size:16px}
+h1{font-size:24px;line-height:1.2;margin:0 0 8px}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:0 0 14px;overflow-x:auto}
+.tabs button{display:inline-flex;align-items:center;gap:6px;padding:9px 14px;border:0;background:none;color:var(--muted);font-weight:500;border-bottom:3px solid transparent;margin-bottom:-1px;white-space:nowrap}
+.tabs button .icon{font-size:18px;color:var(--lc)}
+.tabs button[aria-selected=true]{color:var(--ink);border-color:var(--lc)}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border-radius:999px;font-size:11.5px;font-weight:700;white-space:nowrap;line-height:18px;background:var(--panel);color:var(--muted)}
+.chip .icon{font-size:14px}
+.chip.ok{background:var(--ok-bg);color:var(--ok)}.chip.bad{background:var(--bad-bg);color:var(--bad)}.chip.warn{background:var(--warn-bg);color:var(--warn)}.chip.info{background:var(--info-bg);color:var(--info)}.chip.pages{background:var(--lb);color:var(--lc)}.chip.work{background:var(--work-bg);color:var(--work)}.chip.plat{background:var(--plat-bg);color:var(--plat)}.chip.design{background:#fff3cc;color:#8a6100}.chip.data{background:#d6f3ee;color:#00766c}.chip.lib{background:#f5e2f8;color:#9c27b0}
+.chip.dash{background:none;box-shadow:inset 0 0 0 1px var(--line-strong)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:none;padding:4px 10px;font-size:12.5px;display:inline-flex;align-items:center;gap:4px;color:var(--muted);white-space:nowrap}
+.seg button .icon{font-size:16px}
+.seg button[aria-pressed=true]{background:var(--ink);color:#fff}
+.sel-in{padding:4px 8px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-size:12.5px}
+.lbl-in{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted)}
+
+/* ---------- Map: planning canvas ---------- */
+.mapwrap{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:14px;height:calc(100vh - 196px);min-height:560px}
+.vp{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:16px;background-color:#f2f4f8;background-image:radial-gradient(#cdd3df 1.2px,transparent 1.3px);touch-action:none;user-select:none;-webkit-user-select:none}
+.vp.hand,.vp.hand .node{cursor:grab}.vp.panning,.vp.panning .node{cursor:grabbing}
+.world{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
+.world svg{position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible;pointer-events:none}
+.lkp{fill:none;stroke:#98a3bd;stroke-width:1.8}
+.lkp.on{stroke:var(--lc);stroke-width:3}.lkp.dim{opacity:.18}.lkp.sel{stroke:var(--accent);stroke-width:3}
+.lkp.missing{stroke:var(--hl);stroke-dasharray:7 6;stroke-width:2.4}
+.lkp.temp{stroke:var(--accent);stroke-width:2.2;stroke-dasharray:5 5}
+.hit{fill:none;stroke:transparent;stroke-width:16;pointer-events:stroke;cursor:pointer}
+#labels{position:absolute;left:0;top:0}
+.llabel{position:absolute;transform:translate(-50%,-50%);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:1px 9px;font-size:12px;color:var(--muted);white-space:nowrap;z-index:5;cursor:pointer}
+.llabel.on{border-color:var(--lc);color:var(--lc);font-weight:700}.llabel.dim{opacity:.25}.llabel.sel{border-color:var(--accent);color:var(--accent);font-weight:700}
+.llabel.missing{border-color:var(--hl);color:var(--warn);background:#fffaf0;cursor:default}
+.llabel input{border:0;outline:0;font:inherit;width:150px;background:none;color:var(--ink)}
+.node{position:absolute;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 1px 3px #0000000f;padding:8px;display:flex;flex-direction:column;gap:6px;z-index:3;cursor:default}
+.node:hover{box-shadow:0 0 0 2px #e39b0080,0 6px 16px #00000012}
+.node.sel{box-shadow:0 0 0 2.5px var(--accent),0 6px 16px #00000014}
+.node.inflow{box-shadow:0 0 0 2.5px var(--lc)}
+.node.inflow.sel{box-shadow:0 0 0 2.5px var(--accent)}
+.node.dim{opacity:.55}
+.node.dragging{z-index:10;box-shadow:0 0 0 2.5px var(--accent),0 16px 36px #00000030;opacity:.92}
+.node.target{box-shadow:0 0 0 3px var(--accent),0 0 0 8px #3047b926}
+.node.planned{background:#fbfcfe;border:1.5px dashed #aab4c8}
+.nhead{display:flex;align-items:center;gap:6px;height:24px;font-weight:700;font-size:14px;min-width:0}
+.nhead .icon{font-size:18px;color:var(--lc)}
+.node.planned .nhead .icon{color:var(--faint)}
+.nhead .nt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nhead .ob{margin-left:auto;border:0;background:none;border-radius:8px;padding:2px 4px;color:var(--muted);display:inline-flex}
+.nhead .ob:hover{background:var(--hover);color:var(--ink)}
+.nhead .ob .icon{color:inherit}
+.ntitle{flex:1;min-width:0;border:1px solid transparent;border-radius:6px;padding:1px 5px;font:700 14px Roboto,sans-serif;background:none}
+.ntitle:hover,.ntitle:focus{border-color:var(--line);background:var(--surface);outline:0}
+.nbody{flex:1;min-height:0;display:flex;gap:8px}
+.nbody.blank{flex-direction:column;gap:6px}
+.nnote{flex:1;resize:none;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;background:var(--surface);color:var(--ink)}
+.nstories{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+.nstories select{font-size:11.5px;padding:1px 4px;border:1px dashed var(--line-strong);border-radius:999px;background:none;color:var(--muted)}
+.nth{position:relative;overflow:hidden;border-radius:8px;background:var(--t-surface);box-shadow:inset 0 0 0 1px var(--line);flex:none}
+.nth .tapp{position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:none}
+.nfoot{display:flex;gap:4px;overflow:hidden;height:20px;flex:none}
+.handle{position:absolute;right:-9px;top:50%;width:18px;height:18px;margin-top:-9px;border-radius:50%;background:var(--surface);border:2.5px solid var(--lc);cursor:crosshair;opacity:0;transition:opacity .12s;z-index:6}
+.node:hover .handle,.node.sel .handle,.vp.connecting .handle{opacity:1}
+.handle:hover{background:var(--lc)}
+.nstep{position:absolute;top:-12px;left:10px;display:flex;gap:3px;z-index:6}
+.nstep b{background:var(--lc);color:#fff;border-radius:999px;font-size:11.5px;padding:0 8px;line-height:21px}
+.addstep{position:absolute;top:-13px;right:12px;z-index:6;display:inline-flex;align-items:center;gap:2px;border:1px solid var(--lc);background:var(--surface);color:var(--lc);border-radius:999px;font-size:11.5px;font-weight:700;padding:1px 9px 1px 5px}
+.addstep .icon{font-size:15px}
+.addstep:hover{background:var(--lc);color:#fff}
+.ghostcell{position:absolute;border:2px dashed var(--accent);border-radius:14px;background:#3047b90f;pointer-events:none;z-index:1}
+.ghostcell.bad{border-color:var(--bad);background:#a1231f14}
+.marquee{position:absolute;border:1px solid var(--accent);background:#3047b914;pointer-events:none;z-index:20}
+.ctools{position:absolute;left:12px;top:12px;right:12px;display:flex;gap:6px;z-index:30;flex-wrap:wrap;pointer-events:none}
+.ctools>*{pointer-events:auto}
+.tgroup{display:inline-flex;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:3px;gap:2px;box-shadow:0 2px 8px #0000000f}
+.tgroup button{border:0;background:none;border-radius:8px;padding:5px 8px;display:inline-flex;align-items:center;gap:4px;font-size:12.5px;color:var(--ink)}
+.tgroup button:hover{background:var(--hover)}
+.tgroup button[aria-pressed=true]{background:var(--ink);color:#fff}
+.tgroup button .icon{font-size:18px}
+.tgroup .z{min-width:44px;text-align:center;font-size:12px;color:var(--muted)}
+.chint{position:absolute;left:12px;bottom:10px;z-index:30;font-size:11.5px;color:var(--muted);background:#ffffffd9;border:1px solid var(--line);border-radius:999px;padding:3px 10px}
+.fbanner{position:absolute;left:50%;top:58px;transform:translateX(-50%);z-index:30;display:flex;align-items:center;gap:8px;background:var(--lc);color:#fff;border-radius:999px;padding:5px 6px 5px 14px;font-size:12.5px;box-shadow:0 4px 14px #0002;white-space:nowrap}
+.fbanner button{background:#ffffff2b;border:0;color:#fff;border-radius:999px;padding:3px 10px;font-size:12px}
+.flows{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:8px;overflow:auto;min-height:0}
+.flows h2{font-size:16px;margin:0}
+.frow{border:1px solid var(--line);border-radius:12px;background:var(--surface);flex:none}
+.frow.on{border-color:var(--lc);box-shadow:inset 3px 0 0 var(--lc)}
+.fhd{display:grid;gap:5px;width:100%;border:0;background:none;text-align:left;padding:8px 10px;border-radius:12px}
+.fhd:hover{background:#f6f8fb}
+.frow.on .fhd{background:#f5fbf5}
+.fhd b{font-size:13.5px}
+.fhd small{font-size:11.5px}
+.sbar{display:flex;gap:3px;height:8px}
+.sbar i{flex:1;border-radius:3px;min-width:6px}
+.st-built{background:#3047b9}.st-drift{background:#3047b9;box-shadow:inset 0 -3px 0 #e39b00}.st-specified{background:#e07aa2}.st-planned{background:#c1c8d8}.st-gap{background:repeating-linear-gradient(135deg,#e39b00 0 3px,#fff0cc 3px 6px)}.st-none{background:#eef0f5}
+.lg{display:flex;gap:8px;flex-wrap:wrap;font-size:11px;color:var(--muted)}
+.lg span{display:inline-flex;align-items:center;gap:4px}.lg i{width:14px;height:8px;border-radius:3px;display:inline-block}
+.fedit{display:grid;gap:8px;padding:4px 10px 10px}
+.fsteplist{list-style:none;margin:0;padding:0}
+.fs{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:6px;align-items:center;font-size:13px;padding:3px 0}
+.fs .n{width:20px;height:20px;border-radius:50%;background:var(--lc);color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center}
+.fs .warn{color:var(--warn)}
+.fs .ctl{display:flex}
+.fs .ctl button{border:0;background:none;padding:2px;border-radius:6px;color:var(--muted);display:inline-flex}
+.fs .ctl button:hover{background:var(--hover);color:var(--ink)}
+.fs .ctl button:disabled{opacity:.3}
+.fs .ctl .icon{font-size:17px}
+.fconn{font-size:11.5px;color:var(--muted);padding:0 0 0 2px;display:flex;align-items:center;gap:6px}
+.fconn .icon{font-size:15px;color:var(--lc)}
+.fconn.miss{color:var(--warn)}.fconn.miss .icon{color:var(--warn)}
+.missing{border:1px dashed var(--warn);border-radius:10px;padding:7px 9px;display:grid;gap:6px;font-size:12.5px;background:#fffaf0}
+.missing>b{display:flex;align-items:center;gap:4px;color:var(--warn);font-size:12px}
+.missing .icon{font-size:16px}
+
+/* ---------- Page workspace ---------- */
+.ws{display:grid;grid-template-columns:250px minmax(0,1fr) 340px;border:1px solid var(--line);border-radius:16px;background:var(--surface);height:calc(100vh - 196px);min-height:600px;overflow:hidden}
+.pane{min-height:0;overflow:auto}
+.left{border-right:1px solid var(--line);display:flex;flex-direction:column}
+.phead{padding:10px 12px 6px;font-size:10.5px;letter-spacing:1px;text-transform:uppercase;font-weight:700;color:var(--faint);display:flex;align-items:center;gap:6px}
+.plist{padding:0 4px 6px}
+.pitem{display:flex;align-items:center;gap:8px;width:100%;border:0;background:none;padding:5px 8px;border-radius:9px;text-align:left;font-size:13.5px}
+.pitem:hover{background:var(--hover)}
+.pitem.on{background:var(--lb);font-weight:700;box-shadow:inset 3px 0 0 var(--lc)}
+.pitem .icon{font-size:18px;color:var(--lc)}
+.pitem .st{margin-left:auto}
+.pitem.child{padding-left:26px}
+.dot{width:8px;height:8px;border-radius:50%;flex:none;display:inline-block}
+.d-planned{background:#c1c8d8}.d-specified{background:#e07aa2}.d-built{background:#3047b9}.d-drift{background:var(--hl)}
+.outline{border-top:1px solid var(--line);padding:0 4px 20px;flex:1}
+.oitem{display:flex;align-items:center;gap:6px;width:100%;border:0;background:none;padding:4px 8px;border-radius:8px;text-align:left;font-size:13px;min-height:28px}
+.oitem:hover,.oitem.hov{background:#fff7de}
+.oitem.on{background:var(--lb);box-shadow:inset 3px 0 0 var(--lc);font-weight:600}
+.oitem .icon{font-size:16px;color:var(--muted)}
+.oitem .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.oitem.l2{padding-left:24px}
+.oitem.ghost .nm{color:var(--faint);font-style:italic}
+.oitem .tag{font-size:10.5px;font-weight:700;border-radius:6px;padding:0 5px;white-space:nowrap}
+.tag.nb{background:var(--panel);color:var(--muted)}.tag.df{background:var(--warn-bg);color:var(--warn)}.tag.wk{background:var(--work-bg);color:var(--work)}.tag.ph{background:#eef0f5;color:var(--faint)}
+
+.center{display:flex;flex-direction:column;background:#eef0f4;min-width:0}
+.cbar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--surface);flex-wrap:wrap}
+.cbar .sep{width:1px;height:20px;background:var(--line)}
+.editsw{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:3px 10px 3px 4px;background:var(--surface);font-size:12.5px;font-weight:500}
+.editsw i{width:30px;height:18px;border-radius:9px;background:#c8cfdc;position:relative;transition:background .15s}
+.editsw i::after{content:'';position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:left .15s}
+.editsw[aria-pressed=true] i{background:var(--ink)}.editsw[aria-pressed=true] i::after{left:14px}
+.stage{flex:1;overflow:auto;padding:16px;display:flex;justify-content:center;position:relative;min-height:0}
+.frame{width:100%;max-width:980px;height:max-content;min-height:100%;display:flex;flex-direction:column;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px #0002,0 0 0 1px #0000000d;background:var(--t-surface)}
+.frame.phone{max-width:390px;border-radius:30px;box-shadow:0 0 0 8px #1b1f2a,0 16px 40px #0003;min-height:720px}
+.urlbar{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#e7e9ee;font-size:11.5px;color:var(--muted);border-bottom:1px solid #d7dbe3}
+.urlbar .u{flex:1;background:#fff;border-radius:999px;padding:2px 10px;font-family:"Roboto Mono",monospace;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.frame.phone .urlbar{display:none}
+.specbar{display:flex;align-items:center;gap:8px;padding:6px 10px;background:repeating-linear-gradient(135deg,#f3f7f2 0 10px,#edf3ec 10px 20px);font-size:11.5px;color:var(--lc);font-weight:700;border-bottom:1px solid #d7e5d6}
+.frame.phone .specbar{padding-top:14px}
+.cfoot{display:flex;align-items:center;gap:10px;padding:7px 12px;border-top:1px solid var(--line);background:var(--surface);font-size:12.5px;flex-wrap:wrap}
+.driftnote{display:inline-flex;align-items:center;gap:6px;color:var(--warn);font-weight:500}
+.driftnote .icon{font-size:17px}
+
+/* Hover/selection overlays */
+.ov{position:absolute;pointer-events:none;border:2px solid var(--hl);border-radius:6px;z-index:30;transition:all .06s}
+.ov.sel{border-color:var(--sel);border-width:2.5px}
+.ov.ct{border-style:solid;border-color:#3b82f6}
+.ov.dt{border-style:dashed;border-color:#00766c}
+.ov .tg{position:absolute;left:-2px;top:-19px;background:var(--hl);color:#241800;font:700 10.5px/17px Roboto,sans-serif;padding:0 6px;border-radius:5px 5px 5px 0;white-space:nowrap;display:flex;gap:4px;align-items:center}
+.ov .tg .icon{font-size:13px}
+.ov.sel .tg{background:var(--sel);color:#fff}
+.ov.ct .tg{background:#3b82f6;color:#fff}
+.ov.dt .tg{background:#00766c;color:#fff}
+.ov.below .tg{top:auto;bottom:-19px;border-radius:0 5px 5px 5px}
+
+/* Right pane: inspector */
+.right{border-left:1px solid var(--line);padding:12px 14px 30px;display:grid;gap:12px;align-content:start}
+.right h2{font-size:17px;margin:0;line-height:1.25}
+.right h3{font-size:11px;letter-spacing:.9px;text-transform:uppercase;color:var(--faint);margin:6px 0 -4px;display:flex;align-items:center;gap:6px}
+.right h3 .btn{margin-left:auto;text-transform:none;letter-spacing:0}
+.kv{display:grid;grid-template-columns:92px minmax(0,1fr);gap:4px 10px;font-size:13px}
+.kv dt{color:var(--muted)}.kv dd{margin:0}
+.lk{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:8px;padding:1px 7px;font-size:12px;background:var(--surface);cursor:pointer;color:var(--ink);text-decoration:none}
+.lk:hover{border-color:var(--lc)}
+.lk .icon{font-size:14px}
+.lk.design .icon{color:#8a6100}.lk.data .icon{color:#00766c}.lk.product .icon{color:#b93c0a}.lk.page .icon{color:var(--lc)}.lk.work .icon{color:var(--work)}.lk.plat .icon{color:var(--plat)}.lk.lib .icon{color:#9c27b0}
+.story{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:6px;align-items:start;font-size:13px;padding:4px 0}
+.story b{font-family:"Roboto Mono",monospace;font-size:11.5px;color:#b93c0a;padding-top:1px}
+.sm-st{font-size:10.5px;font-weight:700;border-radius:6px;padding:0 5px;white-space:nowrap}
+.s-proposed{background:#eef0f5;color:#6b7385}.s-defined{background:#e6e9f7;color:#4a56a0}.s-designed{background:#fbe3ec;color:#a3325e}.s-built{background:#e3e8ff;color:#3047b9}.s-shipped{background:var(--ok-bg);color:var(--ok)}
+.matrix{width:100%;border-collapse:collapse;font-size:12.5px}
+.matrix th{font-weight:500;color:var(--muted);text-align:left;padding:3px 4px;font-size:11.5px}
+.matrix td{padding:3px 4px;border-top:1px solid var(--line)}
+.matrix tr.cur td{background:var(--lb)}
+.matrix button{border:0;background:none;padding:0;text-align:left;font-weight:500;color:var(--ink)}
+.matrix .icon{font-size:16px}
+.y{color:var(--ok)}.n{color:var(--faint)}.dfc{color:var(--warn)}
+.why p{margin:0 0 6px;font-size:13px}.why small{color:var(--muted)}
+.actions{display:grid;gap:6px;border-top:1px solid var(--line);padding-top:12px}
+.actions .row .btn{flex:1;justify-content:center}
+.note{font-size:12px;color:var(--muted);line-height:1.4}
+.callout{display:flex;gap:8px;align-items:flex-start;border-radius:10px;padding:8px 10px;font-size:12.5px;line-height:1.4}
+.callout .icon{font-size:18px}
+.callout.warn{background:var(--warn-bg);color:#5c3d00}.callout.info{background:var(--info-bg);color:#0f3f7a}.callout.pages{background:var(--lb);color:#174a1b}.callout.work{background:var(--work-bg);color:#3b2388}
+.field{display:grid;gap:4px;font-size:12.5px;color:var(--muted)}
+.field input,.field textarea,.field select{padding:7px 9px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);font-size:13.5px;width:100%}
+.field textarea{resize:vertical}
+.imgpick{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.imgpick button{border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:4px;display:grid;gap:3px;font-size:11px;color:var(--muted)}
+.imgpick button.cur{border-color:#3b82f6;box-shadow:0 0 0 2px #3b82f633}
+.imgpick .art{height:48px;border-radius:7px}
+
+/* ---------- Tool Share app (imitates the generated Angular Material app) ---------- */
+.app{font-family:Roboto,sans-serif;color:var(--t-on);background:var(--t-surface);min-height:100%;display:flex;flex-direction:column;font-size:14px;position:relative}
+.frame .app{flex:1}
+.a-bar{display:flex;align-items:center;gap:12px;padding:12px 18px;background:var(--t-surface);border-bottom:1px solid var(--t-c-high)}
+.a-bar .logo{display:flex;align-items:center;gap:8px;font:700 18px/1 var(--t-font);color:var(--t-primary)}
+.a-bar .logo .mk{width:28px;height:28px;border-radius:8px;background:var(--t-primary);color:#fff;display:grid;place-items:center;font-size:12px}
+.a-bar .navd{display:flex;gap:4px;margin-left:24px}
+.a-bar .navd span{padding:6px 14px;border-radius:999px;font-weight:500;color:var(--t-muted);display:flex;align-items:center;gap:6px}
+.a-bar .navd span.on{background:var(--t-primary-c);color:var(--t-on-primary-c)}
+.a-bar .av{margin-left:auto;width:32px;height:32px;border-radius:50%;background:var(--t-tertiary-c);display:grid;place-items:center;font-weight:700;color:#6b4000;font-size:13px}
+.a-body{padding:22px 26px 30px;flex:1;display:grid;gap:16px;align-content:start}
+.a-h{font:600 26px/1.2 var(--t-font);margin:0}
+.a-sub{color:var(--t-muted);margin:0}
+.a-nb{display:none;border-top:1px solid var(--t-c-high);background:var(--t-c-low);padding:8px 0 14px;justify-content:space-around;margin-top:auto}
+.a-nb span{display:grid;justify-items:center;gap:2px;font-size:11.5px;font-weight:500;color:var(--t-muted)}
+.a-nb span .icon{padding:3px 18px;border-radius:999px;font-size:22px}
+.a-nb span.on .icon{background:var(--t-primary-c);color:var(--t-on-primary-c);font-variation-settings:'FILL' 1}
+.phone .a-bar .navd{display:none}.phone .a-nb{display:flex}.phone .a-body{padding:16px 16px 20px}.phone .a-h{font-size:22px}
+.thumb .a-bar .navd{display:none}.thumb .a-nb{display:flex}.thumb .a-body{padding:16px}
+.a-search{display:flex;align-items:center;gap:10px;background:var(--t-c-high);border-radius:999px;padding:11px 16px;color:var(--t-muted)}
+.a-chips{display:flex;gap:8px;flex-wrap:wrap}
+.a-chip{border:1px solid var(--t-outline);border-radius:8px;padding:5px 12px;font-size:13px;font-weight:500;color:var(--t-muted);display:flex;gap:4px;align-items:center}
+.a-chip.on{background:var(--t-primary-c);border-color:transparent;color:var(--t-on-primary-c)}
+.a-chip .icon{font-size:16px}
+.a-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
+.phone .a-grid,.thumb .a-grid{grid-template-columns:minmax(0,1fr);gap:10px}
+.a-card{background:var(--t-c-low);border-radius:var(--t-r);overflow:hidden;box-shadow:0 1px 2px #0000001f}
+.a-card .ph{height:120px;display:grid;place-items:center}
+.a-card .ph .icon{font-size:44px;opacity:.75}
+.phone .a-card,.thumb .a-card{display:grid;grid-template-columns:88px minmax(0,1fr)}
+.phone .a-card .ph,.thumb .a-card .ph{height:auto;min-height:84px}
+.a-card .bd{padding:10px 14px 12px;display:grid;gap:2px}
+.a-card .t{font:600 15px/1.25 var(--t-font)}
+.a-card .m{font-size:12.5px;color:var(--t-muted);display:flex;gap:6px;align-items:center}
+.a-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:999px;padding:10px 22px;font-weight:500;background:var(--t-primary);color:var(--t-on-primary);border:0;font-size:14px;width:max-content}
+.a-btn.tonal{background:var(--t-primary-c);color:var(--t-on-primary-c)}
+.a-btn.out{background:none;border:1px solid var(--t-outline);color:var(--t-primary)}
+.a-btn.text{background:none;color:var(--t-primary);padding:10px 12px}
+.a-btn.full{width:100%}
+.a-fab{position:absolute;right:22px;bottom:22px;display:flex;align-items:center;gap:8px;background:var(--t-primary-c);color:var(--t-on-primary-c);border-radius:16px;padding:16px 20px;font-weight:500;box-shadow:0 3px 8px #0003}
+.phone .a-fab,.thumb .a-fab{bottom:92px;right:16px}
+.a-field{border:1px solid var(--t-outline);border-radius:6px;padding:10px 14px 8px;display:grid;gap:1px}
+.a-field small{font-size:11.5px;color:var(--t-primary)}
+.a-field span{color:var(--t-muted)}
+.a-empty{display:grid;justify-items:center;text-align:center;gap:10px;padding:24px 10px}
+.a-art{width:170px;height:120px;border-radius:20px;display:grid;place-items:center;position:relative;overflow:hidden}
+.a-art .icon{font-size:56px;color:#ffffffe6;font-variation-settings:'FILL' 1}
+.art-shed{background:linear-gradient(135deg,#5e9c7a,#2e6b4f)}.art-street{background:linear-gradient(135deg,#f0b35a,#c46b2c)}.art-hands{background:linear-gradient(135deg,#7aa3d6,#3d5f9a)}.art-none{background:var(--t-c-high)}.art-none .icon{color:var(--t-muted)}
+.a-skel{border-radius:var(--t-r);background:linear-gradient(90deg,var(--t-c) 0%,var(--t-c-high) 50%,var(--t-c) 100%);height:84px}
+.a-banner{display:flex;gap:10px;align-items:center;background:var(--t-error-c);color:#410002;border-radius:12px;padding:12px 14px}
+.a-2col{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:22px;align-items:start}
+.phone .a-2col,.thumb .a-2col{grid-template-columns:minmax(0,1fr);gap:14px}
+.a-gal{height:240px;border-radius:var(--t-r);display:grid;place-items:center;background:linear-gradient(135deg,#7c8f84,#4b5d52)}
+.a-gal .icon{font-size:80px;color:#ffffffd0}
+.phone .a-gal,.thumb .a-gal{height:190px}
+.a-panel{background:var(--t-c-low);border-radius:var(--t-r);padding:14px 16px;display:grid;gap:10px}
+.a-panel h4{margin:0;font:600 16px/1.2 var(--t-font)}
+.a-row{display:flex;align-items:center;gap:10px}
+.a-lender{display:flex;align-items:center;gap:10px}
+.a-lender i{width:36px;height:36px;border-radius:50%;background:var(--t-tertiary-c);display:grid;place-items:center;font-style:normal;font-weight:700;color:#6b4000}
+.a-list{display:grid;border-radius:var(--t-r);overflow:hidden;background:var(--t-c-low)}
+.a-li{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--t-c-high)}
+.a-li:last-child{border-bottom:0}
+.a-li i{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-weight:700;flex:none}
+.a-li .tx{flex:1;min-width:0}.a-li .tx b{display:block;font-weight:500}.a-li .tx span{font-size:12.5px;color:var(--t-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.a-badge{background:var(--t-primary);color:#fff;border-radius:999px;font-size:11px;font-weight:700;padding:1px 7px}
+.a-bub{max-width:75%;padding:9px 13px;border-radius:18px;background:var(--t-c-high);font-size:14px}
+.a-bub.me{margin-left:auto;background:var(--t-primary);color:#fff}
+.a-compose{display:flex;gap:8px;align-items:center;border-top:1px solid var(--t-c-high);padding-top:12px}
+.a-compose .a-search{flex:1;border-radius:24px}
+.a-dates{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.a-hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);min-height:520px}
+.a-hero .a-art{width:100%;height:100%;border-radius:0;min-height:220px}
+.a-hero .a-art .icon{font-size:110px}
+.a-hero .fm{padding:44px 40px;display:grid;gap:14px;align-content:center}
+.phone .a-hero,.thumb .a-hero{grid-template-columns:minmax(0,1fr);min-height:0}
+.phone .a-hero .a-art,.thumb .a-hero .a-art{min-height:200px}
+.phone .a-hero .fm,.thumb .a-hero .fm{padding:20px 18px}
+.a-drop{border:1.5px dashed var(--t-outline);border-radius:var(--t-r);display:grid;justify-items:center;gap:6px;padding:26px;color:var(--t-muted)}
+.a-drop .icon{font-size:34px;color:var(--t-primary)}
+.a-skeleton-note{border:1.5px dashed var(--t-outline);border-radius:var(--t-r);padding:18px;color:var(--t-muted);display:grid;gap:10px}
+.a-skeleton-note i{display:block;height:12px;border-radius:6px;background:var(--t-c-high)}
+
+/* Spec mode: section frames and not-built sections */
+.specmode .sec{outline:1px dashed #9cc3a0;outline-offset:3px;border-radius:4px}
+.sec.ghost{opacity:.55}
+.sec.differs{outline:2px dashed var(--hl);outline-offset:4px;border-radius:6px;position:relative}
+.sec.differs::before{content:"Differs from spec";position:absolute;right:0;top:-12px;background:var(--hl);color:#241800;font:700 10.5px/17px Roboto,sans-serif;padding:0 7px;border-radius:5px;z-index:2}
+.sec.req{outline:1.5px dashed var(--work)!important;outline-offset:3px;border-radius:6px;padding:14px;background:repeating-linear-gradient(135deg,#f5f2ff 0 10px,#efe9ff 10px 20px);color:#3b2388;display:grid;gap:4px}
+.sec .phase{display:inline-block;font:700 10px/16px Roboto,sans-serif;background:#eef0f5;color:#6b7385;border-radius:5px;padding:0 6px;margin-bottom:6px}
+.ct{border-radius:3px}
+.editing .ct{box-shadow:inset 0 -1.5px 0 #3b82f6aa;cursor:text}
+.editing .ct.img{box-shadow:0 0 0 2px #3b82f6aa;cursor:pointer}
+.ct[contenteditable=true]{outline:2px solid #3b82f6;outline-offset:2px;background:#3b82f614}
+.dt{cursor:help}
+.unspec{display:grid;justify-items:center;text-align:center;gap:10px;padding:50px 20px;color:var(--muted);border:2px dashed var(--line-strong);border-radius:16px;margin:24px;background:var(--surface)}
+.unspec .icon{font-size:36px;color:var(--faint)}
+.notbuilt{display:grid;justify-items:center;text-align:center;gap:10px;padding:60px 24px;color:var(--muted)}
+.notbuilt .icon{font-size:40px;color:var(--faint)}
+.redirect{display:grid;justify-items:center;text-align:center;gap:8px;padding:60px 24px;color:var(--muted)}
+
+/* ---------- Flows ---------- */
+.fl2{display:grid;grid-template-columns:280px minmax(0,1fr) 320px;gap:14px;height:calc(100vh - 196px);min-height:600px}
+.fsteps{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:8px;overflow:auto;min-height:0}
+.fsteps select{width:100%;font-size:14px;font-weight:700;padding:7px 9px}
+.fsl{display:grid;gap:0}
+.fsi{display:grid;grid-template-columns:22px 50px minmax(0,1fr);gap:8px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:6px 8px 6px 6px;background:var(--surface);text-align:left;width:100%;position:relative}
+.fsi:hover{border-color:var(--line-strong)}
+.fsi.on{border-color:var(--lc);box-shadow:inset 3px 0 0 var(--lc);background:#f5fbf5}
+.fsi.gapstep{border-style:dashed;border-color:var(--warn);background:#fffaf0}
+.fsi .n{width:20px;height:20px;border-radius:50%;background:var(--ink);color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center}
+.fsi.on .n{background:var(--lc)}
+.mini{width:50px;height:88px;position:relative;overflow:hidden;border-radius:7px;box-shadow:inset 0 0 0 1px var(--line);background:var(--t-surface);display:block}
+.mini .tapp{position:absolute;left:0;top:0;width:390px;transform:scale(.128);transform-origin:0 0;pointer-events:none}
+.mini.gapm{display:grid;place-items:center;color:var(--warn);background:repeating-linear-gradient(135deg,#fff8e8 0 6px,#fff1d4 6px 12px)}
+.fsi b{font-size:13px;display:block}
+.fsi small{font-size:11.5px;color:var(--muted);display:block}
+.fsi .rvn{position:absolute;right:8px;top:6px}
+.fsc{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--lc);padding:3px 0 3px 8px;min-height:24px}
+.fsc .icon{font-size:16px}
+.fprev{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#eef0f4;min-height:0;min-width:0}
+.fprev .stage{align-items:flex-start}
+.wside{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px 14px;display:grid;gap:10px;align-content:start;overflow:auto;min-height:0}
+.wside h3{font-size:11px;letter-spacing:.9px;text-transform:uppercase;color:var(--faint);margin:4px 0 -4px}
+.gwt{display:grid;gap:3px;font-size:13px;background:var(--panel);border-radius:10px;padding:8px 10px}
+.gwt b{color:#b93c0a;font-size:11px;text-transform:uppercase;letter-spacing:.6px;margin-right:4px}
+.trig{display:flex;gap:6px;align-items:center;font-size:13px;border:1px solid var(--lc);color:var(--lc);border-radius:10px;padding:6px 10px;background:var(--lb)}
+.rnote{border:1px solid var(--line);border-radius:10px;padding:7px 9px;font-size:12.5px;display:grid;gap:4px}
+.rnote .k{display:flex;gap:6px;align-items:center}
+.ntype{display:flex;gap:4px;flex-wrap:wrap}
+.ntype button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:2px 9px;font-size:12px;color:var(--muted)}
+.ntype button[aria-pressed=true]{border-color:var(--ink);background:var(--ink);color:#fff}
+
+/* Drawer, toast */
+.scrim{position:fixed;inset:0;background:#0f172a38;z-index:79}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(580px,100vw);background:var(--surface);border-left:1px solid var(--line);box-shadow:var(--shadow);z-index:80;overflow:auto;padding:18px 20px 40px;display:grid;align-content:start;gap:12px}
+.drawer h2{margin:0;font-size:20px}
+.drawer h3{margin:6px 0 -4px;font-size:11px;letter-spacing:.9px;text-transform:uppercase;color:var(--faint)}
+.chg{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:7px 9px;font-size:13px}
+.chg .op{font-weight:700;font-size:11px;border-radius:6px;padding:1px 6px}
+.op.add{background:var(--ok-bg);color:var(--ok)}.op.chgd{background:var(--info-bg);color:var(--info)}.op.rm{background:var(--bad-bg);color:var(--bad)}
+.chgform{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;border:1px dashed var(--line-strong);border-radius:12px;padding:10px}
+.chgform .wide{grid-column:1/-1}
+.route{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:center;border-radius:12px;padding:10px 12px;background:var(--plat-bg)}
+.route .tile{--nc:#1a5fb4;--nb:#fff}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;border-radius:12px;padding:10px 14px;font-size:13.5px;z-index:90;box-shadow:var(--shadow);display:flex;gap:10px;align-items:center;max-width:92vw}
+.toast button{background:#ffffff26;border:0;color:#fff;border-radius:999px;padding:3px 10px;font-size:12.5px}
+.notes table{border-collapse:collapse;font-size:13px;width:100%}.notes td{border-top:1px solid var(--line);padding:6px 6px;vertical-align:top}.notes td:first-child{font-weight:700;white-space:nowrap}
+
+/* Narrow */
+@media (max-width:1180px){.ws{grid-template-columns:220px minmax(0,1fr)}.right{grid-column:1/-1;border-left:0;border-top:1px solid var(--line)}.ws{height:auto}.center{min-height:640px}.mapwrap{grid-template-columns:minmax(0,1fr);height:auto}.vp{height:72vh}.fl2{grid-template-columns:260px minmax(0,1fr);height:auto}.fl2 .wside{grid-column:1/-1}.fprev{min-height:640px}}
+@media (max-width:900px){
+  .shell{grid-template-columns:minmax(0,1fr)}.rail{position:static;height:auto;flex-direction:row;overflow-x:auto;padding:8px}.rail .brand,.rail .proj,.rail .sp{display:none}.rail .nav{display:flex;gap:2px}.nav a{padding:4px}.nav a span:not(.tile){display:none}
+  .top{padding:8px 16px}.main{padding:12px 16px}
+  .ws{grid-template-columns:minmax(0,1fr)}.left{border-right:0;border-bottom:1px solid var(--line);max-height:300px}.center{min-height:560px}
+  .fl2{grid-template-columns:minmax(0,1fr)}.fsteps{max-height:360px}.ctools .tgroup:nth-child(3) button{font-size:0}.ctools .tgroup:nth-child(3) button .icon{font-size:18px}.chint{display:none}
+  .stage{padding:10px}
+}
+</style>
+<body>
+<div class="shell">
+  <nav class="rail" aria-label="Project">
+    <div class="brand"><span class="icon">science</span>Aludel</div>
+    <div class="proj"><span class="mk">TS</span><div><b>Tool Share</b><small>Demo phase</small></div></div>
+    <div class="nav">
+      <a href="#" class="n-home"><span class="tile"><span class="icon">home</span></span><span>Home</span></a>
+      <a href="#" class="n-vision"><span class="tile"><span class="icon">flag</span></span><span>Vision</span></a>
+      <a href="#" class="n-design"><span class="tile"><span class="icon">palette</span></span><span>Design</span></a>
+      <a href="#" class="n-pages active" aria-current="page"><span class="tile"><span class="icon">web</span></span><span>Pages</span></a>
+      <a href="#" class="n-data"><span class="tile"><span class="icon">schema</span></span><span>Data</span></a>
+      <a href="#" class="n-platform"><span class="tile"><span class="icon">dns</span></span><span>Platform</span></a>
+      <a href="#" class="n-work"><span class="tile"><span class="icon">task_alt</span></span><span>Work</span></a>
+      <a href="#" class="n-library"><span class="tile"><span class="icon">local_library</span></span><span>Library</span></a>
+    </div>
+    <div class="sp"></div>
+    <div class="nav"><a href="#" class="n-settings"><span class="tile"><span class="icon">settings</span></span><span>Settings</span></a></div>
+  </nav>
+  <div>
+    <header class="top">
+      <label class="search"><span class="icon">search</span><span class="vh">Search</span><input placeholder="Search Tool Share"></label>
+      <button class="btn ghost push" data-act="notes"><span class="icon">rate_review</span>Review notes</button>
+    </header>
+    <main class="main" id="main"></main>
+  </div>
+</div>
+<script>
+/* ================= Data (illustrative Tool Share) ================= */
+const STORIES = {
+  S1:['Someone can sign up with email and password','built','Demo',['a visitor on the sign-in page','they enter a name, email and a password of 8+ characters','an account exists and they are signed in']],
+  S2:['Someone can sign in and sign out','built','Demo',['a registered person','they enter their email and password','they are signed in and see their name in the header']],
+  S3:['Someone can reset a forgotten password','proposed','MVP'],
+  S4:['Sam can browse tools near him, closest first','built','Demo',['Sam is signed in with a location','he opens Browse','he sees tools within 5 km, closest first']],
+  S5:['Sam can search tools by name','built','Demo',['tools named “ladder” and “step ladder” exist nearby','Sam searches for “ladder”','both appear, closest first']],
+  S6:['Sam can filter results by distance and category','proposed','MVP'],
+  S7:['Sam can see a tool’s photos, condition and lender','designed','Demo',['a listed tool','Sam opens it','he sees its photos, condition notes, the lender’s first name and rough distance']],
+  S8:['Sam can ask to borrow a tool for specific dates','designed','Demo',['a tool that is available','Sam picks dates and sends a request','Priya sees the request with Sam’s dates']],
+  S9:['Priya can approve or decline a request','designed','Demo',['a pending request','Priya approves it','Sam is told and the dates are blocked out']],
+  S10:['Sam gets a reminder the day before pick-up','proposed','MVP'],
+  S11:['Sam can message the lender from a tool page','designed','Demo',['Sam is looking at a tool','he taps “Message Priya”','a conversation opens that shows which tool it is about']],
+  S12:['Someone can see their conversations with unread counts','built','Demo',['someone with two conversations, one unread','they open Messages','both show, the unread one first with its count']],
+  S13:['Someone can read and reply in a thread','built','Demo',['an open conversation','they write a reply and send it','it appears at the bottom and the other person sees it']],
+  S14:['Someone gets notified of new messages','proposed','MVP'],
+  S16:['Sam can mark a tool as handed back','proposed','MVP'],
+  S17:['Priya confirms she has it back','proposed','MVP'],
+  S19:['Priya can list a tool with a photo','defined','Demo',['Priya is signed in','she adds a name, photo and condition','the tool appears in Browse for nearby people']],
+  S20:['Priya can pause a listing','proposed','MVP']
+};
+// Content: the copy and images the app reads by key. Editing these is direct; nothing else is.
+const CONTENT = {
+  'shell.name':'Tool Share',
+  'signin.title':'Borrow what you need. Lend what you don’t.','signin.sub':'Tool Share connects neighbours with sheds full of tools.','signin.cta':'Sign in','signin.alt':'New here? Create an account','signin.art':'shed',
+  'browse.title':'Tools near you','browse.search':'Search tools','browse.fab':'List a tool',
+  'browse.empty.title':'No tools nearby yet','browse.empty.body':'Be the first on your street to lend something.','browse.empty.cta':'List a tool','browse.empty.art':'street',
+  'browse.error':'Couldn’t load tools. Check your connection and try again.',
+  'tool.request.title':'When do you need it?','tool.request.cta':'Ask to borrow','tool.message':'Message Priya','tool.lender.title':'Requests for this tool',
+  'list.title':'List a tool','list.photo':'Add a photo','list.cta':'Publish listing',
+  'messages.title':'Messages','messages.empty':'No conversations yet',
+  'thread.placeholder':'Write a message',
+  'profile.title':'Profile','profile.listings':'Your tools','profile.add':'List a tool','profile.signout':'Sign out'
+};
+const ARTS = {shed:['art-shed','home_repair_service','Shed (brand)'],street:['art-street','holiday_village','Street (brand)'],hands:['art-hands','handshake','Handshake (Library)'],none:['art-none','hide_image','None']};
+const CONTENT_USE = {'shell.name':'all','browse.fab':'browse','profile.add':'profile','browse.empty.cta':'browse'};
+const TOOLS = [['Cordless drill','Good','Priya','0.3 km','hardware','#8fb39c'],['Step ladder (3 m)','Fair','Tom','0.6 km','stairs','#b9a57f'],['Hedge trimmer','Good','Ana','1.1 km','yard','#7fa7b9'],['Tile cutter','Like new','Dev','1.8 km','carpenter','#a99ac2']];
+
+// Pages: the spec. Sections are the unit; each names its design-system component, its stories, what data it shows and where it leads.
+// built: true | false | 'differs'. Page status is derived: planned (no spec) → specified (spec accepted) → built (accepted build).
+const PAGES = [
+  {id:'signin',label:'Sign in',icon:'login',nav:false,entry:true,status:'built',origin:'Accounts pack',layout:'Split hero',route:'/sign-in',
+   purpose:'Where visitors join or come back. Shown to anyone not signed in.',stories:['S1','S2','S3'],data:[['Account','data'],['signIn','op'],['signUp','op']],
+   states:{ready:[1,1],loading:[1,1],error:[1,1]},builtBy:['W-01','Aludel template'],rev:2,
+   sections:[
+     {id:'art',name:'Hero image',comp:'Image',stories:[],built:true},
+     {id:'form',name:'Sign-in form',comp:'Text field ×2 · Button',stories:['S1','S2'],data:'signIn',leads:[['browse','Signed in']],built:true},
+     {id:'reset',name:'Forgot password link',comp:'Text button',stories:['S3'],built:false,phase:'MVP'}],
+   history:[['Accounts pack page, as the template builds it','Aludel template · 2026-09-02',1],['Hero image swapped for the shed artwork','You · 2026-09-10',2]]},
+  {id:'browse',label:'Browse',icon:'travel_explore',nav:true,status:'built',origin:'You',layout:'List with search',route:'/browse',
+   purpose:'Sam finds a tool near him without buying one. The first thing a signed-in person sees.',stories:['S4','S5','S6'],data:[['Tool','data'],['listNearbyTools','op']],
+   states:{ready:[1,1],empty:[1,'differs'],loading:[1,1],error:[1,0]},builtBy:['W-12','Codex'],rev:4,
+   sections:[
+     {id:'search',name:'Search',comp:'Search bar',stories:['S5'],data:'listNearbyTools?q=',built:true},
+     {id:'filters',name:'Filters',comp:'Filter chips',stories:['S6'],data:'listNearbyTools?distance,category',built:false,phase:'MVP'},
+     {id:'results',name:'Results',comp:'Card grid → Tool card',stories:['S4'],data:'Tool[] · closest first',leads:[['tool','Tap a tool']],built:true,
+      children:[{id:'card',name:'Tool card',comp:'Card (media, headline, supporting)',data:'Tool.name, photo, condition, lender, distance',built:true}]},
+     {id:'empty',name:'Empty state',comp:'Empty state (illustration, text, button)',stories:['S4'],state:'empty',leads:[['list','List a tool']],built:'differs',
+      drift:'The build has no “List a tool” button in the empty state.'},
+     {id:'fab',name:'List a tool',comp:'Extended FAB',stories:['S19'],leads:[['list','List a tool']],built:true}],
+   history:[['Closest first, not newest: Sam cares about distance (W-12 question)','You · 2026-09-14',3],['Empty state invites lending instead of a dead end','Experience designer · 2026-09-18',4]]},
+  {id:'tool',label:'Tool detail',icon:'handyman',nav:false,parent:'browse',status:'specified',origin:'You',layout:'Detail with side panel',route:'/tools/:id',
+   purpose:'Everything Sam needs to decide, then ask. Priya sees the requests for her own tool here.',stories:['S7','S8','S9','S11'],data:[['Tool','data'],['BorrowRequest','data'],['requestBorrow','op'],['answerRequest','op']],
+   states:{ready:[1,'skeleton'],loading:[0,0],error:[0,0]},builtBy:['W-10','Codex (skeleton)'],rev:3,
+   sections:[
+     {id:'gallery',name:'Photos',comp:'Carousel',needed:true,stories:['S7'],data:'Tool.photos',built:false},
+     {id:'summary',name:'Summary',comp:'Headline, chips, lender row',stories:['S7'],data:'Tool.name, condition, lender, distance',built:false},
+     {id:'request',name:'Ask to borrow',comp:'Date range field · Button',stories:['S8'],data:'requestBorrow',as:'sam',built:false},
+     {id:'message',name:'Message the lender',comp:'Outlined button',stories:['S11'],leads:[['thread','Message Priya']],as:'sam',built:false},
+     {id:'requests',name:'Requests (lender only)',comp:'List → Request item',stories:['S9'],data:'BorrowRequest[] · answerRequest',as:'priya',built:false}],
+   history:[['Spec accepted from SPEC-01','You · 2026-09-19',3]]},
+  {id:'list',label:'List a tool',icon:'add_a_photo',nav:false,parent:'profile',status:'specified',origin:'Story map',layout:'Single form',route:'/tools/new',
+   purpose:'Priya puts a tool up for lending in under a minute.',stories:['S19'],data:[['Tool','data'],['createTool','op']],
+   states:{ready:[1,0],error:[1,0]},builtBy:null,rev:1,
+   sections:[
+     {id:'photo',name:'Photo',comp:'Image upload',stories:['S19'],data:'Tool.photos',built:false},
+     {id:'fields',name:'Details',comp:'Text field ×2 · Select',stories:['S19'],data:'Tool.name, condition, notes',built:false},
+     {id:'submit',name:'Publish',comp:'Button',stories:['S19'],data:'createTool',leads:[['browse','Published']],built:false}],
+   history:[['Spec written by Experience designer (W-19)','Experience designer · 2026-09-21',1]]},
+  {id:'messages',label:'Messages',icon:'chat',nav:true,status:'built',origin:'Messaging pack',layout:'List',route:'/messages',
+   purpose:'Every conversation, unread first.',stories:['S12'],data:[['Conversation','data'],['listConversations','op']],
+   states:{ready:[1,1],empty:[1,1],loading:[1,1]},builtBy:['W-02','Messaging pack'],rev:1,
+   sections:[{id:'list',name:'Conversations',comp:'List → Conversation item',stories:['S12'],data:'Conversation[] · unread first',leads:[['thread','Open']],built:true}],
+   history:[['Messaging pack page','Aludel template · 2026-09-02',1]]},
+  {id:'thread',label:'Conversation',icon:'forum',nav:false,parent:'messages',status:'built',origin:'Messaging pack',layout:'Thread',route:'/messages/:id',
+   purpose:'Arrange pick-up and hand-back.',stories:['S13','S11'],data:[['Message','data'],['sendMessage','op']],
+   states:{ready:[1,1],loading:[1,1]},builtBy:['W-02','Messaging pack'],rev:1,
+   sections:[{id:'about',name:'About this tool',comp:'List item',stories:['S11'],data:'Conversation.tool',built:true},{id:'msgs',name:'Messages',comp:'Message bubbles',stories:['S13'],data:'Message[]',built:true},{id:'compose',name:'Reply',comp:'Text field · Icon button',stories:['S13'],data:'sendMessage',built:true}],
+   history:[['Messaging pack page','Aludel template · 2026-09-02',1]]},
+  {id:'profile',label:'Profile',icon:'person',nav:true,status:'built',origin:'Accounts pack',layout:'List',route:'/profile',
+   purpose:'Your account and your tools.',stories:['S2','S20'],data:[['Account','data'],['Tool','data']],
+   states:{ready:[1,1]},builtBy:['W-01','Aludel template'],rev:1,
+   sections:[{id:'account',name:'Account',comp:'List item',stories:['S2'],data:'Account.name, email',built:true},{id:'mine',name:'Your tools',comp:'List → Tool item',stories:['S20'],data:'Tool[] · mine',built:true,leads:[['list','List a tool']]},{id:'signout',name:'Sign out',comp:'Text button',stories:['S2'],built:true,leads:[['signin','Signed out']]}],
+   history:[['Accounts pack page','Aludel template · 2026-09-02',1]]}
+];
+const P = id => PAGES.find(p => p.id === id);
+const STATE_LABEL = {ready:'Ready',empty:'Empty',loading:'Loading',error:'Error'};
+const WORK = [{id:'W-12',t:'Implement: Browse and search (SPEC-02)',role:'Engineer',type:'implement',st:'Done'}];
+
+// Flows: one per story-map activity; each step is a page in a state, seen as someone, with the trigger to the next step.
+const PERSONAS = [['sam','Sam','Borrower'],['priya','Priya','Lender']]; // Vision › Personas
+const ACT = {join:['S1','S2','S3'], find:['S4','S5','S6','S7'], borrow:['S8','S9','S10'], talk:['S11','S12','S13','S14'], return:['S16','S17'], lend:['S19','S20']};
+// Flows: one per story-map activity; each step is a page seen as someone, with what they do to reach the next step.
+const FLOWS = [
+  {id:'join',title:'Join',persona:'Everyone',as:'visitor',review:'Reviewed',steps:[{page:'signin',as:'visitor',story:'S1',name:'Sign up'},{page:'browse',as:'sam',story:'S4',name:'Land on Browse'}]},
+  {id:'find',title:'Find a tool',persona:'Sam',as:'sam',review:'Due',steps:[{page:'browse',as:'sam',story:'S4',name:'Browse nearby',go:'Search “ladder”'},{page:'browse',as:'sam',story:'S5',name:'Search',q:'ladder'},{page:'tool',as:'sam',story:'S7',name:'See details'}]},
+  {id:'borrow',title:'Borrow',persona:'Sam, Priya',as:'sam',review:'Not started',steps:[{page:'tool',as:'sam',story:'S8',name:'Ask to borrow',go:'Priya is notified'},{page:'tool',as:'priya',story:'S9',name:'Priya answers',go:'Sam is told'},{gap:true,story:'S9',name:'Sam gets the answer',why:'No page shows Sam the answer. S9 says “Sam is told”.'}]},
+  {id:'talk',title:'Talk it over',persona:'Sam, Priya',as:'sam',review:'Not started',steps:[{page:'tool',as:'sam',story:'S11',name:'Start from a tool'},{page:'thread',as:'sam',story:'S13',name:'Read and reply'}]},
+  {id:'return',title:'Give it back',persona:'Sam',as:'sam',review:'No pages',steps:[]},
+  {id:'lend',title:'Lend my tools',persona:'Priya',as:'priya',review:'Not started',steps:[{page:'profile',as:'priya',story:'S20',name:'Your tools'},{page:'list',as:'priya',story:'S19',name:'List a tool'},{page:'browse',as:'sam',story:'S19',name:'Appears in Browse'}]}
+];
+
+/* ================= State ================= */
+const S = {tab:'map', page:'browse', mode:'spec', vp:'desktop', state:'ready', as:'sam', edit:false, sel:null, mapFlow:'', mview:'both', msel:new Set(), mlink:null, tool:'select', fvp:'phone', refit:false, noteType:'Looks right',
+  flow:'find', step:0, reviewing:{}, notes:{}, nextW:21, requested:{}};
+
+/* ================= Helpers ================= */
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const ic = (n, cls='') => `<span class="icon ${cls}" aria-hidden="true">${n}</span>`;
+const C = k => CONTENT[k];
+const ct = (k, tag='span', cls='') => `<${tag} class="ct ${cls}" data-ct="${k}">${esc(C(k))}</${tag}>`;
+const art = (k, extra='') => { const a = ARTS[C(k)] || ARTS.none; return `<div class="a-art ct img ${a[0]} ${extra}" data-ct="${k}" role="img" aria-label="${a[2]}">${ic(a[1])}</div>`; };
+const pageStatus = p => { if (p.status === 'built' && driftCount(p)) return ['drift','Built · differs']; return ({planned:['planned','Planned'],specified:['specified','Specified'],built:['built','Built']})[p.status]; };
+const driftCount = p => allSecs(p).filter(s => s.built === 'differs').length + Object.values(p.states).filter(v => v[1] === 'differs').length;
+const allSecs = p => p.sections.flatMap(s => [s, ...(s.children || [])]);
+const secById = (p, id) => allSecs(p).find(s => s.id === id);
+const secByName = (p, where) => p.sections.find(s => where.replace(/^(Above|Below) /, '') === s.name);
+const storyChip = id => { const s = STORIES[id]; return `<span class="sm-st s-${s[1]}">${s[1][0].toUpperCase() + s[1].slice(1)}</span>`; };
+const toast = (msg, action) => { document.querySelector('.toast')?.remove(); const t = document.createElement('div'); t.className = 'toast'; t.setAttribute('role','status'); t.innerHTML = `${ic('check_circle')}<span>${msg}</span>${action ? `<button data-act="${action[1]}">${action[0]}</button>` : ''}`; document.body.append(t); setTimeout(() => t.remove(), 5200); };
+
+/* ================= The Tool Share app renderer ================= */
+// o: {mode:'spec'|'built', state, as, q}. Sections carry data-sec; content carries data-ct; data carries data-dt.
+function sec(p, id, inner, o, cls='') {
+  const s = secById(p, id); if (!s) return inner;
+  const built = s.built;
+  if (o.mode === 'built' && built === false) return '';
+  if (s.as && o.as && s.as !== o.as) return '';
+  const ghost = o.mode === 'spec' && built === false && s.phase;
+  const differs = o.mode === 'built' && built === 'differs';
+  return `${reqAt(p, 'Above ' + s.name, o)}<div class="sec ${cls} ${ghost ? 'ghost' : ''} ${differs ? 'differs' : ''}" data-sec="${id}">${ghost ? `<span class="phase">${s.phase} · not built</span>` : ''}${inner}</div>${reqAt(p, 'Below ' + s.name, o)}`;
+}
+const reqCard = (r, o) => o.mode === 'spec' ? `<div class="sec req" data-sec="${r.secId}"><b>${ic('add_box')} ${esc(r.name)}</b><span class="small">${esc(r.comp)} · requested in ${r.w}, not built</span></div>` : '';
+function reqAt(p, where, o) { return (S.requested[p.id] || []).filter(r => r.op === 'add' && r.where === where).map(r => reqCard(r, o)).join(''); }
+const revOf = p => p.rev + new Set((S.requested[p.id] || []).map(r => r.w)).size;
+function reqSecs(p, o) {
+  return (S.requested[p.id] || []).filter(r => r.op === 'add' && !(r.where && secByName(p, r.where))).map(r => o.mode === 'spec' ? `<div class="sec req" data-sec="${r.secId}"><b>${ic('add_box')} ${esc(r.name)}</b><span class="small">${esc(r.comp)} · requested in ${r.w}, not built</span></div>` : '').join('');
+}
+function shell(active, body, o) {
+  const tabs = [['browse','travel_explore','Browse'],['messages','chat','Messages'],['profile','person','Profile']];
+  return `<div class="app ${o.mode === 'spec' ? 'specmode' : ''}">
+    <div class="a-bar sec-shell" data-sec="__shell"><span class="logo"><span class="mk">TS</span>${ct('shell.name')}</span>
+      <span class="navd">${tabs.map(t => `<span class="${t[0] === active ? 'on' : ''}">${ic(t[1])}${t[2]}</span>`).join('')}</span><span class="av">${o.as === 'priya' ? 'P' : 'S'}</span></div>
+    <div class="a-body">${body}</div>
+    <nav class="a-nb" data-sec="__shell">${tabs.map(t => `<span class="${t[0] === active ? 'on' : ''}">${ic(t[1])}${t[2]}</span>`).join('')}</nav></div>`;
+}
+const toolCard = (t, i) => `<div class="a-card" ${i === 0 ? 'data-sec="card"' : ''}><div class="ph dt" data-dt="Tool.photos" style="background:${t[5]}">${ic(t[4])}</div><div class="bd"><span class="t dt" data-dt="Tool.name">${t[0]}</span><span class="m"><span class="dt" data-dt="Tool.condition">${t[1]}</span> · <span class="dt" data-dt="Tool.lender">${t[2]}</span></span><span class="m">${ic('near_me')}<span class="dt" data-dt="distance (computed)">${t[3]}</span></span></div></div>`;
+
+const RENDER = {
+  signin(p, o) {
+    if (o.as !== 'visitor' && o.mode) {} // anyone can view the sign-in page
+    const err = o.state === 'error' ? `<div class="a-banner">${ic('error')}That email and password don’t match.</div>` : '';
+    const loading = o.state === 'loading';
+    return `<div class="app ${o.mode === 'spec' ? 'specmode' : ''}"><div class="a-hero">
+      ${sec(p, 'art', art('signin.art'), o)}
+      <div class="fm"><span class="logo" style="font:700 20px var(--t-font);color:var(--t-primary)">${ct('shell.name')}</span>
+        <h1 class="a-h">${ct('signin.title')}</h1><p class="a-sub">${ct('signin.sub')}</p>
+        ${sec(p, 'form', `<div style="display:grid;gap:12px">${err}<div class="a-field"><small>Email</small><span>sam@example.com</span></div><div class="a-field"><small>Password</small><span>••••••••</span></div><span class="a-btn full">${loading ? ic('progress_activity') : ''}${ct('signin.cta')}</span><span class="a-btn text">${ct('signin.alt')}</span></div>`, o)}
+        ${sec(p, 'reset', `<span class="a-btn text">Forgot your password?</span>`, o)}
+      </div></div></div>`;
+  },
+  browse(p, o) {
+    const st = o.state;
+    let results;
+    if (st === 'loading') results = sec(p, 'results', `<div class="a-grid">${[0,1,2,3].map(() => '<div class="a-skel"></div>').join('')}</div>`, o);
+    else if (st === 'empty') {
+      const noCta = o.mode === 'built';
+      results = sec(p, 'empty', `<div class="a-empty">${art('browse.empty.art')}<h3 class="a-h" style="font-size:20px">${ct('browse.empty.title')}</h3><p class="a-sub">${ct('browse.empty.body')}</p>${noCta ? '' : `<span class="a-btn">${ic('add')}${ct('browse.empty.cta')}</span>`}</div>`, o);
+    } else if (st === 'error') {
+      results = o.mode === 'built' ? `<div class="a-grid">${[0,1].map(() => '<div class="a-skel"></div>').join('')}</div>` : sec(p, 'results', `<div class="a-banner">${ic('cloud_off')}${ct('browse.error')}<span class="a-btn text" style="margin-left:auto">Retry</span></div>`, o);
+    } else {
+      const list = o.q ? TOOLS.filter(t => t[0].toLowerCase().includes(o.q)) : TOOLS;
+      results = sec(p, 'results', `<div class="a-grid">${list.map(toolCard).join('')}</div>`, o);
+    }
+    const body = `<div><h1 class="a-h">${ct('browse.title')}</h1></div>
+      ${sec(p, 'search', `<div class="a-search">${ic('search')}${o.q ? `<span style="color:var(--t-on)">${o.q}</span>` : ct('browse.search')}</div>`, o)}
+      ${sec(p, 'filters', `<div class="a-chips"><span class="a-chip on">${ic('check')}Within 2 km</span><span class="a-chip">Garden</span><span class="a-chip">Power tools</span><span class="a-chip">Ladders</span></div>`, o)}
+      ${reqSecs(p, o)}${results}
+      ${st === 'ready' || st === 'empty' ? sec(p, 'fab', `<span class="a-fab">${ic('add')}${ct('browse.fab')}</span>`, o) : ''}`;
+    return shell('browse', body, o);
+  },
+  tool(p, o) {
+    if (o.mode === 'built') return shell('browse', `<h1 class="a-h">Tool detail</h1><div class="a-skeleton-note"><b>${ic('construction')} Skeleton page</b><span>The page exists at <code>/tools/:id</code>, but its sections aren’t built yet.</span><i style="width:70%"></i><i style="width:45%"></i><i style="width:60%"></i></div>`, o);
+    if (o.state !== 'ready') return '';
+    const sam = o.as !== 'priya';
+    const body = `<div class="a-2col"><div style="display:grid;gap:14px">
+        ${sec(p, 'gallery', `<div class="a-gal dt" data-dt="Tool.photos">${ic('hardware')}</div>`, o)}
+        ${sec(p, 'summary', `<div style="display:grid;gap:8px"><h1 class="a-h dt" data-dt="Tool.name">Cordless drill</h1><div class="a-chips"><span class="a-chip dt" data-dt="Tool.condition">${ic('verified')}Good</span><span class="a-chip dt" data-dt="distance (computed)">${ic('near_me')}0.3 km</span></div><div class="a-lender"><i>P</i><div><b class="dt" data-dt="Tool.lender">Priya</b><div class="a-sub" style="font-size:12.5px">Lends 6 tools · usually answers in a few hours</div></div></div></div>`, o)}
+      </div><div style="display:grid;gap:14px">
+        ${sam ? sec(p, 'request', `<div class="a-panel"><h4>${ct('tool.request.title')}</h4><div class="a-dates"><div class="a-field"><small>From</small><span>Sat 3 Oct</span></div><div class="a-field"><small>To</small><span>Sun 4 Oct</span></div></div><span class="a-btn full">${ct('tool.request.cta')}</span></div>`, o) : ''}
+        ${sam ? sec(p, 'message', `<span class="a-btn out full">${ic('chat')}${ct('tool.message')}</span>`, o) : ''}
+        ${!sam ? sec(p, 'requests', `<div class="a-panel"><h4>${ct('tool.lender.title')}</h4><div class="a-li" style="padding:6px 0;border:0"><i style="background:var(--t-tertiary-c);color:#6b4000">S</i><div class="tx"><b>Sam · Sat 3 – Sun 4 Oct</b><span>“For putting up shelves”</span></div></div><div class="a-row"><span class="a-btn">Approve</span><span class="a-btn text">Decline</span></div></div>`, o) : ''}
+        ${reqSecs(p, o)}
+      </div></div>`;
+    return shell('browse', body, o);
+  },
+  list(p, o) {
+    if (o.mode === 'built') return null;
+    const body = `<h1 class="a-h">${ct('list.title')}</h1>
+      ${o.state === 'error' ? `<div class="a-banner">${ic('error')}Add a name and a photo to publish.</div>` : ''}
+      ${sec(p, 'photo', `<div class="a-drop dt" data-dt="Tool.photos">${ic('add_a_photo')}${ct('list.photo')}</div>`, o)}
+      ${sec(p, 'fields', `<div style="display:grid;gap:10px"><div class="a-field"><small>Name</small><span>Cordless drill</span></div><div class="a-field"><small>Condition</small><span>Good ▾</span></div><div class="a-field"><small>Notes</small><span>Two batteries included</span></div></div>`, o)}
+      ${sec(p, 'submit', `<span class="a-btn">${ct('list.cta')}</span>`, o)}${reqSecs(p, o)}`;
+    return shell('profile', body, o);
+  },
+  messages(p, o) {
+    const rows = o.state === 'empty' ? `<div class="a-empty">${ic('forum')}<p class="a-sub">${ct('messages.empty')}</p></div>` : o.state === 'loading' ? '<div class="a-skel"></div><div class="a-skel"></div>' :
+      `<div class="a-list">${[['P','Priya','Cordless drill · Sat works for me!',2,'#c9ecd7'],['T','Tom','Step ladder · Thanks, back on the porch',0,'#ffe0b2'],['A','Ana','Hedge trimmer · Is it still free?',0,'#dbe4ff']].map(r => `<div class="a-li"><i style="background:${r[4]}">${r[0]}</i><div class="tx"><b>${r[1]}</b><span>${r[2]}</span></div>${r[3] ? `<span class="a-badge">${r[3]}</span>` : ''}</div>`).join('')}</div>`;
+    return shell('messages', `<h1 class="a-h">${ct('messages.title')}</h1>${sec(p, 'list', rows, o)}${reqSecs(p, o)}`, o);
+  },
+  thread(p, o) {
+    const me = o.as === 'priya';
+    const body = `${sec(p, 'about', `<div class="a-li" style="background:var(--t-c-low);border-radius:12px"><i style="background:#8fb39c;border-radius:10px">${ic('hardware')}</i><div class="tx"><b>Cordless drill</b><span>${me ? 'Sam' : 'Priya'} · 0.3 km</span></div></div>`, o)}
+      ${sec(p, 'msgs', `<div style="display:grid;gap:8px"><div class="a-bub ${me ? '' : 'me'}">Hi! Could I borrow it Saturday?</div><div class="a-bub ${me ? 'me' : ''}">Sure, I’m home after 10.</div><div class="a-bub ${me ? '' : 'me'}">Perfect, see you then.</div></div>`, o)}
+      ${sec(p, 'compose', `<div class="a-compose"><div class="a-search">${ct('thread.placeholder')}</div><span class="a-btn" style="padding:10px">${ic('send')}</span></div>`, o)}${reqSecs(p, o)}`;
+    return shell('messages', body, o);
+  },
+  profile(p, o) {
+    const body = `<h1 class="a-h">${ct('profile.title')}</h1>
+      ${sec(p, 'account', `<div class="a-list"><div class="a-li"><i style="background:var(--t-tertiary-c);color:#6b4000">${o.as === 'priya' ? 'P' : 'S'}</i><div class="tx"><b>${o.as === 'priya' ? 'Priya Shah' : 'Sam Okafor'}</b><span>${o.as === 'priya' ? 'priya' : 'sam'}@example.com</span></div></div></div>`, o)}
+      ${sec(p, 'mine', `<div style="display:grid;gap:8px"><div class="a-row"><b>${ct('profile.listings')}</b><span class="a-btn text" style="margin-left:auto">${ic('add')}${ct('profile.add')}</span></div><div class="a-list">${(o.as === 'priya' ? TOOLS.slice(0,2) : TOOLS.slice(3)).map(t => `<div class="a-li"><i style="background:${t[5]};border-radius:10px">${ic(t[4])}</i><div class="tx"><b>${t[0]}</b><span>${t[1]} · listed</span></div></div>`).join('')}</div></div>`, o)}
+      ${sec(p, 'signout', `<span class="a-btn text">${ct('profile.signout')}</span>`, o)}${reqSecs(p, o)}`;
+    return shell('profile', body, o);
+  }
+};
+function renderApp(pid, o) {
+  const p = P(pid);
+  if (o.as === 'visitor' && pid !== 'signin') return `<div class="app"><div class="redirect">${ic('lock')}<b>Visitors are sent to Sign in</b><span class="small">Access rule: every page except Sign in needs an account (Data › Access).</span></div></div>`;
+  if (p.status === 'planned') return `<div class="app"><div class="notbuilt">${ic('draft')}<b>${esc(p.label)}</b><span class="small">${esc(p.note || 'Planned. Not specified yet.')}</span></div></div>`;
+  const html = RENDER[pid](p, o);
+  return html;
+}
+
+/* ================= Main render ================= */
+function render() {
+  const m = document.getElementById('main');
+  const tabs = [['map','account_tree','Map'],['pages','web','Pages'],['flows','route','Flows']];
+  m.innerHTML = `<p class="eyebrow">${ic('web')}Pages · how the product works for people</p>
+    <h1>Tool Share’s pages</h1>
+    <div class="tabs" role="tablist">${tabs.map(t => `<button role="tab" aria-selected="${S.tab === t[0]}" data-act="tab" data-v="${t[0]}">${ic(t[1])}${t[2]}</button>`).join('')}</div>
+    <div id="view">${S.tab === 'map' ? mapView() : S.tab === 'pages' ? pagesView() : flowsView()}</div>`;
+  if (S.tab === 'map') mountMap();
+  if (S.tab === 'pages') { requestAnimationFrame(drawSel); }
+}
+
+/* ---------- Map: the planning canvas ---------- */
+// Pages sit in grid cells sized to the view (Desktop, Phone or Both), so spacing stays even and nothing overlaps.
+const POS = {signin:[0,0],browse:[1,0],tool:[2,0],thread:[3,0],profile:[1,1],list:[2,1],messages:[3,1]};
+const CELL = {both:{w:500,h:318}, desktop:{w:420,h:338}, phone:{w:200,h:410}};
+const GX = 120, GY = 90;
+// Links between pages. Spec links come from sections' "leads to"; planned links are drawn on the canvas.
+const LINKS = [];
+PAGES.forEach(p => p.sections.forEach(s => (s.leads || []).forEach(l => { if (!LINKS.some(x => x.from === p.id && x.to === l[0])) LINKS.push({id:'L' + LINKS.length, from:p.id, to:l[0], label:l[1], origin:'spec'}); })));
+let CAM = null, DRAG = null, SPACE = false, nBlank = 0, nLink = 100;
+const cellSz = () => CELL[S.mview];
+const cellXY = (c, r) => [c * (cellSz().w + GX), r * (cellSz().h + GY)];
+function nodeRect(id) { const [c, r] = POS[id]; let [x, y] = cellXY(c, r); if (DRAG?.kind === 'move' && DRAG.ids.has(id)) { x += DRAG.dx; y += DRAG.dy; } return {x, y, w:cellSz().w, h:cellSz().h}; }
+const stepStatus = s => s.gap ? 'gap' : pageStatus(P(s.page))[0];
+const missingStories = f => { const placed = new Set(PAGES.flatMap(p => p.stories)); return (ACT[f.id] || []).filter(id => !placed.has(id)); };
+const curFlow = () => S.mapFlow ? FLOWS.find(f => f.id === S.mapFlow) : null;
+const chipCls = k => k === 'drift' ? 'warn' : k === 'built' ? 'info' : k === 'specified' ? 'pages' : '';
+const mod = /Mac/.test(navigator.platform) ? '⌘' : 'Ctrl';
+
+function thumbs(p) {
+  const v = S.mview, {w, h} = cellSz(), bh = h - 16 - 24 - 20 - 12;
+  if (p.status === 'planned') return `<div class="nbody blank"><textarea class="nnote" data-note="${p.id}" placeholder="What happens here, and for whom?">${esc(p.note)}</textarea>
+    <div class="nstories">${p.stories.map(s => `<span class="chip dash">${s}</span>`).join('')}<select data-act="nodestory" data-v="${p.id}" aria-label="Link a story"><option value="">+ Story</option>${Object.keys(STORIES).filter(s => !p.stories.includes(s)).map(s => `<option value="${s}">${s} ${esc(STORIES[s][0].slice(0, 38))}</option>`).join('')}</select></div></div>`;
+  const o = {mode: p.status === 'built' ? 'built' : 'spec', state:'ready', as: p.id === 'signin' ? 'visitor' : p.id === 'list' ? 'priya' : 'sam'};
+  const pw = v === 'both' ? 118 : w - 16, dw = v === 'both' ? w - 16 - 8 - pw : w - 16;
+  const d = v !== 'phone' ? `<div class="nth" style="width:${dw}px;height:${bh}px"><div class="tapp" style="width:980px;transform:scale(${dw / 980})">${renderApp(p.id, o) || ''}</div></div>` : '';
+  const ph = v !== 'desktop' ? `<div class="nth" style="width:${pw}px;height:${bh}px"><div class="tapp phone" style="width:390px;transform:scale(${pw / 390})">${renderApp(p.id, o) || ''}</div></div>` : '';
+  return `<div class="nbody">${d}${ph}</div>`;
+}
+function nodeHtml(p) {
+  const r = nodeRect(p.id), st = pageStatus(p), f = curFlow();
+  const nums = f ? f.steps.map((s, i) => s.page === p.id ? i + 1 : 0).filter(Boolean) : [];
+  const cls = ['node', p.status === 'planned' ? 'planned' : '', S.msel.has(p.id) ? 'sel' : '', f ? (nums.length ? 'inflow' : 'dim') : ''].join(' ');
+  return `<div class="${cls}" data-node="${p.id}" style="left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px">
+    ${nums.length ? `<span class="nstep">${nums.map(n => `<b>${n}</b>`).join('')}</span>` : ''}
+    ${f ? `<button class="addstep" data-act="addstep" data-v="${p.id}">${ic('add')}Step</button>` : ''}
+    <div class="nhead">${ic(p.status === 'planned' ? 'draft' : p.icon)}${p.status === 'planned' ? `<input class="ntitle" data-title="${p.id}" value="${esc(p.label)}" aria-label="Page title">` : `<span class="nt">${p.label}</span>`}<button class="ob" data-act="openpage" data-v="${p.id}" title="Open in Pages" aria-label="Open ${esc(p.label)} in Pages">${ic('open_in_new')}</button></div>
+    ${thumbs(p)}
+    <div class="nfoot"><span class="chip ${chipCls(st[0])}">${st[1]}</span>${p.nav ? '<span class="chip">In nav</span>' : ''}${p.status !== 'planned' ? p.stories.map(s => `<span class="chip dash">${s}</span>`).join('') : ''}</div>
+    <span class="handle" data-handle="${p.id}" title="Drag to another page to connect"></span></div>`;
+}
+function mapView() {
+  const f = curFlow();
+  return `<div class="mapwrap">
+    <div class="vp ${S.tool === 'hand' ? 'hand' : ''}" id="vp" aria-label="Map canvas">
+      <div class="world" id="world"><div id="ghosts"></div><svg id="links"></svg><div id="labels"></div>${PAGES.map(nodeHtml).join('')}</div>
+      <div class="ctools">
+        <div class="tgroup" role="group" aria-label="Tool"><button aria-pressed="${S.tool === 'select'}" data-act="tool" data-v="select" title="Select (V)">${ic('arrow_selector_tool')}</button><button aria-pressed="${S.tool === 'hand'}" data-act="tool" data-v="hand" title="Pan (H, or hold Space)">${ic('pan_tool')}</button></div>
+        <div class="tgroup"><button data-act="newpage" title="Add a page blank">${ic('add_box')}Page blank</button></div>
+        <div class="tgroup" role="group" aria-label="Show">${[['desktop','desktop_windows','Desktop'],['phone','smartphone','Phone'],['both','devices','Both']].map(m => `<button aria-pressed="${S.mview === m[0]}" data-act="mview" data-v="${m[0]}">${ic(m[1])}${m[2]}</button>`).join('')}</div>
+        <div class="tgroup" style="margin-left:auto"><button data-act="zoom" data-v="0.8" aria-label="Zoom out">${ic('remove')}</button><span class="z" id="zl">100%</span><button data-act="zoom" data-v="1.25" aria-label="Zoom in">${ic('add')}</button><button data-act="fit">${ic('fit_screen')}Fit</button></div>
+      </div>
+      ${f ? `<div class="fbanner">${ic('route')}Editing <b>${esc(f.title)}</b> · “+ Step” adds a page · a link from the last step extends it<button data-act="doneflow">Done</button></div>` : ''}
+      <div class="chint">Scroll to pan · ${mod} + scroll to zoom · drag empty space to select · drag ● to connect · Delete removes</div>
+    </div>
+    ${flowsSidebar()}
+  </div>`;
+}
+function flowsSidebar() {
+  const f0 = curFlow();
+  return `<aside class="flows" aria-label="Flows"><div class="row"><h2>Flows</h2><button class="btn sm push" data-act="newflow">${ic('add')}New flow</button></div>
+    <div class="lg"><span><i class="st-built"></i>Built</span><span><i class="st-specified"></i>Specified</span><span><i class="st-planned"></i>Planned</span><span><i class="st-gap"></i>Missing</span></div>
+    ${FLOWS.map(f => flowRow(f, f0 && f0.id === f.id)).join('')}</aside>`;
+}
+function flowRow(f, on) {
+  const miss = missingStories(f), st = f.steps.map(stepStatus);
+  const n = k => st.filter(x => k === 'built' ? x === 'built' || x === 'drift' : x === k).length;
+  const parts = [[n('built'),'built'],[n('specified'),'specified'],[n('planned'),'planned'],[n('gap') + miss.length,'missing']].filter(x => x[0]).map(x => `${x[0]} ${x[1]}`).join(' · ') || 'No steps yet';
+  const rv = S.reviewing[f.id]; const review = rv ? (rv.done ? rv.verdict : 'In review') : f.review;
+  return `<div class="frow ${on ? 'on' : ''}">
+    <button class="fhd" data-act="selflow" data-v="${f.id}" aria-expanded="${on}"><span class="row"><b>${esc(f.title)}</b><span class="tiny muted">${esc(f.persona)}</span>${review === 'Reviewed' ? `<span class="chip ok push">${ic('check')}Reviewed</span>` : review === 'In review' ? '<span class="chip work push">In review</span>' : ''}</span>
+      <span class="sbar">${st.map(x => `<i class="st-${x}"></i>`).join('')}${miss.map(() => '<i class="st-gap"></i>').join('')}${!st.length && !miss.length ? '<i class="st-none"></i>' : ''}</span><small class="muted">${parts}</small></button>
+    ${on ? flowEditor(f, miss) : ''}</div>`;
+}
+function linkBetween(a, b) { return LINKS.find(l => l.from === a && l.to === b); }
+function flowEditor(f, miss) {
+  return `<div class="fedit">
+    ${f.custom ? `<label class="field">Name<input data-flowtitle="${f.id}" value="${esc(f.title)}"></label>` : ''}
+    <ol class="fsteplist">${f.steps.map((s, i) => { const prev = f.steps[i - 1];
+      let conn = '';
+      if (i) { const same = !prev.gap && !s.gap && prev.page === s.page; const l = !prev.gap && !s.gap && !same ? linkBetween(prev.page, s.page) : null; const miss = !prev.gap && !s.gap && !same && !l;
+        conn = `<li class="fconn ${miss ? 'miss' : ''}">${ic('south')}${l ? esc(l.label) : same ? esc(prev.go || 'Same page') : miss ? 'No link yet: draw one on the canvas' : ''}</li>`; }
+      return `${conn}<li class="fs"><span class="n">${i + 1}</span><span>${s.gap ? `<b class="warn">${esc(s.name)}</b> <span class="tiny muted">no page</span>` : `<b>${esc(P(s.page).label)}</b> <span class="tiny muted">${esc(s.name)}</span>`}</span><span class="ctl">${s.gap ? `<button data-act="fillgap" data-v="${i}" title="Add a page blank for this step" aria-label="Add a page blank">${ic('add_box')}</button>` : ''}<button data-act="upstep" data-v="${i}" ${i ? '' : 'disabled'} aria-label="Move up">${ic('arrow_upward')}</button><button data-act="rmstep" data-v="${i}" aria-label="Remove step">${ic('close')}</button></span></li>`; }).join('')}</ol>
+    ${!f.steps.length ? '<p class="note" style="margin:0">No steps yet. Click “+ Step” on a page, or add a page blank below.</p>' : ''}
+    ${miss.length ? `<div class="missing"><b>${ic('warning')}Stories with no page</b>${miss.map(id => `<div class="row"><span class="small"><b>${id}</b> ${STORIES[id][0]}</span><button class="btn sm push" data-act="blankfor" data-v="${id}">${ic('add_box')}Blank</button></div>`).join('')}</div>` : ''}
+    <div class="row"><button class="btn sm" data-act="reviewflow" data-v="${f.id}">${ic('play_circle')}Walk through</button><button class="btn sm push" data-act="doneflow">Done</button></div></div>`;
+}
+
+/* Links, camera and pointer handling */
+function drawLinks() {
+  const svg = document.getElementById('links'), lab = document.getElementById('labels'); if (!svg) return;
+  const f = curFlow(), pairs = [];
+  if (f) { const ps = f.steps.filter(s => !s.gap).map(s => s.page); for (let i = 0; i < ps.length - 1; i++) if (ps[i] !== ps[i + 1]) pairs.push([ps[i], ps[i + 1]]); }
+  const items = LINKS.slice();
+  pairs.forEach(([a, b]) => { if (!linkBetween(a, b) && !items.some(x => x.from === a && x.to === b)) items.push({id:'', from:a, to:b, label:'No link yet', missing:true}); });
+  const geo = items.map(l => { const A = nodeRect(l.from), B = nodeRect(l.to); const dir = B.x >= A.x + A.w ? 'r' : B.x + B.w <= A.x ? 'l' : B.y > A.y ? 'd' : 'u';
+    return {l, A, B, sa:{r:'r', l:'l', d:'b', u:'t'}[dir], sb:{r:'l', l:'r', d:'t', u:'b'}[dir]}; });
+  // Spread links that share a side of a page so they don't sit on top of each other.
+  const ports = {};
+  geo.forEach((g, i) => { (ports[g.l.from + g.sa] = ports[g.l.from + g.sa] || []).push([i, 'a', g.B]); (ports[g.l.to + g.sb] = ports[g.l.to + g.sb] || []).push([i, 'b', g.A]); });
+  Object.entries(ports).forEach(([k, list]) => { const side = k.slice(-1); list.sort((p, q) => side === 'r' || side === 'l' ? p[2].y - q[2].y : p[2].x - q[2].x); list.forEach(([i, end], j) => { geo[i]['o' + end] = (j - (list.length - 1) / 2) * 30; }); });
+  const pt = (R, side, o) => side === 'r' ? [R.x + R.w, R.y + R.h / 2 + o] : side === 'l' ? [R.x, R.y + R.h / 2 + o] : side === 'b' ? [R.x + R.w / 2 + o, R.y + R.h] : [R.x + R.w / 2 + o, R.y];
+  const vec = {r:[1, 0], l:[-1, 0], b:[0, 1], t:[0, -1]};
+  const mk = (id, c) => `<marker id="${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="${c}"/></marker>`;
+  let out = `<defs>${mk('m', '#98a3bd')}${mk('mon', '#2a7230')}${mk('msel', '#3047b9')}${mk('mmiss', '#e39b00')}</defs>`, labels = '';
+  geo.forEach(g => {
+    const [x1, y1] = pt(g.A, g.sa, g.oa || 0), [x2, y2] = pt(g.B, g.sb, g.ob || 0);
+    const k = Math.max(50, Math.hypot(x2 - x1, y2 - y1) / 2.6);
+    const c1 = [x1 + vec[g.sa][0] * k, y1 + vec[g.sa][1] * k], c2 = [x2 + vec[g.sb][0] * k, y2 + vec[g.sb][1] * k];
+    const d = `M${x1},${y1} C${c1} ${c2} ${x2},${y2}`;
+    const mx = (x1 + 3 * c1[0] + 3 * c2[0] + x2) / 8, my = (y1 + 3 * c1[1] + 3 * c2[1] + y2) / 8;
+    const on = f && pairs.some(p => p[0] === g.l.from && p[1] === g.l.to) && !g.l.missing;
+    const cls = g.l.missing ? 'missing' : on ? 'on' : f ? 'dim' : '', sel = !g.l.missing && S.mlink === g.l.id ? 'sel' : '';
+    out += `<path class="lkp ${cls} ${sel}" d="${d}" marker-end="url(#${g.l.missing ? 'mmiss' : sel ? 'msel' : on ? 'mon' : 'm'})"/>${g.l.missing ? '' : `<path class="hit" data-link="${g.l.id}" d="${d}"/>`}`;
+    labels += `<span class="llabel ${cls} ${sel}" ${g.l.missing ? '' : `data-link="${g.l.id}"`} style="left:${mx}px;top:${my}px" title="${g.l.missing ? 'This flow goes here, but no link is drawn' : g.l.origin === 'spec' ? 'From the spec · double-click to rename' : 'Planned · double-click to rename'}">${esc(g.l.label)}</span>`;
+  });
+  if (DRAG?.kind === 'link') { const A = nodeRect(DRAG.from), x1 = A.x + A.w, y1 = A.y + A.h / 2; out += `<path class="lkp temp" d="M${x1},${y1} C${x1 + 80},${y1} ${DRAG.x - 80},${DRAG.y} ${DRAG.x},${DRAG.y}" marker-end="url(#msel)"/>`; }
+  svg.innerHTML = out; lab.innerHTML = labels;
+}
+function applyCam() {
+  const w = document.getElementById('world'), vp = document.getElementById('vp'); if (!w || !CAM) return;
+  w.style.transform = `translate(${CAM.x}px,${CAM.y}px) scale(${CAM.z})`;
+  const g = 24 * CAM.z; vp.style.backgroundSize = `${g}px ${g}px`; vp.style.backgroundPosition = `${CAM.x}px ${CAM.y}px`;
+  const zl = document.getElementById('zl'); if (zl) zl.textContent = Math.round(CAM.z * 100) + '%';
+}
+function fit() {
+  const vp = document.getElementById('vp'); if (!vp) return; const rs = Object.keys(POS).map(nodeRect);
+  const minX = Math.min(...rs.map(r => r.x)), minY = Math.min(...rs.map(r => r.y)), maxX = Math.max(...rs.map(r => r.x + r.w)), maxY = Math.max(...rs.map(r => r.y + r.h));
+  const top = 70, bottom = 40, side = 40, W = vp.clientWidth - side * 2, H = vp.clientHeight - top - bottom;
+  const z = Math.min(1.1, Math.max(.15, Math.min(W / (maxX - minX), H / (maxY - minY))));
+  CAM = {z, x: side + (W - (maxX - minX) * z) / 2 - minX * z, y: top + (H - (maxY - minY) * z) / 2 - minY * z}; applyCam();
+}
+function zoomAt(f, cx, cy) { const z = Math.min(2, Math.max(.12, CAM.z * f)); CAM.x = cx - (cx - CAM.x) * (z / CAM.z); CAM.y = cy - (cy - CAM.y) * (z / CAM.z); CAM.z = z; applyCam(); }
+const toWorld = e => { const r = document.getElementById('vp').getBoundingClientRect(); return [(e.clientX - r.left - CAM.x) / CAM.z, (e.clientY - r.top - CAM.y) / CAM.z]; };
+function refreshSel() { document.querySelectorAll('.node').forEach(n => n.classList.toggle('sel', S.msel.has(n.dataset.node))); }
+function snapTargets(d) {
+  const {w, h} = cellSz(), moving = d.ids, list = [];
+  let bad = false; const taken = new Set(Object.keys(POS).filter(id => !moving.has(id)).map(id => POS[id].join()));
+  moving.forEach(id => { const [x, y] = cellXY(...POS[id]); const c = Math.round((x + d.dx) / (w + GX)), r = Math.round((y + d.dy) / (h + GY)); const b = c < 0 || r < 0 || taken.has(c + ',' + r); if (b) bad = true; list.push([id, c, r, b]); });
+  return {list, bad};
+}
+function ghosts(d) {
+  const g = document.getElementById('ghosts'); if (!g) return; if (!d) { g.innerHTML = ''; return; }
+  const {w, h} = cellSz(); g.innerHTML = snapTargets(d).list.map(([id, c, r, b]) => { const [x, y] = cellXY(Math.max(0, c), Math.max(0, r)); return `<div class="ghostcell ${b ? 'bad' : ''}" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px"></div>`; }).join('');
+}
+function mapDown(e) {
+  // A blank's title and note drag the page until you click into them.
+  const field = e.target.closest('.node input, .node textarea');
+  if (field && document.activeElement === field) return;
+  if (e.target.closest('.ctools,.fbanner,.chint,button,select') || (e.target.closest('input,textarea') && !field)) return;
+  const vp = document.getElementById('vp'); const [wx, wy] = toWorld(e);
+  const handle = e.target.closest('[data-handle]'), node = e.target.closest('.node'), link = e.target.closest('[data-link]');
+  if (e.button === 1 || S.tool === 'hand' || SPACE) { DRAG = {kind:'pan', sx:e.clientX, sy:e.clientY, cx:CAM.x, cy:CAM.y}; vp.classList.add('panning'); }
+  else if (e.button !== 0) return;
+  else if (handle) { DRAG = {kind:'link', from:handle.dataset.handle, x:wx, y:wy}; vp.classList.add('connecting'); }
+  else if (node) {
+    const id = node.dataset.node;
+    if (e.shiftKey) { S.msel.has(id) ? S.msel.delete(id) : S.msel.add(id); } else if (!S.msel.has(id)) S.msel = new Set([id]);
+    if (S.mlink) { S.mlink = null; drawLinks(); }
+    refreshSel(); DRAG = {kind:'move', ids:new Set(S.msel), sx:wx, sy:wy, dx:0, dy:0, moved:false, field};
+  }
+  else if (link) { S.mlink = link.dataset.link; S.msel.clear(); refreshSel(); drawLinks(); return; }
+  else { if (!e.shiftKey) S.msel.clear(); S.mlink = null; refreshSel(); drawLinks(); DRAG = {kind:'box', x0:wx, y0:wy, base:new Set(S.msel)}; }
+  e.preventDefault(); document.activeElement?.blur?.();
+  window.addEventListener('pointermove', mapMove); window.addEventListener('pointerup', mapUp, {once:true});
+}
+function mapMove(e) {
+  if (!DRAG) return; const [wx, wy] = toWorld(e);
+  if (DRAG.kind === 'pan') { CAM.x = DRAG.cx + e.clientX - DRAG.sx; CAM.y = DRAG.cy + e.clientY - DRAG.sy; applyCam(); }
+  else if (DRAG.kind === 'link') { DRAG.x = wx; DRAG.y = wy; const over = document.elementFromPoint(e.clientX, e.clientY)?.closest('.node'); document.querySelectorAll('.node.target').forEach(n => n.classList.remove('target')); if (over && over.dataset.node !== DRAG.from) over.classList.add('target'); drawLinks(); }
+  else if (DRAG.kind === 'move') {
+    DRAG.dx = wx - DRAG.sx; DRAG.dy = wy - DRAG.sy; if (Math.hypot(DRAG.dx, DRAG.dy) * CAM.z > 4) DRAG.moved = true; if (!DRAG.moved) return;
+    DRAG.ids.forEach(id => { const el = document.querySelector(`.node[data-node="${id}"]`); const r = nodeRect(id); el.style.left = r.x + 'px'; el.style.top = r.y + 'px'; el.classList.add('dragging'); });
+    ghosts(DRAG); drawLinks();
+  } else if (DRAG.kind === 'box') {
+    const x = Math.min(DRAG.x0, wx), y = Math.min(DRAG.y0, wy), w = Math.abs(wx - DRAG.x0), h = Math.abs(wy - DRAG.y0);
+    let m = document.getElementById('marquee'); if (!m) { m = document.createElement('div'); m.id = 'marquee'; m.className = 'marquee'; document.getElementById('world').appendChild(m); }
+    Object.assign(m.style, {left:x + 'px', top:y + 'px', width:w + 'px', height:h + 'px'});
+    S.msel = new Set([...DRAG.base, ...Object.keys(POS).filter(id => { const r = nodeRect(id); return r.x < x + w && r.x + r.w > x && r.y < y + h && r.y + r.h > y; })]); refreshSel();
+  }
+}
+function mapUp(e) {
+  window.removeEventListener('pointermove', mapMove);
+  document.getElementById('vp')?.classList.remove('panning', 'connecting');
+  const d = DRAG; if (!d) return;
+  if (d.kind === 'move' && d.moved) { const t = snapTargets(d); DRAG = null; if (t.bad) toast('That spot is taken, so the pages went back.'); else t.list.forEach(([id, c, r]) => POS[id] = [c, r]); render(); return; }
+  if (d.kind === 'link') { const over = document.elementFromPoint(e.clientX, e.clientY)?.closest('.node'); DRAG = null; document.querySelectorAll('.node.target').forEach(n => n.classList.remove('target')); if (over && over.dataset.node !== d.from) addLink(d.from, over.dataset.node); else drawLinks(); return; }
+  if (d.kind === 'box') document.getElementById('marquee')?.remove();
+  DRAG = null;
+  if (d.kind === 'move' && d.field && !e.shiftKey) d.field.focus();
+}
+function addLink(a, b) {
+  if (linkBetween(a, b)) { toast(`${P(a).label} already links to ${P(b).label}.`); drawLinks(); return; }
+  const id = 'L' + nLink++; LINKS.push({id, from:a, to:b, label:'Go to ' + P(b).label, origin:'plan'});
+  const f = curFlow(), last = f?.steps.filter(s => !s.gap).slice(-1)[0];
+  if (f && last && last.page === a) { f.steps.push(newStep(f, b)); toast(`Linked, and ${P(b).label} is step ${f.steps.length} of ${f.title}.`); }
+  S.mlink = id; render(); editLabel(id);
+}
+function newStep(f, pid) { const p = P(pid); return {page:pid, as:f.as, story:p.stories.find(s => (ACT[f.id] || []).includes(s)) || p.stories[0] || '', name:p.label}; }
+function editLabel(id) {
+  const el = document.querySelector(`.llabel[data-link="${id}"]`), l = LINKS.find(x => x.id === id); if (!el || !l) return;
+  el.innerHTML = `<input value="${esc(l.label)}" aria-label="What does the person do to get there?">`; const inp = el.querySelector('input'); inp.focus(); inp.select();
+  let closed = false; const done = save => { if (closed) return; closed = true; if (save && inp.value.trim()) l.label = inp.value.trim(); drawLinks(); renderSidebar(); };
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') done(true); if (e.key === 'Escape') done(false); e.stopPropagation(); });
+  inp.addEventListener('blur', () => done(true));
+  inp.addEventListener('pointerdown', e => e.stopPropagation());
+}
+function freeCellNear(wx, wy) {
+  const {w, h} = cellSz(), c0 = wx / (w + GX), r0 = wy / (h + GY), taken = new Set(Object.values(POS).map(p => p.join())); let best = null;
+  for (let c = 0; c < 16; c++) for (let r = 0; r < 12; r++) { if (taken.has(c + ',' + r)) continue; const d = (c - c0) ** 2 + (r - r0) ** 2; if (!best || d < best[0]) best = [d, c, r]; }
+  return [best[1], best[2]];
+}
+function addBlank(cell, story) {
+  const id = 'new' + (++nBlank);
+  PAGES.push({id, label: story ? STORIES[story][0].replace(/^(Sam|Priya|Someone) (can |gets |confirms )?/, '').replace(/^./, c => c.toUpperCase()).slice(0, 30) : 'New page', icon:'draft', status:'planned', note:'', stories: story ? [story] : [], sections:[], states:{}, data:[], history:[], layout:'Not chosen', route:'—', purpose:'', nav:false, origin:'You', rev:0});
+  POS[id] = cell; S.msel = new Set([id]); return id;
+}
+function focusTitle(id) { const i = document.querySelector(`.ntitle[data-title="${id}"]`); if (i) { i.focus(); i.select(); } }
+function deleteSel() {
+  if (S.mlink) { const l = LINKS.find(x => x.id === S.mlink); if (l?.origin === 'spec') { toast(`That link is in ${P(l.from).label}’s spec. Change it with a change request.`); return; } LINKS.splice(LINKS.indexOf(l), 1); S.mlink = null; drawLinks(); renderSidebar(); return; }
+  const ids = [...S.msel]; if (!ids.length) return;
+  const keep = ids.filter(id => P(id).status !== 'planned'), gone = ids.filter(id => P(id).status === 'planned');
+  gone.forEach(id => { PAGES.splice(PAGES.findIndex(p => p.id === id), 1); delete POS[id]; for (let i = LINKS.length - 1; i >= 0; i--) if (LINKS[i].from === id || LINKS[i].to === id) LINKS.splice(i, 1); FLOWS.forEach(f => f.steps = f.steps.filter(s => s.page !== id)); });
+  S.msel = new Set(keep); render();
+  if (keep.length) toast(`Only page blanks are deleted here. ${keep.map(id => P(id).label).join(', ')} ${keep.length === 1 ? 'has' : 'have'} a spec or a build.`);
+}
+function renderSidebar() { const s = document.querySelector('.flows'); if (s) s.outerHTML = flowsSidebar(); }
+function mountMap() {
+  const vp = document.getElementById('vp'); if (!vp) return;
+  if (!CAM || S.refit) { S.refit = false; fit(); } else applyCam();
+  drawLinks();
+  vp.addEventListener('wheel', e => { e.preventDefault(); const r = vp.getBoundingClientRect(); if (e.ctrlKey || e.metaKey) zoomAt(Math.exp(-e.deltaY * .0018), e.clientX - r.left, e.clientY - r.top); else { CAM.x -= e.deltaX; CAM.y -= e.deltaY; applyCam(); } }, {passive:false});
+  vp.addEventListener('pointerdown', mapDown);
+  vp.addEventListener('dblclick', e => { const lb = e.target.closest('.llabel[data-link]'); if (lb) return editLabel(lb.dataset.link); const n = e.target.closest('.node'); if (n && !e.target.closest('input,textarea,select,button,.handle')) openPage(n.dataset.node); });
+}
+function openPage(id) { S.tab = 'pages'; S.page = id; S.sel = null; if (!P(id).states[S.state]) S.state = 'ready'; if (id === 'signin') S.as = 'visitor'; else if (S.as === 'visitor') S.as = 'sam'; closeDrawer(); render(); }
+
+/* ---------- Pages workspace ---------- */
+function pagesList() { return PAGES.filter(x => !x.parent).map(x => pitem(x) + PAGES.filter(c => c.parent === x.id).map(c => pitem(c, true)).join('')).join(''); }
+function pagesView() {
+  const p = P(S.page);
+  if (p.status === 'planned') return plannedView(p);
+  const o = {mode:S.mode, state:S.state, as:S.as};
+  const st = pageStatus(p);
+  const stateKeys = Object.keys(STATE_LABEL);
+  const html = renderApp(p.id, o);
+  const specOnly = S.mode === 'built' && html === null;
+  const unspecified = S.mode === 'spec' && !(p.states[S.state] && p.states[S.state][0]);
+  const builtStateMissing = S.mode === 'built' && p.states[S.state] && p.states[S.state][1] === 0 && p.status === 'built';
+  const hiddenBuilt = S.mode === 'built' && p.status === 'built' ? p.sections.filter(s => s.built === false) : [];
+  const driftHere = S.mode === 'built' && p.states[S.state]?.[1] === 'differs';
+  return `<div class="ws">
+    <div class="pane left">
+      <div class="phead">${ic('account_tree')}Pages</div>
+      <div class="plist">${pagesList()}</div>
+      <div class="outline"><div class="phead">${ic('segment')}On this page</div>
+        <button class="oitem ${S.sel?.type === 'page' || !S.sel ? 'on' : ''}" data-act="selpage">${ic('web')}<span class="nm"><b>${p.label}</b> · ${p.layout}</span></button>
+        ${p.id !== 'signin' ? `<button class="oitem ${S.sel?.id === '__shell' ? 'on' : ''}" data-act="selsec" data-v="__shell" data-hov="__shell">${ic('dock_to_bottom')}<span class="nm">App shell</span><span class="tag nb">shared</span></button>` : ''}
+        ${p.sections.map(s => oitem(p, s) + (s.children || []).map(c => oitem(p, c, true)).join('')).join('')}
+        ${(S.requested[p.id] || []).filter(r => r.op === 'add').map(r => `<button class="oitem ${S.sel?.id === r.secId ? 'on' : ''}" data-act="selsec" data-v="${r.secId}" data-hov="${r.secId}">${ic('add_box')}<span class="nm">${esc(r.name)}</span><span class="tag wk">${r.w}</span></button>`).join('')}
+      </div>
+    </div>
+    <div class="pane center">
+      <div class="cbar">
+        <div class="seg" role="group" aria-label="Show">${[['spec','draft','Spec'],['built','deployed_code','Built']].map(m => `<button aria-pressed="${S.mode === m[0]}" data-act="mode" data-v="${m[0]}">${ic(m[1])}${m[2]}</button>`).join('')}</div>
+        <div class="seg" role="group" aria-label="Viewport">${[['desktop','desktop_windows','Desktop'],['phone','smartphone','Phone']].map(m => `<button aria-pressed="${S.vp === m[0]}" data-act="vp" data-v="${m[0]}" aria-label="${m[2]}">${ic(m[1])}</button>`).join('')}</div>
+        <span class="sep"></span>
+        <label class="lbl-in">State <select class="sel-in" data-act="state">${stateKeys.map(k => `<option value="${k}" ${S.state === k ? 'selected' : ''}>${STATE_LABEL[k]}${p.states[k] ? '' : ' (not specified)'}</option>`).join('')}</select></label>
+        <label class="lbl-in">As <select class="sel-in" data-act="as"><optgroup label="Personas · Vision">${PERSONAS.map(a => `<option value="${a[0]}" ${S.as === a[0] ? 'selected' : ''}>${a[1]} · ${a[2]}</option>`).join('')}</optgroup><optgroup label="Everyone else"><option value="visitor" ${S.as === 'visitor' ? 'selected' : ''}>Not signed in</option></optgroup></select></label>
+        <button class="editsw push" aria-pressed="${S.edit}" data-act="edit" title="Edit text and images on the page"><i></i>Edit content</button>
+      </div>
+      <div class="stage" id="stage">
+        <div class="frame ${S.vp === 'phone' ? 'phone' : ''} ${S.edit ? 'editing' : ''}" id="frame">
+          ${S.mode === 'built' ? `<div class="urlbar">${ic('lock', 'tiny')}<span class="u">https://preview.tool-share.localhost${p.route.replace(':id', 'drill-41')}</span><span>Build #14 · ${p.status === 'built' ? 'accepted' : 'skeleton'}</span></div>` : `<div class="specbar">${ic('draft')}Spec · revision ${revOf(p)} · rendered with Tool Share’s components and sample data</div>`}
+          ${specOnly ? `<div class="notbuilt">${ic('deployed_code')}<b>Not built yet</b><span class="small">This page has a spec but no build. Switch to Spec to see it.</span><button class="btn sm" data-act="mode" data-v="spec">Show spec</button></div>` :
+            unspecified ? `<div class="unspec">${ic('draft')}<b>${STATE_LABEL[S.state]} state isn’t specified</b><span class="small">What should ${p.label} show while ${S.state === 'loading' ? 'it loads' : S.state === 'error' ? 'something fails' : 'there is nothing to show'}? Specifying it is Experience designer work.</span><button class="btn sm" data-act="gapwork" data-v="<b>${p.label}</b> · ${S.state} state not specified" data-role="Experience designer">${ic('add_task')}Add to Work · Experience designer</button></div>` :
+            builtStateMissing ? `<div class="app" style="position:relative">${html}<div class="unspec" style="position:absolute;inset:40px 20px auto;background:#ffffffee">${ic('report')}<b>This build has no ${STATE_LABEL[S.state].toLowerCase()} state</b><span class="small">The spec has one. It shows skeletons forever. Building it is Engineer work.</span><button class="btn sm" data-act="buildspec" data-v="state:${S.state}">${ic('code')}Build to spec</button></div></div>` :
+            html}
+        </div>
+      </div>
+      <div class="cfoot">
+        ${S.mode === 'built' ? (p.status !== 'built' ? `<span class="muted">Build #14 has a skeleton for this page. ${p.sections.length} specified sections are not built.</span>` :
+          `${driftHere || hiddenBuilt.length ? `<span class="driftnote">${ic('difference')}${[driftHere ? `The ${STATE_LABEL[S.state].toLowerCase()} state differs from the spec` : '', hiddenBuilt.length ? `${hiddenBuilt.length} specified ${hiddenBuilt.length === 1 ? 'section is' : 'sections are'} not in this build (${hiddenBuilt.map(s => s.name + (s.phase ? ', ' + s.phase : '')).join('; ')})` : ''].filter(Boolean).join(' · ')}</span>` : `<span class="muted">${ic('check', 'tiny')} Matches the spec in this state.</span>`}`) :
+          `<span class="muted">${S.edit ? 'Click text or an image to change it. Changes save as content; the app reads them without a code change.' : 'Hover to see what each part is. Click to inspect it.'}</span>`}
+        <span class="push tiny faint">${S.edit ? '' : 'Layout, sections and behaviour change through a change request.'}</span>
+      </div>
+    </div>
+    <div class="pane right" id="inspector">${inspector(p)}</div>
+  </div>`;
+}
+function pitem(x, child) { const st = pageStatus(x); return `<button class="pitem ${child ? 'child' : ''} ${x.id === S.page ? 'on' : ''}" data-act="openpage" data-v="${x.id}" ${x.id === S.page ? 'aria-current="page"' : ''}>${ic(x.icon)}${x.label}<span class="st row" style="gap:4px">${x.nav ? '' : ''}<i class="dot d-${st[0]}" title="${st[1]}"></i></span></button>`; }
+function oitem(p, s, l2) {
+  const tag = s.built === 'differs' ? '<span class="tag df">differs</span>' : s.built === false ? (s.phase ? `<span class="tag ph">${s.phase}</span>` : '<span class="tag nb">not built</span>') : '';
+  const w = (S.requested[p.id] || []).find(r => r.target === s.id);
+  return `<button class="oitem ${l2 ? 'l2' : ''} ${s.built === false && s.phase ? 'ghost' : ''} ${S.sel?.id === s.id ? 'on' : ''}" data-act="selsec" data-v="${s.id}" data-hov="${s.id}">${ic(s.children ? 'view_module' : l2 ? 'crop_square' : 'view_agenda')}<span class="nm">${s.name}</span>${w ? `<span class="tag wk">${w.w}</span>` : ''}${tag}${s.as ? `<span class="tag nb">${s.as === 'priya' ? 'lender' : 'borrower'}</span>` : ''}</button>`;
+}
+
+/* ---------- Inspector ---------- */
+const lk = (kind, icon, label) => `<a class="lk ${kind}" href="#">${ic(icon)}${label}</a>`;
+function storyRows(ids) { return ids.map(id => `<div class="story"><b>${id}</b><span>${STORIES[id][0]} <span class="faint tiny">· ${STORIES[id][2]}</span></span>${storyChip(id)}</div>`).join('') || '<p class="note">None.</p>'; }
+function inspector(p) {
+  const sel = S.sel;
+  if (sel?.type === 'content') return contentInspector(p, sel.id);
+  if (sel?.type === 'data') return `<div><span class="chip data">${ic('schema')}Data</span></div><h2 class="mono">${esc(sel.id)}</h2><p class="note">This comes from people’s listings, not from content. It isn’t edited here. Its shape is in Data.</p><dl class="kv"><dt>Object</dt><dd>${lk('data','schema',sel.id.split('.')[0].replace(' (computed)',''))}</dd><dt>Shown on</dt><dd>${PAGES.filter(x => x.data.some(d => d[0] === 'Tool')).map(x => x.label).join(', ')}</dd></dl>`;
+  if (sel?.type === 'sec' && sel.id === '__shell') return `<div class="row"><span class="chip pages">${ic('dock_to_bottom')}Layout</span><span class="chip">Shared by 6 pages</span></div><h2>App shell</h2><p class="note">Top bar on desktop, navigation bar on phones. It comes from the navigation and the Tool Share layout in Design.</p><dl class="kv"><dt>Layout</dt><dd>${lk('design','dashboard','App shell (Design › Layouts)')}</dd><dt>Nav items</dt><dd>Browse · Messages · Profile</dd></dl>${actions(p, {id:'__shell', name:'App shell'})}`;
+  if (sel?.type === 'sec') { const req = (S.requested[p.id] || []).find(r => r.secId === sel.id); if (req) return reqInspector(p, req); const s = secById(p, sel.id); if (s) return secInspector(p, s); }
+  return pageInspector(p);
+}
+function pageInspector(p) {
+  const st = pageStatus(p);
+  return `<div class="row wrap"><span class="chip pages">${ic('web')}Page</span><span class="chip ${st[0] === 'drift' ? 'warn' : st[0] === 'built' ? 'info' : 'pages'}">${st[1]}</span>${p.nav ? '<span class="chip">In navigation</span>' : ''}</div>
+    <h2>${p.label}</h2><p class="small" style="margin:0">${p.purpose}</p>
+    <dl class="kv"><dt>Layout</dt><dd>${lk('design','dashboard',p.layout)}</dd><dt>Address</dt><dd class="mono">${p.route}</dd><dt>Origin</dt><dd>${p.origin}</dd><dt>Built by</dt><dd>${p.builtBy ? `${lk('work','task_alt',p.builtBy[0])} ${p.builtBy[1]}` : '<span class="muted">Not built</span>'}</dd></dl>
+    <h3>Stories it realises</h3><div>${storyRows(p.stories)}</div>
+    <h3>States</h3>
+    <table class="matrix"><tr><th>State</th><th>Spec</th><th>Built</th></tr>${Object.keys(STATE_LABEL).map(k => { const v = p.states[k]; const b = v ? v[1] : null;
+      return `<tr class="${S.state === k ? 'cur' : ''}"><td><button data-act="setstate" data-v="${k}">${STATE_LABEL[k]}</button></td><td>${v && v[0] ? `<span class="y">${ic('check')}</span>` : `<span class="n">— <button class="lk" data-act="gapwork" data-v="<b>${p.label}</b> · ${k} state not specified" data-role="Experience designer" style="font-size:11px">Specify</button></span>`}</td><td>${!v ? '<span class="n">—</span>' : b === 1 ? `<span class="y">${ic('check')}</span>` : b === 'differs' ? `<span class="dfc">${ic('difference')} differs</span>` : b === 'skeleton' ? '<span class="n">skeleton</span>' : '<span class="n">—</span>'}</td></tr>`; }).join('')}</table>
+    <h3>Data it shows</h3><div class="row wrap">${p.data.map(d => lk('data', d[1] === 'op' ? 'api' : 'schema', d[0])).join('')}</div>
+    <h3>Leads to</h3><div class="row wrap">${[...new Set(p.sections.flatMap(s => (s.leads || []).map(l => l[0])))].map(id => `<button class="lk page" data-act="openpage" data-v="${id}">${ic(P(id).icon)}${P(id).label}</button>`).join('') || '<span class="note">Nowhere.</span>'}</div>
+    <h3>References</h3><div class="row wrap">${p.id === 'browse' ? lk('lib','image','Airbnb map list (region)') + lk('lib','description','Empty states guideline') : p.id === 'tool' ? lk('lib','image','Fat Llama listing page') : '<span class="note">None. Tag Library items to this page.</span>'}</div>
+    <h3>Why it is this way</h3><div class="why">${p.history.slice().reverse().map(h => `<p>${h[0]}<br><small>Revision ${h[2]} · ${h[1]}</small></p>`).join('')}${(S.requested[p.id] || []).map(r => `<p>${esc(r.why)}<br><small>Requested in ${r.w} · You · today</small></p>`).join('')}</div>
+    ${actions(p)}`;
+}
+function secInspector(p, s) {
+  const w = (S.requested[p.id] || []).find(r => r.target === s.id);
+  const builtTxt = s.built === true ? `<span class="y">${ic('check')}</span> Built` : s.built === 'differs' ? `<span class="dfc">${ic('difference')} Differs</span>` : s.phase ? `Not built · planned for ${s.phase}` : 'Not built';
+  const cts = [...document.querySelectorAll(`#frame [data-sec="${s.id}"] [data-ct]`)].map(e => e.dataset.ct);
+  return `<div class="row wrap"><button class="lk" data-act="selpage">${ic('arrow_back')}${p.label}</button><span class="chip pages">${ic('view_agenda')}Section</span>${s.as ? `<span class="chip">${s.as === 'priya' ? 'Lender only' : 'Borrower only'}</span>` : ''}</div>
+    <h2>${s.name}</h2>
+    ${s.drift ? `<div class="callout warn">${ic('difference')}<span>${s.drift}</span></div>` : ''}
+    ${w ? `<div class="callout work">${ic('task_alt')}<span>${w.w} · ${esc(w.title)} is in Work (Engineer).</span></div>` : ''}
+    <dl class="kv"><dt>Component</dt><dd>${lk('design','widgets',s.comp)}${s.needed ? ' <span class="chip warn">Needed in Design</span>' : ''}</dd>
+      ${s.data ? `<dt>Shows</dt><dd>${lk('data','schema',s.data)}</dd>` : ''}
+      ${s.leads ? `<dt>Leads to</dt><dd>${s.leads.map(l => `<button class="lk page" data-act="openpage" data-v="${l[0]}">${ic('arrow_forward')}${P(l[0]).label}</button> <span class="tiny muted">${l[1]}</span>`).join(' ')}</dd>` : ''}
+      ${s.state ? `<dt>Shown when</dt><dd>${STATE_LABEL[s.state]}</dd>` : ''}
+      <dt>Built</dt><dd>${builtTxt}</dd></dl>
+    ${s.stories ? `<h3>Stories</h3><div>${storyRows(s.stories)}</div>` : ''}
+    ${cts.length ? `<h3>Content <button class="btn sm ghost" data-act="edit">${ic('edit')}${S.edit ? 'Editing' : 'Edit'}</button></h3><div style="display:grid;gap:4px">${cts.map(k => `<button class="lk" style="justify-content:flex-start" data-act="selct" data-v="${k}">${ic(ARTS[C(k)] ? 'image' : 'text_fields')}<span class="mono" style="font-size:11px">${k}</span><span class="muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${ARTS[C(k)] ? ARTS[C(k)][2] : esc(C(k))}</span></button>`).join('')}</div>` : ''}
+    ${actions(p, s)}`;
+}
+function reqInspector(p, r) {
+  return `<div class="row wrap"><button class="lk" data-act="selpage">${ic('arrow_back')}${p.label}</button><span class="chip work">${ic('add_box')}Requested section</span></div><h2>${esc(r.name)}</h2>
+    <div class="callout work">${ic('task_alt')}<span>In the spec since revision ${p.rev + [...new Set((S.requested[p.id] || []).map(x => x.w))].indexOf(r.w) + 1}. <b>${r.w}</b> builds it; until then Built doesn’t show it.</span></div>
+    <dl class="kv"><dt>Component</dt><dd>${lk('design','widgets',r.comp)}</dd><dt>Work</dt><dd>${lk('work','task_alt',r.w)} Engineer · ${esc(r.agent)}</dd><dt>Stories</dt><dd>${r.stories.join(', ') || '—'}</dd></dl>`;
+}
+function contentInspector(p, k) {
+  const isImg = !!ARTS[C(k)];
+  const use = CONTENT_USE[k] === 'all' ? 'all' : null;
+  const secEl = document.querySelector(`#frame [data-ct="${k}"]`)?.closest('[data-sec]');
+  const s = secEl ? secById(p, secEl.dataset.sec) : null;
+  return `<div class="row wrap"><button class="lk" data-act="selpage">${ic('arrow_back')}${p.label}</button><span class="chip info">${ic(isImg ? 'image' : 'text_fields')}Content</span></div>
+    <h2 class="mono" style="font-size:14px">${k}</h2>
+    ${use ? `<div class="callout warn">${ic('warning')}<span>This is used on every page.</span></div>` : ''}
+    ${isImg ? `<div class="field">Image<div class="imgpick">${Object.entries(ARTS).map(([id, a]) => `<button class="${C(k) === id ? 'cur' : ''}" data-act="setimg" data-k="${k}" data-v="${id}"><span class="art ${a[0]}" style="display:grid;place-items:center;color:#fff">${ic(a[1])}</span>${a[2]}</button>`).join('')}</div><span class="row"><button class="btn sm">${ic('upload')}Upload</button><button class="btn sm">${ic('local_library')}From Library</button></span></div>` :
+      `<label class="field">Text<textarea rows="3" data-act="cttext" data-k="${k}">${esc(C(k))}</textarea></label>`}
+    <dl class="kv"><dt>Section</dt><dd>${s ? `<button class="lk page" data-act="selsec" data-v="${s.id}">${s.name}</button>` : secEl?.dataset.sec === '__shell' ? 'App shell' : '—'}</dd><dt>Used on</dt><dd>${use ? 'All pages' : p.label}</dd><dt>Revisions</dt><dd>3 · last by you, 2026-09-18</dd></dl>
+    <div class="callout info">${ic('bolt')}<span>Content saves straight away. The app reads it by key, so no build is needed.</span></div>
+    <p class="note">To change what this part does or where it sits, request a change on the section instead.</p>
+    ${s ? `<button class="btn" data-act="request" data-v="${s.id}">${ic('edit_note')}Request a change to ${s.name}</button>` : ''}`;
+}
+function actions(p, s) {
+  const drift = s && (s.built === 'differs' || (s.built === false && !s.phase && p.status === 'built'));
+  return `<div class="actions">
+    <div class="row"><button class="btn primary" data-act="request" data-v="${s ? s.id : ''}">${ic('edit_note')}Request a change</button>${drift ? `<button class="btn" data-act="buildspec" data-v="${s.id}">${ic('code')}Build to spec</button>` : ''}</div>
+    <p class="note">Changes to layout, sections or behaviour are made to the spec and go to Work as <b>Engineer · implement</b>.</p>
+  </div>`;
+}
+
+/* ---------- Change request drawer ---------- */
+const COMPONENTS = ['Filter chips','Map','Carousel (needed)','Card','List','Banner','Tabs','Segmented button','Date range field','Button','Empty state','Dialog'];
+let CR = null;
+function openRequest(secId) {
+  const p = P(S.page); const s = secId ? (secId === '__shell' ? {id:'__shell', name:'App shell', stories:[]} : secById(p, secId)) : null;
+  CR = {page:p.id, target:secId || null, title: s ? `${p.label}: change ${s.name}` : `${p.label}: `, what:'', changes:[], stories: s?.stories ? [...s.stories] : [], agent:'Codex · coding agent', form:null};
+  if (secId === 'results') CR = {...CR, title:'Browse: add a map view', what:'Sam wants to see where tools are, not just the distance. Add a map above the results that he can switch to.', changes:[{op:'add', name:'Map view', comp:'Map', where:'Above Results', stories:['S4']}], stories:['S4']};
+  drawRequest();
+}
+function drawRequest() {
+  const p = P(CR.page);
+  document.querySelectorAll('.drawer,.scrim').forEach(e => e.remove());
+  const sc = document.createElement('div'); sc.className = 'scrim'; sc.dataset.act = 'closedrawer';
+  const d = document.createElement('aside'); d.className = 'drawer'; d.setAttribute('role','dialog'); d.setAttribute('aria-label','Request a change');
+  const opLbl = {add:['add','Add section'], chg:['chgd','Change'], rm:['rm','Remove section'], state:['chgd','Change state'], lead:['chgd','Change where it leads']};
+  d.innerHTML = `<div class="row"><span class="chip pages">${ic('edit_note')}Change request</span><span class="chip">${p.label}</span><button class="btn sm ghost push" data-act="closedrawer" aria-label="Close">${ic('close')}</button></div>
+    <h2>Request a change</h2>
+    <label class="field">Title<input data-f="title" value="${esc(CR.title)}"></label>
+    <label class="field">What should change, and why<textarea rows="3" data-f="what" placeholder="Describe it the way you’d tell a designer.">${esc(CR.what)}</textarea></label>
+    <h3>Spec changes</h3>
+    <p class="note" style="margin:0">These revise ${p.label}’s spec. They’re chosen from the design system, not drawn.</p>
+    ${CR.changes.map((c, i) => `<div class="chg"><span class="op ${opLbl[c.op][0]}">${opLbl[c.op][1]}</span><span><b>${esc(c.name)}</b> · ${esc(c.comp || c.detail || '')}${c.where ? ` <span class="muted">· ${esc(c.where)}</span>` : ''}</span><button class="btn sm ghost" data-act="rmchg" data-v="${i}" aria-label="Remove">${ic('close')}</button></div>`).join('')}
+    ${CR.form ? chgForm(p) : `<div class="row wrap"><button class="btn sm" data-act="chgform" data-v="add">${ic('add')}Add a section</button><button class="btn sm" data-act="chgform" data-v="chg">${ic('swap_horiz')}Change a section</button><button class="btn sm" data-act="chgform" data-v="state">${ic('layers')}Change a state</button><button class="btn sm" data-act="chgform" data-v="rm">${ic('remove')}Remove a section</button></div>`}
+    <h3>Stories</h3>
+    <div>${CR.stories.length ? storyRows(CR.stories) : '<p class="note">None linked. Link one so the change can be checked against it.</p>'}</div>
+    ${CR.stories.filter(id => STORIES[id][3]).length ? `<div class="gwt">${CR.stories.filter(id => STORIES[id][3]).map(id => `<span><b>${id}</b><b>Given</b>${STORIES[id][3][0]} <b>When</b>${STORIES[id][3][1]} <b>Then</b>${STORIES[id][3][2]}</span>`).join('')}</div>` : ''}
+    <h3>Goes to</h3>
+    <div class="route"><span class="tile">${ic('code')}</span><div><b>Work · Engineer · implement</b><div class="note">Coding work. It carries the spec diff, the stories, their acceptance and the components it uses.</div></div></div>
+    <label class="field">Assign to<select data-f="agent">${['Codex · coding agent','Claude Code · coding agent','Default agent','You'].map(a => `<option ${CR.agent === a ? 'selected' : ''}>${a}</option>`).join('')}</select></label>
+    <div class="callout info">${ic('info')}<span>Saving adds revision ${revOf(p) + 1} to the spec with your reason, and adds the work item. Built shows the difference until the build is accepted.</span></div>
+    <div class="row"><button class="btn primary" data-act="submitreq" ${CR.changes.length || CR.what ? '' : 'disabled'}>${ic('add_task')}Add to Work</button><button class="btn ghost" data-act="closedrawer">Cancel</button></div>`;
+  document.body.append(sc, d);
+  d.querySelectorAll('[data-f]').forEach(el => el.addEventListener('input', () => { CR[el.dataset.f] = el.value; if (el.dataset.f === 'what') d.querySelector('[data-act="submitreq"]').disabled = !(CR.changes.length || CR.what); }));
+  d.querySelector('input,textarea')?.focus();
+}
+function chgForm(p) {
+  const f = CR.form; const secs = p.sections;
+  const body = f === 'add' ? `<label class="field">Name<input id="cf-name" placeholder="e.g. Map view"></label><label class="field">Component<select id="cf-comp">${COMPONENTS.map(c => `<option>${c}</option>`).join('')}</select></label><label class="field">Where<select id="cf-where">${secs.map(s => `<option>Above ${s.name}</option><option>Below ${s.name}</option>`).join('')}</select></label><label class="field">Realises<select id="cf-story"><option value="">—</option>${Object.keys(STORIES).map(s => `<option value="${s}">${s} ${STORIES[s][0].slice(0, 40)}</option>`).join('')}</select></label>`
+    : f === 'state' ? `<label class="field">State<select id="cf-name">${Object.keys(STATE_LABEL).map(k => `<option>${STATE_LABEL[k]}</option>`).join('')}</select></label><label class="field wide">What it should show<input id="cf-comp" placeholder="e.g. a retry button and the last results"></label>`
+    : `<label class="field">Section<select id="cf-name">${secs.map(s => `<option ${CR.target === s.id ? 'selected' : ''}>${s.name}</option>`).join('')}</select></label>${f === 'chg' ? `<label class="field">Change<select id="cf-where"><option>Component</option><option>What it shows</option><option>Where it leads</option><option>Who sees it</option></select></label><label class="field wide">To<input id="cf-comp" placeholder="e.g. Segmented button instead of chips"></label>` : '<input id="cf-comp" type="hidden" value="">'}`;
+  return `<div class="chgform">${body}<div class="row wide"><button class="btn sm primary" data-act="addchg">Add</button><button class="btn sm ghost" data-act="chgform" data-v="">Cancel</button></div></div>`;
+}
+
+/* ---------- Flows ---------- */
+const asName = a => a === 'visitor' ? 'not signed in' : (PERSONAS.find(p => p[0] === a) || [, a])[1];
+function trigger(f, k) { const a = f.steps[k], b = f.steps[k + 1]; if (!a || !b) return ''; if (!a.gap && !b.gap && a.page !== b.page) { const l = linkBetween(a.page, b.page); if (l) return l.label; } return a.go || (a.gap || b.gap ? '' : a.page === b.page ? 'On the same page' : 'No link yet'); }
+function stepApp(s) { return renderApp(s.page, {mode: P(s.page).status === 'built' ? 'built' : 'spec', state:'ready', as:s.as, q:s.q}) || ''; }
+function flowsView() {
+  const f = FLOWS.find(x => x.id === S.flow) || FLOWS[0], n = f.steps.length, i = Math.min(S.step, Math.max(0, n - 1)), step = f.steps[i];
+  const rv = S.reviewing[f.id], status = rv ? (rv.done ? rv.verdict : 'In review') : f.review;
+  const rvChip = r => r === 'Reviewed' ? 'ok' : r === 'Due' ? 'warn' : r === 'No pages' || r === 'Needs changes' ? 'bad' : r === 'In review' ? 'work' : '';
+  const story = step && STORIES[step.story];
+  const notes = step ? S.notes[f.id + i] || [] : [];
+  return `<div class="fl2">
+    <aside class="fsteps" aria-label="Flow steps">
+      <label class="field">Flow<select class="sel-in" data-act="flowsel">${FLOWS.map(x => `<option value="${x.id}" ${x.id === f.id ? 'selected' : ''}>${esc(x.title)}</option>`).join('')}</select></label>
+      <div class="row wrap"><span class="chip">${ic('person')}${esc(f.persona)}</span><span class="chip ${rvChip(status)}">${status}</span></div>
+      ${rv && !rv.done ? `<button class="btn primary sm" data-act="finishreview">${ic('done_all')}Finish review</button>` : `<button class="btn sm ${f.review === 'Due' ? 'primary' : ''}" data-act="startreview" ${n ? '' : 'disabled'}>${ic('rate_review')}Review this flow</button>`}
+      <div class="fsl">${f.steps.map((s, k) => `${k ? `<div class="fsc">${ic('south')}${esc(trigger(f, k - 1))}</div>` : ''}
+        <button class="fsi ${k === i ? 'on' : ''} ${s.gap ? 'gapstep' : ''}" data-act="step" data-v="${k}" ${k === i ? 'aria-current="step"' : ''}><span class="n">${k + 1}</span>${s.gap ? `<span class="mini gapm">${ic('warning')}</span>` : `<span class="mini"><span class="tapp phone">${stepApp(s)}</span></span>`}
+          <span><b>${esc(s.name)}</b><small>${s.gap ? 'No page yet' : esc(P(s.page).label)} · ${s.story || 'no story'}</small><small>As ${asName(s.as)}</small></span>${(S.notes[f.id + k] || []).length ? `<span class="rvn chip work">${S.notes[f.id + k].length}</span>` : ''}</button>`).join('')}</div>
+      ${!n ? '<p class="note">This flow has no steps yet.</p>' : ''}
+      <button class="btn sm" data-act="editonmap" data-v="${f.id}">${ic('account_tree')}Edit this flow on the Map</button>
+    </aside>
+    <section class="fprev" aria-label="Preview">
+      <div class="cbar"><b>${step ? `Step ${i + 1} of ${n} · ${esc(step.name)}` : esc(f.title)}</b>
+        ${step && !step.gap ? `<span class="chip ${P(step.page).status === 'built' ? 'info' : P(step.page).status === 'planned' ? '' : 'pages'}">${P(step.page).status === 'built' ? 'Built' : P(step.page).status === 'planned' ? 'Planned' : 'Spec only'}</span><span class="chip">As ${asName(step.as)}</span>` : ''}
+        <span class="push row"><div class="seg" role="group" aria-label="Viewport">${[['phone','smartphone','Phone'],['desktop','desktop_windows','Desktop']].map(m => `<button aria-pressed="${S.fvp === m[0]}" data-act="fvp" data-v="${m[0]}" aria-label="${m[2]}">${ic(m[1])}</button>`).join('')}</div>
+        <button class="btn sm" data-act="step" data-v="${i - 1}" ${i ? '' : 'disabled'}>${ic('chevron_left')}Back</button><button class="btn sm" data-act="step" data-v="${i + 1}" ${i < n - 1 ? '' : 'disabled'}>Next${ic('chevron_right')}</button></span></div>
+      <div class="stage">${!step ? `<div class="unspec" style="max-width:440px;height:max-content">${ic('route')}<b>No steps yet</b><span class="small">Add page blanks for its stories on the Map, then link them in order.</span><button class="btn sm" data-act="editonmap" data-v="${f.id}">${ic('account_tree')}Edit on the Map</button></div>` :
+        step.gap ? `<div class="unspec" style="max-width:440px;height:max-content">${ic('warning')}<b>${esc(step.name)}: no page</b><span class="small">${esc(step.why || '')}</span><button class="btn sm" data-act="editonmap" data-v="${f.id}">${ic('add_box')}Add a page blank on the Map</button></div>` :
+        `<div class="frame ${S.fvp === 'phone' ? 'phone' : ''}">${P(step.page).status === 'built' ? `<div class="urlbar">${ic('lock', 'tiny')}<span class="u">https://preview.tool-share.localhost${P(step.page).route.replace(':id', 'drill-41')}</span></div>` : `<div class="specbar">${ic('draft')}${P(step.page).status === 'planned' ? 'Planned' : 'Spec'}</div>`}${stepApp(step)}</div>`}</div>
+    </section>
+    <aside class="wside">
+      ${step && !step.gap ? `<div class="row wrap"><button class="lk page" data-act="openpage" data-v="${step.page}">${ic(P(step.page).icon)}Open ${esc(P(step.page).label)}</button></div>` : ''}
+      <h3>Acceptance</h3>
+      ${story && story[3] ? `<div class="gwt"><span><b>${step.story}</b>${story[0]}</span><span><b>Given</b>${story[3][0]}</span><span><b>When</b>${story[3][1]}</span><span><b>Then</b>${story[3][2]}</span></div>` : `<p class="note">${step?.story ? step.story + ' has no acceptance yet.' : 'No story linked to this step.'}</p>`}
+      ${step && trigger(f, i) ? `<div class="trig">${ic('touch_app')}Next: ${esc(trigger(f, i))}</div>` : ''}
+      <h3>Review notes</h3>
+      ${notes.map(nn => `<div class="rnote"><span class="k"><span class="chip ${nn.type === 'Change request' ? 'plat' : nn.type === 'Content fix' ? 'info' : nn.type === 'Looks right' ? 'ok' : 'warn'}">${nn.type}</span>${nn.link ? `<span class="tiny muted">${nn.link}</span>` : ''}</span><span>${esc(nn.text)}</span></div>`).join('')}
+      ${rv && !rv.done && step && !step.gap ? `<div class="rnote"><div class="ntype" role="group" aria-label="Kind of note">${['Looks right','Content fix','Change request','Question'].map(t => `<button aria-pressed="${S.noteType === t}" data-act="ntype" data-v="${t}">${t}</button>`).join('')}</div><textarea rows="2" id="ntext" class="sel-in" style="width:100%" placeholder="What did you notice at this step?"></textarea><div class="row"><button class="btn sm primary" data-act="addnote">Add note</button><span class="note">${S.noteType === 'Change request' ? 'Opens a change request (Engineer).' : S.noteType === 'Content fix' ? 'Opens the page in Edit content.' : S.noteType === 'Question' ? 'Asks the Product lead.' : ''}</span></div></div>` : (!notes.length ? `<p class="note">${rv?.done ? 'No notes on this step.' : 'Start a review to add notes.'}</p>` : '')}
+    </aside>
+  </div>`;
+}
+function plannedView(p) {
+  const flows = FLOWS.filter(f => f.steps.some(s => s.page === p.id));
+  return `<div class="ws">
+    <div class="pane left"><div class="phead">${ic('account_tree')}Pages</div><div class="plist">${pagesList()}</div><div class="outline"><div class="phead">${ic('segment')}On this page</div><p class="note" style="padding:0 12px">Nothing specified yet.</p></div></div>
+    <div class="pane center"><div class="cbar"><span class="chip">Planned</span><span class="small muted">Added on the Map</span></div>
+      <div class="stage"><div class="unspec" style="max-width:520px;height:max-content">${ic('draft')}<b>${esc(p.label)} isn’t specified yet</b><span class="small">${esc(p.note || 'No note yet.')}</span>
+        <div class="row wrap" style="justify-content:center"><button class="btn primary sm" data-act="startspec">${ic('edit_document')}Start the spec</button><button class="btn sm" data-act="gapwork" data-v="<b>${esc(p.label)}</b> · write the spec" data-role="Experience designer">${ic('add_task')}Add to Work · Experience designer</button></div>
+        <span class="note">A spec starts with a layout from Design, then sections chosen from the design system, each linked to its stories and data.</span></div></div></div>
+    <div class="pane right"><div class="row"><span class="chip pages">${ic('web')}Page</span><span class="chip">Planned</span></div>
+      <label class="field">Title<input data-title="${p.id}" value="${esc(p.label)}"></label>
+      <label class="field">Note<textarea rows="4" data-note="${p.id}">${esc(p.note)}</textarea></label>
+      <h3>Stories</h3><div>${storyRows(p.stories)}</div>
+      <h3>In flows</h3><div class="row wrap">${flows.map(f => `<span class="chip pages">${esc(f.title)}</span>`).join('') || '<span class="note">None yet.</span>'}</div>
+      <button class="btn sm" data-act="tab" data-v="map">${ic('account_tree')}Show on the Map</button></div></div>`;
+}
+
+/* ================= Hover and selection on the canvas ================= */
+function overlay(id, el, cls, label, icon) {
+  const stage = document.getElementById('stage'); if (!stage || !el) return;
+  let ov = document.getElementById(id); if (!ov) { ov = document.createElement('div'); ov.id = id; stage.appendChild(ov); }
+  const r = el.getBoundingClientRect(), sr = stage.getBoundingClientRect();
+  ov.className = 'ov ' + cls + (r.top - sr.top < 22 ? ' below' : '');
+  ov.style.left = (r.left - sr.left + stage.scrollLeft - 3) + 'px'; ov.style.top = (r.top - sr.top + stage.scrollTop - 3) + 'px';
+  ov.style.width = (r.width + 6) + 'px'; ov.style.height = (r.height + 6) + 'px';
+  ov.innerHTML = `<span class="tg">${ic(icon)}${label}</span>`;
+}
+const clearOv = id => document.getElementById(id)?.remove();
+function describe(el) {
+  const p = P(S.page);
+  if (el.dataset.ct) return ['ct', (ARTS[C(el.dataset.ct)] ? 'Image · ' : 'Text · ') + el.dataset.ct, ARTS[C(el.dataset.ct)] ? 'image' : 'text_fields'];
+  if (el.dataset.dt) return ['dt', 'Data · ' + el.dataset.dt, 'schema'];
+  const id = el.dataset.sec;
+  if (id === '__shell') return ['', 'App shell · shared', 'dock_to_bottom'];
+  const r = (S.requested[p.id] || []).find(x => x.secId === id); if (r) return ['', r.name + ' · ' + r.w, 'add_box'];
+  const s = secById(p, id); if (!s) return null;
+  return ['', `${s.name} · ${s.comp}${s.stories?.length ? ' · ' + s.stories.join(' ') : ''}${s.built === 'differs' ? ' · differs' : ''}`, s.built === 'differs' ? 'difference' : 'view_agenda'];
+}
+function pick(target) {
+  const frame = document.getElementById('frame'); if (!frame || !frame.contains(target)) return null;
+  if (S.edit) { const c = target.closest('[data-ct]'); if (c) return c; }
+  const d = target.closest('[data-dt]'); if (d && !S.edit && d.closest('[data-sec]') && target.closest('[data-sec]') === d.closest('[data-sec]') && d.dataset.dt && d === target.closest('[data-dt]') && S.sel?.type === 'sec' && S.sel.id === d.closest('[data-sec]').dataset.sec) return d;
+  return target.closest('[data-sec]');
+}
+function drawSel() {
+  clearOv('ov-sel');
+  if (!S.sel || S.sel.type === 'page') return;
+  const sel = S.sel.type === 'content' ? `[data-ct="${S.sel.id}"]` : S.sel.type === 'data' ? `[data-dt="${S.sel.id}"]` : `[data-sec="${S.sel.id}"]`;
+  const el = document.querySelector('#frame ' + sel);
+  if (el) { const d = describe(el); overlay('ov-sel', el, 'sel ' + (S.sel.type === 'content' ? 'ct' : S.sel.type === 'data' ? 'dt' : ''), d[1], d[2]); }
+}
+document.addEventListener('mouseover', e => {
+  if (S.tab !== 'pages') return;
+  const oi = e.target.closest('[data-hov]');
+  let el = oi ? document.querySelector(`#frame [data-sec="${oi.dataset.hov}"]`) : pick(e.target);
+  document.querySelectorAll('.oitem.hov').forEach(x => x.classList.remove('hov'));
+  if (!el) { clearOv('ov-hov'); return; }
+  const d = describe(el); if (!d) { clearOv('ov-hov'); return; }
+  if (S.sel && ((S.sel.type === 'sec' && el.dataset.sec === S.sel.id) || (S.sel.type === 'content' && el.dataset.ct === S.sel.id))) { clearOv('ov-hov'); return; }
+  overlay('ov-hov', el, d[0], d[1], d[2]);
+  if (el.dataset.sec) document.querySelector(`.oitem[data-hov="${el.dataset.sec}"]`)?.classList.add('hov');
+});
+
+/* ================= Actions ================= */
+function refreshInspector() { const i = document.getElementById('inspector'); if (i) i.innerHTML = inspector(P(S.page)); }
+function stopEditing() { document.querySelectorAll('[contenteditable=true]').forEach(x => x.removeAttribute('contenteditable')); }
+document.addEventListener('click', e => {
+  const a = e.target.closest('[data-act]');
+  // Canvas click: select what's under the pointer (or edit content in Edit mode)
+  if (!a && S.tab === 'pages') {
+    const el = pick(e.target);
+    if (el) {
+      if (S.edit && el.dataset.ct) {
+        S.sel = {type:'content', id:el.dataset.ct};
+        if (!ARTS[C(el.dataset.ct)]) { stopEditing(); el.setAttribute('contenteditable', 'true'); el.focus(); el.oninput = () => { CONTENT[el.dataset.ct] = el.textContent; const t = document.querySelector(`[data-act="cttext"][data-k="${el.dataset.ct}"]`); if (t) t.value = el.textContent; }; }
+      } else if (el.dataset.dt) S.sel = {type:'data', id:el.dataset.dt};
+      else S.sel = {type:'sec', id:el.dataset.sec};
+      refreshInspector(); clearOv('ov-hov'); drawSel(); return;
+    }
+  }
+  if (!a || a.tagName === 'SELECT' || a.tagName === 'TEXTAREA') return;
+  const v = a.dataset.v; e.preventDefault();
+  switch (a.dataset.act) {
+    case 'tab': S.tab = v; render(); break;
+    case 'openpage': openPage(v); break;
+    case 'mode': S.mode = v; render(); break;
+    case 'vp': S.vp = v; render(); break;
+    case 'edit': S.edit = !S.edit; if (!S.edit) stopEditing(); render(); break;
+    case 'selpage': S.sel = {type:'page'}; refreshInspector(); drawSel(); document.querySelectorAll('.oitem').forEach(x => x.classList.toggle('on', x.dataset.act === 'selpage')); break;
+    case 'selsec': { S.sel = {type:'sec', id:v}; const sx = secById(P(S.page), v); if (sx?.state) S.state = sx.state; else if (sx && S.state === 'empty' && P(S.page).sections.some(q => q.state === 'empty')) S.state = 'ready'; } render(); document.querySelector(`#frame [data-sec="${v}"]`)?.scrollIntoView({block:'nearest'}); break;
+    case 'selct': S.edit = true; S.sel = {type:'content', id:v}; render(); break;
+    case 'setstate': S.state = v; render(); break;
+    case 'setimg': CONTENT[a.dataset.k] = v; render(); toast('Image changed. It’s live in the preview; no build needed.'); break;
+    case 'tool': S.tool = v; render(); break;
+    case 'mview': S.mview = v; S.refit = true; render(); break;
+    case 'zoom': { const vp = document.getElementById('vp'); zoomAt(+v, vp.clientWidth / 2, vp.clientHeight / 2); break; }
+    case 'fit': fit(); break;
+    case 'newpage': { const vp = document.getElementById('vp'); const id = addBlank(freeCellNear((vp.clientWidth / 2 - CAM.x) / CAM.z - cellSz().w / 2, (vp.clientHeight / 2 - CAM.y) / CAM.z - cellSz().h / 2)); render(); focusTitle(id); break; }
+    case 'selflow': S.mapFlow = S.mapFlow === v ? '' : v; S.msel.clear(); render(); break;
+    case 'doneflow': S.mapFlow = ''; render(); break;
+    case 'newflow': { const id = 'flow' + FLOWS.length; FLOWS.push({id, title:'New flow', persona:'Sam', as:'sam', review:'Not started', steps:[], custom:true}); S.mapFlow = id; render(); const i = document.querySelector(`[data-flowtitle="${id}"]`); i?.focus(); i?.select(); break; }
+    case 'addstep': { const f = curFlow(); f.steps.push(newStep(f, v)); render(); toast(`${P(v).label} is step ${f.steps.length} of ${f.title}.`); break; }
+    case 'rmstep': curFlow().steps.splice(+v, 1); render(); break;
+    case 'upstep': { const st = curFlow().steps; [st[+v - 1], st[+v]] = [st[+v], st[+v - 1]]; render(); break; }
+    case 'fillgap': { const f = curFlow(), g = f.steps[+v]; const prev = f.steps.slice(0, +v).reverse().find(s => !s.gap); const near = prev ? POS[prev.page] : [0, 0]; const id = addBlank(freeCellNear(near[0] + 1, near[1])); P(id).label = g.name; P(id).note = g.why || ''; f.steps[+v] = {page:id, as:f.as, story:g.story, name:g.name}; render(); focusTitle(id); break; }
+    case 'blankfor': { const f = curFlow(); const last = f.steps.filter(s => !s.gap).slice(-1)[0]; const near = last ? POS[last.page] : [0, 2]; const id = addBlank(freeCellNear(near[0] + 1, near[1]), v); f.steps.push({page:id, as:f.as, story:v, name:P(id).label}); render(); focusTitle(id); toast(`Page blank added for ${v} and made step ${f.steps.length}.`); break; }
+    case 'reviewflow': S.tab = 'flows'; S.flow = v; S.step = 0; render(); break;
+    case 'editonmap': S.tab = 'map'; S.mapFlow = v; render(); break;
+    case 'fvp': S.fvp = v; render(); break;
+    case 'startspec': toast('The spec editor isn’t in this prototype. In the build: choose a layout from Design, then add sections.'); break;
+    case 'gapwork': { const role = a.dataset.role; const w = 'W-' + S.nextW++; toast(`${w} added to Work › ${role === 'Engineer' ? 'Engineer · implement' : 'Experience designer'}: ${v.replace(/<[^>]+>/g, '')}`); break; }
+    case 'buildspec': { const w = 'W-' + S.nextW++; toast(`${w} added to Work › Engineer · implement: make ${P(S.page).label} match its spec. Assigned to Codex.`); break; }
+    case 'request': openRequest(v || null); break;
+    case 'closedrawer': closeDrawer(); break;
+    case 'chgform': CR.form = v || null; drawRequest(); break;
+    case 'rmchg': CR.changes.splice(+v, 1); drawRequest(); break;
+    case 'addchg': {
+      const n = document.getElementById('cf-name').value.trim(), c = document.getElementById('cf-comp')?.value.trim() || '', w = document.getElementById('cf-where')?.value || '', st = document.getElementById('cf-story')?.value;
+      if (CR.form === 'add' && !n) { document.getElementById('cf-name').focus(); break; }
+      CR.changes.push({op:CR.form, name:n, comp:c, where:w, stories: st ? [st] : []}); if (st && !CR.stories.includes(st)) CR.stories.push(st); CR.form = null; drawRequest(); break; }
+    case 'submitreq': {
+      const w = 'W-' + S.nextW++; const list = S.requested[CR.page] = S.requested[CR.page] || [];
+      const adds = CR.changes.filter(c => c.op === 'add');
+      if (adds.length) adds.forEach((c, i) => list.push({w, op:'add', secId:'req-' + w + '-' + i, name:c.name, comp:c.comp, where:c.where, title:CR.title, why:CR.what || CR.title, agent:CR.agent, stories:c.stories}));
+      else list.push({w, op:'chg', target:CR.target, title:CR.title, why:CR.what || CR.title, agent:CR.agent, stories:CR.stories});
+      WORK.push({id:w, t:CR.title, role:'Engineer', type:'implement', st:'Ready'});
+      closeDrawer(); S.mode = 'spec'; render();
+      toast(`${w} is in Work › Ready · Engineer · implement, assigned to ${CR.agent.split(' ·')[0]}. The spec is at revision ${revOf(P(CR.page))}.`, ['Show in spec', 'showreq']); break; }
+    case 'showreq': { const l = S.requested[S.page] || []; const last = l[l.length - 1]; S.tab = 'pages'; S.mode = 'spec'; S.sel = last?.secId ? {type:'sec', id:last.secId} : last?.target ? {type:'sec', id:last.target} : null; render(); break; }
+    case 'flow': S.flow = v; S.step = 0; render(); break;
+    case 'step': S.step = Math.max(0, +v); render(); break;
+    case 'startreview': S.reviewing[S.flow] = {done:false}; S.noteType = 'Looks right'; toast(`W-${S.nextW++} is in progress · Experience designer · review “${FLOWS.find(f => f.id === S.flow).title}”.`); render(); break;
+    case 'ntype': S.noteType = v; render(); break;
+    case 'addnote': {
+      const t = document.getElementById('ntext').value.trim(); if (!t) { document.getElementById('ntext').focus(); break; }
+      const f = FLOWS.find(x => x.id === S.flow), step = f.steps[S.step]; const key = S.flow + S.step; (S.notes[key] = S.notes[key] || []);
+      const note = {type:S.noteType, text:t};
+      if (S.noteType === 'Question') note.link = 'Asked Product lead';
+      S.notes[key].push(note);
+      if (S.noteType === 'Change request') { S.page = step.page; openRequest(null); CR.title = `${P(step.page).label}: ${t.slice(0, 60)}`; CR.what = t + ` (from the ${f.title} flow review, step ${S.step + 1})`; CR.stories = [step.story]; drawRequest(); note.link = 'Change request opened'; render(); drawRequest(); }
+      else if (S.noteType === 'Content fix') { note.link = 'Opened in Edit content'; S.tab = 'pages'; S.page = step.page; S.as = step.as; S.edit = true; S.mode = P(step.page).status === 'built' ? 'built' : 'spec'; S.sel = null; render(); toast('Edit content is on. Click the text to fix it.'); }
+      else render();
+      break; }
+    case 'finishreview': { const f = FLOWS.find(x => x.id === S.flow); const notes = f.steps.flatMap((s, i) => S.notes[S.flow + i] || []); const needs = notes.some(n => n.type !== 'Looks right');
+      S.reviewing[S.flow] = {done:true, verdict: needs ? 'Needs changes' : 'Reviewed'}; toast(needs ? `Review closed: needs changes. ${notes.filter(n => n.type !== 'Looks right').length} follow-ups are linked to it.` : 'Review closed: the flow works.'); render(); break; }
+    case 'notes': openNotes(); break;
+  }
+});
+document.addEventListener('change', e => {
+  const a = e.target.closest('[data-act]'); if (!a) return;
+  if (a.dataset.act === 'state') { S.state = a.value; render(); }
+  if (a.dataset.act === 'as') { S.as = a.value; S.sel = null; render(); }
+  if (a.dataset.act === 'flowsel') { S.flow = a.value; S.step = 0; render(); }
+  if (a.dataset.act === 'nodestory' && a.value) { P(a.dataset.v).stories.push(a.value); render(); }
+});
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t.dataset.title) { P(t.dataset.title).label = t.value || 'Untitled'; return; }
+  if (t.dataset.note) { P(t.dataset.note).note = t.value; return; }
+  if (t.dataset.flowtitle) { FLOWS.find(f => f.id === t.dataset.flowtitle).title = t.value || 'Untitled flow'; return; }
+  const a = e.target.closest('[data-act="cttext"]'); if (!a) return;
+  CONTENT[a.dataset.k] = a.value; document.querySelectorAll(`#frame [data-ct="${a.dataset.k}"]`).forEach(x => x.textContent = a.value); drawSel();
+});
+document.addEventListener('focusout', e => { if ((e.target.dataset?.title || e.target.dataset?.flowtitle) && S.tab === 'map') setTimeout(() => { if (!document.activeElement?.closest?.('.flows,.node')) renderSidebar(); }, 0); });
+document.addEventListener('keyup', e => { if (e.key === ' ') { SPACE = false; if (S.tab === 'map' && S.tool !== 'hand') document.getElementById('vp')?.classList.remove('hand'); } });
+document.addEventListener('keydown', e => {
+  if (S.tab !== 'map' || document.querySelector('.drawer')) return;
+  if (e.target.closest?.('input,textarea,select')) { if (e.key === 'Escape' || (e.key === 'Enter' && e.target.tagName === 'INPUT')) e.target.blur(); return; }
+  if (e.key === ' ') { SPACE = true; document.getElementById('vp')?.classList.add('hand'); e.preventDefault(); }
+  else if (e.key === 'Delete' || e.key === 'Backspace') { deleteSel(); e.preventDefault(); }
+  else if (e.key === 'v' || e.key === 'h') { S.tool = e.key === 'h' ? 'hand' : 'select'; render(); }
+  else if (e.key === 'Escape') { if (S.mapFlow && !S.msel.size && !S.mlink) { S.mapFlow = ''; render(); } else { S.msel.clear(); S.mlink = null; refreshSel(); drawLinks(); } }
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (document.querySelector('.drawer')) closeDrawer(); else if (document.querySelector('[contenteditable=true]')) { stopEditing(); } } });
+function closeDrawer() { document.querySelectorAll('.drawer,.scrim').forEach(e => e.remove()); }
+function openNotes() {
+  const rows = [['M1','Map is a canvas: zoom and pan','Scroll, Ctrl/⌘ + scroll, Space-drag or the hand tool; Fit','map'],['M2','Desktop and phone; clean grid','Desktop · Phone · Both; pages sit in grid cells','map'],['M3','Pop in page blanks for stories','“Page blank” tool, or a flow’s “Stories with no page” › Blank','map'],['M4','Drag with snapping; move a group','Drag a page; drag empty space to select several; a taken cell is refused','map'],['M5','Connect pages by dragging','Hover a page, drag its ● to another page, name the link','map'],['M6','Blank has title and note; button opens it in Pages','Type on the blank; ↗ opens it (double-click works too)','map'],['M7','Flows sidebar replaces picker and gaps; edit the selected flow on canvas','Map › Flows; select one, use “+ Step”, reorder or remove in the sidebar','map'],['M10','“As” lists Vision’s personas','Pages › As','pages'],['M11','Flows: preview first; steps down the left with a dropdown','Flows tab','flows']];
+  document.querySelectorAll('.drawer,.scrim').forEach(e => e.remove());
+  const sc = document.createElement('div'); sc.className = 'scrim'; sc.dataset.act = 'closedrawer';
+  const d = document.createElement('aside'); d.className = 'drawer';
+  d.innerHTML = `<div class="row"><h2>Review notes · v2</h2><button class="btn sm ghost push" data-act="closedrawer" aria-label="Close">${ic('close')}</button></div><p class="small muted">Each row of the brief and where to look. Illustrative Tool Share data; nothing is saved.</p><div class="notes"><table>${rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3] ? `<button class="btn sm" data-act="tab" data-v="${r[3]}">Show</button>` : ''}</td></tr>`).join('')}</table></div>
+  <h3 style="margin-top:14px;font-size:11px;letter-spacing:.9px;text-transform:uppercase;color:var(--faint)">Things to try</h3>
+  <ul class="small" style="margin:0;padding-left:18px;display:grid;gap:4px"><li>Map › Flows › Give it back › Blank (S16), then Blank (S17). Drag the second one next to the first and draw a link between them.</li><li>Drag empty space over Profile and List a tool, then drag both one row down together.</li><li>Map › Flows › Borrow: the missing step is dashed. Use its ▣ button to add a blank.</li><li>Drag Browse onto Tool detail: the cell is taken, so it goes back.</li><li>Map › Phone, then Desktop: the grid respaces.</li><li>Open a blank (↗): Pages shows its note and “Start the spec”.</li><li>Flows › Find a tool: preview in the middle; steps on the left.</li></ul></ul>`;
+  document.body.append(sc, d);
+  d.addEventListener('click', ev => { if (ev.target.closest('[data-act="tab"]')) closeDrawer(); });
+}
+window.addEventListener('resize', () => { if (S.tab === 'pages') drawSel(); });
+if (innerWidth < 900) S.vp = 'phone';
+render();
+</script>
+</body>
+</html>

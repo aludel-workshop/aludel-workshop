@@ -11,6 +11,16 @@ This is the seed of the portal's decision workflow. Confirmed owner answers and 
 
 ## Confirmed
 
+2026-09-24 — **DEC-048: The Pages layer is where the Experience designer plans and specs the product; layout and behaviour on built pages change only through change requests.** The owner, after the Pages prototypes ([work record](design/pages-layer/work-record.md)):
+- "no direct structural edits, lets keep this focused and simple. if they want the page to look/behave different, spec it out, change request, gets added as work (note it gets added as coding work, which might have a specific agent, not as ux designer work, which would be e.g. reviewing flows)."
+- On v2: the Map is a planning canvas (pan, zoom, grid, page blanks, drawn links, flows edited on the canvas), and "As" uses Vision's personas. Then "build as you see fit. make it great."
+- **Consequences, as built:**
+  - text and images are content, edited in place, direct;
+  - a page not built yet has its spec edited directly;
+  - on a built page, a spec change is a revision plus a `platform.implement` work item (assignable to a coding agent);
+  - reviewing a flow is `pages.review` work;
+  - generated apps carry a bridge that answers only their portal, so Pages › Built can point into the running app.
+
 2026-09-24 — **DEC-047: Platform pipeline direction: GitHub first, Docker for previews, knowledge location deferred.** The owner answered the PLATFORM-PIPELINE-01 brief's questions ([work record §5–§8](design/platform-pipeline/work-record.md)):
 - **Where knowledge lives: deferred.** The owner: "lets defer this for now … might make sense to have a second repo? it seems like knowledge base evolves rapidly and organically, not following code dev cycles, and i don't want it blowing up app repo." GitHub wikis were considered and rejected ("alright, no wiki"): private wikis need a paid plan, and they offer no review step. A **companion knowledge repository** per project is the provisional direction. P10 (instance sync) waits on this.
 - **Containers: Docker.** "lets get started with docker for containers". Docker Desktop's WSL integration was already installed.

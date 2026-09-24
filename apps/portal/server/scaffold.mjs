@@ -89,13 +89,13 @@ export function agentsGuide(setup, catalogs) {
   // WORK-UX-01: instructions are layered project → role → action; each action says what it may change and use.
   const roleSections = agents ? agents.roles.map(role => `### ${role.name} (${role.layer})\n\n${role.instructions || '_No role instructions yet._'}\n\n${role.actions.map(action => `#### ${action.name}\n\n${action.instructions ? `${action.instructions}\n\n` : ''}- May change: ${action.changes.join('; ') || 'nothing (suggestions only)'}\n- Tools: ${action.tools.join(', ') || 'none'}\n- Asks first: ${action.asks || 'nothing beyond the rules below'}\n`).join('\n')}`).join('\n') : '';
   const agentSections = agents ? `\n## Project instructions\n\n${agents.instructions || '_None yet._'}\n${agents.principles.length ? `\nProduct principles:\n\n${agents.principles.map(item => `- ${item}`).join('\n')}\n` : ''}\n## Roles and actions\n\nEvery layer has a role, and each role performs actions. Read the project instructions first, then the role's, then the action's.\n\n${roleSections}\n## Commits and tests\n\n- End each commit message with trailers: \`Aludel-Work: W-12\` and \`Implements: S4, SPEC-02/FR-001\`.\n- Start test names with the acceptance they check: \`S4 · Given …\`.\n- Do not put tags or IDs in the code; Aludel links code to stories from these.\n` : '';
-  return `# Agent guide for ${setup.project.name}\n\nRead [docs/product.md](docs/product.md) for the product intent and [aludel.json](aludel.json) for the setup choices before changing anything.\n\nWork is assigned per action in Aludel (Work › Roles). Do not pick up work assigned to a person.\n${agentSections}\n## Stack\n\n${Object.entries(preset?.layers || {}).map(([layer, value]) => `- ${layer}: ${value}`).join('\n')}\n\nCommands: \`npm install\`, \`npm run build\`, \`npm start\` (serves on \`PORT\`, default 3000), or \`docker compose up --build\` to run it in its container. \`Dockerfile\` and \`.env.example\` declare how the app runs and every variable it reads; keep them current when that changes.\n\n## Rules\n\n- This app is independent of Aludel. Do not import Aludel code or call Aludel services at runtime.\n- Never commit secrets, \`.env\` files or the \`.data/\` directory.\n- Keep the pages in \`src/site.ts\` in step with the Pages section of \`docs/product.md\`. \`src/page-blocks.ts\` holds the placeholder layouts; replace a page's blocks with real UI as it is built.\n`;
+  return `# Agent guide for ${setup.project.name}\n\nRead [docs/product.md](docs/product.md) for the product intent and [aludel.json](aludel.json) for the setup choices before changing anything.\n\nWork is assigned per action in Aludel (Work › Roles). Do not pick up work assigned to a person.\n${agentSections}\n## Stack\n\n${Object.entries(preset?.layers || {}).map(([layer, value]) => `- ${layer}: ${value}`).join('\n')}\n\nCommands: \`npm install\`, \`npm run build\`, \`npm start\` (serves on \`PORT\`, default 3000), or \`docker compose up --build\` to run it in its container. \`Dockerfile\` and \`.env.example\` declare how the app runs and every variable it reads; keep them current when that changes.\n\n## Rules\n\n- This app is independent of Aludel. Do not import Aludel code or call Aludel services at runtime.\n- Never commit secrets, \`.env\` files or the \`.data/\` directory.\n- Keep the pages in \`src/site.ts\` in step with the Pages section of \`docs/product.md\`. \`src/page-blocks.ts\` holds the placeholder layouts; replace a page's blocks with real UI as it is built.\n- Pages are specified in Aludel's Pages layer. When you build a page section, keep its \`data-aludel-section\` attribute (drop \`data-aludel-skeleton\`), keep \`data-aludel-page\` on the page, and read its text from the section's content in \`src/site.ts\`, so Aludel can show and edit it. Leave \`src/aludel-bridge.ts\` in place.\n`;
 }
 
 // The generation manifest (LAY-07D): every unit the template wrote and the records it realises. Pages are derived:
 // their skeleton is regenerated from the page record, so a rebuild makes their links current again.
 function generationManifest(setup, pages) {
-  const manifest = (setup.pages?.routes || []).map((route, index) => route.id ? { path: 'src/site.ts', symbol: `route ${pages[index].path}`, recordIds: [route.id], derived: true } : null).filter(Boolean);
+  const manifest = pages.map(page => page.id ? { path: 'src/site.ts', symbol: `route ${page.path}`, recordIds: [page.id], derived: true } : null).filter(Boolean);
   const data = setup.data || { objects: [], operations: [] };
   const operation = operationId => data.operations.find(item => item.operationId === operationId);
   const health = operation('health');
@@ -114,20 +114,36 @@ function generationManifest(setup, pages) {
   return manifest;
 }
 
-export function skeletonFiles(setup, catalogs, gitProfile, appUrl, assets, sources) {
-  const feel = catalogs.feels[setup.design.feel || 'sleek-saas'] || catalogs.feels['sleek-saas'];
-  const options = setup.stack.options || {};
-  const media = mediaFiles(assets);
+// Every page's address in the generated app. The first navigation page is home at '/'; the rest get stable paths from
+// their names. PAGES-UX-01: pages outside the navigation (sub-pages, pages planned on the Map) come after it.
+// Pages › Built uses the same function to open a page in the preview.
+export function sitePages(routes, records = []) {
   const used = new Set();
-  // The first page is the app's home at '/'; the rest get stable paths from their names.
-  const pages = (setup.pages?.routes || []).map((page, index) => {
+  const extra = records.filter(record => !routes.some(route => route.id === record.id));
+  return [...routes.map(route => ({ ...route, nav: true })), ...extra.map(record => ({ ...record, nav: false }))].map((page, index) => {
     let path = index === 0 ? '' : slugify(page.label);
     if (index > 0 && reservedPaths.has(path)) path = `${path}-page`;
     for (let suffix = 2; index > 0 && used.has(path); suffix++) path = `${slugify(page.label)}-${suffix}`;
     used.add(path);
-    return { path: `/${path}`, label: page.label, icon: page.icon, description: page.description, pageType: page.pageType,
-      blocks: catalogs.pageTypes[page.pageType]?.blocks || [] };
+    return { ...page, path: `/${path}` };
   });
+}
+
+export function skeletonFiles(setup, catalogs, gitProfile, appUrl, assets, sources) {
+  const feel = catalogs.feels[setup.design.feel || 'sleek-saas'] || catalogs.feels['sleek-saas'];
+  const options = setup.stack.options || {};
+  const media = mediaFiles(assets);
+  const records = setup.pageRecords || [];
+  const pages = sitePages(setup.pages?.routes || [], records).map(page => ({ id: page.id || null, path: page.path, label: page.label, icon: page.icon, description: page.description,
+    pageType: page.pageType, nav: page.nav, blocks: catalogs.pageTypes[page.pageType]?.blocks || [] }));
+  // A page's spec sections become its skeleton, each marked so Aludel's Pages layer can find it in the preview.
+  const previewKind = new Map((setup.designSystem?.components || []).map(component => [component.id, component.preview]));
+  const pathOf = new Map(pages.map(page => [page.id, page.path]));
+  for (const page of pages) {
+    const record = records.find(entry => entry.id === page.id);
+    page.sections = (record?.sections || []).filter(section => section.state === 'ready').map(section => ({ id: section.id, name: section.name, kind: previewKind.get(section.component) || null,
+      region: section.region, title: section.content.title, body: section.content.body, action: section.content.action, leadsTo: section.leadsTo ? pathOf.get(section.leadsTo) || null : null }));
+  }
   const theme = setup.design.theme;
   const accent = setup.design.accent;
   const surface = theme === 'dark' ? feel.surfaceDark : theme === 'light' ? feel.surface : `light-dark(${feel.surface}, ${feel.surfaceDark})`;
@@ -146,6 +162,7 @@ export function skeletonFiles(setup, catalogs, gitProfile, appUrl, assets, sourc
     name: brand.name || setup.project.name, pitch: brand.tagline || setup.direction?.summary || setup.project.description, feel: setup.design.feel || 'sleek-saas',
     markText: brand.mark?.mark?.text || null, mark: markImage ? `/${markImage.file.replace(/^public\//, '')}` : null,
     navigation: setup.design.navigation === 'top' ? 'top' : 'sidebar', auth: Boolean(options.auth), pages,
+    portal: appUrl.portal,
     hero: hero ? `/${hero.file.replace(/^public\//, '')}` : null
   };
   const files = {
@@ -158,9 +175,10 @@ export function skeletonFiles(setup, catalogs, gitProfile, appUrl, assets, sourc
     'tsconfig.json': json({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'bundler', lib: ['ES2022', 'dom'], experimentalDecorators: true, useDefineForClassFields: false, strict: true, skipLibCheck: true, isolatedModules: true, types: [] }, angularCompilerOptions: { strictTemplates: true } }),
     'tsconfig.app.json': json({ extends: './tsconfig.json', compilerOptions: { outDir: './out-tsc/app' }, files: ['src/main.ts'], include: ['src/**/*.ts'] }),
     'index.html': `<!doctype html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1">\n  <title>${html(site.name)}</title>\n${brand.description ? `  <meta name="description" content="${html(brand.description)}">\n` : ''}${design ? `  <link rel="icon" href="${markImage ? site.mark : '/favicon.svg'}">\n` : ''}</head>\n<body>\n  <app-root></app-root>\n  <script type="module" src="/src/main.ts"></script>\n</body>\n</html>\n`,
-    'src/main.ts': "import '@angular/compiler';\nimport { bootstrapApplication } from '@angular/platform-browser';\nimport { App } from './app';\nimport './styles.scss';\n\nbootstrapApplication(App).catch(console.error);\n",
+    'src/main.ts': "import '@angular/compiler';\nimport { bootstrapApplication } from '@angular/platform-browser';\nimport { App } from './app';\nimport './aludel-bridge';\nimport './styles.scss';\n\nbootstrapApplication(App).catch(console.error);\n",
     'src/style.d.ts': "declare module '*.scss';\n",
-    'src/site.ts': `// Generated by Aludel from aludel.json: one entry per page in the primary navigation.\nimport { PageBlock } from './page-blocks';\n\nexport interface SitePage { path: string; label: string; icon: string; description: string; pageType: string; blocks: PageBlock[]; }\nexport interface Site { name: string; pitch: string; feel: string; markText: string | null; mark: string | null; navigation: 'sidebar' | 'top'; auth: boolean; pages: SitePage[]; hero: string | null; }\n\nexport const site: Site = ${JSON.stringify(site, null, 2)};\n`,
+    'src/site.ts': `// Generated by Aludel from its Pages layer: every page, navigation pages first (nav: true).\nimport { PageBlock, PageSection } from './page-blocks';\n\nexport interface SitePage { id: string | null; path: string; label: string; icon: string; description: string; pageType: string; nav: boolean; blocks: PageBlock[]; sections: PageSection[]; }\nexport interface Site { name: string; pitch: string; feel: string; markText: string | null; mark: string | null; navigation: 'sidebar' | 'top'; auth: boolean; pages: SitePage[]; portal: string; hero: string | null; }\n\nexport const site: Site = ${JSON.stringify(site, null, 2)};\n`,
+    'src/aludel-bridge.ts': bridgeSource,
     // Shared verbatim with the Aludel onboarding preview so the skeleton matches what was designed.
     'src/page-blocks.ts': sources.pageBlocks,
     'src/app.ts': appComponent,
@@ -234,6 +252,49 @@ h1 { font-size: clamp(28px, 4vw, 40px); line-height: 1.15; margin: 0 0 8px; }
 `;
 }
 
+// PAGES-UX-01: lets Aludel's Pages layer inspect the app while it shows it in a frame: which page and sections are on
+// screen and where. It answers only the Aludel portal that generated it and does nothing when the app isn't framed.
+const bridgeSource = `// Generated by Aludel. Lets Aludel's Pages layer point at this app's page sections while it shows the app in a frame.
+// It only talks to the Aludel portal named in site.ts and does nothing when the app is not framed. Keep the
+// data-aludel-page and data-aludel-section attributes on pages and sections as they are built out.
+import { site } from './site';
+
+if (window.parent !== window) {
+  let inspecting = false;
+  let hovered: string | null = null;
+  let queued = false;
+  const post = (message: Record<string, unknown>) => window.parent.postMessage({ aludel: 1, ...message }, site.portal);
+  const box = (element: Element) => { const rect = element.getBoundingClientRect(); return { x: rect.left, y: rect.top, w: rect.width, h: rect.height }; };
+  const inventory = () => post({ type: 'inventory', path: location.pathname, page: document.querySelector('[data-aludel-page]')?.getAttribute('data-aludel-page') || null,
+    height: document.documentElement.scrollHeight,
+    sections: Array.from(document.querySelectorAll('[data-aludel-section]')).map(element => ({ id: element.getAttribute('data-aludel-section'), skeleton: element.hasAttribute('data-aludel-skeleton'), box: box(element) })) });
+  const soon = () => { if (!inspecting || queued) return; queued = true; requestAnimationFrame(() => { queued = false; inventory(); }); };
+  const section = (target: EventTarget | null) => target instanceof Element ? target.closest('[data-aludel-section]') : null;
+  window.addEventListener('message', event => {
+    if (event.origin !== site.portal || event.data?.aludel !== 1) return;
+    if (event.data.type === 'inspect') { inspecting = Boolean(event.data.on); inventory(); }
+    if (event.data.type === 'go' && typeof event.data.path === 'string' && event.data.path.startsWith('/')) { history.pushState({}, '', event.data.path); dispatchEvent(new PopStateEvent('popstate')); }
+  });
+  document.addEventListener('mouseover', event => {
+    if (!inspecting) return;
+    const element = section(event.target), id = element?.getAttribute('data-aludel-section') || null;
+    if (id !== hovered) { hovered = id; post({ type: 'hover', id, box: element ? box(element) : null }); }
+  });
+  document.addEventListener('click', event => {
+    const element = inspecting ? section(event.target) : null;
+    if (!element) return;
+    event.preventDefault(); event.stopPropagation();
+    post({ type: 'select', id: element.getAttribute('data-aludel-section'), box: box(element) });
+  }, true);
+  addEventListener('scroll', soon, { passive: true });
+  addEventListener('resize', soon);
+  new MutationObserver(soon).observe(document.documentElement, { childList: true, subtree: true });
+  post({ type: 'ready', path: location.pathname });
+}
+
+export {};
+`;
+
 const appComponent = `import { Component, computed, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -253,6 +314,7 @@ export class App {
   readonly site = site;
   readonly path = signal(location.pathname);
   readonly page = computed<SitePage | null>(() => site.pages.find(item => item.path === this.path()) ?? null);
+  readonly navPages = site.pages.filter(item => item.nav);
   readonly account = signal<Account | null>(null);
   readonly message = signal('');
   readonly busy = signal(false);
@@ -314,7 +376,7 @@ const appTemplate = `<a class="skip-link" href="#main">Skip to content</a>
   <header>
     <a class="brand" href="/" (click)="go($event, '/')">@if (site.mark) { <img class="brand-mark" [src]="site.mark" alt=""> } @else { <span class="brand-mark" aria-hidden="true">{{ site.markText || initials(site.name) }}</span> }{{ site.name }}</a>
     <nav class="nav" aria-label="Main">
-      @for (item of site.pages; track item.path) {
+      @for (item of navPages; track item.path) {
         <a [href]="item.path" (click)="go($event, item.path)" [class.active]="path() === item.path" [attr.aria-current]="path() === item.path ? 'page' : null"><span class="icon" aria-hidden="true">{{ item.icon }}</span>{{ item.label }}</a>
       }
     </nav>
@@ -343,16 +405,18 @@ const appTemplate = `<a class="skip-link" href="#main">Skip to content</a>
       </form>
     } @else if (page(); as current) {
       @if (current.path === '/' && site.hero) { <div class="hero" [style.background-image]="'url(' + site.hero + ')'" role="img" [attr.aria-label]="site.name"></div> }
+      <div class="page" [attr.data-aludel-page]="current.id">
       <h1 tabindex="-1">{{ current.label }}</h1>
       <p class="description" [class.empty]="!current.description">{{ current.description || 'This page is a skeleton. Describe what happens here in Aludel to build it out.' }}</p>
-      <page-blocks [blocks]="current.blocks"></page-blocks>
+      <page-blocks [blocks]="current.blocks" [sections]="current.sections"></page-blocks>
+      </div>
     } @else {
       <h1 tabindex="-1">Page not found</h1>
       <p><a href="/" (click)="go($event, '/')">Go home</a></p>
     }
   </main>
   <nav class="tabs" aria-label="Sections">
-    @for (item of site.pages; track item.path) {
+    @for (item of navPages; track item.path) {
       <a [href]="item.path" (click)="go($event, item.path)" [class.active]="path() === item.path" [attr.aria-current]="path() === item.path ? 'page' : null"><span class="icon" aria-hidden="true">{{ item.icon }}</span>{{ item.label }}</a>
     }
   </nav>
