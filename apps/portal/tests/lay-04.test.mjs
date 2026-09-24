@@ -139,13 +139,13 @@ test('WORK-UX-01: priority and blocking links as Jira has them', () => {
 test('LAY-04C: routines run when due, before releases or by hand, never twice while open', () => {
   const { know, ada, id } = fixture({ profile: 'planner' });
   const routines = know.list(id, 'routine');
-  assert.deepEqual(routines.map(routine => routine.cadence), ['weekly', 'weekly', 'monthly', 'before-release']);
+  assert.deepEqual(routines.map(routine => routine.cadence), ['weekly', 'weekly', 'monthly', 'before-release', 'weekly'], 'ROADMAP-01 adds the weekly milestone check');
   const created = Date.parse(know.view(ada, id).routines[0].nextRunAt) - 7 * day;
   const at = offset => new Date(created + offset * day).toISOString();
   assert.deepEqual(know.runRoutines(id, { at: at(6) }), [], 'nothing is due in the first week');
   const weekly = know.runRoutines(id, { at: at(8) });
-  assert.deepEqual(weekly.map(item => item.title.split(' · ')[0]).sort(), ['Accessibility sweep', 'Product drift check']);
-  assert.deepEqual(weekly.map(item => item.action).sort(), ['pages.a11y', 'product.drift'], 'each routine has its action');
+  assert.deepEqual(weekly.map(item => item.title.split(' · ')[0]).sort(), ['Accessibility sweep', 'Milestone check', 'Product drift check']);
+  assert.deepEqual(weekly.map(item => item.action).sort(), ['pages.a11y', 'product.drift', 'work.milestone'], 'each routine has its action');
   assert.ok(weekly.every(item => item.assignee?.label === 'Default agent'), 'a Planner hands audits to the default agent');
   assert.deepEqual(know.runRoutines(id, { at: at(16) }), [], 'the previous items are still open');
   const drift = weekly.find(item => item.title.startsWith('Product drift'));

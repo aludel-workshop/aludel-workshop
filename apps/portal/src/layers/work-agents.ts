@@ -117,7 +117,7 @@ export class WorkAgentsComponent {
   readonly editingName = signal(false);
   readonly attachable = computed(() => {
     const data = this.ctx.data(); if (!data) return [];
-    const ids = [...Object.values(data.vision).map(entry => entry.id), ...data.docs.map(entry => entry.id), ...data.research.map(entry => entry.id), ...data.specs.map(entry => entry.id),
+    const ids = [...data.claims.map(entry => entry.id), ...data.insights.map(entry => entry.id), ...data.projects.map(entry => entry.id), ...Object.values(data.vision).map(entry => entry.id), ...data.docs.map(entry => entry.id), ...data.research.map(entry => entry.id), ...data.specs.map(entry => entry.id),
       ...data.stories.map(entry => entry.id), ...data.pages.map(entry => entry.id), ...data.objects.map(entry => entry.id), ...data.access.map(entry => entry.id)];
     return ids.map(id => ({ id, label: `${this.ctx.refInfo(id)?.kindLabel}: ${this.ctx.refInfo(id)?.label}` })).filter(option => !this.draft.context.includes(option.id));
   });

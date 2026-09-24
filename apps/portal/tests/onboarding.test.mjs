@@ -194,7 +194,7 @@ test('a build marks template stories built with a done template work item and gi
   assert.deepEqual(view.stories.filter(s => s.status === 'built').map(s => s.pack), ['Accounts', 'Accounts', 'Accounts']);
   assert.ok(view.stories.filter(s => s.pack === 'Messaging').every(s => s.status !== 'built'), 'messaging is not built by the template, so it is not claimed as built');
   assert.ok(view.pages.every(p => p.status === 'skeleton'));
-  assert.ok(view.vision.statement.body.startsWith('Neighbours lend'));
+  assert.ok(view.claims.find(claim => claim.section === 'value')?.text.startsWith('Neighbours lend'), 'ROADMAP-01: the pitch starts the Brief\'s value proposition');
   assert.deepEqual(view.phases.map(p => p.key), ['demo', 'mvp', 'later']);
 });
 

@@ -44,7 +44,7 @@ export function loadCatalogs(configDirectory) {
   }
   return { preferences: profiles.preferences, profiles: profiles.profiles, feels: starter.feels, features: starter.features, packs: loadStoryPacks(configDirectory), stacks,
     pageTypes: pages.types, routeIcons, defaultRoute: starter.defaultRoute, services: read('story-packs.json').services || {}, agentDefaults: loadAgentDefaults(configDirectory),
-    automation: profiles.automation, routines: read('routines.json').routines, agentProviders: loadAgentProviders(configDirectory),
+    automation: profiles.automation, routines: read('routines.json').routines, playbooks: read('playbooks.json'), agentProviders: loadAgentProviders(configDirectory),
     roles: loadRoles(configDirectory, { routines: read('routines.json').routines, styles: Object.keys(profiles.profiles) }) };
 }
 

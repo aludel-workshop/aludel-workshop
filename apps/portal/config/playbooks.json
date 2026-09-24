@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "note": "ROADMAP-01 (DEC-042/043): the foundation projects every new web app needs, per milestone, seeded once into Work › Projects. Feature projects come from the story map (one per activity and milestone). Everything seeded is an ordinary project afterwards.",
+  "projects": [
+    {
+      "milestone": "demo",
+      "title": "Product brief and first story map",
+      "summary": "The Brief, personas and the first slice of the story map.",
+      "layer": "product"
+    },
+    {
+      "milestone": "demo",
+      "title": "Design foundations",
+      "summary": "Tokens, core components and page types.",
+      "layer": "design"
+    },
+    {
+      "milestone": "demo",
+      "title": "Preview environment",
+      "summary": "A preview build for every change.",
+      "layer": "platform"
+    },
+    {
+      "milestone": "mvp",
+      "title": "Launch readiness",
+      "summary": "Production environment, domain, backups and a security audit.",
+      "layer": "platform"
+    }
+  ]
+}

@@ -6,25 +6,31 @@ import { WorkAgentsComponent } from './work-agents';
 import { WorkBoardComponent } from './work-board';
 import { WorkItemComponent } from './work-item';
 import { WorkRolesComponent } from './work-roles';
+import { WorkItemsComponent, WorkProjectsComponent } from './work-plan';
+import { WorkTeamComponent } from './work-team';
 
 // Work: the shared bench (DEC-036), redesigned in WORK-UX-01. Board (batches per assignee, then Queue, Backlog and Done),
 // the item page, Roles (who takes each action and how), Agents (who does agent work) and Routines.
 @Component({
   selector: 'aludel-work-layer', standalone: true,
-  imports: [FormsModule, MatIconModule, WorkBoardComponent, WorkItemComponent, WorkRolesComponent, WorkAgentsComponent],
+  imports: [FormsModule, MatIconModule, WorkBoardComponent, WorkItemComponent, WorkRolesComponent, WorkAgentsComponent, WorkItemsComponent, WorkProjectsComponent, WorkTeamComponent],
   template: `
   @if (tab() === 'item') { <aludel-work-item [id]="ctx.segments()[2] || ''" /> }
   @else if (tab() === 'agents' && ctx.segments()[2]) { <aludel-work-agents [id]="ctx.segments()[2]" /> }
+  @else if (tab() === 'projects' && ctx.segments()[2]) { <aludel-work-projects [selectedId]="ctx.segments()[2]" /> }
   @else {
-    <p class="lay-eyebrow">Work</p>
+    <p class="lay-eyebrow lay-layer"><mat-icon aria-hidden="true">checklist</mat-icon>Work</p>
     <h1 tabindex="-1">{{ heading[tab()] }}</h1>
-    <p class="lay-lead">{{ lead[tab()] }}</p>
+    @if (lead[tab()]) { <p class="lay-lead">{{ lead[tab()] }}</p> }
     <nav class="lay-tabs" aria-label="Work sections">
-      @for (entry of tabs; track entry[0]) { <a [href]="ctx.link('work', entry[0])" (click)="ctx.go(ctx.link('work', entry[0]), $event)" [class.active]="tab() === entry[0]" [attr.aria-current]="tab() === entry[0] ? 'page' : null">{{ entry[1] }}</a> }
+      @for (entry of tabs; track entry[0]) { <a [href]="ctx.link('work', entry[0])" (click)="ctx.go(ctx.link('work', entry[0]), $event)" [class.active]="tab() === entry[0] || (entry[0] === 'team' && tab() === 'agents')" [attr.aria-current]="tab() === entry[0] ? 'page' : null"><mat-icon aria-hidden="true">{{ entry[2] }}</mat-icon>{{ entry[1] }}</a> }
     </nav>
     @switch (tab()) {
       @case ('roles') { <aludel-work-roles [focus]="ctx.segments()[2] || null" /> }
-      @case ('agents') { <aludel-work-agents /> }
+      @case ('items') { <aludel-work-items [selectedId]="ctx.segments()[2] || null" /> }
+      @case ('projects') { <aludel-work-projects /> }
+      @case ('team') { <aludel-work-team /> }
+      @case ('agents') { <aludel-work-team /> }
       @case ('routines') {
         <div class="lay-table-wrap" tabindex="0" role="region" aria-label="Routines"><table><thead><tr><th>Routine</th><th>Role</th><th>Runs</th><th>Next</th><th>Last item</th><th>On</th><th><span class="visually-hidden">Run</span></th></tr></thead><tbody>
           @for (routine of routines(); track routine.id) { <tr><td><strong>{{ routine.title }}</strong>@if (actionFor(routine); as action) { <br><span class="lay-muted small">Goes to {{ ctx.whoName(action.assignee) }}, like any “{{ action.name }}” item</span> }</td>
@@ -47,12 +53,12 @@ import { WorkRolesComponent } from './work-roles';
 })
 export class WorkLayerComponent implements OnDestroy {
   readonly ctx = inject(ProjectContext);
-  readonly tabs: [string, string][] = [['board', 'Board'], ['roles', 'Roles'], ['agents', 'Agents'], ['routines', 'Routines']];
-  readonly heading: Record<string, string> = { board: 'Board', roles: 'Roles', agents: 'Agents', routines: 'Routines' };
+  // ROADMAP-01 (DEC-043): Items and Projects follow Linear; Team holds people and the agent profiles; tabs carry their records' icons.
+  readonly tabs: [string, string, string][] = [['board', 'Board', 'view_kanban'], ['items', 'Items', 'task_alt'], ['projects', 'Projects', 'deployed_code_history'], ['roles', 'Roles', 'badge'], ['team', 'Team', 'group'], ['routines', 'Routines', 'event_repeat']];
+  readonly heading: Record<string, string> = { board: 'Board', items: 'Items', projects: 'Projects', roles: 'Roles', team: 'Team', agents: 'Team', routines: 'Routines' };
   readonly lead: Record<string, string> = {
-    board: 'Batches are what\'s being worked on now, by you and by agents. Everything else waits in the queue or the backlog, highest priority first.',
-    roles: 'Each layer has a role that owns its work. Every action says who takes it, what they must know and what they may do, so anyone who picks it up works the same way.',
-    agents: 'Agent profiles are who does agent work: a model and effort, their own instructions and context, and usage limits.',
+    board: 'Batches are what\'s being worked on now, by you and by agents. Next fills a batch from the current milestone.',
+    roles: 'Each layer has a role that owns its work. Every action says who takes it, what they must know and what they may do. A shield marks an action for leads only.',
     routines: 'Each run creates an ordinary item, assigned like any other by its action. A routine never opens a second item while its last one is open.'
   };
   readonly layerLabel = layerLabel;

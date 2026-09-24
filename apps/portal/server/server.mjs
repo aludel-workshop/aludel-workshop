@@ -75,6 +75,10 @@ for (const projectId of layerProjects()) {
   know.ensureRoutines(projectId);
   // WORK-UX-01: roles and actions replace working style; existing items get actions, priorities, checks and assignee ids.
   know.migrateWork(projectId);
+  // ROADMAP-01: vision sections become Brief claims, research becomes Library sources, and the plan gets its projects.
+  know.ensureBrief(projectId);
+  know.ensureLibrary(projectId);
+  know.ensurePlan(projectId);
 }
 const links = codeLinks({ db, know });
 const ops = platformOps({ db, backupRoot: join(dataDirectory, 'backups') });
@@ -326,7 +330,7 @@ async function api(request, response, url) {
     return json(response, 201, { project: setup.project }, { 'set-cookie': draftCookie('', 0) });
   }
   if (url.pathname === '/api/projects' && request.method === 'GET') return json(response, 200, { projects: userProjects(db, user.id) });
-  const projectRoute = /^\/api\/projects\/([^/]+)\/(setup|preferences|design|pages|assets|features|stack|connections\/agent|steps|repository|skeleton|preview|knowledge|records|work|openapi\.json|platform|database|code|reconcile|agents|changes|routines|batches)(?:\/([^/]+))?$/.exec(url.pathname);
+  const projectRoute = /^\/api\/projects\/([^/]+)\/(setup|preferences|design|pages|assets|features|stack|connections\/agent|steps|repository|skeleton|preview|knowledge|records|work|openapi\.json|platform|database|code|reconcile|agents|changes|routines|batches|docs|comments)(?:\/([^/]+))?$/.exec(url.pathname);
   if (projectRoute) {
     const [, rawId, section, rawItem] = projectRoute;
     const projectId = decodeURIComponent(rawId);
@@ -334,13 +338,15 @@ async function api(request, response, url) {
     requireMember(db, user, projectId);
     const method = request.method;
     // After any successful change to a project's layers, the gaps they reveal become backlog items (DEC-041).
-    if (method !== 'GET' && projectId !== aludelProjectId && ['records', 'work', 'features', 'pages', 'skeleton', 'routines'].includes(section)) {
+    if (method !== 'GET' && projectId !== aludelProjectId && ['records', 'work', 'features', 'pages', 'skeleton', 'routines', 'batches'].includes(section)) {
       response.once('finish', () => { if (response.statusCode < 400) { try { know.syncBacklog(projectId); } catch (error) { console.error(`Backlog for ${projectId}: ${error.message}`); } } });
     }
     if (section === 'setup' && method === 'GET') return json(response, 200, projectView(user, projectId));
     // LAY-03: the layers read one project snapshot and write records and work items through the knowledge module.
     if (section === 'knowledge' && method === 'GET') {
       if (projectId === aludelProjectId) return json(response, 409, { error: 'Aludel’s own knowledge moves into its layers in LAY-06.' });
+      // A project made after start-up plans itself the first time its layers are opened (after onboarding chose its story packs).
+      know.ensurePlan(projectId);
       return json(response, 200, { setup: projectView(user, projectId), knowledge: { ...know.view(user, projectId, { builtBy: links.builtBy(projectId) }), code: links.snapshot(projectId), batches: runs.view(projectId) },
         catalog: { pageTypes: catalogs.pageTypes, routeIcons: catalogs.routeIcons, feels: catalogs.feels, stacks: catalogs.stacks, tools: catalogs.roles.tools, botColors, efforts } });
     }
@@ -402,7 +408,7 @@ async function api(request, response, url) {
       return json(response, 200, know.update(projectId, item, input.data || {}, { expectedRevision: input.expectedRevision, author: user.name, rationale: input.rationale || null, position: input.position, parentId: input.parentId, workItemId: work?.id || null }));
     }
     if (section === 'records' && method === 'DELETE' && item) {
-      const record = ['story', 'spec', 'doc', 'research', 'persona', 'activity', 'step', 'data_object', 'data_operation', 'access_rule'].flatMap(kind => know.list(projectId, kind)).find(entry => entry.id === item);
+      const record = ['story', 'spec', 'doc', 'research', 'persona', 'activity', 'step', 'data_object', 'data_operation', 'access_rule', 'brief_claim', 'source', 'finding', 'insight', 'evidence_link', 'project'].flatMap(kind => know.list(projectId, kind)).find(entry => entry.id === item);
       if (!record) return json(response, 409, { error: 'That record cannot be deleted here.' });
       const users = know.referrers(projectId, item);
       if (users.length) return json(response, 409, { error: `Still used by ${users.slice(0, 3).join(', ')}${users.length > 3 ? ` and ${users.length - 3} more` : ''}. Change those first.` });
@@ -432,7 +438,11 @@ async function api(request, response, url) {
       const input = await readJson(request);
       if (item === 'start') { const { batch } = runs.start(user, projectId, String(input.batchId || '')); return json(response, 202, { batch }); }
       if (item === 'stop') return json(response, 200, { batch: runs.stop(user, projectId, String(input.batchId || '')) });
+      if (item === 'next') return json(response, 200, runs.next(user, projectId, input.assignee, input.count));
     }
+    // ROADMAP-01: documents generated from the Brief, and comments on insights.
+    if (section === 'docs' && method === 'POST') return json(response, item ? 200 : 201, know.generateDoc(user, projectId, { generator: String((await readJson(request)).generator || ''), id: item }));
+    if (section === 'comments' && method === 'POST' && item) return json(response, 201, know.addComment(user, projectId, item, (await readJson(request)).text));
     if (section === 'preferences' && method === 'PUT') { flows.savePreferences(user, projectId, await readJson(request)); return json(response, 200, projectView(user, projectId)); }
     if (section === 'design' && method === 'PUT') { flows.saveDesign(user, projectId, await readJson(request)); return json(response, 200, projectView(user, projectId)); }
     if (section === 'assets' && method === 'POST' && !item) { flows.addAsset(user, projectId, await readJson(request, 12 * 1024 * 1024)); return json(response, 201, projectView(user, projectId)); }

@@ -1,0 +1,1584 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Aludel Vision and Plan</title>
+<!-- ROADMAP-01P prototype v3: owner review of v2 applied (W1-W10 in ../work-record.md). One colour per layer, universal record chips with quick views, Linear-style projects timeline and project page, Jira-style item side panel, Roles/Team with elevated actions. Static; illustrative Tool Share data. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0&display=block">
+<style>
+:root{
+  --bg:#fafbff;--surface:#ffffff;--rail:#f0f4fc;--panel:#f3f6fd;--hover:#e3e9f7;--line:#dce2ef;--line-strong:#c5cee2;--ink:#141727;--muted:#52617d;
+  --primary:#3047b9;--on-primary:#ffffff;--container:#dfe5ff;--on-container:#163698;
+  --product:#6b35c9;--product-bg:#efe7ff;--design:#b3245f;--design-bg:#ffe4ee;--pages:#1f4fb8;--pages-bg:#e6eefe;--data:#0b5d86;--data-bg:#dcf0fb;
+  --platform:#0f7465;--platform-bg:#d9f3ec;--work:#8a5300;--work-bg:#fff0d4;
+  --ok:#146446;--ok-bg:#d9f3e7;--warn:#6b4b00;--warn-bg:#fff0c9;--warn-line:#e0a100;--bad:#a1231f;--bad-bg:#fce1e0;
+  --p-highest:#c9190b;--p-high:#e0531f;--p-medium:#b78103;--p-low:#2463d1;--p-lowest:#6b8fcf;
+  --shadow:0 18px 50px #1c2a5a26;--shadow-card:0 1px 2px #1c2a5a12;--code-bg:#141727;--code-ink:#e8ebf7;--code-add:#1d4b35;--code-del:#5a2022;
+  --person:#2f3a57;--mix:#ffffff;--shot-bg:#fff7fa;--shot-ink:#171a24;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#10121a;--surface:#181b26;--rail:#141722;--panel:#1f2331;--hover:#262b3c;--line:#2b3144;--line-strong:#3a4259;--ink:#e6e9f5;--muted:#9da8c2;
+  --primary:#a3b3ff;--on-primary:#0f1a55;--container:#2b3670;--on-container:#e0e6ff;
+  --product:#cdb1ff;--product-bg:#2d2150;--design:#ffa3c6;--design-bg:#461a2e;--pages:#a6c2ff;--pages-bg:#1c2b52;--data:#8fd3f5;--data-bg:#10334a;
+  --platform:#86e0cb;--platform-bg:#0f3932;--work:#ffc774;--work-bg:#3d2b0c;
+  --ok:#94e2bc;--ok-bg:#12392a;--warn:#ffd680;--warn-bg:#3b2d0b;--warn-line:#b88400;--bad:#ffaca7;--bad-bg:#491a1a;
+  --p-highest:#ff7b72;--p-high:#ff9a66;--p-medium:#f2c14e;--p-low:#7fb0ff;--p-lowest:#a7bfe6;
+  --shadow:0 18px 50px #00000080;--shadow-card:0 1px 2px #00000060;--code-bg:#0b0d14;--code-ink:#dfe3f2;--code-add:#16402c;--code-del:#4d1b1d;
+  --person:#4a5577;--mix:#11131a;--shot-bg:#fff7fa;--shot-ink:#171a24;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10121a;--surface:#181b26;--rail:#141722;--panel:#1f2331;--hover:#262b3c;--line:#2b3144;--line-strong:#3a4259;--ink:#e6e9f5;--muted:#9da8c2;
+  --primary:#a3b3ff;--on-primary:#0f1a55;--container:#2b3670;--on-container:#e0e6ff;
+  --product:#cdb1ff;--product-bg:#2d2150;--design:#ffa3c6;--design-bg:#461a2e;--pages:#a6c2ff;--pages-bg:#1c2b52;--data:#8fd3f5;--data-bg:#10334a;
+  --platform:#86e0cb;--platform-bg:#0f3932;--work:#ffc774;--work-bg:#3d2b0c;
+  --ok:#94e2bc;--ok-bg:#12392a;--warn:#ffd680;--warn-bg:#3b2d0b;--warn-line:#b88400;--bad:#ffaca7;--bad-bg:#491a1a;
+  --p-highest:#ff7b72;--p-high:#ff9a66;--p-medium:#f2c14e;--p-low:#7fb0ff;--p-lowest:#a7bfe6;
+  --shadow:0 18px 50px #00000080;--shadow-card:0 1px 2px #00000060;--code-bg:#0b0d14;--code-ink:#dfe3f2;--code-add:#16402c;--code-del:#4d1b1d;
+  --person:#4a5577;--mix:#11131a;--shot-bg:#fff7fa;--shot-ink:#171a24;color-scheme:dark}
+
+*{box-sizing:border-box}
+body{margin:0;font-family:Roboto,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;font-size:15px;line-height:1.5;color:var(--ink);background:var(--bg)}
+a{color:var(--primary)}button,input,select,textarea{font:inherit;color:inherit}
+h1,h2,h3{text-wrap:balance}
+.icon{font-family:'Material Symbols Rounded';font-weight:normal;font-style:normal;font-size:20px;line-height:1;letter-spacing:normal;text-transform:none;white-space:nowrap;direction:ltr;display:inline-block;vertical-align:middle;font-feature-settings:'liga';-webkit-font-smoothing:antialiased;flex:none}
+:focus-visible{outline:3px solid var(--primary);outline-offset:2px}
+.visually-hidden{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+code,.mono{font-family:"Roboto Mono",ui-monospace,monospace;font-size:.9em}
+.tabular{font-variant-numeric:tabular-nums}
+
+/* Shell */
+.shell{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh;background:linear-gradient(90deg,var(--rail) 232px,transparent 232px)}
+.rail{background:var(--rail);border-right:1px solid var(--line);padding:16px 12px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:19px;padding:4px 10px 12px;color:var(--ink);text-decoration:none}.brand .icon{color:var(--primary);font-size:28px}
+.project{display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;background:var(--surface);border:1px solid var(--line);margin-bottom:10px;color:var(--ink);text-decoration:none}
+.project .mark{display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:#ca3e6f;color:#fff;font-weight:700;font-size:13px}.project small{display:block;color:var(--muted);font-size:12px}
+.nav a{display:flex;align-items:center;gap:12px;padding:9px 12px;border-radius:999px;color:var(--ink);text-decoration:none;font-weight:500}
+.nav a:hover{background:var(--hover)}.nav a.active{background:var(--container);color:var(--on-container);font-weight:700}
+.nav .badge{margin-left:auto;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:var(--primary);color:var(--on-primary);font-size:12px;display:grid;place-items:center}
+.rail .spacer{flex:1}
+.topbar{display:flex;align-items:center;gap:16px;padding:12px 32px;border-bottom:1px solid var(--line);background:var(--bg);position:sticky;top:env(safe-area-inset-top,0px);z-index:10}
+.search{position:relative;flex:1;max-width:520px}.search input{width:100%;padding:9px 14px 9px 40px;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
+.search .icon{position:absolute;left:12px;top:9px;color:var(--muted)}
+.content{padding:26px 32px 110px;max-width:1320px}
+.eyebrow{font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin:0 0 4px}
+.eyebrow a{color:inherit;text-decoration:none}.eyebrow a:hover{color:var(--primary);text-decoration:underline}
+h1{font-size:30px;line-height:1.15;margin:0 0 6px}h2{font-size:18px;margin:0}h3{font-size:15px;margin:0}
+.lead{color:var(--muted);font-size:16px;margin:0 0 20px;max-width:720px}
+.muted{color:var(--muted)}.small{font-size:13.5px}.tiny{font-size:12px}
+.row{display:flex;align-items:center;gap:10px}.wrap{flex-wrap:wrap}.push{margin-left:auto}
+
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:0 0 22px;overflow-x:auto}
+.tabs a{padding:10px 16px;color:var(--muted);text-decoration:none;font-weight:500;border-bottom:3px solid transparent;margin-bottom:-1px;white-space:nowrap}
+.tabs a.active{color:var(--ink);border-color:var(--primary)}
+.subtabs{display:flex;gap:18px}
+.subtabs button{border:0;background:none;padding:6px 0;margin-bottom:-1px;border-bottom:2px solid transparent;color:var(--muted);font-size:13.5px;font-weight:500;cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.subtabs button:hover{color:var(--ink)}
+.subtabs button[aria-selected="true"]{color:var(--ink);border-color:var(--primary)}
+.subtabs .n{font-size:11.5px;min-width:20px;padding:0 6px;border-radius:999px;background:var(--panel);color:var(--muted);text-align:center;font-variant-numeric:tabular-nums}
+
+/* Chips */
+.chip{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap;line-height:18px}
+.chip .icon{font-size:15px}
+.l-product{background:var(--product-bg);color:var(--product)}.l-design{background:var(--design-bg);color:var(--design)}.l-pages{background:var(--pages-bg);color:var(--pages)}
+.l-data{background:var(--data-bg);color:var(--data)}.l-platform{background:var(--platform-bg);color:var(--platform)}.l-work{background:var(--work-bg);color:var(--work)}
+.s-ok{background:var(--ok-bg);color:var(--ok)}.s-warn{background:var(--warn-bg);color:var(--warn)}.s-bad{background:var(--bad-bg);color:var(--bad)}.s-plain{background:var(--panel);color:var(--muted)}.s-info{background:var(--container);color:var(--on-container)}
+
+/* Reference chips + hover cards (A3) */
+.ref{display:inline-flex;align-items:center;gap:4px;max-width:100%;padding:1px 8px 1px 5px;border-radius:7px;border:1px solid var(--line);background:var(--surface);color:var(--ink);text-decoration:none;font-size:13px;font-weight:500;line-height:20px;vertical-align:baseline;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ref .icon{font-size:15px}
+.ref:hover,.ref:focus-visible{border-color:var(--primary);background:var(--panel)}
+.ref.k-product .icon{color:var(--product)}.ref.k-design .icon{color:var(--design)}.ref.k-pages .icon{color:var(--pages)}.ref.k-data .icon{color:var(--data)}.ref.k-platform .icon{color:var(--platform)}.ref.k-work .icon{color:var(--work)}
+.ref .rid{color:var(--muted);font-weight:700;font-size:12px}
+.refs{display:flex;flex-wrap:wrap;gap:6px}
+.prose .ref{margin:0 1px}
+.hovercard{position:fixed;z-index:60;width:320px;max-width:calc(100vw - 24px);background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:12px 14px;font-size:13.5px}
+.hovercard[hidden]{display:none}
+.hc-head{display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap}
+.hc-head .rid{font-weight:700;color:var(--muted);font-size:12px}
+.hovercard strong{display:block;font-size:14.5px;line-height:1.35;margin-bottom:4px}
+.hovercard p{margin:0 0 8px;color:var(--muted)}
+.hovercard dl{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin:0 0 8px}.hovercard dt{color:var(--muted)}.hovercard dd{margin:0}
+.hc-foot{display:flex;align-items:center;gap:8px;border-top:1px solid var(--line);padding-top:8px;margin-top:4px;color:var(--muted);font-size:12.5px}
+.hc-foot a{margin-left:auto;font-weight:500;text-decoration:none;display:inline-flex;align-items:center;gap:2px}
+
+/* Avatars: people are initials; agents are seeded robots on a metal tile (B5) */
+.avatar{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--person);color:#fff;font-size:10.5px;font-weight:700;flex:none;overflow:hidden}
+.avatar.bot{border-radius:7px;background:linear-gradient(145deg,color-mix(in srgb,var(--metal) 18%,var(--mix)),color-mix(in srgb,var(--metal) 42%,var(--mix)));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--metal) 70%,transparent);color:var(--metal)}
+.avatar.bot img{width:88%;height:88%;display:block}
+.avatar.bot .icon{font-size:16px}
+.avatar.template{border-radius:7px;background:var(--work-bg);color:var(--work)}.avatar.template .icon{font-size:16px}
+.avatar.lg{width:36px;height:36px;font-size:13px}.avatar.lg.bot{border-radius:10px}.avatar.lg .icon{font-size:22px}
+.avatar.xl{width:84px;height:84px;border-radius:20px}
+.metal-name{font-weight:500}
+
+/* Split assignee chip */
+.split{display:inline-flex;align-items:stretch;border:1px solid var(--line-strong);border-radius:999px;background:var(--surface);overflow:hidden;height:28px;vertical-align:middle;flex:none;max-width:100%}
+.split.agent{border-color:color-mix(in srgb,var(--metal) 55%,var(--line-strong));background:linear-gradient(90deg,color-mix(in srgb,var(--metal) 10%,var(--surface)),var(--surface) 70%)}
+.split button{border:0;background:none;cursor:pointer;display:inline-flex;align-items:center;gap:6px;color:var(--ink)}
+.split .who{padding:0 10px 0 3px;font-size:13px;font-weight:500;min-width:0}
+.split .who span.name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px}
+.split .drop{padding:0 6px;border-left:1px solid var(--line)}.split .drop .icon{font-size:18px;color:var(--muted)}
+.split button:hover:not(:disabled){background:color-mix(in srgb,var(--panel) 70%,transparent)}
+.split .drop:disabled{cursor:not-allowed}.split .drop:disabled .icon{opacity:.45}
+.split.warn{border-color:var(--warn-line)}
+
+/* Role · action chip (B6) */
+.role{display:inline-flex;align-items:center;gap:5px;padding:2px 10px 2px 6px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap;text-decoration:none;line-height:20px;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.role .icon{font-size:15px}.role .act{font-weight:500;opacity:.9}
+
+/* Priority (B13): Jira's five levels */
+.prio{display:inline-grid;place-items:center;width:20px;height:20px;flex:none}
+.prio .icon{font-size:20px}
+.p-highest{color:var(--p-highest)}.p-high{color:var(--p-high)}.p-medium{color:var(--p-medium)}.p-low{color:var(--p-low)}.p-lowest{color:var(--p-lowest)}
+.prio-btn{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line-strong);background:var(--surface);border-radius:999px;padding:2px 10px 2px 4px;cursor:pointer;font-size:13px}
+.blocked{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:var(--bad);white-space:nowrap}
+.blocked .icon{font-size:16px}
+
+/* Menus */
+.menu{position:fixed;z-index:70;min-width:240px;max-width:calc(100vw - 24px);background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:6px}
+.menu[hidden]{display:none}
+.menu h4{margin:8px 10px 4px;font-size:11px;letter-spacing:.7px;text-transform:uppercase;color:var(--muted)}
+.menu button{display:flex;align-items:center;gap:10px;width:100%;padding:7px 10px;border:0;background:none;border-radius:8px;text-align:left;cursor:pointer;font-size:14px}
+.menu button:hover:not(:disabled),.menu button:focus-visible{background:var(--panel)}
+.menu button:disabled{cursor:not-allowed;opacity:.55}
+.menu button small{display:block;color:var(--muted);font-size:12px}
+.menu .check{margin-left:auto;color:var(--primary)}
+.menu .note{margin:4px 10px 6px;font-size:12px;color:var(--muted)}
+.menu .note.warn{color:var(--warn)}
+.menu hr{border:0;border-top:1px solid var(--line);margin:6px 4px}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:7px 15px;border-radius:999px;border:1px solid var(--primary);background:var(--primary);color:var(--on-primary);font-weight:500;cursor:pointer;text-decoration:none;font-size:13.5px;white-space:nowrap}
+.btn .icon{font-size:18px}
+.btn.ghost{background:transparent;color:var(--primary)}.btn.small{padding:4px 12px;font-size:13px}.btn.small .icon{font-size:16px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.quiet{border-color:var(--line-strong);color:var(--ink);background:var(--surface)}
+.btn.danger{border-color:var(--bad);color:var(--bad);background:transparent}
+.btn.ok{border-color:var(--ok);background:var(--ok);color:var(--surface)}
+.linkbtn{border:0;background:none;color:var(--primary);cursor:pointer;padding:0;font-size:13px}
+
+/* Board */
+.section-head{display:flex;align-items:baseline;gap:10px;margin:0 0 10px;flex-wrap:wrap}
+.section-head h2{font-size:16px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px}
+.panel h2{font-size:12px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin:0 0 10px}
+.proto{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:50;display:flex;gap:8px;align-items:center;background:var(--code-bg);color:var(--code-ink);padding:6px 6px 6px 14px;border-radius:999px;box-shadow:var(--shadow);font-size:12.5px;flex-wrap:wrap;max-width:calc(100vw - 32px)}
+.proto label{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.proto input{accent-color:#a3b3ff}
+.proto button{border:0;border-radius:999px;padding:5px 12px;background:#ffffff1f;color:inherit;cursor:pointer;font-size:12.5px}
+.proto button:hover{background:#ffffff33}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(560px,100vw);background:var(--surface);border-left:1px solid var(--line);box-shadow:var(--shadow);z-index:80;overflow:auto;padding:22px 22px calc(40px + env(safe-area-inset-bottom,0px))}
+.drawer[hidden]{display:none}
+.drawer h2{font-size:20px;margin:0 0 4px}
+.drawer .x{position:absolute;right:14px;top:14px;border:0;background:none;cursor:pointer;color:var(--muted);padding:6px;border-radius:50%}
+.drawer .x:hover{background:var(--panel)}
+.drawer h3{margin:18px 0 0;font-size:13px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
+.ledger{list-style:none;margin:8px 0 0;padding:0}
+.ledger li{display:grid;grid-template-columns:38px minmax(0,1fr);gap:10px;padding:10px 6px;border-top:1px solid var(--line);font-size:13.5px}
+.ledger .n{font-weight:700;color:var(--muted)}
+.ledger p{margin:0}.ledger .ans{color:var(--muted);margin-top:4px}
+.ledger a{font-weight:500}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(72px + env(safe-area-inset-bottom,0px));z-index:90;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:13.5px;box-shadow:var(--shadow);max-width:min(560px,calc(100vw - 32px))}
+.toast[hidden]{display:none}
+.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 3px var(--primary)}100%{box-shadow:0 0 0 3px transparent}}
+/* ---------- ROADMAP-01P additions ---------- */
+.shell>div{min-width:0}
+.nav-sep{height:1px;background:var(--line);margin:8px 10px}
+.nav small.new{margin-left:auto;font-size:10.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--primary)}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:22px;align-items:start}
+.stackv{display:grid;gap:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px 18px;box-shadow:var(--shadow-card)}
+.card>h2{display:flex;align-items:center;gap:8px;margin:0 0 4px}
+.card>.hint{margin:0 0 12px;color:var(--muted);font-size:13.5px}
+.sticky{position:sticky;top:76px}
+.sec-num{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--panel);color:var(--muted);font-size:12px;font-weight:700;flex:none}
+.claims{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.claim{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:start;padding:8px 10px;border-radius:10px}
+.claim:hover{background:var(--panel)}
+.claim p{margin:0}
+.claim small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
+.conf{display:inline-flex;align-items:center;gap:4px;border:0;background:none;padding:2px 6px;border-radius:999px;font-size:12px;font-weight:500;color:var(--muted);cursor:pointer;white-space:nowrap}
+.conf .icon{font-size:16px}
+.conf:hover{background:var(--hover)}
+.conf.assumed{color:var(--muted)}
+.conf.evidenced{color:var(--pages)}
+.conf.validated{color:var(--ok)}
+.conf.contradicted{color:var(--bad)}
+.ev{display:inline-flex;align-items:center;gap:3px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:0 8px 0 5px;font-size:12px;line-height:20px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.ev .icon{font-size:14px}
+.ev:hover{border-color:var(--primary);color:var(--ink)}
+.ev .against{color:var(--bad);font-weight:700}
+.statement{font-size:20px;line-height:1.4;margin:4px 0 2px;font-weight:500}
+.collapsed{border-style:dashed;background:transparent;box-shadow:none}
+.risk{list-style:none;margin:0;padding:0;counter-reset:r}
+.risk li{display:grid;grid-template-columns:26px minmax(0,1fr);gap:8px;padding:10px 0;border-top:1px solid var(--line);font-size:13.5px}
+.risk li:first-child{border-top:0}
+.risk li::before{counter-increment:r;content:counter(r);display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--warn-bg);color:var(--warn);font-weight:700;font-size:12px}
+.risk p{margin:0 0 6px}
+.legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12.5px;color:var(--muted);margin:0 0 16px}
+.legend span{display:inline-flex;align-items:center;gap:4px}.legend .icon{font-size:16px}
+
+/* Opportunity tree */
+.tree,.tree ul{list-style:none;margin:0;padding:0}
+.tree ul{margin-left:22px;padding-left:16px;border-left:2px solid var(--line)}
+.node{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;margin:6px 0;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.node .kind{font-size:11px;letter-spacing:.6px;text-transform:uppercase;font-weight:700;color:var(--muted);min-width:86px}
+.node.outcome{background:var(--container);border-color:transparent}.node.outcome .kind{color:var(--on-container)}
+.node.opp .kind{color:var(--product)}
+.node.cap{background:var(--panel)}
+.node .title{font-weight:500}
+.node .who{font-size:12.5px;color:var(--muted)}
+.node .right{margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.node.focus{box-shadow:0 0 0 2px var(--primary)}
+.twisty{border:0;background:none;cursor:pointer;padding:0;color:var(--muted);display:inline-grid}
+
+/* Story map */
+.map-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:16px;background:var(--panel)}
+.smap{display:grid;gap:6px;padding:12px;min-width:900px}
+.smap .act{background:var(--product-bg);color:var(--product);font-weight:700;border-radius:10px;padding:8px 10px;font-size:13.5px}
+.smap .step{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:6px 10px;font-size:13px;font-weight:500}
+.smap .band{grid-column:1/-1;display:flex;align-items:center;gap:10px;padding:6px 10px;border-top:2px solid var(--line-strong);margin-top:6px;font-size:13px}
+.smap .band.current{border-color:var(--primary)}
+.smap .band strong{font-size:13.5px}
+.smap .cell{display:grid;gap:6px;align-content:start;min-height:34px}
+.scard{display:block;text-align:left;width:100%;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:7px 9px;font-size:13px;cursor:pointer;box-shadow:var(--shadow-card)}
+.scard:hover{border-color:var(--primary)}
+.scard .meta{display:flex;align-items:center;gap:6px;margin-top:4px;color:var(--muted);font-size:11.5px;flex-wrap:wrap}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+.st-proposed{background:var(--line-strong)}.st-defined{background:var(--p-medium)}.st-designed{background:var(--pages)}.st-built{background:var(--ok)}
+
+/* Evidence drawer */
+.insight{border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin:10px 0;background:var(--surface)}
+.insight.contra{border-color:color-mix(in srgb,var(--bad) 45%,var(--line))}
+.insight header{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+.insight header .rid{font-size:12px;font-weight:700;color:var(--muted)}
+.insight h4{margin:0;font-size:14.5px;flex-basis:100%}
+.finding{display:grid;grid-template-columns:18px minmax(0,1fr);gap:8px;padding:8px 0 0;font-size:13.5px}
+.finding .icon{font-size:17px;color:var(--muted);margin-top:1px}
+.finding q{font-style:italic}
+.finding .src{display:block;color:var(--muted);font-size:12.5px}
+.finding .src a{color:inherit}
+.shot{border:1px solid var(--line);border-radius:10px;background:var(--shot-bg);color:var(--shot-ink);padding:10px;margin-top:6px;font-size:12px}
+.shot .fake{display:grid;gap:5px}.shot .fake i{display:block;height:8px;border-radius:4px;background:#d9dbe6}.shot .fake i.hl{background:#ffd76a;outline:2px solid #c98f00}
+.dirpick{display:inline-flex;border:1px solid var(--line-strong);border-radius:999px;overflow:hidden}
+.dirpick button{border:0;background:none;padding:3px 10px;font-size:12.5px;cursor:pointer}
+.dirpick button[aria-pressed="true"]{background:var(--container);color:var(--on-container);font-weight:700}
+.attach{border:1px dashed var(--line-strong);border-radius:14px;padding:12px 14px;margin-top:14px;display:grid;gap:8px}
+.attach select{padding:6px 8px;border-radius:8px;border:1px solid var(--line-strong);background:var(--surface);max-width:100%}
+
+/* Chart (single series: one hue, direct labels, tooltip, table view) */
+.chart{margin-top:8px}
+.bars{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:2px;align-items:end;height:120px;border-bottom:1px solid var(--line-strong);padding:0 4px}
+.bar-col{display:grid;justify-items:center;align-content:end;height:100%;position:relative}
+.bar-col .v{font-size:12px;color:var(--ink);font-variant-numeric:tabular-nums;margin-bottom:2px}
+.bar-col .b{width:62%;background:var(--primary);border-radius:4px 4px 0 0;min-height:2px}
+.bar-col:hover .b,.bar-col:focus-visible .b{background:var(--on-container)}
+.bar-col .tip{position:absolute;bottom:calc(100% + 4px);background:var(--ink);color:var(--bg);font-size:12px;padding:4px 8px;border-radius:6px;white-space:nowrap;visibility:hidden}
+.bar-col:hover .tip,.bar-col:focus-visible .tip{visibility:visible}
+.bar-x{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:2px;font-size:12px;color:var(--muted);text-align:center;padding:4px 4px 0}
+.chart details{margin-top:6px;font-size:12.5px}
+.chart table{border-collapse:collapse;margin-top:4px}.chart td,.chart th{padding:2px 10px 2px 0;text-align:left;font-weight:400}
+
+/* Library */
+.lib{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
+.ltree{list-style:none;margin:0;padding:0}
+.ltree>li{border-top:1px solid var(--line);padding:10px 0}
+.ltree>li:first-child{border-top:0}
+.ltree .lh{display:flex;align-items:center;gap:8px;font-size:14px;margin:0 0 6px}
+.ltree ul{list-style:none;margin:0;padding:0 0 0 30px;display:grid;grid-template-columns:minmax(0,1fr);gap:4px}
+.ltree ul li>.ref{min-width:0}
+.ltree ul li{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13.5px}
+.srcrow{display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 4px;border-top:1px solid var(--line)}
+.srcrow:first-child{border-top:0}
+.srcrow .ic{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:var(--panel);color:var(--muted)}
+.srcrow button.t{border:0;background:none;padding:0;text-align:left;cursor:pointer;font-weight:500;color:var(--ink)}
+.srcrow button.t:hover{color:var(--primary);text-decoration:underline}
+.srcrow small{display:block;color:var(--muted);font-size:12.5px}
+
+/* Plan */
+.viewswitch{display:inline-flex;border:1px solid var(--line-strong);border-radius:999px;overflow:hidden;background:var(--surface)}
+.viewswitch a{padding:5px 14px;font-size:13px;text-decoration:none;color:var(--ink);display:inline-flex;gap:6px;align-items:center}
+.viewswitch a .icon{font-size:17px}
+.viewswitch a[aria-current="page"]{background:var(--container);color:var(--on-container);font-weight:700}
+.ms{border:1px solid var(--line);border-radius:18px;background:var(--panel);padding:14px;margin:0 0 16px}
+.ms.current{border-color:color-mix(in srgb,var(--primary) 50%,var(--line))}
+.ms-head{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin:0 0 4px}
+.ms-head h2{font-size:18px}
+.ms dl{display:flex;flex-wrap:wrap;gap:4px 18px;margin:0 0 12px;font-size:13px;color:var(--muted)}.ms dt{display:inline;font-weight:700}.ms dd{display:inline;margin:0 0 0 4px}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px}
+.pcard{display:grid;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px;text-decoration:none;color:var(--ink);box-shadow:var(--shadow-card)}
+.pcard:hover{border-color:var(--primary)}
+.pcard .top{display:flex;gap:8px;align-items:center}
+.pcard .rid{font-size:12px;font-weight:700;color:var(--muted)}
+.pcard strong{font-size:14.5px;line-height:1.3}
+.pcard .foot{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;font-size:12px;color:var(--muted)}
+.pcard .foot .bad{color:var(--bad);font-weight:700;display:inline-flex;gap:3px;align-items:center}
+.pcard .foot .icon{font-size:15px}
+.lbar{display:flex;gap:2px;height:8px}
+.lbar i{flex:1;border-radius:4px;background:var(--line);position:relative;overflow:hidden}
+.lbar i b{position:absolute;inset:0 auto 0 0;border-radius:4px}
+.lbar-legend{display:flex;flex-wrap:wrap;gap:2px 10px;font-size:11.5px;color:var(--muted)}
+.lbar-legend span{display:inline-flex;align-items:center;gap:4px}
+.st{font-size:12px;font-weight:700;padding:1px 8px;border-radius:999px;white-space:nowrap}
+.st-shaping{background:var(--panel);color:var(--muted);border:1px dashed var(--line-strong)}
+.st-ready{background:var(--warn-bg);color:var(--warn)}
+.st-progress{background:var(--container);color:var(--on-container)}
+.st-done{background:var(--ok-bg);color:var(--ok)}
+.target{display:inline-flex;align-items:center;gap:3px;font-size:12px;color:var(--ink);font-weight:500}.target .icon{font-size:15px;color:var(--muted)}
+
+/* Timeline */
+.tl-wrap{position:relative;overflow-x:auto;border:1px solid var(--line);border-radius:16px;background:var(--surface)}
+.tl{position:relative;display:grid;min-width:980px}
+.tl .axis{display:grid;border-bottom:1px solid var(--line);font-size:12px;color:var(--muted);background:var(--panel)}
+.tl .axis div{padding:8px 10px;border-left:1px solid var(--line)}
+.tl .axis div:first-child{border-left:0}
+.tl .lane{display:grid;align-items:center;border-bottom:1px solid var(--line);min-height:64px}
+.tl .lane:last-child{border-bottom:0}
+.tl .lane-name{padding:8px 12px;font-weight:700;font-size:13.5px;align-self:stretch;display:flex;flex-direction:column;justify-content:center;background:var(--panel);border-right:1px solid var(--line)}
+.tl .lane-name small{font-weight:400;color:var(--muted);font-size:12px}
+.tbar{margin:8px 6px;padding:6px 10px;border-radius:10px;font-size:12.5px;text-decoration:none;color:var(--ink);border:1px solid var(--line-strong);background:var(--surface);position:relative;z-index:2;display:flex;flex-direction:column;gap:2px;box-shadow:var(--shadow-card)}
+.tbar:hover{border-color:var(--primary)}
+.tbar.done{background:var(--ok-bg);border-color:transparent}
+.tbar.progress{background:var(--container);border-color:transparent;color:var(--on-container)}
+.tbar.ready{background:var(--warn-bg);border-color:transparent;color:var(--warn)}
+.tbar.shaping{border-style:dashed}
+.tbar .rid{font-weight:700;font-size:11.5px;opacity:.8}
+.tbar.late{box-shadow:0 0 0 2px var(--bad)}
+.tbar .early{display:inline-flex;align-items:center;gap:3px;color:var(--bad);font-weight:700;font-size:11.5px}.tbar .early .icon{font-size:14px}
+.tl svg{position:absolute;inset:0;pointer-events:none;z-index:1;overflow:visible}
+.tl svg path{fill:none;stroke:var(--line-strong);stroke-width:2}
+.tl svg path.bad{stroke:var(--bad);stroke-dasharray:5 4}
+.tl svg .arrow{fill:var(--line-strong)}.tl svg .arrow.bad{fill:var(--bad)}
+
+/* Project page */
+.pdetail{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:22px;align-items:start}
+.brief-sec{margin:0 0 18px}
+.brief-sec h3{font-size:12px;letter-spacing:.7px;text-transform:uppercase;color:var(--muted);margin:0 0 4px;display:flex;align-items:center;gap:8px}
+.brief-sec p,.brief-sec ul{margin:0}
+.brief-sec ul{padding-left:20px}
+.req{list-style:none;padding:0!important;display:grid;gap:6px}
+.req li{display:grid;grid-template-columns:62px minmax(0,1fr);gap:8px;font-size:14px}
+.req code{font-weight:700;color:var(--muted)}
+.appetite{display:flex;flex-wrap:wrap;gap:8px}
+.appetite span{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:10px;background:var(--panel);font-size:13px}
+.appetite .icon{font-size:17px;color:var(--muted)}
+.scope{list-style:none;margin:0;padding:0}
+.scope>li{border-top:1px solid var(--line);padding:10px 0}
+.scope>li:first-child{border-top:0}
+.scope h3{display:flex;align-items:center;gap:8px;margin:0 0 6px;font-size:13.5px}
+.scope h3 .n{font-weight:400;color:var(--muted)}
+.item{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:center;padding:5px 0 5px 4px;font-size:13.5px}
+.item .rid{font-size:12px;font-weight:700;color:var(--muted)}
+.item .why{display:block;font-size:12px;color:var(--muted)}
+.item .why.bad{color:var(--bad)}
+.istate{font-size:12px;font-weight:500;display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.istate .icon{font-size:16px}
+.istate.done{color:var(--ok)}.istate.blocked{color:var(--bad)}.istate.batched{color:var(--on-container)}.istate.backlog,.istate.queued{color:var(--muted)}.istate.review{color:var(--warn)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:13.5px;margin:0}
+.kv dt{color:var(--muted)}.kv dd{margin:0}
+.callout{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:12px;background:var(--container);color:var(--on-container);font-size:13.5px;margin:0 0 16px}
+.callout .icon{font-size:19px}
+.callout.warn{background:var(--warn-bg);color:var(--warn)}
+
+/* Board (simplified from WORK-UX-01) */
+.lanes2{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:16px;margin:0 0 26px;align-items:start}
+.blane{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:12px;display:grid;gap:8px}
+.blane-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.blane-head small{display:block;color:var(--muted);font-size:12px}
+.blane-head .right{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.bcard{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 12px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:center;font-size:13.5px}
+.bcard .rid{font-size:12px;font-weight:700;color:var(--muted);margin-right:6px}
+.bcard .sub{grid-column:1/-1;display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.bcard.new{border-color:var(--primary);box-shadow:0 0 0 2px color-mix(in srgb,var(--primary) 25%,transparent)}
+.pchip{display:inline-flex;align-items:center;gap:3px;border-radius:6px;padding:0 6px;background:var(--work-bg);color:var(--work);font-weight:700;font-size:11.5px;text-decoration:none;line-height:18px}
+.qgroup{margin:0 0 14px}
+.qgroup h3{display:flex;align-items:center;gap:8px;font-size:13.5px;margin:0 0 6px}
+.fill-list{list-style:none;margin:10px 0;padding:0;display:grid;gap:6px}
+.fill-list li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:start;padding:8px 10px;border:1px solid var(--line);border-radius:12px;font-size:13.5px}
+.fill-list li.skip{opacity:.65}
+.fill-list small{display:block;color:var(--muted);font-size:12.5px}
+
+/* Team */
+.roles{display:grid;gap:12px}
+.rolecard{display:grid;grid-template-columns:240px minmax(0,1fr);background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.rolecard.newrole{border-color:var(--primary);box-shadow:0 0 0 2px color-mix(in srgb,var(--primary) 20%,transparent)}
+.rolecard>header{padding:14px 16px;border-right:1px solid var(--line);background:var(--panel)}
+.rolecard>header p{margin:4px 0 0;color:var(--muted);font-size:13px}
+.rolecard ul{list-style:none;margin:0;padding:6px 16px}
+.rolecard li{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 0;border-top:1px solid var(--line);font-size:13.5px}
+.rolecard li:first-child{border-top:0}
+.rolecard li small{color:var(--muted)}
+.tag-new{font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding:1px 7px;border-radius:999px;background:var(--container);color:var(--on-container)}
+.tag-moved{font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding:1px 7px;border-radius:999px;background:var(--warn-bg);color:var(--warn)}
+
+/* Home */
+.homegrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;align-items:start}
+.bigbar{display:flex;height:12px;border-radius:6px;overflow:hidden;gap:2px;margin:8px 0 6px}
+.bigbar i{display:block}
+.mini{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.mini li{display:flex;gap:8px;align-items:center;font-size:13.5px;flex-wrap:wrap}
+.mini li .push{font-size:12px}
+.plainlist{list-style:none;margin:0 0 10px;padding:0;display:grid;gap:8px}.plainlist .icon{font-size:17px;color:var(--muted);margin-right:4px}
+.live{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--primary);animation:pulse 1.6s infinite}
+@keyframes pulse{0%{opacity:1}50%{opacity:.35}100%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.live{animation:none}}
+
+@media (max-width:1100px){.grid2,.pdetail{grid-template-columns:minmax(0,1fr)}.sticky{position:static}}
+@media (max-width:860px){
+  .shell{grid-template-columns:1fr;background:none}
+  .rail{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;gap:6px;padding:10px 16px}
+  .rail .spacer,.project,.nav-sep{display:none}.nav{display:flex;flex-wrap:wrap;gap:2px}.nav a{padding:6px 10px}
+  .content,.topbar{padding-left:16px;padding-right:16px}
+  .lanes2{grid-template-columns:1fr}
+  .rolecard{grid-template-columns:1fr}.rolecard>header{border-right:0;border-bottom:1px solid var(--line)}
+  .node .kind{min-width:0}
+  .tree ul{margin-left:8px;padding-left:10px}
+  .pgrid{grid-template-columns:1fr}
+  .item{grid-template-columns:auto minmax(0,1fr)}.item .istate{grid-column:2}
+}
+
+/* ---------- v2 additions ---------- */
+.lane-empty{padding:14px;border:1px dashed var(--line-strong);border-radius:14px;color:var(--muted);font-size:13.5px;text-align:center;margin:0}
+.rolecard2.newrole{border-color:var(--primary);box-shadow:0 0 0 2px color-mix(in srgb,var(--primary) 20%,transparent)}
+.chipev{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:1px 9px 1px 6px;font-size:12px;font-weight:500;line-height:20px;cursor:pointer;white-space:nowrap;color:var(--muted)}
+.chipev .icon{font-size:15px}
+.chipev:hover,.chipev:focus-visible{border-color:var(--primary)}
+.chipev .sep{opacity:.5}
+.chipev.assumed{color:var(--muted)}
+.chipev.evidenced{color:var(--pages);border-color:color-mix(in srgb,var(--pages) 35%,var(--line))}
+.chipev.validated{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 35%,var(--line))}
+.chipev.contradicted{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 40%,var(--line))}
+.chipev.plain{color:var(--muted)}
+.claim .tools{display:flex;gap:2px;align-items:center}
+.iconbtn{border:0;background:none;cursor:pointer;color:var(--muted);padding:4px;border-radius:8px;display:inline-grid;place-items:center}
+.iconbtn:hover,.iconbtn:focus-visible{background:var(--hover);color:var(--ink)}
+.iconbtn .icon{font-size:18px}
+.claim .tools .iconbtn{opacity:0}
+.claim:hover .tools .iconbtn,.claim:focus-within .tools .iconbtn{opacity:1}
+@media (hover:none){.claim .tools .iconbtn{opacity:1}}
+.addrow{display:flex;gap:8px;margin:8px 10px 0;flex-wrap:wrap}
+.addrow input,.editin{flex:1 1 240px;min-width:0;padding:7px 10px;border:1px solid var(--line-strong);border-radius:10px;background:var(--surface)}
+.editrow{display:flex;gap:6px;flex-wrap:wrap;align-items:center;width:100%}
+.linked{font-size:12px;color:var(--muted)}
+.linked.none{color:var(--warn)}
+.personas{display:flex;flex-wrap:wrap;gap:6px;margin:0 10px 8px;align-items:center}
+.pchip2{display:inline-flex;align-items:center;gap:6px;padding:2px 10px 2px 3px;border-radius:999px;background:var(--product-bg);color:var(--product);font-size:13px;font-weight:500}
+.pchip2 .avatar{background:var(--product);width:20px;height:20px;font-size:10px}
+
+/* Documents */
+.doclist{display:grid;gap:8px}
+.docrow{display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--surface);text-decoration:none;color:var(--ink)}
+.docrow:hover{border-color:var(--primary)}
+.docrow .ic{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:var(--product-bg);color:var(--product)}
+.docrow small{display:block;color:var(--muted);font-size:12.5px}
+.docbody{font-size:15.5px;line-height:1.65;max-width:740px}
+.docbody h2{font-size:22px;margin:0 0 10px}.docbody h3{font-size:16px;margin:18px 0 6px}
+.docbody p{margin:0 0 12px}
+.stale{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 12px;border-radius:12px;background:var(--warn-bg);color:var(--warn);font-size:13.5px;margin:0 0 16px}
+.fresh{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 12px;border-radius:12px;background:var(--ok-bg);color:var(--ok);font-size:13.5px;margin:0 0 16px}
+.switch{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;cursor:pointer}
+.switch input{width:36px;height:20px;accent-color:var(--primary)}
+
+/* Library v2 */
+.filters2{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin:0 0 14px}
+.filters2 label{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+.filters2 select{padding:5px 8px;border-radius:8px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);font-size:13px}
+.icard{border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:12px 14px;display:grid;gap:8px}
+.icard .top{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.icard .top .rid{font-size:12px;font-weight:700;color:var(--muted)}
+.icard strong{font-size:15px}
+.icard details summary{cursor:pointer;font-size:13px;color:var(--muted)}
+.strength{font-size:11.5px;font-weight:700;padding:1px 8px;border-radius:999px;background:var(--panel);color:var(--muted)}
+.strength.strong{background:var(--ok-bg);color:var(--ok)}.strength.moderate{background:var(--container);color:var(--on-container)}
+.usedin{display:flex;flex-wrap:wrap;gap:6px}
+.usedin .ref.contra{border-color:color-mix(in srgb,var(--bad) 45%,var(--line))}
+.srcpage{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:22px;align-items:start}
+.transcript{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px 22px;font-size:15px;line-height:1.7}
+.transcript p{margin:0 0 12px;display:grid;grid-template-columns:64px minmax(0,1fr);gap:10px}
+.transcript .sp{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding-top:3px}
+.transcript mark{background:#ffe89a;color:#171a24;border-radius:3px;padding:0 1px;cursor:pointer;box-shadow:0 2px 0 #d8a800}
+.transcript mark:focus-visible{outline:2px solid var(--primary)}
+.selpop{position:absolute;z-index:40;display:flex;gap:6px;background:var(--ink);color:var(--bg);border-radius:999px;padding:4px;box-shadow:var(--shadow)}
+.selpop button{border:0;background:none;color:inherit;font:inherit;font-size:13px;padding:4px 12px;border-radius:999px;cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.selpop button:hover{background:#ffffff26}
+.selpop[hidden]{display:none}
+.newfind{border:1px dashed var(--primary);border-radius:14px;padding:12px 14px;display:grid;gap:10px;background:color-mix(in srgb,var(--container) 25%,var(--surface))}
+.newfind blockquote{margin:0;padding:6px 10px;border-left:3px solid #d8a800;background:var(--panel);border-radius:0 8px 8px 0;font-style:italic}
+.newfind select,.newfind input{padding:6px 8px;border-radius:8px;border:1px solid var(--line-strong);background:var(--surface);width:100%}
+
+/* Items list (Linear-style) */
+.toolbar{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin:0 0 12px}
+.toolbar label{display:inline-flex;gap:6px;align-items:center;font-size:13px;color:var(--muted)}
+.toolbar select{padding:5px 8px;border-radius:8px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);font-size:13px}
+.ilist{border:1px solid var(--line);border-radius:14px;background:var(--surface);overflow:hidden}
+.igroup>summary{list-style:none;display:flex;gap:8px;align-items:center;padding:8px 14px;background:var(--panel);border-top:1px solid var(--line);cursor:pointer;font-size:13.5px;font-weight:700}
+.igroup:first-child>summary{border-top:0}
+.igroup>summary::-webkit-details-marker{display:none}
+.igroup>summary .n{font-weight:400;color:var(--muted)}
+.igroup>summary .chev{transition:transform .15s;color:var(--muted)}
+.igroup[open]>summary .chev{transform:rotate(90deg)}
+.irow{display:grid;grid-template-columns:22px 52px minmax(0,1fr) auto auto 26px 22px;gap:10px;align-items:center;padding:7px 14px;border-top:1px solid var(--line);font-size:13.5px;color:var(--ink);text-decoration:none}
+.irow:hover{background:var(--panel)}
+.irow .rid{font-size:12px;font-weight:700;color:var(--muted)}
+.irow .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.irow .blk{color:var(--bad);display:inline-flex;align-items:center;gap:2px;font-size:12px;font-weight:700}
+.irow .blk .icon{font-size:15px}
+.lbl{display:inline-flex;align-items:center;gap:4px;font-size:12px;border:1px solid var(--line);border-radius:999px;padding:0 8px;line-height:20px;white-space:nowrap}
+.lbl i{width:7px;height:7px;border-radius:50%;display:inline-block}
+.sicon .icon{font-size:18px}
+.sicon.s-backlog{color:var(--line-strong)}.sicon.s-queued{color:var(--muted)}.sicon.s-batched{color:var(--p-medium)}.sicon.s-review{color:var(--primary)}.sicon.s-done{color:var(--ok)}
+.pr .icon{font-size:18px}
+.pr.highest{color:var(--p-highest)}.pr.high{color:var(--p-high)}.pr.medium{color:var(--p-medium)}.pr.low{color:var(--p-low)}.pr.lowest{color:var(--p-lowest)}
+
+/* Projects list */
+.ptable-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.ptable{width:100%;border-collapse:collapse;font-size:13.5px;min-width:820px}
+.ptable th{font-size:12px;font-weight:500;color:var(--muted);text-align:left;padding:8px 12px;border-bottom:1px solid var(--line)}
+.ptable td{padding:9px 12px;border-top:1px solid var(--line);vertical-align:middle}
+.ptable tr.mhead td{background:var(--panel);font-weight:700;border-top:1px solid var(--line-strong)}
+.ptable tr.mhead td small{font-weight:400;color:var(--muted);margin-left:8px}
+.ptable a{color:var(--ink);text-decoration:none;font-weight:500}.ptable a:hover{color:var(--primary);text-decoration:underline}
+.health{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;white-space:nowrap}
+.health i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.budget{display:grid;gap:3px;min-width:120px;font-size:12px;color:var(--muted)}
+.budget .track{height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.budget .track b{display:block;height:100%;background:var(--data);border-radius:3px}
+.pst{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;white-space:nowrap}
+.pst .icon{font-size:17px}
+.pst.backlog{color:var(--muted)}.pst.planned{color:var(--muted)}.pst.progress{color:var(--p-medium)}.pst.completed{color:var(--ok)}
+.pct{font-variant-numeric:tabular-nums;color:var(--muted);font-size:12.5px}
+
+/* Calendar timeline */
+.tlbar{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin:0 0 10px}
+.cal{position:relative;overflow:auto;border:1px solid var(--line);border-radius:16px;background:var(--surface);max-height:640px}
+.cal-inner{position:relative}
+.cal-head{position:sticky;top:0;z-index:6;display:flex;background:var(--panel);border-bottom:1px solid var(--line)}
+.cal-corner{position:sticky;left:0;z-index:7;flex:none;width:250px;background:var(--panel);border-right:1px solid var(--line);padding:8px 12px;font-size:12px;color:var(--muted)}
+.cal-ticks{position:relative;height:46px;flex:none}
+.cal-ticks .tk{position:absolute;top:0;bottom:0;border-left:1px solid var(--line);font-size:11.5px;color:var(--muted);padding:4px 6px;white-space:nowrap}
+.cal-ticks .tk.major{color:var(--ink);font-weight:700}
+.cal-row{display:flex;height:44px;border-bottom:1px solid var(--line)}
+.cal-row.mrow{height:36px;background:color-mix(in srgb,var(--panel) 60%,var(--surface))}
+.cal-name{position:sticky;left:0;z-index:4;flex:none;width:250px;background:var(--surface);border-right:1px solid var(--line);padding:0 12px;display:flex;align-items:center;gap:8px;font-size:13.5px;min-width:0}
+.cal-row.mrow .cal-name{background:var(--panel);font-weight:700}
+.cal-name a{color:var(--ink);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cal-name a:hover{color:var(--primary);text-decoration:underline}
+.cal-track{position:relative;flex:none}
+.cal-grid{position:absolute;inset:0;pointer-events:none}
+.cal-grid i{position:absolute;top:0;bottom:0;border-left:1px solid color-mix(in srgb,var(--line) 60%,transparent)}
+.cal-grid i.wk{border-color:var(--line)}
+.today{position:absolute;top:0;bottom:0;width:2px;background:var(--bad);z-index:3;pointer-events:none}
+.today span{position:absolute;top:2px;left:4px;font-size:11px;font-weight:700;color:var(--bad);background:var(--surface);padding:0 3px;border-radius:4px}
+.pbar{position:absolute;top:8px;height:28px;border-radius:8px;z-index:2;display:flex;align-items:center;gap:6px;padding:0 10px;font-size:12.5px;font-weight:500;cursor:grab;user-select:none;touch-action:none;white-space:nowrap;overflow:hidden;box-shadow:var(--shadow-card);border:1px solid transparent}
+.pbar:active{cursor:grabbing}
+.pbar.planned,.pbar.backlog{background:var(--panel);border-color:var(--line-strong);color:var(--ink)}
+.pbar.progress{background:var(--container);color:var(--on-container)}
+.pbar.completed{background:var(--ok-bg);color:var(--ok)}
+.pbar .fill{position:absolute;inset:0 auto 0 0;background:color-mix(in srgb,currentColor 14%,transparent);pointer-events:none}
+.pbar .h{position:absolute;top:0;bottom:0;width:8px;cursor:ew-resize}
+.pbar .h.l{left:0}.pbar .h.r{right:0}
+.pbar .h:hover{background:color-mix(in srgb,currentColor 25%,transparent)}
+.pbar.bad{outline:2px solid var(--bad)}
+.pbar:focus-visible{outline:3px solid var(--primary)}
+.cp{position:absolute;top:13px;width:14px;height:14px;transform:rotate(45deg);background:var(--surface);border:2px solid var(--on-container);z-index:3;pointer-events:none}
+.cp.done{background:var(--ok);border-color:var(--ok)}
+.tgt{position:absolute;top:10px;z-index:2;display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);white-space:nowrap}
+.tgt .d{width:12px;height:12px;transform:rotate(45deg);border:2px solid var(--muted);display:inline-block}
+.mtarget{position:absolute;top:8px;display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:var(--ink);white-space:nowrap}
+.mtarget .d{width:12px;height:12px;transform:rotate(45deg);background:var(--primary);display:inline-block}
+.nodates{position:absolute;top:10px;left:8px;z-index:2}
+.cal svg{position:absolute;inset:0;pointer-events:none;z-index:1;overflow:visible}
+.cal svg path{fill:none;stroke:var(--line-strong);stroke-width:1.6}
+.cal svg path.bad{stroke:var(--bad);stroke-dasharray:4 3}
+.cal svg circle{fill:var(--line-strong)}.cal svg circle.bad{fill:var(--bad)}
+
+/* Project page v2 */
+.props{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;padding:10px 0 14px;border-bottom:1px solid var(--line);margin:0 0 16px;font-size:13.5px}
+.props .p{display:inline-flex;gap:6px;align-items:center}
+.props .p .k{color:var(--muted)}
+.props input[type=date]{padding:3px 6px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);color:var(--ink);font-size:13px}
+.subnav{display:flex;gap:18px;border-bottom:1px solid var(--line);margin:0 0 16px}
+.subnav a{padding:6px 0;text-decoration:none;color:var(--muted);font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px}
+.subnav a[aria-current="page"]{color:var(--ink);border-color:var(--primary)}
+.cplist{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.cplist li{display:flex;gap:10px;align-items:center;font-size:13.5px}
+.cplist .dd{width:11px;height:11px;transform:rotate(45deg);border:2px solid var(--on-container);display:inline-block;flex:none}
+.cplist .dd.done{background:var(--ok);border-color:var(--ok)}
+
+/* Next N panel */
+.nextn{position:absolute;z-index:45;width:min(360px,calc(100vw - 32px));background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:14px;display:grid;gap:10px;font-size:13.5px}
+.nextn[hidden]{display:none}
+.nextn .rule{margin:0;color:var(--muted);font-size:12.5px;background:var(--panel);border-radius:10px;padding:8px 10px}
+.nextn label{display:grid;gap:4px;font-size:12.5px;color:var(--muted)}
+.nextn input,.nextn select{padding:6px 8px;border-radius:8px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink)}
+.nextn .row2{display:grid;grid-template-columns:90px minmax(0,1fr);gap:10px}
+
+/* Roles and team */
+.acttable{width:100%;border-collapse:collapse;font-size:13.5px}
+.acttable th{font-size:12px;font-weight:500;color:var(--muted);text-align:left;padding:6px 10px}
+.acttable td{padding:7px 10px;border-top:1px solid var(--line);vertical-align:middle}
+.acttable select{padding:3px 6px;border-radius:8px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);font-size:13px}
+.mem{display:inline-flex;align-items:center;gap:5px;padding:2px 9px 2px 3px;border-radius:999px;border:1px solid var(--line);font-size:12.5px;white-space:nowrap}
+.mem .star{color:var(--p-medium);font-size:15px}
+.mem .avatar{width:20px;height:20px;font-size:9.5px}
+.members{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.rolecard2{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.rolecard2>header{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;padding:14px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+.rolecard2>header p{margin:2px 0 0;color:var(--muted);font-size:13px}
+.rolecard2 .tablewrap{overflow-x:auto;padding:4px 6px 8px}
+.teamtable{width:100%;border-collapse:collapse;font-size:13.5px;min-width:640px}
+.teamtable th{font-size:12px;font-weight:500;color:var(--muted);text-align:left;padding:8px 12px}
+.teamtable td{padding:10px 12px;border-top:1px solid var(--line);vertical-align:middle}
+.teamtable .who{display:flex;gap:10px;align-items:center}
+.teamtable small{display:block;color:var(--muted);font-size:12px}
+.agentgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.acard{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px;display:grid;gap:10px}
+.acard header{display:flex;gap:10px;align-items:center}
+.acard header small{display:block;color:var(--muted);font-size:12px}
+
+.origin{font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding:1px 7px;border-radius:999px}
+.origin.borrowed{background:var(--ok-bg);color:var(--ok)}.origin.invented{background:var(--warn-bg);color:var(--warn)}
+
+@media (max-width:1100px){.srcpage{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:860px){
+  .irow{grid-template-columns:22px 46px minmax(0,1fr) 22px;grid-template-areas:none}
+  .irow .hide-s{display:none}
+  .cal-corner,.cal-name{width:170px}
+  .transcript{padding:14px}
+  .transcript p{grid-template-columns:1fr;gap:0}
+}
+
+/* ---------- v3: one colour per layer, used everywhere ---------- */
+:root{--vision:var(--product);--vision-bg:var(--product-bg);--library:#56617a;--library-bg:#e5e9f1;--home:var(--primary);--home-bg:var(--container);--on-layer:#ffffff}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--library:#b6c1d8;--library-bg:#262c3b;--on-layer:#10121a}}
+:root[data-theme="dark"]{--library:#b6c1d8;--library-bg:#262c3b;--on-layer:#10121a}
+[data-l="vision"]{--lc:var(--vision);--lb:var(--vision-bg)}[data-l="design"]{--lc:var(--design);--lb:var(--design-bg)}[data-l="pages"]{--lc:var(--pages);--lb:var(--pages-bg)}
+[data-l="data"]{--lc:var(--data);--lb:var(--data-bg)}[data-l="platform"]{--lc:var(--platform);--lb:var(--platform-bg)}[data-l="work"]{--lc:var(--work);--lb:var(--work-bg)}
+[data-l="library"]{--lc:var(--library);--lb:var(--library-bg)}[data-l="home"],[data-l="settings"]{--lc:var(--home);--lb:var(--home-bg)}
+
+/* Nav style A (tiles, like Confluence space avatars) */
+body.nav-tiles .nav a{padding:6px 10px 6px 6px;gap:10px;border-radius:12px}
+body.nav-tiles .nav a .tile{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:var(--lb);color:var(--lc)}
+body.nav-tiles .nav a .tile .icon{font-size:19px}
+body.nav-tiles .nav a.active{background:var(--lb);color:var(--ink);font-weight:700}
+body.nav-tiles .nav a.active .tile{background:var(--lc);color:var(--on-layer)}
+/* Nav style B (owner's idea: coloured icon, solid when active) */
+body.nav-solid .nav a .tile{display:inline-grid;color:var(--lc)}
+body.nav-solid .nav a.active{background:var(--lc);color:var(--on-layer)}
+body.nav-solid .nav a.active .tile{color:var(--on-layer)}
+body.nav-solid .nav a.active .badge{background:var(--on-layer);color:var(--lc)}
+.nav a:hover{background:color-mix(in srgb,var(--lb) 70%,transparent)}
+.eyebrow.layer{display:inline-flex;align-items:center;gap:6px;color:var(--lc);font-weight:700}
+.eyebrow.layer .icon{font-size:16px}
+main .tabs a.active{border-color:var(--lc)}
+.tabs a{display:inline-flex;align-items:center;gap:6px}
+.tabs a .icon{font-size:18px;color:var(--lc)}
+.tabs a:not(.active) .icon{opacity:.75}
+
+/* Universal chips: every reference to a record */
+.ref{--lc:var(--muted)}
+.ref[data-l]{border-color:color-mix(in srgb,var(--lc) 28%,var(--line))}
+.ref .icon{color:var(--lc)!important}
+.ref .kind{color:var(--lc);font-weight:700;font-size:11.5px}
+.ref .tt{overflow:hidden;text-overflow:ellipsis}
+.ref.short .tt{display:none}
+.ref.contra{border-color:color-mix(in srgb,var(--bad) 50%,var(--line))}
+.hovercard .hc-kind{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:var(--lc)}
+.hovercard .hc-kind .icon{font-size:16px}
+.hovercard .props2{display:flex;flex-wrap:wrap;gap:6px 12px;margin:6px 0 8px;font-size:12.5px;color:var(--ink)}
+.hovercard .props2 span{display:inline-flex;align-items:center;gap:4px}
+.hovercard .props2 .icon{font-size:16px}
+
+/* Plain references inside pills and the timeline */
+.refx{display:inline-flex;align-items:center;gap:3px;color:var(--ink);text-decoration:none;--lc:var(--work)}
+.refx .icon{font-size:15px;color:var(--lc)}
+.refx .rid{font-weight:700;font-size:12px;color:var(--muted)}
+.refx:hover .tt,.refx:hover .rid{text-decoration:underline}
+.ptitle .refx .rid{display:none}
+/* Evidence chip v3 */
+.ref{min-width:0}
+.stackv{grid-template-columns:minmax(0,1fr)}.members{align-items:center}.agentgrid{align-items:start}.srcpage>*{min-width:0}
+.srcpage aside .row>.ref{flex:0 1 auto}
+.pst.progress{color:var(--ink)}.pst.progress .icon{color:var(--p-medium)}
+.propgrid dd>span{flex-wrap:wrap}
+@media (max-width:860px){.propgrid{grid-template-columns:minmax(0,1fr)}.propgrid dt{margin-top:6px}}
+.ev3{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:1px 9px 1px 6px;font-size:12px;font-weight:500;line-height:20px;cursor:pointer;white-space:nowrap;color:var(--muted)}
+.ev3 .icon{font-size:15px}
+.ev3:hover,.ev3:focus-visible{border-color:var(--primary)}
+.ev3.sup{color:var(--pages);border-color:color-mix(in srgb,var(--pages) 35%,var(--line))}
+.ev3.con{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 40%,var(--line))}
+.ev3 b{font-weight:700;font-variant-numeric:tabular-nums}
+.evsplit{display:inline-flex;align-items:stretch;border:1px solid var(--line-strong);border-radius:999px;overflow:hidden;background:var(--surface);cursor:pointer;padding:0;font-size:12px;line-height:20px}
+.evsplit span{display:inline-flex;align-items:center;gap:3px;padding:1px 8px 1px 6px;font-weight:700;font-variant-numeric:tabular-nums}
+.evsplit span+span{border-left:1px solid var(--line-strong)}
+.evsplit .icon{font-size:15px}
+.evsplit .s{color:var(--pages)}.evsplit .c{color:var(--bad)}
+.evsplit:hover,.evsplit:focus-visible{border-color:var(--primary)}
+
+/* Story drawer: why + evidence */
+.whybox{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:10px 0 0;display:grid;gap:6px}
+.whybox .lbl2{font-size:12px;color:var(--muted)}
+.scard{cursor:default}.scard .stitle{color:var(--ink);text-decoration:none;display:block}.scard .stitle:hover{color:var(--primary);text-decoration:underline}
+.evgroup>h4{font-size:12px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin:14px 0 4px;display:flex;gap:8px;align-items:center}
+
+/* Insights list v3 */
+.search2{flex:1 1 260px;display:flex;align-items:center;gap:6px;border:1px solid var(--line-strong);border-radius:999px;padding:0 12px;background:var(--surface)}
+.search2 input{border:0;background:none;padding:7px 0;flex:1;min-width:0;outline:none}
+.search2:focus-within{outline:3px solid var(--primary);outline-offset:1px}
+.irow3{display:block;padding:12px 16px;border-top:1px solid var(--line);text-decoration:none;color:var(--ink)}
+.irow3:first-child{border-top:0}
+.irow3:hover{background:var(--panel)}
+.irow3 strong{font-size:15px;font-weight:500}
+.irow3 .meta3{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:4px;font-size:12.5px;color:var(--muted);align-items:center}
+.irow3 .meta3 span{display:inline-flex;align-items:center;gap:4px}
+.irow3 .meta3 .icon{font-size:15px}
+.tag{display:inline-flex;align-items:center;gap:3px;padding:0 8px;border-radius:999px;background:var(--library-bg);color:var(--library);font-size:12px;font-weight:500;line-height:20px}
+.tag button{border:0;background:none;color:inherit;cursor:pointer;padding:0;display:inline-grid}
+.tag button .icon{font-size:14px}
+.ins-title{width:100%;font-size:22px;font-weight:700;border:1px solid transparent;border-radius:10px;padding:4px 8px;margin-left:-8px;background:transparent}
+.ins-title:hover,.ins-title:focus{border-color:var(--line-strong);background:var(--surface)}
+.comments{display:grid;gap:10px}
+.comment{display:grid;grid-template-columns:28px minmax(0,1fr);gap:10px;font-size:14px}
+.comment .avatar{width:26px;height:26px}
+.comment small{color:var(--muted);font-size:12px}
+.comment p{margin:2px 0 0}
+.addcomment{display:grid;gap:8px}
+.addcomment textarea{width:100%;border:1px solid var(--line-strong);border-radius:10px;padding:8px 10px;background:var(--surface);resize:vertical}
+.fpick{display:grid;gap:6px;border:1px dashed var(--line-strong);border-radius:12px;padding:10px 12px}
+.fpick label{display:flex;gap:8px;align-items:flex-start;font-size:13.5px}
+.frow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:start;padding:8px 0;border-top:1px solid var(--line)}
+.frow:first-child{border-top:0}
+
+/* Items list v3 (Linear rows, Jira side panel) */
+.irow4{display:grid;grid-template-columns:22px 52px minmax(0,1fr) auto 26px 22px;gap:10px;align-items:center;padding:6px 14px;border-top:1px solid var(--line);font-size:13.5px;cursor:pointer}
+.irow4:hover{background:var(--panel)}
+.irow4.sel{background:color-mix(in srgb,var(--container) 45%,var(--surface))}
+.irow4 .rid{font-size:12px;font-weight:700;color:var(--muted)}
+.irow4 .tb{border:0;background:none;padding:0;text-align:left;font:inherit;color:inherit;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.irow4 .tb:hover{text-decoration:underline}
+.irow4 .right{display:flex;gap:6px;align-items:center;justify-content:flex-end;min-width:0}
+.pm{display:inline-flex;align-items:stretch;border:1px solid var(--line);border-radius:999px;overflow:hidden;font-size:12px;line-height:20px;white-space:nowrap}
+.pm>*{padding:0 8px;display:inline-flex;align-items:center;gap:3px;color:var(--ink);text-decoration:none}
+.pm>*+*{border-left:1px solid var(--line)}
+.pm .icon{font-size:14px}
+.pm a:hover{background:var(--panel)}
+.side{position:fixed;top:0;right:0;bottom:0;width:min(480px,100vw);background:var(--surface);border-left:1px solid var(--line);box-shadow:var(--shadow);z-index:80;overflow:auto;padding:18px 20px 40px}
+.side[hidden]{display:none}
+.side h2{font-size:20px;margin:4px 0 10px}
+.side .props3{display:grid;grid-template-columns:110px minmax(0,1fr);gap:8px 12px;font-size:13.5px;align-items:center;margin:12px 0}
+.side .props3 dt{color:var(--muted)}.side .props3 dd{margin:0;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+
+/* Projects timeline v3 (after Linear) */
+.tl3{position:relative;overflow:auto;border:1px solid var(--line);border-radius:16px;background:var(--surface);max-height:680px}
+.tl3-in{position:relative}
+.axis3{position:sticky;top:0;z-index:6;background:var(--surface);border-bottom:1px solid var(--line);height:58px}
+.axis3 .mo{position:absolute;top:6px;font-size:11.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
+.axis3 .dy{position:absolute;top:26px;font-size:11.5px;color:var(--muted);transform:translateX(-50%)}
+.axis3 .todaypill{position:absolute;top:22px;transform:translateX(-50%);background:var(--primary);color:var(--on-primary);font-size:11.5px;font-weight:700;padding:1px 8px;border-radius:6px;z-index:2}
+.axis3 .mt{position:absolute;top:42px;transform:translateX(-6px);display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:var(--work);white-space:nowrap}
+.axis3 .mt i{width:9px;height:9px;transform:rotate(45deg);background:var(--work);display:inline-block}
+.grid3{position:absolute;top:58px;bottom:0;left:0;right:0;pointer-events:none}
+.grid3 i{position:absolute;top:0;bottom:0;border-left:1px dashed color-mix(in srgb,var(--line) 80%,transparent)}
+.grid3 .todayline{border-left:2px solid var(--primary)}
+.grid3 .mtl{border-left:1px dashed var(--work);opacity:.6}
+.sect3{position:relative;height:30px}
+.sect3 span{position:sticky;left:12px;display:inline-flex;align-items:center;gap:6px;padding:6px 0 0 12px;font-size:12px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
+.prow{position:relative;height:66px}
+.prow.cps{height:84px}
+.ptitle{position:absolute;top:6px;display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:500;white-space:nowrap;z-index:2}
+.ptitle a{color:var(--ink);text-decoration:none}.ptitle a:hover{text-decoration:underline}
+.ptitle .icon{font-size:17px}
+.ptitle .avatar{width:18px;height:18px;font-size:8.5px}
+.ptitle .hdot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.pbar3{position:absolute;top:32px;height:22px;border-radius:6px;background:var(--panel);border:1px solid var(--line-strong);cursor:grab;touch-action:none;z-index:2;overflow:visible}
+.pbar3:active{cursor:grabbing}
+.pbar3 .fill{position:absolute;inset:0 auto 0 0;border-radius:5px 0 0 5px;background:color-mix(in srgb,var(--work) 22%,transparent);pointer-events:none}
+.pbar3.done{background:var(--ok-bg);border-color:transparent}
+.pbar3 .h{position:absolute;top:0;bottom:0;width:8px;cursor:ew-resize}.pbar3 .h.l{left:-1px}.pbar3 .h.r{right:-1px}
+.pbar3 .h:hover{background:color-mix(in srgb,var(--primary) 30%,transparent)}
+.pbar3:focus-visible{outline:3px solid var(--primary)}
+.over3{position:absolute;top:32px;height:22px;border:1px dashed var(--bad);border-left:0;border-radius:0 6px 6px 0;background:linear-gradient(90deg,color-mix(in srgb,var(--bad) 8%,transparent),color-mix(in srgb,var(--bad) 30%,transparent));z-index:1;pointer-events:none}
+.cp3{position:absolute;top:37px;width:11px;height:11px;transform:rotate(45deg);background:var(--surface);border:2px solid var(--primary);z-index:3;pointer-events:none}
+.cp3l{position:absolute;top:58px;transform:translateX(-50%);font-size:11.5px;color:var(--muted);white-space:nowrap}
+.tg3{position:absolute;top:37px;width:11px;height:11px;transform:rotate(45deg);border:2px solid var(--muted);z-index:2}
+.undated{padding:4px 12px 10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12.5px;color:var(--muted);position:sticky;left:0;width:max-content}
+.tl3 svg{position:absolute;inset:0;pointer-events:none;z-index:1;overflow:visible}
+.tl3 svg path{fill:none;stroke:var(--line-strong);stroke-width:1.5}
+.tl3 svg path.bad{stroke:var(--bad);stroke-dasharray:4 3}
+
+/* Project page v3 (after Linear) */
+.ptile{display:grid;place-items:center;width:40px;height:40px;border-radius:11px;background:var(--work-bg);color:var(--work);margin:0 0 10px}
+.ptile .icon{font-size:24px}
+.psum{color:var(--muted);font-size:16px;margin:2px 0 14px}
+.propgrid{display:grid;grid-template-columns:110px minmax(0,1fr);gap:10px 14px;font-size:13.5px;align-items:center;margin:0 0 18px}
+.propgrid dt{color:var(--muted)}.propgrid dd{margin:0;display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}
+.propgrid dd>span{display:inline-flex;align-items:center;gap:5px}
+.propgrid input[type=date]{padding:2px 6px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);color:var(--ink);font-size:13px}
+.cprow{display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line);font-size:14px}
+.cprow i{width:10px;height:10px;transform:rotate(45deg);border:2px solid var(--primary);display:inline-block;margin-left:3px}
+.cprow small{color:var(--muted);font-size:12.5px;font-variant-numeric:tabular-nums}
+
+/* Next split chip */
+.nextsplit{display:inline-flex;align-items:stretch;border:1px solid var(--primary);border-radius:999px;overflow:hidden;height:30px}
+.nextsplit button{border:0;background:none;color:var(--primary);font:inherit;font-size:13px;font-weight:500;cursor:pointer;padding:0 12px;display:inline-flex;align-items:center;gap:4px}
+.nextsplit button .icon{font-size:17px}
+.nextsplit button:hover{background:color-mix(in srgb,var(--container) 60%,transparent)}
+.nextsplit .num{border-left:1px solid var(--primary);min-width:34px;justify-content:center;font-variant-numeric:tabular-nums;font-weight:700}
+.nextsplit input{width:46px;border:0;border-left:1px solid var(--primary);text-align:center;font-weight:700;background:var(--surface);color:var(--ink)}
+
+/* Roles v3 */
+.role3{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.role3>header{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--line);background:linear-gradient(90deg,var(--lb),var(--surface) 70%)}
+.role3>header .tile{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:var(--lc);color:var(--on-layer)}
+.role3>header h2{font-size:16px}
+.role3>header p{margin:0;color:var(--muted);font-size:13px}
+.arow3{display:grid;grid-template-columns:minmax(0,1fr) auto auto 40px;gap:12px;align-items:center;padding:10px 16px;border-top:1px solid var(--line)}
+.arow3:first-of-type{border-top:0}
+.arow3 small{display:block;color:var(--muted);font-size:12.5px}
+.elev{border:1px solid var(--line-strong);background:var(--surface);border-radius:10px;width:34px;height:30px;display:grid;place-items:center;cursor:pointer;color:var(--line-strong)}
+.elev .icon{font-size:19px}
+.elev[aria-pressed="true"]{background:var(--lb);border-color:var(--lc);color:var(--lc)}
+.setup3{grid-column:1/-1;background:var(--panel);border-radius:12px;padding:12px 14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px 18px;font-size:13px}
+.setup3 h4{margin:0 0 2px;font-size:11.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
+.setup3 p,.setup3 ul{margin:0}.setup3 ul{padding-left:18px}
+.who3{display:inline-flex;align-items:stretch;border:1px solid var(--line-strong);border-radius:999px;height:28px;overflow:hidden;background:var(--surface)}
+.who3 select{border:0;background:none;padding:0 8px 0 4px;font-size:13px;color:var(--ink);max-width:150px}
+.who3 .avatar{margin:3px 0 3px 3px}
+
+/* Role chips (people): tinted = member, solid = lead */
+.rchip{display:inline-flex;align-items:center;gap:4px;padding:0 9px;border-radius:999px;font-size:12px;font-weight:700;line-height:22px;white-space:nowrap;background:var(--lb);color:var(--lc)}
+.rchip .icon{font-size:14px}
+.rchip.lead{background:var(--lc);color:var(--on-layer)}
+
+.acard3{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px;display:grid;gap:10px}
+.acard3 header{display:flex;gap:10px;align-items:center}
+.acard3 header small{display:block;color:var(--muted);font-size:12px}
+.acard3 ul{list-style:none;margin:0;padding:0;display:grid;gap:6px;font-size:13px}
+.acard3 li{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.proto select{border:0;border-radius:999px;padding:4px 8px;background:#ffffff1f;color:inherit;font:inherit;font-size:12.5px}
+.proto select option{color:#111}
+
+@media (max-width:860px){
+  .irow4{grid-template-columns:22px 46px minmax(0,1fr) 22px}.irow4 .right,.irow4 .av{display:none}
+  .arow3{grid-template-columns:minmax(0,1fr) auto}.arow3 .who3{grid-column:1}
+  body.nav-tiles .nav a .tile{width:24px;height:24px}
+}
+</style>
+
+<a class="visually-hidden" href="#main">Skip to content</a>
+<div class="shell">
+  <aside class="rail" aria-label="Project">
+    <a class="brand" href="#/home"><span class="icon" aria-hidden="true">deployed_code</span>Aludel</a>
+    <a class="project" href="#/home"><span class="mark" aria-hidden="true">TS</span><span><strong>Tool Share</strong><small>Demo milestone</small></span></a>
+    <nav class="nav" aria-label="Layers" id="nav"></nav>
+    <div class="spacer"></div>
+    <nav class="nav" aria-label="Utilities" id="nav2"></nav>
+  </aside>
+  <div>
+    <div class="topbar"><div class="search" role="search"><span class="icon" aria-hidden="true">search</span><label class="visually-hidden" for="q">Search every layer</label><input id="q" type="search" placeholder="Search claims, stories, evidence, items…" autocomplete="off"></div></div>
+    <main class="content" id="main" tabindex="-1"></main>
+  </div>
+</div>
+
+<div class="hovercard" id="hovercard" role="tooltip" hidden></div>
+<div class="toast" id="toast" role="status" hidden></div>
+<div class="selpop" id="selpop" hidden><button type="button" id="mkfind"><span class="icon" aria-hidden="true">format_ink_highlighter</span>Make finding</button></div>
+
+<aside class="proto" aria-label="Prototype controls">
+  <span>ROADMAP-01P v3</span>
+  <label>Nav <select id="navstyle"><option value="tiles">A · tiles</option><option value="solid">B · solid</option></select></label>
+  <button type="button" id="open-brief">Your feedback, item by item</button>
+  <button type="button" id="reset">Reset</button>
+</aside>
+
+<aside class="drawer" id="drawer" hidden tabindex="-1" aria-labelledby="drawer-title">
+  <button type="button" class="x" id="close-drawer" aria-label="Close"><span class="icon" aria-hidden="true">close</span></button>
+  <div id="drawer-body"></div>
+</aside>
+
+<script>
+/* Illustrative Tool Share data. Nothing here is real research. Today is 2026-09-23. */
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+const icon = (n, label) => `<span class="icon" ${label ? `role="img" aria-label="${esc(label)}"` : 'aria-hidden="true"'}>${n}</span>`;
+
+/* ---------- One vocabulary: sections, layers, record kinds ---------- */
+const SECS = {
+  home:['Home','home'], vision:['Vision','lightbulb'], design:['Design','palette'], pages:['Pages','web'], data:['Data','schema'], platform:['Platform','dns'], work:['Work','checklist'],
+  library:['Library','local_library'], settings:['Settings','settings'] };
+const LAYER_ORDER = ['vision','design','pages','data','platform','work'];
+/* Every record kind has one icon and one layer. Tabs that list a kind use the same icon. */
+const KIND = {
+  claim:['Claim','fact_check','vision'], story:['Story','bookmark','vision'], activity:['Activity','view_column','vision'], doc:['Document','description','vision'],
+  component:['Component','widgets','design'], page:['Page','web','pages'], object:['Object','data_object','data'],
+  project:['Project','deployed_code_history','work'], item:['Item','task_alt','work'], milestone:['Milestone','flag','work'],
+  insight:['Insight','insights','library'], finding:['Finding','format_quote','library'], source:['Source','article','library'] };
+const SECTIONS = [
+  { key:'problem', title:'Problem', hint:'The top one to three problems, and what people do about them today.' },
+  { key:'customers', title:'Customers', hint:'Who has the problem. Mark the early adopters.' },
+  { key:'diagnosis', title:'Diagnosis', hint:'Why now, and the crux: what currently stops people.' },
+  { key:'value', title:'Value proposition', hint:'One sentence a customer would repeat, plus an “X for Y” concept.' },
+  { key:'approach', title:'Approach', hint:'What we will do, and what that rules out.' },
+  { key:'capabilities', title:'Standout capabilities', hint:'Three to five things that make it worth using.' },
+  { key:'outcomes', title:'Outcomes and measures', hint:'One product outcome (a customer behaviour) and how it is measured.' },
+  { key:'principles', title:'Principles', hint:'Non-negotiables. Every work item reads them.' },
+];
+const INITIAL = {
+  claims:[
+    ['C-1','problem','Neighbours buy tools they use once or twice a year.'],['C-2','problem','Lending to someone you barely know feels risky: people fear loss and damage.'],
+    ['C-3','problem','Asking a near-stranger for a favour feels awkward.'],['C-19','problem','People don’t know when a tool they want will be free.'],
+    ['C-4','customers','Borrowers: renters in dense neighbourhoods doing occasional DIY.','Early adopters'],['C-5','customers','Lenders: homeowners with a full garage.'],['C-6','customers','Lenders are motivated by earning rent from their tools.'],
+    ['C-7','diagnosis','Local groups already swap tools in chat, but nothing tracks who has what.','Why now'],['C-8','diagnosis','Trust is the crux: lenders won’t list until they believe tools come back.','The crux'],
+    ['C-9','value','Borrow the tool you need from someone on your street, today.','Concept: a library card for your neighbours’ garages'],
+    ['C-10','approach','Build trust inside one neighbourhood first: verified neighbours, request and approve, return reminders.'],['C-11','approach','Rules out for now: payments, delivery and city-wide search.','What this rules out'],
+    ['C-12','capabilities','Search by walking distance.'],['C-13','capabilities','Ask and get an answer in two taps.'],['C-14','capabilities','Return reminders and a lender’s history.'],
+    ['C-15','outcomes','Borrowers complete a borrow and return it on time.','Measure: returns on time per week'],
+    ['C-16','principles','Lenders are always in control of who borrows.'],['C-17','principles','Never show an exact address before a request is approved.'],['C-18','principles','Everything works on a phone.'],
+  ],
+  links:[
+    ['I-1','C-2','supports'],['I-1','C-6','contradicts'],['I-1','C-16','supports'],['I-1','P-5','supports'],
+    ['I-2','C-12','supports'],['I-2','S-1','supports'],['I-2','page:Search','supports'],['I-2','object:Tool','supports'],['I-2','A-2','supports'],
+    ['I-3','C-1','supports'],['I-3','C-7','supports'],['I-3','C-6','supports'],
+    ['I-4','C-3','supports'],['I-4','page:Borrow request','supports'],['I-4','component:Request card','supports'],['I-4','P-5','supports'],
+  ],
+  findings:{
+    'F-1':['SRC-1','quote','I lent my drill to a neighbour in March and never saw it again.'],'F-2':['SRC-1','quote','I’d lend to people on my street if I could say no.'],
+    'F-3':['SRC-1','quote','I’d feel weird charging a neighbour.'],'F-4':['SRC-2','quote','I bought a ninety-dollar tile cutter for one bathroom.'],
+    'F-5':['SRC-2','quote','I’d walk ten minutes. I’m not driving across town for it.'],'F-6':['SRC-2','quote','Asking in the building chat feels like begging.'],
+    'F-7':['SRC-3','data','How far would you walk to borrow a tool?'],'F-8':['SRC-3','fact','31 of 42 own a tool they use less than twice a year.'],
+    'F-9':['SRC-4','image','Tile cutter day hire: $38 plus a deposit.'],'F-10':['SRC-5','image','The request is a short form with dates and a note; the lender sees the borrower’s history first.'],
+    'F-12':['SRC-2','quote','I don’t have a car anyway.'],
+  },
+  insights:{
+    'I-1':{ text:'Lenders fear loss more than they want income', f:['F-1','F-2','F-3'], strength:'strong', date:'2026-09-15', tags:['trust','lenders'], comments:[['You','Two of the three quotes are Dana. Worth a second lender before we lean on this.','2026-09-16'],['Alex','Agree. The survey could add a question on this.','2026-09-17']] },
+    'I-2':{ text:'Walking distance is the real radius: about ten minutes', f:['F-5','F-7'], strength:'strong', date:'2026-09-17', tags:['distance','search'], comments:[] },
+    'I-3':{ text:'One-off purchases are the pain, not the lack of tools', f:['F-4','F-8','F-9'], strength:'moderate', date:'2026-09-18', tags:['pricing'], comments:[] },
+    'I-4':{ text:'Asking must feel like a request, not a favour', f:['F-6','F-10'], strength:'moderate', date:'2026-09-19', tags:['asking','borrowers'], comments:[] },
+  },
+  projects:[
+    { id:'P-1', ms:'demo', title:'Product brief and first story map', sum:'The Brief, personas and the first slice of the story map.', lead:'You', status:'completed', start:'2026-09-01', target:'2026-09-11', deps:[], budget:[40,38] },
+    { id:'P-3', ms:'demo', title:'Preview environment', sum:'A preview build for every change.', lead:'You', status:'completed', start:'2026-09-07', target:'2026-09-15', deps:[], budget:[20,12] },
+    { id:'P-2', ms:'demo', title:'Design foundations', sum:'Tokens, core components and page types.', lead:'Alex', status:'progress', health:'risk', start:'2026-09-10', target:'2026-09-21', deps:['P-1'], budget:[120,64] },
+    { id:'P-4', ms:'demo', title:'Find a tool', sum:'Search nearby and a tool’s page.', lead:'You', status:'progress', health:'on', start:'2026-09-18', target:'2026-10-06', deps:['P-2'], budget:[150,91], stories:['S-1','S-2'] },
+    { id:'P-5', ms:'demo', title:'Ask and approve', sum:'A polite way to ask, and a lender who decides.', lead:'You', status:'planned', start:'2026-10-07', target:'2026-10-16', deps:['P-4'], budget:[150,4], stories:['S-3','S-4'],
+      checkpoints:[['CP-1','Acceptance and designs agreed','2026-10-10'],['CP-2','Preview passes S-3 and S-4','2026-10-15']] },
+    { id:'P-6', ms:'demo', title:'Walking skeleton build', sum:'The core flow end to end with sample data.', lead:'Priya', status:'backlog', start:'2026-10-17', target:'2026-10-20', deps:['P-3','P-5'], budget:[100,0] },
+    { id:'P-7', ms:'mvp', title:'Availability and pickup', sum:'', lead:'You', status:'backlog', start:null, target:null, deps:['P-6'], budget:[150,0], stories:['S-5','S-6'] },
+    { id:'P-8', ms:'mvp', title:'Returns and reminders', sum:'', lead:'You', status:'planned', start:'2026-10-21', target:'2026-11-06', deps:['P-6'], budget:[150,0], stories:['S-7','S-8'] },
+    { id:'P-9', ms:'mvp', title:'Launch to Elm Street', sum:'', lead:'Priya', status:'backlog', start:null, target:'2026-11-13', deps:['P-7','P-8'], budget:[60,0] },
+    { id:'P-10', ms:'later', title:'Lender trust history', sum:'', lead:'You', status:'backlog', start:null, target:null, deps:['P-8'], budget:[100,0], stories:['S-9'] },
+  ],
+  items:[
+    ['W-01','P-1','vision','Draft the Brief','done','medium','You'],['W-10','P-3','platform','Configure the preview environment','done','high','You'],
+    ['W-23','P-2','design','Button and input states','done','medium','Sketch'],['W-20','P-2','design','Propose a Request card component','batched','high','Sketch'],
+    ['W-21','P-2','design','Set spacing and elevation tokens','queued','medium','Sketch'],['W-22','P-2','design','Dark theme colour roles','queued','low','Alex'],
+    ['W-33','P-4','vision','Write acceptance for S-2','done','high','Scout'],['W-34','P-4','data','Contract the Tool object','done','high','Scout'],
+    ['W-30','P-4','pages','Design the Tool detail page','review','high','Sketch'],['W-31','P-4','platform','Build S-1','batched','high','Scout'],
+    ['W-32','P-4','platform','Build S-2','queued','high','Scout',['W-30']],['W-35','P-4','pages','Search page empty and error states','queued','medium','Sketch'],
+    ['W-40','P-5','vision','Write acceptance for S-3','done','high','Scout',[],'CP-1'],['W-41','P-5','vision','Write acceptance for S-4','queued','high','Scout',[],'CP-1'],
+    ['W-42','P-5','pages','Design the Borrow request page','queued','high','Sketch',['W-41'],'CP-1'],['W-43','P-5','data','Contract the BorrowRequest object','queued','high','Scout',[],'CP-1'],
+    ['W-44','P-5','data','Set access rules for BorrowRequest','queued','medium','You',['W-43'],'CP-1'],['W-45','P-5','platform','Build S-3','queued','high','Scout',['W-42','W-43'],'CP-2'],
+    ['W-46','P-5','platform','Build S-4','queued','high','Scout',['W-41','W-42','W-44'],'CP-2'],['W-47','P-5','work','Final check: preview against S-3 and S-4','queued','medium','You',['W-45','W-46'],'CP-2'],
+    ['W-48','P-5','vision','Usability test: the ask flow with three neighbours','queued','medium','You',[],'CP-2'],
+    ['W-60','P-6','platform','Wire the core flow end to end','backlog','high','Scout'],['W-61','P-6','data','Seed sample tools','backlog','low','Scout'],
+    ['W-70','P-7','vision','Write acceptance for S-5','backlog','medium','Scout'],['W-80','P-8','vision','Write acceptance for S-7','queued','medium','Scout'],['W-81','P-8','vision','Write acceptance for S-8','queued','medium','Scout'],
+    ['W-50',null,'platform','Security audit (routine)','queued','medium','Scout'],['W-51',null,'platform','Update dependencies (routine)','queued','low','Scout'],
+  ],
+  docs:[
+    { id:'D-1', kind:'generated', title:'PR/FAQ', rev:12, stale:1, agents:false },
+    { id:'D-2', kind:'written', title:'Why Tool Share exists', agents:true },
+    { id:'D-3', kind:'generated', title:'One-pager for the Elm Street group', rev:12, stale:0, agents:false },
+  ],
+};
+const SOURCES = {
+  'SRC-1':{ kind:'Interview', icon:'record_voice_over', title:'Interview: Dana, lender', meta:'2026-09-12 · 40 min · by you', text:[
+    ['You','Thanks for making time. Tell me about the last time you lent something.'],
+    ['Dana','Honestly? I lent my drill to a neighbour in March and never saw it again. He moved out, I think. I didn’t even have his number.'],
+    ['You','How did that change things?'],
+    ['Dana','I stopped offering. My garage is full of stuff I use twice a year, and people ask in the group chat all the time. I’d lend to people on my street if I could say no.'],
+    ['You','What would make saying yes easier?'],
+    ['Dana','Knowing who they are. Knowing when it’s coming back. A reminder that isn’t me nagging them.'],
+    ['You','Would you want to be paid?'],
+    ['Dana','No, that’s the funny part. I’d feel weird charging a neighbour. A thank-you and getting it back clean is enough.'] ] },
+  'SRC-2':{ kind:'Interview', icon:'record_voice_over', title:'Interview: Sam, renter', meta:'2026-09-14 · 35 min · by you', text:[
+    ['You','When did you last need a tool you didn’t have?'],
+    ['Sam','Redoing the bathroom floor. I bought a ninety-dollar tile cutter for one bathroom. It’s under my bed now.'],
+    ['You','Did you try borrowing first?'],
+    ['Sam','Sort of. Asking in the building chat feels like begging, so I asked once and then just bought it.'],
+    ['You','How far would you go to pick one up?'],
+    ['Sam','I’d walk ten minutes. I’m not driving across town for it. I don’t have a car anyway.'] ] },
+  'SRC-3':{ kind:'Survey', icon:'poll', title:'Poll in the Elm Street neighbourhood group', meta:'2026-09-16 · 42 answers · by you' },
+  'SRC-4':{ kind:'Screenshot', icon:'image', title:'Hardware store hire page', meta:'2026-09-17 · by you' },
+  'SRC-5':{ kind:'Screenshot', icon:'image', title:'Neighbourhood lending app: request screen', meta:'2026-09-18 · by Alex' },
+};
+const POLL = [['5 min',9],['10 min',18],['15 min',11],['20+ min',4]];
+const ACTIVITIES = [
+  { id:'A-1', title:'Join', steps:[['Sign up',['S-10']]] }, { id:'A-2', title:'Find a tool', steps:[['Search nearby',['S-1','S-5']],['Look at a tool',['S-2']]] },
+  { id:'A-3', title:'Borrow', steps:[['Ask',['S-3']],['Decide',['S-4']],['Arrange pickup',['S-6']]] }, { id:'A-4', title:'Give it back', steps:[['Return',['S-7','S-8']],['Trust over time',['S-9']]] } ];
+const STORIES = {
+  'S-10':{ t:'Someone can sign up with email', ms:'demo', st:'built', why:null, tpl:true }, 'S-1':{ t:'A borrower can see tools within a 10-minute walk', ms:'demo', st:'designed', why:'C-1' },
+  'S-2':{ t:'A borrower can see a tool’s photos and condition', ms:'demo', st:'defined', why:'C-2' }, 'S-5':{ t:'A borrower can see when a tool is free', ms:'mvp', st:'proposed', why:'C-19' },
+  'S-3':{ t:'A borrower can ask to borrow a tool for given dates', ms:'demo', st:'defined', why:'C-3' }, 'S-4':{ t:'A lender can approve or decline a request', ms:'demo', st:'proposed', why:'C-2' },
+  'S-6':{ t:'Borrower and lender can agree a pickup time', ms:'mvp', st:'proposed', why:'C-3' }, 'S-7':{ t:'A borrower is reminded the day before it’s due', ms:'mvp', st:'proposed', why:'C-2' },
+  'S-8':{ t:'A lender can mark a tool returned', ms:'mvp', st:'proposed', why:'C-2' }, 'S-9':{ t:'A lender can see a borrower’s return history', ms:'later', st:'proposed', why:'C-8' } };
+const STATUS_LABEL = { proposed:'Proposed', defined:'Defined', designed:'Designed', built:'Built' };
+const MILESTONES = [ { key:'demo', label:'Demo', current:true, target:'2026-10-20', goal:'A clickable core flow with sample data.' }, { key:'mvp', label:'MVP', target:'2026-11-15', goal:'Real neighbours use it for real.' }, { key:'later', label:'Later', target:null, goal:'Trust at scale and polish.' } ];
+const PEOPLE = { You:{ name:'You', init:'YO', access:'Owner', note:'henry@… (you)' }, Alex:{ name:'Alex Rivera', init:'AR', access:'Member', note:'Designer' }, Priya:{ name:'Priya Shah', init:'PS', access:'Member', note:'Invited · hasn’t joined yet', invited:true } };
+const AGENTS = { Scout:{ metal:'#3f7fbf', model:'gpt-6-astra', effort:'Medium effort', limit:'200k tokens a day' }, Sketch:{ metal:'#b3245f', model:'claude-opus-5-5', effort:'High effort', limit:'150k tokens a day' } };
+const A = (key, name, desc, who, elevated, extra = {}) => ({ key, name, desc, who, elevated, ...extra });
+const INITIAL_ROLES = [
+  { layer:'vision', name:'Product lead', blurb:'Shapes what to build and why.', members:{ You:true }, actions:[
+    A('acceptance','Write acceptance','Given/When/Then for stories that have none','Scout',false),A('draft','Draft Brief claims','Drafts for any Brief section; you keep or discard','Scout',false),
+    A('brief','Change the Brief','Edit or delete claims','You',true),A('slice','Move stories between milestones','Changes what ships when','You',true),
+    A('research','Research','Sources, findings and insights, attached where used','Scout',false),A('docs','Write and generate documents','PR/FAQ, one-pagers and narratives','Scout',false),
+    A('review','Review Vision work','Accept or send back drafts from this role','You',true)] },
+  { layer:'design', name:'Design lead', blurb:'Keeps the design system coherent.', members:{ Alex:true }, actions:[
+    A('tokens','Evolve tokens and components','New components rather than one-off styles','Sketch',false),A('shared','Change shared tokens','A token more than one page uses','Alex',true),
+    A('audit','Design system audit','One-off styles and drift','Sketch',false),A('review','Review Design work','Accept or send back drafts from this role','Alex',true)] },
+  { layer:'pages', name:'Experience designer', blurb:'Turns stories into pages and flows.', members:{ Alex:true, You:false }, actions:[
+    A('design','Design pages','Every linked story gets a place','Sketch',false),A('concept','Explore page concepts','New layouts and interaction models','Sketch',true),
+    A('flows','Map flows','How pages connect for each activity','Sketch',false),A('review','Review Pages work','Accept or send back drafts from this role','Alex',true)] },
+  { layer:'data', name:'Data architect', blurb:'Owns objects, operations and access.', members:{ You:true }, actions:[
+    A('contract','Write object contracts','Fields, required fields and states, no stack names','Scout',false),A('ops','Write API operations','OpenAPI shape, errors and roles','Scout',false),
+    A('access','Set access rules','Who may read and change each object','You',true),A('review','Review Data work','Accept or send back drafts from this role','You',true)] },
+  { layer:'platform', name:'Engineer', blurb:'Builds stories and keeps the code in step.', members:{ Priya:true, You:false }, actions:[
+    A('build','Build stories','One story per build; the preview must pass','Scout',false),A('deps','Update dependencies','Versions and what changed','Scout',false),
+    A('config','Configure services that cost money','Names the cost and how to undo it','Priya',true),A('review','Review Platform work','Accept or send back drafts from this role','Priya',true)] },
+  { layer:'work', name:'Project lead', blurb:'Plans the work and signs it off.', members:{ You:true }, actions:[
+    A('shape','Create and shape projects','Brief, stories and checkpoints','You',true),A('plan','Set dates, budgets and dependencies','The timeline and spend caps','You',true),
+    A('go','Start batches (Go)','Spends on agent accounts','You',true),A('check','Milestone check','Weekly: exit criteria and what’s slipping','Scout',false),
+    A('final','Final project review','The project’s preview against all its stories','You',true)] },
+];
+let CLAIMS, LINKS, FINDINGS, INSIGHTS, DOCS, PROJECTS, ITEMS, ROLES, state, seq;
+function reset(){
+  const c = structuredClone(INITIAL);
+  CLAIMS = c.claims.map(([id, sec, text, sub]) => ({ id, sec, text, sub, principle:sec === 'principles' }));
+  LINKS = c.links; FINDINGS = Object.fromEntries(Object.entries(c.findings).map(([k, [src, type, text]]) => [k, { src, type, text }]));
+  INSIGHTS = c.insights; DOCS = c.docs; PROJECTS = c.projects;
+  ITEMS = c.items.map(([id, p, layer, title, status, pr, who, by, cp], n) => ({ id, p, layer, title, status, pr, who, by:by || [], cp:cp || null, n }));
+  ROLES = structuredClone(INITIAL_ROLES);
+  state = { editing:null, lf:{ q:'', layer:'', tag:'', sort:'used' }, items:{ group:'status', ms:'', p:'', who:'', layer:'' }, projView:'timeline', zoom:'month', deps:false, ptab:'overview', nextN:{ Scout:5, Sketch:5, You:5 }, editN:null, setupOpen:null, sel:null };
+  seq = { C:20, F:13, I:5 };
+}
+reset();
+
+/* ---------- Records: one lookup, one chip, one quick view ---------- */
+const byItem = id => ITEMS.find(i => i.id === id);
+function rec(id){
+  if (/^C-/.test(id)) { const c = CLAIMS.find(x => x.id === id); if (!c) return null; const s = SECTIONS.find(s => s.key === c.sec); return { kind:'claim', title:c.text, sub:s.title, href:'#/vision/brief/' + id }; }
+  if (/^S-/.test(id)) return { kind:'story', title:STORIES[id].t, href:'#/vision/map/' + id };
+  if (/^A-/.test(id)) return { kind:'activity', title:ACTIVITIES.find(a => a.id === id).title, href:'#/vision/map' };
+  if (/^D-/.test(id)) return { kind:'doc', title:DOCS.find(d => d.id === id).title, href:'#/vision/docs/' + id };
+  if (/^P-/.test(id)) return { kind:'project', title:PROJECTS.find(p => p.id === id).title, href:'#/work/project/' + id };
+  if (/^W-/.test(id)) return { kind:'item', title:byItem(id).title, href:'#/work/items/' + id };
+  if (/^I-/.test(id)) return { kind:'insight', title:INSIGHTS[id].text, href:'#/library/insight/' + id };
+  if (/^F-/.test(id)) return { kind:'finding', title:FINDINGS[id].text, href:'#/library/source/' + FINDINGS[id].src };
+  if (/^SRC-/.test(id)) return { kind:'source', title:SOURCES[id].title, href:'#/library/source/' + id };
+  if (/^ms:/.test(id)) { const m = MILESTONES.find(m => m.key === id.slice(3)); return { kind:'milestone', title:m.label, href:'#/work/projects' }; }
+  const [k, name] = id.split(':'); return { kind:k, title:name, href:'#/' + KIND[k][2] };
+}
+/* ref(): the chip used for every reference. opts.short shows only the id; opts.sub shows the kind label (e.g. “Problem”). */
+function ref(id, opts = {}){
+  const r = rec(id); if (!r) return `<span class="ref">${esc(id)} (deleted)</span>`;
+  const [, ic, layer] = KIND[r.kind]; const showId = !/:/.test(id);
+  const label = opts.sub && r.sub ? `<span class="kind">${esc(r.sub)}</span>` : '';
+  const tt = opts.short ? '' : `<span class="tt">${esc(opts.max && r.title.length > opts.max ? r.title.slice(0, opts.max - 1) + '…' : r.title)}</span>`;
+  return `<a class="ref ${opts.cls || ''}" data-l="${layer}" data-hc="${esc(id)}" href="${r.href}">${icon(ic)}${showId ? `<span class="rid">${esc(id)}</span>` : ''}${label}${tt}</a>`;
+}
+function who(name, size = ''){ if (AGENTS[name]) return `<span class="avatar bot ${size}" style="--metal:${AGENTS[name].metal}" title="${name}">${icon('smart_toy')}</span>`; const p = PEOPLE[name]; return `<span class="avatar ${size}" title="${esc(p.name)}">${p.init}</span>`; }
+const ISTAT = { backlog:['Backlog','radio_button_unchecked'], queued:['Queued','circle'], batched:['In a batch','clock_loader_40'], review:['Ready for review','rate_review'], done:['Done','check_circle'] };
+const PRIO = { highest:['Highest','keyboard_double_arrow_up'], high:['High','keyboard_arrow_up'], medium:['Medium','drag_handle'], low:['Low','keyboard_arrow_down'], lowest:['Lowest','keyboard_double_arrow_down'] };
+const PSTAT = { backlog:['Backlog','radio_button_unchecked'], planned:['Planned','circle'], progress:['In progress','clock_loader_40'], completed:['Completed','check_circle'] };
+const HEALTH = { on:['On track','var(--ok)'], risk:['At risk','var(--p-medium)'], off:['Off track','var(--bad)'] };
+const fmt = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short' }) : '—';
+const blockers = i => i.by.filter(b => byItem(b) && byItem(b).status !== 'done');
+const pStat = p => `<span class="pst ${p.status}">${icon(PSTAT[p.status][1])}${PSTAT[p.status][0]}</span>`;
+const iStat = i => `<span class="sicon s-${i.status}" title="${ISTAT[i.status][0]}">${icon(ISTAT[i.status][1], ISTAT[i.status][0])}</span>`;
+const prIcon = i => `<span class="pr ${i.pr}" title="${PRIO[i.pr][0]} priority">${icon(PRIO[i.pr][1], PRIO[i.pr][0] + ' priority')}</span>`;
+function progressOf(pid, cp){ const it = ITEMS.filter(i => i.p === pid && (!cp || i.cp === cp)); if (!it.length) return 0; return Math.round(it.reduce((a, i) => a + (i.status === 'done' ? 1 : ['batched','review'].includes(i.status) ? .5 : 0), 0) / it.length * 100); }
+function quick(id){
+  const r = rec(id); if (!r) return ''; const [kname, ic, layer] = KIND[r.kind];
+  const head = `<div class="hc-head" data-l="${layer}"><span class="hc-kind">${icon(ic)}${r.sub || kname}</span>${/:/.test(id) ? '' : `<span class="rid">${esc(id)}</span>`}</div><strong>${esc(r.title)}</strong>`;
+  let body = '';
+  if (r.kind === 'claim') body = `<div class="props2">${evChip(id, true)}${CLAIMS.find(c => c.id === id).sec === 'problem' ? `<span>${icon('bookmark')}${storiesFor(id).length} stories</span>` : ''}</div>`;
+  if (r.kind === 'story') { const s = STORIES[id]; body = `<div class="props2"><span>${MILESTONES.find(m => m.key === s.ms).label}</span><span>${STATUS_LABEL[s.st]}</span>${evChip(id)}</div>${s.why ? `<p>Why: ${esc(CLAIMS.find(c => c.id === s.why)?.text || '')}</p>` : ''}`; }
+  if (r.kind === 'project') { const p = PROJECTS.find(x => x.id === id); body = `<div class="props2">${pStat(p)}<span>${who(p.lead)}${esc(PEOPLE[p.lead].name)}</span><span>${icon('date_range')}${fmt(p.start)} → ${fmt(p.target)}</span><span>${progressOf(id)}%</span></div>${p.sum ? `<p>${esc(p.sum)}</p>` : ''}`; }
+  if (r.kind === 'item') { const i = byItem(id), p = PROJECTS.find(x => x.id === i.p); body = `<p>${p ? esc(p.id + ' ' + p.title) + ' · ' + MILESTONES.find(m => m.key === p.ms).label : 'No project'}</p><div class="props2"><span>${iStat(i)}${ISTAT[i.status][0]}</span><span>${prIcon(i)}${PRIO[i.pr][0]}</span><span>${who(i.who)}${esc(PEOPLE[i.who]?.name || i.who)}</span></div>${blockers(i).length ? `<p style="color:var(--bad)">Blocked by ${blockers(i).join(', ')}</p>` : ''}`; }
+  if (r.kind === 'insight') { const i = INSIGHTS[id]; body = `<div class="props2"><span>${icon('format_quote')}${i.f.length} findings</span><span>${icon('link')}used ${usedIn(id).length}×</span><span class="strength ${i.strength}">${i.strength}</span></div>`; }
+  if (r.kind === 'finding') body = `<p>${esc(SOURCES[FINDINGS[id].src].title)}</p>`;
+  if (r.kind === 'source') body = `<p>${esc(SOURCES[id].kind)} · ${esc(SOURCES[id].meta)}</p>`;
+  if (r.kind === 'doc') { const d = DOCS.find(x => x.id === id); body = `<p>${d.kind === 'generated' ? (d.stale ? `Generated · ${d.stale} Brief change since` : 'Generated · up to date') : 'Written'}${d.agents ? ' · agents read this' : ''}</p>`; }
+  if (['page','component','object','activity'].includes(r.kind)) body = `<div class="props2">${evChip(id)}</div>`;
+  if (r.kind === 'milestone') { const m = MILESTONES.find(m => m.key === id.slice(3)); body = `<p>${esc(m.goal)}${m.target ? ' · target ' + fmt(m.target) : ''}</p>`; }
+  return head + body + `<div class="hc-foot">Click to open</div>`;
+}
+
+/* ---------- Evidence ---------- */
+const linksFor = id => LINKS.filter(l => l[1] === id);
+const usedIn = iid => LINKS.filter(l => l[0] === iid);
+function storiesFor(cid){ return Object.entries(STORIES).filter(([, s]) => s.why === cid).map(([k]) => k); }
+/* A story's evidence = its own links plus its problem's links (inherited). */
+function evLinks(id){ const own = linksFor(id); if (/^S-/.test(id) && STORIES[id].why) return [...own, ...linksFor(STORIES[id].why).filter(l => !own.some(o => o[0] === l[0])).map(l => [...l, 'via'])]; return own; }
+/* V3: icon + label + optional number; both directions → split chip, icons and numbers only. */
+function evChip(id, isClaim){
+  const ls = evLinks(id), con = ls.filter(l => l[2] === 'contradicts').length, sup = ls.length - con;
+  if (sup && con) return `<button type="button" class="evsplit" data-ev="${esc(id)}" aria-label="Evidence: ${sup} supporting, ${con} contradicting"><span class="s">${icon('check_circle')}${sup}</span><span class="c">${icon('report')}${con}</span></button>`;
+  if (con) return `<button type="button" class="ev3 con" data-ev="${esc(id)}">${icon('report')}Contradicted${con > 1 ? ` <b>${con}</b>` : ''}</button>`;
+  if (sup) return `<button type="button" class="ev3 sup" data-ev="${esc(id)}">${icon('check_circle')}Supported${sup > 1 ? ` <b>${sup}</b>` : ''}</button>`;
+  return isClaim ? `<button type="button" class="ev3" data-ev="${esc(id)}">${icon('help_outline')}Assumed</button>` : '';
+}
+const conf = id => { const ls = evLinks(id); return ls.some(l => l[2] === 'contradicts') ? 'contradicted' : ls.length ? 'supported' : 'assumed'; };
+function findingHTML(fid, opts = {}){
+  const f = FINDINGS[fid]; const ic = { quote:'format_quote', data:'bar_chart', fact:'fact_check', image:'image' }[f.type];
+  let body = f.type === 'quote' ? `<q>${esc(f.text)}</q>` : esc(f.text);
+  if (f.type === 'data') body += chartHTML();
+  if (f.type === 'image') body += `<div class="shot" role="img" aria-label="Screenshot crop, highlighted area"><div class="fake"><i style="width:70%"></i><i class="hl" style="width:55%"></i><i style="width:85%"></i><i style="width:40%"></i></div></div>`;
+  return `<div class="finding">${icon(ic)}<div>${body}<span class="src">${ref(f.src, { max:40 })}</span></div></div>`;
+}
+function chartHTML(){
+  const max = Math.max(...POLL.map(d => d[1]));
+  return `<figure class="chart" style="margin:8px 0 0"><figcaption class="tiny muted">Answers (n = 42)</figcaption>
+    <div class="bars">${POLL.map(([l, v]) => `<div class="bar-col" tabindex="0" aria-label="${l}: ${v} answers"><span class="v">${v}</span><span class="b" style="height:${v / max * 85}%"></span><span class="tip">${l}: ${v} answers</span></div>`).join('')}</div>
+    <div class="bar-x" aria-hidden="true">${POLL.map(d => `<span>${d[0]}</span>`).join('')}</div>
+    <details><summary>Table</summary><table><thead><tr><th>Walk</th><th>Answers</th></tr></thead><tbody>${POLL.map(d => `<tr><td>${d[0]}</td><td class="tabular">${d[1]}</td></tr>`).join('')}</tbody></table></details></figure>`;
+}
+function insightBlock(iid, dir){
+  const i = INSIGHTS[iid];
+  return `<article class="insight ${dir === 'contradicts' ? 'contra' : ''}"><header>${ref(iid, { short:true })}${dir ? `<span class="chip ${dir === 'contradicts' ? 's-bad' : 's-ok'}">${dir === 'contradicts' ? 'Contradicts' : 'Supports'}</span>` : ''}<span class="strength ${i.strength}">${i.strength}</span>
+    <h4>${esc(i.text)}</h4></header>${i.f.map(f => findingHTML(f)).join('')}</article>`;
+}
+function attachForm(id){
+  const have = linksFor(id).map(l => l[0]); const free = Object.keys(INSIGHTS).filter(k => !have.includes(k));
+  return `<form class="attach" data-attach="${esc(id)}"><strong class="small">Attach an insight</strong>
+    <label class="small">From the Library<select name="ins">${free.map(k => `<option value="${k}">${k} · ${esc(INSIGHTS[k].text)}</option>`).join('')}</select></label>
+    <div class="row wrap"><span class="dirpick" role="group" aria-label="Direction"><button type="button" aria-pressed="true" data-dir="supports">Supports</button><button type="button" aria-pressed="false" data-dir="contradicts">Contradicts</button></span>
+    <button type="submit" class="btn small" ${free.length ? '' : 'disabled'}>Attach</button></div></form>`;
+}
+function evDrawer(id){
+  const r = rec(id); const ls = linksFor(id);
+  return `<p class="eyebrow">${esc(r.sub ? 'Brief · ' + r.sub : KIND[r.kind][0])}</p><h2 id="drawer-title">${esc(r.title)}</h2><p style="margin:8px 0 0">${evChip(id, r.kind === 'claim')}</p>
+    <h3>Evidence</h3>${ls.length ? ls.map(l => insightBlock(l[0], l[2])).join('') : '<p class="muted small">Nothing attached yet.</p>'}${attachForm(id)}`;
+}
+
+/* ---------- Layout helpers ---------- */
+function head(sec, title, tabs, active, extra = ''){
+  return `<p class="eyebrow layer" data-l="${sec}">${icon(SECS[sec][1])}${SECS[sec][0]}</p><h1 tabindex="-1">${title}</h1>${extra}
+  ${tabs ? `<nav class="tabs" aria-label="${SECS[sec][0]} sections" data-l="${sec}">${tabs.map(([k, l, ic, href]) => `<a href="${href || `#/${sec}/${k}`}" class="${k === active ? 'active' : ''}" ${k === active ? 'aria-current="page"' : ''}>${icon(ic)}${l}</a>`).join('')}</nav>` : ''}`;
+}
+const VISION_TABS = [['brief','Brief','fact_check'],['map','Story map','bookmark'],['docs','Documents','description']];
+const WORK_TABS = [['board','Board','view_kanban'],['items','Items','task_alt'],['projects','Projects','deployed_code_history'],['roles','Roles','badge'],['team','Team','group'],['routines','Routines','event_repeat']];
+const LIB_TABS = [['insights','Insights','insights','#/library'],['sources','Sources','article','#/library/sources']];
+
+/* ---------- Vision ---------- */
+function claimRow(c){
+  if (state.editing === c.id) return `<li class="claim" id="cl-${c.id}"><form class="editrow" data-edit="${c.id}"><label class="visually-hidden" for="e-${c.id}">Claim</label><input class="editin" id="e-${c.id}" name="t" value="${esc(c.text)}" maxlength="240">
+    <button type="submit" class="btn small">Save</button><button type="button" class="btn quiet small" data-act="cancel">Cancel</button></form></li>`;
+  const st = c.sec === 'problem' ? storiesFor(c.id) : null;
+  return `<li class="claim" id="cl-${c.id}"><div>${c.sec === 'value' ? `<p class="statement">${esc(c.text)}</p>` : `<p>${esc(c.text)}</p>`}${c.sub ? `<small>${esc(c.sub)}</small>` : ''}
+    ${st ? `<div class="refs" style="margin-top:4px">${st.length ? st.map(s => ref(s, { short:true })).join('') : '<small class="linked none">No stories answer this yet</small>'}</div>` : ''}</div>
+    <span class="tools">${c.principle ? evChip(c.id) : evChip(c.id, true)}
+      <button type="button" class="iconbtn" data-act="edit" data-id="${c.id}" aria-label="Edit claim">${icon('edit')}</button><button type="button" class="iconbtn" data-act="del" data-id="${c.id}" aria-label="Delete claim">${icon('delete')}</button></span></li>`;
+}
+function viewBrief(){
+  const risky = CLAIMS.filter(c => !c.principle && conf(c.id) !== 'supported' && ['problem','customers','diagnosis','value'].includes(c.sec))
+    .sort((a, b) => (conf(a.id) === 'contradicted' ? 0 : 1) - (conf(b.id) === 'contradicted' ? 0 : 1) || SECTIONS.findIndex(s => s.key === a.sec) - SECTIONS.findIndex(s => s.key === b.sec));
+  return `${head('vision', 'What we’re building, and why', VISION_TABS, 'brief')}
+  <div class="grid2"><div class="stackv">
+    ${SECTIONS.map((s, i) => `<section class="card" aria-labelledby="sec-${s.key}"><h2 id="sec-${s.key}"><span class="sec-num">${i + 1}</span>${s.title}<button type="button" class="btn ghost small push" data-toast="The Draft Brief claims action drafts claims for “${esc(s.title)}”. They arrive as drafts to keep or discard.">${icon('auto_awesome')}Draft</button></h2>
+      <p class="hint">${s.hint}</p><ul class="claims">${CLAIMS.filter(c => c.sec === s.key).map(claimRow).join('')}</ul>
+      <form class="addrow" data-add="${s.key}"><label class="visually-hidden" for="add-${s.key}">Add to ${s.title}</label><input id="add-${s.key}" name="t" placeholder="Add a ${s.key === 'principles' ? 'principle' : 'claim'}…" maxlength="240"><button type="submit" class="btn quiet small">${icon('add')}Add</button></form></section>`).join('')}
+    <section class="card collapsed"><h2><span class="sec-num">9</span>Business model <span class="chip s-plain">Optional</span></h2><p class="hint" style="margin:0">Not explored yet. Business will likely become its own layer.</p></section>
+  </div><aside class="stackv sticky" aria-label="Riskiest assumptions"><section class="card"><h2>${icon('crisis_alert')}Riskiest assumptions</h2><p class="hint">Unproven or contradicted claims in Problem, Customers, Diagnosis and Value.</p>
+    <ol class="risk">${risky.map(c => `<li><div><p>${esc(c.text)}</p><div class="row wrap">${evChip(c.id, true)}<button type="button" class="btn quiet small" data-toast="Created a Research item in the backlog: “Test: ${esc(c.text.slice(0, 40))}…”">${icon('science')}Test this</button></div></div></li>`).join('')}</ol></section></aside></div>`;
+}
+function viewMap(sel){
+  const cols = ACTIVITIES.flatMap(a => a.steps.map(s => ({ a, s })));
+  let h = `<div class="smap" style="grid-template-columns:repeat(${cols.length}, minmax(150px,1fr))">`;
+  h += ACTIVITIES.map(a => `<div class="act row" style="grid-column:span ${a.steps.length}"><span>${a.title}</span><span class="push">${evChip(a.id)}</span></div>`).join('');
+  h += cols.map(c => `<div class="step">${c.s[0]}</div>`).join('');
+  for (const m of MILESTONES) {
+    h += `<div class="band ${m.current ? 'current' : ''}">${ref('ms:' + m.key)}<span class="muted">${esc(m.goal)}</span></div>`;
+    h += cols.map(c => `<div class="cell">${c.s[1].filter(id => STORIES[id].ms === m.key).map(id => { const s = STORIES[id]; return `<div class="scard" ${sel === id ? 'style="border-color:var(--primary)"' : ''}><a class="stitle" href="#/vision/map/${id}" data-hc="${id}">${esc(s.t)}</a><span class="meta"><span class="dot st-${s.st}"></span>${STATUS_LABEL[s.st]}${s.tpl ? ' · template' : ''}</span>${evChip(id) ? `<span class="meta">${evChip(id)}</span>` : ''}</div>`; }).join('')}</div>`).join('');
+  }
+  return `${head('vision', 'What we’re building, and why', VISION_TABS, 'map')}<div class="map-wrap" tabindex="0" role="region" aria-label="Story map">${h}</div>`;
+}
+function storyDrawer(id){
+  const s = STORIES[id]; const own = linksFor(id), via = s.why ? linksFor(s.why) : [];
+  return `<div class="refs" style="margin:0 32px 4px 0">${ref(id, { short:true })}${ref('ms:' + s.ms)}</div><h2 id="drawer-title">${esc(s.t)}</h2>
+  <p class="row wrap" style="margin:6px 0 0"><span class="chip s-plain">${STATUS_LABEL[s.st]}</span>${evChip(id)}</p>
+  <div class="whybox"><span class="lbl2">Why: the problem this story answers</span>${s.why ? ref(s.why, { sub:true }) : '<span class="muted small">Template story</span>'}
+    ${s.why ? `<span class="lbl2">${via.length ? 'That problem’s evidence counts for this story too.' : 'That problem has no evidence yet.'}</span>` : ''}</div>
+  <h3>Evidence</h3>
+  ${via.length ? `<div class="evgroup"><h4>${icon('fact_check')}Through its problem ${ref(s.why, { short:true })}</h4>${via.map(l => insightBlock(l[0], l[2])).join('')}</div>` : ''}
+  <div class="evgroup"><h4>${icon('bookmark')}On this story</h4>${own.length ? own.map(l => insightBlock(l[0], l[2])).join('') : '<p class="muted small">Nothing specific to this story. Attach something when evidence is about this story rather than its problem.</p>'}</div>
+  ${attachForm(id)}`;
+}
+const DOC_BODY = {
+  'D-1':`<h2>Tool Share lets neighbours borrow tools from each other, on foot</h2><p><em>Elm Street, spring 2027.</em> Today Tool Share opens to the Elm Street neighbourhood. Borrow the tool you need from someone on your street, today [[C-9]].</p><p>Most of us own tools we use once or twice a year [[C-1]], and lending to near-strangers feels risky [[C-2]]. Tool Share starts with trust: verified neighbours, request and approve, and return reminders [[C-10]].</p><h3>FAQ</h3><p><strong>Do lenders get paid?</strong> No. Lenders told us they would feel weird charging a neighbour [[I-1]].</p>`,
+  'D-2':`<h2>Why Tool Share exists</h2><p>Every street is a hardware store nobody can shop in. The drill in one garage and the tile cutter under one bed could serve twenty homes, if lending didn’t feel like a gamble.</p><p>We are building for the lender first [[C-16]]. If Dana trusts it, Sam gets his tile cutter.</p>`,
+  'D-3':`<h2>Tool Share for Elm Street</h2><p>Borrow instead of buy. Ask in two taps; the owner says yes or no [[C-13]]. Your address stays hidden until they say yes [[C-17]].</p>` };
+const mentions = h => h.replace(/\[\[([A-Z]+-\d+)\]\]/g, (m, id) => ref(id, { short:true }));
+function viewDocs(id){
+  if (id) { const d = DOCS.find(x => x.id === id);
+    return `${head('vision', 'What we’re building, and why', VISION_TABS, 'docs')}<p class="eyebrow"><a href="#/vision/docs">Documents</a> · ${d.kind === 'generated' ? 'Generated' : 'Written'}</p>
+      <div class="row wrap" style="margin:0 0 12px"><h2 style="font-size:22px">${esc(d.title)}</h2><label class="switch push"><input type="checkbox" data-agents="${d.id}" ${d.agents ? 'checked' : ''}>Agents read this</label></div>
+      ${d.kind === 'generated' ? (d.stale ? `<div class="stale">${icon('update')}Generated from Brief revision ${d.rev}. ${d.stale} change${d.stale === 1 ? '' : 's'} since.<button type="button" class="btn small push" data-act="regen" data-id="${d.id}">${icon('autorenew')}Regenerate</button></div>` : `<div class="fresh">${icon('check_circle')}Up to date with Brief revision ${d.rev}.</div>`) : ''}
+      <article class="card docbody">${mentions(DOC_BODY[d.id])}</article>`; }
+  return `${head('vision', 'What we’re building, and why', VISION_TABS, 'docs')}<div class="row wrap" style="margin:0 0 12px"><button type="button" class="btn small push" data-toast="Write your own, or generate a PR/FAQ, one-pager or pitch from the Brief.">${icon('add')}New document</button></div>
+  <div class="doclist">${DOCS.map(d => `<a class="docrow" href="#/vision/docs/${d.id}"><span class="ic">${icon(d.kind === 'generated' ? 'auto_awesome' : 'description')}</span><span><strong>${esc(d.title)}</strong><small>${d.kind === 'generated' ? 'Generated from the Brief' : 'Written by you'}${d.agents ? ' · agents read this' : ''}</small></span>${d.kind === 'generated' && d.stale ? `<span class="chip s-warn">${icon('update')}${d.stale} change${d.stale === 1 ? '' : 's'}</span>` : '<span></span>'}</a>`).join('')}</div>`;
+}
+
+/* ---------- Library ---------- */
+function viewLibrary(){
+  const f = state.lf, q = f.q.toLowerCase();
+  const tags = [...new Set(Object.values(INSIGHTS).flatMap(i => i.tags))].sort();
+  const list = Object.keys(INSIGHTS).filter(iid => { const i = INSIGHTS[iid];
+    if (q && !(i.text.toLowerCase().includes(q) || i.f.some(x => FINDINGS[x].text.toLowerCase().includes(q)) || i.tags.some(t => t.includes(q)))) return false;
+    if (f.layer && !usedIn(iid).some(l => KIND[rec(l[1]).kind][2] === f.layer)) return false;
+    if (f.tag && !i.tags.includes(f.tag)) return false; return true; });
+  const so = { used:(a, b) => usedIn(b).length - usedIn(a).length, new:(a, b) => INSIGHTS[b].date.localeCompare(INSIGHTS[a].date), strength:(a, b) => ['strong','moderate','weak'].indexOf(INSIGHTS[a].strength) - ['strong','moderate','weak'].indexOf(INSIGHTS[b].strength) };
+  list.sort(so[f.sort]);
+  const sel = (name, label, opts) => `<label>${label}<select data-lf="${name}">${opts.map(([v, t]) => `<option value="${v}" ${f[name] === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>`;
+  return `${head('library', 'Library', LIB_TABS, 'insights', '<p class="lead">What we’ve learned: sources, the findings in them, and the insights they add up to.</p>')}
+  <div class="filters2"><label class="search2">${icon('search')}<span class="visually-hidden">Search insights</span><input data-lfq type="search" placeholder="Search insights and findings" value="${esc(f.q)}"></label>
+    ${sel('layer','Used in',[['','Any layer'],...LAYER_ORDER.map(l => [l, SECS[l][0]])])}${sel('tag','Tag',[['','Any tag'],...tags.map(t => [t, t])])}${sel('sort','Sort',[['used','Most used'],['new','Newest'],['strength','Strongest']])}
+    <button type="button" class="btn small push" data-act="newins">${icon('add')}New insight</button></div>
+  <div class="card" style="padding:0">${list.map(iid => { const i = INSIGHTS[iid]; return `<a class="irow3" href="#/library/insight/${iid}" data-hc="${iid}"><strong>${esc(i.text)}</strong>
+    <span class="meta3"><span>${iid}</span><span>${icon('format_quote')}${i.f.length} finding${i.f.length === 1 ? '' : 's'}</span><span>${icon('link')}used ${usedIn(iid).length}×</span><span class="strength ${i.strength}">${i.strength}</span>${i.comments.length ? `<span>${icon('chat_bubble')}${i.comments.length}</span>` : ''}${i.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</span></a>`; }).join('') || '<p class="muted" style="padding:14px">No insights match.</p>'}</div>`;
+}
+function viewInsight(iid){
+  const i = INSIGHTS[iid]; if (!i) return '<p>Not found.</p>';
+  const free = Object.keys(FINDINGS).filter(f => !i.f.includes(f));
+  return `<p class="eyebrow layer" data-l="library">${icon('local_library')}<a href="#/library" style="color:inherit">Library</a> · Insight ${iid}</p>
+  <h1 class="visually-hidden">Insight ${iid}: ${esc(i.text)}</h1><label class="visually-hidden" for="ins-title">Insight</label><input class="ins-title" id="ins-title" data-ins-title="${iid}" value="${esc(i.text)}">
+  <div class="row wrap" style="margin:6px 0 16px"><label class="small muted">Strength <select data-ins-strength="${iid}">${['weak','moderate','strong'].map(s => `<option ${i.strength === s ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
+    <span class="row wrap">${i.tags.map(t => `<span class="tag">${esc(t)}<button type="button" data-act="untag" data-id="${iid}" data-tag="${esc(t)}" aria-label="Remove tag ${esc(t)}">${icon('close')}</button></span>`).join('')}
+    <form data-tagform="${iid}" class="row"><label class="visually-hidden" for="tag-in">Add tag</label><input id="tag-in" name="t" placeholder="Add tag" style="width:110px;padding:3px 8px;border:1px solid var(--line-strong);border-radius:999px;background:var(--surface)"></form></span>
+    <span class="muted small push">Created ${i.date}</span></div>
+  <div class="srcpage"><div class="stackv">
+    <section class="card"><h2>${icon('format_quote')}Findings <span class="muted small">${i.f.length}</span></h2>
+      ${i.f.map(f => `<div class="frow">${findingHTML(f)}<button type="button" class="iconbtn" data-act="unfind" data-id="${iid}" data-f="${f}" aria-label="Remove ${f} from this insight">${icon('remove_circle_outline')}</button></div>`).join('')}
+      <details style="margin-top:10px"><summary class="small" style="cursor:pointer;color:var(--primary)">${icon('add')}Add findings</summary><form class="fpick" data-addfind="${iid}" style="margin-top:8px">
+        ${free.map(f => `<label><input type="checkbox" name="f" value="${f}"><span>${esc(FINDINGS[f].text)} <span class="muted tiny">· ${esc(SOURCES[FINDINGS[f].src].title)}</span></span></label>`).join('')}
+        <div class="row"><button type="submit" class="btn small">Add selected</button><a class="small push" href="#/library/source/SRC-1">Or highlight in a source</a></div></form></details></section>
+    <section class="card"><h2>${icon('chat_bubble')}Comments <span class="muted small">${i.comments.length}</span></h2><div class="comments">
+      ${i.comments.map(([w, t, d]) => `<div class="comment">${who(w)}<div><small><strong style="color:var(--ink)">${esc(PEOPLE[w].name)}</strong> · ${d}</small><p>${esc(t)}</p></div></div>`).join('')}
+      <form class="addcomment" data-comment="${iid}"><label class="visually-hidden" for="cm">Comment</label><textarea id="cm" name="t" rows="2" placeholder="Add a comment"></textarea><div><button type="submit" class="btn small">Comment</button></div></form></div></section>
+  </div><aside class="stackv sticky" aria-label="Used in"><section class="card"><h2>${icon('link')}Used in <span class="muted small">${usedIn(iid).length}</span></h2>
+    <div class="stackv" style="gap:6px">${usedIn(iid).map(([, rid, dir]) => `<div class="row wrap">${ref(rid, { sub:true, max:26, cls:dir === 'contradicts' ? 'contra' : '' })}${dir === 'contradicts' ? '<span class="chip s-bad">Contradicts</span>' : ''}</div>`).join('') || '<p class="muted small">Not used yet. Attach it from any record’s evidence.</p>'}</div></section></aside></div>`;
+}
+function hl(text, src){ let h = esc(text); for (const [fid, f] of Object.entries(FINDINGS)) if (f.src === src && f.type === 'quote') { const e = esc(f.text); h = h.replace(e, `<mark tabindex="0" data-mark="${fid}" data-hc="${fid}">${e}</mark>`); } return h; }
+function viewSources(){
+  return `${head('library', 'Library', LIB_TABS, 'sources', '<p class="lead">What we’ve learned: sources, the findings in them, and the insights they add up to.</p>')}
+  <div class="row wrap" style="margin:0 0 12px"><button type="button" class="btn small push" data-toast="Paste a link or transcript, or drop a screenshot, file or CSV.">${icon('add')}Add source</button></div>
+  <div class="card">${Object.entries(SOURCES).map(([k, s]) => `<div class="srcrow"><span class="ic">${icon(s.icon)}</span><div>${ref(k)}<small>${s.kind} · ${esc(s.meta)}</small></div><span class="muted tiny">${Object.values(FINDINGS).filter(f => f.src === k).length} findings</span></div>`).join('')}</div>`;
+}
+function viewSource(sid){
+  const s = SOURCES[sid], fs = Object.entries(FINDINGS).filter(([, f]) => f.src === sid);
+  const body = s.text ? `<div class="transcript" id="transcript" data-src="${sid}">${s.text.map(([sp, t]) => `<p><span class="sp">${sp}</span><span>${hl(t, sid)}</span></p>`).join('')}</div>` : `<div class="card">${fs.map(([k]) => findingHTML(k)).join('')}</div>`;
+  return `<p class="eyebrow layer" data-l="library">${icon('local_library')}<a href="#/library/sources" style="color:inherit">Library</a> · ${s.kind}</p><h1 tabindex="-1">${esc(s.title)}</h1><p class="muted">${esc(s.meta)}</p>
+  <div class="srcpage"><div>${s.text ? '<p class="muted small" style="margin:0 0 8px">Select a passage to make it a finding.</p>' : ''}${body}</div>
+  <aside class="stackv sticky" aria-label="Findings"><section class="card"><h2>Findings <span class="muted small">${fs.length}</span></h2><div id="newfind"></div>
+    ${fs.map(([k, f]) => { const ins = Object.keys(INSIGHTS).find(i => INSIGHTS[i].f.includes(k)); return `<div class="finding" id="f-${k}">${icon('format_quote')}<div><q>${esc(f.text)}</q><span class="src">${ins ? ref(ins, { max:36 }) : 'Not in an insight yet'}</span></div></div>`; }).join('')}</section></aside></div>`;
+}
+function newFindingForm(text){
+  return `<form class="newfind" id="nf-form"><strong class="small">New finding</strong><blockquote>${esc(text)}</blockquote>
+    <label class="small">Add to insight<select name="ins" id="nf-ins">${Object.entries(INSIGHTS).map(([k, i]) => `<option value="${k}">${k} · ${esc(i.text)}</option>`).join('')}<option value="__new">New insight…</option><option value="__none">No insight yet</option></select></label>
+    <label class="small" id="nf-new" hidden>New insight<input name="newins" placeholder="What this tells us, in one sentence"></label>
+    <div class="row"><button type="submit" class="btn small">Save finding</button><button type="button" class="btn quiet small" data-act="nfcancel">Cancel</button></div></form>`;
+}
+
+/* ---------- Work ---------- */
+function irow(i){
+  const bl = blockers(i), p = PROJECTS.find(x => x.id === i.p);
+  return `<div class="irow4 ${state.sel === i.id ? 'sel' : ''}" data-row="${i.id}">${prIcon(i)}<span class="rid">${i.id}</span>
+    <span style="display:flex;gap:8px;align-items:center;min-width:0"><button type="button" class="tb" data-open="${i.id}" data-hc="${i.id}">${esc(i.title)}</button>${bl.length ? `<span class="blocked">${icon('block')}${bl.map(b => ref(b, { short:true })).join('')}</span>` : ''}</span>
+    <span class="right"><span class="lbl" data-l="${i.layer}"><i style="background:var(--lc)"></i>${SECS[i.layer][0]}</span>${p ? `<span class="pm">${ref(p.id, { short:true }).replace('class="ref', 'class="refx')}<a href="#/work/projects" data-hc="ms:${p.ms}">${icon('flag')}${MILESTONES.find(m => m.key === p.ms).label}</a></span>` : ''}</span>
+    <span class="av">${who(i.who)}</span>${iStat(i)}</div>`;
+}
+function groupList(items, groupBy){
+  const keyOf = { status:i => i.status, project:i => i.p || 'none', who:i => i.who, layer:i => i.layer, cp:i => i.cp || 'none' }[groupBy];
+  const order = { status:Object.keys(ISTAT), project:[...PROJECTS.map(p => p.id), 'none'], who:[...Object.keys(PEOPLE), ...Object.keys(AGENTS)], layer:LAYER_ORDER, cp:['CP-1','CP-2','none'] }[groupBy];
+  const label = { status:k => `${iStat({ status:k })}${ISTAT[k][0]}`, project:k => k === 'none' ? 'No project' : `${icon('deployed_code_history')}<span class="muted">${k}</span> ${esc(PROJECTS.find(p => p.id === k).title)}`, who:k => `${who(k)} ${esc(PEOPLE[k]?.name || k)}`, layer:k => SECS[k][0], cp:k => k === 'none' ? 'No checkpoint' : k }[groupBy];
+  const byPr = (a, b) => Object.keys(PRIO).indexOf(a.pr) - Object.keys(PRIO).indexOf(b.pr) || a.n - b.n;
+  return `<div class="ilist">${order.filter(k => items.some(i => keyOf(i) === k)).map(k => { const g = items.filter(i => keyOf(i) === k).sort(byPr);
+    return `<details class="igroup" ${k === 'done' ? '' : 'open'}><summary><span class="chev">${icon('chevron_right')}</span>${label(k)} <span class="n">${g.length}</span></summary>${g.map(irow).join('')}</details>`; }).join('') || '<p class="muted" style="padding:14px">No items match.</p>'}</div>`;
+}
+function itemPanel(id){
+  const i = byItem(id), p = PROJECTS.find(x => x.id === i.p);
+  return `<div class="refs" style="margin:0 32px 4px 0">${ref(id, { short:true })}${p ? ref(p.id, { max:30 }) : ''}</div><h2 id="drawer-title">${esc(i.title)}</h2>
+  <dl class="props3" style="display:grid;grid-template-columns:110px minmax(0,1fr);gap:8px 12px;font-size:13.5px;align-items:center"><dt class="muted">Status</dt><dd style="margin:0">${iStat(i)} ${ISTAT[i.status][0]}</dd>
+    <dt class="muted">Priority</dt><dd style="margin:0">${prIcon(i)} ${PRIO[i.pr][0]}</dd><dt class="muted">Assignee</dt><dd style="margin:0" class="row">${who(i.who)} ${esc(PEOPLE[i.who]?.name || i.who)}</dd>
+    <dt class="muted">Layer</dt><dd style="margin:0"><span class="lbl" data-l="${i.layer}"><i style="background:var(--lc)"></i>${SECS[i.layer][0]}</span></dd>
+    <dt class="muted">Milestone</dt><dd style="margin:0">${p ? ref('ms:' + p.ms) : '—'}</dd>${i.cp ? `<dt class="muted">Checkpoint</dt><dd style="margin:0">${esc(p.checkpoints.find(c => c[0] === i.cp)[1])}</dd>` : ''}
+    <dt class="muted">Blocked by</dt><dd style="margin:0" class="refs">${blockers(i).map(b => ref(b, { max:28 })).join('') || '—'}</dd></dl>
+  <p class="muted small">Description, done-when, activity and review checks stay as on the WORK-UX-01 item page.</p>
+  <button type="button" class="btn small" data-toast="Opens the full item page (WORK-UX-01, unchanged).">${icon('open_in_full')}Open full page</button>`;
+}
+function viewItems(){
+  const f = state.items;
+  const items = ITEMS.filter(i => (!f.ms || PROJECTS.find(p => p.id === i.p)?.ms === f.ms) && (!f.p || i.p === f.p) && (!f.who || i.who === f.who) && (!f.layer || i.layer === f.layer));
+  const sel = (name, label, opts) => `<label>${label}<select data-if="${name}">${opts.map(([v, t]) => `<option value="${v}" ${f[name] === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>`;
+  return `${head('work', 'Items', WORK_TABS, 'items')}<div class="toolbar">${sel('group','Group',[['status','Status'],['project','Project'],['who','Assignee'],['layer','Layer']])}
+    ${sel('ms','Milestone',[['','All'],...MILESTONES.map(m => [m.key, m.label])])}${sel('p','Project',[['','All'],...PROJECTS.map(p => [p.id, p.id + ' ' + p.title])])}
+    ${sel('who','Assignee',[['','Anyone'],...Object.keys(PEOPLE).map(k => [k, PEOPLE[k].name]),...Object.keys(AGENTS).map(k => [k, k])])}${sel('layer','Layer',[['','All'],...LAYER_ORDER.map(l => [l, SECS[l][0]])])}
+    <span class="muted small push">${items.length} items · click a row for details</span></div>${groupList(items, f.group)}`;
+}
+/* Projects: list and a Linear-style timeline */
+const BASE = new Date('2026-08-31T00:00:00');
+const dayOf = d => Math.round((new Date(d + 'T00:00:00') - BASE) / 864e5);
+const dateOf = n => { const d = new Date(BASE); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+const PPD = { week:32, month:12, quarter:5 }, DAYS = 150, TODAY = '2026-09-23';
+function budget(p){ const [lim, sp] = p.budget; return `<span class="budget"><span>${sp}k of ${lim}k tokens</span><span class="track"><b style="width:${Math.min(100, sp / lim * 100)}%"></b></span></span>`; }
+function viewProjects(){
+  const bar = `<div class="tlbar"><div class="viewswitch" role="group" aria-label="View"><a href="#/work/projects" data-pv="timeline" ${state.projView === 'timeline' ? 'aria-current="page"' : ''}>${icon('view_timeline')}Timeline</a><a href="#/work/projects" data-pv="list" ${state.projView === 'list' ? 'aria-current="page"' : ''}>${icon('list')}List</a></div>
+    ${state.projView === 'timeline' ? `<div class="viewswitch" role="group" aria-label="Zoom">${['week','month','quarter'].map(z => `<a href="#/work/projects" data-zoom="${z}" ${state.zoom === z ? 'aria-current="page"' : ''}>${z[0].toUpperCase() + z.slice(1)}</a>`).join('')}</div>
+      <label class="switch small"><input type="checkbox" data-deps ${state.deps ? 'checked' : ''}>Dependencies</label>` : ''}
+    <button type="button" class="btn small push" data-toast="New project: name, milestone, lead, optional dates and a token budget.">${icon('add')}New project</button></div>`;
+  if (state.projView === 'list') return head('work', 'Projects', WORK_TABS, 'projects') + bar + `<div class="ptable-wrap" tabindex="0" role="region" aria-label="Projects"><table class="ptable"><thead><tr><th>Project</th><th>Health</th><th>Status</th><th>Lead</th><th>Target</th><th>Budget</th><th>Progress</th></tr></thead><tbody>
+    ${MILESTONES.map(m => `<tr class="mhead"><td colspan="7">${ref('ms:' + m.key)}<small>${m.target ? 'Target ' + fmt(m.target) : ''}</small></td></tr>` + PROJECTS.filter(p => p.ms === m.key).map(p => `<tr><td>${ref(p.id, { max:40 })}</td>
+      <td>${p.health ? `<span class="health"><i style="background:${HEALTH[p.health][1]}"></i>${HEALTH[p.health][0]}</span>` : '<span class="muted">—</span>'}</td><td>${pStat(p)}</td><td><span class="row">${who(p.lead)}${esc(PEOPLE[p.lead].name.split(' ')[0])}</span></td><td>${fmt(p.target)}</td><td>${budget(p)}</td><td><span class="pct">${progressOf(p.id)}%</span></td></tr>`).join('')).join('')}</tbody></table></div>`;
+  return head('work', 'Projects', WORK_TABS, 'projects') + bar + timeline();
+}
+function timeline(){
+  const ppd = PPD[state.zoom], W = Math.round(DAYS * ppd); let axis = '', grid = '';
+  for (let n = 0; n < DAYS; n++) { const d = new Date(BASE); d.setDate(d.getDate() + n);
+    if (d.getDate() === 1) axis += `<span class="mo" style="left:${n * ppd + 4}px">${d.toLocaleDateString('en-GB', { month:'short' })}</span>`;
+    const show = state.zoom === 'quarter' ? d.getDate() === 1 : d.getDay() === 1;
+    if (show) { if (!(state.zoom !== 'quarter' && Math.abs(n - dayOf(TODAY)) < 3)) axis += `<span class="dy" style="left:${n * ppd}px">${d.getDate()}</span>`; grid += `<i style="left:${n * ppd}px"></i>`; } }
+  const tx = dayOf(TODAY) * ppd;
+  axis += `<span class="todaypill" style="left:${tx}px">${fmt(TODAY)}</span>`;
+  MILESTONES.filter(m => m.target).forEach(m => { axis += `<span class="mt" style="left:${dayOf(m.target) * ppd}px" data-hc="ms:${m.key}"><i></i>${m.label}</span>`; grid += `<i class="mtl" style="left:${dayOf(m.target) * ppd}px"></i>`; });
+  grid += `<i class="todayline" style="left:${tx}px"></i>`;
+  let rows = '';
+  for (const m of MILESTONES) {
+    const ps = PROJECTS.filter(p => p.ms === m.key);
+    rows += `<div class="sect3"><span>${icon('flag')}${m.label}${m.target ? ' · target ' + fmt(m.target) : ''}</span></div>`;
+    for (const p of ps.filter(p => p.start && p.target)) {
+      const l = dayOf(p.start) * ppd, w = (dayOf(p.target) - dayOf(p.start) + 1) * ppd;
+      const over = p.status !== 'completed' && dayOf(p.target) < dayOf(TODAY);
+      rows += `<div class="prow ${p.checkpoints ? 'cps' : ''}"><span class="ptitle" style="left:${l}px"><span class="pst ${p.status}" title="${PSTAT[p.status][0]}">${icon(PSTAT[p.status][1], PSTAT[p.status][0])}</span>${ref(p.id, { cls:'bare' }).replace('class="ref bare"', 'class="refx"')}${who(p.lead)}${p.health ? `<span class="hdot" style="background:${HEALTH[p.health][1]}" title="${HEALTH[p.health][0]}"></span>` : ''}</span>
+        <span class="pbar3 ${p.status === 'completed' ? 'done' : ''}" id="pb-${p.id}" data-pid="${p.id}" style="left:${l}px;width:${w}px" tabindex="0" role="img" aria-label="${esc(p.title)}: ${fmt(p.start)} to ${fmt(p.target)}"><span class="fill" style="width:${progressOf(p.id)}%"></span><span class="h l" data-h="l"></span><span class="h r" data-h="r"></span></span>
+        ${over ? `<span class="over3" style="left:${l + w}px;width:${tx - l - w}px" title="Past its target"></span>` : ''}
+        ${(p.checkpoints || []).map(([cid, t, d], k, all) => { const x = dayOf(d) * ppd, gap = k ? x - dayOf(all[k - 1][2]) * ppd : 999; return `<span class="cp3" style="left:${x - 6}px" title="${esc(t)} · ${fmt(d)}"></span>${gap >= 110 ? `<span class="cp3l" style="left:${x}px">${esc(t.split(' ').slice(0, 2).join(' '))}</span>` : ''}`; }).join('')}</div>`;
+    }
+    for (const p of ps.filter(p => !p.start && p.target)) rows += `<div class="prow"><span class="ptitle" style="left:${dayOf(p.target) * ppd - 60}px"><span class="pst ${p.status}">${icon(PSTAT[p.status][1], PSTAT[p.status][0])}</span><a class="refx" href="#/work/project/${p.id}" data-hc="${p.id}">${esc(p.title)}</a>${who(p.lead)}</span><span class="tg3" id="pb-${p.id}" style="left:${dayOf(p.target) * ppd - 6}px" title="Target ${fmt(p.target)}, no start date"></span></div>`;
+    const und = ps.filter(p => !p.target);
+    if (und.length) rows += `<div class="undated">No dates: ${und.map(p => `${ref(p.id, { max:28 })}<button type="button" class="linkbtn" data-act="setdates" data-id="${p.id}">Set dates</button>`).join(' ')}</div>`;
+  }
+  return `<div class="tl3" id="tl3" tabindex="0" role="region" aria-label="Project timeline"><div class="tl3-in" style="width:${W}px"><div class="axis3">${axis}</div><div class="grid3">${grid}</div><div id="tl-rows" style="position:relative">${rows}<svg id="tl-svg" aria-hidden="true"></svg></div></div></div>
+  <p class="muted small">Projects only. Drag a bar to move it or its ends to change dates; the date fields on each project do the same from the keyboard. Red dashes: past its target.</p>`;
+}
+function drawDeps(){
+  const rowsEl = document.getElementById('tl-rows'), svg = document.getElementById('tl-svg'); if (!rowsEl) return;
+  if (!state.deps) { svg.innerHTML = ''; return; }
+  const base = rowsEl.getBoundingClientRect(); let s = '';
+  for (const p of PROJECTS) for (const d of p.deps) { const a = document.getElementById('pb-' + d)?.getBoundingClientRect(), b = document.getElementById('pb-' + p.id)?.getBoundingClientRect(); if (!a || !b) continue;
+    const x1 = a.right - base.left, y1 = a.top + a.height / 2 - base.top, x2 = b.left - base.left, y2 = b.top + b.height / 2 - base.top; const bad = x2 < x1 ? 'bad' : '';
+    s += `<path class="${bad}" d="M${x1},${y1} C${Math.max(x1, x2) + 16},${y1} ${x2 - 16},${y2} ${x2},${y2}"/>`; }
+  svg.setAttribute('width', rowsEl.scrollWidth); svg.setAttribute('height', rowsEl.scrollHeight); svg.innerHTML = s;
+}
+let drag = null, suppressUntil = 0;
+document.addEventListener('pointerdown', e => { const bar = e.target.closest('.pbar3'); if (!bar || e.button !== 0) return; const p = PROJECTS.find(x => x.id === bar.dataset.pid); const h = e.target.closest('[data-h]');
+  drag = { p, bar, mode:h ? h.dataset.h : 'move', x:e.clientX, s:dayOf(p.start), t:dayOf(p.target), moved:false }; bar.setPointerCapture(e.pointerId); e.preventDefault(); });
+document.addEventListener('pointermove', e => { if (!drag) return; const ppd = PPD[state.zoom], dd = Math.round((e.clientX - drag.x) / ppd); if (dd) drag.moved = true; let s = drag.s, t = drag.t;
+  if (drag.mode === 'move') { s += dd; t += dd; } else if (drag.mode === 'l') s = Math.min(drag.s + dd, t); else t = Math.max(drag.t + dd, s);
+  drag.p.start = dateOf(s); drag.p.target = dateOf(t); drag.bar.style.left = s * ppd + 'px'; drag.bar.style.width = (t - s + 1) * ppd + 'px'; drag.bar.parentElement.querySelector('.ptitle').style.left = s * ppd + 'px'; drawDeps(); });
+document.addEventListener('pointerup', () => { if (!drag) return; const d = drag; drag = null; if (d.moved && d.mode === 'move' && d.p.checkpoints) { const delta = dayOf(d.p.start) - d.s; d.p.checkpoints.forEach(c => c[2] = dateOf(dayOf(c[2]) + delta)); } if (d.moved) { suppressUntil = Date.now() + 400; const sc = document.getElementById('tl3').scrollLeft; render(); document.getElementById('tl3').scrollLeft = sc; toast(`${d.p.id} now ${fmt(d.p.start)} – ${fmt(d.p.target)}.`); } });
+document.addEventListener('click', e => { if (Date.now() < suppressUntil && e.target.closest('.tl3')) { e.preventDefault(); e.stopPropagation(); } }, true);
+function viewProject(id){
+  const p = PROJECTS.find(x => x.id === id); if (!p) return '<p>Not found.</p>';
+  const items = ITEMS.filter(i => i.p === id);
+  const B = id === 'P-5' ? `<div class="brief-sec"><h3>Problem</h3><p>A borrower who found a tool has no polite way to ask, and a lender has no way to choose who borrows.</p></div>
+    <div class="brief-sec"><h3>Solution sketch</h3><p>A short request (dates and a note) from the tool page. The lender sees the borrower’s name and neighbourhood, then approves or declines. Approval reveals the pickup address.</p></div>
+    <div class="brief-sec"><h3>Rabbit holes</h3><ul><li>Pickup scheduling pulls in chat. Keep it to “the address appears on approval”.</li><li>Declines must not feel hostile: no reason required.</li></ul></div>
+    <div class="brief-sec"><h3>No-gos</h3><ul><li>No deposits or payments</li><li>No messaging thread (that’s ${ref('P-7', { short:true })})</li></ul></div>
+    <div class="brief-sec"><h3>Requirements</h3><ul class="req"><li><code>FR-001</code><span>A signed-in borrower can request a tool for a start and end date, with an optional note.</span></li><li><code>FR-002</code><span>WHEN a request is made, THE SYSTEM SHALL notify the lender.</span></li><li><code>FR-003</code><span>A lender can approve or decline each request.</span></li><li><code>FR-004</code><span>WHEN a request is approved, THE SYSTEM SHALL show the pickup address to the borrower only.</span></li></ul></div>`
+    : `<p class="muted">No brief yet.</p><button type="button" class="btn ghost small" data-toast="Write the brief, or run the Create and shape projects action for a draft.">${icon('edit')}Write the brief</button>`;
+  const tabs = `<nav class="subnav" aria-label="Project sections"><a href="#/work/project/${id}" data-ptab="overview" ${state.ptab === 'overview' ? 'aria-current="page"' : ''}>Overview</a><a href="#/work/project/${id}" data-ptab="items" ${state.ptab === 'items' ? 'aria-current="page"' : ''}>Items <span class="muted">${items.length}</span></a></nav>`;
+  const overview = `<dl class="propgrid"><dt>Properties</dt><dd>${pStat(p)}${p.health ? `<span class="health"><i style="background:${HEALTH[p.health][1]}"></i>${HEALTH[p.health][0]}</span>` : ''}<span>${who(p.lead)}${esc(PEOPLE[p.lead].name)}</span>
+      <span>${icon('date_range')}<label class="visually-hidden" for="ds">Start</label><input type="date" id="ds" data-date="start" data-id="${id}" value="${p.start || ''}">→<label class="visually-hidden" for="dt">Target</label><input type="date" id="dt" data-date="target" data-id="${id}" value="${p.target || ''}"></span></dd>
+    <dt>Milestone</dt><dd>${ref('ms:' + p.ms)}</dd><dt>Budget</dt><dd style="max-width:260px">${budget(p)}</dd>
+    <dt>Blocked by</dt><dd>${p.deps.map(d => ref(d, { max:30 })).join('') || '—'}</dd><dt>Stories</dt><dd>${(p.stories || []).map(s => ref(s, { max:36 })).join('') || '—'}</dd>
+    <dt>Evidence</dt><dd>${evChip(id) || '<span class="muted">—</span>'}</dd></dl>
+    <section class="card"><h2>${icon('description')}Brief</h2>${B}</section>
+    ${p.checkpoints ? `<section class="card" style="margin-top:14px"><h2>${icon('flag')}Checkpoints</h2><p class="hint">Linear calls these project milestones.</p>${p.checkpoints.map(([cid, t, d]) => `<div class="cprow"><i></i><span>${esc(t)}</span><small>${fmt(d)} · ${items.filter(i => i.cp === cid).length} items · ${progressOf(id, cid)}%</small></div>`).join('')}</section>` : ''}`;
+  return `<p class="eyebrow layer" data-l="work">${icon('checklist')}<a href="#/work/projects" style="color:inherit">Projects</a></p><div class="ptile">${icon('deployed_code_history')}</div><h1 tabindex="-1">${esc(p.title)}</h1><p class="psum">${esc(p.sum || '')}</p>${tabs}
+  ${state.ptab === 'items' ? groupList(items, p.checkpoints ? 'cp' : 'status') : overview}`;
+}
+/* Board: batches as before; Next is a split chip, active milestone only */
+function nextFor(w){ const ms = MILESTONES.find(m => m.current).key; return ITEMS.filter(i => i.who === w && i.status === 'queued' && !blockers(i).length && PROJECTS.find(p => p.id === i.p)?.ms === ms).sort((a, b) => Object.keys(PRIO).indexOf(a.pr) - Object.keys(PRIO).indexOf(b.pr) || a.n - b.n); }
+function viewBoard(){
+  const lanes = [['Scout','agent'],['Sketch','agent'],['You','person']];
+  const card = i => `<div class="bcard ${i.justAdded ? 'new' : ''}" data-row="${i.id}" style="cursor:pointer"><span><span class="rid">${i.id}</span><button type="button" class="tb" data-open="${i.id}" data-hc="${i.id}" style="border:0;background:none;padding:0;font:inherit;color:inherit;cursor:pointer;text-align:left">${esc(i.title)}</button></span>${iStat(i)}
+    <span class="sub">${prIcon(i)}<span class="lbl" data-l="${i.layer}"><i style="background:var(--lc)"></i>${SECS[i.layer][0]}</span>${i.p ? ref(i.p, { short:true }) : ''}</span></div>`;
+  return `${head('work', 'Board', WORK_TABS, 'board')}
+  <div class="lanes2">${lanes.map(([n, kind]) => { const its = ITEMS.filter(i => i.who === n && ['batched','review'].includes(i.status)); const N = state.nextN[n];
+    return `<section class="blane" aria-label="${n}’s batch"><div class="blane-head">${who(n, 'lg')}<div><strong>${n}</strong><small>${kind === 'agent' ? AGENTS[n].model : 'Your batch'}</small></div>
+      <div class="right"><span class="nextsplit"><button type="button" data-act="next" data-who="${n}" title="Add the next ${N} queued, unblocked items for ${n} in ${MILESTONES.find(m => m.current).label}, by priority">${icon('playlist_add')}Next</button>
+        ${state.editN === n ? `<label class="visually-hidden" for="n-${n}">How many</label><input type="number" id="n-${n}" data-n="${n}" min="1" max="25" value="${N}">` : `<button type="button" class="num" data-act="editn" data-who="${n}" aria-label="Change how many: ${N}">${N}</button>`}</span>
+      ${kind === 'agent' ? `<button type="button" class="btn small" data-toast="Go: ${n} works through the batch on your key. Items lock while it runs.">${icon('play_arrow')}Go</button>` : ''}</div></div>
+      ${its.map(card).join('') || '<p class="lane-empty">Empty. Press Next.</p>'}</section>`; }).join('')}</div>
+  <div class="row wrap" style="margin:0 0 10px"><h2 style="font-size:16px">Queue</h2><span class="muted small">By project, highest priority first. <a href="#/work/items">All items</a></span></div>${groupList(ITEMS.filter(i => i.status === 'queued'), 'project')}`;
+}
+/* Roles: the WORK-UX-01 setup, plus an elevated toggle per action */
+function assigneeSel(ri, ai, cur){
+  const opts = [...Object.keys(PEOPLE).map(k => [k, PEOPLE[k].name]), ...Object.keys(AGENTS).map(k => [k, k + ' (agent)'])];
+  return `<span class="who3">${who(cur)}<label class="visually-hidden" for="as-${ri}-${ai}">Default assignee</label><select id="as-${ri}-${ai}" data-assign="${ri}:${ai}">${opts.map(([v, t]) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></span>`;
+}
+function viewRoles(){
+  return `${head('work', 'Roles', WORK_TABS, 'roles')}<p class="lead">Each action has a default assignee, a setup, and an elevated switch ${icon('shield_person')}. Only leads of the role may do elevated actions; an agent assigned one acts as a lead for it, and its result waits for a human lead to review.</p>
+  <div class="stackv">${ROLES.map((r, ri) => `<section class="role3" data-l="${r.layer}" aria-labelledby="r-${ri}"><header><span class="tile">${icon(SECS[r.layer][1])}</span><div><h2 id="r-${ri}">${r.name}${r.layer === 'work' ? ' <span class="tag-new">Now includes review</span>' : ''}</h2><p>${r.blurb}</p></div>
+    <div class="members push">${Object.entries(r.members).map(([n, lead]) => `<span class="rchip ${lead ? 'lead' : ''}">${lead ? icon('shield_person') : ''}${esc(PEOPLE[n].name.split(' ')[0])}</span>`).join('')}</div></header>
+    ${r.actions.map((a, ai) => `<div class="arow3"><div><strong>${a.name}</strong><small>${a.desc}</small></div>${assigneeSel(ri, ai, a.who)}
+      <button type="button" class="btn quiet small" data-act="setup" data-id="${ri}:${ai}" aria-expanded="${state.setupOpen === ri + ':' + ai}">${icon('tune')}Setup</button>
+      <button type="button" class="elev" data-act="elev" data-id="${ri}:${ai}" aria-pressed="${a.elevated}" aria-label="Elevated: ${a.name}" title="${a.elevated ? 'Elevated: leads only' : 'Any member'}">${icon(a.elevated ? 'shield_person' : 'shield')}</button>
+      ${state.setupOpen === ri + ':' + ai ? `<div class="setup3"><div><h4>Instructions</h4><p>${a.key === 'acceptance' ? 'Each scenario must be checkable in a preview. Cover the open edges listed on the story.' : 'Follow the role instructions; ask only questions whose answers change the result.'}</p></div>
+        <div><h4>Always reads</h4><p>Principles, the linked records and their evidence</p></div><div><h4>May change</h4><p>${SECS[r.layer][0]} records this action names</p></div>
+        <div><h4>Tools</h4><p>Read every layer · revise records · ask you</p></div><div><h4>Asks first</h4><p>${a.elevated ? 'Always: a lead accepts the result' : 'Anything outside its records'}</p></div><div><h4>Review checks</h4><ul><li>Traces to a story or claim</li><li>Names what it changed</li></ul></div></div>` : ''}</div>`).join('')}</section>`).join('')}</div>`;
+}
+function viewTeam(){
+  const actionsFor = n => ROLES.flatMap(r => r.actions.filter(a => a.who === n).map(a => ({ r, a })));
+  return `${head('work', 'Team', WORK_TABS, 'team')}
+  <div class="row wrap" style="margin:0 0 12px"><h2 style="font-size:16px">People</h2><span class="muted small">Role colour is the layer; <span class="rchip lead" data-l="vision">${icon('shield_person')}solid</span> is a lead, <span class="rchip" data-l="vision">tinted</span> a member.</span>
+    <button type="button" class="btn small push" data-toast="Invite by email with Member or Owner access, then roles. Nothing is sent from the prototype.">${icon('person_add')}Invite</button></div>
+  <div class="ptable-wrap" tabindex="0" role="region" aria-label="People"><table class="teamtable"><thead><tr><th>Person</th><th>Access</th><th>Roles</th></tr></thead><tbody>
+  ${Object.entries(PEOPLE).map(([k, p]) => `<tr><td><span class="who">${who(k, 'lg')}<span><strong>${esc(p.name)}</strong><small>${esc(p.note)}</small></span></span></td><td>${p.access}${p.invited ? ' <span class="chip s-warn">Invited</span>' : ''}</td>
+    <td><div class="members" style="margin:0">${ROLES.filter(r => k in r.members).map(r => `<span class="rchip ${r.members[k] ? 'lead' : ''}" data-l="${r.layer}">${r.members[k] ? icon('shield_person') : ''}${r.name}</span>`).join('')}</div></td></tr>`).join('')}</tbody></table></div>
+  <div class="row wrap" style="margin:22px 0 10px"><h2 style="font-size:16px">Agents</h2><span class="muted small">An agent has no roles of its own. It acts in the role of each action it’s given, as a lead when the action is elevated.</span></div>
+  <div class="agentgrid">${Object.entries(AGENTS).map(([n, a]) => `<section class="acard3"><header>${who(n, 'lg')}<div><strong>${n}</strong><small>${a.model} · ${a.effort} · ${a.limit}</small></div></header>
+    <ul>${actionsFor(n).map(({ r, a: x }) => `<li><span class="rchip ${x.elevated ? 'lead' : ''}" data-l="${r.layer}">${x.elevated ? icon('shield_person') : ''}${r.name}</span>${x.name}${x.elevated ? '<span class="muted tiny">· result needs a human lead</span>' : ''}</li>`).join('')}</ul></section>`).join('')}</div>`;
+}
+function viewRoutines(){ return `${head('work', 'Routines', WORK_TABS, 'routines')}<p class="lead">Unchanged. One new default: the Project lead’s weekly milestone check.</p>`; }
+function viewHome(){
+  const demo = PROJECTS.filter(p => p.ms === 'demo');
+  return `${head('home', 'Tool Share')}<div class="homegrid">
+    <section class="card"><h2>${ref('ms:demo')} <span class="muted small">target ${fmt('2026-10-20')}</span></h2><div class="stackv" style="gap:6px;margin-top:8px">${demo.map(p => `<div class="row wrap">${pStat(p)}${ref(p.id, { max:30 })}</div>`).join('')}</div></section>
+    <section class="card"><h2><span class="live" aria-hidden="true"></span> Running now</h2><ul class="mini"><li>${who('Scout')}${ref('W-31', { max:30 })}</li><li>${who('Sketch')}${ref('W-20', { max:30 })}</li></ul></section>
+    <section class="card"><h2>Needs you</h2><ul class="mini"><li>${icon('rate_review')}Review ${ref('W-30', { max:30 })}</li><li>${icon('report')}Contradicted: ${ref('C-6', { sub:true, max:30 })}</li><li>${icon('schedule')}Past target: ${ref('P-2', { max:30 })}</li></ul></section></div>`;
+}
+function viewPlaceholder(s){ return `${head(s, SECS[s][0])}<p class="lead">Unchanged in this prototype. Its records use the same chips and evidence.</p><div class="refs">${s === 'pages' ? ref('page:Borrow request') + ref('page:Search') : s === 'design' ? ref('component:Request card') : s === 'data' ? ref('object:Tool') : ''}</div>`; }
+
+/* ---------- Shell ---------- */
+function navHTML(keys){ return keys.map(k => `<a href="${{ home:'#/home', vision:'#/vision/brief', work:'#/work/board', library:'#/library' }[k] || '#/' + k}" data-sec="${k}" data-l="${k}"><span class="tile">${icon(SECS[k][1])}</span>${SECS[k][0]}${k === 'work' ? '<span class="badge">2</span>' : ''}</a>`).join(''); }
+document.getElementById('nav').innerHTML = navHTML(['home', ...LAYER_ORDER]);
+document.getElementById('nav2').innerHTML = navHTML(['library','settings']);
+const route = () => location.hash.replace(/^#\/?/, '').split('/');
+function render(){
+  const [a, b, c] = route(); let html, sec = a || 'home';
+  if (a === 'vision') html = b === 'map' ? viewMap(c) : b === 'docs' ? viewDocs(c) : viewBrief();
+  else if (a === 'library') html = b === 'insight' ? viewInsight(c) : b === 'source' ? viewSource(c) : b === 'sources' ? viewSources() : viewLibrary();
+  else if (a === 'work') html = b === 'project' ? viewProject(c) : b === 'items' ? viewItems() : b === 'projects' ? viewProjects() : b === 'roles' ? viewRoles() : b === 'team' ? viewTeam() : b === 'routines' ? viewRoutines() : viewBoard();
+  else if (!a || a === 'home') html = viewHome(); else html = viewPlaceholder(SECS[a] ? a : 'home');
+  const main = document.getElementById('main'); main.innerHTML = html; main.dataset.l = SECS[sec] ? sec : 'home';
+  document.querySelectorAll('.rail nav a').forEach(n => { const on = n.dataset.sec === sec; n.classList.toggle('active', on); on ? n.setAttribute('aria-current', 'page') : n.removeAttribute('aria-current'); });
+  if (a === 'vision' && b === 'map' && c && STORIES[c]) openDrawer(storyDrawer(c), false, ['story', c]);
+  if (a === 'vision' && b === 'brief' && c) setTimeout(() => { const el = document.getElementById('cl-' + c); if (el) { el.scrollIntoView({ block:'center' }); el.classList.add('flash'); } }, 30);
+  if (a === 'work' && b === 'items' && c && byItem(c)) { state.sel = c; openDrawer(itemPanel(c), false, ['item', c]); }
+  if (a === 'work' && b === 'projects' && state.projView === 'timeline' && !state.scrolled) { const t = document.getElementById('tl3'); t.scrollLeft = Math.max(0, dayOf(TODAY) * PPD[state.zoom] - 360); state.scrolled = true; }
+  requestAnimationFrame(drawDeps); ITEMS.forEach(i => delete i.justAdded);
+}
+const drawer = document.getElementById('drawer'); let drawerFrom = null, drawerKind = null;
+function openDrawer(html, focus = true, kind = null){ document.getElementById('drawer-body').innerHTML = html; drawer.hidden = false; drawerKind = kind; if (focus) { drawerFrom = document.activeElement; drawer.focus(); } }
+function closeDrawer(){ drawer.hidden = true; drawerKind = null; state.sel = null; const [a, b, c] = route(); if (c && ((a === 'vision' && b === 'map') || (a === 'work' && b === 'items'))) { history.replaceState(null, '', `#/${a}/${b}`); render(); } else document.querySelectorAll('.irow4.sel').forEach(r => r.classList.remove('sel')); drawerFrom?.focus?.(); }
+function refreshDrawer(){ if (drawer.hidden || !drawerKind) return; const [k, id] = drawerKind; openDrawer(k === 'ev' ? evDrawer(id) : k === 'story' ? storyDrawer(id) : itemPanel(id), false, drawerKind); }
+let toastTimer; function toast(t){ const el = document.getElementById('toast'); el.textContent = t; el.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => el.hidden = true, 4200); }
+const markStale = () => DOCS.forEach(d => { if (d.kind === 'generated') d.stale++; });
+
+/* Quick view on every chip */
+const hc = document.getElementById('hovercard'); let hcT, hcA;
+function showHC(el){ const id = el.dataset.hc; const html = quick(id); if (!html) return; hc.innerHTML = html; const [, , layer] = KIND[rec(id).kind]; hc.dataset.l = layer; hc.hidden = false;
+  const r = el.getBoundingClientRect(), w = hc.offsetWidth, h = hc.offsetHeight; let top = r.bottom + 6; if (top + h > innerHeight - 8) top = r.top - h - 6;
+  hc.style.top = Math.max(8, top) + 'px'; hc.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 8)) + 'px'; hcA = el; el.setAttribute('aria-describedby', 'hovercard'); }
+function hideHC(){ clearTimeout(hcT); hc.hidden = true; hcA?.removeAttribute('aria-describedby'); hcA = null; }
+document.addEventListener('mouseover', e => { const el = e.target.closest('[data-hc]'); if (!el || drag) return; if (el === hcA) return; clearTimeout(hcT); hcT = setTimeout(() => showHC(el), 350); });
+document.addEventListener('mouseout', e => { const el = e.target.closest('[data-hc]'); if (el && !el.contains(e.relatedTarget)) { clearTimeout(hcT); if (!hc.contains(e.relatedTarget)) hideHC(); } });
+hc.addEventListener('mouseleave', hideHC);
+document.addEventListener('focusin', e => { const el = e.target.closest('[data-hc]'); if (el) { clearTimeout(hcT); hcT = setTimeout(() => showHC(el), 500); } else hideHC(); });
+
+document.addEventListener('click', e => {
+  const t = e.target; hideHC();
+  const ev = t.closest('[data-ev]'); if (ev) { e.preventDefault(); openDrawer(evDrawer(ev.dataset.ev), true, ['ev', ev.dataset.ev]); return; }
+  const op = t.closest('[data-open]'); if (op) { state.sel = op.dataset.open; document.querySelectorAll('.irow4').forEach(r => r.classList.toggle('sel', r.dataset.row === op.dataset.open)); openDrawer(itemPanel(op.dataset.open), true, ['item', op.dataset.open]); return; }
+  const row = t.closest('[data-row]'); if (row && !t.closest('a,button,input,select')) { row.querySelector('[data-open]').click(); return; }
+  const ts = t.closest('[data-toast]'); if (ts) { e.preventDefault(); toast(ts.dataset.toast); return; }
+  const pv = t.closest('[data-pv]'); if (pv) { e.preventDefault(); state.projView = pv.dataset.pv; state.scrolled = false; render(); return; }
+  const zm = t.closest('[data-zoom]'); if (zm) { e.preventDefault(); state.zoom = zm.dataset.zoom; state.scrolled = false; render(); return; }
+  const pt = t.closest('[data-ptab]'); if (pt) { e.preventDefault(); state.ptab = pt.dataset.ptab; render(); return; }
+  const dp = t.closest('.dirpick button'); if (dp) { dp.parentElement.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === dp)); return; }
+  const act = t.closest('[data-act]'); if (!act) return; const id = act.dataset.id;
+  switch (act.dataset.act) {
+    case 'edit': state.editing = id; render(); document.getElementById('e-' + id)?.focus(); break;
+    case 'cancel': state.editing = null; render(); break;
+    case 'del': { CLAIMS = CLAIMS.filter(x => x.id !== id); LINKS = LINKS.filter(l => l[1] !== id); markStale(); render(); toast('Deleted. Its revisions keep it; undo is in its history.'); break; }
+    case 'regen': { const d = DOCS.find(x => x.id === id); d.stale = 0; d.rev++; render(); toast('Regenerated from the latest Brief.'); break; }
+    case 'setdates': { const p = PROJECTS.find(x => x.id === id); p.start = '2026-11-02'; p.target = '2026-11-13'; render(); toast(`${p.id} given 2–13 Nov. Drag to adjust.`); break; }
+    case 'newins': { const iid = 'I-' + seq.I++; INSIGHTS[iid] = { text:'New insight', f:[], strength:'weak', date:'2026-09-23', tags:[], comments:[] }; location.hash = '#/library/insight/' + iid; break; }
+    case 'untag': { const i = INSIGHTS[id]; i.tags = i.tags.filter(x => x !== act.dataset.tag); render(); break; }
+    case 'unfind': { const i = INSIGHTS[id]; i.f = i.f.filter(x => x !== act.dataset.f); render(); toast(`${act.dataset.f} removed from ${id}. The finding stays on its source.`); break; }
+    case 'nfcancel': document.getElementById('newfind').innerHTML = ''; break;
+    case 'editn': state.editN = act.dataset.who; render(); document.getElementById('n-' + act.dataset.who).select(); break;
+    case 'next': { const w = act.dataset.who, c = nextFor(w).slice(0, state.nextN[w]); c.forEach(i => { i.status = 'batched'; i.justAdded = true; }); render(); toast(c.length ? `Added ${c.map(i => i.id).join(', ')} to ${w === 'You' ? 'your' : w + '’s'} batch.` : `Nothing ready for ${w} in the active milestone.`); break; }
+    case 'elev': { const [ri, ai] = id.split(':').map(Number); const a = ROLES[ri].actions[ai]; a.elevated = !a.elevated; render(); document.querySelector(`[data-act="elev"][data-id="${id}"]`).focus(); break; }
+    case 'setup': state.setupOpen = state.setupOpen === id ? null : id; render(); document.querySelector(`[data-act="setup"][data-id="${id}"]`).focus(); break;
+  }
+});
+document.addEventListener('input', e => { if (e.target.matches('[data-lfq]')) { state.lf.q = e.target.value; const pos = e.target.selectionStart; render(); const q = document.querySelector('[data-lfq]'); q.focus(); q.setSelectionRange(pos, pos); } });
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.dataset.lf) { state.lf[t.dataset.lf] = t.value; render(); document.querySelector(`[data-lf="${t.dataset.lf}"]`).focus(); }
+  if (t.dataset.if) { state.items[t.dataset.if] = t.value; render(); document.querySelector(`[data-if="${t.dataset.if}"]`).focus(); }
+  if (t.dataset.agents) { DOCS.find(d => d.id === t.dataset.agents).agents = t.checked; }
+  if (t.dataset.date) { PROJECTS.find(x => x.id === t.dataset.id)[t.dataset.date] = t.value || null; toast('Date saved; the timeline follows.'); }
+  if (t.dataset.deps !== undefined && t.type === 'checkbox') { state.deps = t.checked; drawDeps(); }
+  if (t.dataset.assign) { const [ri, ai] = t.dataset.assign.split(':').map(Number); ROLES[ri].actions[ai].who = t.value; render(); document.getElementById(t.id).focus(); }
+  if (t.dataset.insTitle) INSIGHTS[t.dataset.insTitle].text = t.value.trim() || INSIGHTS[t.dataset.insTitle].text;
+  if (t.dataset.insStrength) INSIGHTS[t.dataset.insStrength].strength = t.value;
+  if (t.dataset.n) { state.nextN[t.dataset.n] = Math.max(1, Math.min(25, +t.value || 5)); state.editN = null; render(); }
+  if (t.id === 'nf-ins') document.getElementById('nf-new').hidden = t.value !== '__new';
+});
+document.addEventListener('focusout', e => { if (e.target.dataset?.n && state.editN) { state.nextN[e.target.dataset.n] = Math.max(1, Math.min(25, +e.target.value || 5)); state.editN = null; setTimeout(render, 0); } });
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.dataset?.n) e.target.blur(); if (e.key === 'Escape') { hideHC(); if (!drawer.hidden) closeDrawer(); } });
+document.addEventListener('submit', e => {
+  e.preventDefault(); const f = e.target;
+  if (f.dataset.attach) { const ins = f.ins.value; if (!ins) return; const dir = f.querySelector('.dirpick [aria-pressed="true"]').dataset.dir; LINKS.push([ins, f.dataset.attach, dir]); render(); refreshDrawer(); toast(`${ins} now ${dir} this.`); return; }
+  if (f.dataset.add) { const v = f.t.value.trim(); if (!v) return; CLAIMS.push({ id:'C-' + seq.C++, sec:f.dataset.add, text:v, principle:f.dataset.add === 'principles' }); markStale(); render(); document.getElementById('add-' + f.dataset.add).focus(); return; }
+  if (f.dataset.edit) { const c = CLAIMS.find(x => x.id === f.dataset.edit); c.text = f.t.value.trim() || c.text; state.editing = null; markStale(); render(); return; }
+  if (f.dataset.tagform) { const v = f.t.value.trim().toLowerCase(); if (v && !INSIGHTS[f.dataset.tagform].tags.includes(v)) INSIGHTS[f.dataset.tagform].tags.push(v); render(); document.getElementById('tag-in').focus(); return; }
+  if (f.dataset.addfind) { const sel = [...f.querySelectorAll('input[name=f]:checked')].map(x => x.value); INSIGHTS[f.dataset.addfind].f.push(...sel); render(); toast(sel.length ? `Added ${sel.join(', ')}.` : 'Nothing selected.'); return; }
+  if (f.dataset.comment) { const v = f.t.value.trim(); if (!v) return; INSIGHTS[f.dataset.comment].comments.push(['You', v, '2026-09-23']); render(); return; }
+  if (f.id === 'nf-form') { const src = document.getElementById('transcript').dataset.src, fid = 'F-' + seq.F++; FINDINGS[fid] = { src, type:'quote', text:state.pendingSel };
+    let iid = f.ins.value; if (iid === '__new') { iid = 'I-' + seq.I++; INSIGHTS[iid] = { text:f.newins.value.trim() || 'New insight', f:[], strength:'weak', date:'2026-09-23', tags:[], comments:[] }; }
+    if (iid !== '__none') INSIGHTS[iid].f.push(fid); render(); toast(`${fid} saved${iid !== '__none' ? ' to ' + iid : ''}.`); }
+});
+const selpop = document.getElementById('selpop');
+document.addEventListener('mouseup', () => setTimeout(() => { const tr = document.getElementById('transcript'), s = getSelection();
+  if (!tr || !s || s.isCollapsed || !tr.contains(s.anchorNode) || !tr.contains(s.focusNode)) { selpop.hidden = true; return; }
+  const text = s.toString().trim(); if (text.length < 4) { selpop.hidden = true; return; } state.pendingSel = text; const r = s.getRangeAt(0).getBoundingClientRect();
+  selpop.style.top = (r.top + scrollY - 44) + 'px'; selpop.style.left = (r.left + scrollX) + 'px'; selpop.hidden = false; }, 0));
+document.getElementById('mkfind').onclick = () => { selpop.hidden = true; const nf = document.getElementById('newfind'); nf.innerHTML = newFindingForm(state.pendingSel); getSelection().removeAllRanges(); document.getElementById('nf-ins').focus(); };
+document.getElementById('close-drawer').onclick = closeDrawer;
+window.addEventListener('hashchange', () => { drawer.hidden = true; selpop.hidden = true; hideHC(); state.editing = null; state.sel = null; if (!location.hash.startsWith('#/work/project')) state.ptab = 'overview'; render(); document.getElementById('main').focus({ preventScroll:true }); scrollTo(0, 0); });
+addEventListener('resize', () => requestAnimationFrame(drawDeps));
+const ns = document.getElementById('navstyle'); document.body.className = 'nav-tiles'; ns.onchange = () => { document.body.className = 'nav-' + ns.value; };
+document.getElementById('reset').onclick = () => { reset(); drawer.hidden = true; render(); toast('Prototype reset.'); };
+const LEDGER = [
+  ['W1','Simpler evidence chip; split chip when both','Icon, label and a number only when more than one. Both directions: a split chip with icons and numbers.','#/vision/brief'],
+  ['W2','Insight list prioritises the insight; detail view with editing, tags, findings and comments','Rows: the insight, then one line of meta. Open one: edit, tag, add or remove findings, comment. Keyword filter; Source and Show filters removed.','#/library'],
+  ['W3','Clearer story “why”; no duplicate evidence','The why names its Brief section (“Problem”). Evidence is one list: through its problem, then on this story. Tabs carry the same icons as their chips.','#/vision/map/S-4'],
+  ['W4','Agents under Team; role colours; Reviewer folded into Project lead; no stars','Team lists people and agents. Role chips use layer colours: solid with a shield for lead, tinted for member.','#/work/team'],
+  ['W5','Agents take the role of the action they’re assigned','No roles on the agent profile. An elevated action makes it act as lead; its result waits for a human lead.','#/work/team'],
+  ['W6','Roles page keeps description, default assignee and setup; an elevated toggle; a review action per role','Rows as WORK-UX-01, with a shield toggle. Every role has “Review … work”.','#/work/roles'],
+  ['W7','Next as a split chip','[Next | 5]: Next adds from the active milestone; click the number to change it.','#/work/board'],
+  ['W8','Work structuring grade A, from real screens','Timeline after Linear: names above neutral bars, today on the axis, checkpoint diamonds, overrun in red dashes, dependencies optional. Items: click a row for a side panel (Jira). Project page after Linear.','#/work/projects'],
+  ['W9','One colour per layer, including the nav','Two nav styles to compare in the prototype bar: A tiles (like Confluence space avatars), B your solid idea.','#/home'],
+  ['W10','Chips everywhere, with a quick view','Every record reference is a chip in its layer’s colour. Hover for a quick view; click to go there.','#/home'],
+];
+document.getElementById('open-brief').onclick = () => openDrawer(`<p class="eyebrow">ROADMAP-01P v3 · ledger</p><h2 id="drawer-title">Your review of v2, and where each answer is</h2>
+  <ol class="ledger">${LEDGER.map(([n, ask, ans, href]) => `<li><span class="n">${n}</span><div><p>${esc(ask)}</p><p class="ans">${esc(ans)} <a href="${href}" data-close-d>Show me</a></p></div></li>`).join('')}</ol>`);
+document.addEventListener('click', e => { if (e.target.closest('[data-close-d]')) drawer.hidden = true; });
+if (!location.hash) history.replaceState(null, '', '#/vision/brief');
+render();
+</script>

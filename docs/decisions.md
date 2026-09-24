@@ -11,6 +11,20 @@ This is the seed of the portal's decision workflow. Confirmed owner answers and 
 
 ## Confirmed
 
+2026-09-23 — **DEC-043: ROADMAP-01 prototype v3 accepted with final tweaks; build authorized.** The owner reviewed v3: "looks good, no final prototype, you can go ahead and build." Accepted: W1 (evidence chip), W2 (insights), W6 (roles setup with an elevated toggle and a review action per role), W7 (the Next split chip), W8 ("better, we can work with that") and the tile nav (W9). Final tweaks, recorded in [the work record](design/product-and-plan/work-record.md#owner-acceptance-of-v3-and-build-brief-2026-09-23):
+- A story's why is just "Why" and the chip, in the Vision colour (v3 had lost it).
+- **Shield = elevated**, everywhere. A lead's role chip is the same as a member's plus the small shield.
+- Agent profiles on Team stay as they were before, with no role lists.
+- Layer colours form a clean rainbow down the nav.
+- **Authorized:** local build of the accepted design in the portal, plus tests. No provider calls, spending or external writes.
+
+2026-09-23 — **DEC-042: Product is definition; the plan lives in Work; evidence attaches anywhere and has a Library home.** The owner reviewed the [ROADMAP-01 proposal](design/product-and-plan/work-record.md) and said "i like where you're headed" and "go ahead and prototype". Answers to its four questions:
+- **Dates:** target dates are optional per project, with no calendar dates by default. "timelines get a little weird with agentic development scaling."
+- **Naming:** keep **batch**. Phase becomes **milestone** and spec becomes **project brief**.
+- **Business model:** an optional section of the Brief for now. The owner calls business "an important future layer", so it should not be designed as a Brief section forever.
+- **Library:** a utility in the rail beside Search and Settings, not a layer.
+- **Scope of this decision:** the direction and a prototype (ROADMAP-01P) only. The record kinds, migrations and packets in the proposal stay proposed until the owner reviews the prototype.
+
 2026-09-23 — **DEC-041: Work is organised by roles and actions, with a batch per assignee; working style only presets who takes each action.** The owner reviewed prototypes v1 and v2 of WORK-UX-01 and then authorized the build: "i back you for these changes … get started". Recorded per ask in [the work record](design/work-redesign/work-record.md).
 - **Roles and actions:** one role per layer. Each action carries who takes it (a person or an agent profile), its instructions, what it always reads, what it may change, its tools, what it asks first, its run phases and its review checks. The exact tools and permissions are a first cut: "more thought to be done in the future".
 - **Working style:** the onboarding choice (Dreamer, Planner, Tinkerer) only presets action assignees. It is not shown or used anywhere else. The preferences table and the routing by work type are gone.

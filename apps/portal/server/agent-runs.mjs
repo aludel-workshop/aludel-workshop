@@ -230,6 +230,25 @@ export function agentRuns({ db, know, secrets, providers, callModel = modelCalle
     return know.appendLog(workId, `Staged in ${profile.name}'s batch ${batch.ref}${live ? ' (joins the running batch)' : ''}`, {}, { by: { kind: 'person', id: user.id } });
   }
 
+  // ROADMAP-01 (DEC-043): Next N is a fixed rule, not a ranking. The assignee's queued, unblocked items in the current
+  // milestone's projects, highest priority first, then oldest; agents take only what they can run. Stops when the batch is full.
+  function next(user, projectId, assignee, count) {
+    const limit = Number(count);
+    if (!Number.isInteger(limit) || limit < 1 || limit > batchLimits.max) fail(`Choose between 1 and ${batchLimits.max} items.`);
+    if (!assignee || !['person', 'agent'].includes(assignee.kind)) fail('Say whose batch to fill.');
+    const milestone = know.list(projectId, 'phase').find(phase => phase.current)?.key || 'demo';
+    const projects = new Map(know.list(projectId, 'project').map(project => [project.id, project]));
+    const candidates = know.workList(projectId).filter(entry => entry.status === 'queued' && !entry.blockedBy.length && entry.assignee?.kind === assignee.kind && entry.assignee?.id === assignee.id
+      && projects.get(entry.project)?.milestone === milestone && (assignee.kind !== 'agent' || taskFor(entry))).sort(byPriority);
+    const added = [];
+    for (const entry of candidates) {
+      if (added.length >= limit) break;
+      try { stage(user, projectId, entry.id); added.push(entry.id); }
+      catch (error) { if (/is full/.test(error.message)) break; }
+    }
+    return { added };
+  }
+
   function unstage(user, projectId, workId) {
     const entry = item(projectId, workId);
     if (!entry) fail('Work item not found.', 404);
@@ -476,6 +495,9 @@ export function agentRuns({ db, know, secrets, providers, callModel = modelCalle
     if (record.kind === 'page') return `Page ${record.label}: ${record.description}`;
     if (record.kind === 'data_object') return `Object ${record.name} (${Object.keys(record.schema.properties || {}).join(', ') || 'no fields yet'}): ${record.description}`;
     if (record.kind === 'doc' || record.kind === 'research') return `${record.title}: ${record.body.slice(0, 1500)}`;
+    if (record.kind === 'brief_claim') return `Brief (${record.section}): ${record.text}`;
+    if (record.kind === 'insight') return `Insight (${record.strength}): ${record.text}${record.findings.length ? ` [${record.findings.map(id => know.get(projectId, id)?.text).filter(Boolean).join('; ').slice(0, 1200)}]` : ''}`;
+    if (record.kind === 'project') return `Project P-${record.number} ${record.title}: ${[record.problem, ...record.requirements].filter(Boolean).join(' ').slice(0, 1200)}`;
     if (record.kind === 'vision_section') return `${record.key}: ${[record.body, ...record.items].filter(Boolean).join('; ').slice(0, 800)}`;
     if (record.kind === 'access_rule') return `Access: ${record.sentence}`;
     return null;
@@ -488,10 +510,12 @@ export function agentRuns({ db, know, secrets, providers, callModel = modelCalle
     const steps = know.list(projectId, 'step');
     const activities = know.list(projectId, 'activity');
     const personas = know.list(projectId, 'persona');
-    const vision = know.list(projectId, 'vision_section').find(section => section.key === 'statement')?.body || project?.description || '';
+    const vision = know.list(projectId, 'brief_claim').find(claim => claim.section === 'value')?.text || know.list(projectId, 'vision_section').find(section => section.key === 'statement')?.body || project?.description || '';
     const parts = [`Product: ${project?.name}\nVision: ${vision}`];
     if (personas.length) parts.push(`People: ${personas.map(persona => `${persona.name} (${persona.role})${persona.note ? `: ${persona.note}` : ''}`).join('; ')}`);
-    const always = [...new Set([...(action?.reads || []), ...(profile.context || [])])].map(id => describe(projectId, id)).filter(Boolean);
+    // Documents marked "Agents read this" (ROADMAP-01) are read like the action's own context.
+    const shared = know.list(projectId, 'doc').filter(doc => doc.agents).map(doc => doc.id);
+    const always = [...new Set([...(action?.reads || []), ...(profile.context || []), ...shared])].map(id => describe(projectId, id)).filter(Boolean);
     if (always.length) parts.push(`Always read:\n${always.map(line => `- ${line}`).join('\n')}`);
     for (const target of entry.targets) {
       const record = know.get(projectId, target.id);
@@ -541,5 +565,5 @@ export function agentRuns({ db, know, secrets, providers, callModel = modelCalle
     return value;
   }
 
-  return { draft, stage, unstage, skip, stopItem, reassign, start, stop, run, view, models, taskFor, usage };
+  return { draft, stage, unstage, next, skip, stopItem, reassign, start, stop, run, view, models, taskFor, usage };
 }

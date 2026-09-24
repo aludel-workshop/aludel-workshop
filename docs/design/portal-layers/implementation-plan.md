@@ -126,12 +126,24 @@ Before handing off UI work:
 - Give list grids `grid-template-columns: minmax(0, 1fr)` so they shrink at 390px.
 
 Before handing off a start-up migration, run it against a **copy** of `.data/machine.sqlite` (with its `-wal` and `-shm` files) under `MACHINE_DATA_DIR`, and inspect the result read-only.
+- New record fields and table columns: check the reserved names at the top of `server/knowledge.mjs`. ROADMAP-01 reused `kind` and `project_id`, and the second would have moved items between projects.
+- Stop test portals by the PID you started them with, never with `pkill -f` (it matches its own shell, and the owner's portal).
+- Look at every new screen with realistic data before calling UI work checked: `strictTemplates` missed a missing `NgTemplateOutlet`, and `[value]` on a `<select>` shows the first option. Bind `[selected]` on the options instead.
 
 New `<mat-icon>` names need the font subset rebuilt: `python3 tools/subset-icons.py` needs fontTools (`pip install fonttools brotli`, a venv is fine). If `templates/aludel-web-v1/icons.ttf` changes while its icon list did not, restore it with `git checkout`, because a different fontTools version only re-encodes it. Icons chosen at runtime must appear somewhere as `icon: '…'` so the tool finds them.
 
 ## Current state
 
 Newest first.
+
+- **2026-09-24: ROADMAP-01 built and agent-checked** (DEC-042, DEC-043; [work record](../product-and-plan/work-record.md), [evidence](../../evidence/roadmap-01-product-and-plan.md)).
+  - Product shows as **Vision** (`/vision`; the internal key stays `product`): Brief, Story map, Documents. **Library** is a rail utility. Work tabs: Board, Items, Projects, Roles, Team, Routines.
+  - Entry points:
+    - `server/knowledge.mjs`: `brief_claim`, `source`, `finding`, `insight`, `evidence_link`, `project`; `ensureBrief`, `ensureLibrary`, `ensurePlan`, `generateDoc`, `addComment`, `mayDo`, `projectFor`.
+    - `server/agent-runs.mjs`: `next`.
+    - `src/layers/product.ts`, `evidence.ts`, `library.ts`, `work-plan.ts`, `work-team.ts`.
+    - Colours and nav tiles in `src/styles.scss` (the ROADMAP-01 blocks).
+  - **Next:** owner review of the built layers, then LAY-05.
 
 - **2026-09-23: WORK-UX-01, the Work layer redesign, built and agent-checked** ([work record](../work-redesign/work-record.md), [evidence](../../evidence/work-ux-01-work-redesign.md), DEC-041).
   - Roles and actions replace working style. Agent profiles are who does the work; batches are per assignee; a review checklist; priority and blocking; avatars.

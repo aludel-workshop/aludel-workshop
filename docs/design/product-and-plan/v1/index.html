@@ -1,0 +1,1093 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Aludel Product and Plan</title>
+<!-- ROADMAP-01P prototype v1 (DEC-042): Product as definition (Brief, Opportunities, Story map), evidence attached anywhere with a Library home, and Work › Plan (milestones, projects, fill from plan). Static and clickable; illustrative Tool Share data, not real research. Shell and tokens reused from ../../work-redesign/v2. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0&display=block">
+<style>
+:root{
+  --bg:#fafbff;--surface:#ffffff;--rail:#f0f4fc;--panel:#f3f6fd;--hover:#e3e9f7;--line:#dce2ef;--line-strong:#c5cee2;--ink:#141727;--muted:#52617d;
+  --primary:#3047b9;--on-primary:#ffffff;--container:#dfe5ff;--on-container:#163698;
+  --product:#6b35c9;--product-bg:#efe7ff;--design:#b3245f;--design-bg:#ffe4ee;--pages:#1f4fb8;--pages-bg:#e6eefe;--data:#0b5d86;--data-bg:#dcf0fb;
+  --platform:#0f7465;--platform-bg:#d9f3ec;--work:#8a5300;--work-bg:#fff0d4;
+  --ok:#146446;--ok-bg:#d9f3e7;--warn:#6b4b00;--warn-bg:#fff0c9;--warn-line:#e0a100;--bad:#a1231f;--bad-bg:#fce1e0;
+  --p-highest:#c9190b;--p-high:#e0531f;--p-medium:#b78103;--p-low:#2463d1;--p-lowest:#6b8fcf;
+  --shadow:0 18px 50px #1c2a5a26;--shadow-card:0 1px 2px #1c2a5a12;--code-bg:#141727;--code-ink:#e8ebf7;--code-add:#1d4b35;--code-del:#5a2022;
+  --person:#2f3a57;--mix:#ffffff;--shot-bg:#fff7fa;--shot-ink:#171a24;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#10121a;--surface:#181b26;--rail:#141722;--panel:#1f2331;--hover:#262b3c;--line:#2b3144;--line-strong:#3a4259;--ink:#e6e9f5;--muted:#9da8c2;
+  --primary:#a3b3ff;--on-primary:#0f1a55;--container:#2b3670;--on-container:#e0e6ff;
+  --product:#cdb1ff;--product-bg:#2d2150;--design:#ffa3c6;--design-bg:#461a2e;--pages:#a6c2ff;--pages-bg:#1c2b52;--data:#8fd3f5;--data-bg:#10334a;
+  --platform:#86e0cb;--platform-bg:#0f3932;--work:#ffc774;--work-bg:#3d2b0c;
+  --ok:#94e2bc;--ok-bg:#12392a;--warn:#ffd680;--warn-bg:#3b2d0b;--warn-line:#b88400;--bad:#ffaca7;--bad-bg:#491a1a;
+  --p-highest:#ff7b72;--p-high:#ff9a66;--p-medium:#f2c14e;--p-low:#7fb0ff;--p-lowest:#a7bfe6;
+  --shadow:0 18px 50px #00000080;--shadow-card:0 1px 2px #00000060;--code-bg:#0b0d14;--code-ink:#dfe3f2;--code-add:#16402c;--code-del:#4d1b1d;
+  --person:#4a5577;--mix:#11131a;--shot-bg:#fff7fa;--shot-ink:#171a24;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10121a;--surface:#181b26;--rail:#141722;--panel:#1f2331;--hover:#262b3c;--line:#2b3144;--line-strong:#3a4259;--ink:#e6e9f5;--muted:#9da8c2;
+  --primary:#a3b3ff;--on-primary:#0f1a55;--container:#2b3670;--on-container:#e0e6ff;
+  --product:#cdb1ff;--product-bg:#2d2150;--design:#ffa3c6;--design-bg:#461a2e;--pages:#a6c2ff;--pages-bg:#1c2b52;--data:#8fd3f5;--data-bg:#10334a;
+  --platform:#86e0cb;--platform-bg:#0f3932;--work:#ffc774;--work-bg:#3d2b0c;
+  --ok:#94e2bc;--ok-bg:#12392a;--warn:#ffd680;--warn-bg:#3b2d0b;--warn-line:#b88400;--bad:#ffaca7;--bad-bg:#491a1a;
+  --p-highest:#ff7b72;--p-high:#ff9a66;--p-medium:#f2c14e;--p-low:#7fb0ff;--p-lowest:#a7bfe6;
+  --shadow:0 18px 50px #00000080;--shadow-card:0 1px 2px #00000060;--code-bg:#0b0d14;--code-ink:#dfe3f2;--code-add:#16402c;--code-del:#4d1b1d;
+  --person:#4a5577;--mix:#11131a;--shot-bg:#fff7fa;--shot-ink:#171a24;color-scheme:dark}
+
+*{box-sizing:border-box}
+body{margin:0;font-family:Roboto,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;font-size:15px;line-height:1.5;color:var(--ink);background:var(--bg)}
+a{color:var(--primary)}button,input,select,textarea{font:inherit;color:inherit}
+h1,h2,h3{text-wrap:balance}
+.icon{font-family:'Material Symbols Rounded';font-weight:normal;font-style:normal;font-size:20px;line-height:1;letter-spacing:normal;text-transform:none;white-space:nowrap;direction:ltr;display:inline-block;vertical-align:middle;font-feature-settings:'liga';-webkit-font-smoothing:antialiased;flex:none}
+:focus-visible{outline:3px solid var(--primary);outline-offset:2px}
+.visually-hidden{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+code,.mono{font-family:"Roboto Mono",ui-monospace,monospace;font-size:.9em}
+.tabular{font-variant-numeric:tabular-nums}
+
+/* Shell */
+.shell{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh;background:linear-gradient(90deg,var(--rail) 232px,transparent 232px)}
+.rail{background:var(--rail);border-right:1px solid var(--line);padding:16px 12px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:19px;padding:4px 10px 12px;color:var(--ink);text-decoration:none}.brand .icon{color:var(--primary);font-size:28px}
+.project{display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;background:var(--surface);border:1px solid var(--line);margin-bottom:10px;color:var(--ink);text-decoration:none}
+.project .mark{display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:#ca3e6f;color:#fff;font-weight:700;font-size:13px}.project small{display:block;color:var(--muted);font-size:12px}
+.nav a{display:flex;align-items:center;gap:12px;padding:9px 12px;border-radius:999px;color:var(--ink);text-decoration:none;font-weight:500}
+.nav a:hover{background:var(--hover)}.nav a.active{background:var(--container);color:var(--on-container);font-weight:700}
+.nav .badge{margin-left:auto;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:var(--primary);color:var(--on-primary);font-size:12px;display:grid;place-items:center}
+.rail .spacer{flex:1}
+.topbar{display:flex;align-items:center;gap:16px;padding:12px 32px;border-bottom:1px solid var(--line);background:var(--bg);position:sticky;top:env(safe-area-inset-top,0px);z-index:10}
+.search{position:relative;flex:1;max-width:520px}.search input{width:100%;padding:9px 14px 9px 40px;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
+.search .icon{position:absolute;left:12px;top:9px;color:var(--muted)}
+.content{padding:26px 32px 110px;max-width:1320px}
+.eyebrow{font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin:0 0 4px}
+.eyebrow a{color:inherit;text-decoration:none}.eyebrow a:hover{color:var(--primary);text-decoration:underline}
+h1{font-size:30px;line-height:1.15;margin:0 0 6px}h2{font-size:18px;margin:0}h3{font-size:15px;margin:0}
+.lead{color:var(--muted);font-size:16px;margin:0 0 20px;max-width:720px}
+.muted{color:var(--muted)}.small{font-size:13.5px}.tiny{font-size:12px}
+.row{display:flex;align-items:center;gap:10px}.wrap{flex-wrap:wrap}.push{margin-left:auto}
+
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:0 0 22px;overflow-x:auto}
+.tabs a{padding:10px 16px;color:var(--muted);text-decoration:none;font-weight:500;border-bottom:3px solid transparent;margin-bottom:-1px;white-space:nowrap}
+.tabs a.active{color:var(--ink);border-color:var(--primary)}
+.subtabs{display:flex;gap:18px}
+.subtabs button{border:0;background:none;padding:6px 0;margin-bottom:-1px;border-bottom:2px solid transparent;color:var(--muted);font-size:13.5px;font-weight:500;cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.subtabs button:hover{color:var(--ink)}
+.subtabs button[aria-selected="true"]{color:var(--ink);border-color:var(--primary)}
+.subtabs .n{font-size:11.5px;min-width:20px;padding:0 6px;border-radius:999px;background:var(--panel);color:var(--muted);text-align:center;font-variant-numeric:tabular-nums}
+
+/* Chips */
+.chip{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap;line-height:18px}
+.chip .icon{font-size:15px}
+.l-product{background:var(--product-bg);color:var(--product)}.l-design{background:var(--design-bg);color:var(--design)}.l-pages{background:var(--pages-bg);color:var(--pages)}
+.l-data{background:var(--data-bg);color:var(--data)}.l-platform{background:var(--platform-bg);color:var(--platform)}.l-work{background:var(--work-bg);color:var(--work)}
+.s-ok{background:var(--ok-bg);color:var(--ok)}.s-warn{background:var(--warn-bg);color:var(--warn)}.s-bad{background:var(--bad-bg);color:var(--bad)}.s-plain{background:var(--panel);color:var(--muted)}.s-info{background:var(--container);color:var(--on-container)}
+
+/* Reference chips + hover cards (A3) */
+.ref{display:inline-flex;align-items:center;gap:4px;max-width:100%;padding:1px 8px 1px 5px;border-radius:7px;border:1px solid var(--line);background:var(--surface);color:var(--ink);text-decoration:none;font-size:13px;font-weight:500;line-height:20px;vertical-align:baseline;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ref .icon{font-size:15px}
+.ref:hover,.ref:focus-visible{border-color:var(--primary);background:var(--panel)}
+.ref.k-product .icon{color:var(--product)}.ref.k-design .icon{color:var(--design)}.ref.k-pages .icon{color:var(--pages)}.ref.k-data .icon{color:var(--data)}.ref.k-platform .icon{color:var(--platform)}.ref.k-work .icon{color:var(--work)}
+.ref .rid{color:var(--muted);font-weight:700;font-size:12px}
+.refs{display:flex;flex-wrap:wrap;gap:6px}
+.prose .ref{margin:0 1px}
+.hovercard{position:fixed;z-index:60;width:320px;max-width:calc(100vw - 24px);background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:12px 14px;font-size:13.5px}
+.hovercard[hidden]{display:none}
+.hc-head{display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap}
+.hc-head .rid{font-weight:700;color:var(--muted);font-size:12px}
+.hovercard strong{display:block;font-size:14.5px;line-height:1.35;margin-bottom:4px}
+.hovercard p{margin:0 0 8px;color:var(--muted)}
+.hovercard dl{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin:0 0 8px}.hovercard dt{color:var(--muted)}.hovercard dd{margin:0}
+.hc-foot{display:flex;align-items:center;gap:8px;border-top:1px solid var(--line);padding-top:8px;margin-top:4px;color:var(--muted);font-size:12.5px}
+.hc-foot a{margin-left:auto;font-weight:500;text-decoration:none;display:inline-flex;align-items:center;gap:2px}
+
+/* Avatars: people are initials; agents are seeded robots on a metal tile (B5) */
+.avatar{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--person);color:#fff;font-size:10.5px;font-weight:700;flex:none;overflow:hidden}
+.avatar.bot{border-radius:7px;background:linear-gradient(145deg,color-mix(in srgb,var(--metal) 18%,var(--mix)),color-mix(in srgb,var(--metal) 42%,var(--mix)));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--metal) 70%,transparent);color:var(--metal)}
+.avatar.bot img{width:88%;height:88%;display:block}
+.avatar.bot .icon{font-size:16px}
+.avatar.template{border-radius:7px;background:var(--work-bg);color:var(--work)}.avatar.template .icon{font-size:16px}
+.avatar.lg{width:36px;height:36px;font-size:13px}.avatar.lg.bot{border-radius:10px}.avatar.lg .icon{font-size:22px}
+.avatar.xl{width:84px;height:84px;border-radius:20px}
+.metal-name{font-weight:500}
+
+/* Split assignee chip */
+.split{display:inline-flex;align-items:stretch;border:1px solid var(--line-strong);border-radius:999px;background:var(--surface);overflow:hidden;height:28px;vertical-align:middle;flex:none;max-width:100%}
+.split.agent{border-color:color-mix(in srgb,var(--metal) 55%,var(--line-strong));background:linear-gradient(90deg,color-mix(in srgb,var(--metal) 10%,var(--surface)),var(--surface) 70%)}
+.split button{border:0;background:none;cursor:pointer;display:inline-flex;align-items:center;gap:6px;color:var(--ink)}
+.split .who{padding:0 10px 0 3px;font-size:13px;font-weight:500;min-width:0}
+.split .who span.name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px}
+.split .drop{padding:0 6px;border-left:1px solid var(--line)}.split .drop .icon{font-size:18px;color:var(--muted)}
+.split button:hover:not(:disabled){background:color-mix(in srgb,var(--panel) 70%,transparent)}
+.split .drop:disabled{cursor:not-allowed}.split .drop:disabled .icon{opacity:.45}
+.split.warn{border-color:var(--warn-line)}
+
+/* Role · action chip (B6) */
+.role{display:inline-flex;align-items:center;gap:5px;padding:2px 10px 2px 6px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap;text-decoration:none;line-height:20px;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.role .icon{font-size:15px}.role .act{font-weight:500;opacity:.9}
+
+/* Priority (B13): Jira's five levels */
+.prio{display:inline-grid;place-items:center;width:20px;height:20px;flex:none}
+.prio .icon{font-size:20px}
+.p-highest{color:var(--p-highest)}.p-high{color:var(--p-high)}.p-medium{color:var(--p-medium)}.p-low{color:var(--p-low)}.p-lowest{color:var(--p-lowest)}
+.prio-btn{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line-strong);background:var(--surface);border-radius:999px;padding:2px 10px 2px 4px;cursor:pointer;font-size:13px}
+.blocked{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:var(--bad);white-space:nowrap}
+.blocked .icon{font-size:16px}
+
+/* Menus */
+.menu{position:fixed;z-index:70;min-width:240px;max-width:calc(100vw - 24px);background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:6px}
+.menu[hidden]{display:none}
+.menu h4{margin:8px 10px 4px;font-size:11px;letter-spacing:.7px;text-transform:uppercase;color:var(--muted)}
+.menu button{display:flex;align-items:center;gap:10px;width:100%;padding:7px 10px;border:0;background:none;border-radius:8px;text-align:left;cursor:pointer;font-size:14px}
+.menu button:hover:not(:disabled),.menu button:focus-visible{background:var(--panel)}
+.menu button:disabled{cursor:not-allowed;opacity:.55}
+.menu button small{display:block;color:var(--muted);font-size:12px}
+.menu .check{margin-left:auto;color:var(--primary)}
+.menu .note{margin:4px 10px 6px;font-size:12px;color:var(--muted)}
+.menu .note.warn{color:var(--warn)}
+.menu hr{border:0;border-top:1px solid var(--line);margin:6px 4px}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:7px 15px;border-radius:999px;border:1px solid var(--primary);background:var(--primary);color:var(--on-primary);font-weight:500;cursor:pointer;text-decoration:none;font-size:13.5px;white-space:nowrap}
+.btn .icon{font-size:18px}
+.btn.ghost{background:transparent;color:var(--primary)}.btn.small{padding:4px 12px;font-size:13px}.btn.small .icon{font-size:16px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.quiet{border-color:var(--line-strong);color:var(--ink);background:var(--surface)}
+.btn.danger{border-color:var(--bad);color:var(--bad);background:transparent}
+.btn.ok{border-color:var(--ok);background:var(--ok);color:var(--surface)}
+.linkbtn{border:0;background:none;color:var(--primary);cursor:pointer;padding:0;font-size:13px}
+
+/* Board */
+.section-head{display:flex;align-items:baseline;gap:10px;margin:0 0 10px;flex-wrap:wrap}
+.section-head h2{font-size:16px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px}
+.panel h2{font-size:12px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin:0 0 10px}
+.proto{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:50;display:flex;gap:8px;align-items:center;background:var(--code-bg);color:var(--code-ink);padding:6px 6px 6px 14px;border-radius:999px;box-shadow:var(--shadow);font-size:12.5px;flex-wrap:wrap;max-width:calc(100vw - 32px)}
+.proto label{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.proto input{accent-color:#a3b3ff}
+.proto button{border:0;border-radius:999px;padding:5px 12px;background:#ffffff1f;color:inherit;cursor:pointer;font-size:12.5px}
+.proto button:hover{background:#ffffff33}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(560px,100vw);background:var(--surface);border-left:1px solid var(--line);box-shadow:var(--shadow);z-index:80;overflow:auto;padding:22px 22px calc(40px + env(safe-area-inset-bottom,0px))}
+.drawer[hidden]{display:none}
+.drawer h2{font-size:20px;margin:0 0 4px}
+.drawer .x{position:absolute;right:14px;top:14px;border:0;background:none;cursor:pointer;color:var(--muted);padding:6px;border-radius:50%}
+.drawer .x:hover{background:var(--panel)}
+.drawer h3{margin:18px 0 0;font-size:13px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
+.ledger{list-style:none;margin:8px 0 0;padding:0}
+.ledger li{display:grid;grid-template-columns:38px minmax(0,1fr);gap:10px;padding:10px 6px;border-top:1px solid var(--line);font-size:13.5px}
+.ledger .n{font-weight:700;color:var(--muted)}
+.ledger p{margin:0}.ledger .ans{color:var(--muted);margin-top:4px}
+.ledger a{font-weight:500}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(72px + env(safe-area-inset-bottom,0px));z-index:90;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:13.5px;box-shadow:var(--shadow);max-width:min(560px,calc(100vw - 32px))}
+.toast[hidden]{display:none}
+.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 3px var(--primary)}100%{box-shadow:0 0 0 3px transparent}}
+
+/* ---------- ROADMAP-01P additions ---------- */
+.shell>div{min-width:0}
+.nav-sep{height:1px;background:var(--line);margin:8px 10px}
+.nav small.new{margin-left:auto;font-size:10.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--primary)}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:22px;align-items:start}
+.stackv{display:grid;gap:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px 18px;box-shadow:var(--shadow-card)}
+.card>h2{display:flex;align-items:center;gap:8px;margin:0 0 4px}
+.card>.hint{margin:0 0 12px;color:var(--muted);font-size:13.5px}
+.sticky{position:sticky;top:76px}
+.sec-num{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--panel);color:var(--muted);font-size:12px;font-weight:700;flex:none}
+.claims{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.claim{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:start;padding:8px 10px;border-radius:10px}
+.claim:hover{background:var(--panel)}
+.claim p{margin:0}
+.claim small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
+.conf{display:inline-flex;align-items:center;gap:4px;border:0;background:none;padding:2px 6px;border-radius:999px;font-size:12px;font-weight:500;color:var(--muted);cursor:pointer;white-space:nowrap}
+.conf .icon{font-size:16px}
+.conf:hover{background:var(--hover)}
+.conf.assumed{color:var(--muted)}
+.conf.evidenced{color:var(--pages)}
+.conf.validated{color:var(--ok)}
+.conf.contradicted{color:var(--bad)}
+.ev{display:inline-flex;align-items:center;gap:3px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:0 8px 0 5px;font-size:12px;line-height:20px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.ev .icon{font-size:14px}
+.ev:hover{border-color:var(--primary);color:var(--ink)}
+.ev .against{color:var(--bad);font-weight:700}
+.statement{font-size:20px;line-height:1.4;margin:4px 0 2px;font-weight:500}
+.collapsed{border-style:dashed;background:transparent;box-shadow:none}
+.risk{list-style:none;margin:0;padding:0;counter-reset:r}
+.risk li{display:grid;grid-template-columns:26px minmax(0,1fr);gap:8px;padding:10px 0;border-top:1px solid var(--line);font-size:13.5px}
+.risk li:first-child{border-top:0}
+.risk li::before{counter-increment:r;content:counter(r);display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--warn-bg);color:var(--warn);font-weight:700;font-size:12px}
+.risk p{margin:0 0 6px}
+.legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12.5px;color:var(--muted);margin:0 0 16px}
+.legend span{display:inline-flex;align-items:center;gap:4px}.legend .icon{font-size:16px}
+
+/* Opportunity tree */
+.tree,.tree ul{list-style:none;margin:0;padding:0}
+.tree ul{margin-left:22px;padding-left:16px;border-left:2px solid var(--line)}
+.node{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;margin:6px 0;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.node .kind{font-size:11px;letter-spacing:.6px;text-transform:uppercase;font-weight:700;color:var(--muted);min-width:86px}
+.node.outcome{background:var(--container);border-color:transparent}.node.outcome .kind{color:var(--on-container)}
+.node.opp .kind{color:var(--product)}
+.node.cap{background:var(--panel)}
+.node .title{font-weight:500}
+.node .who{font-size:12.5px;color:var(--muted)}
+.node .right{margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.node.focus{box-shadow:0 0 0 2px var(--primary)}
+.twisty{border:0;background:none;cursor:pointer;padding:0;color:var(--muted);display:inline-grid}
+
+/* Story map */
+.map-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:16px;background:var(--panel)}
+.smap{display:grid;gap:6px;padding:12px;min-width:900px}
+.smap .act{background:var(--product-bg);color:var(--product);font-weight:700;border-radius:10px;padding:8px 10px;font-size:13.5px}
+.smap .step{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:6px 10px;font-size:13px;font-weight:500}
+.smap .band{grid-column:1/-1;display:flex;align-items:center;gap:10px;padding:6px 10px;border-top:2px solid var(--line-strong);margin-top:6px;font-size:13px}
+.smap .band.current{border-color:var(--primary)}
+.smap .band strong{font-size:13.5px}
+.smap .cell{display:grid;gap:6px;align-content:start;min-height:34px}
+.scard{display:block;text-align:left;width:100%;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:7px 9px;font-size:13px;cursor:pointer;box-shadow:var(--shadow-card)}
+.scard:hover{border-color:var(--primary)}
+.scard .meta{display:flex;align-items:center;gap:6px;margin-top:4px;color:var(--muted);font-size:11.5px;flex-wrap:wrap}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+.st-proposed{background:var(--line-strong)}.st-defined{background:var(--p-medium)}.st-designed{background:var(--pages)}.st-built{background:var(--ok)}
+
+/* Evidence drawer */
+.insight{border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin:10px 0;background:var(--surface)}
+.insight.contra{border-color:color-mix(in srgb,var(--bad) 45%,var(--line))}
+.insight header{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+.insight header .rid{font-size:12px;font-weight:700;color:var(--muted)}
+.insight h4{margin:0;font-size:14.5px;flex-basis:100%}
+.finding{display:grid;grid-template-columns:18px minmax(0,1fr);gap:8px;padding:8px 0 0;font-size:13.5px}
+.finding .icon{font-size:17px;color:var(--muted);margin-top:1px}
+.finding q{font-style:italic}
+.finding .src{display:block;color:var(--muted);font-size:12.5px}
+.finding .src a{color:inherit}
+.shot{border:1px solid var(--line);border-radius:10px;background:var(--shot-bg);color:var(--shot-ink);padding:10px;margin-top:6px;font-size:12px}
+.shot .fake{display:grid;gap:5px}.shot .fake i{display:block;height:8px;border-radius:4px;background:#d9dbe6}.shot .fake i.hl{background:#ffd76a;outline:2px solid #c98f00}
+.dirpick{display:inline-flex;border:1px solid var(--line-strong);border-radius:999px;overflow:hidden}
+.dirpick button{border:0;background:none;padding:3px 10px;font-size:12.5px;cursor:pointer}
+.dirpick button[aria-pressed="true"]{background:var(--container);color:var(--on-container);font-weight:700}
+.attach{border:1px dashed var(--line-strong);border-radius:14px;padding:12px 14px;margin-top:14px;display:grid;gap:8px}
+.attach select{padding:6px 8px;border-radius:8px;border:1px solid var(--line-strong);background:var(--surface);max-width:100%}
+
+/* Chart (single series: one hue, direct labels, tooltip, table view) */
+.chart{margin-top:8px}
+.bars{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:2px;align-items:end;height:120px;border-bottom:1px solid var(--line-strong);padding:0 4px}
+.bar-col{display:grid;justify-items:center;align-content:end;height:100%;position:relative}
+.bar-col .v{font-size:12px;color:var(--ink);font-variant-numeric:tabular-nums;margin-bottom:2px}
+.bar-col .b{width:62%;background:var(--primary);border-radius:4px 4px 0 0;min-height:2px}
+.bar-col:hover .b,.bar-col:focus-visible .b{background:var(--on-container)}
+.bar-col .tip{position:absolute;bottom:calc(100% + 4px);background:var(--ink);color:var(--bg);font-size:12px;padding:4px 8px;border-radius:6px;white-space:nowrap;visibility:hidden}
+.bar-col:hover .tip,.bar-col:focus-visible .tip{visibility:visible}
+.bar-x{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:2px;font-size:12px;color:var(--muted);text-align:center;padding:4px 4px 0}
+.chart details{margin-top:6px;font-size:12.5px}
+.chart table{border-collapse:collapse;margin-top:4px}.chart td,.chart th{padding:2px 10px 2px 0;text-align:left;font-weight:400}
+
+/* Library */
+.lib{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
+.ltree{list-style:none;margin:0;padding:0}
+.ltree>li{border-top:1px solid var(--line);padding:10px 0}
+.ltree>li:first-child{border-top:0}
+.ltree .lh{display:flex;align-items:center;gap:8px;font-size:14px;margin:0 0 6px}
+.ltree ul{list-style:none;margin:0;padding:0 0 0 30px;display:grid;grid-template-columns:minmax(0,1fr);gap:4px}
+.ltree ul li>.ref{min-width:0}
+.ltree ul li{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13.5px}
+.srcrow{display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 4px;border-top:1px solid var(--line)}
+.srcrow:first-child{border-top:0}
+.srcrow .ic{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:var(--panel);color:var(--muted)}
+.srcrow button.t{border:0;background:none;padding:0;text-align:left;cursor:pointer;font-weight:500;color:var(--ink)}
+.srcrow button.t:hover{color:var(--primary);text-decoration:underline}
+.srcrow small{display:block;color:var(--muted);font-size:12.5px}
+
+/* Plan */
+.viewswitch{display:inline-flex;border:1px solid var(--line-strong);border-radius:999px;overflow:hidden;background:var(--surface)}
+.viewswitch a{padding:5px 14px;font-size:13px;text-decoration:none;color:var(--ink);display:inline-flex;gap:6px;align-items:center}
+.viewswitch a .icon{font-size:17px}
+.viewswitch a[aria-current="page"]{background:var(--container);color:var(--on-container);font-weight:700}
+.ms{border:1px solid var(--line);border-radius:18px;background:var(--panel);padding:14px;margin:0 0 16px}
+.ms.current{border-color:color-mix(in srgb,var(--primary) 50%,var(--line))}
+.ms-head{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin:0 0 4px}
+.ms-head h2{font-size:18px}
+.ms dl{display:flex;flex-wrap:wrap;gap:4px 18px;margin:0 0 12px;font-size:13px;color:var(--muted)}.ms dt{display:inline;font-weight:700}.ms dd{display:inline;margin:0 0 0 4px}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px}
+.pcard{display:grid;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px;text-decoration:none;color:var(--ink);box-shadow:var(--shadow-card)}
+.pcard:hover{border-color:var(--primary)}
+.pcard .top{display:flex;gap:8px;align-items:center}
+.pcard .rid{font-size:12px;font-weight:700;color:var(--muted)}
+.pcard strong{font-size:14.5px;line-height:1.3}
+.pcard .foot{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;font-size:12px;color:var(--muted)}
+.pcard .foot .bad{color:var(--bad);font-weight:700;display:inline-flex;gap:3px;align-items:center}
+.pcard .foot .icon{font-size:15px}
+.lbar{display:flex;gap:2px;height:8px}
+.lbar i{flex:1;border-radius:4px;background:var(--line);position:relative;overflow:hidden}
+.lbar i b{position:absolute;inset:0 auto 0 0;border-radius:4px}
+.lbar-legend{display:flex;flex-wrap:wrap;gap:2px 10px;font-size:11.5px;color:var(--muted)}
+.lbar-legend span{display:inline-flex;align-items:center;gap:4px}
+.st{font-size:12px;font-weight:700;padding:1px 8px;border-radius:999px;white-space:nowrap}
+.st-shaping{background:var(--panel);color:var(--muted);border:1px dashed var(--line-strong)}
+.st-ready{background:var(--warn-bg);color:var(--warn)}
+.st-progress{background:var(--container);color:var(--on-container)}
+.st-done{background:var(--ok-bg);color:var(--ok)}
+.target{display:inline-flex;align-items:center;gap:3px;font-size:12px;color:var(--ink);font-weight:500}.target .icon{font-size:15px;color:var(--muted)}
+
+/* Timeline */
+.tl-wrap{position:relative;overflow-x:auto;border:1px solid var(--line);border-radius:16px;background:var(--surface)}
+.tl{position:relative;display:grid;min-width:980px}
+.tl .axis{display:grid;border-bottom:1px solid var(--line);font-size:12px;color:var(--muted);background:var(--panel)}
+.tl .axis div{padding:8px 10px;border-left:1px solid var(--line)}
+.tl .axis div:first-child{border-left:0}
+.tl .lane{display:grid;align-items:center;border-bottom:1px solid var(--line);min-height:64px}
+.tl .lane:last-child{border-bottom:0}
+.tl .lane-name{padding:8px 12px;font-weight:700;font-size:13.5px;align-self:stretch;display:flex;flex-direction:column;justify-content:center;background:var(--panel);border-right:1px solid var(--line)}
+.tl .lane-name small{font-weight:400;color:var(--muted);font-size:12px}
+.tbar{margin:8px 6px;padding:6px 10px;border-radius:10px;font-size:12.5px;text-decoration:none;color:var(--ink);border:1px solid var(--line-strong);background:var(--surface);position:relative;z-index:2;display:flex;flex-direction:column;gap:2px;box-shadow:var(--shadow-card)}
+.tbar:hover{border-color:var(--primary)}
+.tbar.done{background:var(--ok-bg);border-color:transparent}
+.tbar.progress{background:var(--container);border-color:transparent;color:var(--on-container)}
+.tbar.ready{background:var(--warn-bg);border-color:transparent;color:var(--warn)}
+.tbar.shaping{border-style:dashed}
+.tbar .rid{font-weight:700;font-size:11.5px;opacity:.8}
+.tbar.late{box-shadow:0 0 0 2px var(--bad)}
+.tbar .early{display:inline-flex;align-items:center;gap:3px;color:var(--bad);font-weight:700;font-size:11.5px}.tbar .early .icon{font-size:14px}
+.tl svg{position:absolute;inset:0;pointer-events:none;z-index:1;overflow:visible}
+.tl svg path{fill:none;stroke:var(--line-strong);stroke-width:2}
+.tl svg path.bad{stroke:var(--bad);stroke-dasharray:5 4}
+.tl svg .arrow{fill:var(--line-strong)}.tl svg .arrow.bad{fill:var(--bad)}
+
+/* Project page */
+.pdetail{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:22px;align-items:start}
+.brief-sec{margin:0 0 18px}
+.brief-sec h3{font-size:12px;letter-spacing:.7px;text-transform:uppercase;color:var(--muted);margin:0 0 4px;display:flex;align-items:center;gap:8px}
+.brief-sec p,.brief-sec ul{margin:0}
+.brief-sec ul{padding-left:20px}
+.req{list-style:none;padding:0!important;display:grid;gap:6px}
+.req li{display:grid;grid-template-columns:62px minmax(0,1fr);gap:8px;font-size:14px}
+.req code{font-weight:700;color:var(--muted)}
+.appetite{display:flex;flex-wrap:wrap;gap:8px}
+.appetite span{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:10px;background:var(--panel);font-size:13px}
+.appetite .icon{font-size:17px;color:var(--muted)}
+.scope{list-style:none;margin:0;padding:0}
+.scope>li{border-top:1px solid var(--line);padding:10px 0}
+.scope>li:first-child{border-top:0}
+.scope h3{display:flex;align-items:center;gap:8px;margin:0 0 6px;font-size:13.5px}
+.scope h3 .n{font-weight:400;color:var(--muted)}
+.item{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:center;padding:5px 0 5px 4px;font-size:13.5px}
+.item .rid{font-size:12px;font-weight:700;color:var(--muted)}
+.item .why{display:block;font-size:12px;color:var(--muted)}
+.item .why.bad{color:var(--bad)}
+.istate{font-size:12px;font-weight:500;display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.istate .icon{font-size:16px}
+.istate.done{color:var(--ok)}.istate.blocked{color:var(--bad)}.istate.batched{color:var(--on-container)}.istate.backlog,.istate.queued{color:var(--muted)}.istate.review{color:var(--warn)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:13.5px;margin:0}
+.kv dt{color:var(--muted)}.kv dd{margin:0}
+.callout{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:12px;background:var(--container);color:var(--on-container);font-size:13.5px;margin:0 0 16px}
+.callout .icon{font-size:19px}
+.callout.warn{background:var(--warn-bg);color:var(--warn)}
+
+/* Board (simplified from WORK-UX-01) */
+.lanes2{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:16px;margin:0 0 26px;align-items:start}
+.blane{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:12px;display:grid;gap:8px}
+.blane-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.blane-head small{display:block;color:var(--muted);font-size:12px}
+.blane-head .right{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.bcard{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 12px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:center;font-size:13.5px}
+.bcard .rid{font-size:12px;font-weight:700;color:var(--muted);margin-right:6px}
+.bcard .sub{grid-column:1/-1;display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.bcard.new{border-color:var(--primary);box-shadow:0 0 0 2px color-mix(in srgb,var(--primary) 25%,transparent)}
+.pchip{display:inline-flex;align-items:center;gap:3px;border-radius:6px;padding:0 6px;background:var(--work-bg);color:var(--work);font-weight:700;font-size:11.5px;text-decoration:none;line-height:18px}
+.qgroup{margin:0 0 14px}
+.qgroup h3{display:flex;align-items:center;gap:8px;font-size:13.5px;margin:0 0 6px}
+.fill-list{list-style:none;margin:10px 0;padding:0;display:grid;gap:6px}
+.fill-list li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:start;padding:8px 10px;border:1px solid var(--line);border-radius:12px;font-size:13.5px}
+.fill-list li.skip{opacity:.65}
+.fill-list small{display:block;color:var(--muted);font-size:12.5px}
+
+/* Team */
+.roles{display:grid;gap:12px}
+.rolecard{display:grid;grid-template-columns:240px minmax(0,1fr);background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.rolecard.newrole{border-color:var(--primary);box-shadow:0 0 0 2px color-mix(in srgb,var(--primary) 20%,transparent)}
+.rolecard>header{padding:14px 16px;border-right:1px solid var(--line);background:var(--panel)}
+.rolecard>header p{margin:4px 0 0;color:var(--muted);font-size:13px}
+.rolecard ul{list-style:none;margin:0;padding:6px 16px}
+.rolecard li{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 0;border-top:1px solid var(--line);font-size:13.5px}
+.rolecard li:first-child{border-top:0}
+.rolecard li small{color:var(--muted)}
+.tag-new{font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding:1px 7px;border-radius:999px;background:var(--container);color:var(--on-container)}
+.tag-moved{font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding:1px 7px;border-radius:999px;background:var(--warn-bg);color:var(--warn)}
+
+/* Home */
+.homegrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;align-items:start}
+.bigbar{display:flex;height:12px;border-radius:6px;overflow:hidden;gap:2px;margin:8px 0 6px}
+.bigbar i{display:block}
+.mini{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.mini li{display:flex;gap:8px;align-items:center;font-size:13.5px;flex-wrap:wrap}
+.mini li .push{font-size:12px}
+.plainlist{list-style:none;margin:0 0 10px;padding:0;display:grid;gap:8px}.plainlist .icon{font-size:17px;color:var(--muted);margin-right:4px}
+.live{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--primary);animation:pulse 1.6s infinite}
+@keyframes pulse{0%{opacity:1}50%{opacity:.35}100%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.live{animation:none}}
+
+@media (max-width:1100px){.grid2,.pdetail{grid-template-columns:minmax(0,1fr)}.sticky{position:static}}
+@media (max-width:860px){
+  .shell{grid-template-columns:1fr;background:none}
+  .rail{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;gap:6px;padding:10px 16px}
+  .rail .spacer,.project,.nav-sep{display:none}.nav{display:flex;flex-wrap:wrap;gap:2px}.nav a{padding:6px 10px}
+  .content,.topbar{padding-left:16px;padding-right:16px}
+  .lanes2{grid-template-columns:1fr}
+  .rolecard{grid-template-columns:1fr}.rolecard>header{border-right:0;border-bottom:1px solid var(--line)}
+  .node .kind{min-width:0}
+  .tree ul{margin-left:8px;padding-left:10px}
+  .pgrid{grid-template-columns:1fr}
+  .item{grid-template-columns:auto minmax(0,1fr)}.item .istate{grid-column:2}
+}
+</style>
+
+<a class="visually-hidden" href="#main">Skip to content</a>
+<div class="shell">
+  <aside class="rail" aria-label="Project">
+    <a class="brand" href="#/home"><span class="icon" aria-hidden="true">deployed_code</span>Aludel</a>
+    <a class="project" href="#/home"><span class="mark" aria-hidden="true">TS</span><span><strong>Tool Share</strong><small>Demo milestone</small></span></a>
+    <nav class="nav" aria-label="Layers" id="nav">
+      <a href="#/home" data-sec="home"><span class="icon" aria-hidden="true">home</span>Home</a>
+      <a href="#/product/brief" data-sec="product"><span class="icon" aria-hidden="true">lightbulb</span>Product</a>
+      <a href="#/design" data-sec="design"><span class="icon" aria-hidden="true">palette</span>Design</a>
+      <a href="#/pages" data-sec="pages"><span class="icon" aria-hidden="true">web</span>Pages</a>
+      <a href="#/data" data-sec="data"><span class="icon" aria-hidden="true">schema</span>Data</a>
+      <a href="#/platform" data-sec="platform"><span class="icon" aria-hidden="true">dns</span>Platform</a>
+      <a href="#/work/plan" data-sec="work"><span class="icon" aria-hidden="true">checklist</span>Work<span class="badge" id="needs-badge">3</span></a>
+    </nav>
+    <div class="spacer"></div>
+    <nav class="nav" aria-label="Utilities">
+      <a href="#/library" data-sec="library"><span class="icon" aria-hidden="true">local_library</span>Library<small class="new">new</small></a>
+      <a href="#/settings" data-sec="settings"><span class="icon" aria-hidden="true">settings</span>Settings</a>
+    </nav>
+  </aside>
+  <div>
+    <div class="topbar"><div class="search" role="search"><span class="icon" aria-hidden="true">search</span><label class="visually-hidden" for="q">Search every layer</label><input id="q" type="search" placeholder="Search claims, stories, evidence, projects…" autocomplete="off"></div></div>
+    <main class="content" id="main" tabindex="-1"></main>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<aside class="proto" aria-label="Prototype controls">
+  <span>ROADMAP-01P v1</span>
+  <button type="button" id="open-brief">Your brief, item by item</button>
+  <button type="button" id="reset">Reset</button>
+</aside>
+
+<aside class="drawer" id="drawer" hidden tabindex="-1" aria-labelledby="drawer-title">
+  <button type="button" class="x" id="close-drawer" aria-label="Close"><span class="icon" aria-hidden="true">close</span></button>
+  <div id="drawer-body"></div>
+</aside>
+
+<script>
+/* Illustrative Tool Share data. Nothing here is real research. */
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+const icon = (n, label) => `<span class="icon" ${label ? `role="img" aria-label="${esc(label)}"` : 'aria-hidden="true"'}>${n}</span>`;
+const LAYER = { product:['Product','lightbulb'], design:['Design','palette'], pages:['Pages','web'], data:['Data','schema'], platform:['Platform','dns'], work:['Work','checklist'] };
+const LAYER_ORDER = ['product','design','pages','data','platform','work'];
+const LCOLOR = { product:'var(--product)', design:'var(--design)', pages:'var(--pages)', data:'var(--data)', platform:'var(--platform)', work:'var(--work)' };
+
+/* ---------- Brief ---------- */
+const SECTIONS = [
+  { key:'problem', title:'Problem', hint:'The top one to three problems, and what people do about them today.' },
+  { key:'customers', title:'Customers', hint:'Who has the problem. Mark the early adopters: who feels it most, first.' },
+  { key:'diagnosis', title:'Diagnosis', hint:'Why now, and the crux: what currently stops people. Everything else follows from this.' },
+  { key:'value', title:'Value proposition', hint:'One sentence a customer would repeat, plus an “X for Y” concept.' },
+  { key:'approach', title:'Approach', hint:'The guiding policy: what we will do, and what that rules out.' },
+  { key:'capabilities', title:'Standout capabilities', hint:'Three to five things that make it worth using.' },
+  { key:'outcomes', title:'Outcomes and measures', hint:'One product outcome (a customer behaviour) and how it is measured.' },
+  { key:'principles', title:'Principles', hint:'Non-negotiables. Every work item reads them.' },
+];
+let CLAIMS, LINKS, PROJECTS, ITEMS, state;
+const INITIAL_CLAIMS = [
+  { id:'C-1', sec:'problem', text:'Neighbours buy tools they use once or twice a year.' },
+  { id:'C-2', sec:'problem', text:'Lending to someone you barely know feels risky: people fear loss and damage.' },
+  { id:'C-3', sec:'problem', text:'Today people buy new, ask in group chats, or hire from a store.', sub:'Existing alternatives' },
+  { id:'C-4', sec:'customers', text:'Borrowers: renters in dense neighbourhoods doing occasional DIY.', sub:'Early adopters · persona Sam' },
+  { id:'C-5', sec:'customers', text:'Lenders: homeowners with a full garage.', sub:'Persona Dana' },
+  { id:'C-6', sec:'customers', text:'Lenders are motivated by earning rent from their tools.' },
+  { id:'C-7', sec:'diagnosis', text:'Local groups already swap tools in chat, but nothing tracks who has what.', sub:'Why now' },
+  { id:'C-8', sec:'diagnosis', text:'Trust is the crux: lenders won’t list until they believe tools come back.', sub:'The crux' },
+  { id:'C-9', sec:'value', text:'Borrow the tool you need from someone on your street, today.', sub:'Concept: a library card for your neighbours’ garages', statement:true },
+  { id:'C-10', sec:'approach', text:'Build trust inside one neighbourhood first: verified neighbours, request and approve, return reminders.' },
+  { id:'C-11', sec:'approach', text:'Rules out for now: payments, delivery and city-wide search.', sub:'What this rules out (was “no-gos”)' },
+  { id:'C-12', sec:'capabilities', text:'Search by walking distance.' },
+  { id:'C-13', sec:'capabilities', text:'Ask and get an answer in two taps.' },
+  { id:'C-14', sec:'capabilities', text:'Return reminders and a lender’s history.' },
+  { id:'C-15', sec:'outcomes', text:'Borrowers complete a borrow and return it on time.', sub:'Measure: returns on time per week · supporting: listings per active lender, approval rate' },
+  { id:'C-16', sec:'principles', text:'Lenders are always in control of who borrows.', principle:true },
+  { id:'C-17', sec:'principles', text:'Never show an exact address before a request is approved.', principle:true },
+  { id:'C-18', sec:'principles', text:'Everything works on a phone.', principle:true },
+];
+
+/* ---------- Opportunities ---------- */
+const OPP = { id:'OUT', kind:'outcome', title:'More borrows returned on time each week', children:[
+  { id:'O-1', kind:'opp', who:'Sam', title:'I don’t know who nearby has the tool I need', children:[
+    { id:'O-1.1', kind:'opp', who:'Sam', title:'I can’t tell if it’s close enough to walk to', children:[{ id:'CAP-1', kind:'cap', title:'Search by walking distance', stories:['S-1','S-2'] }] },
+    { id:'O-1.2', kind:'opp', who:'Sam', title:'I need it today, not next week', children:[{ id:'CAP-4', kind:'cap', title:'Availability at a glance', stories:['S-5'] }] } ] },
+  { id:'O-2', kind:'opp', who:'Dana', title:'I’m afraid my tool won’t come back, or comes back broken', children:[
+    { id:'O-2.1', kind:'opp', who:'Dana', title:'I want to choose who borrows', children:[{ id:'CAP-2', kind:'cap', title:'Request and approve', stories:['S-3','S-4'] }] },
+    { id:'O-2.2', kind:'opp', who:'Dana', title:'I forget who has my things', children:[{ id:'CAP-3', kind:'cap', title:'Return reminders and history', stories:['S-7','S-8','S-9'] }] } ] },
+  { id:'O-3', kind:'opp', who:'Sam', title:'Asking a stranger feels like begging', children:[{ id:'CAP-2b', kind:'cap', title:'Request and approve', stories:['S-3'] }] },
+]};
+
+/* ---------- Story map ---------- */
+const ACTIVITIES = [
+  { title:'Join', steps:[['Sign up',['S-10']]] },
+  { title:'Find a tool', steps:[['Search nearby',['S-1','S-5']],['Look at a tool',['S-2']]] },
+  { title:'Borrow', steps:[['Ask',['S-3']],['Decide',['S-4']],['Arrange pickup',['S-6']]] },
+  { title:'Give it back', steps:[['Return',['S-7','S-8']],['Trust over time',['S-9']]] },
+];
+const STORIES = {
+  'S-10':{ t:'Someone can sign up with email', ms:'demo', st:'built', why:null, tpl:true },
+  'S-1':{ t:'A borrower can see tools within a 10-minute walk', ms:'demo', st:'designed', why:'O-1.1' },
+  'S-2':{ t:'A borrower can see a tool’s photos and condition', ms:'demo', st:'defined', why:'O-1.1' },
+  'S-5':{ t:'A borrower can see when a tool is free', ms:'mvp', st:'proposed', why:'O-1.2' },
+  'S-3':{ t:'A borrower can ask to borrow a tool for given dates', ms:'demo', st:'defined', why:'O-3' },
+  'S-4':{ t:'A lender can approve or decline a request', ms:'demo', st:'proposed', why:'O-2.1' },
+  'S-6':{ t:'Borrower and lender can agree a pickup time', ms:'mvp', st:'proposed', why:'O-2.1' },
+  'S-7':{ t:'A borrower is reminded the day before it’s due', ms:'mvp', st:'proposed', why:'O-2.2' },
+  'S-8':{ t:'A lender can mark a tool returned', ms:'mvp', st:'proposed', why:'O-2.2' },
+  'S-9':{ t:'A lender can see a borrower’s return history', ms:'later', st:'proposed', why:'O-2' },
+};
+const STATUS_LABEL = { proposed:'Proposed', defined:'Defined', designed:'Designed', built:'Built' };
+const MILESTONES = [
+  { key:'demo', label:'Demo', current:true, goal:'A clickable core flow with sample data.', exit:'Someone can find, ask for and approve a tool end to end in the preview.' },
+  { key:'mvp', label:'MVP', goal:'Real neighbours use it for real.', exit:'Five testers complete a borrow and a return with real data.' },
+  { key:'later', label:'Later', goal:'Trust at scale and polish.', exit:'' },
+];
+
+/* ---------- Evidence (atomic research) ---------- */
+const SOURCES = {
+  'SRC-1':{ kind:'interview', icon:'record_voice_over', title:'Interview: Dana, lender', meta:'2026-09-12 · 40 min · by you' },
+  'SRC-2':{ kind:'interview', icon:'record_voice_over', title:'Interview: Sam, renter', meta:'2026-09-14 · 35 min · by you' },
+  'SRC-3':{ kind:'survey', icon:'poll', title:'Poll in the Elm Street neighbourhood group', meta:'2026-09-16 · 42 answers · by you' },
+  'SRC-4':{ kind:'competitor', icon:'storefront', title:'Hardware store hire page', meta:'Screenshot · 2026-09-17 · by the Product lead', url:'example.com/hire' },
+  'SRC-5':{ kind:'competitor', icon:'storefront', title:'Neighbourhood lending app: request screen', meta:'Screenshot · 2026-09-18 · by the Design lead', url:'example.com/app' },
+};
+const FINDINGS = {
+  'F-1':{ src:'SRC-1', type:'quote', text:'I lent my drill to a neighbour in March and never saw it again.' },
+  'F-2':{ src:'SRC-1', type:'quote', text:'I’d lend to people on my street if I could say no.' },
+  'F-3':{ src:'SRC-1', type:'quote', text:'I’d feel weird charging a neighbour.' },
+  'F-4':{ src:'SRC-2', type:'quote', text:'I bought a $90 tile cutter for one bathroom.' },
+  'F-5':{ src:'SRC-2', type:'quote', text:'I’d walk ten minutes. I’m not driving across town for it.' },
+  'F-6':{ src:'SRC-2', type:'quote', text:'Asking in the building chat feels like begging.' },
+  'F-7':{ src:'SRC-3', type:'data', text:'How far would you walk to borrow a tool?', data:[['5 min',9],['10 min',18],['15 min',11],['20+ min',4]] },
+  'F-8':{ src:'SRC-3', type:'fact', text:'31 of 42 own a tool they use less than twice a year.' },
+  'F-9':{ src:'SRC-4', type:'image', text:'Tile cutter day hire: $38 plus a deposit.' },
+  'F-10':{ src:'SRC-5', type:'image', text:'The request is a short form with dates and a note; the lender sees the borrower’s history first.' },
+};
+const INSIGHTS = {
+  'I-1':{ text:'Lenders fear loss more than they want income', f:['F-1','F-2','F-3'] },
+  'I-2':{ text:'Walking distance is the real radius: about ten minutes', f:['F-5','F-7'] },
+  'I-3':{ text:'One-off purchases are the pain, not the lack of tools', f:['F-4','F-8','F-9'] },
+  'I-4':{ text:'Asking must feel like a request, not a favour', f:['F-6','F-10'] },
+};
+const INITIAL_LINKS = [
+  ['I-1','C-2','supports'],['I-1','C-6','contradicts'],['I-1','C-16','supports'],['I-1','O-2','supports'],['I-1','O-2.1','supports'],['I-1','P-5','supports'],
+  ['I-2','C-12','supports'],['I-2','O-1.1','supports'],['I-2','S-1','supports'],['I-2','page:Search','supports'],['I-2','object:Tool','supports'],
+  ['I-3','C-1','supports'],['I-3','C-3','supports'],
+  ['I-4','O-3','supports'],['I-4','S-3','supports'],['I-4','page:Borrow request','supports'],['I-4','component:Request card','supports'],['I-4','P-5','supports'],
+  ['I-3','C-7','supports'],
+];
+const RECORD = id => {
+  if (/^C-/.test(id)) { const c = CLAIMS.find(x => x.id === id); return { layer:'product', icon:'fact_check', kind:'Brief · ' + SECTIONS.find(s => s.key === c.sec).title, title:c.text, href:'#/product/brief' }; }
+  if (/^O-|^OUT/.test(id)) { const n = findNode(OPP, id); return { layer:'product', icon:'account_tree', kind:'Opportunity ' + id, title:n.title, href:'#/product/opportunities/' + id }; }
+  if (/^S-/.test(id)) return { layer:'product', icon:'bookmark', kind:'Story ' + id, title:STORIES[id].t, href:'#/product/map/' + id };
+  if (/^P-/.test(id)) { const p = PROJECTS.find(x => x.id === id); return { layer:'work', icon:'folder_special', kind:'Project ' + id, title:p.title, href:'#/work/project/' + id }; }
+  const [k, name] = id.split(':');
+  const m = { page:['pages','web','Page'], component:['design','widgets','Component'], object:['data','data_object','Data object'] }[k];
+  return { layer:m[0], icon:m[1], kind:m[2], title:name, href:'#/' + m[0] };
+};
+function findNode(n, id){ if (n.id === id) return n; for (const c of n.children || []) { const r = findNode(c, id); if (r) return r; } return null; }
+const linksFor = id => LINKS.filter(l => l[1] === id);
+function confidence(id){
+  const c = CLAIMS.find(x => x.id === id); if (c && c.validated) return 'validated';
+  const ls = linksFor(id); if (ls.some(l => l[2] === 'contradicts')) return 'contradicted';
+  return ls.length ? 'evidenced' : 'assumed';
+}
+const CONF = { assumed:['Assumed','help_outline'], evidenced:['Evidenced','check_circle'], validated:['Validated','verified'], contradicted:['Contradicted','report'] };
+function evChip(id){
+  const ls = linksFor(id); if (!ls.length) return '';
+  const against = ls.filter(l => l[2] === 'contradicts').length;
+  return `<button type="button" class="ev" data-ev="${esc(id)}" aria-label="Evidence: ${ls.length - against} supporting, ${against} against">${icon('attach_file')}${ls.length - against}${against ? ` <span class="against">· ${against} against</span>` : ''}</button>`;
+}
+
+/* ---------- Plan ---------- */
+const INITIAL_PROJECTS = [
+  { id:'P-1', ms:'demo', title:'Product brief and first story map', lead:'product', state:'done', deps:[], playbook:true },
+  { id:'P-2', ms:'demo', title:'Design foundations', lead:'design', state:'progress', deps:['P-1'], playbook:true },
+  { id:'P-3', ms:'demo', title:'Preview environment', lead:'platform', state:'done', deps:[], playbook:true },
+  { id:'P-4', ms:'demo', title:'Find a tool', lead:'work', state:'progress', deps:['P-2'], violated:['P-2'], stories:['S-1','S-2'] },
+  { id:'P-5', ms:'demo', title:'Ask and approve', lead:'work', state:'ready', deps:['P-4'], stories:['S-3','S-4'] },
+  { id:'P-6', ms:'demo', title:'Walking skeleton build', lead:'platform', state:'shaping', deps:['P-3','P-5'], playbook:true },
+  { id:'P-7', ms:'mvp', title:'Availability and pickup', lead:'work', state:'shaping', deps:['P-6'], stories:['S-5','S-6'] },
+  { id:'P-8', ms:'mvp', title:'Returns and reminders', lead:'work', state:'shaping', deps:['P-6'], stories:['S-7','S-8'] },
+  { id:'P-9', ms:'mvp', title:'Launch to Elm Street', lead:'platform', state:'shaping', deps:['P-7','P-8'], target:'1 Nov', playbook:true },
+  { id:'P-10', ms:'later', title:'Lender trust history', lead:'work', state:'shaping', deps:['P-8'], stories:['S-9'] },
+];
+const PSTATE = { shaping:'Shaping', ready:'Ready to start', progress:'In progress', done:'Done' };
+/* progress per layer: [done,total] */
+const PPROG = {
+  'P-1':{product:[6,6]}, 'P-2':{design:[3,5]}, 'P-3':{platform:[3,3]},
+  'P-4':{product:[2,2],pages:[1,2],data:[1,1],platform:[0,2]},
+  'P-5':{product:[1,2],pages:[0,1],data:[0,2],platform:[0,2]},
+  'P-6':{platform:[0,2],work:[0,1]}, 'P-7':{product:[0,2]}, 'P-8':{product:[0,2]}, 'P-9':{platform:[0,3]}, 'P-10':{product:[0,1]},
+};
+const INITIAL_ITEMS = [
+  // P-5 Ask and approve, in layer order
+  { id:'W-40', p:'P-5', layer:'product', title:'Write acceptance for S-3', state:'done', who:'Scout' },
+  { id:'W-41', p:'P-5', layer:'product', title:'Write acceptance for S-4', state:'backlog', who:'Scout' },
+  { id:'W-42', p:'P-5', layer:'pages', title:'Design the Borrow request page', state:'blocked', who:'Scout', by:'W-41' },
+  { id:'W-43', p:'P-5', layer:'data', title:'Contract the BorrowRequest object', state:'backlog', who:'Scout' },
+  { id:'W-44', p:'P-5', layer:'data', title:'Set access rules for BorrowRequest', state:'blocked', who:'You', by:'W-43' },
+  { id:'W-45', p:'P-5', layer:'platform', title:'Build S-3', state:'blocked', who:'Scout', by:'W-42, W-43' },
+  { id:'W-46', p:'P-5', layer:'platform', title:'Build S-4', state:'blocked', who:'Scout', by:'W-41, W-42, W-44' },
+  { id:'W-47', p:'P-5', layer:'work', title:'Check the preview against S-3 and S-4', state:'blocked', who:'You', by:'W-45, W-46' },
+  // P-4 Find a tool
+  { id:'W-30', p:'P-4', layer:'pages', title:'Design the Tool detail page', state:'review', who:'Scout' },
+  { id:'W-31', p:'P-4', layer:'platform', title:'Build S-1', state:'batched', who:'Scout' },
+  { id:'W-32', p:'P-4', layer:'platform', title:'Build S-2', state:'blocked', who:'Scout', by:'W-30' },
+  // P-2 Design foundations
+  { id:'W-20', p:'P-2', layer:'design', title:'Propose a Request card component', state:'batched', who:'Scout' },
+  { id:'W-21', p:'P-2', layer:'design', title:'Set spacing and elevation tokens', state:'queued', who:'Scout' },
+  // no project
+  { id:'W-50', p:null, layer:'platform', title:'Security audit (routine)', state:'queued', who:'Scout' },
+];
+const ISTATE = { done:['Done','check_circle'], backlog:['Backlog','inbox'], queued:['Queued','schedule'], batched:['In a batch','play_circle'], review:['Ready for review','rate_review'], blocked:['Blocked','block'] };
+
+function reset(){
+  CLAIMS = structuredClone(INITIAL_CLAIMS); LINKS = structuredClone(INITIAL_LINKS);
+  PROJECTS = structuredClone(INITIAL_PROJECTS); ITEMS = structuredClone(INITIAL_ITEMS);
+  state = { planView:'roadmap', filled:false, collapsed:{}, libView:'supports' };
+}
+reset();
+
+/* ---------- Shared bits ---------- */
+const layerChip = l => `<span class="chip l-${l}">${icon(LAYER[l][1])}${LAYER[l][0]}</span>`;
+const roleName = { product:'Product lead', design:'Design lead', pages:'Experience designer', data:'Data architect', platform:'Engineer', work:'Project lead' };
+const pstate = s => `<span class="st st-${s}">${PSTATE[s]}</span>`;
+function lbar(pid){
+  const prog = PPROG[pid] || {};
+  return `<div class="lbar" role="img" aria-label="${esc(Object.entries(prog).map(([l,[d,t]]) => `${LAYER[l][0]} ${d} of ${t}`).join(', '))}">${Object.entries(prog).map(([l,[d,t]]) =>
+    `<i title="${LAYER[l][0]}: ${d} of ${t} done" style="flex:${t}"><b style="width:${t ? d / t * 100 : 0}%;background:${LCOLOR[l]}"></b></i>`).join('')}</div>`;
+}
+function tabs(base, list, active){
+  return `<nav class="tabs" aria-label="Sections">${list.map(([k, label, extra]) => `<a href="#/${base}/${k}" class="${k === active ? 'active' : ''}" ${k === active ? 'aria-current="page"' : ''}>${label}${extra || ''}</a>`).join('')}</nav>`;
+}
+const productTabs = a => tabs('product', [['brief','Brief'],['opportunities','Opportunities'],['map','Story map']], a);
+const workTabs = a => tabs('work', [['plan','Plan'],['board','Board'],['team','Team'],['routines','Routines']], a);
+
+/* ---------- Views ---------- */
+function viewBrief(){
+  const risky = CLAIMS.filter(c => !c.principle && ['assumed','contradicted'].includes(confidence(c.id)) && ['problem','customers','diagnosis','value'].includes(c.sec));
+  const order = { contradicted:0, assumed:1 };
+  risky.sort((a, b) => order[confidence(a.id)] - order[confidence(b.id)] || SECTIONS.findIndex(s => s.key === a.sec) - SECTIONS.findIndex(s => s.key === b.sec));
+  const counts = CLAIMS.reduce((m, c) => (m[confidence(c.id)] = (m[confidence(c.id)] || 0) + 1, m), {});
+  return `<p class="eyebrow">Product · founder and product lead</p><h1 tabindex="-1">What we’re building, and why</h1>
+  ${productTabs('brief')}
+  <p class="lead">One page, in the order a founder should think it through (Lean Canvas order, plus a diagnosis and an approach). Each line is a claim; its marker says how sure we are, from the evidence attached to it.</p>
+  <div class="legend" aria-label="Confidence key">${Object.entries(CONF).map(([k,[l,i]]) => `<span class="conf ${k}" style="cursor:default">${icon(i)}${l} <b class="tabular">${counts[k] || 0}</b></span>`).join('')}</div>
+  <div class="grid2"><div class="stackv">
+    ${SECTIONS.map((s, i) => `<section class="card" aria-labelledby="sec-${s.key}">
+      <h2 id="sec-${s.key}"><span class="sec-num">${i + 1}</span>${s.title}<button type="button" class="btn ghost small push" data-toast="The Product lead drafts claims for “${esc(s.title)}” from the rest of the Brief and the Library. They come back for review.">${icon('auto_awesome')}Draft with Product lead</button></h2>
+      <p class="hint">${s.hint}${s.key === 'principles' ? ' Principles are rules, so they carry evidence but no confidence marker.' : ''}</p>
+      <ul class="claims">${CLAIMS.filter(c => c.sec === s.key).map(c => claimRow(c)).join('')}</ul>
+    </section>`).join('')}
+    <section class="card collapsed" aria-labelledby="sec-biz">
+      <h2 id="sec-biz"><span class="sec-num">9</span>Business model <span class="chip s-plain">Optional</span>
+        <button type="button" class="btn ghost small push" aria-expanded="${!!state.bizOpen}" data-act="biz">${state.bizOpen ? 'Hide' : 'Open'}</button></h2>
+      <p class="hint">Channels, revenue, costs and unfair advantage. Not explored yet. Business is expected to become its own layer later (DEC-042), so this stays light.</p>
+      ${state.bizOpen ? `<ul class="claims">${['Channels','Revenue','Costs','Unfair advantage'].map(t => `<li class="claim"><div><p class="muted">${t}: not written yet.</p></div></li>`).join('')}</ul>` : ''}
+    </section>
+  </div>
+  <aside class="stackv sticky" aria-label="Riskiest assumptions and changes">
+    <section class="card" aria-labelledby="riskiest"><h2 id="riskiest">${icon('crisis_alert')}Riskiest assumptions</h2>
+      <p class="hint">Unproven claims in Problem, Customers, Diagnosis and Value, contradicted first. Test these before building much.</p>
+      <ol class="risk">${risky.map(c => `<li><div><p>${esc(c.text)}</p><div class="row wrap">${confBtn(c)}
+        <button type="button" class="btn quiet small" data-toast="Created W-60 “Test: ${esc(c.text.slice(0, 48))}…”, a Research item for the Product lead. It sits in P-1 and asks you to approve the test plan first.">${icon('science')}Test this</button></div></div></li>`).join('') || '<li><div><p class="muted">Nothing unproven. Nice.</p></div></li>'}</ol>
+    </section>
+    <section class="card"><h2>${icon('info')}Where things went</h2>
+      <ul class="plainlist small">
+        <li>${icon('route')}Roadmap and specs moved to <a href="#/work/plan">Work › Plan</a>: phases are milestones, and a spec is a project’s brief.</li>
+        <li>${icon('local_library')}Research is the <a href="#/library">Library</a>, attached wherever it’s used.</li>
+        <li>${icon('description')}Docs became Library notes. A PR/FAQ is a narrative generated from this Brief.</li>
+      </ul>
+      <button type="button" class="btn ghost small" data-act="prfaq">${icon('newspaper')}Generate a PR/FAQ from the Brief</button>
+    </section>
+  </aside></div>`;
+}
+function confBtn(c){ const k = confidence(c.id); return `<button type="button" class="conf ${k}" data-ev="${c.id}" aria-label="${CONF[k][0]}: open evidence">${icon(CONF[k][1])}${CONF[k][0]}</button>`; }
+function claimRow(c){
+  const right = c.principle ? evChip(c.id) || '<span class="muted tiny">Rule</span>' : `<span class="row">${confBtn(c)}${evChip(c.id)}</span>`;
+  return `<li class="claim"><div>${c.statement ? `<p class="statement">${esc(c.text)}</p>` : `<p>${esc(c.text)}</p>`}${c.sub ? `<small>${esc(c.sub)}</small>` : ''}</div>${right}</li>`;
+}
+
+function viewOpps(focus){
+  const node = n => {
+    const kids = n.children || [];
+    const kind = { outcome:'Outcome', opp:'Opportunity', cap:'Capability' }[n.kind];
+    const open = !state.collapsed[n.id];
+    return `<li><div class="node ${n.kind} ${focus === n.id ? 'focus' : ''}" id="n-${n.id}">
+      ${kids.length ? `<button type="button" class="twisty" data-act="twist" data-id="${n.id}" aria-expanded="${open}" aria-label="${open ? 'Collapse' : 'Expand'} ${esc(n.title)}">${icon(open ? 'expand_more' : 'chevron_right')}</button>` : ''}
+      <span class="kind">${kind}${n.kind === 'opp' ? ' ' + n.id : ''}</span><span class="title">${esc(n.title)}</span>${n.who ? `<span class="who">· ${n.who}</span>` : ''}
+      <span class="right">${n.stories ? n.stories.map(s => `<a class="ref k-product" href="#/product/map/${s}">${icon('bookmark')}<span class="rid">${s}</span></a>`).join('') : ''}${evChip(n.id)}</span></div>
+      ${kids.length && open ? `<ul>${kids.map(node).join('')}</ul>` : ''}</li>`;
+  };
+  return `<p class="eyebrow">Product · founder and product lead</p><h1 tabindex="-1">What we’re building, and why</h1>
+  ${productTabs('opportunities')}
+  <p class="lead">The tree from the outcome to the stories (an Opportunity Solution Tree). Needs nest; capabilities answer them; stories on the map deliver them. A story’s “why” is a link to one of these needs.</p>
+  <div class="row wrap" style="margin:0 0 12px"><button type="button" class="btn quiet small" data-toast="New opportunity under the outcome. Tip: opportunities come from things people said. Attach the finding when you add it.">${icon('add')}Add opportunity</button>
+  <span class="muted small">${icon('attach_file')} marks evidence. O-2 has the most; O-1.2 has none, so it’s a guess worth testing.</span></div>
+  <ul class="tree" aria-label="Opportunity tree">${node(OPP)}</ul>`;
+}
+
+function viewMap(sel){
+  const cols = ACTIVITIES.flatMap(a => a.steps.map(s => ({ a, s })));
+  const tpl = `repeat(${cols.length}, minmax(150px,1fr))`;
+  let html = `<div class="smap" style="grid-template-columns:${tpl}">`;
+  html += ACTIVITIES.map(a => `<div class="act" style="grid-column:span ${a.steps.length}">${a.title}</div>`).join('');
+  html += cols.map(c => `<div class="step">${c.s[0]}</div>`).join('');
+  for (const m of MILESTONES) {
+    html += `<div class="band ${m.current ? 'current' : ''}"><strong>${m.label}</strong><span class="muted">${esc(m.goal)}</span><a class="small push" href="#/work/plan">Milestone in Plan</a></div>`;
+    html += cols.map(c => `<div class="cell">${c.s[1].filter(id => STORIES[id].ms === m.key).map(id => { const s = STORIES[id]; return `<a class="scard" href="#/product/map/${id}" ${sel === id ? 'style="border-color:var(--primary)"' : ''}>${esc(s.t)}<span class="meta"><span class="dot st-${s.st}"></span>${STATUS_LABEL[s.st]}${s.tpl ? ' · template' : ''}${linksFor(id).length ? ` · ${icon('attach_file')}${linksFor(id).length}` : ''}</span></a>`; }).join('')}</div>`).join('');
+  }
+  html += '</div>';
+  return `<p class="eyebrow">Product · founder and product lead</p><h1 tabindex="-1">What we’re building, and why</h1>
+  ${productTabs('map')}
+  <p class="lead">Unchanged, except the bands are now <strong>milestones</strong> from Work › Plan. Moving a story between bands is still a product decision, made here.</p>
+  <div class="map-wrap" tabindex="0" role="region" aria-label="Story map">${html}</div>`;
+}
+
+function storyDrawer(id){
+  const s = STORIES[id]; const opp = s.why ? findNode(OPP, s.why) : null;
+  const proj = PROJECTS.find(p => (p.stories || []).includes(id));
+  return `<p class="eyebrow">Story ${id} · ${MILESTONES.find(m => m.key === s.ms).label}</p><h2 id="drawer-title">${esc(s.t)}</h2>
+  <dl class="kv" style="margin:12px 0 16px"><dt>Status</dt><dd>${STATUS_LABEL[s.st]}</dd>
+    <dt>Why it matters</dt><dd>${opp ? `<a class="ref k-product" href="#/product/opportunities/${opp.id}">${icon('account_tree')}<span class="rid">${opp.id}</span>${esc(opp.title)}</a><br><span class="muted tiny">Was free text. Now a link to a need, so the need’s evidence counts here too.</span>` : '<span class="muted">Template story</span>'}</dd>
+    <dt>Project</dt><dd>${proj ? `<a class="ref k-work" href="#/work/project/${proj.id}">${icon('folder_special')}<span class="rid">${proj.id}</span>${esc(proj.title)}</a>` : '—'}</dd></dl>
+  <p class="muted small">Acceptance, edge cases, pages, Built by and history stay as they are today.</p>
+  ${evidenceSection(id)}`;
+}
+
+function findingHTML(fid){
+  const f = FINDINGS[fid], src = SOURCES[f.src];
+  const ic = { quote:'format_quote', data:'bar_chart', fact:'fact_check', image:'image' }[f.type];
+  let body = f.type === 'quote' ? `<q>${esc(f.text)}</q>` : esc(f.text);
+  if (f.type === 'data') body += chartHTML(f);
+  if (f.type === 'image') body += `<div class="shot" role="img" aria-label="Screenshot crop, highlighted area"><div class="fake"><i style="width:70%"></i><i class="hl" style="width:55%"></i><i style="width:85%"></i><i style="width:40%"></i></div></div>`;
+  return `<div class="finding">${icon(ic)}<div>${body}<span class="src"><button type="button" class="linkbtn" data-src="${f.src}">${esc(src.title)}</button> · ${esc(src.meta.split(' · ')[0])}</span></div></div>`;
+}
+function chartHTML(f){
+  const max = Math.max(...f.data.map(d => d[1]));
+  return `<figure class="chart" style="margin:8px 0 0"><figcaption class="tiny muted">Answers (n = ${f.data.reduce((a, d) => a + d[1], 0)})</figcaption>
+    <div class="bars">${f.data.map(([l, v]) => `<div class="bar-col" tabindex="0" aria-label="${l}: ${v} answers"><span class="v">${v}</span><span class="b" style="height:${v / max * 85}%"></span><span class="tip">${l}: ${v} answers</span></div>`).join('')}</div>
+    <div class="bar-x" aria-hidden="true">${f.data.map(d => `<span>${d[0]}</span>`).join('')}</div>
+    <details><summary>Table</summary><table><thead><tr><th>Walk</th><th>Answers</th></tr></thead><tbody>${f.data.map(d => `<tr><td>${d[0]}</td><td class="tabular">${d[1]}</td></tr>`).join('')}</tbody></table></details></figure>`;
+}
+function insightHTML(iid, dir){
+  const i = INSIGHTS[iid];
+  const used = LINKS.filter(l => l[0] === iid).length;
+  return `<article class="insight ${dir === 'contradicts' ? 'contra' : ''}"><header><span class="rid">${iid}</span>
+    ${dir ? `<span class="chip ${dir === 'contradicts' ? 's-bad' : 's-ok'}">${dir === 'contradicts' ? 'Contradicts' : 'Supports'}</span>` : ''}<span class="muted tiny">Used in ${used} places</span>
+    <h4>${esc(i.text)}</h4></header>${i.f.map(findingHTML).join('')}</article>`;
+}
+function evidenceSection(id){
+  const ls = linksFor(id);
+  const free = Object.keys(INSIGHTS).filter(k => !ls.some(l => l[0] === k));
+  return `<h3>Evidence</h3>${ls.length ? ls.map(l => insightHTML(l[0], l[2])).join('') : '<p class="muted small">No evidence yet: this is an assumption.</p>'}
+  <form class="attach" data-attach="${esc(id)}"><strong class="small">Attach evidence</strong>
+    <label class="small">Insight from the Library<select name="ins">${free.map(k => `<option value="${k}">${k} · ${esc(INSIGHTS[k].text)}</option>`).join('')}</select></label>
+    <div class="row wrap"><span class="dirpick" role="group" aria-label="Direction"><button type="button" aria-pressed="true" data-dir="supports">Supports</button><button type="button" aria-pressed="false" data-dir="contradicts">Contradicts</button></span>
+    <button type="submit" class="btn small" ${free.length ? '' : 'disabled'}>Attach</button></div>
+    <p class="muted tiny" style="margin:0">Or add a new source: paste a link, drop a screenshot or file, or record an interview note. Highlight what matters and it becomes a finding.</p></form>`;
+}
+function evDrawer(id){
+  const r = RECORD(id);
+  const c = CLAIMS.find(x => x.id === id);
+  return `<p class="eyebrow">${esc(r.kind)}</p><h2 id="drawer-title">${esc(r.title)}</h2>
+  ${c && !c.principle ? `<p class="row wrap" style="margin:8px 0 0">${confBtn(c)}<span class="muted small">${{ assumed:'Nothing attached yet.', evidenced:'Supported by evidence, not yet tested.', validated:'A test passed.', contradicted:'Something we learned says otherwise. Revise the claim or attach a stronger finding.' }[confidence(id)]}</span></p>` : ''}
+  <p style="margin:10px 0 0"><a href="${r.href}" class="small">Open the ${esc(r.kind.split(' ·')[0].toLowerCase())}</a></p>
+  ${evidenceSection(id)}`;
+}
+function sourceDrawer(sid){
+  const s = SOURCES[sid];
+  const fs = Object.entries(FINDINGS).filter(([, f]) => f.src === sid).map(([k]) => k);
+  return `<p class="eyebrow">Library · ${esc(s.kind)}</p><h2 id="drawer-title">${esc(s.title)}</h2><p class="muted small">${esc(s.meta)}${s.url ? ` · <span class="mono">${esc(s.url)}</span>` : ''}</p>
+  <h3>Findings</h3>${fs.map(f => { const ins = Object.entries(INSIGHTS).filter(([, i]) => i.f.includes(f)).map(([k]) => k); return `<div class="insight">${findingHTML(f)}<p class="tiny muted" style="margin:6px 0 0 26px">In ${ins.map(k => `<b>${k}</b> ${esc(INSIGHTS[k].text)}`).join(', ') || 'no insight yet'}</p></div>`; }).join('')}
+  <p class="muted tiny">Findings are facts: what was said, seen or counted. Interpretation goes in insights.</p>`;
+}
+
+function viewLibrary(){
+  const groups = {};
+  for (const [iid, rid] of LINKS) { const r = RECORD(rid); (groups[r.layer] ||= {}); (groups[r.layer][rid] ||= []).push(iid); }
+  const byUse = `<ul class="ltree">${LAYER_ORDER.filter(l => groups[l]).map(l => `<li><h2 class="lh">${layerChip(l)}<span class="muted small">${Object.keys(groups[l]).length} record${Object.keys(groups[l]).length === 1 ? '' : 's'}</span></h2><ul>
+    ${Object.entries(groups[l]).map(([rid, ins]) => { const r = RECORD(rid); return `<li><a class="ref k-${l}" href="${r.href}">${icon(r.icon)}<span>${esc(r.title.length > 60 ? r.title.slice(0, 58) + '…' : r.title)}</span></a>${evChip(rid)}<span class="muted tiny">${esc(r.kind)}</span></li>`; }).join('')}</ul></li>`).join('')}</ul>`;
+  const sources = Object.entries(SOURCES).map(([k, s]) => `<div class="srcrow"><span class="ic">${icon(s.icon)}</span><div><button type="button" class="t" data-src="${k}">${esc(s.title)}</button><small>${esc(s.meta)}</small></div>
+    <span class="muted tiny">${Object.values(FINDINGS).filter(f => f.src === k).length} findings</span></div>`).join('');
+  const insights = Object.keys(INSIGHTS).map(k => insightHTML(k)).join('');
+  const views = [['supports','By what it supports'],['sources','Sources'],['insights','Insights']];
+  return `<p class="eyebrow">Library</p><h1 tabindex="-1">Everything we’ve learned</h1>
+  <p class="lead">The home for research from every layer: sources (interviews, links, screenshots, files, data), the findings pulled from them, and the insights they add up to. You rarely need to come here. Evidence shows up on the records it supports.</p>
+  <div class="row wrap" style="margin:0 0 16px"><div class="viewswitch" role="group" aria-label="View">${views.map(([k, l]) => `<a href="#/library" data-lib="${k}" ${state.libView === k ? 'aria-current="page"' : ''}>${l}</a>`).join('')}</div>
+    <button type="button" class="btn small push" data-toast="Add a source: paste a link, drop a screenshot, file or CSV, or write an interview note. Highlighting part of it makes a finding.">${icon('add')}Add source</button></div>
+  <div class="card">${state.libView === 'sources' ? sources : state.libView === 'insights' ? insights : `<p class="hint" style="margin-top:0">The tree follows the layers, so nothing is filed twice. It’s built from what each insight is attached to.</p>${byUse}`}</div>`;
+}
+
+function viewPlan(){
+  const head = `<p class="eyebrow">Work · project lead</p><h1 tabindex="-1">Plan</h1>${workTabs('plan')}
+  <div class="row wrap" style="margin:0 0 14px"><p class="lead" style="margin:0;flex:1 1 420px">Milestones, and the projects that get each one done: foundations as well as features. Items come from each project’s gaps, in layer order. Dates are optional.</p>
+  <div class="viewswitch" role="group" aria-label="Plan view"><a href="#/work/plan" data-plan="roadmap" ${state.planView === 'roadmap' ? 'aria-current="page"' : ''}>${icon('view_agenda')}Roadmap</a><a href="#/work/plan" data-plan="timeline" ${state.planView === 'timeline' ? 'aria-current="page"' : ''}>${icon('timeline')}Timeline</a></div></div>`;
+  if (state.planView === 'timeline') return head + timelineHTML();
+  return head + MILESTONES.map(m => {
+    const ps = PROJECTS.filter(p => p.ms === m.key);
+    const done = ps.filter(p => p.state === 'done').length;
+    return `<section class="ms ${m.current ? 'current' : ''}" aria-labelledby="ms-${m.key}"><div class="ms-head"><h2 id="ms-${m.key}">${m.label}</h2>${m.current ? '<span class="chip s-info">Current</span>' : ''}<span class="muted small">${done} of ${ps.length} projects done</span>
+      <button type="button" class="btn ghost small push" data-toast="New project in ${m.label}. Pick a playbook (feature, foundations, launch) or start blank; the Project lead can shape the brief.">${icon('add')}Project</button></div>
+      <dl><div><dt>Goal</dt><dd>${esc(m.goal)}</dd></div>${m.exit ? `<div><dt>Done when</dt><dd>${esc(m.exit)}</dd></div>` : ''}</dl>
+      <div class="pgrid">${ps.map(pcard).join('')}</div></section>`;
+  }).join('') + `<p class="lbar-legend">${LAYER_ORDER.map(l => `<span><i class="dot" style="background:${LCOLOR[l]}"></i>${LAYER[l][0]}</span>`).join('')} <span>Bars show items done per layer.</span></p>`;
+}
+function pcard(p){
+  const blockers = p.deps.map(d => PROJECTS.find(x => x.id === d)).filter(d => d.state !== 'done');
+  return `<a class="pcard" href="#/work/project/${p.id}"><span class="top"><span class="rid">${p.id}</span>${pstate(p.state)}${p.target ? `<span class="target push">${icon('flag')}${p.target}</span>` : ''}</span>
+    <strong>${esc(p.title)}</strong>${lbar(p.id)}
+    <span class="foot"><span>${roleName[p.lead]}</span>${p.playbook ? '<span>· playbook</span>' : ''}${(p.stories || []).length ? `<span>· ${p.stories.length} ${p.stories.length === 1 ? 'story' : 'stories'}</span>` : ''}
+    ${blockers.length ? (p.violated && p.state === 'progress' ? `<span class="bad">${icon('warning')}Started before ${blockers.map(b => b.id).join(', ')} finished</span>` : `<span>· after ${blockers.map(b => b.id).join(', ')}</span>`) : ''}</span></a>`;
+}
+function depth(p){ const same = p.deps.map(d => PROJECTS.find(x => x.id === d)).filter(d => d.ms === p.ms); return same.length ? 1 + Math.max(...same.map(depth)) : 0; }
+function timelineHTML(){
+  const maxD = Math.max(...PROJECTS.map(depth));
+  const cols = `160px repeat(${maxD + 1}, minmax(150px,1fr))`;
+  let h = `<div class="tl-wrap" tabindex="0" role="region" aria-label="Timeline"><div class="tl" id="tl">
+    <div class="axis" style="grid-template-columns:${cols}"><div>Milestone</div>${Array.from({ length:maxD + 1 }, (_, i) => `<div>Step ${i + 1}</div>`).join('')}</div>`;
+  for (const m of MILESTONES) {
+    const ps = PROJECTS.filter(p => p.ms === m.key);
+    const rows = [];
+    for (const p of ps) { const d = depth(p); let r = rows.findIndex(row => !row[d]); if (r < 0) { rows.push({}); r = rows.length - 1; } rows[r][d] = p; }
+    h += `<div class="lane" style="grid-template-columns:${cols};grid-template-rows:repeat(${rows.length},auto)"><div class="lane-name" style="grid-row:1/span ${rows.length}">${m.label}<small>${esc(m.goal)}</small></div>`;
+    rows.forEach((row, ri) => Object.entries(row).forEach(([d, p]) => {
+      h += `<a class="tbar ${p.state} ${p.violated && p.state === 'progress' ? 'late' : ''}" id="tb-${p.id}" href="#/work/project/${p.id}" style="grid-column:${+d + 2};grid-row:${ri + 1}"><span class="rid">${p.id} · ${PSTATE[p.state]}</span>${esc(p.title)}${p.target ? `<span class="target">${icon('flag')}Target ${p.target}</span>` : ''}${p.violated && p.state === 'progress' ? `<span class="early">${icon('warning')}Started before ${p.violated.join(', ')} finished</span>` : ''}${p.deps.some(d => PROJECTS.find(x => x.id === d).ms !== p.ms) ? `<span class="tiny">After ${p.deps.filter(d => PROJECTS.find(x => x.id === d).ms !== p.ms).join(', ')} (earlier milestone)</span>` : ''}</a>`;
+    }));
+    h += `</div>`;
+  }
+  h += `<svg id="tl-svg" aria-hidden="true"></svg></div></div>
+  <p class="muted small">Milestones run in order. Within one, columns are sequence worked out from “after” links, not calendar weeks: with agents, how fast a step goes depends on batches and your review time. A red dashed line is a project that started before what it depends on finished. The flag is an optional target date.</p>`;
+  return h;
+}
+function drawLinks(){
+  const tl = document.getElementById('tl'), svg = document.getElementById('tl-svg'); if (!tl) return;
+  const base = tl.getBoundingClientRect(); let s = '';
+  for (const p of PROJECTS) for (const d of p.deps) {
+    if (PROJECTS.find(x => x.id === d).ms !== p.ms) continue;
+    const a = document.getElementById('tb-' + d)?.getBoundingClientRect(), b = document.getElementById('tb-' + p.id)?.getBoundingClientRect(); if (!a || !b) continue;
+    const x1 = a.right - base.left, y1 = a.top + a.height / 2 - base.top, x2 = b.left - base.left - 4, y2 = b.top + b.height / 2 - base.top;
+    const bad = (p.violated || []).includes(d) ? 'bad' : ''; const mx = (x1 + x2) / 2;
+    s += `<path class="${bad}" d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}"/><path class="arrow ${bad}" d="M${x2},${y2} l-7,-4 v8 z"/>`;
+  }
+  svg.setAttribute('width', tl.scrollWidth); svg.setAttribute('height', tl.scrollHeight); svg.innerHTML = s;
+}
+
+const BRIEFS = {
+  'P-5':{ problem:'A borrower who found a tool has no polite way to ask, and a lender has no way to choose who borrows.', opps:['O-3','O-2.1'],
+    appetite:['Up to 12 items','About 150k agent tokens','One review sitting'],
+    solution:'A short request (dates and a note) from the tool page. The lender sees the borrower’s name and neighbourhood, then approves or declines. Approval reveals the pickup address.',
+    holes:['Pickup scheduling pulls in chat. Keep it to “the address appears on approval”.','Declines must not feel hostile: no reason required.'],
+    nogos:['No deposits or payments','No messaging thread (that’s P-7)'],
+    reqs:[['FR-001','A signed-in borrower can request a tool for a start and end date, with an optional note.'],['FR-002','WHEN a request is made, THE SYSTEM SHALL notify the lender.'],['FR-003','A lender can approve or decline each request.'],['FR-004','WHEN a request is approved, THE SYSTEM SHALL show the pickup address to the borrower only.']] },
+};
+function viewProject(id){
+  const p = PROJECTS.find(x => x.id === id); if (!p) return '<p>Not found.</p>';
+  const b = BRIEFS[id]; const items = ITEMS.filter(i => i.p === id);
+  const deps = p.deps.map(d => PROJECTS.find(x => x.id === d));
+  const scope = LAYER_ORDER.filter(l => items.some(i => i.layer === l)).map((l, n) => `<li><h3><span class="sec-num">${n + 1}</span>${layerChip(l)}<span class="n">${items.filter(i => i.layer === l && i.state === 'done').length} of ${items.filter(i => i.layer === l).length} done</span></h3>
+    ${items.filter(i => i.layer === l).map(i => `<div class="item"><span class="rid">${i.id}</span><span>${esc(i.title)}${i.by ? `<span class="why bad">Blocked by ${i.by}, added automatically: ${l === 'platform' ? 'a build waits for its page and contract' : l === 'work' ? 'the check waits for the builds' : l === 'pages' ? 'a page waits for its acceptance' : 'access rules wait for the contract'}</span>` : ''}</span>
+      <span class="istate ${i.state}">${icon(ISTATE[i.state][1])}${ISTATE[i.state][0]} · ${i.who}</span></div>`).join('')}</li>`).join('');
+  return `<p class="eyebrow"><a href="#/work/plan">Plan</a> · ${MILESTONES.find(m => m.key === p.ms).label} · ${p.id}</p>
+  <div class="row wrap" style="align-items:flex-start"><h1 tabindex="-1" style="flex:1 1 300px">${esc(p.title)}</h1>
+    ${p.state === 'ready' ? `<button type="button" class="btn" data-act="start" data-id="${p.id}">${icon('play_arrow')}Start project</button>` : pstate(p.state)}</div>
+  ${p.state === 'ready' ? `<div class="callout">${icon('info')}<div>Shaped and ready. Starting it is your bet: its items become available to fill batches, in the order below. Nothing spends until you press Go on a batch.</div></div>` : ''}
+  ${p.violated && p.state === 'progress' ? `<div class="callout warn">${icon('warning')}<div>Started before ${p.violated.join(', ')} (Design foundations) finished. Pages designed now may need rework when the tokens change.</div></div>` : ''}
+  <div class="pdetail"><div>
+    ${b ? `<section class="card"><h2>${icon('description')}Project brief</h2><p class="hint">This was the spec. Shape Up pitch plus numbered requirements, for this increment only.</p>
+      <div class="brief-sec"><h3>Problem</h3><p>${esc(b.problem)}</p><div class="refs" style="margin-top:6px">${b.opps.map(o => `<a class="ref k-product" href="#/product/opportunities/${o}">${icon('account_tree')}<span class="rid">${o}</span>${esc(findNode(OPP, o).title)}</a>`).join('')}${evChip(id)}</div></div>
+      <div class="brief-sec"><h3>Appetite <span class="chip s-plain">Proposed for agent work</span></h3><div class="appetite">${b.appetite.map((a, n) => `<span>${icon(['checklist','toll','rate_review'][n])}${a}</span>`).join('')}</div>
+        <p class="muted tiny" style="margin-top:6px">Measured in items, tokens and your review time rather than weeks. Past it, the Project lead flags the project and you decide: cut scope, extend or stop.</p></div>
+      <div class="brief-sec"><h3>Stories</h3><div class="refs">${p.stories.map(s => `<a class="ref k-product" href="#/product/map/${s}">${icon('bookmark')}<span class="rid">${s}</span>${esc(STORIES[s].t)}</a>`).join('')}</div></div>
+      <div class="brief-sec"><h3>Solution sketch</h3><p>${esc(b.solution)}</p></div>
+      <div class="brief-sec"><h3>Rabbit holes</h3><ul>${b.holes.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>
+      <div class="brief-sec"><h3>No-gos</h3><ul>${b.nogos.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>
+      <div class="brief-sec"><h3>Requirements</h3><ul class="req">${b.reqs.map(([k, t]) => `<li><code>${k}</code><span>${esc(t)}</span></li>`).join('')}</ul></div></section>`
+    : `<section class="card"><h2>${icon('description')}Project brief</h2><p class="hint">${p.state === 'shaping' ? 'Not shaped yet.' : 'Brief from the playbook.'} ${p.playbook ? 'This project came from the default playbook for a new web app.' : ''}</p>
+      <button type="button" class="btn ghost small" data-toast="The Project lead drafts the brief from the stories, their evidence and the Brief’s approach. It comes back for your review.">${icon('auto_awesome')}Shape with the Project lead</button></section>`}
+    <section class="card" style="margin-top:14px"><h2>${icon('account_tree')}Scope, in layer order</h2><p class="hint">Items come from the project’s gaps across layers. Each layer’s items wait for the one before where they depend on it; the rest can run in parallel.</p>
+      ${items.length ? `<ul class="scope">${scope}</ul>` : '<p class="muted small">No items yet. They appear when the project is shaped.</p>'}</section>
+  </div>
+  <aside class="stackv sticky" aria-label="Project details"><section class="panel"><h2>Details</h2><dl class="kv">
+    <dt>State</dt><dd>${pstate(p.state)}</dd><dt>Milestone</dt><dd>${MILESTONES.find(m => m.key === p.ms).label}</dd>
+    <dt>Lead</dt><dd>${roleName[p.lead]}</dd>
+    <dt>After</dt><dd>${deps.length ? deps.map(d => `<a href="#/work/project/${d.id}">${d.id} ${esc(d.title)}</a> ${d.state === 'done' ? '✓' : `(${PSTATE[d.state].toLowerCase()})`}`).join('<br>') : '—'}</dd>
+    <dt>Target date</dt><dd>${p.target || '<span class="muted">None (optional)</span>'}</dd></dl>
+    <div style="margin-top:10px">${lbar(p.id)}</div></section>
+    ${linksFor(id).length ? `<section class="panel"><h2>Evidence</h2><p class="small" style="margin:0">${linksFor(id).map(l => `<b>${l[0]}</b> ${esc(INSIGHTS[l[0]].text)}`).join('<br>')}</p><button type="button" class="linkbtn" data-ev="${id}">Open evidence</button></section>` : ''}
+  </aside></div>`;
+}
+
+function viewBoard(){
+  const scout = ITEMS.filter(i => i.who === 'Scout' && (i.state === 'batched' || i.state === 'review' || i.filled));
+  const card = i => `<div class="bcard ${i.filled ? 'new' : ''}"><span><span class="rid">${i.id}</span>${esc(i.title)}</span><span class="istate ${i.state}">${icon(ISTATE[i.state][1])}${ISTATE[i.state][0]}</span>
+    <span class="sub">${layerChip(i.layer)}${i.p ? `<a class="pchip" href="#/work/project/${i.p}">${icon('folder_special')}${i.p}</a>` : '<span>No project</span>'}${i.filled ? '<span>Added from the plan</span>' : ''}</span></div>`;
+  const queue = ITEMS.filter(i => ['queued','backlog'].includes(i.state) && !i.filled);
+  const groups = [...new Set(queue.map(i => i.p))];
+  return `<p class="eyebrow">Work</p><h1 tabindex="-1">Board</h1>${workTabs('board')}
+  <p class="lead">Batches are unchanged, one per assignee. What’s new is <strong>Fill from plan</strong>: it proposes the next ready items from started projects, in plan order, so you rarely pick from a flat pile.</p>
+  <div class="lanes2">
+    <section class="blane" aria-label="Scout’s batch"><div class="blane-head"><span class="avatar lg bot" style="--metal:#3f7fbf">${icon('smart_toy')}</span><div><strong>Scout</strong><small>Default agent · batch B-8</small></div>
+      <div class="right"><button type="button" class="btn quiet small" data-act="fill">${icon('playlist_add')}Fill from plan</button><button type="button" class="btn small" data-toast="Go: Scout works through the batch on your key. Items lock while it runs.">${icon('play_arrow')}Go</button></div></div>
+      ${scout.map(card).join('')}</section>
+    <section class="blane" aria-label="Your batch"><div class="blane-head"><span class="avatar lg">YO</span><div><strong>You</strong><small>Your batch</small></div>
+      <div class="right"><button type="button" class="btn quiet small" data-toast="Your fill follows the same order: the next ready items assigned to you.">${icon('playlist_add')}Fill from plan</button></div></div>
+      <div class="bcard"><span><span class="rid">W-30</span>Review: Design the Tool detail page</span><span class="istate review">${icon('rate_review')}Ready for review</span><span class="sub">${layerChip('pages')}<a class="pchip" href="#/work/project/P-4">${icon('folder_special')}P-4</a></span></div></section>
+  </div>
+  <div class="row wrap" style="margin:0 0 10px"><h2 style="font-size:16px">Queue and backlog</h2><span class="muted small">Grouped by project. “Add to batch” on any item is still there when you need to jump the order.</span></div>
+  ${groups.map(g => { const p = PROJECTS.find(x => x.id === g); return `<div class="qgroup"><h3>${p ? `<a class="pchip" href="#/work/project/${p.id}">${icon('folder_special')}${p.id}</a>${esc(p.title)} ${pstate(p.state)}` : '<span class="muted">No project (routines and one-offs)</span>'}</h3>
+    <div class="stackv" style="gap:6px">${queue.filter(i => i.p === g).map(i => `<div class="bcard"><span><span class="rid">${i.id}</span>${esc(i.title)}</span><button type="button" class="btn ghost small" data-toast="${i.id} added to ${i.who === 'You' ? 'your' : 'Scout’s'} batch, ahead of the plan order.">Add to batch</button><span class="sub">${layerChip(i.layer)}<span>${ISTATE[i.state][0]}</span></span></div>`).join('')}</div></div>`; }).join('')}`;
+}
+function fillDrawer(){
+  const rows = [
+    ['W-21','Set spacing and elevation tokens','P-2 Design foundations','Queued in a started project, and P-4 depends on it', true],
+    ['W-41','Write acceptance for S-4','P-5 Ask and approve','Unblocks three items. <b>P-5 isn’t started yet:</b> start it to include this', false],
+    ['W-43','Contract the BorrowRequest object','P-5 Ask and approve','Same: waits for you to start P-5', false],
+    ['W-32','Build S-2','P-4 Find a tool','Blocked by W-30, which is waiting for your review', false],
+    ['W-50','Security audit (routine)','No project','Routines follow started projects unless marked urgent', false],
+  ];
+  const p5 = PROJECTS.find(p => p.id === 'P-5').state !== 'ready';
+  return `<p class="eyebrow">Fill Scout’s batch from the plan</p><h2 id="drawer-title">Next ready items</h2>
+  <p class="muted small">Ready means unblocked, in a started project, current milestone first, then project order, then priority. The batch holds up to 10.</p>
+  <ul class="fill-list">${rows.map(([id, t, p, why, ok]) => { const on = ok || (p5 && ['W-41','W-43'].includes(id)); return `<li class="${on ? '' : 'skip'}">${icon(on ? 'check_box' : 'check_box_outline_blank', on ? 'Will add' : 'Skipped')}<div><strong>${id}</strong> ${esc(t)}<small>${p} · ${on && !ok ? 'P-5 is started now, so this is ready' : why}</small></div></li>`; }).join('')}</ul>
+  <div class="row wrap"><button type="button" class="btn" data-act="dofill">${icon('playlist_add')}Add ${p5 ? 3 : 1} to the batch</button>${p5 ? '' : `<a class="btn quiet" href="#/work/project/P-5" data-close>${icon('play_arrow')}Look at P-5</a>`}</div>`;
+}
+
+function viewTeam(){
+  const ROLES = [
+    ['work','Project lead','Plans the work: shapes projects, orders them, fills batches and watches milestones.',[
+      ['Shape a project','Drafts the project brief from its stories and evidence','new'],['Order the plan','Proposes “after” links and the order in a milestone; you accept','new'],
+      ['Fill batches','Proposes the next ready items per assignee; Go stays yours','new'],['Milestone check','Weekly: exit criteria against what is built, and what is slipping','new'],['Appetite check','Flags a project past its items, tokens or review budget','new']]],
+    ['product','Product lead','Shapes what to build and why.',[['Draft the Brief','Claims per section, in Lean Canvas order','new'],['Test an assumption','Turns a risky claim into a research item','new'],['Write acceptance','Given/When/Then for stories',''],['Research','Now on every role, attached where it’s used',''],['Write specs','Moved to the Project lead as “Shape a project”','moved']]],
+    ['work','Reviewer','Checks work against acceptance before it reaches you.',[['Check work against acceptance','Unchanged','']]],
+  ];
+  return `<p class="eyebrow">Work</p><h1 tabindex="-1">Team</h1>${workTabs('team')}
+  <p class="lead">Roles and Agents together: who takes each action, and how. Only the changes are shown; Design, Pages, Data and Platform roles are unchanged except that each gains a Research action.</p>
+  <div class="roles">${ROLES.map(([l, n, blurb, acts]) => `<section class="rolecard ${n === 'Project lead' ? 'newrole' : ''}" aria-label="${n}"><header>${layerChip(l)}<h2 style="margin-top:8px">${n}${n === 'Project lead' ? ' <span class="tag-new">New</span>' : ''}</h2><p>${blurb}</p></header>
+    <ul>${acts.map(([a, d, t]) => `<li><strong>${a}</strong>${t === 'new' ? '<span class="tag-new">New</span>' : t === 'moved' ? '<span class="tag-moved">Moved</span>' : ''}<small>${d}</small></li>`).join('')}</ul></section>`).join('')}
+  <section class="card"><h2>${icon('smart_toy')}Agents</h2><p class="hint" style="margin:0">Unchanged from WORK-UX-01: profiles, models, instructions and usage limits. They sit under Team now.</p></section></div>`;
+}
+
+function viewHome(){
+  const demo = PROJECTS.filter(p => p.ms === 'demo');
+  const cnt = s => demo.filter(p => p.state === s).length;
+  const seg = [['done','var(--ok)'],['progress','var(--primary)'],['ready','var(--p-medium)'],['shaping','var(--line-strong)']];
+  return `<p class="eyebrow">Tool Share · Home</p><h1 tabindex="-1">Tool Share</h1>
+  <p class="lead">The simple view: where the milestone is, what’s running, and what needs you. Planning happens in Work › Plan.</p>
+  <div class="homegrid">
+    <section class="card"><h2>Demo milestone</h2><p class="hint" style="margin:0">${esc(MILESTONES[0].exit)}</p>
+      <div class="bigbar" role="img" aria-label="${seg.map(([s]) => `${cnt(s)} ${PSTATE[s].toLowerCase()}`).join(', ')}">${seg.map(([s, c]) => cnt(s) ? `<i style="flex:${cnt(s)};background:${c}"></i>` : '').join('')}</div>
+      <p class="legend" style="margin:0 0 8px">${seg.map(([s, c]) => `<span><i class="dot" style="background:${c}"></i>${cnt(s)} ${PSTATE[s].toLowerCase()}</span>`).join('')}</p>
+      <a href="#/work/plan" class="small">Open the plan</a></section>
+    <section class="card"><h2><span class="live" aria-hidden="true"></span> Running now</h2><ul class="mini">
+      <li><span class="avatar bot" style="--metal:#3f7fbf">${icon('smart_toy')}</span>Scout · batch B-8 · 1 of 2 · <span class="muted">W-31 Build S-1</span></li></ul>
+      <a href="#/work/board" class="small">Board</a></section>
+    <section class="card"><h2>Needs you <span class="muted small">3</span></h2><ul class="mini">
+      <li>${icon('rate_review')}Review W-30 Design the Tool detail page<a class="push" href="#/work/board">Review</a></li>
+      <li>${icon('play_arrow')}P-5 Ask and approve is ready to start<a class="push" href="#/work/project/P-5">Look</a></li>
+      <li>${icon('report')}A Brief claim is contradicted by evidence<a class="push" href="#/product/brief">Brief</a></li></ul></section>
+  </div>`;
+}
+function viewPlaceholder(name){ return `<p class="eyebrow">${esc(name)}</p><h1 tabindex="-1">${esc(name)}</h1><p class="lead">Unchanged in this prototype. Evidence markers appear on its records the same way (for example the Borrow request page and the Tool object).</p><p><a href="#/library">See what’s attached in the Library</a></p>`; }
+function viewRoutines(){ return `<p class="eyebrow">Work</p><h1 tabindex="-1">Routines</h1>${workTabs('routines')}<p class="lead">Unchanged. One new default: the Project lead’s weekly milestone check.</p>`; }
+
+/* ---------- Router ---------- */
+const route = () => location.hash.replace(/^#\/?/, '').split('/');
+function render(){
+  const [a, b, c] = route();
+  let html, sec = a || 'home';
+  if (a === 'product') html = b === 'opportunities' ? viewOpps(c) : b === 'map' ? viewMap(c) : viewBrief();
+  else if (a === 'library') html = viewLibrary();
+  else if (a === 'work') html = b === 'project' ? viewProject(c) : b === 'board' ? viewBoard() : b === 'team' ? viewTeam() : b === 'routines' ? viewRoutines() : viewPlan();
+  else if (a === 'home' || !a) html = viewHome();
+  else html = viewPlaceholder(a[0].toUpperCase() + a.slice(1));
+  document.getElementById('main').innerHTML = html;
+  document.querySelectorAll('#nav a, .rail nav a').forEach(n => { const on = n.dataset.sec === sec; n.classList.toggle('active', on); on ? n.setAttribute('aria-current', 'page') : n.removeAttribute('aria-current'); });
+  document.getElementById('needs-badge').textContent = PROJECTS.find(p => p.id === 'P-5').state === 'ready' ? 3 : 2;
+  if (a === 'product' && b === 'map' && c && STORIES[c]) openDrawer(storyDrawer(c), false, ['story', c]);
+  if (a === 'product' && b === 'opportunities' && c) document.getElementById('n-' + c)?.scrollIntoView({ block:'center' });
+  requestAnimationFrame(drawLinks);
+}
+const drawer = document.getElementById('drawer'); let drawerFrom = null, drawerKind = null;
+function openDrawer(html, focus = true, kind = null){ document.getElementById('drawer-body').innerHTML = html; drawer.hidden = false; drawerKind = kind; if (focus) { drawerFrom = document.activeElement; drawer.focus(); } }
+function closeDrawer(){ drawer.hidden = true; drawerKind = null; const [a, b, c] = route(); if (a === 'product' && b === 'map' && c) { history.replaceState(null, '', '#/product/map'); render(); } drawerFrom?.focus?.(); }
+function refreshDrawer(){ if (drawer.hidden || !drawerKind) return; const [k, id] = drawerKind; openDrawer(k === 'ev' ? evDrawer(id) : k === 'story' ? storyDrawer(id) : k === 'fill' ? fillDrawer() : sourceDrawer(id), false, drawerKind); }
+let toastTimer; function toast(t){ const el = document.getElementById('toast'); el.textContent = t; el.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => el.hidden = true, 4200); }
+
+document.addEventListener('click', e => {
+  const t = e.target;
+  const ev = t.closest('[data-ev]'); if (ev) { openDrawer(evDrawer(ev.dataset.ev), true, ['ev', ev.dataset.ev]); return; }
+  const src = t.closest('[data-src]'); if (src) { openDrawer(sourceDrawer(src.dataset.src), true, ['src', src.dataset.src]); return; }
+  const ts = t.closest('[data-toast]'); if (ts) { toast(ts.dataset.toast); return; }
+  const pl = t.closest('[data-plan]'); if (pl) { e.preventDefault(); state.planView = pl.dataset.plan; render(); return; }
+  const lb = t.closest('[data-lib]'); if (lb) { e.preventDefault(); state.libView = lb.dataset.lib; render(); return; }
+  const dp = t.closest('.dirpick button'); if (dp) { dp.parentElement.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === dp)); return; }
+  if (t.closest('[data-close]')) { drawer.hidden = true; return; }
+  const act = t.closest('[data-act]'); if (!act) return;
+  switch (act.dataset.act) {
+    case 'biz': state.bizOpen = !state.bizOpen; render(); break;
+    case 'prfaq': toast('The Product lead drafts a PR/FAQ from the Brief’s claims. It’s a generated view, so it updates when the Brief changes; nothing is copied into a separate document.'); break;
+    case 'twist': state.collapsed[act.dataset.id] = !state.collapsed[act.dataset.id]; render(); break;
+    case 'start': { const p = PROJECTS.find(x => x.id === act.dataset.id); p.state = 'progress'; render(); refreshDrawer(); toast(`${p.id} started. Its unblocked items (W-41, W-43) can now fill batches.`); break; }
+    case 'fill': openDrawer(fillDrawer(), true, ['fill']); break;
+    case 'dofill': { const p5 = PROJECTS.find(p => p.id === 'P-5').state !== 'ready'; const ids = p5 ? ['W-21','W-41','W-43'] : ['W-21'];
+      ITEMS.forEach(i => { if (ids.includes(i.id)) { i.filled = true; i.state = 'batched'; } }); drawer.hidden = true; render(); toast(`Added ${ids.join(', ')} to Scout’s batch. Press Go when you’re ready.`); break; }
+  }
+});
+document.addEventListener('submit', e => {
+  const f = e.target.closest('[data-attach]'); if (!f) return; e.preventDefault();
+  const ins = f.ins.value; if (!ins) return;
+  const dir = f.querySelector('.dirpick [aria-pressed="true"]').dataset.dir;
+  LINKS.push([ins, f.dataset.attach, dir]); render(); refreshDrawer();
+  toast(`${ins} now ${dir === 'contradicts' ? 'contradicts' : 'supports'} this. Confidence and the Library update from it.`);
+});
+document.getElementById('close-drawer').onclick = closeDrawer;
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !drawer.hidden) closeDrawer(); });
+window.addEventListener('hashchange', () => { drawer.hidden = true; render(); document.getElementById('main').focus({ preventScroll:true }); window.scrollTo(0, 0); });
+window.addEventListener('resize', () => requestAnimationFrame(drawLinks));
+document.getElementById('reset').onclick = () => { reset(); drawer.hidden = true; render(); toast('Prototype reset.'); };
+
+/* ---------- Brief ledger ---------- */
+const LEDGER = [
+  ['R1','Roadmap and specs leave Product','Product tabs are Brief, Opportunities and Story map. Phases are milestones and specs are project briefs, both in Work › Plan.','#/work/plan'],
+  ['R2','A proven structure for defining the product','The Brief: Lean Canvas order, plus Rumelt’s diagnosis and approach.','#/product/brief'],
+  ['R3','Vision lacks rigor','Every claim has a confidence taken from its evidence, and the riskiest assumptions are ranked with a “Test this” action.','#/product/brief'],
+  ['R4','Keep the story map','Kept. The bands are milestones and a story’s “why” links to an opportunity (click a story).','#/product/map/S-3'],
+  ['R5','Research attached where it’s used, with a home','Evidence markers on claims, opportunities, stories and projects open the evidence drawer. The Library sits in the rail.','#/library'],
+  ['R6','No untethered docs','Docs are gone. Notes are Library sources, and a PR/FAQ is generated from the Brief (button on the Brief).','#/product/brief'],
+  ['R7','A tree for the vision?','The Brief keeps fixed sections; the Opportunities tab is the tree.','#/product/opportunities'],
+  ['R8','How other tools do it','In the work record, §2 and §3.',null],
+  ['R9','A project management role','The Project lead, under Team.','#/work/team'],
+  ['R10','Roles and routines are project management','Work tabs: Plan, Board, Team (Roles and Agents), Routines.','#/work/team'],
+  ['R11','Batching is project management','Board is under Work, next to Plan.','#/work/board'],
+  ['R12','A Gantt chart?','A sequence timeline worked out from “after” links, with optional target dates (DEC-042). Try the Timeline view.','#/work/plan'],
+  ['R13','Simple stack view on Home','Home shows the milestone, what’s running and what needs you.','#/home'],
+  ['R14','Do we need to batch by hand?','Fill from plan proposes items with reasons, and “Add to batch” is still there to jump the order. Try Fill on Scout’s batch, then start P-5 and fill again.','#/work/board'],
+  ['R15','Rename batch?','Kept as “batch” (DEC-042).',null],
+  ['R16','PM belongs in Work','Plan is Work’s first tab.','#/work/plan'],
+  ['R17','Foundations too, not just features','Demo has playbook projects for the brief, design foundations, the preview environment and the walking skeleton.','#/work/plan'],
+];
+document.getElementById('open-brief').onclick = () => openDrawer(`<p class="eyebrow">ROADMAP-01 · ledger</p><h2 id="drawer-title">What you asked for, and where it is</h2>
+  <p class="muted small">Each row is one ask from your brief. “Show me” opens the screen that answers it.</p>
+  <ol class="ledger">${LEDGER.map(([n, ask, ans, href]) => `<li><span class="n">${n}</span><div><p>${esc(ask)}</p><p class="ans">${esc(ans)}${href ? ` <a href="${href}" data-close>Show me</a>` : ''}</p></div></li>`).join('')}</ol>`);
+
+if (!location.hash) history.replaceState(null, '', '#/home');
+render();
+</script>

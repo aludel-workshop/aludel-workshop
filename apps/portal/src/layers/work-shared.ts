@@ -46,7 +46,7 @@ let cardCount = 0;
   selector: 'aludel-ref', standalone: true, imports: [MatIconModule],
   template: `@if (info(); as r) {
     <a [class]="'lay-ref lay-ref-' + r.layer" [href]="r.href" (click)="hide(); ctx.go(r.href, $event)" (mouseenter)="enter()" (mouseleave)="leave()" (focus)="show()" (blur)="leave()"
-      [attr.aria-describedby]="shown() ? cardId : null"><mat-icon aria-hidden="true">{{ r.icon }}</mat-icon><span>{{ short() && r.kind === 'work_item' ? r.label.split(' ')[0] : r.label }}</span></a>
+      [attr.aria-describedby]="shown() ? cardId : null" [attr.aria-label]="short() && shortLabel(r) !== r.label ? r.label : null"><mat-icon aria-hidden="true">{{ r.icon }}</mat-icon><span>{{ short() ? shortLabel(r) : r.label }}</span></a>
     @if (shown()) {
       <div class="lay-refcard" role="tooltip" [id]="cardId" [style.left.px]="position().left" [style.top.px]="position().top" (mouseenter)="enter()" (mouseleave)="leave()">
         <div class="lay-refcard-head"><span [class]="'lay-chip lay-l-' + r.layer"><mat-icon aria-hidden="true">{{ r.icon }}</mat-icon>{{ r.kindLabel }}</span>@if (r.status) { <span class="lay-chip lay-plain">{{ r.status }}</span> }</div>
@@ -65,6 +65,13 @@ export class RefChipComponent {
   readonly short = input(false);
   readonly fallback = input('');
   readonly info = computed(() => this.ctx.refInfo(this.id()));
+  // A compact chip shows a handle, not the whole record (ROADMAP-01): an item, story or project's number, a Brief claim's
+  // section, or the kind of record; the quick view has the rest.
+  shortLabel(r: { kind: string; kindLabel: string; label: string }) {
+    if (['work_item', 'story', 'project'].includes(r.kind)) return r.label.split(' ')[0];
+    if (['brief_claim', 'insight', 'finding', 'source'].includes(r.kind)) return r.kindLabel;
+    return r.label;
+  }
   readonly shown = signal(false);
   readonly position = signal({ left: 0, top: 0 });
   readonly cardId = `lay-refcard-${++cardCount}`;

@@ -2,7 +2,7 @@
 id: portal-layers-knowledge-structures
 kind: domain-model-proposal
 status: proposed
-updated: 2026-09-23
+updated: 2026-09-24
 depends_on: [portal-layers-model, portal-layers-knowledge-research, portal-layers-data-platform-research]
 ---
 
@@ -11,6 +11,26 @@ depends_on: [portal-layers-model, portal-layers-knowledge-research, portal-layer
 The record types, their fields, and how they connect, for every project, Aludel included. Grounded in the [knowledge research](knowledge-research.md) (DEC-037) and the [data, platform and traceability research](data-platform-research.md) (DEC-038). [Prototype v2](v2/index.html) shows Product, Design, Pages and Work; [prototype v3](v3/index.html) adds Data, the Platform operations tabs, Work › Agents and code links, all with Tool Share data.
 
 **Stack rule (DEC-038):** nothing above Platform references stack specifics. Product, Design, Pages and Data are written so any stack could implement them; Platform holds the binding.
+
+## ROADMAP-01 changes (DEC-042/043, built 2026-09-24)
+
+This supersedes parts of the Product section below. See [the work record](../product-and-plan/work-record.md) and [the evidence](../../evidence/roadmap-01-product-and-plan.md).
+
+- **Vision (was Product): Brief · Story map · Documents.**
+  - `brief_claim` {section, text, note} replaces `vision_section`. Sections: problem, customers, diagnosis, value, approach, capabilities, outcomes, principles, business.
+  - A story's `claim` links its why.
+- **Documents:** `doc` {form: written|generated, generator: prfaq|onepager, briefRevision, agents}.
+- **Library (a rail utility):**
+  - `source` {type, title, url, date, by, body};
+  - `finding` {sourceId, type: quote|fact|data|image, text, data};
+  - `insight` {text, strength, tags, findings, comments};
+  - `evidence_link` {insightId, recordId, direction}, on claims, personas, activities, stories, pages, objects, operations and projects.
+  - Research records migrated into sources.
+- **Work › Projects:**
+  - `project` {title, summary, milestone, status, health, lead, start, target, deps, budget, stories, problem, solution, rabbitHoles, noGos, requirements, checkpoints}. It replaces specs.
+  - Phases are milestones, with an optional `target`.
+  - Items carry `plan_project_id` and `checkpoint`.
+- **Roles:** each role records `members` [{id, lead}]. `work_action` has `elevated`. Every role has a review action, and the Work role is Project lead.
 
 ## Navigation
 

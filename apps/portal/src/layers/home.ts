@@ -7,15 +7,15 @@ import { ProjectContext, layerLabel, statusLabel, statusOrder, workStatusLabel }
   template: `
   <p class="lay-eyebrow">{{ ctx.setup()?.project?.name }} · Home</p>
   <h1 tabindex="-1">{{ ctx.setup()?.project?.name }}</h1>
-  <p class="lay-lead">{{ ctx.data()?.vision?.['statement']?.body }}</p>
+  <p class="lay-lead">{{ valueStatement() }}</p>
   <div class="lay-grid lay-g3">
     <section class="lay-card lay-wide" aria-labelledby="home-phase">
-      <div class="lay-row"><h2 id="home-phase" class="lay-flat">{{ currentPhase() }} phase</h2><span class="lay-chip lay-plain">{{ phaseStories().length }} stories</span>
+      <div class="lay-row"><h2 id="home-phase" class="lay-flat">{{ currentPhase() }} milestone</h2><span class="lay-chip lay-plain">{{ phaseStories().length }} stories</span>
         <a class="lay-push" [href]="ctx.link('product', 'map')" (click)="ctx.go(ctx.link('product', 'map'), $event)">Story map</a></div>
       @if (phaseStories().length) {
         <div class="lay-progress" role="img" [attr.aria-label]="progressLabel()">@for (entry of phaseCounts(); track entry.status) { @if (entry.count) { <span [style.width.%]="entry.count / phaseStories().length * 100" [style.background]="statusColor[entry.status]"></span> } }</div>
         <div class="lay-legend">@for (entry of phaseCounts(); track entry.status) { <span><i [style.background]="statusColor[entry.status]"></i>{{ entry.count }} {{ statusLabel[entry.status] }}</span> }</div>
-      } @else { <p class="lay-muted">No stories in this phase yet. <a [href]="ctx.link('product', 'map')" (click)="ctx.go(ctx.link('product', 'map'), $event)">Add some on the story map</a>.</p> }
+      } @else { <p class="lay-muted">No stories in this milestone yet. <a [href]="ctx.link('product', 'map')" (click)="ctx.go(ctx.link('product', 'map'), $event)">Add some on the story map</a>.</p> }
     </section>
     <section class="lay-card" aria-labelledby="home-needs"><h2 id="home-needs">Needs you <span class="lay-count">{{ needsYou().length }}</span></h2>
       @if (needsYou().length) {
@@ -45,6 +45,8 @@ export class HomeLayerComponent {
   readonly layerLabel = layerLabel;
   readonly statusColor: Record<string, string> = { proposed: '#c1c8d8', defined: '#8e9ad0', designed: '#d9708f', built: '#3047b9', shipped: '#146446' };
   readonly currentPhase = computed(() => this.ctx.data()?.phases.find(phase => phase.current)?.label || 'Demo');
+  // The Brief's value proposition (ROADMAP-01), or the older vision statement.
+  readonly valueStatement = computed(() => this.ctx.data()?.claims.find(claim => claim.section === 'value')?.text || this.ctx.data()?.vision?.['statement']?.body || '');
   readonly needsYou = computed(() => (this.ctx.data()?.work || []).filter(item => item.status === 'needs' || item.status === 'review'));
   readonly backlog = computed(() => (this.ctx.data()?.work || []).filter(item => item.status === 'backlog').length);
   readonly phaseStories = computed(() => { const data = this.ctx.data(); const phase = data?.phases.find(item => item.current)?.key || 'demo'; return (data?.stories || []).filter(story => story.phase === phase); });

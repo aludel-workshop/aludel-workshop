@@ -19,9 +19,10 @@ interface Draft { instructions: string; reads: string[]; changes: string[]; tool
   <div class="lay-roles">
     @for (role of roles(); track role.layer) {
       <section class="lay-role" [id]="'role-' + role.layer" [attr.aria-labelledby]="'role-heading-' + role.layer">
-        <header>
-          <span [class]="'lay-chip lay-l-' + role.layer">{{ layerLabel[role.layer] }}</span>
-          <h2 [id]="'role-heading-' + role.layer">{{ role.name }}</h2>
+        <header [class]="'lay-lc-' + role.layer">
+          <div class="lay-row lay-wrap"><span class="lay-tile lay-tile-solid"><mat-icon aria-hidden="true">{{ layerIcon[role.layer] }}</mat-icon></span>
+            <h2 [id]="'role-heading-' + role.layer" class="lay-flat">{{ role.name }}</h2>
+            <span class="lay-refs lay-push">@for (member of role.members; track member.id) { <span class="lay-rchip">@if (member.lead) { <mat-icon aria-label="lead" role="img" class="lay-shield">shield_person</mat-icon> }{{ memberName(member.id) }}</span> }</span></div>
           <p>{{ role.blurb }}</p>
           <details [open]="editingRole() === role.layer" (toggle)="roleToggled(role, $event)"><summary><mat-icon aria-hidden="true">menu_book</mat-icon>Role instructions · revision {{ role.revision }}</summary>
             <form (ngSubmit)="saveRole(role)" class="lay-role-form"><label class="visually-hidden" [for]="'role-instructions-' + role.layer">{{ role.name }} instructions</label>
@@ -39,6 +40,8 @@ interface Draft { instructions: string; reads: string[]; changes: string[]; tool
                   @if (action.assignee?.kind === 'agent' && !ctx.agentReady()) { <small class="lay-warn-text"><mat-icon aria-hidden="true">schedule</mat-icon>Waits until an agent account is connected</small> }</div>
                 <aludel-assignee [assignee]="action.assignee" label="Default assignee" (changed)="assign(action, $event)" />
                 <button type="button" class="lay-setup-btn" [attr.aria-expanded]="openAction() === action.id" [attr.aria-controls]="'setup-' + action.id" (click)="toggle(action)">Setup<mat-icon aria-hidden="true">expand_more</mat-icon></button>
+                <button type="button" class="lay-elev" [attr.aria-pressed]="action.elevated" [attr.aria-label]="'Elevated (leads only): ' + action.name" [title]="action.elevated ? 'Elevated: only leads of this role; an agent given it acts as a lead and its result waits for a human lead' : 'Any member of this role'" (click)="elevate(action)" [disabled]="!action.recordId">
+                  <mat-icon aria-hidden="true">{{ action.elevated ? 'shield_person' : 'shield' }}</mat-icon></button>
               </div>
               @if (openAction() === action.id) {
                 <form class="lay-setup" [id]="'setup-' + action.id" (ngSubmit)="saveAction(action)" [attr.aria-label]="action.name + ' setup'">
@@ -88,7 +91,7 @@ export class WorkRolesComponent {
   readonly editingRole = signal<string | null>(null);
   readonly attachable = computed(() => {
     const data = this.ctx.data(); if (!data) return [];
-    const ids = [...Object.values(data.vision).map(entry => entry.id), ...data.docs.map(entry => entry.id), ...data.research.map(entry => entry.id), ...data.specs.map(entry => entry.id),
+    const ids = [...data.claims.map(entry => entry.id), ...data.insights.map(entry => entry.id), ...data.projects.map(entry => entry.id), ...Object.values(data.vision).map(entry => entry.id), ...data.docs.map(entry => entry.id), ...data.research.map(entry => entry.id), ...data.specs.map(entry => entry.id),
       ...data.stories.map(entry => entry.id), ...data.pages.map(entry => entry.id), ...data.objects.map(entry => entry.id), ...data.operations.map(entry => entry.id), ...data.access.map(entry => entry.id)];
     return ids.map(id => ({ id, label: `${this.ctx.refInfo(id)?.kindLabel}: ${this.ctx.refInfo(id)?.label}` })).filter(option => !this.draft.reads.includes(option.id));
   });
@@ -114,6 +117,14 @@ export class WorkRolesComponent {
     this.openAction.set(action.id);
   }
   toggle(action: WorkAction) { if (this.openAction() === action.id) this.openAction.set(null); else this.open(action); }
+  readonly layerIcon: Record<string, string> = { product: 'lightbulb', design: 'palette', pages: 'web', data: 'schema', platform: 'dns', work: 'checklist' };
+  memberName(id: string) { return id === this.ctx.me() ? 'You' : this.ctx.memberById().get(id)?.name.split(' ')[0] || 'Someone'; }
+  // The shield: elevated actions are for leads of the role (ROADMAP-01, DEC-043).
+  elevate(action: WorkAction) {
+    if (!action.recordId) return;
+    void this.ctx.write(() => this.ctx.change(action.recordId!, { elevated: !action.elevated }, action.revision, `${action.name} is now ${action.elevated ? 'for any member' : 'for leads only'}`),
+      action.elevated ? `${action.name}: any member of the role.` : `${action.name}: leads only.`);
+  }
   without(list: string[], value: string) { return list.filter(entry => entry !== value); }
   attach() { if (this.draft.attach) { this.draft.reads = [...this.draft.reads, this.draft.attach]; this.draft.attach = ''; } }
   addChange() { const value = this.draft.newChange.trim(); if (value && !this.draft.changes.includes(value)) this.draft.changes = [...this.draft.changes, value]; this.draft.newChange = ''; }

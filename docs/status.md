@@ -2,10 +2,10 @@
 id: status-001
 kind: project-status
 status: active
-updated: 2026-09-23
+updated: 2026-09-24
 current_phase: M1
 phase_state: in-progress
-next_action: ROADMAP-01
+next_action: ROADMAP-01R
 ---
 
 # Current project status
@@ -16,11 +16,16 @@ Turn the running local portal foundation into the first complete request → del
 
 ## Next action
 
-**ROADMAP-01: design an action-based roadmap and how agent batches come from it.** Owner (2026-09-23): "that roadmap should be all actions, not just restating the story phases", and asked whether batches should "tie them in to the roadmap". It needs an owner-reviewed direction or prototype before any build. Meanwhile the owner can run real agent batches (DEC-041): Work › Board › stage items in an agent's batch › Go. [Evidence](evidence/lay-04-work-automation.md).
+**ROADMAP-01R: owner review of the built Vision, Library and Work plan.**
+- DEC-043 accepted v3 with final tweaks and authorized the build, which is done and agent-checked.
+- Restart the portal (`./launch-machine`). Start-up migrates each project once: vision sections become Brief claims, research becomes Library sources, and specs and the story map become projects.
+- Then look at Vision › Brief, the Library, Work › Projects (timeline), Items, Next on the Board, Roles (the shield) and Team.
+
+[Evidence and retrospective](evidence/roadmap-01-product-and-plan.md).
 
 ## Ready queue
 
-1. **ROADMAP-01**: an action-based roadmap that batches can be drawn from (design first).
+1. **ROADMAP-01R**: owner review of the built layers (and any follow-ups it finds).
 2. **LAY-05**: coding agents against stories (absorbs B-03B), committing with LAY-07's trailers.
 3. **LAY-06**: Aludel's own knowledge into its layers; retire the hash workspace.
 
@@ -57,6 +62,7 @@ One packet at a time. B-03's worker/artifact/recovery work remains required and 
 
 | Packet | Result | Evidence |
 |---|---|---|
+| ROADMAP-01 | Product became **Vision**: the Brief (claims with confidence from evidence; riskiest assumptions), Story map, and Documents generated from the Brief. **Library**: sources, highlighted findings, insights, and evidence attached anywhere. **Work**: Items (Linear list with a side panel), Projects (Linear-style timeline, project briefs that replace specs, milestones with target dates, budgets), Next, Roles with the elevated shield and a review action per role, and Team. Rainbow layer colours with a tile nav; chips with quick views everywhere. Agent-checked (server 69/69, layers browser with axe and 390px, migration trial on a copy of real data); owner review pending | [Evidence/retrospective](evidence/roadmap-01-product-and-plan.md), [work record](design/product-and-plan/work-record.md) |
 | WORK-UX-01 | Work layer redesign (DEC-041): roles and actions replace working style; flexible agent profiles with robots, models, effort and usage limits; batches per assignee with locking, skip and stop, and results held for review; review checklist with evidence; priority and blocking; backlog from gaps; hover cards; avatars. Agent-checked (server 63/63, layers and onboarding browser, migration on a copy of real data); owner review pending | [Evidence/retrospective](evidence/work-ux-01-work-redesign.md), [work record](design/work-redesign/work-record.md) |
 | LAY-04D | Pasted, checked agent keys with a user guide (DEC-039); agent pool, batches you start with Go, OpenAI/Anthropic runner for acceptance, clarification options and data contracts, review and accept (DEC-040); agent-checked with a provider stand-in | [Evidence/retrospective](evidence/lay-04-work-automation.md) |
 | LAY-04A–C | Verified closing, applied answers, server suggestions, working-style staging and routing, routines; interim project page redirected; agent-checked | [Evidence/retrospective](evidence/lay-04-work-automation.md) |
@@ -83,6 +89,29 @@ One packet at a time. B-03's worker/artifact/recovery work remains required and 
 | M0 research/design | Product loop, local agent path, runner choice, recovery model, product workflow, knowledge boundary, experience architecture, and design-system strategy | [Execution plan](execution-plan.md), [decision register](decisions.md) |
 
 ## Latest handoff
+
+2026-09-24: **ROADMAP-01 built** after the owner accepted v3 (DEC-043). Details are in [the evidence](evidence/roadmap-01-product-and-plan.md). Three things matter for the next session:
+- **Restart the portal to migrate.** The migration was run against a copy of real data: repeatable, and no item changed its project.
+- **Caught before any real data was touched:** a column-name clash that would have moved work items between projects. Now `plan_project_id`.
+- **A pre-existing crash is fixed:** "Mariachi Madness" could not load, because of old stories without `services`.
+
+Next: owner review (ROADMAP-01R), then LAY-05.
+
+2026-09-23: **ROADMAP-01P v3 built** after the owner's v2 review ("v2, nice"). Studied Linear's timeline, peek and project images and borrowed from them. Agents act in the role of their assigned action, and elevated results still wait for a human lead. Agent-checked: 18 routes, both themes, 1400px and 390px, axe clean, 14 interactions scripted. Next: owner review of v3.
+
+2026-09-23: **ROADMAP-01P v2 built** after the owner's v1 review. Recommendations recorded (work record §10):
+- documents come back, with an anchor and a consumer;
+- the opportunity tree is dropped;
+- people have member or lead access per role action, and agents are members only;
+- a Linear and Jira mapping;
+- Next N;
+- Product becomes Vision.
+
+Process: the purpose test now asks about overlap, and prototypes mark each composition as borrowed or invented. Agent-checked: 16 routes in both themes at 1400px and 390px, axe clean, 11 interactions scripted. Next: owner review of v2.
+
+2026-09-23: **DEC-042 recorded and ROADMAP-01P prototype v1 built.** The owner answered: optional target dates, keep "batch", phase → milestone, spec → project brief, the business model optional (a future layer), and the Library in the rail. [Prototype](design/product-and-plan/v1/index.html). Agent-checked: 11 routes in light and dark at 1400px and 390px, axe clean, three interactions scripted. Next: owner review.
+
+2026-09-23: **ROADMAP-01 research and proposal** ([work record](design/product-and-plan/work-record.md)). Primary sources: Lean Canvas, Rumelt, Mehta, OST, impact mapping, atomic research, Productboard, Jira Product Discovery, Dovetail, Linear, Shape Up, Now-Next-Later. No code changed. Process: the purpose test was added to [operating procedure §2](design/process/operating-procedure.md#2-inventory-evidence-for-the-proposed-scope) and applied to the Product tabs; it is unproven. Next: the owner's answers to four questions, then the prototype.
 
 2026-09-23: **WORK-UX-01 built and agent-checked (DEC-041)** after the owner accepted prototype v2.
 - Work now has Board (batches per assignee; Queue, Backlog and Done), Roles, Agents and Routines. Items carry priority, blocking links and a review checklist.

@@ -38,27 +38,66 @@ try {
   await page.goto(`${portal}/p/tool-share`);
   await page.getByRole('heading', { name: 'Tool Share', level: 1 }).waitFor();
   await page.getByText('Neighbours lend and borrow tools they rarely use.').first().waitFor();
-  await page.getByRole('heading', { name: 'Demo phase' }).waitFor();
+  await page.getByRole('heading', { name: 'Demo milestone' }).waitFor();
   assert.match(await page.locator('.lay-legend').innerText(), /3 Built/, 'the Accounts template stories are built after the build');
   await check('home');
 
-  // Product › Vision
-  await layerNav().getByRole('link', { name: 'Product' }).click();
+  // Vision › Brief (ROADMAP-01): claims per section, edited in place; personas under Customers.
+  await layerNav().getByRole('link', { name: 'Vision' }).click();
   await page.getByRole('heading', { name: 'What we\'re building, and why' }).waitFor();
-  await page.getByRole('heading', { name: 'Principles' }).locator('..').getByRole('button', { name: 'Edit' }).click();
-  await page.getByLabel('Principles (one per line)').fill('Neighbourly, never transactional\nRough distance only, never addresses');
-  await page.getByLabel('Why this change').fill('From the first interviews');
+  assert.match(page.url(), /\/p\/tool-share\/vision$/, 'Product is shown as Vision');
+  await page.getByText('Neighbours lend and borrow tools they rarely use.').first().waitFor();
+  const addClaim = async (section, text) => { await page.getByLabel(`Add to ${section}`).fill(text); await page.getByLabel(`Add to ${section}`).press('Enter'); await page.locator('.lay-claim', { hasText: text }).waitFor(); };
+  await addClaim('Problem', 'Lending to someone you barely know feels risky.');
+  await addClaim('Customers', 'Lenders are motivated by earning rent from their tools.');
+  await addClaim('Principles', 'Rough distance only, never addresses');
+  const risky = page.locator('.lay-claim', { hasText: 'Lenders are motivated by earning rent' });
+  await risky.getByRole('button', { name: /^Edit:/ }).click();
+  await page.getByLabel('Claim', { exact: true }).fill('Lenders want to earn rent from their tools.');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
-  await page.getByText('Rough distance only, never addresses').waitFor();
-  await page.getByLabel('Name', { exact: true }).fill('Sam');
-  await page.getByLabel('Role').fill('Borrower');
-  await page.getByLabel('What they need').fill('Needs a tool once, hates buying it');
-  await page.getByRole('button', { name: 'Add persona' }).click();
+  await page.locator('.lay-claim', { hasText: 'Lenders want to earn rent' }).waitFor();
+  await page.getByLabel('Persona name').fill('Sam');
+  await page.getByLabel('Persona role').fill('Borrower');
+  await page.getByRole('button', { name: 'Persona', exact: true }).click();
   await page.getByText('Sam · Borrower').waitFor();
-  await check('product-vision');
+  assert.equal(await page.getByRole('complementary', { name: 'Riskiest assumptions' }).locator('li').count(), 3, 'three unproven claims are the riskiest');
+  await check('vision-brief');
 
-  // Product › Story map
-  await page.getByRole('link', { name: 'Story map' }).click();
+  // Library: a source, a finding made from its text, an insight, and that insight attached as evidence (ROADMAP-01).
+  await page.getByRole('navigation', { name: 'Utilities' }).getByRole('link', { name: 'Library' }).click();
+  await page.getByRole('link', { name: 'Sources' }).click();
+  await page.getByLabel('Title').fill('Interview: Dana, lender');
+  await page.getByLabel(/^Text/).fill('Dana: I lent my drill to a neighbour in March and never saw it again.\nDana: I\'d feel weird charging a neighbour.');
+  await page.getByRole('button', { name: 'Add source' }).click();
+  await page.getByRole('heading', { name: 'Interview: Dana, lender', level: 1 }).waitFor();
+  await page.getByLabel('Finding', { exact: true }).fill('I\'d feel weird charging a neighbour.');
+  await page.getByLabel('Add to insight').selectOption('new');
+  await page.getByRole('textbox', { name: 'New insight' }).fill('Lenders fear loss more than they want income');
+  await page.getByRole('button', { name: 'Save finding' }).click();
+  await page.locator('.lay-transcript mark', { hasText: 'weird charging' }).waitFor();
+  await check('library-source');
+  await page.goto(`${portal}/p/tool-share/library`);
+  await page.getByLabel('Search insights and findings').fill('charging');
+  await page.getByRole('link', { name: /Lenders fear loss/ }).click();
+  await page.getByLabel('Add tag').fill('trust'); await page.getByLabel('Add tag').press('Enter');
+  await page.locator('.lay-itag', { hasText: 'trust' }).waitFor();
+  await page.getByLabel('Comment', { exact: true }).fill('Only one lender so far.');
+  await page.getByRole('button', { name: 'Comment', exact: true }).click();
+  await page.getByText('Only one lender so far.').waitFor();
+  await check('library-insight');
+  await page.goto(`${portal}/p/tool-share/vision`);
+  await page.locator('.lay-claim', { hasText: 'Lenders want to earn rent' }).getByRole('button', { name: 'Assumed' }).click();
+  const evidence = page.getByRole('dialog', { name: 'Lenders want to earn rent from their tools.' });
+  await evidence.getByLabel('From the Library').selectOption({ label: 'Lenders fear loss more than they want income' });
+  await evidence.getByRole('button', { name: 'Contradicts' }).click();
+  await evidence.getByRole('button', { name: 'Attach' }).click();
+  await evidence.locator('.lay-insight-contra').waitFor();
+  await check('vision-evidence');
+  await evidence.getByRole('button', { name: 'Close evidence' }).click();
+  await page.locator('.lay-claim', { hasText: 'Lenders want to earn rent' }).getByRole('button', { name: 'Contradicted' }).waitFor();
+
+  // Vision › Story map: bands are milestones; a story's why is a Brief claim.
+  await tab('Vision', 'Story map').click();
   const map = page.getByRole('region', { name: 'Story map' });
   await map.getByText('Join').first().waitFor();
   assert.equal(await map.locator('.lay-pack').count(), 2, 'both packs are marked on the map');
@@ -72,6 +111,7 @@ try {
   await map.getByRole('link', { name: /Sam can ask to borrow a tool/ }).click();
   const drawer = page.getByRole('dialog');
   await drawer.getByRole('heading', { name: 'Sam can ask to borrow a tool for specific dates' }).waitFor();
+  await drawer.getByLabel('Why: the Brief claim it answers').selectOption({ label: 'Lending to someone you barely know feels risky.' });
   await drawer.getByRole('button', { name: 'Add scenario' }).click();
   await drawer.getByLabel('Given').fill('an available tool');
   await drawer.getByLabel('When').fill('Sam picks dates and sends a request');
@@ -80,35 +120,28 @@ try {
   await drawer.getByRole('button', { name: 'Save story' }).click();
   await drawer.getByText('Agreed with Priya in the kickoff').waitFor();
   await until(async () => (await drawer.locator('.lay-chip').first().innerText()) === 'Defined', 'acceptance makes the story Defined');
-  await check('product-map-story');
+  await drawer.locator('.lay-why').getByRole('link', { name: /Problem: Lending to someone/ }).waitFor();
+  await check('vision-map-story');
   await drawer.getByRole('link', { name: 'Close story' }).click();
 
-  // Product › Specs, Docs, Research, Roadmap
-  await page.getByRole('link', { name: 'Specs' }).click();
-  await page.getByPlaceholder(/New spec/).fill('Ask to borrow, and get an answer');
-  await page.getByRole('button', { name: 'New spec' }).click();
-  await page.getByRole('button', { name: 'Save spec' }).waitFor();
-  await page.getByRole('checkbox', { name: /Sam can ask to borrow/ }).check();
-  await page.getByLabel('Problem').fill('Sam can find a tool but cannot ask for it.');
-  await page.getByLabel('Requirements (one per line)').fill('FR-001 The system must let a signed-in person request a tool for a start and end date.\nFR-002 WHEN a request is sent, the system must notify the lender.');
-  await page.getByRole('button', { name: 'Save spec' }).click();
-  await page.getByText('Spec saved.').waitFor();
-  await check('product-spec');
-  await page.getByRole('link', { name: 'Docs' }).click();
-  await page.getByText('Free-form documents, organised your way.').waitFor();
-  await page.getByLabel('Title').fill('Launch plan');
-  await page.getByLabel('Template').selectOption('PR/FAQ');
-  await page.getByRole('button', { name: 'Create' }).click();
-  await until(async () => (await page.getByLabel('Document (Markdown)').inputValue()).includes('# Press release'), 'templates seed the document');
-  await page.getByRole('link', { name: 'Research' }).click();
-  await page.getByRole('heading', { name: 'Add research' }).waitFor();
-  await page.getByLabel('Title').fill('Interview: Maya');
-  await page.getByLabel('Notes').fill('“I bought a tile cutter for one bathroom.”');
-  await page.getByRole('button', { name: 'Add' }).click();
-  await page.getByRole('heading', { name: 'Interview: Maya' }).waitFor();
-  await page.getByRole('link', { name: 'Roadmap' }).click();
-  await page.getByRole('heading', { name: 'MVP' }).waitFor();
-  await check('product-roadmap');
+  // Vision › Documents: a PR/FAQ generated from the Brief goes out of date when the Brief changes.
+  await tab('Vision', 'Documents').click();
+  await page.getByRole('button', { name: 'Generate PR/FAQ' }).click();
+  await page.getByText(/Up to date with Brief revision/).waitFor();
+  await page.locator('.lay-docbody').getByText(/Rough distance only, never addresses/).waitFor();
+  await page.getByLabel('Agents read this').check();
+  await page.getByText('Agents now read this document.').waitFor();
+  await tab('Vision', 'Brief').click();
+  await addClaim('Approach', 'Start with one neighbourhood.');
+  await tab('Vision', 'Documents').click();
+  await page.getByRole('link', { name: /PR\/FAQ/ }).click();
+  await page.getByText('1 Brief change since.').waitFor();
+  await page.getByRole('button', { name: 'Regenerate' }).click();
+  await page.getByText(/Up to date with Brief revision/).waitFor();
+  await check('vision-document');
+  // Old Product tabs point to where things moved.
+  await page.goto(`${portal}/p/tool-share/product/specs`);
+  await page.getByRole('heading', { name: 'This moved' }).waitFor();
 
   // Pages
   await layerNav().getByRole('link', { name: 'Pages' }).click();
@@ -379,7 +412,7 @@ try {
   await page.getByRole('heading', { name: 'Product lead' }).waitFor();
   await page.locator('#action-product\\.spec').getByRole('button', { name: 'Change default assignee' }).click();
   await page.getByRole('menuitem', { name: /You \(Ada Lovelace\)/ }).click();
-  await toast('New “Write specs” items go to You. Existing items keep their assignee.');
+  await toast('New “Shape project briefs” items go to You. Existing items keep their assignee.');
   await page.locator('#action-platform\\.implement').getByRole('button', { name: 'Setup' }).click();
   const setup = page.getByRole('form', { name: 'Build stories setup' });
   await setup.getByLabel('Instructions for Build stories').fill('One story per build. Commit with Aludel-Work and Implements trailers.');
@@ -388,9 +421,49 @@ try {
   await page.getByRole('button', { name: 'Save Build stories' }).click();
   await toast('Build stories saved. New work and runs use it.');
   await check('work-roles');
+  // The shield marks an action for leads only (DEC-043).
+  const shield = page.getByRole('button', { name: 'Elevated (leads only): Research' });
+  assert.equal(await shield.getAttribute('aria-pressed'), 'false');
+  await shield.click();
+  await toast('Research: leads only.');
+  assert.equal(await page.getByRole('button', { name: 'Elevated (leads only): Research' }).getAttribute('aria-pressed'), 'true');
+
+  // Work › Projects (ROADMAP-01): story-map activities became projects; set dates, add a story, see it on the timeline.
+  await page.goto(`${portal}/p/tool-share/work/projects`);
+  await page.getByRole('region', { name: 'Project timeline' }).waitFor();
+  await page.getByRole('region', { name: 'Project timeline' }).getByRole('button', { name: 'Set dates' }).first().click();
+  await toast(/Saved\./);
+  assert.ok(await page.locator('.lay-tl-bar').count() >= 1, 'a dated project draws a bar');
+  await check('work-projects-timeline');
+  await page.getByRole('button', { name: 'List' }).click();
+  await page.getByRole('region', { name: 'Projects' }).getByRole('link', { name: /Talk it over/ }).first().click();
+  await page.getByLabel('Project name').waitFor();
+  await page.getByLabel('Add a story').selectOption({ label: await page.getByLabel('Add a story').locator('option', { hasText: 'Sam can ask to borrow' }).innerText() });
+  await toast('Saved.');
+  await page.getByLabel('Problem').fill('Sam can find a tool but cannot ask for it.');
+  await page.getByRole('button', { name: 'Save brief' }).click();
+  await toast('Saved.');
+  await check('work-project');
+
+  // Work › Items: one list, grouped; a row opens the item beside it.
+  await page.goto(`${portal}/p/tool-share/work/items`);
+  await page.getByRole('heading', { name: 'Items', level: 1 }).waitFor();
+  await page.locator('.lay-irow').first().click();
+  await page.getByRole('dialog').getByRole('link', { name: 'Open full page' }).waitFor();
+  await check('work-items');
+
+  // Next (DEC-043): fills your batch with your queued, unblocked items in the current milestone, by priority.
+  await page.goto(`${portal}/p/tool-share/work`);
+  await page.getByRole('region', { name: 'Your batch' }).getByRole('button', { name: 'Change how many: 5' }).click();
+  await page.getByLabel('How many', { exact: true }).fill('1');
+  await page.getByLabel('How many', { exact: true }).press('Enter');
+  await page.getByRole('region', { name: 'Your batch' }).getByRole('button', { name: /^Next/ }).click();
+  await page.getByRole('status').getByText(/^(Added 1 item to your batch|Nothing is ready for you in Demo)\./).waitFor();
 
   // Agents (B4, B5, C1-C5): a new profile with its robot, model from the account, effort and usage limits.
-  await page.goto(`${portal}/p/tool-share/work/agents`);
+  await page.goto(`${portal}/p/tool-share/work/team`);
+  await page.getByRole('heading', { name: 'People' }).waitFor();
+  await page.getByRole('region', { name: 'People' }).getByText('Project lead').waitFor();
   await page.getByRole('heading', { name: 'Project instructions' }).waitFor();
   await page.getByRole('button', { name: 'Export AGENTS.md' }).click();
   await toast(/AGENTS.md written to the workspace/);
@@ -470,7 +543,7 @@ try {
   await stranger.close();
 
   await page.setViewportSize({ width: 390, height: 844 });
-  for (const path of ['', '/product/map', '/pages/tree', '/data/objects', '/data/api', '/platform', '/platform/code', '/platform/database', '/work', '/work/roles', '/work/agents', `/work/item/${blocker.id}`]) {
+  for (const path of ['', '/vision', '/vision/map', '/vision/docs', '/library', '/library/sources', '/pages/tree', '/data/objects', '/data/api', '/platform', '/platform/code', '/platform/database', '/work', '/work/items', '/work/projects', '/work/roles', '/work/team', `/work/item/${blocker.id}`]) {
     await page.goto(`${portal}/p/tool-share${path}`);
     await page.locator('.lay-main h1').waitFor();
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `${path || 'home'} overflows at 390px`);
@@ -482,5 +555,5 @@ try {
   await page.waitForURL(`${portal}/`);
 
   assert.deepEqual(errors, []);
-  console.log(`PASS: layers ${checked.join(' → ')}; pack stories and template work; story edits with rationale; spec, doc, research; page canvas, linking and designed status; Data objects, fields, relations, contracts, OpenAPI export and access; Platform release, binding, code units, repository, health, database backup/restore, masked browse and guarded query; agent profiles (robot, model, effort, limits), your avatar, AGENTS.md export; roles and action setup; suspect code to a Reconcile item and back; per-assignee batches (stage, Go, review checklist, accept, send back), reassigning between batches, priority and blocking, applied answers, verified closing, routines; backlog to done work; search; member isolation; 390px; sign out.`);
+  console.log(`PASS: layers ${checked.join(' → ')}; pack stories and template work; Brief claims, personas and riskiest assumptions; Library source, finding, insight, tag, comment; evidence contradicting a claim; story why linked to a claim; generated PR/FAQ going stale and regenerated; story edits with rationale; projects timeline, dates, stories and brief; items list and side panel; Next; the elevated shield; People and agents on Team; page canvas, linking and designed status; Data objects, fields, relations, contracts, OpenAPI export and access; Platform release, binding, code units, repository, health, database backup/restore, masked browse and guarded query; agent profiles (robot, model, effort, limits), your avatar, AGENTS.md export; roles and action setup; suspect code to a Reconcile item and back; per-assignee batches (stage, Go, review checklist, accept, send back), reassigning between batches, priority and blocking, applied answers, verified closing, routines; backlog to done work; search; member isolation; 390px; sign out.`);
 } finally { await browser.close(); }

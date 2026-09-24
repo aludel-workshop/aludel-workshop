@@ -2,13 +2,55 @@
   "schemaVersion": 1,
   "note": "Default routines seeded into every project's Work › Routines (LAY-04C). A routine creates an ordinary work item when due, never a second one while its last is still open. Cadence: weekly, monthly, or before-release (each preview build).",
   "routines": [
-    { "key": "product-drift", "title": "Product drift check", "layer": "product", "type": "audit", "cadence": "weekly",
-      "documents": ["Product › stories whose built behaviour and acceptance disagree"] },
-    { "key": "accessibility", "title": "Accessibility sweep", "layer": "pages", "type": "audit", "cadence": "weekly",
-      "documents": ["Pages › pages with contrast, focus or labelling problems"] },
-    { "key": "dependencies", "title": "Dependency updates", "layer": "platform", "type": "configure", "cadence": "monthly",
-      "documents": ["Platform › dependency versions and what changed"] },
-    { "key": "security", "title": "Security audit before release", "layer": "platform", "type": "audit", "cadence": "before-release",
-      "documents": ["Platform › security findings for this release"] }
+    {
+      "key": "product-drift",
+      "title": "Product drift check",
+      "layer": "product",
+      "type": "audit",
+      "cadence": "weekly",
+      "documents": [
+        "Product › stories whose built behaviour and acceptance disagree"
+      ]
+    },
+    {
+      "key": "accessibility",
+      "title": "Accessibility sweep",
+      "layer": "pages",
+      "type": "audit",
+      "cadence": "weekly",
+      "documents": [
+        "Pages › pages with contrast, focus or labelling problems"
+      ]
+    },
+    {
+      "key": "dependencies",
+      "title": "Dependency updates",
+      "layer": "platform",
+      "type": "configure",
+      "cadence": "monthly",
+      "documents": [
+        "Platform › dependency versions and what changed"
+      ]
+    },
+    {
+      "key": "security",
+      "title": "Security audit before release",
+      "layer": "platform",
+      "type": "audit",
+      "cadence": "before-release",
+      "documents": [
+        "Platform › security findings for this release"
+      ]
+    },
+    {
+      "key": "milestone-check",
+      "title": "Milestone check",
+      "layer": "work",
+      "type": "audit",
+      "cadence": "weekly",
+      "documents": [
+        "Work › projects past their target date or budget"
+      ]
+    }
   ]
 }

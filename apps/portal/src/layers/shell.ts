@@ -6,7 +6,7 @@ import { contrastText, readableAccent } from '../color';
 import { DomSanitizer } from '@angular/platform-browser';
 import { personAvatar } from '../avatars';
 import { AvatarEditorComponent } from './avatar-editor';
-import { PersonAvatar, ProjectContext, dataStatusLabel, statusLabel, unitStateLabel, workStatusLabel } from './context';
+import { PersonAvatar, ProjectContext, dataStatusLabel, phaseName, sectionTitle, statusLabel, unitStateLabel, workStatusLabel } from './context';
 import { DesignLayerComponent } from './design';
 import { PagesLayerComponent } from './pages';
 import { DataLayerComponent } from './data';
@@ -14,13 +14,16 @@ import { PlatformLayerComponent } from './platform';
 import { ProductLayerComponent } from './product';
 import { WorkLayerComponent } from './work';
 import { HomeLayerComponent } from './home';
+import { LibraryComponent } from './library';
+import { EvidencePanelComponent } from './evidence';
 
-const layers = [{ id: 'home', icon: 'home', label: 'Home' }, { id: 'product', icon: 'lightbulb', label: 'Product' }, { id: 'design', icon: 'palette', label: 'Design' }, { id: 'pages', icon: 'web', label: 'Pages' }, { id: 'data', icon: 'schema', label: 'Data' }, { id: 'platform', icon: 'dns', label: 'Platform' }, { id: 'work', icon: 'checklist', label: 'Work' }];
+// ROADMAP-01 (DEC-043): Product is shown as Vision (URLs /vision/…; the internal layer key stays `product`), and each layer has one colour.
+const layers = [{ id: 'home', icon: 'home', label: 'Home' }, { id: 'product', icon: 'lightbulb', label: 'Vision' }, { id: 'design', icon: 'palette', label: 'Design' }, { id: 'pages', icon: 'web', label: 'Pages' }, { id: 'data', icon: 'schema', label: 'Data' }, { id: 'platform', icon: 'dns', label: 'Platform' }, { id: 'work', icon: 'checklist', label: 'Work' }];
 
 // LAY-02: every project's workspace at /p/<slug>/<layer>/<tab>/<id>. The layer comes first (DEC-036).
 @Component({
   selector: 'aludel-project-shell', standalone: true,
-  imports: [FormsModule, MatIconModule, AvatarEditorComponent, HomeLayerComponent, ProductLayerComponent, DesignLayerComponent, PagesLayerComponent, DataLayerComponent, PlatformLayerComponent, WorkLayerComponent],
+  imports: [FormsModule, MatIconModule, AvatarEditorComponent, HomeLayerComponent, ProductLayerComponent, DesignLayerComponent, PagesLayerComponent, DataLayerComponent, PlatformLayerComponent, WorkLayerComponent, LibraryComponent, EvidencePanelComponent],
   providers: [ProjectContext],
   template: `
   <a class="skip-link" href="#lay-main">Skip to content</a>
@@ -29,18 +32,21 @@ const layers = [{ id: 'home', icon: 'home', label: 'Home' }, { id: 'product', ic
       <a class="lay-brand" href="/projects"><mat-icon aria-hidden="true">deployed_code</mat-icon>Aludel</a>
       @if (ctx.setup(); as setup) {
         <a class="lay-project" [href]="ctx.link()" (click)="ctx.go(ctx.link(), $event)"><span class="lay-mark" [style.background]="markColor()" [style.color]="markText()" aria-hidden="true">{{ initials(setup.project.name) }}</span>
-          <span><strong>{{ setup.project.name }}</strong><small>{{ currentPhase() }} phase</small></span></a>
+          <span><strong>{{ setup.project.name }}</strong><small>{{ currentPhase() }} milestone</small></span></a>
       }
       <nav class="lay-nav" aria-label="Layers">
         @for (item of layers; track item.id) {
-          <a [href]="item.id === 'home' ? ctx.link() : ctx.link(item.id)" (click)="ctx.go(item.id === 'home' ? ctx.link() : ctx.link(item.id), $event)" [class.active]="layer() === item.id" [attr.aria-current]="layer() === item.id ? 'page' : null">
-            <mat-icon aria-hidden="true">{{ item.icon }}</mat-icon>{{ item.label }}
+          <a [class]="'lay-lc-' + item.id" [href]="item.id === 'home' ? ctx.link() : ctx.link(item.id)" (click)="ctx.go(item.id === 'home' ? ctx.link() : ctx.link(item.id), $event)" [class.active]="layer() === item.id" [attr.aria-current]="layer() === item.id ? 'page' : null">
+            <span class="lay-tile"><mat-icon aria-hidden="true">{{ item.icon }}</mat-icon></span>{{ item.label }}
             @if (item.id === 'work' && needsYou().length) { <span class="lay-badge" [attr.aria-label]="needsYou().length + ' need you'">{{ needsYou().length }}</span> }
           </a>
         }
       </nav>
       <div class="lay-spacer"></div>
-      <a class="lay-settings" [href]="ctx.link('settings')" (click)="ctx.go(ctx.link('settings'), $event)" [class.active]="layer() === 'settings'"><mat-icon aria-hidden="true">settings</mat-icon>Settings</a>
+      <nav class="lay-nav" aria-label="Utilities">
+        <a class="lay-lc-library" [href]="ctx.link('library')" (click)="ctx.go(ctx.link('library'), $event)" [class.active]="layer() === 'library'" [attr.aria-current]="layer() === 'library' ? 'page' : null"><span class="lay-tile"><mat-icon aria-hidden="true">local_library</mat-icon></span>Library</a>
+        <a class="lay-settings lay-lc-settings" [href]="ctx.link('settings')" (click)="ctx.go(ctx.link('settings'), $event)" [class.active]="layer() === 'settings'" [attr.aria-current]="layer() === 'settings' ? 'page' : null"><span class="lay-tile"><mat-icon aria-hidden="true">settings</mat-icon></span>Settings</a>
+      </nav>
       <div class="lay-account-wrap">
         <button type="button" class="lay-account" (click)="menu.set(!menu())" [attr.aria-expanded]="menu()" aria-controls="lay-account-menu" [attr.aria-label]="'Account menu, ' + (user()?.name || 'you')">
           <img class="lay-av lay-av-md" [src]="myAvatar()" alt="" aria-hidden="true"><span><strong>{{ user()?.name }}</strong><small>{{ user()?.email || 'Owner access key' }}</small></span></button>
@@ -69,7 +75,7 @@ const layers = [{ id: 'home', icon: 'home', label: 'Home' }, { id: 'product', ic
           }
         </div>
       </div>
-      <main class="lay-main" id="lay-main" tabindex="-1">
+      <main [class]="'lay-main lay-lc-' + layerColour()" id="lay-main" tabindex="-1">
         @if (ctx.workingOn(); as current) {
           <div class="lay-working" role="status"><mat-icon aria-hidden="true">assignment</mat-icon><span>Working on <strong>{{ current.ref }}</strong>: edits to its targets are saved as its output.</span>
             <a [href]="ctx.link('work', 'item', current.id)" (click)="ctx.go(ctx.link('work', 'item', current.id), $event)">Back to {{ current.ref }}</a><button type="button" class="lay-link-button" (click)="ctx.workingOn.set(null)">Stop</button></div>
@@ -86,6 +92,7 @@ const layers = [{ id: 'home', icon: 'home', label: 'Home' }, { id: 'product', ic
             @case ('data') { <aludel-data-layer /> }
             @case ('platform') { <aludel-platform-layer /> }
             @case ('work') { <aludel-work-layer /> }
+            @case ('library') { <aludel-library /> }
             @case ('settings') {
               <p class="lay-eyebrow">Settings</p><h1 tabindex="-1">{{ ctx.setup()?.project?.name }} settings</h1>
               <div class="lay-grid lay-g2"><section class="lay-card"><h2>Project</h2><dl class="lay-kv"><dt>Name</dt><dd>{{ ctx.setup()?.project?.name }}</dd><dt>Address</dt><dd><code>{{ ctx.setup()?.urls?.app }}</code></dd><dt>Members</dt><dd>You (owner)</dd></dl></section>
@@ -100,6 +107,7 @@ const layers = [{ id: 'home', icon: 'home', label: 'Home' }, { id: 'product', ic
             @default { <aludel-home-layer /> }
           }
         } @else { <p class="lay-muted">Loading…</p> }
+        @if (ctx.data()) { <aludel-evidence-panel /> }
       </main>
     </div>
   </div>`
@@ -113,31 +121,37 @@ export class ProjectShellComponent implements OnInit {
   readonly missing = signal(false);
   readonly q = signal('');
   query = '';
-  readonly layer = computed(() => this.ctx.segments()[0] || 'home');
+  // /vision/… is the Product layer; old /product/… links still open it.
+  readonly layer = computed(() => { const segment = this.ctx.segments()[0] || 'home'; return segment === 'vision' ? 'product' : segment; });
+  readonly layerColour = computed(() => ['account'].includes(this.layer()) ? 'settings' : this.layer());
   readonly user = computed(() => this.ctx.session()?.user || null);
   readonly needsYou = computed(() => (this.ctx.data()?.work || []).filter(item => item.status === 'needs' || item.status === 'review'));
   private readonly sanitizer = inject(DomSanitizer);
   readonly myAvatar = computed(() => this.sanitizer.bypassSecurityTrustUrl(personAvatar(this.user()?.avatar as PersonAvatar | null, this.user()?.name || 'you')));
   readonly currentPhase = computed(() => this.ctx.data()?.phases.find(phase => phase.current)?.label || 'Demo');
+  // Milestones replaced phases in the language (ROADMAP-01).
   readonly results = computed(() => {
     const term = this.q().trim().toLowerCase(); const data = this.ctx.data();
     if (!term || !data) return [];
     const groups = [
+      { label: 'Brief', hits: data.claims.map(claim => ({ text: claim.text, sub: sectionTitle(claim.section), href: this.ctx.link('product', 'brief', claim.id) })) },
+      { label: 'Library', hits: [...data.insights.map(insight => ({ text: insight.text, sub: 'Insight', href: this.ctx.link('library', 'insight', insight.id) })), ...data.sources.map(source => ({ text: source.title, sub: source.type, href: this.ctx.link('library', 'source', source.id) }))] },
+      { label: 'Projects', hits: data.projects.map(project => ({ text: `${project.ref} ${project.title}`, sub: phaseName(project.milestone), href: this.ctx.link('work', 'projects', project.id) })) },
       { label: 'Story map', hits: data.stories.map(story => ({ text: `${story.ref} ${story.title}`, sub: statusLabel[story.status], href: this.ctx.link('product', 'map', story.id) })) },
-      { label: 'Specs', hits: data.specs.map(spec => ({ text: `${spec.ref} ${spec.title}`, sub: spec.status, href: this.ctx.link('product', 'specs', spec.id) })) },
-      { label: 'Docs and research', hits: [...data.docs.map(doc => ({ text: doc.title, sub: doc.template, href: this.ctx.link('product', 'docs', doc.id) })), ...data.research.map(item => ({ text: item.title, sub: 'Research', href: this.ctx.link('product', 'research') }))] },
+      { label: 'Documents', hits: data.docs.map(doc => ({ text: doc.title, sub: doc.form === 'generated' ? 'Generated' : 'Written', href: this.ctx.link('product', 'docs', doc.id) })) },
       { label: 'Pages', hits: data.pages.map(page => ({ text: `${page.label} page`, sub: page.origin, href: this.ctx.link('pages', 'tree', page.id) })) },
       { label: 'Data', hits: [...data.objects.map(object => ({ text: `${object.name} object`, sub: dataStatusLabel[object.status], href: this.ctx.link('data', 'objects', object.id) })),
         ...data.operations.map(op => ({ text: `${op.method} ${op.path}`, sub: `${op.operationId} · ${op.summary}`, href: this.ctx.link('data', 'api', op.id) }))] },
       { label: 'Code', hits: data.code.units.filter(unit => unit.kind !== 'const').map(unit => ({ text: unit.symbol, sub: `${unit.path} · ${unitStateLabel[unit.state]}`, href: this.ctx.link('platform', 'code', unit.id) })) },
-      { label: 'Work', hits: data.work.map(item => ({ text: `${item.ref} ${item.title}`, sub: workStatusLabel[item.status], href: this.ctx.link('work', 'item', item.id) })) }
+      { label: 'Work', hits: data.work.map(item => ({ text: `${item.ref} ${item.title}`, sub: workStatusLabel[item.status], href: this.ctx.link('work', 'items', item.id) })) }
     ];
     return groups.map(group => ({ ...group, hits: group.hits.filter(hit => `${hit.text} ${hit.sub}`.toLowerCase().includes(term)).slice(0, 5) })).filter(group => group.hits.length);
   });
 
   constructor() {
     window.addEventListener('popstate', () => this.ctx.path.set(location.pathname));
-    effect(() => { const layer = this.layer(); document.title = `${layer === 'home' ? 'Home' : layer.charAt(0).toUpperCase() + layer.slice(1)} · ${this.ctx.setup()?.project.name || 'Aludel'}`; });
+    effect(() => { if (this.ctx.segments()[0] === 'product') { const path = this.ctx.link(...this.ctx.segments()); history.replaceState({}, '', path); this.ctx.path.set(path); } });
+    effect(() => { const layer = this.layer(); document.title = `${layer === 'home' ? 'Home' : layer === 'product' ? 'Vision' : layer.charAt(0).toUpperCase() + layer.slice(1)} · ${this.ctx.setup()?.project.name || 'Aludel'}`; });
   }
 
   async ngOnInit() {

@@ -1,4 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Assignee, Batch, ProjectContext, WorkItem, priorityOrder } from './context';
@@ -10,7 +11,7 @@ interface Lane { key: string; who: Assignee; title: string; items: WorkItem[]; b
 // Work › Board (WORK-UX-01): batches are what's being worked on now, one per assignee; agent results stay in their batch
 // until someone clears them. Everything else waits in Queue or Backlog, highest priority first; Done keeps the history.
 @Component({
-  selector: 'aludel-work-board', standalone: true, imports: [MatIconModule, MatTooltipModule, AvatarComponent, WorkCardComponent],
+  selector: 'aludel-work-board', standalone: true, imports: [FormsModule, MatIconModule, MatTooltipModule, AvatarComponent, WorkCardComponent],
   template: `
   <div class="lay-section-head"><h2>Batches</h2><span class="lay-muted small">Agent results stay in their batch until you clear them</span></div>
   <div class="lay-lanes">
@@ -19,6 +20,11 @@ interface Lane { key: string; who: Assignee; title: string; items: WorkItem[]; b
         <div class="lay-lane-head"><aludel-avatar [who]="lane.who" size="lg" />
           <div class="lay-lane-who"><strong>{{ lane.title }}</strong><small>{{ laneNote(lane) }}</small></div>
           <div class="lay-lane-right">
+            @if (!running(lane)) {
+              <span class="lay-nextsplit"><button type="button" (click)="next(lane)" [matTooltip]="'Adds the next ' + count(lane) + ' queued, unblocked items for ' + lane.title.replace('Your batch', 'you') + ' in ' + milestone() + ', highest priority first'"><mat-icon aria-hidden="true">playlist_add</mat-icon>Next</button>
+                @if (editing() === lane.key) { <label class="visually-hidden" [for]="'n-' + lane.key">How many</label><input type="number" [id]="'n-' + lane.key" min="1" max="25" [ngModel]="count(lane)" (ngModelChange)="setCount(lane, $event)" (blur)="editing.set('')" (keydown.enter)="editing.set('')"> }
+                @else { <button type="button" class="lay-nextsplit-n" (click)="editCount(lane)" [attr.aria-label]="'Change how many: ' + count(lane)">{{ count(lane) }}</button> }</span>
+            }
             @if (running(lane) && lane.batch; as batch) {
               <div class="lay-ticker"><strong>{{ elapsedFor(batch) }}</strong> active<br>{{ tokenText(batch) }} tokens</div>
               @if (batch.state === 'running') { <button type="button" class="lay-button ghost small" (click)="stopBatch(batch)"><mat-icon aria-hidden="true">pause</mat-icon>Stop run</button> }
@@ -33,7 +39,7 @@ interface Lane { key: string; who: Assignee; title: string; items: WorkItem[]; b
         @if (lane.who.kind === 'agent' && !ctx.agentReady() && waiting(lane)) { <p class="lay-lock-note lay-lock-warn"><mat-icon aria-hidden="true">power_off</mat-icon>Connect an agent account to run this batch.
           <a [href]="ctx.link('work', 'agents')" (click)="ctx.go(ctx.link('work', 'agents'), $event)">Agents</a></p> }
         @if (lane.items.length) { <ol class="lay-stack">@for (item of lane.items; track item.id) { <li><aludel-work-card [item]="item" /></li> }</ol> }
-        @else { <p class="lay-lane-empty">{{ lane.key === 'me' ? 'Nothing staged for you. Stage items assigned to you from the queue.' : 'Empty.' }}</p> }
+        @else { <p class="lay-lane-empty">Empty. Press Next, or stage items from the queue.</p> }
       </section>
     }
   </div>
@@ -94,7 +100,8 @@ export class WorkBoardComponent {
     }
     for (const profile of data.profiles) {
       const items = this.work().filter(item => item.assignee?.kind === 'agent' && item.assignee.id === profile.id && inLane(item)).sort(byPriority);
-      if (!items.length) continue;
+      // Every active agent has a lane, so Next can fill it (ROADMAP-01).
+      if (!items.length && !profile.active) continue;
       const batches = data.batches.filter(batch => batch.profileId === profile.id);
       const batch = batches.find(isRunningBatch) || batches.find(entry => entry.state === 'draft') || batches.find(entry => items.some(item => item.context?.batch === entry.id)) || null;
       lanes.push({ key: profile.id, who: { kind: 'agent', id: profile.id }, title: profile.name, items, batch });
@@ -103,6 +110,18 @@ export class WorkBoardComponent {
     return who ? lanes.filter(lane => lane.who.id === who) : lanes;
   });
 
+  // Next (ROADMAP-01, DEC-043): a fixed rule on the server; the number is per lane and remembered while you stay.
+  readonly editing = signal('');
+  private readonly nextCounts = signal<Record<string, number>>({});
+  readonly milestone = computed(() => this.ctx.currentMilestone()?.label || 'the current milestone');
+  count(lane: Lane) { return this.nextCounts()[lane.key] || 5; }
+  setCount(lane: Lane, value: number) { const n = Math.max(1, Math.min(25, Math.round(Number(value) || 5))); this.nextCounts.set({ ...this.nextCounts(), [lane.key]: n }); }
+  editCount(lane: Lane) { this.editing.set(lane.key); setTimeout(() => (document.getElementById('n-' + lane.key) as HTMLInputElement | null)?.select()); }
+  next(lane: Lane) {
+    let added = 0;
+    void this.ctx.write(async () => { added = (await this.ctx.next(lane.who, this.count(lane))).added.length; })
+      .then(ok => { if (ok) this.ctx.notice.set(added ? `Added ${added} item${added === 1 ? '' : 's'} to ${lane.key === 'me' ? 'your batch' : lane.title}.` : `Nothing is ready for ${lane.key === 'me' ? 'you' : lane.title} in ${this.milestone()}.`); });
+  }
   running(lane: Lane) { return isRunning(lane.batch); }
   waiting(lane: Lane) { return lane.items.filter(item => item.status === 'staged').length; }
   laneNote(lane: Lane) {
