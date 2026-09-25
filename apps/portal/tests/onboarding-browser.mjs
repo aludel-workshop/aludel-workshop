@@ -224,7 +224,7 @@ try {
   await page.getByRole('navigation', { name: 'Work sections' }).getByRole('link', { name: 'Roles' }).click();
   await page.getByRole('heading', { name: 'Product lead' }).waitFor();
   assert.match(await page.locator('[id="action-product.define"]').innerText(), /Default agent/, 'a Dreamer hands acceptance to the default agent');
-  assert.match(await page.locator('[id="action-platform.configure"]').innerText(), /You/, 'anything that may cost money stays with the person');
+  assert.match(await page.locator('[id="action-deploy.configure"]').innerText(), /You/, 'anything that may cost money stays with the person');
   assert.equal(await page.getByText(/Dreamer|Working style/).count(), 0, 'the style is not shown after onboarding');
   await check('project');
 

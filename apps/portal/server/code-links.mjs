@@ -31,6 +31,8 @@ export function initCodeLinks(db) {
     );
     CREATE INDEX IF NOT EXISTS idx_trace_links_record ON trace_links(project_id, record_id);
   `);
+  // PLATFORM-UX-01: where each unit ends, so Code › Explorer can highlight the whole chunk.
+  if (!db.prepare('PRAGMA table_info(code_units)').all().some(column => column.name === 'end_line')) db.exec('ALTER TABLE code_units ADD COLUMN end_line INTEGER');
 }
 
 // ---- Structure: units and references from one file ----
@@ -182,7 +184,7 @@ export function indexWorkspace(root) {
   const reachable = new Set();
   const queue = [...roots];
   while (queue.length) { const unit = queue.pop(); if (reachable.has(unit)) continue; reachable.add(unit); queue.push(...unit.calls); }
-  return all.map(unit => ({ key: unit.key, path: unit.path, symbol: unit.symbol, kind: unit.kind, hash: unit.hash, line: unit.startLine, reachable: reachable.has(unit), calls: unit.calls.map(item => item.key) }));
+  return all.map(unit => ({ key: unit.key, path: unit.path, symbol: unit.symbol, kind: unit.kind, hash: unit.hash, line: unit.startLine, end: unit.endLine, reachable: reachable.has(unit), calls: unit.calls.map(item => item.key) }));
 }
 
 // ---- Commit trailers: `Aludel-Work: W-12` and `Implements: S4, SPEC-02/FR-001` on a commit link the units it changed ----
@@ -300,9 +302,9 @@ export function codeLinks({ db, know }) {
     const keep = new Set();
     for (const unit of units) {
       const id = unitId(projectId, unit.key); keep.add(id);
-      db.prepare(`INSERT INTO code_units(id, project_id, unit_key, path, symbol, kind, hash, reachable, last_commit, line, calls_json, indexed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(project_id, unit_key) DO UPDATE SET hash = excluded.hash, kind = excluded.kind, reachable = excluded.reachable, last_commit = excluded.last_commit, line = excluded.line, calls_json = excluded.calls_json, indexed_at = excluded.indexed_at`)
-        .run(id, projectId, unit.key, unit.path, unit.symbol, unit.kind, unit.hash, unit.reachable ? 1 : 0, lastCommit.get(unit.path), unit.line, JSON.stringify(unit.calls.map(key => unitId(projectId, key))), indexed);
+      db.prepare(`INSERT INTO code_units(id, project_id, unit_key, path, symbol, kind, hash, reachable, last_commit, line, calls_json, indexed_at, end_line) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(project_id, unit_key) DO UPDATE SET hash = excluded.hash, kind = excluded.kind, reachable = excluded.reachable, last_commit = excluded.last_commit, line = excluded.line, end_line = excluded.end_line, calls_json = excluded.calls_json, indexed_at = excluded.indexed_at`)
+        .run(id, projectId, unit.key, unit.path, unit.symbol, unit.kind, unit.hash, unit.reachable ? 1 : 0, lastCommit.get(unit.path), unit.line, JSON.stringify(unit.calls.map(key => unitId(projectId, key))), indexed, unit.end ?? unit.line);
     }
     for (const stale of unitRows(projectId).filter(row => !keep.has(row.id))) {
       db.prepare('DELETE FROM trace_links WHERE unit_id = ?').run(stale.id);
@@ -357,7 +359,7 @@ export function codeLinks({ db, know }) {
       units: units.map(unit => {
         const own = links.filter(item => item.unit_id === unit.id).map(item => ({ recordId: item.record_id, revision: item.record_revision, currentRevision: current(item.record_id), kind: item.kind, source: item.source, state: item.state, workRef: item.work_ref }));
         const state = own.some(item => item.state === 'suspect') ? 'suspect' : own.length ? 'healthy' : unit.reachable ? 'untraced' : 'dead';
-        return { id: unit.id, path: unit.path, symbol: unit.symbol, kind: unit.kind, line: unit.line, reachable: Boolean(unit.reachable), lastCommit: unit.last_commit, calls: parse(unit.calls_json, []), calledBy: calledBy.get(unit.id) || [], state, links: own };
+        return { id: unit.id, path: unit.path, symbol: unit.symbol, kind: unit.kind, line: unit.line, endLine: unit.end_line ?? unit.line, reachable: Boolean(unit.reachable), lastCommit: unit.last_commit, calls: parse(unit.calls_json, []), calledBy: calledBy.get(unit.id) || [], state, links: own };
       })
     };
   }

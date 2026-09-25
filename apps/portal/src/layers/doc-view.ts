@@ -6,7 +6,7 @@ import { Doc, ProjectContext, layerLabel } from './context';
 import { markdownBlocks } from './product';
 import { RefChipComponent } from './work-shared';
 
-const docLayers = ['product', 'design', 'pages', 'data', 'platform', 'work'];
+const docLayers = ['product', 'design', 'pages', 'data', 'platform', 'deploy', 'work'];
 
 // DESIGN-UX-01 (D19): documents live in the Library; each shows in the layers it lists. The Library lists all of them,
 // and a layer's Docs tab lists the ones that show there. Both open the same view.

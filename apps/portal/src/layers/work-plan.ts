@@ -68,7 +68,7 @@ export const progressOf = (items: WorkItem[]) => items.length ? Math.round(items
 export class WorkItemsComponent {
   readonly ctx = inject(ProjectContext);
   readonly selectedId = input<string | null>(null);
-  readonly layers = ['product', 'design', 'pages', 'data', 'platform', 'work'];
+  readonly layers = ['product', 'design', 'pages', 'data', 'platform', 'deploy', 'work'];
   readonly layerLabel = layerLabel; readonly statusLabel = workStatusLabel; readonly icons = statusIcon; readonly phaseName = phaseName;
   readonly group = signal('status'); readonly milestone = signal(''); readonly project = signal(''); readonly layer = signal(''); readonly showDone = signal(false);
   readonly selected = computed(() => this.ctx.workById().get(this.selectedId() || '') || null);

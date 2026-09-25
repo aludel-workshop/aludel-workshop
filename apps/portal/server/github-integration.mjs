@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { mintInstallationToken as mintToken } from './github-app-auth.mjs';
+import { parseJunit, unzipFile } from './ci-results.mjs';
 
 const apiVersion = '2022-11-28';
 const digest = value => createHash('sha256').update(value).digest('hex');
@@ -161,11 +162,18 @@ export function githubIntegration({ db, secrets, config, callbackUrl, setupUrl, 
     return minted.token;
   }
 
-  async function pushToken(projectId, repositoryName) {
+  // PLATFORM-UX-01: pushing files under .github/workflows needs the Workflows permission. An installation that hasn't
+  // accepted it still gets a contents-only token, and the scaffold leaves its workflow files out (canPushWorkflows).
+  async function scopedToken(projectId, permissionSet, repositoryName) {
     const repo = binding(projectId);
     if (!repo?.installation_id) throw failure('The project has no GitHub installation binding.', 409);
-    return installationToken(repo.installation_id, { permissions: { contents: 'write' }, repositories: [repositoryName || repo.name] });
+    return installationToken(repo.installation_id, { permissions: permissionSet, repositories: [repositoryName || repo.name] });
   }
+  async function tryToken(projectId, permissionSet, repositoryName) { try { return await scopedToken(projectId, permissionSet, repositoryName); } catch { return null; } }
+  async function pushToken(projectId, repositoryName) {
+    return (await tryToken(projectId, { contents: 'write', workflows: 'write' }, repositoryName)) || scopedToken(projectId, { contents: 'write' }, repositoryName);
+  }
+  const api = (repo, path) => `https://api.github.com/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}${path}`;
 
   return {
     status(userId, projectId, local) {
@@ -295,6 +303,39 @@ export function githubIntegration({ db, secrets, config, callbackUrl, setupUrl, 
       }
       return binding(projectId);
     },
-    installationTokenForRepository: pushToken
+    installationTokenForRepository: pushToken,
+    // null when the project has no GitHub repository; otherwise whether the App may push workflow files to it.
+    async canPushWorkflows(projectId) {
+      const repo = binding(projectId);
+      if (!repo?.installation_id) return null;
+      return Boolean(await tryToken(projectId, { contents: 'write', workflows: 'write' }));
+    },
+    // A tag and a GitHub Release on the project's own repository. The commit must already be on GitHub.
+    async createRelease(projectId, { tag, sha, name, body }) {
+      const repo = binding(projectId);
+      if (!repo || repo.status !== 'ready') throw failure('The project has no GitHub repository yet.', 409);
+      const token = await scopedToken(projectId, { contents: 'write' });
+      const created = await requestJson(api(repo, '/releases'), token, { method: 'POST', body: JSON.stringify({ tag_name: tag, target_commitish: sha, name, body, draft: false, prerelease: false }) }, fetcher);
+      return { url: created.html_url, id: created.id };
+    },
+    // The CI run for a commit and its test results (the test-results artifact). Needs the Actions permission (read).
+    async ciResults(projectId, sha) {
+      const repo = binding(projectId);
+      if (!repo || repo.status !== 'ready') return { state: 'no-github' };
+      const token = await tryToken(projectId, { actions: 'read' });
+      if (!token) return { state: 'no-permission' };
+      const runs = await requestJson(api(repo, `/actions/runs?head_sha=${encodeURIComponent(sha)}&per_page=10`), token, {}, fetcher);
+      const run = (runs.workflow_runs || []).find(entry => /(^|\/)ci\.ya?ml$/.test(entry.path || '')) || null;
+      if (!run) return { state: 'no-run', sha };
+      const summary = { state: run.status === 'completed' ? run.conclusion || 'completed' : 'running', url: run.html_url, sha, at: run.updated_at, tests: [] };
+      if (run.status !== 'completed') return summary;
+      const artifacts = await requestJson(run.artifacts_url, token, {}, fetcher);
+      const artifact = (artifacts.artifacts || []).find(entry => entry.name === 'test-results' && !entry.expired);
+      if (!artifact) return summary;
+      const download = await fetcher(artifact.archive_download_url, { headers: { authorization: `Bearer ${token}`, accept: 'application/vnd.github+json', 'x-github-api-version': apiVersion, 'user-agent': 'aludel-portal' } });
+      if (!download.ok) return summary;
+      const file = unzipFile(Buffer.from(await download.arrayBuffer()), name => name.endsWith('.xml'));
+      return { ...summary, tests: file ? parseJunit(file.text) : [] };
+    }
   };
 }

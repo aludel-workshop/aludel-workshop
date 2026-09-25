@@ -76,7 +76,7 @@ export interface PersonAvatar { seed?: string; backgroundColor?: string; skinCol
 export interface Member { id: string; name: string; role: string; avatar: PersonAvatar | null; }
 // Code links (LAY-07D)
 export interface TraceLink { recordId: string; revision: number; currentRevision: number | null; kind: string; source: string; state: string; workRef: string | null; }
-export interface CodeUnit { id: string; path: string; symbol: string; kind: string; line: number; reachable: boolean; lastCommit: string | null; calls: string[]; calledBy: string[]; state: string; links: TraceLink[]; }
+export interface CodeUnit { id: string; path: string; symbol: string; kind: string; line: number; endLine: number; reachable: boolean; lastCommit: string | null; calls: string[]; calledBy: string[]; state: string; links: TraceLink[]; }
 export interface Service { key: string; label: string; icon: string; stories: string[]; }
 export interface WorkTarget { id: string; kind: string; label: string; }
 export type WorkStatus = 'backlog' | 'queued' | 'staged' | 'working' | 'needs' | 'review' | 'done';
@@ -141,7 +141,7 @@ export const projectStatusLabel: Record<string, string> = { backlog: 'Backlog', 
 export const projectStatusIcon: Record<string, string> = { backlog: 'radio_button_unchecked', planned: 'circle', progress: 'clock_loader_40', completed: 'check_circle', canceled: 'cancel' };
 export const healthLabel: Record<string, string> = { on: 'On track', risk: 'At risk', off: 'Off track' };
 export const sourceTypeIcon: Record<string, string> = { interview: 'record_voice_over', observation: 'visibility', survey: 'ballot', link: 'link', article: 'article', competitor: 'storefront', screenshot: 'image', analytics: 'query_stats', note: 'edit_note' };
-export const layerLabel: Record<string, string> = { product: 'Vision', library: 'Library', design: 'Design', pages: 'Pages', data: 'Data', platform: 'Platform', work: 'Work' };
+export const layerLabel: Record<string, string> = { product: 'Vision', library: 'Library', design: 'Design', pages: 'Pages', data: 'Data', platform: 'Code', deploy: 'Deploy', work: 'Work' };
 export const dataStatusLabel: Record<string, string> = { proposed: 'Proposed', contracted: 'Contracted', built: 'Built', shipped: 'Shipped' };
 export const unitStateLabel: Record<string, string> = { healthy: 'Healthy', suspect: 'Suspect', untraced: 'Untraced', dead: 'Unused' };
 
@@ -249,7 +249,7 @@ export class ProjectContext {
     if (kind === 'research') return this.link('library', 'sources');
     if (kind === 'vision_section' || kind === 'persona') return this.link('product', 'brief');
     if (kind === 'access_rule') return this.link('data', 'access');
-    if (kind === 'code_unit') return this.link('platform', 'code', id);
+    if (kind === 'code_unit') return this.link('platform', 'explorer', id);
     return this.link('product', 'map', id);
   }
 
@@ -318,7 +318,7 @@ export class ProjectContext {
     if (action) return info('work_action', 'Action', 'tune', 'work', action.name, action.name, { where: 'Work › Roles', note: action.instructions || action.description, href: this.link('work', 'roles', action.id), facts: [['Revision', String(action.revision)]] });
     if (data.projectInstructions?.id === id) return info('project_instructions', 'Project instructions', 'menu_book', 'work', 'Project instructions', 'Project instructions', { where: 'Work › Agents', note: data.projectInstructions.body.slice(0, 240) });
     const unit = this.unitById().get(id);
-    if (unit) return info('code_unit', 'Code unit', 'code', 'platform', unit.symbol, unit.symbol, { status: unitStateLabel[unit.state], where: 'Platform › Code', facts: [['Path', unit.path], ['Kind', unit.kind]] });
+    if (unit) return info('code_unit', 'Code unit', 'code', 'platform', unit.symbol, unit.symbol, { status: unitStateLabel[unit.state], where: 'Code › Explorer', facts: [['Path', unit.path], ['Kind', unit.kind]] });
     return null;
   }
   recordLabel(id: string): [string, string, string] {
@@ -346,7 +346,8 @@ export class ProjectContext {
   }
 
   // The Product layer lives at /vision (ROADMAP-01); callers keep naming it by its layer key.
-  link(...parts: string[]) { if (parts[0] === 'product') parts = ['vision', ...parts.slice(1)]; return `/p/${encodeURIComponent(this.slug())}${parts.length ? '/' + parts.map(encodeURIComponent).join('/') : ''}`; }
+  // Internal layer keys stay stable; URLs use the names people see (ROADMAP-01 Vision, PLATFORM-UX-01 Code).
+  link(...parts: string[]) { if (parts[0] === 'product') parts = ['vision', ...parts.slice(1)]; if (parts[0] === 'platform') parts = ['code', ...parts.slice(1)]; return `/p/${encodeURIComponent(this.slug())}${parts.length ? '/' + parts.map(encodeURIComponent).join('/') : ''}`; }
 
   async api<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
     const response = await fetch(path, { method, headers: { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });

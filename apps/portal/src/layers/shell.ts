@@ -10,7 +10,8 @@ import { PersonAvatar, ProjectContext, dataStatusLabel, phaseName, sectionTitle,
 import { DesignLayerComponent } from './design';
 import { PagesLayerComponent } from './pages';
 import { DataLayerComponent } from './data';
-import { PlatformLayerComponent } from './platform';
+import { CodeLayerComponent } from './code';
+import { DeployLayerComponent } from './deploy';
 import { ProductLayerComponent } from './product';
 import { WorkLayerComponent } from './work';
 import { HomeLayerComponent } from './home';
@@ -18,12 +19,12 @@ import { LibraryComponent } from './library';
 import { EvidencePanelComponent } from './evidence';
 
 // ROADMAP-01 (DEC-043): Product is shown as Vision (URLs /vision/…; the internal layer key stays `product`), and each layer has one colour.
-const layers = [{ id: 'home', icon: 'home', label: 'Home' }, { id: 'product', icon: 'lightbulb', label: 'Vision' }, { id: 'design', icon: 'palette', label: 'Design' }, { id: 'pages', icon: 'web', label: 'Pages' }, { id: 'data', icon: 'schema', label: 'Data' }, { id: 'platform', icon: 'dns', label: 'Platform' }, { id: 'work', icon: 'checklist', label: 'Work' }];
+const layers = [{ id: 'home', icon: 'home', label: 'Home' }, { id: 'product', icon: 'lightbulb', label: 'Vision' }, { id: 'design', icon: 'palette', label: 'Design' }, { id: 'pages', icon: 'web', label: 'Pages' }, { id: 'data', icon: 'schema', label: 'Data' }, { id: 'platform', icon: 'code', label: 'Code' }, { id: 'deploy', icon: 'rocket_launch', label: 'Deploy' }, { id: 'work', icon: 'checklist', label: 'Work' }];
 
 // LAY-02: every project's workspace at /p/<slug>/<layer>/<tab>/<id>. The layer comes first (DEC-036).
 @Component({
   selector: 'aludel-project-shell', standalone: true,
-  imports: [FormsModule, MatIconModule, AvatarEditorComponent, HomeLayerComponent, ProductLayerComponent, DesignLayerComponent, PagesLayerComponent, DataLayerComponent, PlatformLayerComponent, WorkLayerComponent, LibraryComponent, EvidencePanelComponent],
+  imports: [FormsModule, MatIconModule, AvatarEditorComponent, HomeLayerComponent, ProductLayerComponent, DesignLayerComponent, PagesLayerComponent, DataLayerComponent, CodeLayerComponent, DeployLayerComponent, WorkLayerComponent, LibraryComponent, EvidencePanelComponent],
   providers: [ProjectContext],
   template: `
   <a class="skip-link" href="#lay-main">Skip to content</a>
@@ -90,7 +91,8 @@ const layers = [{ id: 'home', icon: 'home', label: 'Home' }, { id: 'product', ic
             @case ('design') { <aludel-design-layer /> }
             @case ('pages') { <aludel-pages-layer /> }
             @case ('data') { <aludel-data-layer /> }
-            @case ('platform') { <aludel-platform-layer /> }
+            @case ('platform') { <aludel-code-layer /> }
+            @case ('deploy') { <aludel-deploy-layer /> }
             @case ('work') { <aludel-work-layer /> }
             @case ('library') { <aludel-library /> }
             @case ('settings') {
@@ -121,8 +123,15 @@ export class ProjectShellComponent implements OnInit {
   readonly missing = signal(false);
   readonly q = signal('');
   query = '';
-  // /vision/… is the Product layer; old /product/… links still open it.
-  readonly layer = computed(() => { const segment = this.ctx.segments()[0] || 'home'; return segment === 'vision' ? 'product' : segment; });
+  // /vision/… is the Product layer; old /product/… links still open it. /code/… is the Platform layer (PLATFORM-UX-01);
+  // old /platform/… links still open it, and its old operations tabs open Deploy.
+  readonly layer = computed(() => {
+    const [segment = 'home', tab] = this.ctx.segments();
+    if (segment === 'vision') return 'product';
+    if (segment === 'code') return 'platform';
+    if (segment === 'platform' && ['environments', 'database', 'domains'].includes(tab)) return 'deploy';
+    return segment;
+  });
   readonly layerColour = computed(() => ['account'].includes(this.layer()) ? 'settings' : this.layer());
   readonly user = computed(() => this.ctx.session()?.user || null);
   readonly needsYou = computed(() => (this.ctx.data()?.work || []).filter(item => item.status === 'needs' || item.status === 'review'));
@@ -142,7 +151,7 @@ export class ProjectShellComponent implements OnInit {
       { label: 'Pages', hits: data.pages.map(page => ({ text: `${page.label} page`, sub: page.origin, href: this.ctx.link('pages', 'page', page.id) })) },
       { label: 'Data', hits: [...data.objects.map(object => ({ text: `${object.name} object`, sub: dataStatusLabel[object.status], href: this.ctx.link('data', 'objects', object.id) })),
         ...data.operations.map(op => ({ text: `${op.method} ${op.path}`, sub: `${op.operationId} · ${op.summary}`, href: this.ctx.link('data', 'api', op.id) }))] },
-      { label: 'Code', hits: data.code.units.filter(unit => unit.kind !== 'const').map(unit => ({ text: unit.symbol, sub: `${unit.path} · ${unitStateLabel[unit.state]}`, href: this.ctx.link('platform', 'code', unit.id) })) },
+      { label: 'Code', hits: data.code.units.filter(unit => unit.kind !== 'const').map(unit => ({ text: unit.symbol, sub: `${unit.path} · ${unitStateLabel[unit.state]}`, href: this.ctx.link('platform', 'explorer', unit.id) })) },
       { label: 'Work', hits: data.work.map(item => ({ text: `${item.ref} ${item.title}`, sub: workStatusLabel[item.status], href: this.ctx.link('work', 'items', item.id) })) }
     ];
     return groups.map(group => ({ ...group, hits: group.hits.filter(hit => `${hit.text} ${hit.sub}`.toLowerCase().includes(term)).slice(0, 5) })).filter(group => group.hits.length);

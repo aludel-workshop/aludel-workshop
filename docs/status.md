@@ -35,9 +35,10 @@ Turn the running local portal foundation into the first complete request → del
 1. **PLATFORM-PIPELINE-01**: PP-01C onboarding (GitHub required, recipe approval) → PP-01D environments → PP-01E guards ([work record](design/platform-pipeline/work-record.md)).
 2. **ICONS-FONTS-01**: icon and font libraries in Design (unblocked in principle by PP-01A; waits behind PLATFORM-PIPELINE-01).
 3. **PAGES-UX-01**: built and agent-checked (DEC-048; [evidence](evidence/pages-ux-01-pages-layer.md)). Next: owner review of the built layer.
-4. **DATA-PLATFORM-UX-01**: the rest of Data and Platform (owner: "perhaps").
-5. **LAY-05**: coding agents against stories (absorbs B-03B), committing with LAY-07's trailers.
-6. **LAY-06**: Aludel's own knowledge into its layers; retire the hash workspace.
+4. **PLATFORM-UX-01**: **built and agent-checked** (DEC-049; [evidence](evidence/platform-ux-01-code-deploy.md)). Next: owner review of the built Code and Deploy layers ([work record](design/platform-layer/work-record.md), [prototype](design/platform-layer/v1/index.html)). It supplies PP-01D's Environments UX and absorbs the Platform half of DATA-PLATFORM-UX-01.
+5. **DATA-PLATFORM-UX-01**: the rest of Data (owner: "perhaps").
+6. **LAY-05**: coding agents against stories (absorbs B-03B), committing with LAY-07's trailers.
+7. **LAY-06**: Aludel's own knowledge into its layers; retire the hash workspace.
 
 One packet at a time. B-03's worker/artifact/recovery work remains required and must not be displaced by later workspace expansion. [Proposed dependency order](design/project-workspace/v1/delivery-plan.md).
 
@@ -72,6 +73,20 @@ One packet at a time. B-03's worker/artifact/recovery work remains required and 
 
 | Packet | Result | Evidence |
 |---|---|---|
+| PLATFORM-UX-01 | Platform split into **Code** and **Deploy**.
+
+**Code:**
+- Overview: structure and stack from the repository.
+- Explorer: files → chunks, a read-only viewer, a story lens, and change requests to the Engineer.
+- Tests: story → scenario → tests.
+- Docs: AGENTS.md as the map; a starter set from the layers; section sources in a sidecar; refresh as Engineer work.
+- Releases: recorded explicitly.
+
+**Deploy:**
+- Environments: Preview; Production not set up.
+- Variables from `.env.example`, Integrations, and Data (the database tools).
+
+New Operator role. Agent-checked: server 88/89 (1 pre-existing), all browser suites pass. Owner review pending (DEC-049) | [Evidence/retrospective](evidence/platform-ux-01-code-deploy.md), [work record](design/platform-layer/work-record.md) |
 | PAGES-UX-01 | Pages as Map (a planning canvas with page blanks, drawn links, grid moves and flows edited on the canvas), Pages (specs from Design components; Spec and Built views; content edited in place; change requests become `platform.implement` work) and Flows (walkthroughs and `pages.review` reviews). Agent-checked; owner review pending (DEC-048) | [Evidence/retrospective](evidence/pages-ux-01-pages-layer.md), [work record](design/pages-layer/work-record.md) |
 | DESIGN-UX-01 | Design as Tokens (a tree beside a live preview of real Angular Material components in the project's theme; three tiers; W3C design tokens), Components (contracts with slots, nesting, needed → specified → built, references, revisions), Brand (starter assets, templates) and Docs (Library documents shown in layers). Saved changes reach the generated app. Agent-checked (server 75/75, design browser suite); **owner accepted** (DEC-046) | [Evidence/retrospective](evidence/design-ux-01-design-layer.md), [work record](design/design-layer/work-record.md) |
 | ROADMAP-01 | Product became **Vision**: the Brief (claims with confidence from evidence; riskiest assumptions), Story map, and Documents generated from the Brief. **Library**: sources, highlighted findings, insights, and evidence attached anywhere. **Work**: Items (Linear list with a side panel), Projects (Linear-style timeline, project briefs that replace specs, milestones with target dates, budgets), Next, Roles with the elevated shield and a review action per role, and Team. Rainbow layer colours with a tile nav; chips with quick views everywhere. Agent-checked (server 69/69, layers browser with axe and 390px, migration trial on a copy of real data); **owner accepted** (DEC-044) | [Evidence/retrospective](evidence/roadmap-01-product-and-plan.md), [work record](design/product-and-plan/work-record.md) |
@@ -101,6 +116,33 @@ One packet at a time. B-03's worker/artifact/recovery work remains required and 
 | M0 research/design | Product loop, local agent path, runner choice, recovery model, product workflow, knowledge boundary, experience architecture, and design-system strategy | [Execution plan](execution-plan.md), [decision register](decisions.md) |
 
 ## Latest handoff
+
+2026-09-24: **PLATFORM-UX-01 built and agent-checked** (DEC-049; [evidence](evidence/platform-ux-01-code-deploy.md)).
+- Platform is now **Code** (`/code`) and **Deploy** (`/deploy`); old `/platform` links still work.
+- **Restart the portal** to get the Operator role and the new layers for existing projects.
+- Not built: publishing releases to GitHub (needs your OK for that write), CI test results, and Production hosting.
+- The Docs checks flag the scaffold's 277-line `AGENTS.md`; harness engineering suggests about 100.
+- **Round 3:**
+  - Releases publish to each project's own GitHub (tag and Release; the app's release workflow builds the image into GitHub Packages).
+  - Code › Tests reads the app's CI results.
+  - `AGENTS.md` is a short map and the guide is `docs/agents.md`.
+- **Owner step:** add **Workflows: read and write** and **Actions: read** to the GitHub App, and accept them on each installation. Until then, workflow files are held back and Tests says why.
+- Next: owner review. PLATFORM-PIPELINE-01 remains `next_action`.
+
+2026-09-24: **PLATFORM-UX-01 v2 ready for owner review** ([v2](design/platform-layer/v2/index.html), [work record §8](design/platform-layer/work-record.md)).
+- Code is now a reference layer: Overview (compact structure with stack, "as of"), Explorer (files → chunks, story lens), Tests (scenario → test → green), Docs (AGENTS.md as a map, a sidecar for provenance, findings from any layer) and Releases (explicit; GitHub Releases and Packages).
+- Deploy is Environments, Variables, Integrations and Data.
+- Agent-checked: 28 screenshots with no errors, and no horizontal scroll at 390 px. Static only.
+
+2026-09-24: **PLATFORM-UX-01 prototype v1 ready for owner review** ([work record](design/platform-layer/work-record.md), [prototype](design/platform-layer/v1/index.html), [screenshots](design/platform-layer/v1/shots/)).
+- The owner asked to split Platform into Code (architecture, code, repository, releases) and Deploy (environments, database, domains), bridged by releases. They asked for a tree to browse code "in smaller chunks" (not an IDE), and for the existing worldview to be captured without designing integrations.
+- **v1:**
+  - Code has Overview (generated summary, C4 structure, stack read from manifests, ADRs, constraints), Explorer (a Structure or Files tree; read-only source with a gutter showing which piece each line belongs to; request a change), Dependencies, Changes and Releases.
+  - Deploy has Pipeline (Heroku-style columns, health and "in step", promote), Environment (variables from `.env.example`, services, history with rollback, logs, hosting and leaving Aludel), Database (migrations per environment), Domains and Monitoring.
+- **Agent-checked:** a 25-step Chromium walkthrough with no errors, and no horizontal scroll at 390 px. No axe audit.
+- **Process:** new [tools/capture-refs.mjs](../tools/capture-refs.mjs) records every reference capture and its failures (31 of 35 usable).
+- **Open questions (§7):** Releases in Code; Structure-first Explorer; a new Operator role; ADRs in the app repository; where the app lists its environments.
+- Static only: no portal code changed. PLATFORM-PIPELINE-01 remains `next_action`.
 
 2026-09-24: **PLATFORM-PIPELINE-01 brief written** for a fresh session ([work record](design/platform-pipeline/work-record.md)). It has the owner's ask ledger (P1–P11), verified facts about repos, previews and knowledge today, the decisions those force, a research plan and three questions for the owner. It flags a conflict: full ownership and multi-instance sync probably mean product knowledge moves into each project's repository, which revises the knowledge strategy. The owner committed and pushed DESIGN-UX-01 as `36dcb0c`.
 

@@ -205,46 +205,74 @@ try {
   await page.getByRole('cell', { name: 'People see only their own account.', exact: true }).waitFor();
   await check('data-access');
 
-  // Platform (LAY-07B): overview, binding, code, repository, releases, environments, database, domains.
-  await layerNav().getByRole('link', { name: 'Platform' }).click();
-  await page.getByRole('heading', { name: 'Last release' }).waitFor();
-  await until(async () => (await page.getByRole('heading', { name: 'Last release' }).locator('..').innerText()).includes('Passed'), 'the build became a passed release');
-  await check('platform-overview');
-  await tab('Platform', 'Architecture').click();
-  await page.getByText('Angular 22 + Vite').waitFor();
-  await page.getByRole('cell', { name: 'Route handler POST /api/sign-up', exact: true }).waitFor();
-  await page.getByRole('cell', { name: 'Table accounts', exact: true }).waitFor();
-  assert.match(await page.getByText(/^Needed by/).first().innerText(), /S\d+/, 'email delivery lists the stories that need it');
-  await check('platform-architecture');
-  await tab('Platform', 'Code').click();
-  await page.getByRole('region', { name: 'Coverage' }).waitFor();
-  await page.getByRole('link', { name: /POST \/api\/sign-up/ }).click();
+  // Code (PLATFORM-UX-01): structure, file → chunk explorer, tests by scenario, docs with sources, explicit releases.
+  await layerNav().getByRole('link', { name: 'Code' }).click();
+  await page.getByRole('heading', { name: 'Structure' }).waitFor();
+  await page.getByRole('button', { name: /API server/ }).click();
+  await page.getByRole('link', { name: 'POST /api/sign-up' }).first().waitFor();
+  await check('code-overview');
+  await page.getByRole('link', { name: 'POST /api/sign-up' }).first().click();
+  await page.getByRole('heading', { name: 'POST /api/sign-up', level: 2 }).waitFor();
   await page.getByRole('heading', { name: 'Why it exists' }).waitFor();
-  await page.getByRole('link', { name: 'signUp operation' }).waitFor();
-  await page.getByRole('heading', { name: 'References' }).locator('..').getByText('table accounts').waitFor();
-  await check('platform-code-unit');
-  await tab('Platform', 'Repository').click();
-  await page.getByText('feat: generate Tool Share skeleton').waitFor();
-  await tab('Platform', 'Releases').click();
-  await page.getByRole('region', { name: 'Releases' }).getByText('Passed', { exact: true }).waitFor();
-  await check('platform-releases');
-  await tab('Platform', 'Environments').click();
-  await page.getByText('Running').first().waitFor();
-  await until(async () => /\/api\/health 200/.test(await page.getByRole('region', { name: 'Environments' }).innerText()), 'the preview answers its health check');
-  await check('platform-environments');
+  await page.locator('.lay-cx-insp').getByRole('link', { name: 'POST /api/sign-up' }).waitFor();
+  await page.locator('.lay-cx-src tr.lay-cx-hl').first().waitFor();
+  assert.match(await page.locator('.lay-cx-srcbar').innerText(), /server\/server\.mjs[\s\S]*lines \d+–\d+/, 'the viewer opens the chunk\'s file at its lines');
+  assert.equal(await page.locator('.lay-cx-src textarea, .lay-cx-src [contenteditable]').count(), 0, 'source is read only');
+  await check('code-explorer');
+  const knowledgeNow = await json('GET', `/api/projects/${project.id}/knowledge`);
+  const signUpStory = knowledgeNow.knowledge.stories.find(story => /sign up/.test(story.title));
+  await page.getByLabel("Highlight a record's code").selectOption(signUpStory.id);
+  await page.getByText(/\d+ chunks in \d+ files/).waitFor();
+  assert.ok(await page.locator('.lay-cx-lensed').count() > 0, 'the story\'s chunks are highlighted across files');
+  const unsafe = await api.fetch(`${portal}/api/projects/${project.id}/code/file?path=${encodeURIComponent('../../etc/passwd')}`);
+  assert.equal(unsafe.status(), 404, 'only tracked files are readable');
+  await tab('Code', 'Tests').click();
+  await page.getByText(/scenarios with a test/).waitFor();
+  await page.getByText(/Given/).first().waitFor();
+  await check('code-tests');
+  await tab('Code', 'Docs').click();
+  await page.getByRole('button', { name: 'Write a starter set' }).click();
+  await page.getByText(/^Wrote \d+ files/).waitFor();
+  await page.getByRole('treeitem', { name: 'docs/product/stories.md' }).click();
+  await page.locator('.lay-cx-md').getByText(/^S\d+\/1$/).first().waitFor();
+  await page.getByRole('button', { name: /^Sources of S1 / }).click();
+  await page.getByRole('heading', { name: 'Built from' }).waitFor();
+  await page.locator('.lay-cx-insp').getByRole('link', { name: /Someone can sign up/ }).waitFor();
+  assert.match(await page.locator('.lay-main').innerText(), /Every doc linked from AGENTS\.md/);
+  await check('code-docs');
+
+  // Deploy (PLATFORM-UX-01): the preview it runs, its builds, the variables the app declares, integrations and data.
+  await layerNav().getByRole('link', { name: 'Deploy' }).click();
+  await page.getByRole('heading', { name: 'Now running' }).waitFor();
+  await until(async () => /\/api\/health 200/.test(await page.locator('.lay-main').innerText()), 'the preview answers its health check');
+  await check('deploy-environments');
+  await page.goto(`${portal}/p/tool-share/code/releases`);
+  await page.getByRole('heading', { name: 'Next release' }).waitFor();
+  await page.getByRole('button', { name: /^Record v0\.1\.0/ }).click();
+  await page.getByRole('heading', { name: 'v0.1.0' }).waitFor();
+  await page.getByRole('link', { name: 'Running in Preview' }).waitFor();
+  await check('code-releases');
+  await page.goto(`${portal}/p/tool-share/deploy/environments/preview/history`);
+  await page.getByRole('region', { name: 'Preview builds' }).getByRole('cell', { name: 'v0.1.0' }).first().waitFor();
+  await tab('Deploy', 'Variables').click();
+  await page.getByRole('cell', { name: /^PORT/ }).waitFor();
+  await check('deploy-variables');
+  await tab('Deploy', 'Integrations').click();
+  assert.match(await page.getByText(/^Needed by/).first().innerText(), /S\d+/, 'email delivery lists the stories that need it');
+  await check('deploy-integrations');
   // The preview database appears once the app stores something: sign up in the generated app itself.
   const app = `http://tool-share.localhost:${port}`;
   const signUp = await api.fetch(`${app}/api/sign-up`, { method: 'POST', data: { email: 'sam@example.com', name: 'Sam', password: 'borrow-a-ladder' }, headers: { 'content-type': 'application/json' } });
   assert.equal(signUp.status(), 201, 'the generated app signs Sam up');
-  await tab('Platform', 'Database').click();
-  await page.reload();
+  await page.goto(`${portal}/p/tool-share/platform/database`);
+  await page.getByRole('heading', { name: 'Data', level: 1 }).waitFor();
   await page.getByRole('heading', { name: 'Health' }).waitFor();
   await page.getByText('accounts 1').waitFor();
   await page.getByRole('button', { name: 'Back up now' }).click();
   await page.getByText('Backed up.').waitFor();
   await page.getByRole('button', { name: /^Restore the backup from/ }).first().click();
   await page.getByText('This replaces the preview database').waitFor();
-  await check('platform-database-restore');
+  await check('deploy-database-restore');
   await page.getByRole('button', { name: 'Restore it' }).click();
   await page.getByText(/^Restored\./).waitFor();
   await page.getByRole('link', { name: 'Browse' }).click();
@@ -252,7 +280,7 @@ try {
   assert.equal(await page.getByRole('region', { name: 'accounts' }).getByText('hidden').count(), 2, 'salt and hash are hidden');
   const browsed = await json('GET', `/api/projects/${project.id}/database/browse?table=sessions`);
   assert.ok(browsed.rows.every(row => row[browsed.columns.indexOf('token_hash')] === null), 'session tokens never leave the server');
-  await check('platform-database-browse');
+  await check('deploy-database-browse');
   await page.getByRole('link', { name: 'Query' }).click();
   await page.getByLabel(/Read-only query/).fill('SELECT name, email FROM accounts');
   await page.getByRole('button', { name: 'Run' }).click();
@@ -260,9 +288,7 @@ try {
   await page.getByLabel(/Read-only query/).fill('DELETE FROM accounts');
   await page.getByRole('button', { name: 'Run' }).click();
   await page.getByRole('alert').getByText(/Only SELECT/).waitFor();
-  await check('platform-database-query');
-  await tab('Platform', 'Domains').click();
-  await page.getByText(`tool-share.localhost:${port}`).waitFor();
+  await check('deploy-database-query');
 
   // Work (WORK-UX-01): board with batches per assignee, Queue / Backlog / Done, one card everywhere.
   const board = () => page.goto(`${portal}/p/tool-share/work`).then(() => page.getByRole('heading', { name: 'Board', level: 1 }).waitFor());
@@ -466,8 +492,8 @@ try {
   await page.getByRole('heading', { name: 'People' }).waitFor();
   await page.getByRole('region', { name: 'People' }).getByText('Project lead').waitFor();
   await page.getByRole('heading', { name: 'Project instructions' }).waitFor();
-  await page.getByRole('button', { name: 'Export AGENTS.md' }).click();
-  await toast(/AGENTS.md written to the workspace/);
+  await page.getByRole('button', { name: 'Export the agent guide' }).click();
+  await toast(/docs\/agents.md written to the workspace/);
   await check('work-agents');
   await page.getByRole('button', { name: 'New profile' }).click();
   await page.getByLabel('Name', { exact: true }).fill('Careful architect');
@@ -544,7 +570,7 @@ try {
   await stranger.close();
 
   await page.setViewportSize({ width: 390, height: 844 });
-  for (const path of ['', '/vision', '/vision/map', '/vision/docs', '/library', '/library/sources', '/library/docs', '/design', '/design/components', '/design/brand', '/pages/tree', '/data/objects', '/data/api', '/platform', '/platform/code', '/platform/database', '/work', '/work/items', '/work/projects', '/work/roles', '/work/team', `/work/item/${blocker.id}`]) {
+  for (const path of ['', '/vision', '/vision/map', '/vision/docs', '/library', '/library/sources', '/library/docs', '/design', '/design/components', '/design/brand', '/pages/tree', '/data/objects', '/data/api', '/code', '/code/explorer', '/code/tests', '/code/docs', '/code/releases', '/deploy', '/deploy/variables', '/deploy/integrations', '/deploy/data', '/work', '/work/items', '/work/projects', '/work/roles', '/work/team', `/work/item/${blocker.id}`]) {
     await page.goto(`${portal}/p/tool-share${path}`);
     await page.locator('.lay-main h1').waitFor();
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `${path || 'home'} overflows at 390px`);
@@ -556,5 +582,5 @@ try {
   await page.waitForURL(`${portal}/`);
 
   assert.deepEqual(errors, []);
-  console.log(`PASS: layers ${checked.join(' → ')}; pack stories and template work; Brief claims, personas and riskiest assumptions; Library source, finding, insight, tag, comment; evidence contradicting a claim; story why linked to a claim; generated PR/FAQ going stale and regenerated; story edits with rationale; projects timeline, dates, stories and brief; items list and side panel; Next; the elevated shield; People and agents on Team; page canvas, linking and designed status; Data objects, fields, relations, contracts, OpenAPI export and access; Platform release, binding, code units, repository, health, database backup/restore, masked browse and guarded query; agent profiles (robot, model, effort, limits), your avatar, AGENTS.md export; roles and action setup; suspect code to a Reconcile item and back; per-assignee batches (stage, Go, review checklist, accept, send back), reassigning between batches, priority and blocking, applied answers, verified closing, routines; backlog to done work; search; member isolation; 390px; sign out.`);
+  console.log(`PASS: layers ${checked.join(' → ')}; pack stories and template work; Brief claims, personas and riskiest assumptions; Library source, finding, insight, tag, comment; evidence contradicting a claim; story why linked to a claim; generated PR/FAQ going stale and regenerated; story edits with rationale; projects timeline, dates, stories and brief; items list and side panel; Next; the elevated shield; People and agents on Team; page canvas, linking and designed status; Data objects, fields, relations, contracts, OpenAPI export and access; Code structure, file → chunk explorer with a story lens, tests by scenario, starter docs with sources, a recorded release; Deploy preview health and builds, variables, integrations, database backup/restore, masked browse and guarded query; agent profiles (robot, model, effort, limits), your avatar, AGENTS.md export; roles and action setup; suspect code to a Reconcile item and back; per-assignee batches (stage, Go, review checklist, accept, send back), reassigning between batches, priority and blocking, applied answers, verified closing, routines; backlog to done work; search; member isolation; 390px; sign out.`);
 } finally { await browser.close(); }

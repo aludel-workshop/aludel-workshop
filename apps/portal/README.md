@@ -33,7 +33,7 @@ Browser checks for the flow: start a fresh portal, then `MACHINE_PORT=<port> PLA
 
 ## Project layers (`/p/<slug>`)
 
-Every project except Aludel itself opens in its layered workspace: Home, Product, Design, Pages, Platform, Work (DEC-036/037). Records live in `server/knowledge.mjs` (typed `knowledge_records`, revisions with rationale, `layer_work_items`). The UI lives in `src/layers/`. Story packs are in `config/story-packs.json`. The handoff for continuing this work is [the implementation plan](../../docs/design/portal-layers/implementation-plan.md). Browser check: `MACHINE_PORT=<port> PLAYWRIGHT_MODULE=<…> node tests/layers-browser.mjs` against a fresh portal.
+Every project except Aludel itself opens in its layered workspace: Home, Vision, Design, Pages, Data, Code, Deploy, Work (DEC-036/037/049). Records live in `server/knowledge.mjs` (typed `knowledge_records`, revisions with rationale, `layer_work_items`). The UI lives in `src/layers/`. Story packs are in `config/story-packs.json`. The handoff for continuing this work is [the implementation plan](../../docs/design/portal-layers/implementation-plan.md). Browser check: `MACHINE_PORT=<port> PLAYWRIGHT_MODULE=<…> node tests/layers-browser.mjs` against a fresh portal.
 
 ## GitHub App setup
 
@@ -57,7 +57,11 @@ This walkthrough configures the default local portal at `http://127.0.0.1:4310`.
 7. Under **Webhook**, clear **Active**. This local integration does not consume webhook events yet, so it needs neither a webhook URL nor a webhook secret.
 8. Under **Repository permissions**, set only:
    - **Administration: Read and write** — required to create an organization repository.
-   - **Contents: Read and write** — required to create and push the initial Git commit.
+   - **Contents: Read and write** — required to create and push the initial Git commit, and to publish releases (tags and GitHub Releases).
+   - **Workflows: Read and write** — required to push the app's `.github/workflows/` files (CI and the release image). Without it, Aludel leaves those files out, because GitHub refuses the whole push otherwise.
+   - **Actions: Read-only** — required to read each app's CI run and its `test-results` artifact for Code › Tests.
+
+   After adding permissions to an existing App, each installation's owner must accept them on GitHub (Settings › Applications › Installed GitHub Apps › Configure → review the request).
 9. Under **Where can this GitHub App be installed?**, choose **Any account** for the intended vendor/customer model. A Marketplace listing is not required. For a strictly private, single-account local trial, **Only on this account** can be used, but it does not exercise the intended customer installation model.
 10. Select **Create GitHub App**.
 
@@ -133,7 +137,7 @@ The owner authorization and refresh tokens are encrypted in `.data/machine.sqlit
 - **The remote repository exists but the initial push failed**: do not retry repository creation and do not delete the remote. The binding remains `local-setup-needed`; fix the reported local/configuration problem and select **Finish Git setup**. Aludel reuses the recorded remote and will not create a duplicate.
 - **A credential was exposed**: revoke and regenerate the client secret or private key in GitHub, update the process configuration, and restart. Re-authorize the owner if a user token or the local integration vault may have been exposed.
 
-The owner flow uses authorization-code PKCE and one-time state values for both authorization and installation return. User/refresh tokens are encrypted in the local integration vault. The encrypted user token discovers installations and creates personal repositories because GitHub does not permit that endpoint to use an installation token. Organization creation and every Git push mint a fresh installation token. Git tokens are narrowed to Contents write plus the bound repository, passed through process-local askpass, and never persisted or placed in the remote URL. Repository creation requires typing the exact repository name in the final confirmation.
+The owner flow uses authorization-code PKCE and one-time state values for both authorization and installation return. User/refresh tokens are encrypted in the local integration vault. The encrypted user token discovers installations and creates personal repositories because GitHub does not permit that endpoint to use an installation token. Organization creation and every Git push mint a fresh installation token. Git tokens are narrowed to Contents write (plus Workflows write when granted) and the bound repository, passed through process-local askpass, and never persisted or placed in the remote URL. Repository creation requires typing the exact repository name in the final confirmation.
 
 The configuration and recovery behavior are locally and mock tested. A real GitHub connection remains an owner-triggered external trial.
 
@@ -155,5 +159,7 @@ npm run build
 npm run build-storybook
 npm run test:server
 ```
+
+Run `typecheck` before `build` and before any browser check. `vite build` succeeds even when a component template has an error, and the page then fails at runtime with "JIT compiler unavailable" (PLATFORM-UX-01). `npm run typecheck` reports the template error.
 
 The browser smoke test uses the existing bootstrap Playwright runtime and is documented in the B-01 evidence record.

@@ -23,7 +23,7 @@ Read `docs/status.md` for the selected packet, engineering context, and limitati
 
 ## Current focus (2026-09-24)
 
-The portal is being rebuilt around project **layers** (Home, Vision, Design, Pages, Data, Platform, Work). Start from [the layers implementation plan and handoff](docs/design/portal-layers/implementation-plan.md) before touching the portal UI or onboarding. The next pass, PLATFORM-PIPELINE-01 (owner-owned repositories, app-defined environments, containers per subdomain, multi-instance sync), starts from [its brief](docs/design/platform-pipeline/work-record.md).
+The portal is being rebuilt around project **layers** (Home, Vision, Design, Pages, Data, Code, Deploy, Work; Platform split into Code and Deploy by DEC-049). Start from [the layers implementation plan and handoff](docs/design/portal-layers/implementation-plan.md) before touching the portal UI or onboarding. The next pass, PLATFORM-PIPELINE-01 (owner-owned repositories, app-defined environments, containers per subdomain, multi-instance sync), starts from [its brief](docs/design/platform-pipeline/work-record.md).
 
 ## Required reading
 

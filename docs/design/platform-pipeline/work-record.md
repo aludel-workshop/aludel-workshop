@@ -236,7 +236,7 @@ The container ran with `--memory 256m --memory-swap 256m --cpus 0.5 --pids-limit
 - **PP-01A:** container runtime for previews, plus the Dockerfile and compose in the scaffold. **Built and agent-checked** (§9).
 - **PP-01B:** the live personal-account GitHub proof (owner steps).
 - **PP-01C:** GitHub-first onboarding: required connection and the recipe approval screen (UX pass: prototype, then build).
-- **PP-01D:** the Environments view reads the app's own declaration (UX pass).
+- **PP-01D:** the Environments view reads the app's own declaration (UX pass). The UX pass is [PLATFORM-UX-01](../platform-layer/work-record.md) (Deploy › Pipeline and Environment, prototype v1).
 - **PP-01E:** quotas, idle stop and the egress policy, designed now and enforced before public hosting.
 - Then **ICONS-FONTS-01**, now unblocked by PP-01A because each app installs its own dependencies.
 

@@ -7,10 +7,11 @@ import { hostTopology } from './hosts.mjs';
 import { initOnboarding, loadCatalogs, onboarding } from './onboarding.mjs';
 import { botColors, efforts, initKnowledge, knowledge } from './knowledge.mjs';
 import { previewManager, previewRuntime } from './previews.mjs';
-import { agentsGuide, copyMedia, initialFiles, loadScaffoldSources, sitePages, skeletonFiles, writeBinaries, writeFiles } from './scaffold.mjs';
+import { agentsGuide, copyMedia, initialFiles, loadScaffoldSources, sitePages, skeletonFiles, workflowPaths, writeBinaries, writeFiles } from './scaffold.mjs';
 import { brandUsage, componentStatus } from './design.mjs';
 import { codeLinks, initCodeLinks, workspaceIsIndexable } from './code-links.mjs';
 import { initPlatformOps, platformOps } from './platform-ops.mjs';
+import { codeReleases, initCodeLayer, readDocs, readSource, readStack, readVariables, starterDocs, trackedFiles } from './code-layer.mjs';
 import { agentRuns, initAgentRuns } from './agent-runs.mjs';
 import { extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -42,6 +43,7 @@ initOnboarding(db);
 initKnowledge(db);
 initCodeLinks(db);
 initPlatformOps(db);
+initCodeLayer(db);
 initAgentRuns(db);
 const secrets = openSecretStore(dataDirectory);
 const topology = hostTopology(process.env, port);
@@ -85,6 +87,8 @@ for (const projectId of layerProjects()) {
 }
 const links = codeLinks({ db, know });
 const ops = platformOps({ db, backupRoot: join(dataDirectory, 'backups') });
+const codeRelease = codeReleases({ db });
+const storyRefs = projectId => know.list(projectId, 'story').map(story => ({ ...story, ref: `S${story.number}` }));
 const runs = agentRuns({ db, know, secrets, providers: catalogs.agentProviders.providers });
 // LAY-04: routines that are due create work, and each layer's gaps become backlog items (DEC-041). At start-up, then every ten minutes.
 function tickRoutines() {
@@ -174,6 +178,13 @@ function scaffoldSetup(user, projectId) {
 async function generateSkeleton(user, projectId) {
   const setup = scaffoldSetup(user, projectId);
   const { files, media, binaries, manifest } = skeletonFiles(setup, catalogs, projectGitProfile, appUrls(setup.project.slug), flows.projectAssets(projectId), scaffoldSources);
+  // PLATFORM-UX-01: AGENTS.md belongs to the developers once it exists. Workflow files are left out while the GitHub
+  // App lacks the Workflows permission, because GitHub refuses the whole push otherwise.
+  // The old generated guide (it starts "# Agent guide for") is Aludel's own file: it becomes the map once; its content lives on in docs/agents.md.
+  const agentsPath = join(setup.workspacePath, 'AGENTS.md');
+  if (existsSync(agentsPath) && !readFileSync(agentsPath, 'utf8').startsWith('# Agent guide for ')) delete files['AGENTS.md'];
+  const workflows = await github.canPushWorkflows(projectId).catch(() => false);
+  if (workflows === false) for (const path of workflowPaths) if (!existsSync(join(setup.workspacePath, path))) delete files[path];
   createWorkspace(setup, user);
   writeFiles(setup.workspacePath, files);
   writeBinaries(setup.workspacePath, binaries);
@@ -379,7 +390,7 @@ async function api(request, response, url) {
       const setup = flows.projectSetup(user, projectId);
       const workspace = setup.workspacePath;
       return json(response, 200, { releases: ops.releases.list(projectId), repository: ops.commits(workspace), database: ops.health(workspace), backups: ops.listBackups(projectId),
-        health: await previews.probe(projectId), domains: { preview: appUrls(setup.project.slug).app, base: topology.baseDomain || 'localhost' } });
+        health: await previews.probe(projectId), domains: { preview: appUrls(setup.project.slug).app, base: topology.baseDomain || 'localhost' }, variables: readVariables(workspace) });
     }
     if (section === 'database') {
       const workspace = flows.projectSetup(user, projectId).workspacePath;
@@ -394,6 +405,44 @@ async function api(request, response, url) {
         const input = await readJson(request);
         return json(response, 200, await ops.restore(projectId, workspace, input.name, { confirm: input.confirm, stopPreview: () => previews.stop(projectId) }));
       }
+    }
+    // PLATFORM-UX-01: Code reads the repository; it never edits code. Starter docs fill only missing files.
+    if (section === 'code' && item !== 'index') {
+      const workspace = flows.projectSetup(user, projectId).workspacePath;
+      if (item === 'files' && method === 'GET') { const files = trackedFiles(workspace); return json(response, 200, { files, stack: readStack(workspace, files) }); }
+      if (item === 'file' && method === 'GET') return json(response, 200, readSource(workspace, url.searchParams.get('path')));
+      if (item === 'docs' && method === 'GET') return json(response, 200, readDocs(workspace, id => { const record = know.get(projectId, id); return record ? record.revision : undefined; }));
+      if (item === 'docs-starter' && method === 'POST') {
+        if (!inspectGitRepository(workspace).committed) return json(response, 409, { error: 'The repository does not exist yet. Finish setup first.' });
+        const setup = flows.projectSetup(user, projectId);
+        return json(response, 200, starterDocs(workspace, { project: setup.project, stories: storyRefs(projectId), personas: know.list(projectId, 'persona'), objects: know.list(projectId, 'data_object'),
+          operations: know.list(projectId, 'data_operation'), tokens: know.list(projectId, 'design_tokens')[0] || null, components: know.list(projectId, 'component'), stack: readStack(workspace) }));
+      }
+      if (item === 'docs-refresh' && method === 'POST') {
+        const input = await readJson(request);
+        const view = readDocs(workspace, id => { const record = know.get(projectId, id); return record ? record.revision : undefined; });
+        const docSection = view.docs.find(doc => doc.path === input.path)?.sections.find(entry => entry.heading === input.heading);
+        if (!docSection) return json(response, 404, { error: 'That section is not in the docs.' });
+        const changed = docSection.sources.filter(source => source.state !== 'current' && know.get(projectId, source.id));
+        return json(response, 201, know.createWork(projectId, { action: 'platform.docs', title: `Refresh ${input.path} › ${input.heading}`.slice(0, 160),
+          targets: changed.map(source => ({ id: source.id, label: `${source.kind} revision ${source.revision} → ${source.current}` })) }, user.name));
+      }
+      if (item === 'releases' && method === 'GET') return json(response, 200, { releases: codeRelease.list(projectId), draft: codeRelease.draft(projectId, workspace, storyRefs(projectId), [...links.builtBy(projectId).keys()]) });
+      if (item === 'releases' && method === 'POST') return json(response, 201, codeRelease.record(projectId, workspace, storyRefs(projectId), await readJson(request), user.name, [...links.builtBy(projectId).keys()]));
+      // Round 3 (owner-authorized): publish a recorded release to the project's own GitHub repository as a tag and a GitHub Release.
+      // The repository's release workflow then builds the image into GitHub Packages.
+      if (item === 'releases-publish' && method === 'POST') {
+        const version = String((await readJson(request)).version || '');
+        const release = codeRelease.list(projectId).find(entry => entry.version === version);
+        if (!release) return json(response, 404, { error: 'That release is not recorded.' });
+        if (release.publishedAt) return json(response, 409, { error: `v${release.version} is already published.` });
+        const sha = codeRelease.fullSha(workspace, release.commit);
+        const titles = new Map(storyRefs(projectId).map(story => [story.id, `${story.ref} ${story.title}`]));
+        const body = [release.notes, release.stories.length ? `Ships:\n${release.stories.map(id => `- ${titles.get(id) || id}`).join('\n')}` : '', release.changes.length ? `Stack changes:\n${release.changes.map(change => `- ${change.name} ${change.from || 'added'} → ${change.to || 'removed'}`).join('\n')}` : ''].filter(Boolean).join('\n\n');
+        const published = await github.createRelease(projectId, { tag: `v${release.version}`, sha, name: `v${release.version}`, body });
+        return json(response, 200, codeRelease.markPublished(projectId, release.version, published.url));
+      }
+      if (item === 'ci' && method === 'GET') return json(response, 200, await github.ciResults(projectId, codeRelease.fullSha(workspace, url.searchParams.get('sha') || 'HEAD')));
     }
     // LAY-07D: re-read the workspace; and the context a Reconcile item needs.
     if (section === 'code' && item === 'index' && method === 'POST') {
@@ -411,8 +460,8 @@ async function api(request, response, url) {
     if (section === 'agents' && item === 'export' && method === 'POST') {
       const setup = scaffoldSetup(user, projectId);
       if (!inspectGitRepository(setup.workspacePath).committed) return json(response, 409, { error: 'The repository does not exist yet. Finish setup first.' });
-      writeFiles(setup.workspacePath, { 'AGENTS.md': agentsGuide(setup, catalogs) });
-      return json(response, 200, { written: 'AGENTS.md', committed: false });
+      writeFiles(setup.workspacePath, { 'docs/agents.md': agentsGuide(setup, catalogs) });
+      return json(response, 200, { written: 'docs/agents.md', committed: false });
     }
     if (section === 'records' && method === 'POST' && !item) {
       const input = await readJson(request);

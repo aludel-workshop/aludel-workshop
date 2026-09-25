@@ -1,0 +1,44 @@
+// The v2 walkthrough: screenshots at 1600x1000, then a 390 px horizontal-scroll check. Set PLAYWRIGHT_MODULE.
+const { chromium } = await import(process.env.PLAYWRIGHT_MODULE);
+import { mkdirSync } from 'node:fs';
+const base = new URL('./index.html', import.meta.url).href;
+const out = new URL('./shots/', import.meta.url).pathname; mkdirSync(out, { recursive: true });
+const browser = await chromium.launch();
+const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
+const errors = []; page.on('pageerror', e => errors.push(e.message)); page.on('console', m => m.type() === 'error' && errors.push(m.text()));
+let n = 0; const shot = async name => { n++; await page.waitForTimeout(250); await page.evaluate(() => document.querySelectorAll('.toast').forEach(t => t.remove())); await page.screenshot({ path: `${out}${String(n).padStart(2, '0')}-${name}.png` }); };
+const step = async (label, fn) => { try { await fn(); } catch (e) { errors.push(`${label}: ${e.message.split('\n')[0]}`); } };
+await page.goto(base + '#code/overview'); await page.waitForTimeout(1500); await shot('overview');
+await step('part web', () => page.click('[data-part="web"]')); await step('asof', () => page.selectOption('#asof', 'v0.4.0')); await shot('overview-web-v040');
+await step('chunk from overview', () => page.click('[data-part="api"]')); await step('go chunk', () => page.click('[data-go-chunk="approveRequest"]')); await shot('explorer-approve');
+await step('lens', () => page.selectOption('#lens', 'TS-06')); await shot('explorer-lens-ts06');
+await step('lens off', () => page.selectOption('#lens', '')); await step('mail file', () => page.click('.tn[data-file="server/mail.mjs"]')); await step('mail', () => page.click('.tn[data-chunk="sendMail"]')); await shot('explorer-sendmail');
+await step('file only', () => page.click('.tn[data-file="server/routes/requests.mjs"]')); await shot('explorer-file');
+await step('suspect', () => page.click('[data-filt="suspect"]')); await shot('explorer-suspect');
+await step('all', () => page.click('[data-filt="all"]')); await step('search', () => page.type('#tq', 'docker')); await step('dockerfile', () => page.click('.tn[data-file="Dockerfile"]')); await shot('explorer-dockerfile');
+await page.goto(base + '#code/tests'); await shot('tests');
+await step('change test', () => page.click('[data-act="change-test"][data-scn="TS-06/1"]')); await shot('tests-change'); await step('send', () => page.click('[data-act="send"]'));
+await page.goto(base + '#code/docs'); await shot('docs-architecture');
+await step('sec', () => page.click('.sec[data-sec="2"]')); await shot('docs-finding-f12');
+await step('borrowing', () => page.click('.tn[data-doc="docs/product/borrowing.md"]')); await step('sec1', () => page.click('.sec[data-sec="1"]')); await shot('docs-borrowing-suspect');
+await step('agents', () => page.click('.tn[data-doc="AGENTS.md"]')); await step('plain', () => page.uncheck('#showsrc')); await shot('docs-agents-plain');
+await step('plain on', () => page.check('#showsrc')); await step('sidecar', () => page.click('[data-act="sidecar"]')); await shot('docs-sidecar');
+await page.goto(base + '#code/releases'); await shot('releases');
+await step('draft', () => page.click('[data-act="draft"]')); await shot('release-draft'); await step('publish', () => page.click('[data-act="publish"]')); await shot('release-published');
+await page.goto(base + '#deploy/environments'); await shot('deploy-environments');
+await step('promote', () => page.click('[data-act="promote"]')); await shot('deploy-promote'); await step('do', () => page.click('[data-act="do-promote"]')); await shot('deploy-history');
+await page.goto(base + '#deploy/environments/production/settings'); await shot('deploy-settings');
+await page.goto(base + '#deploy/variables'); await step('var', async () => { const i = page.locator('[data-var="MAIL_FROM:staging"]'); await i.click(); await i.press('End'); await i.type('.uk'); }); await shot('deploy-variables');
+await page.goto(base + '#deploy/integrations'); await shot('deploy-integrations');
+await page.goto(base + '#deploy/data'); await shot('deploy-data');
+await page.goto(base + '#code/overview'); await step('notes', () => page.click('[data-act="notes"]')); await shot('review-notes');
+await page.setViewportSize({ width: 390, height: 844 });
+for (const h of ['#code/overview', '#code/explorer', '#code/tests', '#code/docs', '#code/releases', '#deploy/environments', '#deploy/variables', '#deploy/integrations', '#deploy/data']) {
+  await page.goto(base + h); await page.waitForTimeout(300);
+  const over = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+  if (over > 0) errors.push(`horizontal scroll ${over}px at 390 on ${h}: ` + await page.evaluate(() => [...document.querySelectorAll('main *')].filter(el => el.getBoundingClientRect().right > innerWidth + 1 && !el.closest('.tw,.src,.logs,.tabs,.tree-body,.json,[style*="overflow-x"]')).slice(0, 4).map(el => el.tagName + '.' + el.className).join(' | ')));
+}
+await page.goto(base + '#code/explorer'); await shot('phone-explorer');
+await page.goto(base + '#code/docs'); await shot('phone-docs');
+await browser.close();
+console.log(errors.length ? 'ERRORS\n' + errors.join('\n') : `NO ERRORS · ${n} shots`);

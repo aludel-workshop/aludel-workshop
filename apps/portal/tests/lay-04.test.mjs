@@ -98,14 +98,14 @@ test('WORK-UX-01 (DEC-041): each layer\'s gaps become backlog items, assigned by
 test('WORK-UX-01: roles by layer; the onboarding style only presets who takes each action', () => {
   const planner = fixture({ profile: 'planner' });
   const roles = planner.know.roleView(planner.id);
-  assert.deepEqual(roles.map(role => role.layer), ['product', 'design', 'pages', 'data', 'platform', 'work']);
+  assert.deepEqual(roles.map(role => role.layer), ['product', 'design', 'pages', 'data', 'platform', 'deploy', 'work']);
   const action = (fixtureValue, key) => fixtureValue.know.roleView(fixtureValue.id).flatMap(role => role.actions).find(entry => entry.id === key);
   const agent = planner.know.defaultProfile(planner.id);
   assert.deepEqual(action(planner, 'product.define').assignee, { kind: 'person', id: planner.ada.id }, 'a Planner writes acceptance');
   assert.deepEqual(action(planner, 'data.contract').assignee, { kind: 'agent', id: agent.id }, 'agents write contracts');
   const dreamer = fixture({ profile: 'dreamer' });
   assert.equal(action(dreamer, 'product.define').assignee.kind, 'agent');
-  assert.equal(action(dreamer, 'platform.configure').assignee.kind, 'person', 'anything that may cost money stays with the person');
+  assert.equal(action(dreamer, 'deploy.configure').assignee.kind, 'person', 'anything that may cost money stays with the person');
   const tinkerer = fixture({ profile: 'tinkerer' });
   assert.ok(tinkerer.know.roleView(tinkerer.id).flatMap(role => role.actions).every(entry => entry.assignee.kind === 'person'));
   // Changing an action's assignee is a revision; new items follow it, existing ones keep theirs.

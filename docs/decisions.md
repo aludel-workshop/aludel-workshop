@@ -11,6 +11,20 @@ This is the seed of the portal's decision workflow. Confirmed owner answers and 
 
 ## Confirmed
 
+2026-09-24 — **DEC-049: Platform splits into Code and Deploy; Code is a reference layer, Deploy has an Operator.** The owner, over two prototype rounds ([work record](design/platform-layer/work-record.md), ledger C1–C9 and R1–R17):
+- Code is "a handy reference for how the code connects to everything else", not a workspace: "no one will come to this code layer to do their work". There is no code editing; a change is requested and becomes Engineer work.
+- Code holds Overview, Explorer (one file tree whose last level is the linked chunks), Tests (story → scenario → tests; not every test is story-driven), Docs and Releases.
+- Docs follow OpenAI's harness engineering: AGENTS.md is a short map into a `docs/` tree. "docs are owned by the developers, they know what they need and can assemble it from the evidence/sources." A sidecar (`docs/.aludel/sources.json`) records each section's sources, and findings from any layer can be evidence for any doc or record ("full inter-connection").
+- Releases are explicit ("hope that doesnt mean every commit is a release"), using GitHub Releases and GitHub Packages, and recorded in Code as its output. Deploy runs them.
+- Deploy holds Environments, Variables, Integrations (domains, email, storage) and Data. "deploy gets operator role." Aludel may be the project's host, so Deploy must operate it.
+- **Consequences, as built:**
+  - URLs are `/code/…` (the layer key stays `platform`) and `/deploy/…`; old `/platform/…` links still resolve;
+  - a new `deploy` role (Operator) takes over `configure`, plus `promote`, `rollback` and `review`, with existing projects' configure actions and open items moved;
+  - the Engineer gains `platform.docs`;
+  - preview builds are no longer called releases;
+  - publishing a release to GitHub is not built, because it needs owner authorization for that write.
+- **Round 3 (same day):** the owner authorized publishing releases to each project's own connected repository, and adding the GitHub App permissions CI needs (Workflows write, Actions read). `AGENTS.md` starts from the README as a short map and grows with the docs; the generated guide moved to `docs/agents.md`. Each app's CI and release image run in its own repository's GitHub Actions.
+
 2026-09-24 — **DEC-048: The Pages layer is where the Experience designer plans and specs the product; layout and behaviour on built pages change only through change requests.** The owner, after the Pages prototypes ([work record](design/pages-layer/work-record.md)):
 - "no direct structural edits, lets keep this focused and simple. if they want the page to look/behave different, spec it out, change request, gets added as work (note it gets added as coding work, which might have a specific agent, not as ux designer work, which would be e.g. reviewing flows)."
 - On v2: the Map is a planning canvas (pan, zoom, grid, page blanks, drawn links, flows edited on the canvas), and "As" uses Vision's personas. Then "build as you see fit. make it great."

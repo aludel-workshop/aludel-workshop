@@ -83,7 +83,8 @@ test('organization flow verifies installation, seals user token, and recovers wi
   assert.equal(partial.status, 'local-setup-needed');
   assert.equal(calls.find(call => call.url.endsWith('/orgs/acme/repos')).authorization, 'Bearer installation-token-1');
   assert.deepEqual(minted[0].options.permissions, { administration: 'write', contents: 'write' });
-  assert.deepEqual(minted[1].options, { permissions: { contents: 'write' }, repositories: ['machine'] });
+  // PLATFORM-UX-01: the push token asks for Workflows too; an installation without it gets a contents-only token (tests/ci-releases.test.mjs).
+  assert.deepEqual(minted[1].options, { permissions: { contents: 'write', workflows: 'write' }, repositories: ['machine'] });
   const ready = await integration.finishLocalSetup('the-machine', values => {
     assert.equal(values.token, 'installation-token-3'); return { commit: 'abc123', trackedFiles: 42 };
   });

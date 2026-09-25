@@ -18,5 +18,5 @@ export class BuiltByComponent {
   readonly ctx = inject(ProjectContext);
   readonly recordId = input.required<string>();
   readonly summary = computed(() => this.ctx.builtBy().get(this.recordId()) || null);
-  readonly href = computed(() => this.ctx.link('platform', 'code', 'for', this.recordId()));
+  readonly href = computed(() => this.ctx.link('platform', 'explorer', 'for', this.recordId()));
 }

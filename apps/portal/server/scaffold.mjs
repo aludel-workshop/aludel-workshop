@@ -76,20 +76,30 @@ export function initialFiles(setup, catalogs, gitProfile, appUrl) {
     '.gitignore': `${[...gitProfile.gitignore, '', '# A linked dependency folder is a symlink, which a trailing-slash pattern does not match.', 'node_modules'].join('\n')}\n`,
     '.gitattributes': `${gitProfile.gitattributes.join('\n')}\n`,
     'README.md': `# ${name}\n\n${setup.direction?.summary || setup.project.description}\n\nThis repository was started with [Aludel](${appUrl.portal}). The app skeleton is generated from the \`${setup.stack.preset}\` stack preset once setup is finished.\n\n- Product intent: [docs/product.md](docs/product.md)\n- Setup choices: [aludel.json](aludel.json)\n- Agent guide: [AGENTS.md](AGENTS.md)\n`,
-    'AGENTS.md': agentsGuide(setup, catalogs),
+    'AGENTS.md': agentsMap(setup),
+    'docs/agents.md': agentsGuide(setup, catalogs),
     'aludel.json': json(manifest(setup, catalogs, media)),
     'docs/product.md': productDoc(setup, media, catalogs)
   };
 }
 
+// PLATFORM-UX-01 (round 3): AGENTS.md starts from the README and is a short map into docs/. Developers own it: it is
+// written when the repository starts and never regenerated. The generated guide lives in docs/agents.md.
+export function agentsMap(setup) {
+  return `# ${setup.project.name}\n\n${setup.direction?.summary || setup.project.description}\n\nThis file is the map. Read what the task needs, not everything.\n\n## Where to look\n\n` +
+    `- \`README.md\`: what it is and how to run it\n- \`docs/product.md\`: the product intent (from Aludel's Vision)\n- \`docs/agents.md\`: how work is done here: instructions, roles, conventions (from Aludel's Work)\n- \`aludel.json\`: the setup choices\n\n` +
+    `## Run it\n\n- \`docker compose up --build\`, then open http://localhost:3000\n- \`npm test\` runs the tests; CI runs them on every push (\`.github/workflows/ci.yml\`)\n\nAdd a line here for each doc you add under \`docs/\`.\n`;
+}
+
 // setup.agents (LAY-07C) carries the project instructions and profiles from Work › Agents, so any coding tool reads the same rules.
+// It is written to docs/agents.md, so its links are relative to docs/.
 export function agentsGuide(setup, catalogs) {
   const preset = catalogs.stacks.presets[setup.stack.preset];
   const agents = setup.agents;
   // WORK-UX-01: instructions are layered project → role → action; each action says what it may change and use.
   const roleSections = agents ? agents.roles.map(role => `### ${role.name} (${role.layer})\n\n${role.instructions || '_No role instructions yet._'}\n\n${role.actions.map(action => `#### ${action.name}\n\n${action.instructions ? `${action.instructions}\n\n` : ''}- May change: ${action.changes.join('; ') || 'nothing (suggestions only)'}\n- Tools: ${action.tools.join(', ') || 'none'}\n- Asks first: ${action.asks || 'nothing beyond the rules below'}\n`).join('\n')}`).join('\n') : '';
   const agentSections = agents ? `\n## Project instructions\n\n${agents.instructions || '_None yet._'}\n${agents.principles.length ? `\nProduct principles:\n\n${agents.principles.map(item => `- ${item}`).join('\n')}\n` : ''}\n## Roles and actions\n\nEvery layer has a role, and each role performs actions. Read the project instructions first, then the role's, then the action's.\n\n${roleSections}\n## Commits and tests\n\n- End each commit message with trailers: \`Aludel-Work: W-12\` and \`Implements: S4, SPEC-02/FR-001\`.\n- Start test names with the acceptance they check: \`S4 · Given …\`.\n- Do not put tags or IDs in the code; Aludel links code to stories from these.\n` : '';
-  return `# Agent guide for ${setup.project.name}\n\nRead [docs/product.md](docs/product.md) for the product intent and [aludel.json](aludel.json) for the setup choices before changing anything.\n\nWork is assigned per action in Aludel (Work › Roles). Do not pick up work assigned to a person.\n${agentSections}\n## Stack\n\n${Object.entries(preset?.layers || {}).map(([layer, value]) => `- ${layer}: ${value}`).join('\n')}\n\nCommands: \`npm install\`, \`npm run build\`, \`npm start\` (serves on \`PORT\`, default 3000), or \`docker compose up --build\` to run it in its container. \`Dockerfile\` and \`.env.example\` declare how the app runs and every variable it reads; keep them current when that changes.\n\n## Rules\n\n- This app is independent of Aludel. Do not import Aludel code or call Aludel services at runtime.\n- Never commit secrets, \`.env\` files or the \`.data/\` directory.\n- Keep the pages in \`src/site.ts\` in step with the Pages section of \`docs/product.md\`. \`src/page-blocks.ts\` holds the placeholder layouts; replace a page's blocks with real UI as it is built.\n- Pages are specified in Aludel's Pages layer. When you build a page section, keep its \`data-aludel-section\` attribute (drop \`data-aludel-skeleton\`), keep \`data-aludel-page\` on the page, and read its text from the section's content in \`src/site.ts\`, so Aludel can show and edit it. Leave \`src/aludel-bridge.ts\` in place.\n`;
+  return `# Agent guide for ${setup.project.name}\n\nRead [product.md](product.md) for the product intent and [aludel.json](../aludel.json) for the setup choices before changing anything.\n\nWork is assigned per action in Aludel (Work › Roles). Do not pick up work assigned to a person.\n${agentSections}\n## Stack\n\n${Object.entries(preset?.layers || {}).map(([layer, value]) => `- ${layer}: ${value}`).join('\n')}\n\nCommands: \`npm install\`, \`npm run build\`, \`npm start\` (serves on \`PORT\`, default 3000), or \`docker compose up --build\` to run it in its container. \`Dockerfile\` and \`.env.example\` declare how the app runs and every variable it reads; keep them current when that changes.\n\n## Rules\n\n- This app is independent of Aludel. Do not import Aludel code or call Aludel services at runtime.\n- Never commit secrets, \`.env\` files or the \`.data/\` directory.\n- Keep the pages in \`src/site.ts\` in step with the Pages section of \`docs/product.md\`. \`src/page-blocks.ts\` holds the placeholder layouts; replace a page's blocks with real UI as it is built.\n- Pages are specified in Aludel's Pages layer. When you build a page section, keep its \`data-aludel-section\` attribute (drop \`data-aludel-skeleton\`), keep \`data-aludel-page\` on the page, and read its text from the section's content in \`src/site.ts\`, so Aludel can show and edit it. Leave \`src/aludel-bridge.ts\` in place.\n`;
 }
 
 // The generation manifest (LAY-07D): every unit the template wrote and the records it realises. Pages are derived:
@@ -170,7 +180,7 @@ export function skeletonFiles(setup, catalogs, gitProfile, appUrl, assets, sourc
     'aludel.json': json(manifest(setup, catalogs, media)),
     'docs/product.md': productDoc(setup, media, catalogs),
     'package.json': json({ name: setup.project.slug, version: '0.1.0', private: true, type: 'module', engines: { node: '^24.14.0' },
-      scripts: { dev: 'vite', build: 'vite build', start: 'npm run build && node server/server.mjs', serve: 'node server/server.mjs' }, dependencies, devDependencies }),
+      scripts: { dev: 'vite', build: 'vite build', start: 'npm run build && node server/server.mjs', serve: 'node server/server.mjs', test: 'node --test' }, dependencies, devDependencies }),
     'vite.config.ts': "import { defineConfig } from 'vite';\nimport angular from '@analogjs/vite-plugin-angular';\n\nexport default defineConfig({ plugins: [angular({ tsconfig: 'tsconfig.app.json' })], build: { outDir: 'dist' } });\n",
     'tsconfig.json': json({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'bundler', lib: ['ES2022', 'dom'], experimentalDecorators: true, useDefineForClassFields: false, strict: true, skipLibCheck: true, isolatedModules: true, types: [] }, angularCompilerOptions: { strictTemplates: true } }),
     'tsconfig.app.json': json({ extends: './tsconfig.json', compilerOptions: { outDir: './out-tsc/app' }, files: ['src/main.ts'], include: ['src/**/*.ts'] }),
@@ -187,6 +197,7 @@ export function skeletonFiles(setup, catalogs, gitProfile, appUrl, assets, sourc
     ...(design ? designFiles(design, site.name) : {}),
     'server/server.mjs': serverSource(Boolean(options.auth)),
     ...containerFiles(),
+    ...workflowFiles(),
     'licenses/Material-Symbols-LICENSE': sources.iconLicense
   };
   return { files, media, binaries: { 'public/fonts/icons.ttf': sources.iconFont }, manifest: generationManifest(setup, pages) };
@@ -425,6 +436,61 @@ const appTemplate = `<a class="skip-link" href="#main">Skip to content</a>
 
 // PLATFORM-PIPELINE-01: the app declares how it builds and runs, so any container host (and Aludel's previews) runs it the
 // same way. Limits are not declared here: the host that runs the app sets them.
+// PLATFORM-UX-01 (round 3): the app's own CI and release image, run by GitHub Actions in its repository with its own
+// token, so both keep working without Aludel. Aludel reads the CI run's test-results artifact to show which tests pass.
+export const workflowPaths = ['.github/workflows/ci.yml', '.github/workflows/release.yml'];
+function workflowFiles() {
+  return {
+    '.github/workflows/ci.yml': `# Runs the tests and the build on every push and pull request. Aludel reads the test-results artifact.
+name: CI
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi
+      - run: node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=test-results.xml
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results.xml
+          if-no-files-found: ignore
+      - run: npm run build
+`,
+    '.github/workflows/release.yml': `# When a release is published, build its image once and push it to GitHub Packages (ghcr.io) with this repository's token.
+name: Release image
+on:
+  release:
+    types: [published]
+permissions:
+  contents: read
+  packages: write
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: \${{ github.actor }}
+          password: \${{ secrets.GITHUB_TOKEN }}
+      - id: image
+        run: echo "name=ghcr.io/\${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: \${{ steps.image.outputs.name }}:\${{ github.event.release.tag_name }},\${{ steps.image.outputs.name }}:latest
+`
+  };
+}
+
 function containerFiles() {
   return {
     'Dockerfile': `# syntax=docker/dockerfile:1

@@ -10,7 +10,8 @@ const read = path => readFileSync(join(root, path), 'utf8');
 test('every literal icon name used by the portal is in the committed font subset', () => {
   const { icons } = JSON.parse(read('src/icon-subset.json'));
   const used = new Set();
-  for (const file of readdirSync(join(root, 'src'))) {
+  // Every file under src/, layers included (it used to read only the top level, so layer icons went unchecked).
+  for (const file of readdirSync(join(root, 'src'), { recursive: true })) {
     if (!/\.(html|ts)$/.test(file) || file.endsWith('.stories.ts')) continue;
     for (const [, name] of read(`src/${file}`).matchAll(/<mat-icon[^>]*>\s*([a-z0-9_]+)\s*<\/mat-icon>/g)) used.add(name);
   }

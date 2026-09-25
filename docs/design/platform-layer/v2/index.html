@@ -1,0 +1,1078 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aludel Code and Deploy</title>
+<!-- PLATFORM-UX-01 prototype v2 (round-1 rows R1-R13 in ../work-record.md; v1 ledger C1-C9). Static; illustrative Tool Share data at a later stage than today's scaffold; nothing is saved or sent. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block">
+<style>
+:root{
+  --bg:#fbfbfd;--surface:#fff;--rail:#f3f5f9;--panel:#f4f6fa;--hover:#e9edf5;--line:#dfe3ec;--line-strong:#c8cfdc;--ink:#1b1f2a;--muted:#5d6679;--faint:#8a93a6;
+  --accent:#3047b9;--accent-bg:#e3e8ff;
+  --ok:#146446;--ok-bg:#d9f3e7;--bad:#a1231f;--bad-bg:#fce1e0;--warn:#8a5a00;--warn-bg:#fff0cc;--info:#1a5fb4;--info-bg:#e2ecfb;
+  --shadow:0 18px 50px #1c2a5a2e;
+  --c-vision:#b93c0a;--b-vision:#ffeddc;--c-design:#8a6100;--b-design:#fff3cc;--c-pages:#2a7230;--b-pages:#e2f4e3;--c-data:#00766c;--b-data:#d6f3ee;
+  --c-code:#1a5fb4;--b-code:#e2ecfb;--c-deploy:#2f3a9e;--b-deploy:#e4e7f8;--c-work:#5b3cc4;--b-work:#ece7fd;
+  --lc:var(--c-code);--lb:var(--b-code);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:Roboto,system-ui,sans-serif;font-size:14.5px;line-height:1.45;color:var(--ink);background:var(--bg)}
+body.deploy{--lc:var(--c-deploy);--lb:var(--b-deploy)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:var(--accent)}
+.icon{font-family:'Material Symbols Rounded';font-weight:normal;font-style:normal;font-size:20px;line-height:1;letter-spacing:normal;text-transform:none;white-space:nowrap;display:inline-block;vertical-align:middle;font-feature-settings:'liga';-webkit-font-smoothing:antialiased;flex:none;font-variation-settings:'FILL' 0,'wght' 400}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.mono,code{font-family:"Roboto Mono",ui-monospace,monospace;font-size:.88em}
+.muted{color:var(--muted)}.faint{color:var(--faint)}.small{font-size:13px}.tiny{font-size:11.5px}
+.row{display:flex;align-items:center;gap:8px}.push{margin-left:auto}.wrap{flex-wrap:wrap}.col{display:grid;gap:12px;align-content:start}
+.vh{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* Shell: matches the built portal and the Pages v2 prototype */
+.shell{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:100vh}
+.rail{background:var(--rail);border-right:1px solid var(--line);padding:14px 10px;display:flex;flex-direction:column;gap:2px;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:18px;padding:2px 8px 12px}
+.brand .icon{color:var(--accent);font-size:26px}
+.proj{display:flex;align-items:center;gap:9px;padding:8px;border-radius:12px;background:var(--surface);border:1px solid var(--line);margin-bottom:10px}
+.proj .mk{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:#2e7d5b;color:#fff;font-weight:700;font-size:12px}
+.proj small{display:block;color:var(--muted);font-size:11.5px}
+.nav a{display:flex;align-items:center;gap:10px;padding:5px 10px 5px 6px;border-radius:12px;color:var(--ink);text-decoration:none;font-weight:500}
+.nav a:hover{background:color-mix(in srgb,var(--nb) 70%,transparent)}
+.nav a.active{background:var(--nb);font-weight:700}
+.nav a .new{margin-left:auto;font-size:10px;font-weight:700;color:var(--nc);letter-spacing:.5px}
+.tile{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:var(--nb);color:var(--nc)}
+.tile .icon{font-size:19px}
+.nav a.active .tile{background:var(--nc);color:#fff}
+.rail .sp{flex:1}
+.n-home{--nc:#c62828;--nb:#fde8e8}.n-vision{--nc:#b93c0a;--nb:#ffeddc}.n-design{--nc:#8a6100;--nb:#fff3cc}.n-pages{--nc:#2a7230;--nb:#e2f4e3}.n-data{--nc:#00766c;--nb:#d6f3ee}.n-code{--nc:#1a5fb4;--nb:#e2ecfb}.n-deploy{--nc:#2f3a9e;--nb:#e4e7f8}.n-work{--nc:#5b3cc4;--nb:#ece7fd}.n-library{--nc:#9c27b0;--nb:#f5e2f8}.n-settings{--nc:#4a5568;--nb:#e8ebf0}
+.top{display:flex;align-items:center;gap:14px;padding:10px 24px;border-bottom:1px solid var(--line);background:var(--bg);position:sticky;top:0;z-index:20}
+.search{position:relative;flex:1;max-width:480px}.search input{width:100%;padding:8px 14px 8px 38px;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
+.search .icon{position:absolute;left:11px;top:8px;color:var(--muted)}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:var(--surface);font-weight:500;font-size:13.5px;white-space:nowrap;text-decoration:none;color:var(--ink)}
+.btn:hover{background:var(--hover)}.btn .icon{font-size:18px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}.btn.primary:hover{background:#2539a0}
+.btn.ghost{border-color:transparent;background:none}.btn.ghost:hover{background:var(--hover)}
+.btn.sm{padding:3px 9px;font-size:12.5px}.btn.sm .icon{font-size:16px}
+.btn:disabled{opacity:.5;cursor:default}
+.main{padding:14px 24px 24px;min-width:0}
+.eyebrow{display:inline-flex;align-items:center;gap:6px;font-size:12px;letter-spacing:.8px;text-transform:uppercase;color:var(--lc);font-weight:700;margin:0 0 2px}
+.eyebrow .icon{font-size:16px}
+h1{font-size:24px;line-height:1.2;margin:0 0 8px}
+h2{font-size:16px;margin:0 0 8px}
+h3{font-size:11.5px;letter-spacing:.8px;text-transform:uppercase;color:var(--faint);margin:14px 0 6px}
+.lead{color:var(--muted);margin:-2px 0 12px;max-width:900px}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:0 0 14px;overflow-x:auto}
+.tabs a{display:inline-flex;align-items:center;gap:6px;padding:9px 14px;color:var(--muted);font-weight:500;border-bottom:3px solid transparent;margin-bottom:-1px;white-space:nowrap;text-decoration:none}
+.tabs a .icon{font-size:18px;color:var(--lc)}
+.tabs a[aria-current=page]{color:var(--ink);border-color:var(--lc)}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border-radius:999px;font-size:11.5px;font-weight:700;white-space:nowrap;line-height:18px;background:var(--panel);color:var(--muted);text-decoration:none;border:0}
+.chip .icon{font-size:14px}
+button.chip,a.chip{cursor:pointer}
+.chip.ok{background:var(--ok-bg);color:var(--ok)}.chip.bad{background:var(--bad-bg);color:var(--bad)}.chip.warn{background:var(--warn-bg);color:var(--warn)}.chip.info{background:var(--info-bg);color:var(--info)}
+.chip.vision{background:var(--b-vision);color:var(--c-vision)}.chip.design{background:var(--b-design);color:var(--c-design)}.chip.pages{background:var(--b-pages);color:var(--c-pages)}.chip.data{background:var(--b-data);color:var(--c-data)}.chip.code{background:var(--b-code);color:var(--c-code)}.chip.deploy{background:var(--b-deploy);color:var(--c-deploy)}.chip.work{background:var(--b-work);color:var(--c-work)}
+.chip.dash{background:none;box-shadow:inset 0 0 0 1px var(--line-strong)}
+.chip.on{background:var(--lc);color:#fff}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:none;padding:4px 10px;font-size:12.5px;display:inline-flex;align-items:center;gap:4px;color:var(--muted);white-space:nowrap}
+.seg button .icon{font-size:16px}
+.seg button[aria-pressed=true]{background:var(--ink);color:#fff}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px;min-width:0}
+.card>.row{flex-wrap:wrap}
+.card.quiet{background:var(--panel);border-style:dashed}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.side{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:14px;align-items:start}
+.rel-side{grid-template-columns:320px minmax(0,1fr)}
+.kv{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 14px;margin:0;font-size:13.5px}.kv dt{color:var(--muted)}.kv dd{margin:0;min-width:0}
+table.t{border-collapse:collapse;width:100%;font-size:13.5px}
+table.t th{text-align:left;font-size:11.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--faint);font-weight:700;padding:6px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+table.t td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+table.t tr.click{cursor:pointer}table.t tr.click:hover td{background:var(--panel)}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.list{list-style:none;margin:0;padding:0}
+.li{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line)}.li:first-child{border-top:0}
+.li .icon{color:var(--lc)}
+.src-note{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+.src-note code{background:var(--panel);padding:0 5px;border-radius:5px}
+.bar{height:8px;border-radius:99px;background:var(--panel);overflow:hidden;display:flex}
+.bar i{display:block;height:100%}
+.note{background:var(--info-bg);color:#133c73;border-radius:12px;padding:9px 12px;font-size:13px}
+.note.warn{background:var(--warn-bg);color:#5b3c00}
+
+/* Explorer: tree | detail */
+.ex{display:grid;grid-template-columns:320px minmax(0,1fr);border:1px solid var(--line);border-radius:16px;background:var(--surface);height:calc(100vh - 186px);min-height:600px;overflow:hidden}
+.tree{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;background:#fcfcfe}
+.tree-head{padding:10px;display:grid;gap:8px;border-bottom:1px solid var(--line)}
+.tree-head input{width:100%;padding:6px 10px 6px 32px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font-size:13px}
+.tree-head .search .icon{top:6px;left:8px;font-size:18px}
+.filters{display:flex;gap:4px;flex-wrap:wrap}
+.tree-body{overflow:auto;padding:6px 4px 20px;flex:1}
+.tn{display:flex;align-items:center;gap:5px;padding:3px 8px 3px 0;border-radius:8px;cursor:pointer;white-space:nowrap;font-size:13.5px;min-width:0;border:0;background:none;width:100%;text-align:left}
+.tn:hover{background:var(--hover)}
+.tn.sel{background:var(--lb);font-weight:600}
+.tn .tw-ch{width:18px;display:inline-grid;place-items:center;color:var(--faint);flex:none}
+.tn .tw-ch .icon{font-size:18px;transition:transform .12s}
+.tn[aria-expanded=false] .tw-ch .icon{transform:rotate(-90deg)}
+.tn .ki{font-size:17px;color:var(--muted)}
+.tn .ki.k-container,.tn .ki.k-system{color:var(--lc)}
+.tn .nm{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.tn .meta{margin-left:auto;display:flex;gap:4px;align-items:center;padding-left:6px}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+.d-healthy{background:#2e9d6b}.d-suspect{background:#e39b00}.d-untraced{background:#9aa3b5}.d-dead{background:#c0392b}
+.cnt{font-size:11px;color:var(--faint);font-weight:500}
+.tn.dim{opacity:.4}
+.detail{overflow:auto;min-width:0;display:flex;flex-direction:column}
+.dhead{padding:14px 18px 10px;border-bottom:1px solid var(--line);display:grid;gap:6px;position:sticky;top:0;background:var(--surface);z-index:2}
+.crumbs{font-size:12.5px;color:var(--muted);display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+.crumbs button{border:0;background:none;padding:0;color:var(--accent);font-size:12.5px}
+.dtitle{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.dtitle h2{margin:0;font-size:20px}
+.dbody{padding:14px 18px 24px;display:grid;gap:14px}
+.unitview{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:14px;align-items:start}
+.links .li{align-items:center}
+.links .li .lt{flex:1;min-width:0}
+.links small{display:block;color:var(--muted);font-size:12px}
+.relgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.rel a,.rel button.lk{display:flex;align-items:center;gap:6px;padding:4px 0;font-size:13px;border:0;background:none;color:var(--accent);text-align:left;cursor:pointer}
+.rel a .icon,.rel button.lk .icon{font-size:17px;color:var(--muted)}
+
+/* Source viewer (read-only) */
+.srcwrap{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#fbfcfe}
+.srcbar{display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--line);background:var(--panel);font-size:12.5px}
+.src{font-family:"Roboto Mono",ui-monospace,monospace;font-size:12.5px;line-height:20px;overflow:auto;max-height:560px}
+.src table{border-collapse:collapse;width:100%}
+.src td{padding:0;white-space:pre;vertical-align:top}
+.src .ln{width:1%;text-align:right;color:var(--faint);padding:0 10px 0 8px;user-select:none}
+.src .mk{width:6px;padding:0}
+.src .mk i{display:block;width:4px;height:20px;border-radius:2px}
+.src tr.hl td{background:#fff7e0}
+.src tr.hl td.ln{color:var(--warn)}
+.src .cd{padding-right:16px}
+.tk-k{color:#7a3db8}.tk-s{color:#1f7a3a}.tk-c{color:#8a93a6;font-style:italic}.tk-n{color:#b35c00}.tk-f{color:#1a5fb4}
+.outline{font-size:13px}
+.outline button{display:flex;gap:6px;align-items:center;width:100%;border:0;background:none;padding:3px 4px;border-radius:6px;text-align:left}
+.outline button:hover{background:var(--hover)}
+.outline button.sel{background:var(--lb);font-weight:600}
+.readonly{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--muted)}
+
+/* C4 diagram */
+.c4{width:100%;height:auto;display:block}
+.c4 .box{cursor:pointer}
+.c4 .box rect{transition:filter .1s}
+.c4 .box:hover rect{filter:brightness(.96)}
+.c4 text{font-family:Roboto,sans-serif}
+.stack{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.stk{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--surface)}
+.stk h4{margin:0 0 6px;font-size:12px;letter-spacing:.6px;text-transform:uppercase;color:var(--faint)}
+.stk .it{display:flex;justify-content:space-between;gap:8px;font-size:13.5px;padding:2px 0}
+.stk .it code{color:var(--muted)}
+.langbar{display:flex;height:8px;border-radius:99px;overflow:hidden;margin:6px 0}
+.adr{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line)}
+.adr:first-child{border-top:0}
+.adr .num{font:600 12px "Roboto Mono",monospace;color:var(--muted);padding-top:2px}
+
+/* Deploy pipeline */
+.pipe{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:start}
+.stage{background:var(--panel);border-radius:16px;padding:10px;display:grid;gap:10px;align-content:start;min-height:260px}
+.stage-h{display:flex;align-items:center;gap:6px;font-size:12px;letter-spacing:.7px;text-transform:uppercase;color:var(--muted);font-weight:700;padding:2px 4px}
+.stage-h .icon{font-size:18px}
+.env{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 12px;display:grid;gap:6px;cursor:pointer}
+.env:hover{box-shadow:0 0 0 2px var(--lb)}
+.env .nm{font-weight:700;display:flex;align-items:center;gap:6px}
+.env .ln2{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+.env.dashed{border-style:dashed;background:#fbfcfe;cursor:default}
+.pend{display:flex;align-items:center;gap:8px;background:var(--warn-bg);color:#5b3c00;border-radius:10px;padding:6px 8px;font-size:12.5px}
+.dora{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.dora .card{padding:10px 14px}
+.dora b{font-size:20px;display:block}
+.dora small{color:var(--muted)}
+.applybar{display:flex;align-items:center;gap:10px;background:#1b1f2a;color:#fff;border-radius:12px;padding:8px 10px 8px 14px;font-size:13.5px}
+.applybar .btn{border-color:#ffffff40;background:#ffffff14;color:#fff}
+.applybar .btn.primary{background:#fff;color:var(--ink)}
+.meter{display:grid;gap:3px;font-size:12.5px}
+.meter .bar{height:7px}
+.logs{background:#12151f;color:#d6dbea;border-radius:12px;padding:10px 12px;font:12px/19px "Roboto Mono",monospace;overflow:auto;max-height:420px;white-space:pre}
+.logs .t{color:#7f89a6}.logs .w{color:#ffcf66}.logs .e{color:#ff8a80}
+.var-in{border:1px solid var(--line);border-radius:8px;padding:3px 7px;font:12.5px "Roboto Mono",monospace;width:100%;min-width:120px;background:var(--surface)}
+.var-in.changed{border-color:#e39b00;background:#fffaf0}
+.matrix td.c{text-align:center}
+
+/* Drawers */
+.scrim{position:fixed;inset:0;background:#0f172a38;z-index:79}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(600px,100vw);background:var(--surface);border-left:1px solid var(--line);box-shadow:var(--shadow);z-index:80;overflow:auto;padding:18px 20px 40px;display:grid;align-content:start;gap:12px}
+.drawer h2{margin:0;font-size:20px}
+.drawer textarea{width:100%;min-height:110px;border:1px solid var(--line);border-radius:12px;padding:10px;font-size:14px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;border-radius:12px;padding:10px 14px;font-size:13.5px;z-index:90;box-shadow:var(--shadow);display:flex;gap:10px;align-items:center;max-width:92vw}
+.toast button{background:#ffffff26;border:0;color:#fff;border-radius:999px;padding:3px 10px;font-size:12.5px}
+.notes table{border-collapse:collapse;font-size:13px;width:100%}.notes td{border-top:1px solid var(--line);padding:6px 6px;vertical-align:top}.notes td:first-child{font-weight:700;white-space:nowrap}
+.hovercard{position:fixed;z-index:95;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:8px 10px;font-size:12.5px;max-width:320px;pointer-events:none}
+
+@media (max-width:1250px){.unitview{grid-template-columns:minmax(0,1fr)}.side{grid-template-columns:minmax(0,1fr)}.pipe{grid-template-columns:minmax(0,1fr)}.grid3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:900px){
+  .shell{grid-template-columns:minmax(0,1fr)}.rail{position:static;height:auto;flex-direction:row;overflow-x:auto;padding:8px}.rail .brand,.rail .proj,.rail .sp{display:none}.rail .nav{display:flex;gap:2px}.nav a{padding:4px}.nav a span:not(.tile){display:none}
+  .top{padding:8px 16px}.main{padding:12px 16px}
+  .ex{grid-template-columns:minmax(0,1fr);height:auto}.tree{border-right:0;border-bottom:1px solid var(--line);max-height:320px}
+  .grid2,.grid3,.dora{grid-template-columns:minmax(0,1fr)}.relgrid{grid-template-columns:minmax(0,1fr)}
+  .src{max-height:400px}
+}
+
+/* ---------- v2 ---------- */
+.chip.library{background:#f5e2f8;color:#8e24aa}
+.asof{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+.asof select{border:1px solid var(--line);border-radius:999px;padding:3px 10px;background:var(--surface);font-size:13px}
+/* compact structure map */
+.map{display:grid;grid-template-columns:110px 18px repeat(2,minmax(0,1fr) 18px) minmax(0,1fr);align-items:stretch;gap:0}
+.map .arrow{display:grid;place-items:center;color:var(--faint)}
+.map .arrow .icon{font-size:18px}
+.people{display:grid;gap:6px;align-content:center}
+.people span{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:var(--c-vision);background:var(--b-vision);border-radius:10px;padding:4px 8px}
+.part{border:1px solid var(--line);border-radius:12px;padding:8px 10px;background:var(--surface);cursor:pointer;text-align:left;display:grid;gap:4px;align-content:start;min-width:0}
+.part:hover{box-shadow:0 0 0 2px var(--lb)}
+.part.sel{box-shadow:0 0 0 2.5px var(--lc)}
+.part b{display:flex;align-items:center;gap:6px;font-size:14px}
+.part b .icon{font-size:18px;color:var(--lc)}
+.part .st{font-size:12px;color:var(--muted);line-height:1.35}
+.part.data b .icon{color:var(--c-data)}
+.map-ext{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
+.ext{display:inline-flex;align-items:center;gap:6px;border:1px dashed var(--line-strong);border-radius:10px;padding:4px 10px;font-size:12.5px;background:#fbfcfe;cursor:pointer;color:var(--ink);text-decoration:none}
+.ext .icon{font-size:17px;color:var(--c-deploy)}
+.partpanel{margin-top:12px;border-top:1px solid var(--line);padding-top:12px;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:14px}
+/* three-pane explorer */
+.ex3{display:grid;grid-template-columns:290px minmax(0,1fr) 310px;border:1px solid var(--line);border-radius:16px;background:var(--surface);height:calc(100vh - 186px);min-height:600px;overflow:hidden}
+.ex3 .center{display:flex;flex-direction:column;min-width:0;border-right:1px solid var(--line)}
+.ex3 .center .srcbar{border-radius:0}
+.ex3 .center .src{max-height:none;flex:1}
+.ex3 .insp{overflow:auto;padding:12px 14px 20px;display:grid;gap:12px;align-content:start}
+.ex3 .insp h2{font-size:15px;margin:0}
+.lens{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted)}
+.lens select{flex:1;min-width:0;border:1px solid var(--line);border-radius:10px;padding:4px 8px;background:var(--surface);font-size:12.5px}
+.tn.lensed{background:#fff4d6}
+.tn.lensed.sel{background:var(--lb)}
+.tn .ck{font-family:"Roboto Mono",monospace;font-size:12.5px}
+.src tr.lens td{background:#fffaeb}
+.src tr.sel-range td{background:#fff1c2}
+.src tr.sel-range td.ln{color:var(--warn);font-weight:700}
+.empty-center{display:grid;place-items:center;flex:1;color:var(--muted);padding:30px;text-align:center}
+/* tests */
+.scn{border-top:1px solid var(--line);padding:9px 0;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:start}
+.scn:first-of-type{border-top:0}
+.gwt{font-size:13px;line-height:1.5}
+.gwt b{color:var(--c-vision);font-weight:700}
+.tres{display:flex;gap:4px;flex-wrap:wrap;margin-top:5px}
+.story-block{margin-bottom:12px}
+.story-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.cov{display:flex;gap:3px}
+.cov i{width:10px;height:10px;border-radius:3px;display:block}
+.cov .pass{background:#2e9d6b}.cov .fail{background:#c0392b}.cov .none{background:#fff;box-shadow:inset 0 0 0 1.5px #c8cfdc}.cov .pending{background:#6a8fd8}
+/* docs */
+.docs3{display:grid;grid-template-columns:260px minmax(0,1fr) 320px;border:1px solid var(--line);border-radius:16px;background:var(--surface);height:calc(100vh - 230px);min-height:560px;overflow:hidden}
+.docs3 .center{overflow:auto;border-right:1px solid var(--line);min-width:0}
+.docs3 .insp{overflow:auto;padding:12px 14px 20px;display:grid;gap:12px;align-content:start}
+.md{padding:18px 26px 40px;max-width:820px;font-size:14px;line-height:1.6}
+.md h1{font-size:22px;margin:0 0 8px}.md h2{font-size:17px;margin:18px 0 6px}
+.md p{margin:6px 0}.md ul{margin:6px 0;padding-left:20px}
+.md code{background:var(--panel);padding:0 4px;border-radius:4px}
+.sec{position:relative;border-radius:10px;padding:2px 10px 4px 14px;margin:0 -10px 4px -14px;cursor:pointer;border-left:4px solid transparent}
+.sec:hover{background:var(--panel)}
+.sec.sel{background:var(--lb)}
+.show-src .sec{border-left-color:#2e9d6b}
+.show-src .sec.suspect{border-left-color:#e39b00}
+.show-src .sec.plain{border-left-color:#c8cfdc}
+.sec .srcchips{display:none;gap:4px;flex-wrap:wrap;margin:2px 0 4px}
+.show-src .sec .srcchips{display:flex}
+.checks{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.json{background:#12151f;color:#d6dbea;border-radius:12px;padding:12px 14px;font:12px/18px "Roboto Mono",monospace;white-space:pre;overflow:auto;margin:14px 26px}
+/* deploy */
+.envdetail{margin-top:14px}
+.intg{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
+.intg .card{display:grid;gap:8px;align-content:start}
+.perenv{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 12px;font-size:13px}
+@media (max-width:1250px){.ex3{grid-template-columns:260px minmax(0,1fr);height:auto}.ex3 .insp{grid-column:1/-1;border-top:1px solid var(--line)}.ex3 .center{min-height:520px;border-right:0}.docs3{grid-template-columns:240px minmax(0,1fr);height:auto}.docs3 .insp{grid-column:1/-1;border-top:1px solid var(--line)}.docs3 .center{border-right:0}.partpanel{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:900px){.map{grid-template-columns:minmax(0,1fr)}.map .arrow{transform:rotate(90deg);height:18px}.ex3,.docs3{grid-template-columns:minmax(0,1fr)}.ex3 .tree,.docs3 .tree{max-height:300px;border-right:0;border-bottom:1px solid var(--line)}.ex3 .center{min-height:420px}.md{padding:14px 16px 30px}.json{margin:10px 16px}}
+</style>
+<body>
+<div class="shell">
+  <nav class="rail" aria-label="Project">
+    <div class="brand"><span class="icon">science</span>Aludel</div>
+    <div class="proj"><span class="mk">TS</span><div><b>Tool Share</b><small>Beta phase</small></div></div>
+    <div class="nav">
+      <a href="#" class="n-home"><span class="tile"><span class="icon">home</span></span><span>Home</span></a>
+      <a href="#" class="n-vision"><span class="tile"><span class="icon">flag</span></span><span>Vision</span></a>
+      <a href="#" class="n-design"><span class="tile"><span class="icon">palette</span></span><span>Design</span></a>
+      <a href="#" class="n-pages"><span class="tile"><span class="icon">web</span></span><span>Pages</span></a>
+      <a href="#" class="n-data"><span class="tile"><span class="icon">schema</span></span><span>Data</span></a>
+      <a href="#code/overview" class="n-code" id="nav-code"><span class="tile"><span class="icon">code</span></span><span>Code</span></a>
+      <a href="#deploy/environments" class="n-deploy" id="nav-deploy"><span class="tile"><span class="icon">rocket_launch</span></span><span>Deploy</span><span class="new">NEW</span></a>
+      <a href="#" class="n-work"><span class="tile"><span class="icon">task_alt</span></span><span>Work</span></a>
+      <a href="#" class="n-library"><span class="tile"><span class="icon">local_library</span></span><span>Library</span></a>
+    </div>
+    <div class="sp"></div>
+    <div class="nav"><a href="#" class="n-settings"><span class="tile"><span class="icon">settings</span></span><span>Settings</span></a></div>
+  </nav>
+  <div>
+    <header class="top">
+      <label class="search"><span class="icon">search</span><span class="vh">Search</span><input placeholder="Search Tool Share"></label>
+      <button class="btn ghost push" data-act="notes"><span class="icon">rate_review</span>Review notes</button>
+    </header>
+    <main class="main" id="main"></main>
+  </div>
+</div>
+<div id="overlay"></div>
+<script>
+// ---------------------------------------------------------------- data (illustrative Tool Share, beta phase)
+const REPO = 'henrydker/tool-share';
+const REC = {
+  'TS-01': ['vision', 'Sign up', 'auto_stories', 2], 'TS-02': ['vision', 'Sign in', 'auto_stories', 1], 'TS-03': ['vision', 'List a tool', 'auto_stories', 3],
+  'TS-04': ['vision', 'Browse tools near me', 'auto_stories', 2], 'TS-05': ['vision', 'Ask to borrow a tool', 'auto_stories', 2], 'TS-06': ['vision', 'Approve or decline a request', 'auto_stories', 4],
+  'TS-07': ['vision', 'Mark a tool returned', 'auto_stories', 1],
+  'P-home': ['pages', 'Home', 'web'], 'P-browse': ['pages', 'Browse', 'web'], 'P-tool': ['pages', 'Tool detail', 'web'], 'P-list': ['pages', 'List a tool', 'web'], 'P-requests': ['pages', 'Requests', 'web'], 'P-signin': ['pages', 'Sign in', 'web'],
+  'D-account': ['data', 'Account object', 'schema', 2], 'D-tool': ['data', 'Tool object', 'schema', 3], 'D-request': ['data', 'Borrow request object', 'schema', 4],
+  'OP-signUp': ['data', 'signUp operation', 'api', 1], 'OP-listTools': ['data', 'listTools operation', 'api', 2], 'OP-createTool': ['data', 'createTool operation', 'api', 1], 'OP-createRequest': ['data', 'createRequest operation', 'api', 1], 'OP-approve': ['data', 'decideRequest operation', 'api', 3], 'OP-return': ['data', 'returnTool operation', 'api', 1],
+  'C-toolcard': ['design', 'Tool card component', 'widgets', 2], 'C-requestrow': ['design', 'Request row component', 'widgets', 1], 'C-tokens': ['design', 'Tool Share tokens', 'palette', 6],
+  'W-231': ['work', 'W-231 Decline a request with a reason', 'task_alt'], 'W-236': ['work', 'W-236 Photos on listings', 'task_alt'], 'W-219': ['work', 'W-219 Return a tool', 'task_alt'],
+  'E-health': ['deploy', 'Health check (every environment)', 'monitor_heart'], 'E-env': ['deploy', 'Variables in every environment', 'tune'],
+};
+// A unit: [kind, symbol, path, line, endLine, state, links[[id, how, rev, current?]], calls, tests, last change, changes in 30 days]
+const U = {};
+function u(id, kind, symbol, path, line, end, state, links, calls = [], tests = [], last = 'c19a2f0', churn = 1) { U[id] = { id, kind, symbol, path, line, end, state, links, calls, tests, last, churn }; }
+u('appShell', 'component', 'AppShell', 'src/app.ts', 8, 30, 'healthy', [['P-home', 'renders the navigation for'], ['C-tokens', 'themes with', 6]], ['navItems'], ['t-e2e']);
+u('navItems', 'const', 'navItems', 'src/site.ts', 4, 12, 'healthy', [['P-browse', 'lists'], ['P-requests', 'lists']]);
+u('browsePage', 'component', 'BrowsePage', 'src/pages/browse.page.ts', 6, 28, 'healthy', [['TS-04', 'implements', 2], ['P-browse', 'renders']], ['toolCard', 'listTools'], ['t-browse', 't-e2e'], 'a41c9e2', 2);
+u('toolPage', 'component', 'ToolPage', 'src/pages/tool.page.ts', 6, 40, 'healthy', [['TS-04', 'implements', 2], ['TS-05', 'implements', 2], ['P-tool', 'renders']], ['getTool', 'createRequest'], ['t-e2e']);
+u('listToolPage', 'component', 'ListToolPage', 'src/pages/list-tool.page.ts', 6, 38, 'healthy', [['TS-03', 'implements', 3], ['P-list', 'renders']], ['createTool'], ['t-tools']);
+u('requestsPage', 'component', 'RequestsPage', 'src/pages/requests.page.ts', 6, 44, 'suspect', [['TS-06', 'implements', 3, 4], ['P-requests', 'renders'], ['TS-07', 'implements', 1]], ['requestRow', 'approveRequest', 'returnTool'], ['t-e2e'], 'd07be11', 4);
+u('signInPage', 'component', 'SignInPage', 'src/pages/sign-in.page.ts', 6, 30, 'healthy', [['TS-01', 'implements', 2], ['TS-02', 'implements', 1], ['P-signin', 'renders']], ['signUp', 'signIn'], ['t-signup']);
+u('toolCard', 'component', 'ToolCard', 'src/page-blocks.ts', 10, 36, 'healthy', [['C-toolcard', 'builds', 2]], [], ['t-browse']);
+u('requestRow', 'component', 'RequestRow', 'src/page-blocks.ts', 38, 60, 'suspect', [['C-requestrow', 'builds', 1], ['TS-06', 'shows actions for', 3, 4]], [], [], 'd07be11', 3);
+u('legacyTile', 'component', 'LegacyToolTile', 'src/page-blocks.ts', 62, 74, 'dead', [], [], [], '5be0a14', 0);
+u('brand', 'const', 'brand', 'src/brand.ts', 1, 9, 'healthy', [['C-tokens', 'generated from', 6]]);
+u('signUp', 'handler', 'POST /api/signup', 'server/routes/accounts.mjs', 6, 20, 'healthy', [['TS-01', 'implements', 2], ['OP-signUp', 'realises', 1], ['D-account', 'creates', 2]], ['accountsTable', 'hashPassword'], ['t-signup']);
+u('signIn', 'handler', 'POST /api/signin', 'server/routes/accounts.mjs', 22, 36, 'healthy', [['TS-02', 'implements', 1]], ['accountsTable', 'sessionsTable'], ['t-signup']);
+u('hashPassword', 'function', 'hashPassword', 'server/auth.mjs', 4, 12, 'untraced', [], [], ['t-signup']);
+u('requireSession', 'function', 'requireSession', 'server/auth.mjs', 14, 28, 'untraced', [], ['sessionsTable'], ['t-signup']);
+u('listTools', 'handler', 'GET /api/tools', 'server/routes/tools.mjs', 5, 18, 'healthy', [['TS-04', 'implements', 2], ['OP-listTools', 'realises', 2]], ['toolsTable'], ['t-browse'], 'a41c9e2', 2);
+u('getTool', 'handler', 'GET /api/tools/:id', 'server/routes/tools.mjs', 20, 28, 'healthy', [['TS-04', 'implements', 2]], ['toolsTable'], ['t-browse']);
+u('createTool', 'handler', 'POST /api/tools', 'server/routes/tools.mjs', 30, 46, 'healthy', [['TS-03', 'implements', 3], ['OP-createTool', 'realises', 1], ['D-tool', 'creates', 3]], ['requireSession', 'toolsTable', 'slugify'], ['t-tools']);
+u('slugify', 'function', 'slugify', 'server/util.mjs', 1, 6, 'untraced', [], [], ['t-tools']);
+u('createRequest', 'handler', 'POST /api/requests', 'server/routes/requests.mjs', 6, 16, 'healthy', [['TS-05', 'implements', 2], ['OP-createRequest', 'realises', 1], ['D-request', 'creates', 3, 4]], ['requireSession', 'requestsTable'], ['t-borrow']);
+u('approveRequest', 'handler', 'POST /api/requests/:id/approve', 'server/routes/requests.mjs', 20, 29, 'suspect', [['TS-06', 'implements', 3, 4], ['OP-approve', 'realises', 2, 3]], ['requireSession', 'requestsTable'], ['t-borrow'], 'd07be11', 4);
+u('returnTool', 'handler', 'POST /api/requests/:id/return', 'server/routes/requests.mjs', 33, 42, 'healthy', [['TS-07', 'implements', 1], ['OP-return', 'realises', 1], ['W-219', 'built by']], ['requireSession', 'requestsTable'], [], 'e9f4c02', 1);
+u('health', 'handler', 'GET /api/health', 'server/server.mjs', 18, 22, 'untraced', [['E-health', 'answers']], [], ['t-e2e']);
+u('accountsTable', 'table', 'accounts', 'db/migrations/0001_accounts.sql', 1, 7, 'healthy', [['D-account', 'stores', 2]]);
+u('sessionsTable', 'table', 'sessions', 'db/migrations/0001_accounts.sql', 9, 13, 'untraced', []);
+u('toolsTable', 'table', 'tools', 'db/migrations/0002_tools.sql', 1, 10, 'healthy', [['D-tool', 'stores', 3]]);
+u('requestsTable', 'table', 'borrow_requests', 'db/migrations/0003_borrow_requests.sql', 1, 10, 'suspect', [['D-request', 'stores', 3, 4]], [], [], 'd07be11', 1);
+u('t-signup', 'test', 'signup.test.mjs', 'tests/signup.test.mjs', 1, 30, 'healthy', [['TS-01', 'checks', 2], ['TS-02', 'checks', 1]]);
+u('t-browse', 'test', 'browse.test.mjs', 'tests/browse.test.mjs', 1, 26, 'healthy', [['TS-04', 'checks', 2]]);
+u('t-tools', 'test', 'tools.test.mjs', 'tests/tools.test.mjs', 1, 22, 'healthy', [['TS-03', 'checks', 3]]);
+u('t-borrow', 'test', 'borrow.test.mjs', 'tests/borrow.test.mjs', 1, 40, 'suspect', [['TS-05', 'checks', 2], ['TS-06', 'checks', 3, 4]]);
+u('t-e2e', 'test', 'borrow-flow.spec.ts', 'tests/e2e/borrow-flow.spec.ts', 1, 48, 'healthy', [['TS-04', 'walks through', 2], ['TS-05', 'walks through', 2]]);
+for (const unit of Object.values(U)) unit.calledBy = Object.values(U).filter(other => other.calls.includes(unit.id)).map(other => other.id);
+
+// Structure: App → parts (C4 containers) → components → units. Derived from the code index and compose.yaml.
+const TREE = { id: 'app', kind: 'system', name: 'Tool Share', children: [
+  { id: 'web', kind: 'container', name: 'Web app', tech: 'Angular 22 · Angular Material', where: 'src/', about: 'What Sam and Priya use in the browser. Built by Vite into dist/ and served by the API server.', children: [
+    { id: 'c-shell', kind: 'component', name: 'Shell and navigation', units: ['appShell', 'navItems'] },
+    { id: 'c-pages', kind: 'component', name: 'Pages', units: ['browsePage', 'toolPage', 'listToolPage', 'requestsPage', 'signInPage'] },
+    { id: 'c-blocks', kind: 'component', name: 'Page blocks', units: ['toolCard', 'requestRow', 'legacyTile'] },
+    { id: 'c-brand', kind: 'component', name: 'Brand and theme', units: ['brand'], files: ['src/styles.scss', 'design/tokens.json'] } ] },
+  { id: 'api', kind: 'container', name: 'API server', tech: 'Node 24 · node:http', where: 'server/', about: 'Answers /api requests, signs people in and stores records. One process per environment.', children: [
+    { id: 'c-accounts', kind: 'component', name: 'Accounts and sessions', units: ['signUp', 'signIn', 'hashPassword', 'requireSession'] },
+    { id: 'c-tools', kind: 'component', name: 'Tools', units: ['listTools', 'getTool', 'createTool', 'slugify'] },
+    { id: 'c-borrow', kind: 'component', name: 'Borrowing', units: ['createRequest', 'approveRequest', 'returnTool'] },
+    { id: 'c-ops', kind: 'component', name: 'Health', units: ['health'] } ] },
+  { id: 'db', kind: 'container', name: 'Database', tech: 'SQLite · one file on the data volume', where: 'db/', about: 'accounts, sessions, tools and borrow_requests. Numbered migrations create them; each environment has its own file.', children: [
+    { id: 'c-tables', kind: 'component', name: 'Tables', units: ['accountsTable', 'sessionsTable', 'toolsTable', 'requestsTable'] },
+    { id: 'c-migrations', kind: 'component', name: 'Migrations', files: ['db/migrations/0001_accounts.sql', 'db/migrations/0002_tools.sql', 'db/migrations/0003_borrow_requests.sql'] } ] },
+  { id: 'tests', kind: 'container', name: 'Tests', tech: 'node:test · Playwright', where: 'tests/', about: 'Run on every pull request and before every release.', children: [
+    { id: 'c-unit', kind: 'component', name: 'Server tests', units: ['t-signup', 't-browse', 't-tools', 't-borrow'] },
+    { id: 'c-e2e', kind: 'component', name: 'Browser walkthroughs', units: ['t-e2e'] } ] },
+  { id: 'run', kind: 'container', name: 'Build and run', tech: 'Docker · compose', where: '/', about: 'How the app builds and runs anywhere, with or without Aludel. Deploy reads these files.', children: [
+    { id: 'c-runfiles', kind: 'component', name: 'Run files', files: ['Dockerfile', 'compose.yaml', '.env.example'] },
+    { id: 'c-buildfiles', kind: 'component', name: 'Build files', files: ['package.json', 'package-lock.json', 'vite.config.ts', 'tsconfig.json'] } ] },
+  { id: 'docs', kind: 'container', name: 'Docs', tech: 'Markdown', where: 'docs/', about: 'Where a developer starts: what it is, how to run it, and why it is built this way.', children: [
+    { id: 'c-readme', kind: 'component', name: 'Start here', files: ['README.md', 'AGENTS.md'] },
+    { id: 'c-adr', kind: 'component', name: 'Decisions (ADRs)', files: ['docs/adr/0001-angular-material.md', 'docs/adr/0002-sqlite-per-environment.md', 'docs/adr/0003-cookie-sessions.md', 'docs/adr/0004-photos-on-data-volume.md'] } ] } ] };
+
+// Source for a few files. Everything else shows its outline only.
+const SRC = {
+'server/routes/requests.mjs': `// Borrowing: ask, approve, return. Generated for TS-05..TS-07; see Code › Explorer for why each part exists.
+import { requireSession } from '../auth.mjs';
+import { db } from '../db.mjs';
+import { json, readBody } from '../http.mjs';
+
+export async function createRequest(req, res) {
+  const account = requireSession(req, res); if (!account) return;
+  const { toolId, from, until, message } = await readBody(req);
+  const tool = db.prepare('SELECT id, owner FROM tools WHERE id = ?').get(toolId);
+  if (!tool) return json(res, 404, { error: 'No such tool' });
+  if (tool.owner === account.email) return json(res, 409, { error: 'You own this tool' });
+  const id = crypto.randomUUID();
+  db.prepare(\`INSERT INTO borrow_requests (id, tool_id, borrower, from_date, until_date, message, state, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, 'asked', datetime('now'))\`).run(id, toolId, account.email, from, until, message ?? '');
+  return json(res, 201, { id, state: 'asked' });
+}
+
+// Only the lender decides. TS-06 revision 4 adds "decline with a reason": not built yet (W-231, PR #14).
+
+export async function approveRequest(req, res, { id }) {
+  const account = requireSession(req, res); if (!account) return;
+  const request = db.prepare(\`SELECT r.id, r.state, t.owner FROM borrow_requests r
+    JOIN tools t ON t.id = r.tool_id WHERE r.id = ?\`).get(id);
+  if (!request) return json(res, 404, { error: 'No such request' });
+  if (request.owner !== account.email) return json(res, 403, { error: 'Only the lender can approve' });
+  if (request.state !== 'asked') return json(res, 409, { error: \`Already \${request.state}\` });
+  db.prepare("UPDATE borrow_requests SET state = 'approved', decided_at = datetime('now') WHERE id = ?").run(id);
+  return json(res, 200, { id, state: 'approved' });
+}
+
+// Either side can mark it returned once the loan has started.
+
+export async function returnTool(req, res, { id }) {
+  const account = requireSession(req, res); if (!account) return;
+  const request = db.prepare(\`SELECT r.id, r.state, r.borrower, t.owner FROM borrow_requests r
+    JOIN tools t ON t.id = r.tool_id WHERE r.id = ?\`).get(id);
+  if (!request) return json(res, 404, { error: 'No such request' });
+  if (![request.owner, request.borrower].includes(account.email)) return json(res, 403, { error: 'Not your loan' });
+  if (request.state !== 'approved') return json(res, 409, { error: 'Not on loan' });
+  db.prepare("UPDATE borrow_requests SET state = 'returned', returned_at = datetime('now') WHERE id = ?").run(id);
+  return json(res, 200, { id, state: 'returned' });
+}
+`,
+'src/pages/browse.page.ts': `import { Component, inject, signal } from '@angular/core';
+import { MatChipsModule } from '@angular/material/chips';
+import { ToolCard } from '../page-blocks';
+import { api } from '../api';
+
+@Component({
+  selector: 'ts-browse',
+  imports: [MatChipsModule, ToolCard],
+  template: \`
+    <h1>Tools near you</h1>
+    <mat-chip-listbox aria-label="Category" (change)="category.set($event.value)">
+      @for (c of categories; track c) { <mat-chip-option [value]="c">{{ c }}</mat-chip-option> }
+    </mat-chip-listbox>
+    <div class="grid">
+      @for (tool of tools(); track tool.id) { <ts-tool-card [tool]="tool" /> }
+      @empty { <p class="empty">Nothing listed near you yet. Be the first: list a tool.</p> }
+    </div>\`,
+})
+export class BrowsePage {
+  readonly categories = ['Garden', 'Power tools', 'Ladders', 'Camping'];
+  readonly category = signal<string | null>(null);
+  readonly tools = signal<Tool[]>([]);
+  constructor() { this.load(); }
+  async load() {
+    const query = this.category() ? \`?category=\${encodeURIComponent(this.category()!)}\` : '';
+    this.tools.set(await api<Tool[]>(\`/api/tools\${query}\`));
+  }
+}
+`,
+'Dockerfile': `# How Tool Share builds and runs, anywhere. Aludel adds limits from outside; nothing here depends on Aludel.
+FROM node:24-bookworm-slim AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM node:24-bookworm-slim
+WORKDIR /app
+ENV NODE_ENV=production DATA_DIR=/data PORT=3000 HOST=0.0.0.0
+COPY --from=build /app/package.json ./
+COPY --from=build /app/server ./server
+COPY --from=build /app/db ./db
+COPY --from=build /app/dist ./dist
+USER node
+EXPOSE 3000
+HEALTHCHECK --interval=30s CMD node -e "fetch('http://127.0.0.1:3000/api/health').then(r => process.exit(r.ok ? 0 : 1))"
+CMD ["node", "server/server.mjs"]
+`,
+'.env.example': `# Every variable Tool Share reads. Names only are committed; each environment holds its own values.
+# Port the server listens on.
+PORT=3000
+# Interface to listen on (0.0.0.0 inside a container).
+HOST=0.0.0.0
+# Folder for the database and uploaded photos.
+DATA_DIR=/data
+# The address people use, for links in emails. Required outside previews.
+PUBLIC_URL=
+# Sender address for request emails.
+MAIL_FROM=
+# SMTP password for the email provider. Secret.
+SMTP_PASSWORD=
+`,
+'db/migrations/0003_borrow_requests.sql': `-- 0003: borrow requests (TS-05, TS-06, TS-07). Stores the Borrow request object, revision 3.
+CREATE TABLE borrow_requests (
+  id TEXT PRIMARY KEY,
+  tool_id TEXT NOT NULL REFERENCES tools(id),
+  borrower TEXT NOT NULL REFERENCES accounts(email),
+  from_date TEXT NOT NULL, until_date TEXT NOT NULL, message TEXT NOT NULL DEFAULT '',
+  state TEXT NOT NULL CHECK (state IN ('asked', 'approved', 'returned')),
+  created_at TEXT NOT NULL, decided_at TEXT, returned_at TEXT
+);
+CREATE INDEX borrow_requests_tool ON borrow_requests (tool_id, state);
+`,
+'docs/adr/0002-sqlite-per-environment.md': `# 2. SQLite in one file per environment
+
+Status: accepted · 2026-08-30 · Implements: TS-01
+
+## Context
+Tool Share is small, and the owner wants no paid services and an app that runs anywhere with docker compose.
+
+## Decision
+Each environment keeps one SQLite file on its data volume (DATA_DIR). Numbered migrations in db/migrations
+run at start-up. Backups are file copies taken before every promotion.
+
+## Consequences
+- One server process per environment writes to the database; no horizontal scaling.
+- Moving to PostgreSQL later means a new ADR, a driver change in server/db.mjs, and a data export.
+`,
+};
+const FILE_LINES = { 'src/app.ts': 30, 'src/site.ts': 12, 'src/pages/tool.page.ts': 40, 'src/pages/list-tool.page.ts': 38, 'src/pages/requests.page.ts': 44, 'src/pages/sign-in.page.ts': 30, 'src/page-blocks.ts': 74, 'src/brand.ts': 9,
+  'server/routes/accounts.mjs': 36, 'server/auth.mjs': 28, 'server/routes/tools.mjs': 46, 'server/util.mjs': 6, 'server/server.mjs': 58, 'db/migrations/0001_accounts.sql': 13, 'db/migrations/0002_tools.sql': 10,
+  'tests/signup.test.mjs': 30, 'tests/browse.test.mjs': 26, 'tests/tools.test.mjs': 22, 'tests/borrow.test.mjs': 40, 'tests/e2e/borrow-flow.spec.ts': 48 };
+const EXTRA_FILES = ['server/db.mjs', 'server/http.mjs', 'src/api.ts', 'src/main.ts', 'src/styles.scss', 'design/tokens.json', 'design/components.json', 'aludel.json', 'index.html', 'public/favicon.svg',
+  'compose.yaml', 'package.json', 'package-lock.json', 'vite.config.ts', 'tsconfig.json', 'README.md', 'AGENTS.md', 'docs/adr/0001-angular-material.md', 'docs/adr/0003-cookie-sessions.md', 'docs/adr/0004-photos-on-data-volume.md',
+  'db/migrations/0001_accounts.sql', 'db/migrations/0002_tools.sql'];
+const ALL_FILES = [...new Set([...Object.values(U).map(unit => unit.path), ...Object.keys(SRC), ...EXTRA_FILES])].sort();
+
+const STACK = [
+  ['Frontend', [['Angular', '22.1.7'], ['Angular Material', '22.1.7'], ['RxJS', '7.8.2']]],
+  ['Backend', [['Node.js', '24.14'], ['node:http', 'built in']]],
+  ['Data', [['SQLite', 'node:sqlite'], ['Migrations', 'db/migrations']]],
+  ['Build', [['Vite', '8.3.0'], ['TypeScript', '6.0.3'], ['Sass', '1.104.1']]],
+  ['Test', [['node:test', 'built in'], ['Playwright', '1.60.0']]],
+  ['Runtime', [['Docker image', 'node:24-bookworm-slim'], ['compose', 'compose.yaml']]] ];
+const ADRS = [['0001', 'Angular Material for every component', 'accepted', 'Design'], ['0002', 'SQLite in one file per environment', 'accepted', 'Data'], ['0003', 'Sessions in an HTTP-only cookie, not tokens', 'accepted', 'Code'], ['0004', 'Photos stored on the data volume', 'proposed', 'Deploy']];
+const CONSTRAINTS = [['Runs in 256 MB and half a CPU', 'Deploy limits'], ['No paid service without the owner\'s OK', 'Owner rule'], ['Runs without Aludel: docker compose up', 'Ownership (P5)'], ['Personal fields never leave the environment', 'Data access rules']];
+const DEPS = [
+  ['@angular/core (and 7 more @angular packages)', 'runtime', '22.1.7', '22.2.0', 'minor', 'MIT', '', ['web']],
+  ['@angular/material', 'runtime', '22.1.7', '22.2.0', 'minor', 'MIT', '', ['web']],
+  ['rxjs', 'runtime', '7.8.2', '7.8.2', '', 'Apache-2.0', '', ['web']],
+  ['@fontsource/roboto', 'runtime', '5.3.0', '5.3.0', '', 'OFL-1.1', '', ['web']],
+  ['vite', 'build', '8.3.0', '8.3.2', 'patch', 'MIT', '1 moderate (via a transitive package, build only)', ['web']],
+  ['typescript', 'build', '6.0.3', '6.0.3', '', 'Apache-2.0', '', ['web']],
+  ['sass', 'build', '1.104.1', '1.104.1', '', 'MIT', '', ['web']],
+  ['playwright', 'test', '1.60.0', '1.61.0', 'minor', 'Apache-2.0', '', ['tests']] ];
+const SERVICES = [['Email', 'mail', 'Sends request and approval emails (TS-05, TS-06)', 'Not connected', 'MAIL_FROM, SMTP_PASSWORD'], ['File storage', 'photo_library', 'Tool photos (W-236, proposed ADR 0004)', 'Data volume', 'DATA_DIR']];
+const PRS = [
+  { n: 14, title: 'Decline a request with a reason', branch: 'aludel/w-231-decline', by: 'Coder (agent)', state: 'open', checks: [['build', 'ok'], ['server tests', 'ok'], ['browser walkthrough', 'ok'], ['acceptance TS-06 rev 4', 'running']], work: 'W-231', stories: ['TS-06'], files: 6, env: 'pr-14', units: ['approveRequest', 'requestsPage', 'requestRow', 'requestsTable'] },
+  { n: 15, title: 'Photos on listings', branch: 'aludel/w-236-photos', by: 'Coder (agent)', state: 'draft', checks: [['build', 'ok'], ['server tests', 'bad']], work: 'W-236', stories: ['TS-03'], files: 9, env: 'pr-15', units: ['createTool', 'listToolPage', 'toolCard'] },
+  { n: 13, title: 'Mark a tool returned', branch: 'aludel/w-219-return', by: 'Coder (agent) · reviewed by Henry', state: 'merged', checks: [['build', 'ok'], ['server tests', 'ok'], ['browser walkthrough', 'ok']], work: 'W-219', stories: ['TS-07'], files: 5, env: '', units: ['returnTool', 'requestsPage'] } ];
+const COMMITS = [['e9f4c02', 'feat: mark a tool returned', 'W-219', 'TS-07', '2 days ago'], ['d07be11', 'feat: approve borrow requests', 'W-212', 'TS-06', '6 days ago'], ['a41c9e2', 'feat: filter browse by category', 'W-208', 'TS-04', '13 days ago'], ['c19a2f0', 'chore: numbered migrations', 'W-205', '', '15 days ago']];
+const RELEASES = [
+  { v: '0.5.0', commit: 'e9f4c02', when: '2 days ago', state: 'passed', ships: ['TS-07'], where: ['staging'], notes: ['Lenders and borrowers can mark a tool returned (TS-07).', 'Requests page shows returned loans.'], migrations: [], stackDiff: [['Angular', '22.1.6 → 22.1.7'], ['Vite', '8.2.4 → 8.3.0']], checks: [['build', 'ok'], ['server tests 41/41', 'ok'], ['browser walkthrough', 'ok'], ['acceptance TS-07', 'ok']] },
+  { v: '0.4.0', commit: 'd07be11', when: '6 days ago', state: 'passed', ships: ['TS-05', 'TS-06'], where: ['production'], notes: ['Ask to borrow a tool (TS-05).', 'Lenders approve requests (TS-06, revision 3).'], migrations: ['0003_borrow_requests'], stackDiff: [], checks: [['build', 'ok'], ['server tests 36/36', 'ok'], ['browser walkthrough', 'ok']] },
+  { v: '0.3.1', commit: 'b72d0e9', when: '10 days ago', state: 'passed', ships: [], where: [], notes: ['Fix: sign-in kept people on the sign-in page.'], migrations: [], stackDiff: [], checks: [['build', 'ok'], ['server tests 30/30', 'ok']] },
+  { v: '0.3.0', commit: 'a41c9e2', when: '12 days ago', state: 'failed', ships: ['TS-04'], where: [], notes: ['Filter browse by category (TS-04).', 'Failed its health check in Production and was rolled back after 20 minutes.'], migrations: [], stackDiff: [], checks: [['build', 'ok'], ['server tests 30/30', 'ok'], ['Production health check', 'bad']] } ];
+const ENVS = {
+  'pr-14': { name: 'pr-14', stage: 'preview', release: 'PR #14 · 3f1ac77', url: 'pr-14.tool-share.localhost', health: 'ok', sync: 'ok', branch: 'aludel/w-231-decline', data: 'Seeded copy', expires: 'Removed when the PR closes' },
+  'pr-15': { name: 'pr-15', stage: 'preview', release: 'PR #15 · 8c20d4b', url: 'pr-15.tool-share.localhost', health: 'bad', sync: 'ok', branch: 'aludel/w-236-photos', data: 'Seeded copy', expires: 'Removed when the PR closes' },
+  staging: { name: 'Staging', stage: 'staging', release: 'v0.5.0', url: 'staging.tool-share.aludel.dev', health: 'ok', sync: 'ok', branch: 'main (auto-deploys)', data: 'Own database', auto: true },
+  production: { name: 'Production', stage: 'production', release: 'v0.4.0', url: 'tool-share.app', health: 'ok', sync: 'pending', branch: 'Promoted releases only', data: 'Own database · backed up before each promotion', protected: true } };
+const VARS = [
+  ['PORT', 'Port the server listens on.', false, false, ['3000', '3000', '3000']],
+  ['HOST', 'Interface to listen on.', false, false, ['0.0.0.0', '0.0.0.0', '0.0.0.0']],
+  ['DATA_DIR', 'Folder for the database and uploaded photos.', false, false, ['/data', '/data', '/data']],
+  ['PUBLIC_URL', 'The address people use, for links in emails.', true, false, ['(set by the preview)', 'https://staging.tool-share.aludel.dev', 'https://tool-share.app']],
+  ['MAIL_FROM', 'Sender address for request emails.', true, false, ['', 'staging@tool-share.app', 'hello@tool-share.app']],
+  ['SMTP_PASSWORD', 'SMTP password for the email provider.', true, true, ['', 'set', '']] ];
+
+// ---------------------------------------------------------------- v2 additions to the data (round 1: R1-R13)
+Object.assign(REC, {
+  'VISION-brief': ['vision', 'Vision brief', 'flag', 5], 'V-personas': ['vision', 'Personas: Sam and Priya', 'group', 2],
+  'WORK-roles': ['work', 'Roles and actions', 'groups'], 'CODE-structure': ['code', 'Structure (read from the code)', 'account_tree'], 'CODE-conventions': ['code', 'Branch, commit and test conventions', 'rule'],
+  'DOCS-tree': ['code', 'The docs tree itself', 'list'], 'CODE-tests': ['code', 'Test results on main', 'fact_check'], 'CODE-health': ['code', 'Code health', 'monitor_heart'],
+  'REF-material': ['design', 'Angular Material reference', 'menu_book'],
+  'F-12': ['library', 'Finding: SQLite serialises writes', 'lightbulb'], 'F-15': ['library', 'Finding: lenders want to say why they decline', 'lightbulb'], 'F-18': ['library', 'Finding: emails are skipped without SMTP', 'lightbulb'],
+});
+u('sendMail', 'function', 'sendMail', 'server/mail.mjs', 4, 14, 'healthy', [['TS-05', 'notifies the lender for', 2], ['F-18', 'documented by']], [], [], 'e9f4c02', 1);
+U.createRequest.calls.push('sendMail'); U.approveRequest.calls.push('sendMail');
+for (const unit of Object.values(U)) unit.calledBy = Object.values(U).filter(other => other.calls.includes(unit.id)).map(other => other.id);
+SRC['server/mail.mjs'] = `// Email: request and approval notices. Needs MAIL_FROM and SMTP_PASSWORD (see .env.example).
+import { createTransport } from './smtp.mjs';
+
+export async function sendMail({ to, subject, text }) {
+  if (!process.env.SMTP_PASSWORD) {
+    console.warn(\`mail not configured: "\${subject}" to \${to} skipped\`);
+    return { sent: false };
+  }
+  const transport = createTransport({ from: process.env.MAIL_FROM, password: process.env.SMTP_PASSWORD });
+  await transport.send({ to, subject, text });
+  return { sent: true };
+}
+
+// Callers must not depend on the email arriving (finding F-18).
+`;
+FILE_LINES['server/mail.mjs'] = 16;
+const FILES = [...new Set([...Object.values(U).map(unit => unit.path), ...Object.keys(SRC), 'server/db.mjs', 'server/http.mjs', 'server/smtp.mjs', 'src/api.ts', 'src/main.ts', 'src/styles.scss', 'design/tokens.json', 'aludel.json', 'index.html',
+  'compose.yaml', 'package.json', 'package-lock.json', 'vite.config.ts', 'tsconfig.json', '.github/workflows/ci.yml', 'db/migrations/0001_accounts.sql', 'db/migrations/0002_tools.sql', 'tests/util.test.mjs'])].filter(f => !f.startsWith('docs/')).sort();
+
+// Acceptance scenarios per story (Vision) and the tests that check them, linked by test name ("TS-06/3 …").
+const SCEN = {
+  'TS-01': [['a new visitor', 'they sign up with an email and a password', 'they are signed in']], 'TS-02': [['an account', 'they sign in with the right password', 'they reach Browse'], ['an account', 'they sign in with the wrong password', 'they see an error and no session starts']],
+  'TS-03': [['a signed-in lender', 'they list a tool with a title, category and area', 'it appears in Browse'], ['a signed-in lender', 'they list a tool without a photo', 'they are asked for one (revision 3)']],
+  'TS-04': [['tools listed near Sam', 'Sam opens Browse', 'the newest are first'], ['tools in several categories', 'Sam picks Garden', 'only garden tools show'], ['nothing listed nearby', 'Sam opens Browse', 'Sam is invited to list a tool']],
+  'TS-05': [['a tool Sam doesn\'t own', 'Sam asks for dates', 'Priya sees the request under Requests'], ['Sam\'s own tool', 'Sam asks to borrow it', 'Sam is told they own it'], ['a new request', 'it is created', 'Priya gets an email']],
+  'TS-06': [['a request for Priya\'s tool', 'Priya approves', 'Sam sees it approved'], ['a request', 'someone other than the lender decides', 'it is refused'], ['a request', 'Priya declines with a reason', 'Sam sees the reason (new in revision 4)']],
+  'TS-07': [['an approved loan', 'either side marks it returned', 'it shows as returned'], ['a request not yet approved', 'someone marks it returned', 'it is refused']] };
+SCEN['TS-01'].push(['an email that already has an account', 'someone signs up with it', 'they are told to sign in instead']);
+// [id, file, name, scenarios, result on main, extra]
+const TESTS = [
+  ['t1', 'tests/signup.test.mjs', 'TS-01/1 signs a new account in', ['TS-01/1'], 'pass'], ['t2', 'tests/signup.test.mjs', 'TS-01/2 refuses an email in use', ['TS-01/2'], 'pass'],
+  ['t3', 'tests/signup.test.mjs', 'TS-02/1 signs in', ['TS-02/1'], 'pass'], ['t4', 'tests/signup.test.mjs', 'TS-02/2 refuses a wrong password', ['TS-02/2'], 'fail', 'expected 401, got 500 · failing since d07be11'],
+  ['t5', 'tests/tools.test.mjs', 'TS-03/1 lists a tool', ['TS-03/1'], 'pass'], ['t6', 'tests/tools.test.mjs', 'TS-03/2 asks for a photo', ['TS-03/2'], 'pending', 'on PR #15 only'],
+  ['t7', 'tests/browse.test.mjs', 'TS-04/1 newest first near me', ['TS-04/1'], 'pass'], ['t8', 'tests/e2e/borrow-flow.spec.ts', 'TS-04/2 filters by category', ['TS-04/2'], 'pass'],
+  ['t9', 'tests/borrow.test.mjs', 'TS-05/1 creates a request', ['TS-05/1'], 'pass'], ['t10', 'tests/borrow.test.mjs', 'TS-05/2 refuses your own tool', ['TS-05/2'], 'pass'],
+  ['t11', 'tests/borrow.test.mjs', 'TS-06/1 lender approves', ['TS-06/1'], 'pass', 'written for revision 3'], ['t12', 'tests/borrow.test.mjs', 'TS-06/2 only the lender decides', ['TS-06/2'], 'pass', 'written for revision 3'],
+  ['t13', 'tests/borrow.test.mjs', 'TS-06/3 declines with a reason', ['TS-06/3'], 'pending', 'on PR #14 only'],
+  ['t14', 'tests/e2e/borrow-flow.spec.ts', 'borrow flow: ask, approve', ['TS-05/1', 'TS-06/1'], 'pass'], ['t15', 'tests/util.test.mjs', 'slugify keeps ascii', [], 'pass'] ];
+const FINDINGS = {
+  'F-12': { from: 'Session on PR #13 (Coder agent)', kind: 'Code session', text: 'Two writers on one SQLite file lock each other; the server must be the only writer.', used: [['doc', 'ARCHITECTURE.md › Data and concurrency'], ['deploy', 'Deploy › Production › one container only'], ['data', 'Data › Borrow request object, notes']] },
+  'F-15': { from: 'Interview with Priya, 3 Sep (Library source)', kind: 'Research', text: '"I want to say no without feeling rude: let me tell them why."', used: [['vision', 'Vision › TS-06, revision 4'], ['doc', 'docs/product/borrowing.md › Approve or decline'], ['doc', 'docs/plans/active/W-231-decline.md']] },
+  'F-18': { from: 'Production logs, noticed in the review of W-219', kind: 'Operations', text: 'Without SMTP_PASSWORD, request and approval emails are skipped with only a warning.', used: [['doc', 'ARCHITECTURE.md › Integrations'], ['deploy', 'Deploy › Integrations › Email'], ['code', 'Tests › TS-05/3 has no test']] } };
+// The repository's docs tree (harness engineering: AGENTS.md is the map, docs/ the system of record). [heading, lines, sources, suspect source]
+const DOCS = {
+  'AGENTS.md': { owner: 'Project lead', lines: 92, sections: [
+    ['Tool Share', ['A place for neighbours to lend and borrow tools. This file is a map: read it first, then open only what the task needs.'], ['VISION-brief']],
+    ['Where to look', ['- `ARCHITECTURE.md`: the parts, where code lives, and the rules between them', '- `docs/product/`: who it is for and what each story must do', '- `docs/design/DESIGN.md`: tokens and components; never hard-code a colour', '- `docs/data/` and `docs/generated/`: objects, the API and the database schema', '- `docs/plans/active/`: work in progress and its decisions', '- `docs/QUALITY.md`: what is weak or untested right now'], ['DOCS-tree']],
+    ['How to work here', ['- One branch per work item, `aludel/w-<id>-<slug>`; commits carry `Aludel-Work:` and `Implements:` trailers.', '- Name each test after the scenario it checks: `TS-06/3 declines with a reason`.', '- Before a pull request: `npm test`, then `docker compose up --build` and open the app.'], ['CODE-conventions', 'WORK-roles']] ] },
+  'ARCHITECTURE.md': { owner: 'Engineer', sections: [
+    ['Parts', ['One container runs the **Web app** (Angular 22, `src/`) and the **API server** (Node 24, `server/`). Records live in one **SQLite** file per environment on the data volume.'], ['CODE-structure']],
+    ['Borrowing', ['`server/routes/requests.mjs` owns the request lifecycle: asked → approved → returned. Only the lender decides.'], ['TS-05', 'TS-06', 'D-request'], 'TS-06'],
+    ['Data and concurrency', ['SQLite serialises writes. Keep one server process per environment and never share a data volume between containers.'], ['F-12', 'D-request']],
+    ['Integrations', ['Email goes through `server/mail.mjs`. Without `SMTP_PASSWORD` it warns and skips sending, so no flow may depend on an email arriving.'], ['F-18', 'OP-createRequest']] ] },
+  'docs/product/index.md': { owner: 'Product lead', sections: [
+    ['Who it is for', ['**Sam** borrows: occasional DIY, no garage full of tools. **Priya** lends: owns good tools, wants them back in good shape.'], ['V-personas']],
+    ['Stories', ['Accounts: TS-01, TS-02 · Listing: TS-03 · Finding: TS-04 · Borrowing: TS-05 to TS-07 (see `borrowing.md`).'], ['VISION-brief']] ] },
+  'docs/product/borrowing.md': { owner: 'Product lead', sections: [
+    ['Ask to borrow (TS-05)', ['- Sam asks for dates; Priya sees the request under Requests.', '- Nobody can ask for their own tool.', '- Priya gets an email about the request.'], ['TS-05']],
+    ['Approve or decline (TS-06)', ['- Only the lender decides.', '- Approving shows the loan as approved to Sam.'], ['TS-06', 'F-15'], 'TS-06'],
+    ['Return (TS-07)', ['- Either side marks an approved loan returned.'], ['TS-07']] ] },
+  'docs/design/DESIGN.md': { owner: 'Design lead', sections: [
+    ['Tokens', ['Primary `#2e6b4f`, radius 16, DM Sans. Use `var(--mat-sys-*)`; the full set is in `design/tokens.json`.'], ['C-tokens']],
+    ['Components', ['Tool card and Request row are the project\'s own; everything else is Angular Material (see `references/angular-material-llms.txt`).'], ['C-toolcard', 'C-requestrow', 'REF-material']] ] },
+  'docs/data/objects.md': { owner: 'Data architect', sections: [
+    ['Account', ['email (key), name, password hash. Personal: email, name.'], ['D-account']],
+    ['Tool', ['id, owner → Account, title, category, area, photo.'], ['D-tool']],
+    ['Borrow request', ['id, tool → Tool, borrower → Account, dates, message, state: asked | approved | returned.'], ['D-request'], 'D-request'] ] },
+  'docs/generated/db-schema.md': { owner: 'Generated', generated: true, sections: [['Tables', ['`accounts`, `sessions`, `tools`, `borrow_requests`: written from the migrations after every build.'], ['CODE-structure']]] },
+  'docs/plans/active/W-231-decline.md': { owner: 'Engineer', sections: [
+    ['Goal', ['Let Priya decline with a reason (TS-06 revision 4).'], ['W-231', 'TS-06', 'F-15']],
+    ['Decisions so far', ['- The reason is required and shown to Sam only.', '- Migration `0004_request_reason` adds a nullable column.'], ['W-231']] ] },
+  'docs/QUALITY.md': { owner: 'Generated', generated: true, sections: [['Now', ['4 suspect chunks (all TS-06), 1 unused (`LegacyToolTile`). 4 scenarios have no test; `TS-02/2` is failing on main.'], ['CODE-health', 'CODE-tests']]] },
+  'docs/references/angular-material-llms.txt': { owner: 'Design lead', sections: [['Reference', ['A condensed Angular Material 22 reference for agents, pinned to the version in `package.json`.'], ['REF-material']]] } };
+const docState = path => DOCS[path].sections.some(s => s[3]) ? 'suspect' : 'healthy';
+let st = { asof: 'v0.5.0', part: 'api', file: 'server/routes/requests.mjs', chunk: 'approveRequest', lens: '', filt: 'all', q: '', open: new Set(['d:server/', 'd:server/routes/', 'f:server/routes/requests.mjs']),
+  doc: 'ARCHITECTURE.md', sec: 1, showSrc: true, sidecar: false, docOpen: new Set(['d:docs/', 'd:docs/product/', 'd:docs/plans/', 'd:docs/plans/active/']), testStory: '', release: '0.5.0', drafted: false,
+  env: 'production', envTab: 'overview', varEdits: {}, applied: false, promoted: false, dbEnv: 'production', logKind: 'runtime' };
+
+// ---------------------------------------------------------------- helpers
+const $ = (sel, root = document) => root.querySelector(sel);
+const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+const icon = (name, extra = '') => `<span class="icon" aria-hidden="true"${extra}>${name}</span>`;
+const stateLabel = { healthy: 'Healthy', suspect: 'Suspect', untraced: 'Untraced', dead: 'Unused' };
+const stateChip = { healthy: 'ok', suspect: 'warn', untraced: '', dead: 'bad' };
+const kindIcon = kind => ({ component: 'web', handler: 'api', table: 'table', function: 'function', const: 'data_object', test: 'fact_check' }[kind] || 'code');
+const layerName = { vision: 'Vision', pages: 'Pages', data: 'Data', design: 'Design', work: 'Work', deploy: 'Deploy', code: 'Code', library: 'Library' };
+const short = id => /^(TS|W|F)-/.test(id) ? id : REC[id][1];
+const recChip = (id, extra = '') => { const r = REC[id]; if (!r) return ''; return `<span class="chip ${r[0]}" data-hover="${esc(layerName[r[0]] + ' · ' + r[1] + (r[3] ? ' · revision ' + r[3] : ''))}">${icon(r[2])}${esc(short(id))}${extra}</span>`; };
+const md = line => esc(line).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`(.+?)`/g, '<code>$1</code>');
+const resChip = r => ({ pass: `<span class="chip ok">${icon('check')}Green</span>`, fail: `<span class="chip bad">${icon('close')}Red</span>`, pending: `<span class="chip info">${icon('call_split')}In a PR</span>`, none: '<span class="chip dash">No test</span>' }[r]);
+function toast(text) { document.querySelectorAll('.toast').forEach(t => t.remove()); const el = document.createElement('div'); el.className = 'toast'; el.setAttribute('role', 'status'); el.textContent = text; document.body.append(el); setTimeout(() => el.remove(), 4200); }
+const tabs = (layer, items, current) => `<nav class="tabs" aria-label="${layer} sections">${items.map(([key, label, ic]) => `<a href="#${layer.toLowerCase()}/${key}" ${current === key ? 'aria-current="page"' : ''}>${icon(ic)}${label}</a>`).join('')}</nav>`;
+const fileNote = files => `<span class="src-note">${icon('description', ' style="font-size:15px"')}Reads ${files.map(f => `<code>${esc(f)}</code>`).join(' ')}</span>`;
+const rollup = units => { const c = { healthy: 0, suspect: 0, untraced: 0, dead: 0 }; for (const unit of units) c[unit.state]++; return c; };
+const healthBar = c => `<div class="bar">${['healthy', 'suspect', 'untraced', 'dead'].map(s => `<i class="d-${s}" style="flex:${c[s]}"></i>`).join('')}</div>`;
+function scenResult(story, n) { const key = `${story}/${n}`; const ts = TESTS.filter(t => t[3].includes(key)); if (!ts.length) return ['none', ts]; if (ts.some(t => t[4] === 'fail')) return ['fail', ts]; if (ts.every(t => t[4] === 'pending')) return ['pending', ts]; return ['pass', ts]; }
+function allScen() { const out = []; for (const [story, list] of Object.entries(SCEN)) list.forEach((s, i) => out.push([story, i + 1, s, ...scenResult(story, i + 1)])); return out; }
+function highlight(line) {
+  const escd = String(line).replace(/[&<>]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[ch]));
+  if (/^\s*(\/\/|#|--)/.test(line)) return `<span class="tk-c">${escd}</span>`;
+  return escd.replace(/('[^']*'|"[^"]*"|`[^`]*`)/g, '<span class="tk-s">$1</span>')
+    .replace(/\b(import|from|export|async|await|function|return|const|if|readonly|class|new|for|of|FROM|RUN|COPY|WORKDIR|ENV|USER|EXPOSE|CMD|HEALTHCHECK|AS|CREATE|TABLE|INDEX|ON|TEXT|NOT|NULL|PRIMARY|KEY|REFERENCES|DEFAULT|CHECK|IN)\b(?![^<]*>)/g, '<span class="tk-k">$1</span>')
+    .replace(/(?<![\w-])(\d+)\b(?![^<]*>)/g, '<span class="tk-n">$1</span>');
+}
+function dirTree(paths) { const root = {}; for (const path of paths) { let at = root; const parts = path.split('/'); parts.forEach((p, i) => { if (i === parts.length - 1) (at.__f ||= []).push(path); else at = at[p] ||= {}; }); } return root; }
+const collect = d => [...(d.__f || []), ...Object.keys(d).filter(k => k !== '__f').flatMap(k => collect(d[k]))];
+
+// ---------------------------------------------------------------- CODE › Overview (R7)
+const PARTS = {
+  web: { name: 'Web app', icon: 'web', stack: [['Angular', '22.1.7'], ['Angular Material', '22.1.7'], ['RxJS', '7.8.2'], ['Built by Vite', '8.3.0'], ['TypeScript', '6.0.3']], folder: 'src/', about: 'What Sam and Priya use. Built into dist/ and served by the API server.', doc: 'ARCHITECTURE.md' },
+  api: { name: 'API server', icon: 'api', stack: [['Node.js', '24.14'], ['node:http', 'built in'], ['node:sqlite', 'built in']], folder: 'server/', about: 'Answers /api, signs people in, stores records and sends email.', doc: 'ARCHITECTURE.md' },
+  db: { name: 'Database', icon: 'database', data: true, stack: [['SQLite', 'one file per environment'], ['Migrations', 'db/migrations · 3']], folder: 'db/', about: 'Tables for Account, Tool and Borrow request. What each holds is defined in Data.', doc: 'docs/generated/db-schema.md' },
+  tests: { name: 'Tests', icon: 'fact_check', stack: [['node:test', 'built in'], ['Playwright', '1.60.0'], ['CI', 'GitHub Actions']], folder: 'tests/', about: 'Run on every pull request and before every release.', doc: 'docs/QUALITY.md' },
+  run: { name: 'Container', icon: 'deployed_code', stack: [['Image', 'node:24-bookworm-slim'], ['Build', 'Dockerfile'], ['Run anywhere', 'compose.yaml']], folder: '', about: 'Web app and API server run together in one container per environment.', doc: 'ARCHITECTURE.md' } };
+const partUnits = key => { const f = PARTS[key].folder; return f ? Object.values(U).filter(unit => unit.path.startsWith(f)) : []; };
+function codeOverview() {
+  const partCard = key => { const p = PARTS[key]; const c = rollup(partUnits(key)); const n = partUnits(key).length;
+    return `<button class="part ${p.data ? 'data' : ''} ${st.part === key ? 'sel' : ''}" data-part="${key}"><b>${icon(p.icon)}${p.name}</b><span class="st">${p.stack.slice(0, 2).map(s => `${s[0]} ${s[1]}`).join(' · ')}</span>${n ? healthBar(c) + `<span class="tiny muted">${n} chunks${c.suspect ? ` · <span style="color:var(--warn)">${c.suspect} suspect</span>` : ''}</span>` : ''}</button>`; };
+  const p = PARTS[st.part]; const order = { suspect: 0, dead: 1, untraced: 2, healthy: 3 }; const pu = partUnits(st.part).sort((a, b) => order[a.state] - order[b.state]); const pc = rollup(pu);
+  const code = Object.values(U).filter(unit => unit.kind !== 'test'); const c = rollup(code); const scen = allScen();
+  const old = st.asof === 'v0.4.0';
+  return `<div class="row wrap" style="margin-bottom:10px"><p class="lead" style="margin:0">How Tool Share's code fits together, and how it connects to the other layers. Everything is read from <a href="#">${REPO}</a>.</p>
+    <label class="asof push">As of <select id="asof"><option value="v0.5.0" ${st.asof === 'v0.5.0' ? 'selected' : ''}>v0.5.0 · latest release</option><option value="main" ${st.asof === 'main' ? 'selected' : ''}>main · e9f4c02 + 2 commits</option><option value="v0.4.0" ${old ? 'selected' : ''}>v0.4.0 · in Production</option></select></label></div>
+  ${old ? '<div class="note" style="margin-bottom:12px">v0.4.0 is older: it has no <code>returnTool</code> and runs Angular 22.1.6. Health and tests below are as they were at that release.</div>' : ''}
+  <div class="side">
+    <div class="col">
+      <section class="card"><div class="row"><h2 style="margin:0">Structure</h2><span class="tiny muted">Click a part for its stack and chunks</span></div>
+        <div class="map" style="margin-top:10px"><div class="people"><span>${icon('person', ' style="font-size:16px"')}Sam</span><span>${icon('person', ' style="font-size:16px"')}Priya</span></div><div class="arrow">${icon('arrow_forward')}</div>${partCard('web')}<div class="arrow">${icon('arrow_forward')}</div>${partCard('api')}<div class="arrow">${icon('arrow_forward')}</div>${partCard('db')}</div>
+        <div class="map-ext"><span class="tiny muted">Around it</span>${partCard('tests').replace('class="part', 'style="padding:4px 10px" class="part')}${partCard('run').replace('class="part', 'style="padding:4px 10px" class="part')}<span class="tiny muted" style="margin-left:6px">Outside services</span>
+          <a class="ext" href="#deploy/integrations">${icon('mail')}Email · not connected</a><a class="ext" href="#deploy/integrations">${icon('photo_library')}File storage · data volume</a></div>
+        <div class="partpanel"><div><div class="row"><b>${icon(p.icon, ' style="color:var(--lc)"')} ${p.name}</b>${pu.length ? `<span class="chip ${pc.suspect ? 'warn' : 'ok'}">${pc.suspect ? pc.suspect + ' suspect' : 'All current'}</span>` : ''}</div><p class="small muted" style="margin:4px 0 8px">${p.about}</p>
+          <table class="t"><tbody>${p.stack.map(([n, v]) => `<tr><td>${n}</td><td><code>${old && n === 'Angular' ? '22.1.6' : v}</code></td></tr>`).join('')}</tbody></table></div>
+          <div><h3 style="margin-top:0">Chunks</h3>${pu.length ? `<div class="row wrap">${pu.slice(0, 9).map(unit => `<button class="chip ${unit.state === 'suspect' ? 'warn' : 'code'}" data-go-chunk="${unit.id}">${esc(unit.symbol)}</button>`).join('')}${pu.length > 9 ? `<a class="chip dash" href="#code/explorer" data-go-folder="${p.folder}">+${pu.length - 9} more</a>` : ''}</div>` : '<p class="small muted" style="margin:0">Files only: <code>Dockerfile</code>, <code>compose.yaml</code>, <code>.env.example</code>. Deploy reads them.</p>'}
+            <h3>Read more</h3><button class="chip code" data-go-doc="${p.doc}">${icon('description')}${p.doc}</button></div></div></section>
+      <section class="card"><div class="row"><h2 style="margin:0">Stories: code and tests</h2><a class="push small" href="#code/tests">Tests</a></div>
+        <div style="overflow-x:auto"><table class="t" style="margin-top:6px"><thead><tr><th>Story</th><th>Chunks</th><th>Scenarios tested</th><th>On main</th></tr></thead><tbody>
+        ${Object.keys(SCEN).map(id => { const us = code.filter(unit => unit.links.some(l => l[0] === id)); const ss = scen.filter(s => s[0] === id); const sus = us.some(unit => unit.links.some(l => l[0] === id && l[3]));
+          return `<tr class="click" data-test-story="${id}"><td>${recChip(id)} <span class="small">${esc(REC[id][1])}</span></td><td>${us.length} ${sus ? '<span class="chip warn">Suspect</span>' : ''}</td><td><div class="cov">${ss.map(s => `<i class="${s[3]}" title="${s[0]}/${s[1]}: ${s[3]}"></i>`).join('')}</div></td><td>${ss.some(s => s[3] === 'fail') ? resChip('fail') : ss.some(s => s[3] === 'none') ? '<span class="tiny muted">Gaps</span>' : resChip('pass')}</td></tr>`; }).join('')}</tbody></table></div></section>
+    </div>
+    <div class="col">
+      <section class="card"><h2>Code health</h2>${healthBar(c).replace('class="bar"', 'class="bar" style="height:10px;margin:4px 0 8px"')}
+        <div class="row wrap">${['healthy', 'suspect', 'untraced', 'dead'].map(s => `<a class="chip ${stateChip[s]}" href="#code/explorer" data-filt="${s}">${stateLabel[s]} ${c[s]}</a>`).join('')}</div>
+        <p class="tiny muted" style="margin:8px 0 0">Suspect: something it was built for changed since. Untraced: used, but nothing says why (often glue). Unused: nothing calls it.</p></section>
+      <section class="card"><h2>Tests on main</h2><div class="row wrap">${resChip('pass')}<b>${TESTS.filter(t => t[4] === 'pass').length}</b>${resChip('fail')}<b>1</b><span class="tiny muted">CI · 2 h ago</span></div>
+        <p class="small" style="margin:8px 0 0">${scen.filter(s => s[3] === 'pass').length} of ${scen.length} scenarios have a green test. <a href="#code/tests">${scen.filter(s => s[3] === 'none').length} have none</a>.</p></section>
+      <section class="card"><h2>Docs</h2><div class="row wrap"><span class="chip ok">${Object.keys(DOCS).filter(d => docState(d) === 'healthy').length} current</span><span class="chip warn">${Object.keys(DOCS).filter(d => docState(d) === 'suspect').length} need a refresh</span></div>
+        <p class="small" style="margin:8px 0 0">What agents and developers read in the repository. <a href="#code/docs">Docs</a></p></section>
+      <section class="card"><h2>Latest release</h2><p class="small" style="margin:0"><a href="#code/releases"><b>v0.5.0</b></a> · 2 days ago · in Staging. Production runs v0.4.0.</p></section>
+    </div></div>`;
+}
+
+// ---------------------------------------------------------------- CODE › Explorer (R1, R2)
+const lensUnits = () => st.lens ? Object.values(U).filter(unit => unit.links.some(l => l[0] === st.lens)).map(unit => unit.id) : [];
+function unitMatches(unit) {
+  const q = st.q.trim().toLowerCase(); if (q && !unit.symbol.toLowerCase().includes(q) && !unit.path.toLowerCase().includes(q)) return false;
+  if (st.filt === 'all') return true; if (st.filt === 'untested') return !['test', 'table', 'const'].includes(unit.kind) && !unit.tests.length; return unit.state === st.filt;
+}
+function explorerTree() {
+  const q = st.q.trim().toLowerCase(); const filtering = st.filt !== 'all' || q; const lensed = new Set(lensUnits());
+  const fileShown = f => { const us = Object.values(U).filter(unit => unit.path === f); if (!filtering) return true; return us.some(unitMatches) || (q && f.toLowerCase().includes(q) && st.filt === 'all'); };
+  const render = (dir, name, prefix, depth) => {
+    const files = collect(dir).filter(fileShown); if (name && !files.length) return '';
+    const key = 'd:' + prefix; const hasLens = files.some(f => Object.values(U).some(unit => unit.path === f && lensed.has(unit.id)));
+    const open = !name || st.open.has(key) || filtering || hasLens;
+    let html = '';
+    if (name) { const c = rollup(Object.values(U).filter(unit => files.includes(unit.path))); html += `<button class="tn" role="treeitem" data-dir="${key}" aria-expanded="${open}" style="padding-left:${depth * 14 + 4}px"><span class="tw-ch">${icon('expand_more')}</span>${icon(open ? 'folder_open' : 'folder', ' class="ki"')}<span class="nm">${esc(name)}</span><span class="meta">${c.suspect ? '<span class="dot d-suspect"></span>' : ''}</span></button>`; }
+    if (!open) return html;
+    const d = name ? depth + 1 : depth;
+    for (const k of Object.keys(dir).filter(k => k !== '__f').sort()) html += render(dir[k], k, prefix + k + '/', d);
+    for (const f of (dir.__f || []).filter(fileShown).sort()) {
+      const us = Object.values(U).filter(unit => unit.path === f).sort((a, b) => a.line - b.line); const shownUs = us.filter(unitMatches);
+      const fOpen = st.open.has('f:' + f) || filtering || us.some(unit => lensed.has(unit.id)); const worst = ['suspect', 'dead', 'untraced', 'healthy'].find(s => us.some(unit => unit.state === s));
+      html += `<button class="tn ${st.file === f && !st.chunk ? 'sel' : ''}" role="treeitem" data-file="${f}" ${us.length ? `aria-expanded="${fOpen}"` : ''} style="padding-left:${d * 14 + 4}px"><span class="tw-ch">${us.length ? icon('expand_more') : ''}</span>${icon('description', ' class="ki"')}<span class="nm">${esc(f.split('/').pop())}</span><span class="meta">${us.length ? `<span class="cnt">${us.length}</span>` : ''}${worst ? `<span class="dot d-${worst}"></span>` : ''}</span></button>`;
+      if (fOpen) for (const unit of shownUs) html += `<button class="tn ${st.chunk === unit.id ? 'sel' : ''} ${lensed.has(unit.id) ? 'lensed' : ''}" role="treeitem" data-chunk="${unit.id}" style="padding-left:${(d + 1) * 14 + 4}px"><span class="tw-ch"></span>${icon(kindIcon(unit.kind), ' class="ki"')}<span class="nm ${unit.kind === 'handler' || unit.kind === 'table' ? 'ck' : ''}">${esc(unit.symbol)}</span><span class="meta"><span class="dot d-${unit.state}" title="${stateLabel[unit.state]}"></span></span></button>`;
+    }
+    return html;
+  };
+  return render(dirTree(FILES), '', '', 0);
+}
+function sourcePane() {
+  const path = st.file; const text = SRC[path]; const us = Object.values(U).filter(unit => unit.path === path); const focus = st.chunk ? U[st.chunk] : null; const lensed = new Set(lensUnits());
+  const bar = `<div class="srcbar">${icon('description', ' style="font-size:17px;color:var(--muted)"')}<code>${esc(path)}</code>${focus ? `<span class="tiny muted" style="white-space:nowrap">lines ${focus.line}–${focus.end}</span>` : ''}<span class="readonly push" style="white-space:nowrap">${icon('lock', ' style="font-size:15px"')}Read only · e9f4c02</span><a class="btn sm ghost" href="#">${icon('open_in_new')}GitHub</a></div>`;
+  if (!text) return `${bar}<div class="empty-center"><div>${FILE_LINES[path] || 20} lines.<br><span class="small">This prototype has source for <button class="lk" data-file="server/routes/requests.mjs" style="border:0;background:none;color:var(--accent)">requests.mjs</button>, <button class="lk" data-file="server/mail.mjs" style="border:0;background:none;color:var(--accent)">mail.mjs</button>, <button class="lk" data-file="src/pages/browse.page.ts" style="border:0;background:none;color:var(--accent)">browse.page.ts</button>, <button class="lk" data-file="Dockerfile" style="border:0;background:none;color:var(--accent)">Dockerfile</button> and a migration. The build shows every file.</span>${us.length ? `<div style="margin-top:12px;text-align:left">${us.map(unit => `<div class="row small" style="padding:2px 0"><span class="dot d-${unit.state}"></span><button class="lk" data-chunk="${unit.id}" style="border:0;background:none;color:var(--accent);font-family:Roboto Mono,monospace">${esc(unit.symbol)}</button><span class="faint tiny">lines ${unit.line}–${unit.end}</span></div>`).join('')}</div>` : ''}</div></div>`;
+  const rows = text.replace(/\n$/, '').split('\n').map((line, i) => {
+    const n = i + 1; const owner = us.find(unit => n >= unit.line && n <= unit.end);
+    const cls = focus && n >= focus.line && n <= focus.end ? 'sel-range' : owner && lensed.has(owner.id) ? 'lens' : '';
+    const mark = owner ? `<i class="d-${owner.state}" data-chunk="${owner.id}" data-hover="${esc(owner.symbol + ' · ' + stateLabel[owner.state])}" style="cursor:pointer;opacity:${!focus || owner === focus ? 1 : .35}"></i>` : '';
+    return `<tr class="${cls}" ${focus && n === focus.line ? 'id="focus-line"' : ''}><td class="ln">${n}</td><td class="mk">${mark}</td><td class="cd">${highlight(line)}</td></tr>`;
+  }).join('');
+  return `${bar}<div class="src" tabindex="0" aria-label="Source of ${esc(path)}"><table>${rows}</table></div>`;
+}
+function inspector() {
+  const unit = st.chunk ? U[st.chunk] : null;
+  if (!unit) { const us = Object.values(U).filter(x => x.path === st.file); const ids = [...new Set(us.flatMap(x => x.links.map(l => l[0])))];
+    return `<div class="row"><h2>${esc(st.file.split('/').pop())}</h2><button class="btn sm push" data-act="change">${icon('edit_note')}Request a change</button></div>
+      <section><h3 style="margin-top:0">Chunks</h3>${us.length ? us.map(x => `<button class="tn" data-chunk="${x.id}">${icon(kindIcon(x.kind), ' class="ki"')}<span class="nm">${esc(x.symbol)}</span><span class="meta"><span class="dot d-${x.state}"></span></span></button>`).join('') : '<p class="small muted" style="margin:0">None. Build, run and config files are read whole.</p>'}</section>
+      ${ids.length ? `<section><h3>Why this file exists</h3><div class="row wrap">${ids.map(id => recChip(id)).join('')}</div></section>` : ''}
+      ${['Dockerfile', 'compose.yaml', '.env.example'].includes(st.file) ? '<p class="small note">Deploy reads this file: variables come from <code>.env.example</code>, the image from the Dockerfile.</p>' : ''}`; }
+  const sus = unit.links.find(l => l[3]); const work = ['approveRequest', 'requestsPage', 'requestRow', 'requestsTable'].includes(unit.id) ? 'W-231' : unit.id === 'returnTool' ? 'W-219' : '';
+  const scen = TESTS.filter(t => unit.tests.some(tid => U[tid].path === t[1]) && t[3].some(s => unit.links.some(l => s.startsWith(l[0]))));
+  return `<div class="row wrap"><h2 class="${unit.kind === 'handler' ? 'ck' : ''}">${esc(unit.symbol)}</h2><span class="chip ${stateChip[unit.state]}">${stateLabel[unit.state]}</span></div>
+    <p class="tiny muted" style="margin:0">${unit.kind} · lines ${unit.line}–${unit.end} · last changed in <code>${unit.last}</code></p>
+    ${sus ? `<div class="note warn small">${icon('update', ' style="font-size:16px"')} <b>${esc(REC[sus[0]][1])}</b> is at revision ${sus[3]}; this was built for ${sus[2]}.${work === 'W-231' ? ' PR #14 (W-231) is on it.' : ''}</div>` : ''}
+    <section><h3 style="margin-top:0">Why it exists</h3>${unit.links.length ? unit.links.map(([id, how, rev, now]) => `<div style="padding:5px 0;border-top:1px solid var(--line)"><div class="row">${recChip(id)}<span class="chip ${now ? 'warn' : 'ok'} push">${now ? 'Changed' : 'Current'}</span></div><div class="tiny muted" style="margin-top:2px">${esc(how)} ${esc(REC[id][1])}${rev ? ` · linked at revision ${rev}${now ? ', now ' + now : ''}` : ''}</div></div>`).join('') : `<p class="small muted" style="margin:0">${unit.state === 'dead' ? 'Nothing uses it and nothing needs it.' : 'Used, but nothing says why. Usually glue.'}</p>`}</section>
+    <section><h3>Calls · called by</h3><div class="rel">${unit.calls.map(id => `<button class="lk" data-chunk="${id}">${icon('arrow_forward')}<code>${esc(U[id].symbol)}</code></button>`).join('')}${unit.calledBy.map(id => `<button class="lk" data-chunk="${id}">${icon('arrow_back')}<code>${esc(U[id].symbol)}</code></button>`).join('')}${!unit.calls.length && !unit.calledBy.length ? '<p class="tiny muted" style="margin:0">Nothing</p>' : ''}</div></section>
+    <section><h3>Tests</h3>${scen.length ? scen.map(t => `<div class="row small" style="padding:2px 0">${t[4] === 'pass' ? icon('check_circle', ' style="color:var(--ok);font-size:17px"') : t[4] === 'pending' ? icon('call_split', ' style="color:var(--info);font-size:17px" title="In a pull request"') : icon('cancel', ' style="color:var(--bad);font-size:17px"')}<span>${esc(t[2])}</span></div>`).join('') : '<p class="small muted" style="margin:0">No test reaches it.</p>'}${work ? `<h3>Work</h3>${recChip(work)}` : ''}</section>
+    <button class="btn sm primary" data-act="change" style="justify-self:start">${icon('edit_note')}Request a change</button>`;
+}
+function codeExplorer() {
+  const filters = [['all', 'All'], ['suspect', 'Suspect'], ['untraced', 'Untraced'], ['dead', 'Unused'], ['untested', 'Untested']];
+  return `<div class="ex3">
+    <div class="tree"><div class="tree-head">
+      <label class="search"><span class="icon">search</span><span class="vh">Go to file or chunk</span><input id="tq" placeholder="Go to file or chunk" value="${esc(st.q)}"></label>
+      <div class="filters" role="group" aria-label="Show">${filters.map(([k, l]) => `<button class="chip ${st.filt === k ? 'on' : 'dash'}" data-filt="${k}" aria-pressed="${st.filt === k}">${!['all', 'untested'].includes(k) ? `<span class="dot d-${k}"></span>` : ''}${l}</button>`).join('')}</div>
+      <label class="lens">${icon('auto_stories', ' style="font-size:17px;color:var(--c-vision)"')}<select id="lens" aria-label="Highlight a record's code"><option value="">Highlight code for…</option>${['TS-01', 'TS-02', 'TS-03', 'TS-04', 'TS-05', 'TS-06', 'TS-07', 'D-request', 'D-tool', 'C-toolcard'].map(id => `<option value="${id}" ${st.lens === id ? 'selected' : ''}>${short(id)}${/^TS/.test(id) ? ' ' + REC[id][1] : ''}</option>`).join('')}</select></label>
+      ${st.lens ? `<p class="tiny muted" style="margin:0">${lensUnits().length} chunks in ${new Set(lensUnits().map(id => U[id].path)).size} files</p>` : ''}
+    </div><div class="tree-body" role="tree" aria-label="Files">${explorerTree()}</div></div>
+    <div class="center">${sourcePane()}</div>
+    <div class="insp">${inspector()}</div></div>`;
+}
+
+// ---------------------------------------------------------------- CODE › Tests (R11)
+function codeTests() {
+  const scen = allScen(); const count = r => scen.filter(s => s[3] === r).length;
+  const stories = st.testStory ? [st.testStory] : Object.keys(SCEN);
+  const unmapped = TESTS.filter(t => !t[3].length);
+  return `<p class="lead">Does each story's acceptance have tests, and are they green? Scenarios come from Vision; tests are linked by name (<code>TS-06/3 …</code>). CI runs them on every pull request, in <code>.github/workflows/ci.yml</code>.</p>
+  <div class="row wrap" style="margin-bottom:12px"><span class="chip ok">${count('pass')} green</span><span class="chip bad">${count('fail')} red</span><span class="chip info">${count('pending')} in a pull request</span><span class="chip dash">${count('none')} with no test</span><span class="tiny muted">of ${scen.length} scenarios · main @ e9f4c02 · CI 2 h ago</span>
+    <select class="var-in push" id="tstory" style="width:auto" aria-label="Story"><option value="">All stories</option>${Object.keys(SCEN).map(id => `<option value="${id}" ${st.testStory === id ? 'selected' : ''}>${id} ${REC[id][1]}</option>`).join('')}</select>
+    ${count('none') ? `<button class="btn sm primary" data-act="write-tests">${icon('add_task')}Write tests for ${count('none')} scenarios</button>` : ''}</div>
+  <div class="side"><div class="col">${stories.map(id => `<section class="card story-block"><div class="story-head">${recChip(id)}<b>${esc(REC[id][1])}</b><span class="tiny muted">revision ${REC[id][3]}</span><span class="push cov">${scen.filter(s => s[0] === id).map(s => `<i class="${s[3]}"></i>`).join('')}</span></div>
+    ${scen.filter(s => s[0] === id).map(([sid, n, [g, w, t], r, ts]) => `<div class="scn"><div><div class="gwt"><span class="tiny faint">${sid}/${n}</span> <b>Given</b> ${esc(g)}, <b>when</b> ${esc(w)}, <b>then</b> ${esc(t)}.</div>
+      <div class="tres">${ts.map(x => `<span class="chip ${x[4] === 'pass' ? 'ok' : x[4] === 'fail' ? 'bad' : 'info'}" data-hover="${esc(x[1] + (x[5] ? ' · ' + x[5] : ''))}">${icon(x[4] === 'pass' ? 'check' : x[4] === 'fail' ? 'close' : 'call_split')}${esc(x[2])}</span>${x[5] ? `<span class="tiny muted">${esc(x[5])}</span>` : ''}`).join('') || '<span class="tiny muted">Nothing checks this yet.</span>'}</div></div>
+      <div class="row">${resChip(r)}<button class="btn sm ghost" data-act="change-test" data-scn="${sid}/${n}" title="Request a change">${icon('edit_note')}</button></div></div>`).join('')}</section>`).join('')}</div>
+    <div class="col">
+      <section class="card"><h2>Red on main</h2><p class="small" style="margin:0"><b>TS-02/2 refuses a wrong password</b><br><span class="muted">expected 401, got 500 · failing since <code>d07be11</code> (6 days)</span></p><button class="btn sm" style="margin-top:8px" data-act="fix-red">${icon('build')}Ask the Engineer to fix it</button></section>
+      <section class="card"><h2>Tests with no scenario</h2>${unmapped.map(t => `<p class="small" style="margin:0"><code>${esc(t[2])}</code> <span class="tiny muted">${t[1]}</span></p>`).join('')}<p class="tiny muted" style="margin:6px 0 0">Fine for helpers. If it checks behaviour, name it after a scenario.</p></section>
+      <section class="card"><h2>How to read this</h2><ul class="small" style="margin:0;padding-left:18px"><li>Agents usually write the tests with the code.</li><li>If a test doesn't really check what the scenario says, use ${icon('edit_note', ' style="font-size:16px"')} to request a change, as on Pages.</li><li>Tests written for an older story revision are marked, like suspect code.</li></ul></section>
+    </div></div>`;
+}
+
+// ---------------------------------------------------------------- CODE › Docs (R8, R9, R10, R13)
+function docsTree() {
+  const paths = Object.keys(DOCS);
+  const render = (dir, name, prefix, depth) => {
+    const key = 'd:' + prefix; const open = !name || st.docOpen.has(key); let html = '';
+    if (name) { const sus = collect(dir).some(f => docState(f) === 'suspect'); html += `<button class="tn" data-docdir="${key}" aria-expanded="${open}" style="padding-left:${depth * 14 + 4}px"><span class="tw-ch">${icon('expand_more')}</span>${icon(open ? 'folder_open' : 'folder', ' class="ki"')}<span class="nm">${esc(name)}</span><span class="meta">${sus ? '<span class="dot d-suspect"></span>' : ''}</span></button>`; }
+    if (!open) return html; const d = name ? depth + 1 : depth;
+    for (const f of (dir.__f || []).sort((a, b) => a === 'AGENTS.md' ? -1 : b === 'AGENTS.md' ? 1 : a.localeCompare(b))) html += `<button class="tn ${st.doc === f && !st.sidecar ? 'sel' : ''}" data-doc="${f}" style="padding-left:${d * 14 + 4}px"><span class="tw-ch"></span>${icon(f === 'AGENTS.md' ? 'map' : DOCS[f].generated ? 'auto_awesome' : 'description', ' class="ki"')}<span class="nm">${esc(f.split('/').pop())}</span><span class="meta"><span class="dot d-${docState(f)}"></span></span></button>`;
+    for (const k of Object.keys(dir).filter(k => k !== '__f').sort()) html += render(dir[k], k, prefix + k + '/', d);
+    return html;
+  };
+  return render(dirTree(paths), '', '', 0) + `<button class="tn ${st.sidecar ? 'sel' : ''}" data-act="sidecar" style="padding-left:18px;margin-top:6px"><span class="tw-ch"></span>${icon('data_object', ' class="ki"')}<span class="nm">.aludel/sources.json</span><span class="meta"><span class="cnt">sidecar</span></span></button>`;
+}
+function docsInspector() {
+  const doc = DOCS[st.doc]; const sec = doc.sections[st.sec] || doc.sections[0]; const [h, , src, sus] = sec;
+  return `<div class="row"><h2>${esc(h)}</h2><span class="chip ${sus ? 'warn' : 'ok'} push">${sus ? 'Needs a refresh' : 'Current'}</span></div>
+    <p class="tiny muted" style="margin:0">in <code>${esc(st.doc)}</code> · maintained by ${esc(doc.owner)}${doc.generated ? ' (rewritten after every build)' : ''} · last refreshed in PR #12</p>
+    ${sus ? `<div class="note warn small">${esc(REC[sus][1])} changed (${sus === 'TS-06' ? 'revision 3 → 4: decline with a reason' : 'revision 3 → 4: a decline reason field'}). This section still describes the old version.</div>` : ''}
+    <section><h3 style="margin-top:0">Built from</h3>${src.map(id => { const f = FINDINGS[id]; return `<div style="padding:6px 0;border-top:1px solid var(--line)"><div class="row">${recChip(id)}${id === sus ? '<span class="chip warn push">Changed</span>' : ''}</div>
+      ${f ? `<p class="small" style="margin:4px 0 2px">${esc(f.text)}</p><p class="tiny muted" style="margin:0">${f.kind} · ${esc(f.from)}</p><p class="tiny" style="margin:4px 0 2px;color:var(--muted)">Also evidence for:</p>${f.used.filter(x => !x[1].startsWith(st.doc)).map(([l, t]) => `<div class="row tiny" style="padding:1px 0"><span class="chip ${l === 'doc' ? 'code' : l}">${layerName[l] || 'Doc'}</span>${esc(t)}</div>`).join('')}` : `<p class="tiny muted" style="margin:2px 0 0">${esc(REC[id][1])}${REC[id][3] ? ' · revision ' + REC[id][3] : ''}</p>`}</div>`; }).join('')}</section>
+    <div class="row wrap">${sus ? `<button class="btn sm primary" data-act="refresh-one">${icon('autorenew')}Refresh this section</button>` : ''}<button class="btn sm" data-act="change">${icon('edit_note')}Request a change</button></div>`;
+}
+function codeDocs() {
+  const doc = DOCS[st.doc]; const suspectCount = Object.values(DOCS).reduce((n, d) => n + d.sections.filter(s => s[3]).length, 0);
+  const sidecar = JSON.stringify({ 'ARCHITECTURE.md': { '#borrowing': { sources: [['story', 'TS-06', 3], ['story', 'TS-05', 2], ['data_object', 'Borrow request', 3]] }, '#data-and-concurrency': { sources: [['finding', 'F-12'], ['data_object', 'Borrow request', 4]] }, '#integrations': { sources: [['finding', 'F-18'], ['data_operation', 'createRequest', 1]] } }, 'docs/product/borrowing.md': { '#approve-or-decline-ts-06': { sources: [['story', 'TS-06', 3], ['finding', 'F-15']] } } }, null, 2);
+  return `<p class="lead">What agents and developers read in the repository. <code>AGENTS.md</code> is the map; <code>docs/</code> holds the rest. Aludel writes and maintains them from every layer, and keeps where each section came from in a separate sidecar file, so the docs stay plain Markdown.</p>
+  <div class="checks"><span class="chip ok">${icon('check')}Every doc is linked from AGENTS.md</span><span class="chip ok">${icon('check')}No broken links</span><span class="chip ok">${icon('check')}AGENTS.md 92 lines</span><span class="chip warn">${suspectCount} sections need a refresh</span><span class="tiny muted">Last doc-gardening run: yesterday</span>
+    <label class="lbl-in push" style="font-size:13px"><input type="checkbox" id="showsrc" ${st.showSrc ? 'checked' : ''}> Show where each section comes from</label><button class="btn sm primary" data-act="refresh-all">${icon('autorenew')}Refresh ${suspectCount} sections</button></div>
+  <div class="docs3"><div class="tree"><div class="tree-body" role="tree" aria-label="Docs">${docsTree()}</div></div>
+    <div class="center">${st.sidecar ? `<div class="md" style="padding-bottom:0"><h1>.aludel/sources.json</h1><p class="small muted">Where each section came from, with revisions. Agents don't need it; it lets Aludel know which sections a change makes stale. Excerpt:</p></div><div class="json">${esc(sidecar)}</div>` :
+      `<article class="md ${st.showSrc ? 'show-src' : ''}"><p class="tiny muted" style="margin:0 0 6px"><code>${esc(st.doc)}</code>${doc.lines ? ` · ${doc.lines} lines` : ''}${doc.generated ? ' · generated' : ''}</p>
+      ${doc.sections.map(([h, lines, src, sus], i) => `<div class="sec ${sus ? 'suspect' : ''} ${st.sec === i ? 'sel' : ''}" data-sec="${i}">${i === 0 && st.doc === 'AGENTS.md' ? `<h1>${esc(h)}</h1>` : `<h2>${esc(h)}</h2>`}<div class="srcchips">${src.map(id => recChip(id)).join('')}</div>
+        ${lines.every(l => l.startsWith('- ')) ? `<ul>${lines.map(l => `<li>${md(l.slice(2))}</li>`).join('')}</ul>` : lines.map(l => `<p>${md(l)}</p>`).join('')}</div>`).join('')}</article>`}</div>
+    <div class="insp">${st.sidecar ? '<h2>The sidecar</h2><p class="small" style="margin:0">One file for the whole tree. When a story, contract, token or finding gets a new revision, the sections that cite it are marked for a refresh and a doc-gardening item opens in Work.</p>' : docsInspector()}</div></div>`;
+}
+
+// ---------------------------------------------------------------- CODE › Releases (R6, R3)
+function codeReleases() {
+  const list = st.drafted ? [{ v: '0.6.0', commit: 'f2a90b1', when: 'just now', state: 'passed', ships: [], where: [], notes: ['Fix: request dates show in the borrower\'s time zone.', 'Docs: borrowing refreshed.'], migrations: [], stackDiff: [['vite', '8.3.0 → 8.3.2']], checks: [['build', 'ok'], ['tests 12/13', 'bad']] }, ...RELEASES] : RELEASES;
+  const r = list.find(x => x.v === st.release) || list[0];
+  return `<p class="lead">Releases are made on purpose, not per commit or merge. Each is a GitHub Release (a tag and notes) and a container image in GitHub Packages. Deploy runs them.</p>
+  <div class="row wrap" style="margin-bottom:12px">${st.drafted ? '' : `<span class="chip">main is 2 commits ahead of v0.5.0</span><button class="btn sm primary" data-act="draft">${icon('new_label')}Draft the next release</button>`}</div>
+  <div class="side rel-side">
+    <section class="card" style="padding:6px"><ul class="list">${list.map(x => `<li><button class="tn ${x.v === r.v ? 'sel' : ''}" data-rel="${x.v}" style="padding:8px 10px;white-space:normal"><b style="width:56px">v${x.v}</b><span style="flex:1" class="small">${x.ships.length ? x.ships.map(s => REC[s][1]).join(', ') : x.notes[0]}</span><span class="meta">${x.where.map(w => `<span class="chip deploy">${ENVS[w].name}</span>`).join('')}${x.state === 'failed' ? '<span class="chip bad">Rolled back</span>' : ''}</span></button></li>`).join('')}</ul></section>
+    <div class="col">
+      <section class="card"><div class="row wrap"><h2 style="margin:0">v${r.v}</h2><code class="small">${r.commit}</code><span class="tiny muted">${r.when}</span><span class="push row">${r.where.map(w => `<a class="chip deploy" href="#deploy/environments/${w}">${icon('rocket_launch')}Running in ${ENVS[w].name}</a>`).join('') || `<a class="chip dash" href="#deploy/environments">${r.v === '0.6.0' ? 'Ready to deploy' : 'Not running'}</a>`}</span></div>
+        <div class="row wrap" style="margin-top:6px"><a class="chip" href="#">${icon('sell')}Tag v${r.v}</a><a class="chip" href="#">${icon('open_in_new')}GitHub Release</a><a class="chip" href="#">${icon('deployed_code')}ghcr.io/henrydker/tool-share:${r.v}</a></div>
+        <h3>Notes</h3><ul class="small" style="margin:0;padding-left:18px">${r.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul>
+        <h3>Ships</h3><div class="row wrap">${r.ships.map(s => recChip(s)).join('') || '<span class="small muted">Fixes only</span>'}</div>
+        <h3>Checks at release</h3><div class="row wrap">${r.checks.map(([n, s]) => `<span class="chip ${s === 'ok' ? 'ok' : 'bad'}">${esc(n)}</span>`).join('')}</div></section>
+      <div class="grid2"><section class="card"><h2>Stack changes</h2>${r.stackDiff.length ? `<table class="t"><tbody>${r.stackDiff.map(([n, d]) => `<tr><td>${n}</td><td><code>${d}</code></td></tr>`).join('')}</tbody></table>` : '<p class="small muted" style="margin:0">Same packages as the release before.</p>'}<p class="tiny muted" style="margin:8px 0 0">From <code>package-lock.json</code> at each tag. No separate dependencies page.</p></section>
+        <section class="card"><h2>Database changes</h2>${r.migrations.length ? r.migrations.map(m => `<div class="row small">${icon('table')}<code>${m}</code></div>`).join('') : '<p class="small muted" style="margin:0">None</p>'}</section></div>
+    </div></div>`;
+}
+function draftDrawer() {
+  $('#overlay').innerHTML = `<div class="scrim" data-close></div><aside class="drawer" role="dialog" aria-modal="true" aria-label="Draft a release">
+    <div class="row"><h2>Draft the next release</h2><button class="btn ghost sm push" data-close>${icon('close')}</button></div>
+    <p class="small muted" style="margin:0">From <code>main</code> at <code>f2a90b1</code>, 2 commits since v0.5.0. Nothing is published until you say so.</p>
+    <dl class="kv"><dt>Version</dt><dd><input class="var-in" value="0.6.0" style="width:90px;display:inline-block"> <span class="tiny muted">patch would be enough: no new stories. Minor keeps room for PR #14.</span></dd>
+      <dt>Ships</dt><dd class="small">No new stories · <code>fix: request dates in the borrower's time zone</code> · <code>docs: refresh borrowing</code></dd>
+      <dt>Stack</dt><dd class="small"><code>vite 8.3.0 → 8.3.2</code></dd><dt>Database</dt><dd class="small">No migrations</dd>
+      <dt>Tests</dt><dd><span class="chip bad">1 red on main: TS-02/2</span> <span class="tiny muted">You can publish anyway; the notes will say so.</span></dd></dl>
+    <label class="small"><b>Notes</b><textarea>- Fix: request dates show in the borrower's time zone.
+- Docs: borrowing refreshed.</textarea></label>
+    <p class="tiny muted" style="margin:0">Publishing creates tag v0.6.0 and a GitHub Release, then builds the image once and pushes it to GitHub Packages. Every environment will run that same image.</p>
+    <div class="row"><button class="btn primary" data-act="publish">${icon('publish')}Publish v0.6.0</button><button class="btn" data-close>Cancel</button></div></aside>`;
+}
+
+// ---------------------------------------------------------------- DEPLOY (R12)
+function envCard(key) {
+  const e = ENVS[key]; const pending = key === 'production' && !st.applied;
+  return `<div class="env" data-env="${key}" tabindex="0" role="link" aria-label="Open ${e.name}" ${st.env === key ? 'style="box-shadow:0 0 0 2.5px var(--lc)"' : ''}><div class="nm">${icon(e.stage === 'preview' ? 'call_split' : e.stage === 'staging' ? 'science' : 'public', ' style="color:var(--lc);font-size:19px"')}${esc(e.name)}${e.protected ? `<span class="icon" title="Protected" style="font-size:16px;color:var(--muted)">shield</span>` : ''}<span class="push chip ${e.health === 'ok' ? 'ok' : 'bad'}">${e.health === 'ok' ? 'Healthy' : 'Failing'}</span></div>
+    <div class="ln2"><b style="color:var(--ink)">${key === 'production' && st.promoted ? 'v0.5.0' : e.release}</b>${e.branch ? ` · ${esc(e.branch)}` : ''}</div><div class="ln2">${icon('link', ' style="font-size:15px"')}<span>${e.url}</span></div>
+    ${pending ? `<div class="pend">${icon('pending')}1 change to apply</div>` : `<div class="ln2">${icon('sync', ' style="font-size:15px;color:var(--ok)"')}In step</div>`}
+    ${key === 'staging' && !st.promoted ? `<button class="btn sm primary" data-act="promote" style="justify-self:start">${icon('arrow_forward')}Promote v0.5.0</button>` : ''}
+    ${key === 'pr-15' ? '<div class="ln2" style="color:var(--bad)">/api/health returned 500</div>' : ''}</div>`;
+}
+function envDetail() {
+  const key = st.env; const e = ENVS[key]; const tab = st.envTab;
+  const sub = [['overview', 'Overview'], ['history', 'History'], ['settings', 'Settings']];
+  let body = '';
+  if (tab === 'overview') body = `<div class="grid2"><section class="card"><dl class="kv"><dt>Release</dt><dd><a href="#code/releases"><b>${key === 'production' && st.promoted ? 'v0.5.0' : e.release}</b></a></dd><dt>Address</dt><dd><a href="#">${e.url}</a></dd><dt>Health</dt><dd><span class="chip ${e.health === 'ok' ? 'ok' : 'bad'}">${e.health === 'ok' ? 'Healthy' : 'Failing'}</span> <span class="tiny muted">/api/health · 42 ms · 20 s ago</span></dd><dt>Hosted</dt><dd>${key.startsWith('pr') ? 'This machine (preview)' : 'By Aludel, on this server'}</dd><dt>Data</dt><dd>${esc(e.data)}</dd></dl>
+      ${[['Memory', 61, 256, 'MB'], ['CPU', 4, 50, '% of a core'], ['Disk', 38, 1024, 'MB']].map(([n, v, max, unit]) => `<div class="meter" style="margin-top:8px"><div class="row"><span>${n}</span><span class="push tiny muted">${v} / ${max} ${unit}</span></div><div class="bar"><i style="width:${Math.max(3, v / max * 100)}%;background:var(--lc)"></i></div></div>`).join('')}</section>
+      <section class="card"><div class="row"><h2 style="margin:0">Recent logs</h2><div class="seg push" role="group" aria-label="Log">${[['build', 'Build'], ['deploy', 'Deploy'], ['runtime', 'Runtime']].map(([k, l]) => `<button data-log="${k}" aria-pressed="${st.logKind === k}">${l}</button>`).join('')}</div></div>
+        <div class="logs" style="margin-top:8px;max-height:230px">${{ build: '<span class="t">09:12:19</span> RUN npm run build\n<span class="t">09:12:36</span> ✓ 214 modules transformed\n<span class="t">09:12:38</span> pushed ghcr.io/henrydker/tool-share:0.5.0', deploy: '<span class="t">09:14:00</span> backup → before-v0.4.0.sqlite\n<span class="t">09:14:01</span> migrate 0003_borrow_requests applied\n<span class="t">09:14:03</span> health 200 in 38 ms · switched', runtime: '<span class="t">14:02:15</span> POST /api/requests 201 18ms\n<span class="t">14:03:40</span> <span class="w">warn</span> mail not configured: "New request" skipped\n<span class="t">14:05:02</span> POST /api/requests/9c1e/approve 200 9ms\n<span class="t">14:07:44</span> GET /api/health 200 1ms' }[st.logKind]}</div><p class="tiny muted" style="margin:6px 0 0">The last 200 lines. The warning is finding <b>F-18</b>.</p></section></div>`;
+  if (tab === 'history') body = `<div class="tw"><table class="t"><thead><tr><th>When</th><th>What</th><th>By</th><th>Backup</th><th></th></tr></thead><tbody>${(st.promoted && key === 'production' ? [['just now', 'Promoted v0.5.0', 'Henry (lead)', 'before-v0.5.0', true]] : []).concat([['6 days ago', 'Promoted v0.4.0', 'Henry (lead)', 'before-v0.4.0', !st.promoted], ['10 days ago', 'Promoted v0.3.1 (fix)', 'Operator agent, approved by Henry', 'before-v0.3.1', false], ['12 days ago', 'Rolled back to v0.2.0: v0.3.0 failed its health check', 'Henry', 'before-v0.3.0', false]]).map(([w, what, by, b, cur]) => `<tr><td class="small">${w}</td><td>${esc(what)}${cur ? ' <span class="chip ok">Running</span>' : ''}</td><td class="small">${esc(by)}</td><td><code class="small">${b}</code></td><td>${!cur && what.startsWith('Promoted') ? `<button class="btn sm" data-act="rollback">${icon('undo')}Run again</button>` : ''}</td></tr>`).join('')}</tbody></table></div>`;
+  if (tab === 'settings') body = `<div class="grid2"><section class="card"><h2>Hosting</h2>${[['Aludel hosts it', 'On this server as a subdomain, one container, limits set here.', true], ['Your own server', 'Aludel runs the same image there with docker compose. You keep the server.', false], ['A platform', 'Render, Fly.io or Railway run the image; Aludel shows what they report and links out.', false]].map(([t, d, on]) => `<label class="li" style="cursor:pointer"><input type="radio" name="host" ${on ? 'checked' : ''}><div><b class="small">${t}</b><div class="tiny muted">${d}</div></div></label>`).join('')}</section>
+      <section class="card"><h2>Protection</h2><dl class="kv"><dt>Promote here</dt><dd>${e.protected ? 'A lead approves' : 'Anyone on the team'}</dd><dt>Change variables</dt><dd>${e.protected ? 'Operator' : 'Engineer or Operator'}</dd></dl>
+        <h2 style="margin-top:14px">Leaving Aludel</h2><p class="small" style="margin:0">The image is in your GitHub Packages; how it runs is in your repository. Download the variables (not secrets) and the latest backup, then <code>docker compose up</code> anywhere.</p><div class="row" style="margin-top:8px"><button class="btn sm">${icon('download')}Variables</button><button class="btn sm">${icon('download')}Latest backup</button></div></section></div>`;
+  return `<div class="envdetail"><div class="row wrap" style="margin-bottom:6px"><h2 style="margin:0">${esc(e.name)}</h2><span class="chip ${e.health === 'ok' ? 'ok' : 'bad'}">${e.health === 'ok' ? 'Healthy' : 'Failing'}</span>${e.protected ? `<span class="chip">${icon('shield')}Protected</span>` : ''}</div>
+    <nav class="tabs" aria-label="${e.name} sections">${sub.map(([k, l]) => `<a href="#deploy/environments/${key}/${k}" ${tab === k ? 'aria-current="page"' : ''}>${l}</a>`).join('')}</nav>${body}</div>`;
+}
+function deployEnvironments() {
+  return `<p class="lead">Where Tool Share runs and which release each place runs. Aludel hosts Staging and Production for this project; previews run on this machine.</p>
+  <div class="row wrap" style="margin-bottom:10px">${fileNote(['compose.yaml', '.env.example'])}<span class="tiny muted">Releases come from <a href="#code/releases">Code › Releases</a></span></div>
+  <div class="pipe"><div class="stage"><div class="stage-h">${icon('call_split')}Previews<span class="push tiny" style="text-transform:none;letter-spacing:0;font-weight:400">one per pull request</span></div>${envCard('pr-14')}${envCard('pr-15')}</div>
+    <div class="stage"><div class="stage-h">${icon('science')}Staging<span class="push tiny" style="text-transform:none;letter-spacing:0;font-weight:400">newest release</span></div>${envCard('staging')}</div>
+    <div class="stage"><div class="stage-h">${icon('public')}Production</div>${envCard('production')}</div></div>
+  ${envDetail()}`;
+}
+function promoteDrawer() {
+  $('#overlay').innerHTML = `<div class="scrim" data-close></div><aside class="drawer" role="dialog" aria-modal="true" aria-label="Promote to Production">
+    <div class="row"><h2>Promote v0.5.0 to Production</h2><button class="btn ghost sm push" data-close>${icon('close')}</button></div>
+    <p class="small muted" style="margin:0">Runs the image that passed in Staging (<code>ghcr.io/henrydker/tool-share:0.5.0</code>). Nothing is rebuilt.</p>
+    <table class="t"><tbody><tr><td>Now running</td><td>v0.4.0</td></tr><tr><td>Ships</td><td>${recChip('TS-07')} Mark a tool returned. It becomes Shipped in Vision.</td></tr><tr><td>Database</td><td>No migrations. A backup is taken first.</td></tr><tr><td>Config</td><td>${st.applied ? 'In step' : '<span style="color:var(--warn)">MAIL_FROM changed; applies with this promotion</span>'}</td></tr><tr><td>Approval</td><td><span class="chip work">${icon('shield')}Operator lead</span> Production is protected.</td></tr></tbody></table>
+    <div class="row"><button class="btn primary" data-act="do-promote">${icon('rocket_launch')}Promote</button><button class="btn" data-close>Cancel</button><span class="tiny muted push">Roll back from History</span></div></aside>`;
+}
+function deployVariables() {
+  const pending = !st.applied;
+  return `<p class="lead">Names come from <code>.env.example</code> in the repository. Values are kept per environment on this server and never committed. Secrets can be replaced, never shown.</p>
+    ${pending ? `<div class="applybar" style="margin-bottom:10px">${icon('pending')}<span>Production: ${Object.keys(st.varEdits).length ? Object.keys(st.varEdits).map(k => k.split(':')[0]).join(', ') : 'MAIL_FROM'} changed. Applying restarts it (about 3 s).</span><button class="btn sm primary push" data-act="apply">Apply</button></div>` : ''}
+    <div class="tw"><table class="t"><thead><tr><th>Variable</th><th>Previews</th><th>Staging</th><th>Production</th></tr></thead><tbody>${VARS.map(([n, d, req, secret, vals]) => `<tr><td><code><b>${n}</b></code>${req ? ' <span class="chip">Required</span>' : ''}${secret ? ` <span class="chip">${icon('key')}Secret</span>` : ''}<div class="tiny muted">${esc(d)}</div></td>${vals.map((v, i) => { const col = ['previews', 'staging', 'production'][i]; const k = n + ':' + col; const ed = st.varEdits[k];
+      if (secret) return `<td>${v === 'set' ? '<span class="mono small">••••••••</span> <span class="tiny muted">set 3 days ago</span>' : req && col !== 'previews' ? '<span class="chip bad">Missing</span> <a class="small" href="#deploy/integrations">Connect email</a>' : '<span class="muted small">Not needed</span>'}</td>`;
+      return `<td><input class="var-in ${ed !== undefined ? 'changed' : ''}" data-var="${k}" value="${esc(ed ?? v)}" ${v.startsWith('(') ? 'disabled' : ''} aria-label="${n} in ${col}"></td>`; }).join('')}</tr>`).join('')}</tbody></table></div>`;
+}
+function deployIntegrations() {
+  return `<p class="lead">Services outside the app that each environment connects to. The code calls them; which provider and which account is decided here, per environment. Free tiers first; anything paid needs your OK.</p>
+  <div class="intg">
+    <section class="card"><div class="row">${icon('language', ' style="color:var(--lc)"')}<b>Domains</b><span class="chip warn push">1 waiting for DNS</span></div>
+      <div class="perenv"><span class="muted">Previews</span><code>pr-&lt;n&gt;.tool-share.localhost</code><span class="muted">Staging</span><span><code>staging.tool-share.aludel.dev</code> <span class="chip ok">HTTPS</span></span><span class="muted">Production</span><span><code>tool-share.app</code> <span class="chip ok">HTTPS</span><br><code>www.tool-share.app</code> <span class="chip warn">Waiting for DNS</span></span></div>
+      <p class="tiny muted" style="margin:0">Add <code>CNAME www → tool-share.app.</code> at your registrar. Aludel never buys domains or changes DNS for you.</p></section>
+    <section class="card"><div class="row">${icon('mail', ' style="color:var(--lc)"')}<b>Email</b><span class="chip warn push">Not connected</span></div>
+      <p class="small" style="margin:0">Request and approval emails (TS-05, TS-06). Until it's connected they are skipped (finding ${recChip('F-18')}).</p>
+      <div class="perenv"><span class="muted">Code</span><button class="lk" data-go-chunk="sendMail" style="border:0;background:none;color:var(--accent);padding:0;text-align:left"><code>server/mail.mjs › sendMail</code></button><span class="muted">Needs</span><span><code>MAIL_FROM</code>, <code>SMTP_PASSWORD</code></span><span class="muted">Staging</span><span>Test inbox (catches everything)</span><span class="muted">Production</span><span class="muted">Choose a provider</span></div>
+      <button class="btn sm primary" data-act="provider" style="justify-self:start">${icon('add_link')}Choose a provider…</button></section>
+    <section class="card"><div class="row">${icon('photo_library', ' style="color:var(--lc)"')}<b>File storage</b><span class="chip ok push">Data volume</span></div>
+      <p class="small" style="margin:0">Tool photos (W-236). What is stored, and who may see it, is defined in <a href="#">Data › Tool › photo</a>. Where it's stored is set here.</p>
+      <div class="perenv"><span class="muted">Staging</span><span>Data volume · 12 MB</span><span class="muted">Production</span><span>Data volume · 26 MB of 1 GB</span></div>
+      <p class="tiny muted" style="margin:0">Later: an S3-compatible bucket when photos outgrow the volume.</p></section>
+    <section class="card quiet"><div class="row">${icon('add', ' style="color:var(--lc)"')}<b>Add an integration</b></div><p class="small" style="margin:0">Payments, analytics, error tracking, maps. The code side becomes Engineer work; the account and keys are set here.</p></section>
+  </div>`;
+}
+function deployData() {
+  const migs = [['0001_accounts', ['✓', '✓', '✓']], ['0002_tools', ['✓', '✓', '✓']], ['0003_borrow_requests', ['✓', '✓', '✓']], ['0004_request_reason', ['pr-14', '', '']]];
+  return `<p class="lead">Each environment has its own database. Code holds the migrations; this shows where each has been applied, and the backups taken before every change. Browse and query work as they do today.</p>
+  <div class="grid2"><section class="card"><h2>Migrations</h2><div style="overflow-x:auto"><table class="t"><thead><tr><th>Migration</th><th>Previews</th><th>Staging</th><th>Production</th></tr></thead><tbody>${migs.map(([m, v]) => `<tr><td><code>${m}</code></td>${v.map(x => `<td>${x ? `<span class="chip ok">${x}</span>` : '<span class="faint">—</span>'}</td>`).join('')}</tr>`).join('')}</tbody></table></div><p class="tiny muted" style="margin:8px 0 0"><code>0004</code> is in PR #14. It reaches Production with the release that carries it, and promotion lists it first.</p></section>
+    <section class="card"><div class="row"><h2 style="margin:0">Production</h2><select class="var-in push" style="width:auto" id="dbenv" aria-label="Environment">${['staging', 'production'].map(k => `<option value="${k}" ${st.dbEnv === k ? 'selected' : ''}>${ENVS[k].name}</option>`).join('')}</select></div><dl class="kv" style="margin-top:8px"><dt>Size</dt><dd>1.2 MB</dd><dt>Integrity</dt><dd><span class="chip ok">OK</span></dd><dt>Rows</dt><dd class="small">accounts 38 · tools 64 · borrow_requests 91</dd></dl>
+      <h3>Backups</h3><ul class="list small">${[['before-v0.4.0', '6 days ago'], ['nightly', '3 h ago'], ['nightly', '1 day ago']].map(([n, w]) => `<li class="li">${icon('backup')}<span style="flex:1"><code>${n}</code> · ${w}</span><button class="btn sm ghost">Restore…</button></li>`).join('')}</ul><div class="row"><button class="btn sm">${icon('backup')}Back up now</button><button class="btn sm ghost">Browse</button><button class="btn sm ghost">Query</button></div></section></div>`;
+}
+
+// ---------------------------------------------------------------- drawers and notes
+function changeDrawer(about, stories) {
+  $('#overlay').innerHTML = `<div class="scrim" data-close></div><aside class="drawer" role="dialog" aria-modal="true" aria-label="Request a change">
+    <div class="row"><h2>Request a change</h2><button class="btn ghost sm push" data-close>${icon('close')}</button></div>
+    <p class="small muted" style="margin:0">Nothing is edited here. Say what should change; it becomes a work item with this context attached.</p>
+    <dl class="kv"><dt>About</dt><dd><code>${esc(about)}</code></dd><dt>Linked</dt><dd>${stories.map(s => recChip(s)).join(' ') || '<span class="small muted">Nothing</span>'}</dd><dt>Goes to</dt><dd><span class="chip work">${icon('build')}Engineer</span> <select class="var-in" style="width:auto;display:inline-block"><option>Coder (agent)</option><option>Henry</option></select></dd></dl>
+    <label class="small"><b>What should change, and why</b><textarea placeholder="e.g. This test only checks the status code; it should check that Sam sees the reason."></textarea></label>
+    <div class="row"><button class="btn primary" data-act="send">${icon('send')}Add to Work</button><button class="btn" data-close>Cancel</button></div></aside>`;
+}
+function notes() {
+  const rows = [['R1, R2', 'One file tree whose last level is chunks; chunks are file-local, links span files', '#code/explorer', 'Explorer (try "Highlight code for… TS-06")'], ['R3', 'No dependencies tab: stack changes per release', '#code/releases', 'Releases'],
+    ['R4', 'Email, domains, storage in Deploy', '#deploy/integrations', 'Integrations'], ['R5', 'No Changes tab', '#code/overview', '(removed)'], ['R6', 'Explicit releases: GitHub Releases and Packages, in Code', '#code/releases', 'Draft the next release'],
+    ['R7', 'Compact structure with stack, "as of", health', '#code/overview', 'Overview'], ['R8', 'Findings from any layer as evidence, used everywhere', '#code/docs', 'Docs › ARCHITECTURE.md › Data and concurrency'], ['R9, R10, R13', 'Docs: AGENTS.md as the map, a sidecar for sources', '#code/docs', 'Docs'],
+    ['R11', 'Story → scenario → tests → green; request a change on a test', '#code/tests', 'Tests'], ['R12', 'Deploy: Environments, Variables, Integrations, Data', '#deploy/environments', 'Environments']];
+  $('#overlay').innerHTML = `<div class="scrim" data-close></div><aside class="drawer notes" role="dialog" aria-modal="true" aria-label="Review notes">
+    <div class="row"><h2>Review notes · v2</h2><button class="btn ghost sm push" data-close>${icon('close')}</button></div>
+    <p class="small muted" style="margin:0">Round-1 rows R1–R13 are in the work record. Illustrative Tool Share data; nothing is saved.</p>
+    <table><tbody>${rows.map(([id, ask, h, l]) => `<tr><td>${id}</td><td>${esc(ask)}<br><a href="${h}" data-close>${esc(l)}</a></td></tr>`).join('')}</tbody></table>
+    <h3>Open questions</h3><ol class="small" style="margin:0;padding-left:18px"><li>Docs: does each layer's lead own its folder (as shown), or does one doc-gardening routine own the whole tree?</li><li>Tests: is naming tests after scenarios (<code>TS-06/3 …</code>) an acceptable convention for agents and people?</li><li>A new Operator role for Deploy, or the Engineer?</li></ol></aside>`;
+}
+
+// ---------------------------------------------------------------- router and events
+function render() {
+  const [layer = 'code', tab = 'overview', a, b] = location.hash.slice(1).split('/');
+  document.body.className = layer === 'deploy' ? 'deploy' : '';
+  $('#nav-code').classList.toggle('active', layer === 'code'); $('#nav-deploy').classList.toggle('active', layer === 'deploy');
+  let html;
+  if (layer === 'code') {
+    const titles = { overview: 'How Tool Share is built', explorer: 'Explorer', tests: 'Tests', docs: 'Docs', releases: 'Releases' };
+    html = `<p class="eyebrow">${icon('code')}Code · how it's built and connected</p><h1>${titles[tab] || titles.overview}</h1>` + tabs('Code', [['overview', 'Overview', 'dashboard'], ['explorer', 'Explorer', 'account_tree'], ['tests', 'Tests', 'fact_check'], ['docs', 'Docs', 'menu_book'], ['releases', 'Releases', 'new_label']], titles[tab] ? tab : 'overview') +
+      ({ overview: codeOverview, explorer: codeExplorer, tests: codeTests, docs: codeDocs, releases: codeReleases }[tab] || codeOverview)();
+  } else {
+    if (tab === 'environments' && ENVS[a]) { st.env = a; st.envTab = b || 'overview'; }
+    const titles = { environments: 'Environments', variables: 'Variables', integrations: 'Integrations', data: 'Data' };
+    html = `<p class="eyebrow">${icon('rocket_launch')}Deploy · where it runs</p><h1>${titles[tab] || titles.environments}</h1>` + tabs('Deploy', [['environments', 'Environments', 'view_column'], ['variables', 'Variables', 'tune'], ['integrations', 'Integrations', 'hub'], ['data', 'Data', 'database']], titles[tab] ? tab : 'environments') +
+      ({ environments: deployEnvironments, variables: deployVariables, integrations: deployIntegrations, data: deployData }[tab] || deployEnvironments)();
+  }
+  $('#main').innerHTML = html;
+  const focus = $('#focus-line'); if (focus) { const box = focus.closest('.src'); box.scrollTop = Math.max(0, focus.offsetTop - 80); }
+  const q = $('#tq'); if (q && st.refocus) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); st.refocus = false; }
+}
+function openChunk(id) { const unit = U[id]; st.chunk = id; st.file = unit.path; const parts = unit.path.split('/'); for (let i = 1; i < parts.length; i++) st.open.add('d:' + parts.slice(0, i).join('/') + '/'); st.open.add('f:' + unit.path); }
+function go(hash) { if (location.hash === hash) render(); else location.hash = hash; }
+document.addEventListener('click', event => {
+  const t = event.target.closest('[data-close],[data-part],[data-go-chunk],[data-go-doc],[data-go-folder],[data-dir],[data-file],[data-chunk],[data-filt],[data-test-story],[data-docdir],[data-doc],[data-sec],[data-rel],[data-env],[data-log],[data-act]');
+  if (!t) return;
+  if (t.dataset.close !== undefined) { $('#overlay').innerHTML = ''; return; }
+  if (t.dataset.part) { st.part = t.dataset.part; render(); return; }
+  if (t.dataset.goChunk) { event.preventDefault(); openChunk(t.dataset.goChunk); go('#code/explorer'); return; }
+  if (t.dataset.goDoc) { st.doc = t.dataset.goDoc; st.sec = 0; st.sidecar = false; go('#code/docs'); return; }
+  if (t.dataset.goFolder) { st.open.add('d:' + t.dataset.goFolder); return; }
+  if (t.dataset.dir) { st.open.has(t.dataset.dir) ? st.open.delete(t.dataset.dir) : st.open.add(t.dataset.dir); render(); return; }
+  if (t.dataset.file) { event.preventDefault(); const f = t.dataset.file; if (st.file === f && !st.chunk) { st.open.has('f:' + f) ? st.open.delete('f:' + f) : st.open.add('f:' + f); } else { st.file = f; st.chunk = ''; st.open.add('f:' + f); } go('#code/explorer'); return; }
+  if (t.dataset.chunk) { event.preventDefault(); openChunk(t.dataset.chunk); go('#code/explorer'); return; }
+  if (t.dataset.filt) { st.filt = t.dataset.filt; if (t.tagName !== 'A') render(); return; }
+  if (t.dataset.testStory) { st.testStory = t.dataset.testStory; go('#code/tests'); return; }
+  if (t.dataset.docdir) { st.docOpen.has(t.dataset.docdir) ? st.docOpen.delete(t.dataset.docdir) : st.docOpen.add(t.dataset.docdir); render(); return; }
+  if (t.dataset.doc) { st.doc = t.dataset.doc; st.sec = 0; st.sidecar = false; render(); return; }
+  if (t.dataset.sec) { st.sec = Number(t.dataset.sec); render(); return; }
+  if (t.dataset.rel) { st.release = t.dataset.rel; render(); return; }
+  if (t.dataset.env) { go('#deploy/environments/' + t.dataset.env); return; }
+  if (t.dataset.log) { st.logKind = t.dataset.log; render(); return; }
+  const act = t.dataset.act;
+  if (act === 'notes') notes();
+  if (act === 'change') { const unit = st.chunk ? U[st.chunk] : null; const onDocs = location.hash.startsWith('#code/docs'); changeDrawer(onDocs ? `${st.doc} › ${DOCS[st.doc].sections[st.sec][0]}` : unit ? unit.symbol : st.file, onDocs ? DOCS[st.doc].sections[st.sec][2].filter(id => /^(TS|F)-/.test(id)) : unit ? unit.links.map(l => l[0]).filter(id => /^TS/.test(id)) : []); }
+  if (act === 'change-test') changeDrawer(`scenario ${t.dataset.scn} and its tests`, [t.dataset.scn.split('/')[0]]);
+  if (act === 'send') { $('#overlay').innerHTML = ''; toast('Added W-240 to Work for the Engineer, with the code, its links and your note.'); }
+  if (act === 'write-tests') toast('Added W-241 "Tests for 4 scenarios" for the Engineer: TS-04/3, TS-05/3, TS-07/1, TS-07/2.');
+  if (act === 'fix-red') toast('Added W-242 "TS-02/2 is red on main" for the Engineer, with the failing output.');
+  if (act === 'sidecar') { st.sidecar = true; render(); }
+  if (act === 'refresh-one' || act === 'refresh-all') toast(`Added a doc-gardening item for the ${act === 'refresh-one' ? 'section' : '3 sections'}. It opens one pull request; each section keeps its sources.`);
+  if (act === 'draft') draftDrawer();
+  if (act === 'publish') { st.drafted = true; st.release = '0.6.0'; $('#overlay').innerHTML = ''; render(); toast('Published v0.6.0: tag, GitHub Release, and the image in GitHub Packages. Deploy can run it now.'); }
+  if (act === 'promote') promoteDrawer();
+  if (act === 'do-promote') { st.promoted = true; st.applied = true; $('#overlay').innerHTML = ''; st.envTab = 'history'; go('#deploy/environments/production/history'); toast('Production runs v0.5.0. TS-07 is now Shipped in Vision.'); }
+  if (act === 'apply') { st.applied = true; st.varEdits = {}; render(); toast('Applied. Production restarted in 3 s and is healthy.'); }
+  if (act === 'rollback') toast('This runs that release again here, after a backup. Production needs a lead\'s approval.');
+  if (act === 'provider') toast('Would list providers with free tiers first. Connecting fills MAIL_FROM and SMTP_PASSWORD for the environment you pick.');
+});
+document.addEventListener('input', event => {
+  if (event.target.id === 'tq') { st.q = event.target.value; st.refocus = true; render(); }
+  if (event.target.dataset.var) { const k = event.target.dataset.var; st.varEdits[k] = event.target.value; event.target.classList.add('changed'); if (st.applied) { st.applied = false; const pos = event.target.selectionStart; render(); const again = document.querySelector(`[data-var="${k}"]`); again.focus(); again.setSelectionRange(pos, pos); } }
+});
+document.addEventListener('change', event => {
+  if (event.target.id === 'asof') { st.asof = event.target.value; render(); }
+  if (event.target.id === 'lens') { st.lens = event.target.value; render(); }
+  if (event.target.id === 'tstory') { st.testStory = event.target.value; render(); }
+  if (event.target.id === 'showsrc') { st.showSrc = event.target.checked; render(); }
+  if (event.target.id === 'dbenv') { st.dbEnv = event.target.value; render(); }
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') $('#overlay').innerHTML = '';
+  if ((event.key === 'Enter' || event.key === ' ') && event.target.matches('.env[data-env]')) { event.preventDefault(); event.target.click(); }
+  if (event.target.matches('.tn') && ['ArrowDown', 'ArrowUp'].includes(event.key)) { event.preventDefault(); const all = [...document.querySelectorAll('.tree-body .tn')]; const i = all.indexOf(event.target); all[Math.max(0, Math.min(all.length - 1, i + (event.key === 'ArrowDown' ? 1 : -1)))]?.focus(); }
+});
+let hc; document.addEventListener('mouseover', event => { const t = event.target.closest('[data-hover]'); hc?.remove(); hc = null; if (!t) return; hc = document.createElement('div'); hc.className = 'hovercard'; hc.textContent = t.dataset.hover; document.body.append(hc); const r = t.getBoundingClientRect(); hc.style.left = Math.min(innerWidth - 330, r.left) + 'px'; hc.style.top = (r.bottom + 6) + 'px'; });
+window.addEventListener('hashchange', () => { $('#overlay').innerHTML = ''; render(); window.scrollTo(0, 0); });
+if (!location.hash) history.replaceState(null, '', '#code/overview');
+render();
+</script>
+</body>
+</html>

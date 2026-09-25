@@ -1,0 +1,356 @@
+{
+  "github-tree": {
+    "url": "https://github.com/sveltejs/kit/tree/main/packages/kit/src/runtime",
+    "note": "GitHub file tree beside a folder listing with last commit per entry",
+    "accessed": "2026-09-24T23:35:32.377Z",
+    "status": 200,
+    "finalUrl": "https://github.com/sveltejs/kit/tree/main/packages/kit/src/runtime",
+    "title": "kit/packages/kit/src/runtime at main \u00b7 sveltejs/kit \u00b7 GitHub",
+    "file": "github-tree.png",
+    "ok": true
+  },
+  "github-blob-symbols": {
+    "url": "https://github.com/sveltejs/kit/blob/main/packages/kit/src/runtime/server/respond.js",
+    "note": "GitHub code view: tree, file, symbols",
+    "accessed": "2026-09-24T23:35:36.024Z",
+    "status": 200,
+    "finalUrl": "https://github.com/sveltejs/kit/blob/main/packages/kit/src/runtime/server/respond.js",
+    "title": "kit/packages/kit/src/runtime/server/respond.js at main \u00b7 sveltejs/kit \u00b7 GitHub",
+    "file": "github-blob-symbols.png",
+    "ok": true
+  },
+  "github-languages": {
+    "url": "https://github.com/sveltejs/kit",
+    "note": "Repo home: README, languages bar, releases, about",
+    "accessed": "2026-09-24T23:35:56.669Z",
+    "status": 200,
+    "finalUrl": "https://github.com/sveltejs/kit",
+    "title": "GitHub - sveltejs/kit: web development, streamlined \u00b7 GitHub",
+    "file": "github-languages.png",
+    "ok": true
+  },
+  "github-releases": {
+    "url": "https://github.com/sveltejs/kit/releases",
+    "note": "GitHub releases: tag, notes, assets",
+    "accessed": "2026-09-24T23:36:00.878Z",
+    "status": 200,
+    "finalUrl": "https://github.com/sveltejs/kit/releases",
+    "title": "Releases \u00b7 sveltejs/kit",
+    "file": "github-releases.png",
+    "ok": true
+  },
+  "github-deployments": {
+    "url": "https://github.com/vercel/vercel/deployments",
+    "note": "GitHub deployments per environment (image deleted: failed capture)",
+    "accessed": "2026-09-24T23:41:51.407Z",
+    "status": 404,
+    "finalUrl": "https://github.com/vercel/vercel/deployments",
+    "title": "Page not found \u00b7 GitHub \u00b7 GitHub",
+    "file": null,
+    "ok": false,
+    "problem": "HTTP 404"
+  },
+  "deepwiki": {
+    "url": "https://deepwiki.com/sveltejs/kit",
+    "note": "Generated architecture wiki from a repo",
+    "accessed": "2026-09-24T23:36:07.721Z",
+    "status": 200,
+    "finalUrl": "https://deepwiki.com/sveltejs/kit",
+    "title": "sveltejs/kit | DeepWiki",
+    "file": "deepwiki.png",
+    "ok": true
+  },
+  "backstage-catalog": {
+    "url": "https://demo.backstage.io/catalog",
+    "note": "Backstage software catalog",
+    "accessed": "2026-09-24T23:36:16.442Z",
+    "status": 200,
+    "finalUrl": "https://demo.backstage.io/catalog?filters%5Bkind%5D=component&filters%5Buser%5D=all&limit=20",
+    "title": "Backstage Demo",
+    "file": "backstage-catalog.png",
+    "ok": true
+  },
+  "backstage-component": {
+    "url": "https://demo.backstage.io/catalog/default/component/playback-order",
+    "note": "Backstage component overview: about, relations, links",
+    "accessed": "2026-09-24T23:38:00.060Z",
+    "status": 200,
+    "finalUrl": "https://demo.backstage.io/catalog/default/component/playback-order",
+    "title": "playback-order | Overview | Backstage Demo",
+    "file": "backstage-component.png",
+    "ok": true
+  },
+  "backstage-deps": {
+    "url": "https://demo.backstage.io/catalog/default/component/playback-order/dependencies",
+    "note": "Backstage dependencies tab (image deleted: failed capture)",
+    "accessed": "2026-09-24T23:38:09.055Z",
+    "status": 200,
+    "finalUrl": "https://demo.backstage.io/catalog/default/component/playback-order/dependencies",
+    "title": "playback-order | Backstage Demo",
+    "file": null,
+    "ok": false,
+    "problem": "not found"
+  },
+  "structurizr-c4": {
+    "url": "https://structurizr.com/share/36141/diagrams#SystemContext",
+    "note": "Structurizr C4 Big Bank example",
+    "accessed": "2026-09-24T23:36:42.759Z",
+    "status": 200,
+    "finalUrl": "https://structurizr.com/share/36141/diagrams#SystemContext",
+    "title": "Structurizr - Big Bank plc - Internet Banking System",
+    "file": "structurizr-c4.png",
+    "ok": true
+  },
+  "c4model": {
+    "url": "https://c4model.com/",
+    "note": "C4 model: context, containers, components, code",
+    "accessed": "2026-09-24T23:36:50.509Z",
+    "status": 200,
+    "finalUrl": "https://c4model.com/",
+    "title": "Home | C4 model",
+    "file": "c4model.png",
+    "ok": true
+  },
+  "depsdev": {
+    "url": "https://deps.dev/npm/express",
+    "note": "deps.dev package: versions, dependencies, advisories, licences",
+    "accessed": "2026-09-24T23:38:24.850Z",
+    "status": 200,
+    "finalUrl": "https://deps.dev/npm/express",
+    "title": "express | npm | Open Source Insights",
+    "file": "depsdev.png",
+    "ok": true
+  },
+  "renovate-dashboard": {
+    "url": "https://github.com/renovatebot/renovate/issues/2162",
+    "note": "Renovate dependency dashboard issue (may be old)",
+    "accessed": "2026-09-24T23:37:00.262Z",
+    "status": 200,
+    "finalUrl": "https://github.com/renovatebot/renovate/issues/2162",
+    "title": "Support nested changelog.md files \u00b7 Issue #2162 \u00b7 renovatebot/renovate",
+    "file": "renovate-dashboard.png",
+    "ok": true
+  },
+  "nx-graph": {
+    "url": "https://nx.dev/docs/features/explore-graph",
+    "note": "Nx project graph",
+    "accessed": "2026-09-24T23:37:04.609Z",
+    "status": 200,
+    "finalUrl": "https://nx.dev/docs/features/explore-graph",
+    "title": "Explore your Workspace | Nx",
+    "file": "nx-graph.png",
+    "ok": true
+  },
+  "sourcegraph": {
+    "url": "https://sourcegraph.com/github.com/sveltejs/kit",
+    "note": "Sourcegraph repo view (image deleted: failed capture)",
+    "accessed": "2026-09-24T23:37:13.881Z",
+    "status": 403,
+    "finalUrl": "https://sourcegraph.com/github.com/sveltejs/kit",
+    "title": "Sourcegraph - Firewall Block",
+    "file": null,
+    "ok": false,
+    "problem": "HTTP 403"
+  },
+  "adr-github": {
+    "url": "https://adr.github.io/",
+    "note": "Architecture decision records",
+    "accessed": "2026-09-24T23:37:18.866Z",
+    "status": 200,
+    "finalUrl": "https://adr.github.io/",
+    "title": "Architectural Decision Records (ADRs) | Architectural Decision Records",
+    "file": "adr-github.png",
+    "ok": true
+  },
+  "arc42": {
+    "url": "https://arc42.org/overview",
+    "note": "arc42 template sections",
+    "accessed": "2026-09-24T23:37:21.514Z",
+    "status": 200,
+    "finalUrl": "https://arc42.org/overview/",
+    "title": "arc42 Template Overview - arc42",
+    "file": "arc42.png",
+    "ok": true
+  },
+  "backstage-radar": {
+    "url": "https://demo.backstage.io/tech-radar",
+    "note": "Backstage tech radar",
+    "accessed": "2026-09-24T23:38:17.023Z",
+    "status": 200,
+    "finalUrl": "https://demo.backstage.io/tech-radar",
+    "title": "Tech Radar | Company Radar | Backstage Demo",
+    "file": "backstage-radar.png",
+    "ok": true
+  },
+  "stackshare": {
+    "url": "https://stackshare.io/airbnb/airbnb",
+    "note": "StackShare: a company's stack by category",
+    "accessed": "2026-09-24T23:38:33.249Z",
+    "status": 200,
+    "finalUrl": "https://stackshare.io/airbnb/airbnb",
+    "title": "Airbnb - Airbnb's Tech Stack | StackShare | StackShare",
+    "file": "stackshare.png",
+    "ok": true
+  },
+  "heroku-pipelines": {
+    "url": "https://devcenter.heroku.com/articles/pipelines",
+    "note": "Heroku pipeline overview image: review apps, staging, production, promote",
+    "accessed": "2026-09-24T23:41:03.679Z",
+    "status": 200,
+    "finalUrl": "https://devcenter.heroku.com/articles/pipelines",
+    "title": "Pipelines | Heroku Dev Center",
+    "file": "heroku-pipelines.png",
+    "ok": true
+  },
+  "railway-home": {
+    "url": "https://railway.com/",
+    "note": "Railway project canvas (marketing)",
+    "accessed": "2026-09-24T23:38:47.458Z",
+    "status": 200,
+    "finalUrl": "https://railway.com/",
+    "title": "Railway | The all-in-one intelligent cloud provider",
+    "file": "railway-home.png",
+    "ok": true
+  },
+  "railway-environments": {
+    "url": "https://docs.railway.com/environments",
+    "note": "Railway environments docs",
+    "accessed": "2026-09-24T23:39:08.974Z",
+    "status": 200,
+    "finalUrl": "https://docs.railway.com/environments",
+    "title": "Environments | Railway Docs",
+    "file": "railway-environments.png",
+    "ok": true
+  },
+  "render-previews": {
+    "url": "https://render.com/docs/preview-environments",
+    "note": "Render preview environments",
+    "accessed": "2026-09-24T23:39:12.421Z",
+    "status": 200,
+    "finalUrl": "https://render.com/docs/preview-environments",
+    "title": "Preview Environments \u2013 Render Docs",
+    "file": "render-previews.png",
+    "ok": true
+  },
+  "vercel-environments": {
+    "url": "https://vercel.com/docs/deployments/environments",
+    "note": "Vercel environments",
+    "accessed": "2026-09-24T23:39:29.301Z",
+    "status": 200,
+    "finalUrl": "https://vercel.com/docs/deployments/environments",
+    "title": "Environments",
+    "file": "vercel-environments.png",
+    "ok": true
+  },
+  "vercel-promote": {
+    "url": "https://vercel.com/docs/deployments/promoting-a-deployment",
+    "note": "Vercel promote and instant rollback",
+    "accessed": "2026-09-24T23:39:39.918Z",
+    "status": 200,
+    "finalUrl": "https://vercel.com/docs/deployments/promoting-a-deployment",
+    "title": "Promoting Deployments",
+    "file": "vercel-promote.png",
+    "ok": true
+  },
+  "coolify-home": {
+    "url": "https://coolify.io/",
+    "note": "Coolify self-hosted PaaS",
+    "accessed": "2026-09-24T23:39:44.787Z",
+    "status": 200,
+    "finalUrl": "https://coolify.io/",
+    "title": "Coolify",
+    "file": "coolify-home.png",
+    "ok": true
+  },
+  "argocd-demo": {
+    "url": "https://cd.apps.argoproj.io/applications",
+    "note": "Argo CD: desired vs live state, sync, health",
+    "accessed": "2026-09-24T23:41:16.928Z",
+    "status": 200,
+    "finalUrl": "https://cd.apps.argoproj.io/applications?proj=&sync=&autoSync=&health=&namespace=&targetRevision=&repo=&cluster=&labels=&annotations=&operation=",
+    "title": "Applications Tiles - Argo CD",
+    "file": "argocd-demo.png",
+    "ok": true
+  },
+  "sentry-releases": {
+    "url": "https://docs.sentry.io/product/releases/health/",
+    "note": "Sentry release health",
+    "accessed": "2026-09-24T23:40:23.337Z",
+    "status": 200,
+    "finalUrl": "https://docs.sentry.io/product/releases/health/",
+    "title": "Release Health | Sentry Docs",
+    "file": "sentry-releases.png",
+    "ok": true
+  },
+  "dora-metrics": {
+    "url": "https://dora.dev/guides/dora-metrics/",
+    "note": "DORA software delivery metrics",
+    "accessed": "2026-09-24T23:40:27.477Z",
+    "status": 200,
+    "finalUrl": "https://dora.dev/guides/dora-metrics/",
+    "title": "DORA | DORA\u2019s software delivery performance metrics",
+    "file": "dora-metrics.png",
+    "ok": true
+  },
+  "release-please": {
+    "url": "https://github.com/googleapis/release-please",
+    "note": "Release PRs from conventional commits",
+    "accessed": "2026-09-24T23:40:30.076Z",
+    "status": 200,
+    "finalUrl": "https://github.com/googleapis/release-please",
+    "title": "GitHub - googleapis/release-please: generate release PRs based on the conventionalcommits.org spec \u00b7 GitHub",
+    "file": "release-please.png",
+    "ok": true
+  },
+  "supabase-branching": {
+    "url": "https://supabase.com/docs/guides/deployment/branching",
+    "note": "Database branches per preview",
+    "accessed": "2026-09-24T23:40:34.051Z",
+    "status": 200,
+    "finalUrl": "https://supabase.com/docs/guides/deployment/branching",
+    "title": "Branching | Supabase Docs",
+    "file": "supabase-branching.png",
+    "ok": true
+  },
+  "kamal": {
+    "url": "https://kamal-deploy.org/",
+    "note": "Deploy to your own servers",
+    "accessed": "2026-09-24T23:40:39.979Z",
+    "status": 200,
+    "finalUrl": "https://kamal-deploy.org/",
+    "title": "Kamal \u2014 Deploy web apps anywhere",
+    "file": "kamal.png",
+    "ok": true
+  },
+  "codescene-hotspots": {
+    "url": "https://codescene.io/docs/guides/technical/hotspots.html",
+    "note": "CodeScene hotspots map",
+    "accessed": "2026-09-24T23:40:42.817Z",
+    "status": 200,
+    "finalUrl": "https://codescene.io/docs/guides/technical/hotspots.html",
+    "title": "Technical Debt \u2014 CodeScene 1 Documentation",
+    "file": "codescene-hotspots.png",
+    "ok": true
+  },
+  "railway-canvas": {
+    "url": "https://railway.com/",
+    "note": "Railway project canvas (marketing screenshot, not a live trial)",
+    "accessed": "2026-09-24T23:41:08.055Z",
+    "status": 200,
+    "finalUrl": "https://railway.com/",
+    "title": "Railway | The all-in-one intelligent cloud provider",
+    "file": "railway-canvas.png",
+    "ok": true
+  },
+  "github-deployments-2": {
+    "url": "https://github.com/withastro/astro/deployments",
+    "note": "GitHub deployments per environment (image deleted: failed capture)",
+    "accessed": "2026-09-24T23:41:54.473Z",
+    "status": 404,
+    "finalUrl": "https://github.com/withastro/astro/deployments",
+    "title": "Page not found \u00b7 GitHub \u00b7 GitHub",
+    "file": null,
+    "ok": false,
+    "problem": "HTTP 404"
+  }
+}

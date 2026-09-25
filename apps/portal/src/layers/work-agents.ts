@@ -85,10 +85,10 @@ interface ProfileDraft { name: string; description: string; model: string; effor
     <div class="lay-grid lay-g2">
       <aludel-agent-connection class="lay-card" [projectId]="ctx.projectId()" [projectName]="ctx.setup()?.project?.name || ''" heading="Account" description="Agents run on your own Anthropic or OpenAI account: paste an API key. Every profile uses it." (changed)="ctx.reload()" />
       <form class="lay-card lay-form" (ngSubmit)="saveInstructions()" aria-labelledby="project-instructions"><h2 id="project-instructions">Project instructions</h2>
-        <p class="lay-muted small">Everyone reads these first, then the role's, then the action's, then the profile's own. Exported to <code>AGENTS.md</code> so any coding tool reads the same rules.</p>
+        <p class="lay-muted small">Everyone reads these first, then the role's, then the action's, then the profile's own. Exported to <code>docs/agents.md</code> so any coding tool reads the same rules.</p>
         <label class="visually-hidden" for="project-instructions-text">Project instructions</label><textarea id="project-instructions-text" name="projectInstructions" rows="5" [(ngModel)]="instructionsDraft"></textarea>
         <label class="visually-hidden" for="project-instructions-why">Why this change</label><input id="project-instructions-why" name="instructionsWhy" [(ngModel)]="instructionsWhy" placeholder="Why this change (saved with the revision)">
-        <div class="lay-row lay-wrap"><button type="submit" class="lay-button small">Save</button><button type="button" class="lay-button ghost small" (click)="exportAgents()"><mat-icon aria-hidden="true">download</mat-icon>Export AGENTS.md</button></div></form>
+        <div class="lay-row lay-wrap"><button type="submit" class="lay-button small">Save</button><button type="button" class="lay-button ghost small" (click)="exportAgents()"><mat-icon aria-hidden="true">download</mat-icon>Export the agent guide</button></div></form>
     </div>
     <div class="lay-section-head lay-gap-top"><h2>Profiles</h2><span class="lay-muted small">Who does agent work. Roles decide which actions each one takes.</span></div>
     <div class="lay-profiles">
@@ -199,7 +199,7 @@ export class WorkAgentsComponent {
   }
   saveInstructions() {
     const record = this.ctx.data()?.projectInstructions; if (!record) return;
-    void this.ctx.write(() => this.ctx.change(record.id, { body: this.instructionsDraft }, record.revision, this.instructionsWhy || 'Project instructions revised'), 'Saved. Export AGENTS.md to put them in the repository.');
+    void this.ctx.write(() => this.ctx.change(record.id, { body: this.instructionsDraft }, record.revision, this.instructionsWhy || 'Project instructions revised'), 'Saved. Export the agent guide to put them in the repository (docs/agents.md).');
   }
-  exportAgents() { void this.ctx.write(() => this.ctx.api(`/api/projects/${encodeURIComponent(this.ctx.projectId())}/agents/export`, 'POST', {}), 'AGENTS.md written to the workspace. The next build commits it.'); }
+  exportAgents() { void this.ctx.write(() => this.ctx.api(`/api/projects/${encodeURIComponent(this.ctx.projectId())}/agents/export`, 'POST', {}), 'docs/agents.md written to the workspace. The next build commits it.'); }
 }

@@ -75,7 +75,10 @@ function cleanSection(section) {
 const specStatuses = ['draft', 'in-review', 'accepted', 'superseded'];
 export const workStates = ['suggested', 'ready', 'claimed', 'needs-input', 'review', 'done'];
 export const workTypes = ['define', 'spec', 'plan', 'design', 'implement', 'reconcile', 'review', 'research', 'audit', 'configure'];
-export const layers = ['product', 'design', 'pages', 'data', 'platform', 'work'];
+// PLATFORM-UX-01: 'platform' is shown as Code (URLs /code/…); 'deploy' is the Operator's layer.
+export const layers = ['product', 'design', 'pages', 'data', 'platform', 'deploy', 'work'];
+// Actions that moved to another role keep their record, assignee and open work (PLATFORM-UX-01).
+const movedActions = { 'platform.configure': 'deploy.configure' };
 // WORK-UX-01: Jira's five priorities, highest first; agent effort levels; the unnamed metal tones agent avatars use.
 export const priorities = ['highest', 'high', 'medium', 'low', 'lowest'];
 export const efforts = ['low', 'medium', 'high'];
@@ -726,6 +729,13 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
       for (const action of role.actions) {
         const id = `${role.layer}.${action.key}`;
         if (actions.some(entry => entry.key === id)) continue;
+        const from = Object.keys(movedActions).find(old => movedActions[old] === id);
+        const old = from && actions.find(entry => entry.key === from);
+        if (old) {
+          update(projectId, old.id, { key: id, changes: action.changes }, { rationale: `Moved to the ${role.name} role`, parentId: record.id });
+          db.prepare('UPDATE layer_work_items SET action = ?, layer = ? WHERE project_id = ? AND action = ?').run(id, role.layer, projectId, from);
+          continue;
+        }
         // Elevated actions (leads only) start with a person, whatever the working style preset says.
         const toAgent = !action.elevated && (preset.you ? !preset.you.includes(id) : (preset.agent || []).includes(id));
         const assignee = toAgent && agent ? { kind: 'agent', id: agent.id } : owner ? { kind: 'person', id: owner } : null;

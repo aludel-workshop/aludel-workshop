@@ -20,7 +20,8 @@ Owner direction, 2026-09-22, recorded as DEC-036. Each layer of a project is a s
 | **Design** | Creative lead | Design system: foundations and tokens, components, patterns, guidelines, sources and changes | Extend the system, propose a component |
 | **Pages** | Creative lead, applied | The **page tree**, where each page has concept art, notes, options and a live prototype built from real tokens and components; flows across pages | Design a page for a story, propose layout options |
 | **Data** | Back-end design (stack-neutral) | Objects (JSON Schema), API contracts (OpenAPI 3.1), access rules, later events. Nothing here names a stack (DEC-038) | Contract the objects a spec needs, check access rules |
-| **Platform** | Engineering / operations | The stack binding (architecture, runtime services), code links, repository and GitHub, releases (CI/CD), environments, database operations, domains | Configure an environment, reconcile suspect code links |
+| **Code** (key `platform`; DEC-049) | Engineer | How the code connects to every layer: structure and stack read from the repository, a file → chunk explorer over the code links, tests per acceptance scenario, the docs developers and agents read (AGENTS.md as the map, sources in a sidecar), explicit releases | Reconcile suspect code, refresh docs, request a change |
+| **Deploy** (DEC-049) | Operator | Where it runs: environments and their builds, variables from `.env.example`, integrations (domains, email, storage), each environment's data and backups | Promote or roll back a release, choose a provider, restore data |
 | **Work** | The shared bench | One stack of work items from every layer, **agents** (provider accounts and role profiles), **routines** that create work on a schedule, and the **working style** that decides what is automated | — |
 
 Later: an **Insights** layer (usage analytics, feedback, experiments), which feeds observations back to Product.
