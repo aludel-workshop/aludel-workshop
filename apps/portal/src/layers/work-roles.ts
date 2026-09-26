@@ -13,8 +13,9 @@ interface Draft { instructions: string; reads: string[]; changes: string[]; tool
   selector: 'aludel-work-roles', standalone: true, imports: [FormsModule, MatIconModule, AssigneeComponent, RefChipComponent],
   template: `
   @if (!ctx.agentReady()) {
-    <div class="lay-banner-warn" role="note"><mat-icon aria-hidden="true">power_off</mat-icon><p><strong>Agents can't take work yet.</strong> No agent account is connected, so agent choices are unavailable. Actions set to an agent wait for one.
-      <a [href]="ctx.link('work', 'agents')" (click)="ctx.go(ctx.link('work', 'agents'), $event)">Connect an account</a></p></div>
+    <div class="lay-banner-warn" role="note"><mat-icon aria-hidden="true">power_off</mat-icon><p><strong>Agents can't take work yet.</strong>
+      @if (!ctx.data()?.workerPool?.dispatchEnabled) { Agent execution is disabled for this portal, even if the Symphony host is online. <a [href]="ctx.link('deploy', 'agents')" (click)="ctx.go(ctx.link('deploy', 'agents'), $event)">View runtime</a> }
+      @else { Create or activate a Codex profile in <a [href]="ctx.link('work', 'agents')" (click)="ctx.go(ctx.link('work', 'agents'), $event)">Agents</a>. }</p></div>
   }
   <div class="lay-roles">
     @for (role of roles(); track role.layer) {
@@ -37,7 +38,7 @@ interface Draft { instructions: string; reads: string[]; changes: string[]; tool
               <div class="lay-arow">
                 <div><strong>{{ action.name }}</strong>@if (action.routine) { <span class="lay-tag"><mat-icon aria-hidden="true">event_repeat</mat-icon>Routine</span> }
                   <small>{{ action.description }}</small>
-                  @if (action.assignee?.kind === 'agent' && !ctx.agentReady()) { <small class="lay-warn-text"><mat-icon aria-hidden="true">schedule</mat-icon>Waits until an agent account is connected</small> }</div>
+                  @if (action.assignee?.kind === 'agent' && !ctx.agentReady()) { <small class="lay-warn-text"><mat-icon aria-hidden="true">schedule</mat-icon>Waits for agent execution to be enabled</small> }</div>
                 <aludel-assignee [assignee]="action.assignee" label="Default assignee" (changed)="assign(action, $event)" />
                 <button type="button" class="lay-setup-btn" [attr.aria-expanded]="openAction() === action.id" [attr.aria-controls]="'setup-' + action.id" (click)="toggle(action)">Setup<mat-icon aria-hidden="true">expand_more</mat-icon></button>
                 <button type="button" class="lay-elev" [attr.aria-pressed]="action.elevated" [attr.aria-label]="'Elevated (leads only): ' + action.name" [title]="action.elevated ? 'Elevated: only leads of this role; an agent given it acts as a lead and its result waits for a human lead' : 'Any member of this role'" (click)="elevate(action)" [disabled]="!action.recordId">

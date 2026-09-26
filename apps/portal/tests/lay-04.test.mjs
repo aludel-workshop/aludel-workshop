@@ -44,7 +44,7 @@ test('LAY-04A: closing a record-changing item needs a revision made from it; cod
   assert.equal(know.updateWork(ada, id, work.id, { state: 'done' }).state, 'done');
   assert.equal(edited.revision, 3);
   assert.throws(() => know.openWorkItem(id, work.id), error => error.status === 409, 'a done item takes no more changes');
-  const audit = know.createWork(id, { layer: 'platform', type: 'audit', title: 'Audit', targets: [], documents: ['Platform › findings'] });
+  const audit = know.createWork(id, { layer: 'platform', type: 'audit', title: 'Audit', targets: [], documents: ['Platform › findings'], assignee: { kind: 'person', id: ada.id } });
   assert.equal(know.updateWork(ada, id, audit.id, { state: 'done' }).state, 'done', 'findings are verified in LAY-05, not by revision');
 });
 
@@ -123,7 +123,7 @@ test('WORK-UX-01: roles by layer; the onboarding style only presets who takes ea
 
 test('WORK-UX-01: priority and blocking links as Jira has them', () => {
   const { know, ada, id } = fixture();
-  const [a, b, c] = ['One', 'Two', 'Three'].map(title => know.createWork(id, { layer: 'platform', type: 'audit', title, documents: ['x'] }));
+  const [a, b, c] = ['One', 'Two', 'Three'].map(title => know.createWork(id, { layer: 'platform', type: 'audit', title, documents: ['x'], assignee: { kind: 'person', id: ada.id } }));
   assert.equal(a.priority, 'medium');
   assert.equal(know.updateWork(ada, id, a.id, { priority: 'highest' }).priority, 'highest');
   assert.throws(() => know.updateWork(ada, id, a.id, { priority: 'urgent' }), /Choose a priority/);
@@ -149,6 +149,7 @@ test('LAY-04C: routines run when due, before releases or by hand, never twice wh
   assert.ok(weekly.every(item => item.assignee?.label === 'Default agent'), 'a Planner hands audits to the default agent');
   assert.deepEqual(know.runRoutines(id, { at: at(16) }), [], 'the previous items are still open');
   const drift = weekly.find(item => item.title.startsWith('Product drift'));
+  know.updateWork(ada, id, drift.id, { assignee: { kind: 'person', id: ada.id } });
   know.updateWork(ada, id, drift.id, { state: 'done' });
   assert.deepEqual(know.runRoutines(id, { at: at(16) }).map(item => item.title.split(' · ')[0]), ['Product drift check'], 'due again once closed, a week after the last run');
   assert.deepEqual(know.runRoutines(id, { trigger: 'release', at: at(16) }).map(item => item.title.split(' · ')[0]), ['Security audit before release']);
@@ -158,7 +159,9 @@ test('LAY-04C: routines run when due, before releases or by hand, never twice wh
   assert.throws(() => know.runRoutines(id, { trigger: 'manual', routineId: monthly.id }), error => error.status === 409);
   const sweep = routines.find(routine => routine.title === 'Accessibility sweep');
   know.update(id, sweep.id, { enabled: false }, { rationale: 'Not yet' });
-  know.updateWork(ada, id, weekly.find(item => item.title.startsWith('Accessibility')).id, { state: 'done' });
+  const accessibility = weekly.find(item => item.title.startsWith('Accessibility'));
+  know.updateWork(ada, id, accessibility.id, { assignee: { kind: 'person', id: ada.id } });
+  know.updateWork(ada, id, accessibility.id, { state: 'done' });
   assert.deepEqual(know.runRoutines(id, { at: at(60) }).filter(item => item.context.routine === sweep.id), [], 'a disabled routine does not run on schedule');
   assert.equal(know.runRoutines(id, { trigger: 'manual', routineId: sweep.id }).length, 1, 'but can still be run by hand');
   assert.throws(() => know.insert(id, 'routine', { title: 'Hourly', layer: 'product', type: 'audit', cadence: 'hourly' }), /how often/);

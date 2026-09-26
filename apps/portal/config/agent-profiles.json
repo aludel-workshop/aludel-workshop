@@ -1,10 +1,10 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "note": "WORK-UX-01: every project starts with one Default agent profile; people add others with their own model, effort, context and usage limits. What an action allows (tools, what it may change, what it asks first) lives on the action in config/roles.json, not on the profile. The five role profiles from DEC-038 are migrated: their layer's role takes any instructions the owner edited, and the old profile is deactivated. Nothing here calls a provider (DEC-004).",
   "projectInstructions": "Keep to the principles in Product › Vision. Answers and decisions land as revisions of the records they change, with a reason. Ask before anything that costs money, uses an external account or deploys.",
   "defaultProfile": {
     "key": "default", "name": "Default agent", "description": "Reads the project, role and action instructions, nothing more.",
-    "avatar": { "seed": "aludel-default-agent", "color": "#4b6ea8" }, "model": "", "effort": "medium", "instructions": "", "context": [],
+    "avatar": { "seed": "aludel-default-agent", "color": "#4b6ea8" }, "provider": "codex", "model": "gpt-5.6-sol", "effort": "medium", "instructions": "", "context": [],
     "limits": { "itemOutput": 8000, "batchTokens": 200000, "monthlyTokens": 2000000 }
   },
   "legacyRoles": { "product-lead": "product", "design-lead": "pages", "architect": "data", "coding-agent": "platform", "reviewer": "work" }

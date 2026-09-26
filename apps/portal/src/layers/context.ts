@@ -63,7 +63,7 @@ export interface DataOperation extends RecordBase { operationId: string; summary
 export interface AccessRule extends RecordBase { role: string; objectId: string; action: string; effect: string; sentence: string; pack: string | null; }
 // Work › Agents (WORK-UX-01): a profile is who does the work; what an action allows lives on the action.
 export interface ProfileLimits { itemOutput: number; batchTokens: number | null; monthlyTokens: number | null; }
-export interface AgentProfile extends RecordBase { key: string | null; name: string; description: string; avatar: { seed: string; color: string }; model: string; effort: string; instructions: string;
+export interface AgentProfile extends RecordBase { key: string | null; name: string; description: string; avatar: { seed: string; color: string }; provider: 'codex' | 'openai-api' | 'anthropic'; model: string; effort: string; instructions: string;
   context: string[]; limits: ProfileLimits; active: boolean; history: Revision[]; }
 export interface Pin { id: string; revision: number; key?: string; }
 export interface InstructionPins { principles: Pin | null; project: Pin | null; role: Pin | null; action: Pin | null; profile: Pin | null; }
@@ -79,9 +79,10 @@ export interface TraceLink { recordId: string; revision: number; currentRevision
 export interface CodeUnit { id: string; path: string; symbol: string; kind: string; line: number; endLine: number; reachable: boolean; lastCommit: string | null; calls: string[]; calledBy: string[]; state: string; links: TraceLink[]; }
 export interface Service { key: string; label: string; icon: string; stories: string[]; }
 export interface WorkTarget { id: string; kind: string; label: string; }
-export type WorkStatus = 'backlog' | 'queued' | 'staged' | 'working' | 'needs' | 'review' | 'done';
+export type WorkStatus = 'backlog' | 'queued' | 'staged' | 'working' | 'blocked' | 'needs' | 'review' | 'done';
 export interface WorkCheck { text: string; source: { id: string; revision?: number | null } | null; verdict: 'accept' | 'reject' | null; note: string; by?: string | null; at?: string | null; }
 export interface LogEntry { at: string; text: string; refs?: string[]; by?: { kind: string; id: string } | null; }
+export interface ExecutionBlock { code: string; reason: string; recovery: 'deploy' | 'agents' | 'retry'; }
 export interface RunState { phases?: string[]; phase?: number; activity?: string; startedAt?: string; finishedAt?: string; model?: string; provider?: string; batch?: string; profileId?: string;
   usage?: { input: number; output: number }; at?: string; done?: boolean; }
 export interface WorkItem { id: string; number: number; ref: string; layer: string; type: string; action: string | null; title: string; state: string; status: WorkStatus; priority: string;
@@ -89,7 +90,12 @@ export interface WorkItem { id: string; number: number; ref: string; layer: stri
   question: { text: string; options: string[]; answer?: string; rationale?: string; answeredBy?: string; applied?: string[]; recommendation?: string; reasoning?: string } | null; documents: string[]; log: LogEntry[]; createdAt: string; updatedAt: string;
   profileId: string | null; instructions: InstructionPins | null; project: string | null; checkpoint: string | null;
   context: { reconcile?: { recordId: string; fromRevision: number; toRevision: number }; routine?: string; suggestion?: string; batch?: string; staged?: boolean; skip?: boolean;
-    feedback?: { check: string; note: string; by: string; at: string }[]; run?: RunState } | null; }
+    feedback?: { check: string; note: string; by: string; at: string }[]; run?: RunState; executionBlock?: ExecutionBlock;
+    visionProposal?: { id: string; section: string; text: string; note: string; basis: string; targetId: string | null;
+      expectedRevision: number | null; beforeText: string | null; briefRevision: number; acceptedClaimId?: string };
+    workProposal?: { id: string; action: string; summary: string; content: Record<string, unknown>; usedInputs: { id: string; revision: number }[]; repositoryCommit: string };
+    auditReport?: { id: string; repositoryCommit: string; summary: string; findings: { severity: string; title: string; affected: string; evidence: string; recommendation: string }[];
+      checks: { name: string; status: string; detail?: string }[]; usedInputs?: { id: string; revision: number }[] } } | null; }
 export interface FieldChange { field: string; before: unknown; after: unknown; }
 export interface WorkChange { recordId: string; revision: number; author: string; rationale: string | null; createdAt: string; kind: string | null; exists: boolean; fields: FieldChange[]; }
 export interface Routine extends RecordBase { key: string | null; title: string; layer: string; type: string; cadence: string; documents: string[]; enabled: boolean; nextRunAt: string | null; lastRunAt: string | null; lastWorkId: string | null; history: Revision[]; }
@@ -102,15 +108,19 @@ export interface Knowledge {
   profiles: AgentProfile[]; projectInstructions: (RecordBase & { body: string }) | null; workTypes: string[];
   roles: Role[]; members: Member[];
   code: { indexedAt: string | null; units: CodeUnit[] };
-  routines: Routine[]; batches: Batch[];
+  routines: Routine[]; batches: Batch[]; symphonyProfiles: string[]; workerPool: WorkerPool;
   claims: Claim[]; briefRevision: number; sources: Source[]; findings: Finding[]; insights: Insight[]; evidence: EvidenceLink[]; projects: PlanProject[];
   tokens: TokenSet | null; components: DesignComponent[]; brand: BrandAsset[]; uploads: Upload[]; brandUsage: Record<string, { path: string; line: number }[]>;
 }
-// Batches belong to one agent profile (WORK-UX-01); Go runs them.
-export interface Batch { id: string; number: number; ref: string; state: string; limit: number; profileId: string | null; createdAt: string; startedAt: string | null; finishedAt: string | null;
+export interface WorkerPool { configured: number; reported: number; online: boolean; dispatchEnabled: boolean; profileOverrides: boolean; capacity: number; used: number; free: number; queued: number; location: string; credentialPath: string | null; lastSeenAt: string | null; active: { attemptId: string; workId: string; workRef: string; title: string; batchId: string; profileId: string; state: string; activity: string }[]; running: { batchId: string; profileId: string; slots: number }[]; }
+// Batches belong to one agent profile; Go can queue until their requested slots are available.
+export interface Batch { id: string; number: number; ref: string; state: string; limit: number; profileId: string | null; requestedSlots: number; authorizedAt: string | null; createdAt: string; startedAt: string | null; finishedAt: string | null;
   startedBy: string | null; note: string | null; items: string[]; usage: { input: number; output: number }; working: string | null; }
+export interface ProviderModel { id: string; label: string; description: string; efforts: string[]; defaultEffort: string; isDefault: boolean; }
+export interface ProviderModelCatalog { models: ProviderModel[]; fetchedAt: string | null; error: string | null; }
 export interface Catalog { pageTypes: Record<string, PageType>; routeIcons: string[]; feels: Record<string, { label: string; summary: string; navigation: string; font: string; radius: number; surface: string; surfaceDark: string }>;
   stacks: { presets: Record<string, { label: string; layers?: Record<string, string> }> }; tools: Record<string, string>; botColors: string[]; efforts: string[];
+  providers: Record<string, ProviderModelCatalog>;
   brandTemplates: Record<string, { label: string; summary: string; icon: string; assets: number }>; }
 // What a hover card shows for any referenced record (A3).
 export interface RefInfo { id: string; kind: string; kindLabel: string; icon: string; layer: string; label: string; title: string; status: string | null; note: string; facts: [string, string][]; where: string; href: string; }
@@ -118,7 +128,7 @@ export interface RefInfo { id: string; kind: string; kindLabel: string; icon: st
 export const statusOrder = ['proposed', 'defined', 'designed', 'built', 'shipped'];
 export const statusLabel: Record<string, string> = { proposed: 'Proposed', defined: 'Defined', designed: 'Designed', built: 'Built', shipped: 'Shipped' };
 export const stateLabel: Record<string, string> = { suggested: 'Backlog', ready: 'Queued', claimed: 'Working', 'needs-input': 'Needs you', review: 'Ready for review', done: 'Done' };
-export const workStatusLabel: Record<string, string> = { backlog: 'Backlog', queued: 'Queued', staged: 'Staged', working: 'Working', needs: 'Needs you', review: 'Ready for review', done: 'Done' };
+export const workStatusLabel: Record<string, string> = { backlog: 'Backlog', queued: 'Queued', staged: 'Staged', working: 'Working', blocked: 'Blocked', needs: 'Needs you', review: 'Ready for review', done: 'Done' };
 // Jira's five priorities, highest first.
 export const priorityOrder = ['highest', 'high', 'medium', 'low', 'lowest'];
 export const priorityLabel: Record<string, string> = { highest: 'Highest', high: 'High', medium: 'Medium', low: 'Low', lowest: 'Lowest' };
@@ -200,7 +210,7 @@ export class ProjectContext {
   // The evidence panel is one drawer for the whole project; any chip opens it on its record.
   readonly evidenceOpen = signal<string | null>(null);
   readonly me = computed(() => this.session()?.user?.id || '');
-  readonly agentReady = computed(() => { const connection = this.setup()?.agentConnection; return Boolean(connection && connection.status !== 'rejected' && !connection.retired); });
+  readonly agentReady = computed(() => Boolean(this.data()?.symphonyProfiles?.length));
   // A clock the Work pages read for live elapsed times; ticks only while something is running.
   readonly now = signal(Date.now());
   // The board's assignee filter: set from an assignee chip or a profile's "its work" link, kept while moving around Work.

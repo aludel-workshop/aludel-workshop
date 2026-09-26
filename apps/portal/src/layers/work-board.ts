@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Assignee, Batch, ProjectContext, WorkItem, priorityOrder } from './context';
-import { AvatarComponent, WorkCardComponent, isRunning, tokens, elapsed } from './work-shared';
+import { AvatarComponent, WorkCardComponent, agentRunnable, isRunning, tokens, elapsed } from './work-shared';
 
 const byPriority = (a: WorkItem, b: WorkItem) => priorityOrder.indexOf(a.priority) - priorityOrder.indexOf(b.priority) || a.number - b.number;
 interface Lane { key: string; who: Assignee; title: string; items: WorkItem[]; batch: Batch | null; }
@@ -13,31 +13,35 @@ interface Lane { key: string; who: Assignee; title: string; items: WorkItem[]; b
 @Component({
   selector: 'aludel-work-board', standalone: true, imports: [FormsModule, MatIconModule, MatTooltipModule, AvatarComponent, WorkCardComponent],
   template: `
-  <div class="lay-section-head"><h2>Batches</h2><span class="lay-muted small">Agent results stay in their batch until you clear them</span></div>
+  <div class="lay-section-head"><h2>Batches</h2><div class="lay-row lay-wrap"><span class="lay-muted small">Agent results stay in their batch until you clear them</span><a class="lay-button small" [href]="ctx.link('work', 'create')" (click)="ctx.go(ctx.link('work', 'create'), $event)"><mat-icon aria-hidden="true">add</mat-icon>Create task</a></div></div>
+  <p class="lay-muted small">Symphony workers: {{ ctx.data()?.workerPool?.free || 0 }} free of {{ ctx.data()?.workerPool?.capacity || 0 }} online slots · {{ ctx.data()?.workerPool?.queued || 0 }} queued batches. Capacity and host health are in <a [href]="ctx.link('deploy', 'agents')" (click)="ctx.go(ctx.link('deploy', 'agents'), $event)">Deploy</a>.</p>
   <div class="lay-lanes">
     @for (lane of lanes(); track lane.key) {
       <section class="lay-lane" [class.lay-lane-running]="running(lane)" [attr.aria-label]="lane.title" [id]="'lane-' + lane.key">
         <div class="lay-lane-head"><aludel-avatar [who]="lane.who" size="lg" />
           <div class="lay-lane-who"><strong>{{ lane.title }}</strong><small>{{ laneNote(lane) }}</small></div>
           <div class="lay-lane-right">
-            @if (!running(lane)) {
+            @if (!running(lane) && lane.batch?.state !== 'queued') {
               <span class="lay-nextsplit"><button type="button" (click)="next(lane)" [matTooltip]="'Adds the next ' + count(lane) + ' queued, unblocked items for ' + lane.title.replace('Your batch', 'you') + ' in ' + milestone() + ', highest priority first'"><mat-icon aria-hidden="true">playlist_add</mat-icon>Next</button>
                 @if (editing() === lane.key) { <label class="visually-hidden" [for]="'n-' + lane.key">How many</label><input type="number" [id]="'n-' + lane.key" min="1" max="25" [ngModel]="count(lane)" (ngModelChange)="setCount(lane, $event)" (blur)="editing.set('')" (keydown.enter)="editing.set('')"> }
                 @else { <button type="button" class="lay-nextsplit-n" (click)="editCount(lane)" [attr.aria-label]="'Change how many: ' + count(lane)">{{ count(lane) }}</button> }</span>
             }
-            @if (running(lane) && lane.batch; as batch) {
+            @if (lane.batch?.state === 'queued' && lane.batch; as batch) {
+              <span class="lay-chip lay-plain">Queued · {{ batch.requestedSlots }} worker{{ batch.requestedSlots === 1 ? '' : 's' }}</span>
+              <button type="button" class="lay-button ghost small" (click)="stopBatch(batch)">Cancel</button>
+            } @else if (running(lane) && lane.batch; as batch) {
               <div class="lay-ticker"><strong>{{ elapsedFor(batch) }}</strong> active<br>{{ tokenText(batch) }} tokens</div>
               @if (batch.state === 'running') { <button type="button" class="lay-button ghost small" (click)="stopBatch(batch)"><mat-icon aria-hidden="true">pause</mat-icon>Stop run</button> }
             } @else if (lane.who.kind === 'agent' && waiting(lane) && lane.batch; as batch) {
-              <button type="button" class="lay-button small" (click)="go(batch)" [disabled]="!ctx.agentReady()" [matTooltip]="ctx.agentReady() ? 'Spends on your agent account' : 'Connect an agent account first'">
-                <mat-icon aria-hidden="true">play_arrow</mat-icon>Go: run {{ waiting(lane) }}</button>
+              <label class="small">Workers <input type="number" min="1" [max]="maxSlots(lane)" [ngModel]="slots(lane)" (ngModelChange)="setSlots(lane, $event)" style="width:3.5rem"></label>
+              <button type="button" class="lay-button small" (click)="go(batch, lane)" [disabled]="!canGo(lane)" [matTooltip]="canGo(lane) ? 'Authorize now; queue until all requested workers are free' : 'This batch needs a supported profile and adapted actions'">
+                <mat-icon aria-hidden="true">play_arrow</mat-icon>Go: {{ waiting(lane) }} item{{ waiting(lane) === 1 ? '' : 's' }}</button>
             }
           </div>
         </div>
         @if (running(lane)) { <p class="lay-lock-note"><mat-icon aria-hidden="true">lock</mat-icon>Locked in while it runs. Hover an item to skip or stop it.</p> }
         @if (lane.batch; as batch) { @if (batch.note && !running(lane)) { <p class="lay-lock-note lay-lock-warn"><mat-icon aria-hidden="true">info</mat-icon>{{ batch.ref }}: {{ batch.note }}</p> } }
-        @if (lane.who.kind === 'agent' && !ctx.agentReady() && waiting(lane)) { <p class="lay-lock-note lay-lock-warn"><mat-icon aria-hidden="true">power_off</mat-icon>Connect an agent account to run this batch.
-          <a [href]="ctx.link('work', 'agents')" (click)="ctx.go(ctx.link('work', 'agents'), $event)">Agents</a></p> }
+        @if (lane.who.kind === 'agent' && !canGo(lane) && waiting(lane) && !running(lane) && lane.batch?.state !== 'queued') { <p class="lay-lock-note lay-lock-warn"><mat-icon aria-hidden="true">info</mat-icon>This task needs a supported profile and Symphony action adapter.</p> }
         @if (lane.items.length) { <ol class="lay-stack">@for (item of lane.items; track item.id) { <li><aludel-work-card [item]="item" /></li> }</ol> }
         @else { <p class="lay-lane-empty">Empty. Press Next, or stage items from the queue.</p> }
       </section>
@@ -103,7 +107,7 @@ export class WorkBoardComponent {
       // Every active agent has a lane, so Next can fill it (ROADMAP-01).
       if (!items.length && !profile.active) continue;
       const batches = data.batches.filter(batch => batch.profileId === profile.id);
-      const batch = batches.find(isRunningBatch) || batches.find(entry => entry.state === 'draft') || batches.find(entry => items.some(item => item.context?.batch === entry.id)) || null;
+      const batch = batches.find(isRunningBatch) || batches.find(entry => entry.state === 'queued') || batches.find(entry => entry.state === 'draft') || batches.find(entry => items.some(item => item.context?.batch === entry.id)) || null;
       lanes.push({ key: profile.id, who: { kind: 'agent', id: profile.id }, title: profile.name, items, batch });
     }
     const who = this.ctx.boardFilter();
@@ -112,6 +116,10 @@ export class WorkBoardComponent {
 
   // Next (ROADMAP-01, DEC-043): a fixed rule on the server; the number is per lane and remembered while you stay.
   readonly editing = signal('');
+  private readonly slotCounts = signal<Record<string, number>>({});
+  maxSlots(lane: Lane) { return Math.max(1, Math.min(this.ctx.data()?.workerPool?.configured || 1, this.waiting(lane))); }
+  slots(lane: Lane) { return Math.min(this.slotCounts()[lane.key] || 1, this.maxSlots(lane)); }
+  setSlots(lane: Lane, value: number) { const max = this.maxSlots(lane); this.slotCounts.set({ ...this.slotCounts(), [lane.key]: Math.max(1, Math.min(max, Math.round(Number(value) || 1))) }); }
   private readonly nextCounts = signal<Record<string, number>>({});
   readonly milestone = computed(() => this.ctx.currentMilestone()?.label || 'the current milestone');
   count(lane: Lane) { return this.nextCounts()[lane.key] || 5; }
@@ -123,18 +131,32 @@ export class WorkBoardComponent {
       .then(ok => { if (ok) this.ctx.notice.set(added ? `Added ${added} item${added === 1 ? '' : 's'} to ${lane.key === 'me' ? 'your batch' : lane.title}.` : `Nothing is ready for ${lane.key === 'me' ? 'you' : lane.title} in ${this.milestone()}.`); });
   }
   running(lane: Lane) { return isRunning(lane.batch); }
-  waiting(lane: Lane) { return lane.items.filter(item => item.status === 'staged').length; }
+  waiting(lane: Lane) { return lane.items.filter(item => item.state === 'ready' && item.context?.batch === lane.batch?.id).length; }
   laneNote(lane: Lane) {
     if (lane.who.kind === 'person') return lane.key === 'me' ? 'Your work, highest priority first' : 'Their work, highest priority first';
     const batch = lane.batch;
     if (!batch) return '';
-    const state = batch.state === 'draft' ? 'Staged, not started' : batch.state === 'running' ? 'Running' : batch.state === 'stopping' ? 'Stopping after the current item' : this.waiting(lane) ? 'Ready to run again' : 'Finished: clear each item to close it';
+    const state = batch.state === 'draft' ? 'Staged, not started' : batch.state === 'queued' ? this.queueReason(lane) : batch.state === 'running' ? 'Running' : batch.state === 'stopping' ? 'Stopping after the current item' : this.waiting(lane) ? 'Ready to run again' : 'Finished: clear each item to close it';
     return `${batch.ref} · ${state}`;
+  }
+  queueReason(lane: Lane) {
+    const batch = lane.batch;
+    if (!batch) return 'Queued';
+    const pool = this.ctx.data()?.workerPool;
+    if (!pool?.online) return `Queued for ${batch.requestedSlots} workers; waiting for Symphony host`;
+    const profile = this.ctx.profileById().get(batch.profileId || '');
+    if ((profile?.model || (profile?.effort || 'medium') !== 'medium') && !pool.profileOverrides) return 'Queued; waiting for host support for this profile’s model and effort';
+    return `Queued for ${batch.requestedSlots} workers; ${pool.free} free`;
   }
   elapsedFor(batch: Batch) { return elapsed(batch.startedAt || undefined, this.ctx.now()); }
   tokenText(batch: Batch) { return tokens(batch.usage.input + batch.usage.output); }
-  go(batch: Batch) { void this.ctx.write(() => this.ctx.api(`/api/projects/${encodeURIComponent(this.ctx.projectId())}/batches/start`, 'POST', { batchId: batch.id }), `${batch.ref} started. Its items are locked in while it runs.`); }
-  stopBatch(batch: Batch) { void this.ctx.write(() => this.ctx.api(`/api/projects/${encodeURIComponent(this.ctx.projectId())}/batches/stop`, 'POST', { batchId: batch.id }), 'Stopping after the current item.'); }
+  canGo(lane: Lane) {
+    const items = lane.items.filter(item => item.state === 'ready' && item.context?.batch === lane.batch?.id);
+    if (!items.length) return false;
+    return Boolean(lane.batch && ['draft', 'stopped'].includes(lane.batch.state) && lane.who.id && this.ctx.data()?.symphonyProfiles?.includes(lane.who.id) && items.every(item => agentRunnable(item, this.ctx)));
+  }
+  go(batch: Batch, lane: Lane) { void this.ctx.write(() => this.ctx.api(`/api/projects/${encodeURIComponent(this.ctx.projectId())}/batches/start`, 'POST', { batchId: batch.id, requestedSlots: this.slots(lane) }), `${batch.ref} authorized. It starts when its workers are free.`); }
+  stopBatch(batch: Batch) { void this.ctx.write(() => this.ctx.api(`/api/projects/${encodeURIComponent(this.ctx.projectId())}/batches/stop`, 'POST', { batchId: batch.id }), batch.state === 'queued' ? 'Queued batch canceled.' : 'Stopping after the current item.'); }
   toggleFilter(id: string | null) { this.ctx.boardFilter.set(this.ctx.boardFilter() === id ? null : id); }
   when(at: string | null) { return at ? new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''; }
   keys(event: KeyboardEvent) {

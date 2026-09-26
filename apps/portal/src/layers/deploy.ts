@@ -2,7 +2,7 @@ import { Component, OnInit, computed, effect, inject, signal, untracked } from '
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
-import { ProjectContext } from './context';
+import { ProjectContext, WorkerPool } from './context';
 import { RefChipComponent } from './work-shared';
 
 // Deploy (PLATFORM-UX-01): where the app runs and whether it is OK. Aludel may be the host, so this operates the
@@ -99,6 +99,29 @@ const buildState: Record<string, [string, string]> = { building: ['lay-plain', '
         }
       </div>
     }
+    @case ('agents') {
+      <p class="lay-lead">The execution pool for agent batches. Profiles and assignments live in Work; this runtime supplies worker slots.</p>
+      <div class="lay-grid lay-g2">
+        <section class="lay-card"><h2>Symphony runtime</h2><dl class="lay-kv">
+          <dt>Location</dt><dd>{{ workerPool()?.location || 'This machine' }}</dd>
+          <dt>Status</dt><dd><span class="lay-chip" [class.lay-ok]="workerPool()?.online" [class.lay-warn]="!workerPool()?.online">{{ workerPool()?.online ? 'Online' : 'Offline' }}</span></dd>
+          <dt>Work dispatch</dt><dd>{{ workerPool()?.dispatchEnabled ? 'Enabled' : 'Disabled in this portal' }}</dd>
+          <dt>Last poll</dt><dd>{{ when(workerPool()?.lastSeenAt || undefined) }}</dd>
+          <dt>Capacity</dt><dd>{{ workerPool()?.free || 0 }} free · {{ workerPool()?.used || 0 }} reserved · {{ workerPool()?.reported || 0 }} reported by host</dd>
+          <dt>Profile settings</dt><dd>{{ workerPool()?.profileOverrides ? 'Per-task Codex model and effort supported' : 'Waiting for a host with per-task Codex settings' }}</dd>
+          <dt>Queue</dt><dd>{{ workerPool()?.queued || 0 }} authorized batches waiting</dd></dl>
+          <button type="button" class="lay-button ghost small" (click)="loadWorkers()"><mat-icon aria-hidden="true">refresh</mat-icon>Refresh status</button>
+          @if (!workerPool()?.online) { <p class="lay-muted small">No Symphony host has polled recently. Batches can be authorized and queued; they start only after the host is online. Local host setup is not managed by this portal yet.</p> }
+        </section>
+        <section class="lay-card"><h2>Worker slots</h2>
+          <p class="small">Set the most concurrent agent sessions this project may use. The host also reports its actual capacity; the smaller limit applies.</p>
+          <label>Capacity <input type="number" min="1" max="8" [(ngModel)]="capacityDraft" style="width:5rem"></label>
+          <div class="lay-row lay-gap-top"><button type="button" class="lay-button small" (click)="saveCapacity()">Save capacity</button></div>
+          <p class="lay-muted small">Host credentials are generated and stored in private local data. They are never paired to a Work profile.</p>
+        </section>
+      </div>
+      @if (workerPool()?.active?.length) { <section class="lay-card lay-gap-top"><h2>Active tasks</h2><ul class="lay-list">@for (entry of workerPool()?.active || []; track entry.attemptId) { <li><strong>{{ entry.workRef }} · {{ entry.title }}</strong> · {{ ctx.profileById().get(entry.profileId)?.name || entry.profileId }} · {{ entry.activity }}</li> }</ul></section> }
+    }
     @case ('data') {
       <p class="lay-muted small">Environment: <strong>Preview</strong> ({{ info()?.database?.engine || 'SQLite' }}, <code>{{ info()?.database?.path }}</code>). Production appears once it exists.</p>
       <div class="lay-toggle lay-block" role="group" aria-label="Database views">@for (entry of databaseParts; track entry[0]) { <a [href]="ctx.link('deploy', 'data', entry[0])" (click)="ctx.go(ctx.link('deploy', 'data', entry[0]), $event)" [class.on]="dbPart() === entry[0]" [attr.aria-current]="dbPart() === entry[0] ? 'page' : null">{{ entry[1] }}</a> }</div>
@@ -148,12 +171,14 @@ const buildState: Record<string, [string, string]> = { building: ['lay-plain', '
 })
 export class DeployLayerComponent implements OnInit {
   readonly ctx = inject(ProjectContext);
-  readonly tabs = [['environments', 'Environments'], ['variables', 'Variables'], ['integrations', 'Integrations'], ['data', 'Data']];
-  readonly titles: Record<string, string> = { environments: 'Environments', variables: 'Variables', integrations: 'Integrations', data: 'Data' };
+  readonly tabs = [['environments', 'Environments'], ['variables', 'Variables'], ['integrations', 'Integrations'], ['agents', 'Agents'], ['data', 'Data']];
+  readonly titles: Record<string, string> = { environments: 'Environments', variables: 'Variables', integrations: 'Integrations', agents: 'Agent runtime', data: 'Data' };
   readonly envTabs = [['overview', 'Overview'], ['history', 'History'], ['settings', 'Settings']];
   readonly databaseParts = [['health', 'Health & backups'], ['migrations', 'Schema'], ['browse', 'Browse'], ['query', 'Query']];
   readonly buildState = buildState;
   readonly info = signal<DeployInfo | null>(null);
+  readonly workerPool = signal<WorkerPool | null>(null);
+  capacityDraft = 1;
   readonly releases = signal<{ version: string; commit: string }[]>([]);
   readonly schema = signal<{ type: string; name: string; tableName: string; sql: string }[]>([]);
   readonly grid = signal<Grid | null>(null);
@@ -179,12 +204,14 @@ export class DeployLayerComponent implements OnInit {
       untracked(() => { if (part === 'migrations') void this.loadSchema(); if (part === 'browse' && table) void this.loadBrowse(table); });
     });
   }
-  async ngOnInit() { await this.load(); }
+  async ngOnInit() { await this.load(); await this.loadWorkers(); }
   private base() { return `/api/projects/${encodeURIComponent(this.ctx.projectId())}`; }
   async load() {
     try { this.info.set(await this.ctx.api<DeployInfo>(`${this.base()}/platform`)); } catch (error) { this.ctx.error.set(error instanceof Error ? error.message : String(error)); }
     try { this.releases.set((await this.ctx.api<{ releases: { version: string; commit: string }[] }>(`${this.base()}/code/releases`)).releases); } catch { this.releases.set([]); }
   }
+  async loadWorkers() { try { const status = await this.ctx.api<WorkerPool>(`${this.base()}/agents/symphony`); this.workerPool.set(status); this.capacityDraft = status.configured; } catch (error) { this.ctx.error.set(error instanceof Error ? error.message : String(error)); } }
+  saveCapacity() { void this.ctx.write(async () => { const status = await this.ctx.api<WorkerPool>(`${this.base()}/agents/symphony`, 'PUT', { capacity: Number(this.capacityDraft) }); this.workerPool.set(status); }, 'Agent capacity saved.'); }
   async loadSchema() { try { this.schema.set((await this.ctx.api<{ schema: { type: string; name: string; tableName: string; sql: string }[] }>(`${this.base()}/database/schema`)).schema); } catch { this.schema.set([]); } }
   async loadBrowse(table: string) { try { this.grid.set(await this.ctx.api<Grid>(`${this.base()}/database/browse?table=${encodeURIComponent(table)}`)); } catch (error) { this.grid.set(null); this.ctx.error.set(error instanceof Error ? error.message : String(error)); } }
   async runQuery() {

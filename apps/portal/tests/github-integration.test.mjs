@@ -162,7 +162,7 @@ test('every tracked script with a shebang is committed executable', () => {
   const root = new URL('../../..', import.meta.url).pathname;
   const entries = spawnSync('git', ['ls-files', '-s'], { cwd: root, encoding: 'utf8' }).stdout.trim().split('\n');
   const missing = entries.map(line => /^(\d+) \S+ \d+\t(.+)$/.exec(line)).filter(Boolean)
-    .filter(([, mode, path]) => mode !== '100755' && !path.startsWith('prototypes/') && readFileSync(join(root, path)).subarray(0, 2).toString() === '#!')
+    .filter(([, mode, path]) => mode !== '100755' && !path.startsWith('prototypes/') && existsSync(join(root, path)) && readFileSync(join(root, path)).subarray(0, 2).toString() === '#!')
     .map(([, , path]) => path);
   assert.deepEqual(missing, [], 'Fix with: git update-index --chmod=+x <path> && chmod +x <path>');
 });

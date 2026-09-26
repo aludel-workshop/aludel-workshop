@@ -1,0 +1,50 @@
+diff --git a/elixir/lib/symphony_elixir/orchestrator.ex b/elixir/lib/symphony_elixir/orchestrator.ex
+index b52e991..1da4f28 100644
+--- a/elixir/lib/symphony_elixir/orchestrator.ex
++++ b/elixir/lib/symphony_elixir/orchestrator.ex
+@@ -755,6 +755,8 @@ defmodule SymphonyElixir.Orchestrator do
+   end
+ 
+   defp block_issue_from_entry(%State{} = state, issue_id, running_entry, error) do
++    Task.start(fn -> Tracker.report_blocked(Map.get(running_entry, :issue), error) end)
++
+     blocked_entry = %{
+       issue_id: issue_id,
+       identifier: Map.get(running_entry, :identifier, issue_id),
+diff --git a/elixir/lib/symphony_elixir/tracker.ex b/elixir/lib/symphony_elixir/tracker.ex
+index f588e63..9dfaf01 100644
+--- a/elixir/lib/symphony_elixir/tracker.ex
++++ b/elixir/lib/symphony_elixir/tracker.ex
+@@ -11,6 +11,7 @@ defmodule SymphonyElixir.Tracker do
+   alias SymphonyElixir.Tracker.Issue
+ 
+   @adapters %{
++    "aludel" => SymphonyElixir.Aludel.Adapter,
+     "asana" => SymphonyElixir.Asana.Adapter,
+     "github" => SymphonyElixir.GitHub.Adapter,
+     "gitlab" => SymphonyElixir.GitLab.Adapter,
+@@ -25,9 +26,11 @@ defmodule SymphonyElixir.Tracker do
+   @callback execute_agent_tool(String.t(), term(), keyword()) :: map()
+   @callback secret_environment_names(map()) :: [String.t()]
+   @callback validate_config(map()) :: :ok | {:error, term()}
++  @callback report_blocked(Issue.t(), term()) :: :ok | {:error, term()}
+ 
+   @optional_callbacks agent_tool_specs: 0,
+                       execute_agent_tool: 3,
++                      report_blocked: 2,
+                       validate_config: 1
+ 
+   @spec fetch_issues_by_states([String.t()]) :: {:ok, [Issue.t()]} | {:error, term()}
+@@ -40,6 +43,12 @@ defmodule SymphonyElixir.Tracker do
+     adapter().fetch_issues_by_ids(issue_ids)
+   end
+ 
++  @spec report_blocked(Issue.t(), term()) :: :ok | {:error, term()}
++  def report_blocked(issue, error) do
++    current = adapter()
++    if Code.ensure_loaded?(current) and function_exported?(current, :report_blocked, 2), do: current.report_blocked(issue, error), else: :ok
++  end
++
+   @doc """
+   Captures the selected adapter and effective tracker settings for one
+   app-server session so tool advertisement and execution cannot drift across a

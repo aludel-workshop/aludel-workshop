@@ -1,0 +1,134 @@
+{
+  "schemaVersion": "aludel-task-open-v1",
+  "identity": {
+    "projectId": "project-tool-share",
+    "workId": "W-53",
+    "attemptId": "A-8",
+    "batchId": "B-9",
+    "authorizationEpoch": 1,
+    "manifestDigest": "sha256:example-only-not-a-live-digest"
+  },
+  "task": {
+    "title": "Tighten the pickup promise",
+    "brief": "Make the Brief claim precise about when a reserved tool is ready for pickup.",
+    "primaryRole": {
+      "id": "product",
+      "revision": 2,
+      "name": "Product lead"
+    },
+    "action": {
+      "id": "product.brief",
+      "revision": 5,
+      "name": "Change the Brief"
+    },
+    "status": "authorized"
+  },
+  "guidance": {
+    "role": "Write for the project's audience and distinguish evidence from assumptions.",
+    "action": "Propose short, checkable claims with their support. Ask before removing a claim used elsewhere.",
+    "profile": "Give one recommended wording and explain the tradeoff."
+  },
+  "requiredInputs": [
+    {
+      "id": "claim-14",
+      "kind": "brief_claim",
+      "revision": 3,
+      "summary": "Members can collect a confirmed reservation promptly."
+    },
+    {
+      "id": "finding-8",
+      "kind": "finding",
+      "revision": 2,
+      "summary": "Interviews showed uncertainty about pickup time."
+    },
+    {
+      "id": "decision-9",
+      "kind": "decision",
+      "revision": 1,
+      "summary": "Pickup confirmation is instant in the first release.",
+      "control": true
+    }
+  ],
+  "outputs": [
+    {
+      "key": "claim",
+      "kind": "brief_claim_revision",
+      "operation": "propose_revision",
+      "targetId": "claim-14",
+      "expectedRevision": 3,
+      "ownerLayer": "product",
+      "required": true,
+      "checks": [
+        "The claim is short and testable",
+        "The wording distinguishes observation from a product promise"
+      ],
+      "reviewerRole": "product.review"
+    }
+  ],
+  "capabilities": {
+    "read": {
+      "projectId": "project-tool-share",
+      "relations": [
+        "supports",
+        "contradicts",
+        "decided-by",
+        "derived-from",
+        "supersedes"
+      ],
+      "scope": "project_nonsecret_knowledge",
+      "preferredKinds": [
+        "brief_claim",
+        "story",
+        "source",
+        "finding",
+        "insight",
+        "decision",
+        "doc"
+      ]
+    },
+    "tools": [
+      "task_open",
+      "knowledge_map",
+      "knowledge_search",
+      "knowledge_read",
+      "knowledge_links",
+      "task_status",
+      "task_ask",
+      "record_propose",
+      "task_submit",
+      "task_note"
+    ],
+    "candidateEffects": [
+      "brief_claim:propose_revision:claim-14"
+    ],
+    "prohibitedEffects": [
+      "record:apply",
+      "repository:write",
+      "environment:change",
+      "release:promote"
+    ]
+  },
+  "runtime": {
+    "workspace": "scratch",
+    "baseCommit": null,
+    "runsRemaining": 2,
+    "turnsThisRun": 1
+  },
+  "contextIndex": [
+    {
+      "topic": "Pickup evidence",
+      "seedId": "finding-8",
+      "hint": "Follow supports links to the claim."
+    },
+    {
+      "topic": "Related stories",
+      "query": "pickup confirmation",
+      "hint": "Check that the proposed promise agrees with acceptance."
+    }
+  ],
+  "review": {
+    "submissionRoute": "work_item",
+    "acceptanceAuthority": "human_role_lead",
+    "selfAcceptance": false
+  }
+}

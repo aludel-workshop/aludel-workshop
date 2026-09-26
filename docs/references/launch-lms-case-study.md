@@ -119,3 +119,7 @@ Do not copy a subsystem because it exists there. Begin with the problem and acce
 - What is the smallest subset of the current Symphony workflow that still provides reliable handoff and recovery?
 - Which product-map and design-record structures improve agent work, and which mainly reflect legacy breadth?
 
+
+## 2026-09-25 cached sibling follow-up
+
+A local sibling `../launch-lms-infra` is now present. Its checked-out `main` was `bf270ce8c50ea3e99342819724510b56e4ae754b` and predates Symphony. Its locally cached `origin/main` at `dc2319105dd6ebf161bb3f9d47ce2a309195fedc` contains the Symphony setup; it was inspected with read-only Git object commands, without a fetch or checkout change. At that revision, `symphony/WORKFLOW.md` allows one concurrent agent and 30 turns in each run, retains a workpad across retries and routes review through an exact SHA. `symphony/README.md` states that concurrency/turn limits are not a dollar budget, describes a persistent pause marker and retained workspaces, and keeps provider credentials outside the repo. `symphony/supervise.py` ties orchestrator and evidence-uploader lifetimes. These are source observations, not a local run of that deployment. [LAY-05 application and tests](../evidence/lay-05-budget-recovery.md) record the smaller boundary adopted for Aludel.

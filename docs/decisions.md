@@ -177,11 +177,15 @@ DEC-028 is superseded for interim dispatch by DEC-029. Its bridge evidence and p
 
 ## Accepted architecture decisions
 
-### ADR-008 — Task-driven M1 with a Symphony worker and Linear connector
+### ADR-008 — Task-driven M1 with a Symphony worker and Aludel queue
 
 **Status:** accepted on 2026-09-18 by project direction and R-03/R-06 evidence.
 
-**Decision:** The portal owns projects, task intent, acceptance criteria, decisions, execution authorization, attempts, artifacts, and review history. M1 uses Linear as the first execution-tracker connector and runs the pinned upstream Symphony reference implementation behind a small local runner gateway. Symphony owns scheduling within the connected execution queue and manages Codex App Server sessions and workspaces. The gateway claims authorized portal tasks, performs idempotent tracker mapping, supervises Symphony, translates its current state and Codex updates into the portal event contract, and reports artifacts. Go is a durable task authorization transition; it is not an instruction to open or control an interactive local Codex session.
+**2026-09-25 amendment, accepted by owner in chat:** Aludel Work is Symphony's execution tracker and remains authoritative for readiness, Go authorization, stop/skip, attempts and review. Symphony polls Aludel through a project/profile-scoped worker API and an Aludel tracker adapter. Linear and Jira are optional synchronized views of the same work; neither account is required to run an Aludel project. This replaces the mandatory Linear queue, gateway claim/mirror and Linear account consequences below, while retaining Symphony scheduling, Codex App Server and the portal's durable result/review ownership. External sync may never confer execution eligibility. [Boundary and proof plan](design/lay-05/symphony-adapter.md). The adapter and recovery behavior still require local proof before dispatch is enabled.
+
+**Historical 2026-09-18 rationale below; its mandatory Linear queue is superseded by the amendment.**
+
+**Original decision:** The portal owns projects, task intent, acceptance criteria, decisions, execution authorization, attempts, artifacts, and review history. M1 uses Linear as the first execution-tracker connector and runs the pinned upstream Symphony reference implementation behind a small local runner gateway. Symphony owns scheduling within the connected execution queue and manages Codex App Server sessions and workspaces. The gateway claims authorized portal tasks, performs idempotent tracker mapping, supervises Symphony, translates its current state and Codex updates into the portal event contract, and reports artifacts. Go is a durable task authorization transition; it is not an instruction to open or control an interactive local Codex session.
 
 The first deployment may set concurrency to one while recovery is proven, but task, lease, attempt, event, and connector records support multiple projects and workers from the start. Increasing concurrency is configuration plus capacity, rather than a schema rewrite.
 
@@ -269,7 +273,7 @@ The owner sees the consequence of answering, and can revisit a past answer. A ch
 
 2026-09-20: Owner selected D-01E option 1 (“go go option 1”), then requested an operable review harness after finding missing task controls. Authorized a bounded 70/30 implementation and standards-compliance retrospective. This selects the visual direction and local exploration scope, not complete interaction acceptance or production authorization. See [review harness record](design/portal-visual/v1/review-harness-retrospective.md). D-01E remains open for owner review.
 
-ADR-008 resolves the initial runner direction: durable portal tasks, Linear as the first execution connector, upstream Symphony behind a local gateway, and Codex as the first agent adapter. Treat local execution and concurrency one as bootstrap configuration. Do not regress the interaction into controlling a local Codex session.
+ADR-008 resolves the initial runner direction: durable portal tasks, Aludel as Symphony's tracker, optional Linear/Jira synchronization, and Codex as the first agent adapter. Treat local execution and concurrency one as bootstrap configuration. Do not regress the interaction into controlling a local Codex session.
 
 The next design work is D-01E, consuming the owner-selected D-01F v3 foundation (DEC-025). Preserve enduring product semantics and re-evaluate unaccepted views from intent. Use the same capability contract for Aludel and other projects. Angular Material is selected for continued design work; ADR-003 production architecture remains proposed. No provider account or M1 transition is authorized.
 

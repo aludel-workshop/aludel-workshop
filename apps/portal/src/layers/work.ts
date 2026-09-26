@@ -4,6 +4,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { ProjectContext, layerLabel, lines, workStatusLabel } from './context';
 import { WorkAgentsComponent } from './work-agents';
 import { WorkBoardComponent } from './work-board';
+import { WorkCreateComponent } from './work-create';
 import { WorkItemComponent } from './work-item';
 import { WorkRolesComponent } from './work-roles';
 import { WorkItemsComponent, WorkProjectsComponent } from './work-plan';
@@ -13,9 +14,10 @@ import { WorkTeamComponent } from './work-team';
 // the item page, Roles (who takes each action and how), Agents (who does agent work) and Routines.
 @Component({
   selector: 'aludel-work-layer', standalone: true,
-  imports: [FormsModule, MatIconModule, WorkBoardComponent, WorkItemComponent, WorkRolesComponent, WorkAgentsComponent, WorkItemsComponent, WorkProjectsComponent, WorkTeamComponent],
+  imports: [FormsModule, MatIconModule, WorkBoardComponent, WorkCreateComponent, WorkItemComponent, WorkRolesComponent, WorkAgentsComponent, WorkItemsComponent, WorkProjectsComponent, WorkTeamComponent],
   template: `
-  @if (tab() === 'item') { <aludel-work-item [id]="ctx.segments()[2] || ''" /> }
+  @if (tab() === 'create') { <aludel-work-create /> }
+  @else if (tab() === 'item') { <aludel-work-item [id]="ctx.segments()[2] || ''" /> }
   @else if (tab() === 'agents' && ctx.segments()[2]) { <aludel-work-agents [id]="ctx.segments()[2]" /> }
   @else if (tab() === 'projects' && ctx.segments()[2]) { <aludel-work-projects [selectedId]="ctx.segments()[2]" /> }
   @else {
@@ -69,13 +71,13 @@ export class WorkLayerComponent implements OnDestroy {
   // /work, /work/board, and the old /work/queue and /work/style addresses all land somewhere sensible.
   readonly tab = computed(() => { const segment = this.ctx.segments()[1] || 'board'; return segment === 'queue' ? 'board' : segment === 'style' ? 'roles' : segment; });
   readonly routines = computed(() => this.ctx.data()?.routines || []);
-  readonly live = computed(() => (this.ctx.data()?.batches || []).some(batch => batch.state === 'running' || batch.state === 'stopping'));
+  readonly live = computed(() => (this.ctx.data()?.batches || []).some(batch => ['queued', 'running', 'stopping'].includes(batch.state)));
   newRoutine = { title: '', layer: 'product', type: 'audit', cadence: 'weekly', documents: '' };
   private poll: ReturnType<typeof setInterval> | null = null;
   private clock: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
-    // While a batch runs: reload every two seconds and tick the clock every second, so progress shows without a reload.
+    // While a batch waits or runs: refresh capacity, queue order and progress without a manual reload.
     effect(() => {
       const running = this.live();
       untracked(() => {

@@ -1,0 +1,31 @@
+--- a/elixir/lib/symphony_elixir/codex/app_server.ex
++++ b/elixir/lib/symphony_elixir/codex/app_server.ex
+@@ -357,6 +357,7 @@
+         "approvalPolicy" => approval_policy,
+         "sandboxPolicy" => turn_sandbox_policy
+       }
++      |> Map.merge(codex_turn_overrides(issue))
+     })
+ 
+     case await_response(port, @turn_start_id) do
+@@ -364,6 +365,20 @@
+       other -> other
+     end
+   end
++
++  @spec profile_turn_overrides?() :: boolean()
++  def profile_turn_overrides?, do: true
++
++  defp codex_turn_overrides(%{native_ref: ref}) when is_map(ref) do
++    Enum.reduce([{"codex_model", "model"}, {"codex_effort", "effort"}], %{}, fn {source, target}, acc ->
++      case Map.get(ref, source) do
++        value when is_binary(value) and value != "" -> Map.put(acc, target, value)
++        _ -> acc
++      end
++    end)
++  end
++
++  defp codex_turn_overrides(_), do: %{}
+ 
+   defp await_turn_completion(port, on_message, tool_executor, auto_approve_requests) do
+     receive_loop(

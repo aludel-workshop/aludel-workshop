@@ -372,6 +372,22 @@ try {
   assert.equal(await blockedCard.getByRole('button', { name: 'Stage' }).count(), 0, 'a blocked item offers no Stage');
   await check('work-board-blocked');
 
+  // A person can create an action-bound task from the Board without starting an agent.
+  await page.getByRole('link', { name: 'Create task' }).click();
+  await page.getByRole('heading', { name: 'Create task' }).waitFor();
+  await page.getByLabel('Role', { exact: true }).selectOption('data');
+  await page.getByLabel('Action', { exact: true }).selectOption('data.contract');
+  await page.getByLabel('Task title').fill('Specify pickup data');
+  await page.getByLabel('Task brief').fill('Capture the pickup deadline and who can change it.');
+  await page.getByLabel('Target record').selectOption(snapshot.objects[0].id);
+  await page.getByLabel('Assignee').selectOption(`person:${snapshot.members[0].id}`);
+  await page.getByLabel('Review checks, one per line').fill('The deadline has a clear owner');
+  await page.getByRole('button', { name: 'Create task' }).click();
+  await page.getByText('Capture the pickup deadline and who can change it.').waitFor();
+  await page.getByText('The deadline has a clear owner').waitFor();
+  await check('work-manual-task');
+  await board();
+
   // LAY-04C: routines. The build already ran the security audit; running it again while it is open is refused.
   await tab('Work', 'Routines').click();
   const routines = page.getByRole('region', { name: 'Routines' });

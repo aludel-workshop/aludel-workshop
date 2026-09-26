@@ -2,10 +2,10 @@
 id: status-001
 kind: project-status
 status: active
-updated: 2026-09-24
+updated: 2026-09-25
 current_phase: M1
 phase_state: in-progress
-next_action: PLATFORM-PIPELINE-01
+next_action: WORK-AGENTS-01
 ---
 
 # Current project status
@@ -16,34 +16,24 @@ Turn the running local portal foundation into the first complete request → del
 
 ## Next action
 
-**PLATFORM-PIPELINE-01: projects owned by their owners, run the way Aludel runs** (DEC-046, DEC-047). **Brief and progress:** [work record](design/platform-pipeline/work-record.md).
-- The owner decided (DEC-047):
-  - knowledge location deferred, with a companion repository provisional;
-  - Docker for containers;
-  - GitHub required before creating an app, on a personal account or an organization.
-- **PP-01A done, agent-checked:** previews build from each app's own `Dockerfile` and run one limited container per project. Server tests pass 77/77, and onboarding passes in the browser under Docker. [Evidence §9](design/platform-pipeline/work-record.md#9-pp-01a-container-previews-built-2026-09-24-agent-checked-owner-review-pending).
-- **PP-01B passed (live, 2026-09-24):**
-  - `henrydker/browser-buddy` was created on the personal account with the user token.
-  - The App's push identity (`aludel-workshop[bot]`) was proven with an installation token.
-  - A defect was fixed: pushes had used the person's `gh` credential helper. The portal needs a restart to pick up the fix.
-  - [Evidence §13](design/platform-pipeline/work-record.md#13-pp-01b-verified-2026-09-24-agent-checked-against-live-github).
-- **Next: PP-01C** (GitHub-first onboarding), then PP-01D (Environments), PP-01E (quotas, idle stop, egress).
-- Not authorized: GitHub writes beyond the one throwaway proof, DNS, servers, public hosting or spending.
+**WORK-AGENTS-01: action-neutral agent work across layers**, selected by the owner on 2026-09-25 ahead of LAY-05 browser review. [Work record](design/work-agents/work-record.md). Manual task creation and explicit Symphony adapters now cover representative actions in every layer, including review-only Vision Brief proposals. The old connected-key path no longer receives Go work. Full action coverage, person-paired manifest parity, host profile controls and general parallel Symphony work remain. [Audit-slice evidence](evidence/work-agents-01-audit-slice.md). LAY-05 was selected earlier and its coding proof is preserved. [Authorization and readiness](design/lay-05/work-record.md). Live candidate retention, structured checks, bounded runs, owner reauthorization and process-interruption recovery now pass on disposable work. The owner deferred browser review until Work supports representative action-based tasks; that review remains open before normal production use; the owner requested local Symphony testing with an explicit Go. The Work item displays reserved turns and exhaustion; the pinned overlay compiles and the exact-commit review path has live evidence. The PP-01R bridge remains built; live pairing and PP-01C are deferred, and the blank-project feature trial remains shelved. Owner correction on 2026-09-26: workers are shared capacity, profiles include provider/model/effort, Work must not expose token pairing, and Deploy owns runtime capacity/status. [Worker-pool contract](design/work-agents/worker-pool-contract.md). The manual project/profile binding has been replaced by a private project worker pool and automatic credential provisioning. Local Docker hosts now poll both configured project pools; Deploy reports one slot and per-task Codex profile capability for each. The local portal now starts with Symphony Work dispatch enabled from its ignored env file, so active Codex profiles are assignable in Work. No batch has run. [Host activation and readiness evidence](evidence/work-agents-01-host-online.md).
 
 ## Ready queue
 
-1. **PLATFORM-PIPELINE-01**: PP-01C onboarding (GitHub required, recipe approval) → PP-01D environments → PP-01E guards ([work record](design/platform-pipeline/work-record.md)).
-2. **ICONS-FONTS-01**: icon and font libraries in Design (unblocked in principle by PP-01A; waits behind PLATFORM-PIPELINE-01).
-3. **PAGES-UX-01**: built and agent-checked (DEC-048; [evidence](evidence/pages-ux-01-pages-layer.md)). Next: owner review of the built layer.
-4. **PLATFORM-UX-01**: **built and agent-checked** (DEC-049; [evidence](evidence/platform-ux-01-code-deploy.md)). Next: owner review of the built Code and Deploy layers ([work record](design/platform-layer/work-record.md), [prototype](design/platform-layer/v1/index.html)). It supplies PP-01D's Environments UX and absorbs the Platform half of DATA-PLATFORM-UX-01.
-5. **DATA-PLATFORM-UX-01**: the rest of Data (owner: "perhaps").
-6. **LAY-05**: coding agents against stories (absorbs B-03B), committing with LAY-07's trailers.
-7. **LAY-06**: Aludel's own knowledge into its layers; retire the hash workspace.
+1. **WORK-AGENTS-01**: action-neutral agent contract and Work execution/review across layers; manual task creation and explicit Symphony output adapters across all seven layers built; remaining actions, person-paired card, host profile controls and worker claim fencing remain.
+2. **LAY-05**: coding proof preserved; candidate boundary, direct tracker, live retention, bounded runs and live interruption recovery pass; owner browser review follows the general Work flow.
+3. **PLATFORM-PIPELINE-01**: PP-01C onboarding → PP-01D environments → PP-01E guards ([work record](design/platform-pipeline/work-record.md)).
+4. **ICONS-FONTS-01**: icon and font libraries in Design (unblocked in principle by PP-01A; waits behind PLATFORM-PIPELINE-01).
+5. **PAGES-UX-01**: built and agent-checked (DEC-048; [evidence](evidence/pages-ux-01-pages-layer.md)). Next: owner review of the built layer.
+6. **PLATFORM-UX-01**: **built and agent-checked** (DEC-049; [evidence](evidence/platform-ux-01-code-deploy.md)). Next: owner review of the built Code and Deploy layers ([work record](design/platform-layer/work-record.md), [prototype](design/platform-layer/v1/index.html)). It supplies PP-01D's Environments UX and absorbs the Platform half of DATA-PLATFORM-UX-01.
+7. **DATA-PLATFORM-UX-01**: the rest of Data (owner: "perhaps").
+8. **LAY-06**: Aludel's own knowledge into its layers; retire the hash workspace.
 
 One packet at a time. B-03's worker/artifact/recovery work remains required and must not be displaced by later workspace expansion. [Proposed dependency order](design/project-workspace/v1/delivery-plan.md).
 
 ## Active blockers
 
+- **LAY-05 activation:** ADR-008 selects Aludel as Symphony's tracker. Agent submission, isolated preview, terminal-workspace retention, structured checks and live process-interruption recovery pass on disposable projects. Owner browser review still blocks real-work dispatch.
 - **Operational records:** PW-01A is complete and exposes unavailable states rather than synthetic telemetry. Connected milestone records and live agent/server/spend telemetry still depend on later domain and B-03 work. [Implementation evidence](evidence/pw-01a-work-implementation.md) · [passed design QA](../apps/portal/design-qa.md).
 - **Owner interface validation:** portal-only dispatch is suspended by DEC-029 after ready work became unstartable under stale/open decision checks. The replacement must prove recovery from changed decision inputs before portal-first dispatch returns. Prior request/proposal/authorization evidence remains historical.
 - **Automated execution/review:** full B-03 remains incomplete. B-03B must supply worker transport/leases/recovery and immutable candidate review, including DEC-026 review-bar migration.
@@ -58,7 +48,7 @@ One packet at a time. B-03's worker/artifact/recovery work remains required and 
 - DEC-031 names the self-hosting product Aludel. Project-owned brand metadata and bounded raster uploads now drive the shell; the supplied alchemical workshop art is the current hero. Node 24 typecheck/build, five server/domain suites, and a disposable wide/narrow accessibility browser flow pass. [Evidence/post-hoc](design/process/aludel-brand-work-record.md).
 - D-02 audits 11 request concerns, proposes product-area vs change-centric organization, six owner journeys and phased records/preview/project-setup contracts. [Evidence/post-hoc](design/project-workspace/v1/work-record.md); no strategy features or historical migration implemented.
 - D-04 retains four owner-job surfaces. [V7 reference study](design/project-workspace/v7/work-record.md) records screenshot-backed directions. [V9 composition evidence](design/project-workspace/v9/work-record.md) applies them and passes static desktop/narrow browser checks; no new product interaction or runtime capability is claimed.
-- DEC-029 supersedes DEC-028 for interim dispatch: explicit chat instructions authorize recorded bounded local work. B-03A's portal bridge remains evidence for the replacement, but its current state cannot block work. The portal runs at `http://127.0.0.1:4310`; no automatic worker is connected. [Evidence and retrospective](evidence/b-03a-supervised-cycle.md).
+- DEC-029 supersedes DEC-028 for interim dispatch: explicit chat instructions authorize recorded bounded local work. B-03A's portal bridge remains evidence for the replacement, but its current state cannot block work. The portal runs at `http://127.0.0.1:4310`; two project-scoped local Docker hosts now poll automatically ([activation evidence](evidence/work-agents-01-host-online.md)). [Evidence and retrospective](evidence/b-03a-supervised-cycle.md).
 
 - DEC-027 records the explicit local-only G-00 waiver and owner-confirmed M1 transition. No external effect or spend is implied.
 - B-02 is complete for its local boundary. Saved requests create versioned proposals; decisions use immutable revisions and optimistic conflict checks; exact dependency bindings stale only linked records; reassessment is explicit and starts no execution.
@@ -69,10 +59,31 @@ One packet at a time. B-03's worker/artifact/recovery work remains required and 
 - The vendor-owned GitHub App flow has completed its first live organization trial. The portal binding is `ready` for private `aludel-workshop/aludel-workshop`; the active installation has all-repository access plus Administration/Contents write; local `main`, the portal record and GitHub `main` all resolve to baseline commit `6c54d7a`; 404 tracked files agree; and the ignored `.env`/PEM plus client secret are absent from the commit. Baseline inspection found a dangling tracked `apps/portal/node_modules` symlink and legacy `the-machine[bot]` attribution for follow-up. Organization/personal endpoint-token behavior, state/PKCE, JWT signing, redaction and recovery retain their local/mocked coverage. [Implementation and live evidence](design/process/enterprise-github-app-work-record.md).
 - R-03, R-06B, and R-05 provide the bounded local Codex path, Symphony/Linear direction, and recovery protocol evidence for later B-03 integration.
 
+2026-09-25: **LAY-05 run allowance and recovery checkpoint.** A cached `launch-lms-infra` Symphony revision was compared read-only. Aludel now reserves three one-turn runs per Go-pinned item; a restarted portal preserves the count and unfinished workspace edits. Focused tests pass; a real interrupted Codex turn is unproved. [Evidence and retrospective](evidence/lay-05-budget-recovery.md).
+
+2026-09-25: **LAY-05 live retention check.** One tiny Codex turn submitted a disposable candidate through pinned Symphony. After terminal workspace cleanup and portal restart, exact-commit diff, named checks and isolated preview remained available; the shared project HEAD stayed pinned. [Evidence and retrospective](evidence/lay-05-live-retention.md). LAY-05 remains partial.
+
+2026-09-25: **LAY-05 direct tracker checkpoint.** The owner selected Aludel polling with optional Linear/Jira sync; ADR-008 and architecture now reflect it. Project/profile worker tokens, Go-pinned bundles, HTTP polling/ID refresh, stale-input withdrawal and a pinned Symphony Elixir overlay and host-side workspace hook are built. Disposable Go → poll → refresh → stop and portal-restart checks pass; dispatch remains off by default. [Integration evidence and retrospective](evidence/lay-05-symphony-worker.md) · [adapter guide](../integrations/symphony/README.md).
+
+2026-09-26: **WORK-AGENTS-01 worker-pool correction.** Manual pairing was removed from Work. A private per-project pool credential, profile-pinned task cards, 1–N-slot Go queue, and Deploy runtime status/capacity have disposable evidence. Local Symphony hosts now report one slot each for the two configured projects. Codex model/effort settings are pinned per task and the hosts report the override patch; other providers remain gated. Auto host startup, Elixir/live-turn proof, multi-host fencing and owner browser review remain open. [Evidence and retrospective](evidence/work-agents-01-worker-pool.md).
+
+2026-09-26: **WORK-AGENTS-01 Symphony swap checkpoint.** Live Work Go dispatch uses only Symphony for ten explicit actions across seven layers; review-only proposals/reports and exact acceptance have disposable evidence. The portal is running with dispatch enabled, but W-4 has no paired worker and no live turn was started. Other actions remain gated; Elixir compile and owner browser review remain open; the owner approved retiring mapped legacy tests. [Evidence and retrospective](evidence/work-agents-01-symphony-swap.md).
+
+2026-09-25: **WORK-AGENTS-01 Vision queue correction (superseded).** The owner’s targetless W-4 “write value prop” now stages through its verified connected-key Work batch and produces a Brief claim proposal for Product lead review. The Brief changes only on exact checked acceptance. Provider-stand-in tests and portal build pass; no live turn was started. This direct path is a usability bridge, not the final unified orchestrator. [Evidence and retrospective](evidence/work-agents-01-vision-queue.md).
+
+2026-09-25: **WORK-AGENTS-01 audit slice built.** Go now pins a compact task card for code/security actions; Symphony audit attempts can read scoped knowledge, ask a blocking question and submit a read-only report for Work checklist review. Disposable audit/restart/coding regressions pass; host Elixir compile, real Codex audit, owner browser review and broader layer actions remain. [Evidence and retrospective](evidence/work-agents-01-audit-slice.md).
+
+2026-09-25: **WORK-AGENTS-01 session contract proposed.** A short startup card, immutable task manifest, scoped knowledge search/read/link tools, durable question and typed submission workflow are specified. Security-audit and Vision-edit JSON fixtures use one shape; no new runner or live agent capability is claimed. Next: pure compiler/validator and parity with the existing Symphony and editor bundles. [Contract](design/work-agents/session-contract.md) · [work record](design/work-agents/work-record.md).
+
+2026-09-25: **WORK-AGENTS-01 output-first correction.** The owner deferred the coding proof browser review after a manual security-audit task showed that its agent action has no runner. Layers are being assessed by their primary outputs, governing inputs, activity and review; the audit is the first non-code fixture. [Analysis](design/work-agents/layer-output-model.md) · [work record](design/work-agents/work-record.md). This is design evidence, not all-layer execution proof.
+
+2026-09-25: **LAY-05 manual task creation bridge.** Work › Board now has Create task with role/action, brief, target, assignee, outputs and review checks. A brief reaches the structured runner; unsupported agent actions remain non-runnable. Typecheck, build and focused Work tests pass; the browser scenario is added but unrun because Playwright is unavailable locally. This is a planning and UX bridge, not all-layer agent execution. [Evidence and retrospective](evidence/lay-05-manual-task-creation.md). Owner browser review of the coding proof remains open.
+
 ## Completed packets
 
 | Packet | Result | Evidence |
 |---|---|---|
+| PP-01R | Project-scoped read-only Codex bridge: Work → Team pairing, assigned tasks and live knowledge, saved context bundles, local MCP adapter; agent-checked on a disposable portal; owner live pairing pending | [Evidence/retrospective](evidence/pp-01r-editor-bridge.md), [guide](guides/co-work-with-codex.md) |
 | PLATFORM-UX-01 | Platform split into **Code** and **Deploy**.
 
 **Code:**
@@ -116,6 +127,20 @@ New Operator role. Agent-checked: server 88/89 (1 pre-existing), all browser sui
 | M0 research/design | Product loop, local agent path, runner choice, recovery model, product workflow, knowledge boundary, experience architecture, and design-system strategy | [Execution plan](execution-plan.md), [decision register](decisions.md) |
 
 ## Latest handoff
+
+2026-09-25: **LAY-05 direct agent submission passed; terminal cleanup exposed a review defect.** A real Codex turn called `aludel_commit_candidate`, submitted an exact commit, and produced a healthy isolated Docker preview without moving the shared project. Symphony then deleted its terminal workspace, leaving the candidate detail route at 409; loosely shaped agent checks were stored as unnamed skipped claims. Aludel now snapshots the exact commit before acknowledging submission and requires structured check fields. Focused tests cover clone deletion, portal restart, preview and acceptance from the retained snapshot; the updated adapter compiles. These fixes still need live proof, as do owner browser review, interruption recovery and a durable turn budget. The authorized turn is spent and dispatch stays off. [Evidence and retrospective](evidence/lay-05-agent-submission-snapshot.md).
+
+2026-09-25: **LAY-05 real Codex turn reached code and tests; host commit correction is locally checked.** Codex passed four disposable blog API tests, but its sandbox made `.git` read only. An alternate clone commit was correctly rejected. A new trusted `aludel_commit_candidate` path validates and commits in the registered workspace; focused tests, pinned adapter compilation/mock POST, and operator-assisted submission of the actual agent files to a Docker preview passed. The preview passed API probes and isolated portal sessions; the shared project did not move. Agent-initiated submission, owner browser review, and interruption recovery remain open. The one authorized additional turn is spent; dispatch stays off. [Evidence and retrospective](evidence/lay-05-live-turn-host-commit.md).
+
+2026-09-25: **LAY-05 supervised trial stopped before candidate submission.** Pinned Symphony polled a disposable Go-authorized blog item; the host hook cloned and registered the exact workspace. One Codex App Server process started, but Symphony failed before a turn event or candidate. The workspace stayed clean and all trial processes stopped. an isolated newer CLI passes a no-turn handshake, but writable retained logs and a coding turn still need proof; another live coding turn requires new owner authorization. Dispatch stays off. [Trial evidence and retrospective](evidence/lay-05-live-trial-checkpoint.md).
+
+2026-09-25: **LAY-05 local result and review cycle checked; packet remains partial.** Symphony-owned workspace registration, durable attempts/events, exact-commit submission, isolated Docker preview, Work review and owner acceptance were exercised through a disposable HTTP cycle. The submitted candidate did not move the shared repository; acceptance did. Full server suite 103/104, with only the pre-existing executable-bit failure. The pinned Elixir overlay compiles and its tools pass a local HTTP mock, but a real Symphony/Codex cycle, browser review and live interruption recovery remain unproved; keep dispatch off. [Evidence and retrospective](evidence/lay-05-result-preview-review.md).
+
+2026-09-25: **LAY-05 direct tracker integration remains partial.** The owner accepted Aludel as Symphony's tracker. The scoped worker API, guarded coding Go path, tested workspace hook and pinned Elixir overlay are built; the disposable HTTP/restart test passes. Keep `MACHINE_SYMPHONY_DISPATCH` off until upstream adapter conformance, workspace attachment, result/event intake, candidate preview and exact-commit review are proved. [Evidence and retrospective](evidence/lay-05-symphony-worker.md). PP-01C and the feature trial remain deferred.
+
+2026-09-25: **LAY-05 Symphony correction.** The owner reaffirmed Symphony as the orchestrator. ADR-008 already selected it; a custom coding-agent tool loop was not built. Aludel now has a tested, side-effect-free projection from a Go-snapshotted item and pinned bundle to a Symphony issue (1/1 focused test). [Work record](design/lay-05/work-record.md) · [alignment evidence](evidence/lay-05-symphony-alignment.md). The owner accepted direct Aludel polling with optional Linear/Jira sync; ADR-008 is amended. A scoped worker API and pinned Symphony adapter overlay have focused local tests; live Symphony conformance remains open. Keep coding dispatch gated until scoped context, events, preview and review are proved.
+
+2026-09-25: **LAY-05 active, candidate foundation agent-checked.** The owner selected it ahead of PP-01C. Detached worktrees now preserve the shared repository until review, enforce a pinned clean base and action path permissions, and store commit/check evidence; the project API reads candidates. [Evidence/retrospective](evidence/lay-05-candidate-foundation.md). Focused tests 3/3, typecheck/build pass; full server tests 98/99 with the existing executable-mode failure. Next: container-bound coding executor, candidate preview and independent checks, then Work review/acceptance. Agent batch execution for `platform.implement` remains gated. PP-01C and the feature trial remain deferred.
 
 2026-09-24: **PLATFORM-UX-01 built and agent-checked** (DEC-049; [evidence](evidence/platform-ux-01-code-deploy.md)).
 - Platform is now **Code** (`/code`) and **Deploy** (`/deploy`); old `/platform` links still work.

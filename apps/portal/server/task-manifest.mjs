@@ -1,0 +1,48 @@
+// Compact, model-facing view of a Go-pinned bundle. Effects come from explicit adapters,
+// never from free-form role/action text or the task brief.
+const fail = message => { throw Object.assign(new Error(message), { status: 409 }); };
+const summary = record => String(record.summary || record.description || record.title || record.name || record.text || record.body || '').slice(0, 220);
+
+export function compileTaskManifest(bundle) {
+  const { project, work, guidance, sources, repository, instructionPins } = bundle;
+  if (!project?.id || !work?.id || !guidance?.role?.revision || !guidance?.action?.revision || !guidance?.profile?.revision ||
+      !/^[a-f0-9]{40}$/.test(repository?.commit || '')) fail('The task is missing pinned inputs.');
+  const action = guidance.action;
+  const coding = action.id === 'platform.implement' && action.tools?.includes('code') && action.changes?.some(value => value.startsWith('Code › '));
+  const audit = action.id === 'platform.security' && action.tools?.includes('read') && !action.changes?.length;
+  const proposal = ['product.define', 'product.clarify', 'product.brief', 'data.contract'].includes(action.id) && action.tools?.includes('read');
+  const assessment = ['design.audit', 'pages.a11y', 'deploy.review', 'work.review'].includes(action.id) && action.tools?.includes('read') && !action.changes?.length;
+  if (!coding && !audit && !proposal && !assessment) fail('This action has no task output adapter.');
+  if (action.id === 'product.clarify' && (!work.question || work.question.answer)) fail('Clarification needs an open question.');
+  const inputs = (work.targets || []).map(target => {
+    const source = sources.find(record => record.id === target.id && record.kind === target.kind);
+    if (!source?.revision) fail('A task target has no pinned project revision.');
+    return { id: source.id, kind: source.kind, revision: source.revision, summary: summary(source) };
+  });
+  return {
+    schemaVersion: 'aludel-task-open-v1',
+    identity: { projectId: project.id, workId: work.id, workRef: work.ref, batchId: bundle.batch.id },
+    task: { title: work.title, brief: work.context?.suggestion || '', answeredQuestion: work.question?.answer ? { question: work.question.text, answer: work.question.answer } : null, openQuestion: work.action === 'product.clarify' && work.question && !work.question.answer ? work.question.text : null, role: { id: guidance.role.id, revision: guidance.role.revision, name: guidance.role.name },
+      action: { id: action.id, revision: action.revision, name: action.name }, profile: { id: guidance.profile.id, revision: guidance.profile.revision, name: guidance.profile.name, provider: guidance.profile.provider || 'codex', model: guidance.profile.model || '', effort: guidance.profile.effort || 'medium' } },
+    guidance: { project: guidance.project, role: guidance.role.instructions, action: action.instructions, profile: guidance.profile.instructions,
+      method: audit ? 'Inspect only the pinned source and relevant knowledge. Report severity, affected source, evidence, recommendation, checked scope and unknowns. Ask if a decision blocks the result.' :
+        coding ? 'Implement only the allowed code surface, run relevant checks, and submit the exact candidate commit.' :
+        assessment ? 'Inspect the task scope and relevant project knowledge. Submit a findings report for lead review. Do not change project records or repository files.' :
+        'Read the task and relevant project knowledge. Submit a bounded proposal for Work review. Do not change project records or repository files. Ask if a decision blocks the result.' },
+    requiredInputs: inputs,
+    contextSeeds: sources.filter(record => record.kind === 'doc' && !(work.targets || []).some(target => target.id === record.id))
+      .slice(0, 12).map(record => ({ id: record.id, kind: record.kind, revision: record.revision, summary: summary(record) })),
+    outputs: audit ? [{ key: 'findings', kind: 'security_finding_report', operation: 'submit_for_review', reviewer: 'project owner',
+      checks: work.checks.map(check => check.text) }] : coding ? [{ key: 'code', kind: 'code_candidate', operation: 'commit_for_review', reviewer: 'project owner', checks: work.checks.map(check => check.text) }] :
+      [{ key: 'proposal', kind: assessment ? 'review_report' : action.id === 'product.brief' ? 'vision_claim_proposal' : 'work_proposal', operation: 'submit_for_review', reviewer: 'role lead',
+        shape: assessment ? 'summary; content: scope, findings[{title,evidence,recommendation}], optional uncertainty; usedInputs' :
+          action.id === 'product.brief' ? 'summary; content: section, text, note, basis; usedInputs' :
+          action.id === 'product.define' ? 'summary; content: scenarios[{given,when,then}], optional edges[], questions[]; usedInputs' :
+          action.id === 'product.clarify' ? 'summary; content: options[2..4], recommendation, reasoning; usedInputs' :
+          'summary; content: description, fields[{name,type,required,description,format?}], optional states[]; usedInputs',
+        checks: work.checks.map(check => check.text) }],
+    capabilities: { knowledge: ['map', 'search', 'read'], repository: coding ? 'scoped code candidate' : 'read-only pinned commit',
+      submit: audit ? 'security_report' : coding ? 'code_candidate' : 'work_proposal' },
+    runtime: { repositoryCommit: repository.commit, instructionPins, staleInputs: 'withdraw this attempt when a pinned input changes' }
+  };
+}

@@ -361,10 +361,12 @@ const validators = {
     };
     const effort = data.effort || 'medium';
     if (!efforts.includes(effort)) fail(`Choose an effort: ${efforts.join(', ')}.`);
+    const provider = data.provider || 'codex';
+    if (!['codex', 'openai-api', 'anthropic'].includes(provider)) fail('Choose a supported provider type.');
     const color = String(data.avatar?.color || '').toLowerCase();
     return { key: data.key ? text(data.key, 40, 'Key') : null, name: text(data.name, 40, 'Profile name', true), description: text(data.description ?? data.role, 300, 'Description'),
       avatar: { seed: text(data.avatar?.seed || data.name, 60, 'Avatar seed') || 'agent', color: botColors.includes(color) ? color : botColors[3] },
-      model: text(data.model, 100, 'Model'), effort, instructions: text(data.instructions, 8000, 'Instructions'), context: ids(data.context),
+      provider, model: text(data.model, 100, 'Model'), effort, instructions: text(data.instructions, 8000, 'Instructions'), context: ids(data.context),
       limits: { itemOutput: count(limits.itemOutput, 8000, 20000, 'Output tokens per item'), batchTokens: count(limits.batchTokens, 200000, 10000000, 'Tokens per batch run'),
         monthlyTokens: count(limits.monthlyTokens, 2000000, 1000000000, 'Tokens per month') },
       active: data.active !== false };
@@ -696,6 +698,11 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
   // their layer's role and are deactivated; open work they held moves to the Default agent.
   function ensureAgents(projectId) {
     if (!defaultProfile(projectId)) insert(projectId, 'agent_profile', agentDefaults.defaultProfile, { rationale: 'Default profile' });
+    const configuredDefault = defaultProfile(projectId);
+    if (configuredDefault && configuredDefault.revision === 1 && !configuredDefault.model && agentDefaults.defaultProfile.model) {
+      update(projectId, configuredDefault.id, { provider: agentDefaults.defaultProfile.provider || 'codex', model: agentDefaults.defaultProfile.model },
+        { rationale: `Default model selected by owner (${agentDefaults.defaultProfile.model})` });
+    }
     if (!list(projectId, 'project_instructions').length) insert(projectId, 'project_instructions', { body: agentDefaults.projectInstructions }, { rationale: 'Default project instructions' });
     ensureRoles(projectId);
     const fallback = defaultProfile(projectId);
@@ -984,7 +991,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
   // Status as people see it (WORK-UX-01): backlog, queued, staged (in an agent's batch or a person's list), working,
   // needs you, review, done. The stored states stay as they were.
   // A running batch locks all its items in (claimed); only the one the runner has started is working, the rest wait staged.
-  const statusOf = (state, context) => state === 'suggested' ? 'backlog' : state === 'ready' ? (context?.batch || context?.staged ? 'staged' : 'queued')
+  const statusOf = (state, context) => !['done', 'review', 'needs-input'].includes(state) && context?.executionBlock ? 'blocked' : state === 'suggested' ? 'backlog' : state === 'ready' ? (context?.batch || context?.staged ? 'staged' : 'queued')
     : state === 'claimed' ? (context?.run?.startedAt && !context.run.done ? 'working' : 'staged') : state === 'needs-input' ? 'needs' : state;
   const workRow = item => {
     if (!item) return null;
@@ -1166,6 +1173,13 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
       question = { ...question, answer: chosen, rationale: text(rationale, 1000, 'Reason'), answeredBy: user.name, answeredAt: now() };
       entry(`Answered: ${chosen}`);
       answered = true;
+      if (item.state === 'needs-input' && (item.action === 'platform.security' || item.context?.batch &&
+          db.prepare("SELECT execution_kind FROM agent_batches WHERE id = ?").get(item.context.batch)?.execution_kind === 'symphony')) {
+        nextState = 'ready';
+        context = { ...context, batch: undefined, run: undefined };
+        answered = false; // An audit question does not apply a decision to target records.
+        entry('Ready to stage again with the answer pinned in a new batch');
+      }
     }
     if (assignee !== undefined) {
       if (item.state === 'claimed' || item.state === 'review') fail(`${item.ref} is ${item.state === 'review' ? 'ready for review' : 'being worked on'}; it can't be reassigned now.`, 409);
@@ -1194,7 +1208,25 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     }
     if (state !== undefined) {
       if (!workStates.includes(state)) fail('Unknown work state.');
+      if (state === 'review' && ['product.define', 'product.clarify', 'data.contract', 'design.audit', 'pages.a11y', 'deploy.review', 'work.review'].includes(item.action) && item.assignee?.kind === 'agent' && !item.context?.workProposal?.id)
+        fail('Submit a Work proposal before reviewing this agent task.', 409);
+      if (state === 'review' && item.action === 'product.brief' && item.assignee?.kind === 'agent' && !item.context?.visionProposal?.id)
+        fail('Submit a Vision proposal before reviewing this work.', 409);
+      if (state === 'review' && item.action === 'platform.implement' && item.assignee?.kind === 'agent' &&
+          !db.prepare("SELECT 1 FROM code_candidates WHERE project_id = ? AND work_id = ? AND state = 'review' LIMIT 1").get(projectId, workId))
+        fail('Build and check a code candidate before reviewing this work.', 409);
       if (state === 'done') {
+        if (['product.define', 'product.clarify', 'data.contract', 'design.audit', 'pages.a11y', 'deploy.review', 'work.review'].includes(item.action) && item.assignee?.kind === 'agent' &&
+            (item.state !== 'review' || !input.proposalId || !db.prepare("SELECT 1 FROM symphony_proposals WHERE id = ? AND project_id = ? AND work_id = ? AND state = 'accepted'").get(input.proposalId, projectId, workId)))
+          fail('Accept the exact Work proposal before closing this agent task.', 409);
+        if (item.action === 'product.brief' && item.assignee?.kind === 'agent' && (item.state !== 'review' || !input.visionProposalId ||
+            !db.prepare("SELECT 1 FROM vision_proposals WHERE id = ? AND project_id = ? AND work_id = ? AND state = 'accepted'").get(input.visionProposalId, projectId, workId)))
+          fail('Accept the exact Vision proposal before closing this work.', 409);
+        if (item.action === 'platform.security' && item.assignee?.kind === 'agent' && (item.state !== 'review' || !item.context?.auditReport?.id))
+          fail('Review a submitted security report before closing this work.', 409);
+        if (item.action === 'platform.implement' && item.assignee?.kind === 'agent' &&
+            (item.state !== 'review' || !input.candidateId || !db.prepare("SELECT 1 FROM code_candidates WHERE id = ? AND project_id = ? AND work_id = ? AND state = 'accepted' LIMIT 1").get(input.candidateId, projectId, workId)))
+          fail('Accept an exact, independently checked code candidate before closing this work.', 409);
         if (!outputs.length && !checks.length) fail('Name what this work checks or documents before closing it (DEC-036: logs are not documentation).', 409);
         if (item.state === 'review' && checks.some(check => check.verdict !== 'accept')) fail('Accept every check before accepting the work, or send it back.', 409);
         if (item.state === 'review' && item.action && !mayDo(user, projectId, item.action)) fail(`Only a lead of the ${catalogs.roles.roles.find(role => role.layer === item.action.split('.')[0])?.name || 'role'} can accept ${item.ref}: its action is elevated.`, 403);

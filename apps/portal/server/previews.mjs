@@ -29,23 +29,27 @@ export function previewRuntime(environment = process.env, docker = 'docker') {
   return spawnSync(docker, ['info', '--format', '{{.ServerVersion}}'], { stdio: 'ignore', timeout: 5000 }).status === 0 ? 'docker' : 'process';
 }
 
-export function previewManager({ db, portalRoot, workspaceRoot, logRoot, runtime = 'process', docker = 'docker', limits = containerLimits }) {
-  db.exec(`CREATE TABLE IF NOT EXISTS app_previews (
-    project_id TEXT PRIMARY KEY REFERENCES projects(id), status TEXT NOT NULL, commit_sha TEXT, port INTEGER,
+export function previewManager({ db, portalRoot, workspaceRoot, logRoot, runtime = 'process', docker = 'docker', limits = containerLimits, kind = 'project', dataRoot = null }) {
+  if (!['project', 'candidate'].includes(kind)) throw new Error('Unknown preview kind.');
+  const table = kind === 'candidate' ? 'candidate_previews' : 'app_previews';
+  const owner = kind === 'candidate' ? 'code_candidates' : 'projects';
+  db.exec(`CREATE TABLE IF NOT EXISTS ${table} (
+    project_id TEXT PRIMARY KEY REFERENCES ${owner}(id), status TEXT NOT NULL, commit_sha TEXT, port INTEGER,
     last_error TEXT, built_at TEXT, updated_at TEXT NOT NULL
   )`);
   // Nothing survives a portal restart: previews come back on demand from their last build.
-  db.prepare("UPDATE app_previews SET status = CASE WHEN built_at IS NULL THEN 'failed' ELSE 'stopped' END, port = NULL WHERE status IN ('building', 'starting', 'running')").run();
+  db.prepare(`UPDATE ${table} SET status = CASE WHEN built_at IS NULL THEN 'failed' ELSE 'stopped' END, port = NULL WHERE status IN ('building', 'starting', 'running')`).run();
   mkdirSync(workspaceRoot, { recursive: true });
   mkdirSync(logRoot, { recursive: true });
+  if (dataRoot) mkdirSync(dataRoot, { recursive: true });
   // Process runtime: workspaces resolve the preset's packages through this parent link, so nothing is linked inside a
   // project repository. Containers install each app's own dependencies instead.
   const sharedModules = join(workspaceRoot, 'node_modules');
   if (runtime === 'process' && !existsSync(sharedModules)) symlinkSync(join(portalRoot, 'node_modules'), sharedModules, 'dir');
   // Containers carry the portal instance they belong to, so a second portal (tests, another checkout) never touches them.
-  const instance = createHash('sha256').update(workspaceRoot).digest('hex').slice(0, 12);
+  const instance = createHash('sha256').update(workspaceRoot + (kind === 'candidate' ? ':candidate' : '')).digest('hex').slice(0, 12);
   const containerName = projectId => `aludel-${instance}-${projectId}`;
-  const imageName = projectId => `aludel-preview/${projectId}`;
+  const imageName = projectId => kind === 'candidate' ? `aludel-candidate/${projectId}` : `aludel-preview/${projectId}`;
   const dockerSync = args => spawnSync(docker, args, { encoding: 'utf8', timeout: 30000 });
   // Like child processes, containers don't outlive the portal: previews come back on demand from their last image.
   if (runtime === 'docker') {
@@ -56,12 +60,12 @@ export function previewManager({ db, portalRoot, workspaceRoot, logRoot, runtime
   const processes = new Map();
   const pending = new Map();
 
-  const row = projectId => db.prepare('SELECT * FROM app_previews WHERE project_id = ?').get(projectId);
+  const row = projectId => db.prepare(`SELECT * FROM ${table} WHERE project_id = ?`).get(projectId);
   const logPath = projectId => join(logRoot, `${projectId}.log`);
   function update(projectId, values) {
     const current = row(projectId);
     const next = { status: 'stopped', commit_sha: null, port: null, last_error: null, built_at: null, ...current, ...values, updated_at: now() };
-    db.prepare(`INSERT INTO app_previews(project_id, status, commit_sha, port, last_error, built_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+    db.prepare(`INSERT INTO ${table}(project_id, status, commit_sha, port, last_error, built_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(project_id) DO UPDATE SET status=excluded.status, commit_sha=excluded.commit_sha, port=excluded.port,
       last_error=excluded.last_error, built_at=excluded.built_at, updated_at=excluded.updated_at`)
       .run(projectId, next.status, next.commit_sha, next.port, next.last_error, next.built_at, next.updated_at);
@@ -97,7 +101,7 @@ export function previewManager({ db, portalRoot, workspaceRoot, logRoot, runtime
     update(projectId, { status: 'starting', port: null, last_error: null });
     // Locally the data folder is a bind mount of the workspace's .data, so backups, restore and the Database view
     // read the same file the process runtime used. A server would use a named volume.
-    const dataDirectory = join(workspacePath, '.data');
+    const dataDirectory = dataRoot ? join(dataRoot, projectId) : join(workspacePath, '.data');
     mkdirSync(dataDirectory, { recursive: true });
     const log = createWriteStream(logPath(projectId), { flags: 'a' });
     const run = dockerSync(['run', '-d', '--name', name, '--label', `aludel.preview=${instance}`, '--label', `aludel.project=${projectId}`,

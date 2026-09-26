@@ -21,4 +21,9 @@ if [[ ! -x node_modules/.bin/vite ]]; then
 fi
 
 npm run build
+
+if ! "$machine_root/integrations/symphony/local-hosts"; then
+  echo "Symphony local hosts: startup failed; the portal will start and queued agent work will remain Blocked." >&2
+fi
+
 exec node --env-file-if-exists="$machine_root/.env" server/server.mjs

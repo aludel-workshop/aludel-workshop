@@ -1,0 +1,133 @@
+{
+  "schemaVersion": "aludel-task-open-v1",
+  "identity": {
+    "projectId": "project-tool-share",
+    "workId": "W-52",
+    "attemptId": "A-7",
+    "batchId": "B-9",
+    "authorizationEpoch": 1,
+    "manifestDigest": "sha256:example-only-not-a-live-digest"
+  },
+  "task": {
+    "title": "Security audit for the release candidate",
+    "brief": "Check access and session handling before review of this release.",
+    "primaryRole": {
+      "id": "platform",
+      "revision": 3,
+      "name": "Engineer"
+    },
+    "action": {
+      "id": "platform.security",
+      "revision": 4,
+      "name": "Security audit"
+    },
+    "status": "authorized"
+  },
+  "guidance": {
+    "role": "Own code quality and explain risks in terms of affected behavior.",
+    "action": "Report each finding with severity, exact affected revision, evidence, uncertainty and a suggested next action. This audit cannot edit code.",
+    "profile": "Be concise; distinguish observed failures from inferred risk."
+  },
+  "requiredInputs": [
+    {
+      "id": "code:9b77e1a",
+      "kind": "repository_commit",
+      "revision": "9b77e1a",
+      "summary": "Release candidate base; inspect only files relevant to access and sessions."
+    },
+    {
+      "id": "rule-access-3",
+      "kind": "access_rule",
+      "revision": 2,
+      "summary": "Members may read only their own reservations."
+    },
+    {
+      "id": "decision-12",
+      "kind": "decision",
+      "revision": 1,
+      "summary": "Do not publish a release with a known cross-account read path.",
+      "control": true
+    }
+  ],
+  "outputs": [
+    {
+      "key": "findings",
+      "kind": "security_finding_report",
+      "operation": "create_candidate",
+      "ownerLayer": "platform",
+      "required": true,
+      "checks": [
+        "Each finding has severity, affected revision, evidence and reproduction or reasoning",
+        "Unknowns are stated"
+      ],
+      "reviewerRole": "platform.review"
+    }
+  ],
+  "capabilities": {
+    "read": {
+      "projectId": "project-tool-share",
+      "relations": [
+        "supports",
+        "contradicts",
+        "decided-by",
+        "implements",
+        "tests",
+        "supersedes"
+      ],
+      "scope": "project_nonsecret_knowledge",
+      "preferredKinds": [
+        "story",
+        "data_object",
+        "access_rule",
+        "decision",
+        "doc",
+        "source",
+        "finding"
+      ]
+    },
+    "tools": [
+      "task_open",
+      "knowledge_map",
+      "knowledge_search",
+      "knowledge_read",
+      "knowledge_links",
+      "task_status",
+      "task_ask",
+      "finding_stage",
+      "task_submit",
+      "task_note"
+    ],
+    "candidateEffects": [
+      "security_finding_report:create"
+    ],
+    "prohibitedEffects": [
+      "repository:write",
+      "record:apply",
+      "environment:change",
+      "release:promote"
+    ]
+  },
+  "runtime": {
+    "workspace": "read_only_repository_plus_scratch",
+    "baseCommit": "9b77e1a",
+    "runsRemaining": 2,
+    "turnsThisRun": 1
+  },
+  "contextIndex": [
+    {
+      "topic": "Access rules",
+      "seedId": "rule-access-3",
+      "hint": "Follow decided-by and implements links."
+    },
+    {
+      "topic": "Session handling",
+      "query": "session authorization",
+      "hint": "Search within permitted records if the code points to a contract."
+    }
+  ],
+  "review": {
+    "submissionRoute": "work_item",
+    "acceptanceAuthority": "human_role_lead",
+    "selfAcceptance": false
+  }
+}

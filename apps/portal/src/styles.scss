@@ -548,9 +548,9 @@ aludel-ref,aludel-role-chip,aludel-assignee{display:inline-flex;max-width:100%;m
 .lay-item-titles{flex:1;min-width:280px}
 .lay-item-meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:8px}
 .lay-st{display:inline-flex;align-items:center;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap;background:var(--machine-panel);color:var(--machine-muted)}
-.lay-st-working{background:var(--mat-sys-primary-container);color:var(--mat-sys-on-primary-container)}.lay-st-review,.lay-st-done{background:var(--lay-ok-bg);color:var(--lay-ok-ink)}.lay-st-needs{background:var(--machine-waiting-bg);color:#6b4500}
+.lay-st-working{background:var(--mat-sys-primary-container);color:var(--mat-sys-on-primary-container)}.lay-st-blocked{background:var(--machine-blocked-bg);color:var(--machine-blocked-ink)}.lay-st-review,.lay-st-done{background:var(--lay-ok-bg);color:var(--lay-ok-ink)}.lay-st-needs{background:var(--machine-waiting-bg);color:#6b4500}
 .lay-runbox{margin:0 0 22px;padding:14px 16px;border:1px solid var(--machine-line);border-radius:16px;background:#fff}
-.lay-runbox-live{border-color:color-mix(in srgb,var(--machine-accent) 45%,var(--machine-line))}
+.lay-runbox-live{border-color:color-mix(in srgb,var(--machine-accent) 45%,var(--machine-line))}.lay-runbox-blocked{border-color:var(--machine-blocked-ink);background:var(--machine-blocked-bg)}
 .lay-runbox header{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:12px}
 .lay-main .lay-runbox h2{display:flex;align-items:center;gap:6px;margin:0;font-size:15px}.lay-runbox h2 mat-icon{width:20px;height:20px;font-size:20px}
 .lay-runbox .lay-ticker{margin-left:auto}

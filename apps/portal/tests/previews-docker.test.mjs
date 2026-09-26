@@ -7,6 +7,7 @@ import { request } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
+import { initCodeCandidates } from '../server/code-candidates.mjs';
 import { createUser, initAccounts } from '../server/accounts.mjs';
 import { initKnowledge, knowledge } from '../server/knowledge.mjs';
 import { initOnboarding, loadCatalogs, onboarding } from '../server/onboarding.mjs';
@@ -106,6 +107,34 @@ test('a preview builds from the app\'s Dockerfile and runs in one limited contai
   } finally {
     previews.stopAll(); other.stopAll();
     docker('image', 'rm', '-f', `aludel-preview/${project.id}`);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+
+test('candidate preview has separate container, image, state and runtime data', { skip: !dockerReady && 'Docker is not reachable', timeout: 600_000 }, async () => {
+  const root = mkdtempSync(join(tmpdir(), 'aludel-candidate-preview-'));
+  const { db, project, workspace } = generatedApp(root);
+  initCodeCandidates(db);
+  const candidateId = 'can-00000000-0000-4000-8000-000000000001';
+  db.prepare(`INSERT INTO code_candidates(id, project_id, work_id, state, base_commit, candidate_commit, worktree_path, created_at)
+    VALUES (?, ?, ?, 'submitted', ?, ?, ?, ?)`).run(candidateId, project.id, 'work-test', 'a'.repeat(40), 'b'.repeat(40), workspace, new Date().toISOString());
+  const projectPreview = previewManager({ db, portalRoot: new URL('..', import.meta.url).pathname, workspaceRoot: join(root, 'workspaces'),
+    logRoot: join(root, 'project-logs'), runtime: 'docker' });
+  const candidate = previewManager({ db, portalRoot: new URL('..', import.meta.url).pathname, workspaceRoot: join(root, 'candidate-workspaces'),
+    logRoot: join(root, 'candidate-logs'), dataRoot: join(root, 'candidate-data'), kind: 'candidate', runtime: 'docker' });
+  try {
+    const status = await candidate.build(candidateId, workspace, 'b'.repeat(40));
+    assert.equal(status.status, 'running', status.log);
+    assert.ok((await candidate.probe(candidateId)).ok);
+    assert.equal((await post(status.running ? (await candidate.ensureRunning(candidateId, '')) : 0, '/api/sign-up',
+      { email: 'a@b.co', name: 'A', password: 'longenough1' })).status, 201);
+    assert.ok(existsSync(join(root, 'candidate-data', candidateId, 'app.sqlite')));
+    assert.equal(existsSync(join(workspace, '.data')), false, 'candidate preview did not write inside the Git workspace');
+    assert.equal(db.prepare('SELECT count(*) AS count FROM app_previews WHERE project_id = ?').get(project.id).count, 0);
+  } finally {
+    candidate.stopAll(); projectPreview.stopAll();
+    docker('image', 'rm', '-f', `aludel-candidate/${candidateId}`);
     rmSync(root, { recursive: true, force: true });
   }
 });

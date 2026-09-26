@@ -9,8 +9,15 @@ import { Assignee, Batch, ProjectContext, WorkItem, layerLabel, priorityIcon, pr
 // WORK-UX-01 shared pieces for the Work layer: every person and agent looks the same everywhere, every referenced record
 // is a chip with a hover card, and every item is one card whether it sits in a batch or in the stack.
 
-// Actions agents can run today (the runner's tasks); others need a person until LAY-05.
-export const agentRunnable = (item: WorkItem) => item.action === 'product.define' || item.action === 'data.contract' || (item.action === 'product.clarify' && Boolean(item.question && !item.question.answer));
+// Only explicitly adapted actions and compatible profiles can be staged; host capacity is checked when queued work starts.
+const symphonyActions = new Set(['platform.implement', 'platform.security', 'product.define', 'product.clarify', 'product.brief', 'data.contract', 'design.audit', 'pages.a11y', 'deploy.review', 'work.review']);
+export const agentRunnable = (item: WorkItem, ctx: ProjectContext) => Boolean(item.action && symphonyActions.has(item.action) &&
+  item.assignee?.kind === 'agent' && ctx.data()?.symphonyProfiles?.includes(item.assignee.id || '') &&
+  (item.action !== 'product.clarify' || Boolean(item.question && !item.question.answer)) &&
+  (item.action !== 'product.brief' || item.targets.length <= 1 && item.targets.every(target => target.kind === 'brief_claim')) &&
+  (item.action !== 'product.define' || item.targets.some(target => target.kind === 'story')) &&
+  (item.action !== 'data.contract' || item.targets.some(target => target.kind === 'data_object')) &&
+  (item.action !== 'platform.implement' || item.targets.some(target => target.kind === 'story')));
 export const batchOf = (ctx: ProjectContext, item: WorkItem): Batch | null => (item.context?.batch && ctx.data()?.batches.find(batch => batch.id === item.context?.batch)) || null;
 export const isRunning = (batch: Batch | null) => Boolean(batch && (batch.state === 'running' || batch.state === 'stopping'));
 export const elapsed = (from: string | undefined, to: number) => {
@@ -94,7 +101,7 @@ export class RefChipComponent {
 @Component({
   selector: 'aludel-assignee', standalone: true, imports: [MatIconModule, MatMenuModule, MatTooltipModule, AvatarComponent],
   template: `
-  <span class="lay-split" [class.lay-split-agent]="assignee()?.kind === 'agent'" [style.--lay-metal]="metal()" [class.lay-split-warn]="assignee()?.kind === 'agent' && !ctx.agentReady()">
+  <span class="lay-split" [class.lay-split-agent]="assignee()?.kind === 'agent'" [style.--lay-metal]="metal()" [class.lay-split-warn]="assignee()?.kind === 'agent' && !ctx.data()?.symphonyProfiles?.length">
     <a class="lay-split-who" [href]="whoHref()" (click)="openWho($event)" [attr.aria-label]="label() + ': ' + ctx.whoName(assignee())"><aludel-avatar [who]="assignee()" /><span>{{ ctx.whoName(assignee()) }}</span></a>
     @if (assignee()?.kind !== 'template') {
       <button type="button" class="lay-split-drop" [matMenuTriggerFor]="menu" [disabled]="!!locked()" [matTooltip]="locked() || ''" [attr.aria-label]="locked() ? 'Assignee locked: ' + locked() : 'Change ' + label().toLowerCase()">
@@ -109,10 +116,10 @@ export class RefChipComponent {
     }
     <p class="lay-menu-head">Agent profiles</p>
     @for (profile of activeProfiles(); track profile.id) {
-      <button mat-menu-item type="button" [disabled]="!ctx.agentReady()" (click)="changed.emit({ kind: 'agent', id: profile.id })"><aludel-avatar [who]="{ kind: 'agent', id: profile.id }" />
+      <button mat-menu-item type="button" [disabled]="!ctx.data()?.symphonyProfiles?.includes(profile.id)" (click)="changed.emit({ kind: 'agent', id: profile.id })"><aludel-avatar [who]="{ kind: 'agent', id: profile.id }" />
         <span>{{ profile.name }}<small>{{ profile.model || 'Account default' }} · {{ profile.effort }} effort</small></span>@if (isCurrent('agent', profile.id)) { <mat-icon class="lay-menu-check" aria-label="current">check</mat-icon> }</button>
     }
-    @if (!ctx.agentReady()) { <p class="lay-menu-note"><mat-icon aria-hidden="true">power_off</mat-icon>Connect an agent account to choose an agent.</p> }
+    @if (!ctx.data()?.symphonyProfiles?.length) { <p class="lay-menu-note"><mat-icon aria-hidden="true">power_off</mat-icon>Create a Codex agent profile to assign agent work. Other providers need a runtime adapter.</p> }
     <a mat-menu-item [href]="ctx.link('work', 'agents')" (click)="ctx.go(ctx.link('work', 'agents'), $event)"><mat-icon aria-hidden="true">tune</mat-icon><span>Manage agent profiles</span></a>
   </mat-menu>`
 })
@@ -162,13 +169,14 @@ export class RoleChipComponent {
   selector: 'aludel-work-card', standalone: true, imports: [MatIconModule, MatTooltipModule, RefChipComponent, AssigneeComponent, PriorityComponent, RoleChipComponent],
   template: `
   @if (item(); as work) {
-    <article class="lay-wc" [class.lay-wc-second]="!!parts().second" [class.lay-wc-skipped]="work.context?.skip" [class.lay-wc-blocked]="work.blockedBy.length" [attr.aria-label]="work.ref + ' ' + work.title">
+    <article class="lay-wc" [class.lay-wc-second]="!!parts().second" [class.lay-wc-skipped]="work.context?.skip" [class.lay-wc-blocked]="work.blockedBy.length || work.status === 'blocked'" [attr.aria-label]="work.ref + ' ' + work.title">
       <div class="lay-wc-row">
         <div class="lay-wc-main">
           <div class="lay-wc-title"><aludel-priority [value]="work.priority" /><span class="lay-wc-ref">{{ work.ref }}</span>
             <a [href]="ctx.link('work', 'item', work.id)" (click)="ctx.go(ctx.link('work', 'item', work.id), $event)">{{ work.title }}</a></div>
           <div class="lay-wc-meta"><aludel-role-chip [layer]="work.layer" [action]="work.action" /><aludel-assignee [assignee]="work.assignee" [locked]="lock()" (changed)="reassign($event)" />
-            @for (blocker of work.blockedBy; track blocker) { <span class="lay-blocked"><mat-icon aria-hidden="true">block</mat-icon>Blocked by</span><aludel-ref [id]="blocker" [short]="true" /> }</div>
+            @for (blocker of work.blockedBy; track blocker) { <span class="lay-blocked"><mat-icon aria-hidden="true">block</mat-icon>Blocked by</span><aludel-ref [id]="blocker" [short]="true" /> }
+            @if (work.context?.executionBlock; as block) { <span class="lay-blocked" [matTooltip]="block.reason"><mat-icon aria-hidden="true">block</mat-icon>{{ block.reason }}</span> }</div>
         </div>
         <div class="lay-wc-act">
           @switch (parts().primary) {
@@ -185,6 +193,9 @@ export class RoleChipComponent {
                 @case ('skip') { <span class="lay-wc-sec"><button type="button" class="lay-button ghost small" (click)="update({ skip: true }, work.ref + ' skipped for this run.')"><mat-icon aria-hidden="true">lock</mat-icon>Skip this run</button></span> }
                 @case ('include') { <span class="lay-wc-sec"><button type="button" class="lay-button ghost small" (click)="update({ skip: false }, work.ref + ' is back in this run.')"><mat-icon aria-hidden="true">lock_open</mat-icon>Include</button></span> }
                 @case ('stop') { <span class="lay-wc-sec"><button type="button" class="lay-button ghost small" (click)="update({ stop: true }, 'Stopping ' + work.ref + '.')"><mat-icon aria-hidden="true">stop_circle</mat-icon>Stop</button></span> }
+                @case ('deploy') { <span class="lay-wc-sec"><a class="lay-button ghost small" [href]="ctx.link('deploy', 'agents')" (click)="ctx.go(ctx.link('deploy', 'agents'))">Open Deploy</a></span> }
+                @case ('agents') { <span class="lay-wc-sec"><a class="lay-button ghost small" [href]="ctx.link('work', 'agents')" (click)="ctx.go(ctx.link('work', 'agents'))">Manage agent</a></span> }
+                @case ('retry') { <span class="lay-wc-sec">@if (work.context?.batch) { <a class="lay-button ghost small" [href]="ctx.link('work')">Open batch</a> } @else { <button type="button" class="lay-button ghost small" (click)="update({ stage: true }, work.ref + ' staged to retry.')">Stage again</button> }</span> }
               }
             }
           }
@@ -221,13 +232,14 @@ export class WorkCardComponent {
       case 'queued':
         if (work.blockedBy.length) return { status: 'Blocked', icon: 'block', tone: 'blocked' };
         if (!work.assignee) return { primary: 'stage', disabled: 'Assign it to someone first' };
-        if (agent && !agentRunnable(work)) return { primary: 'stage', disabled: `Agents can't run “${this.ctx.actionById().get(work.action || '')?.name || work.type}” yet. Assign it to a person.` };
+        if (agent && !agentRunnable(work, this.ctx)) return { primary: 'stage', disabled: `Agents can't run “${this.ctx.actionById().get(work.action || '')?.name || work.type}” yet. Assign it to a person.` };
         return { primary: 'stage' };
       case 'staged':
         if (!agent) return { primary: 'done', second: 'unstage' };
         if (isRunning(this.batch())) return work.context?.skip ? { status: 'Skipped this run', icon: 'lock', tone: 'skipped', second: 'include' } : { status: '', second: 'skip' };
         return { status: 'Staged', icon: 'playlist_add_check', tone: 'staged', second: 'unstage' };
       case 'working': return { status: 'Working', icon: 'progress_activity', tone: 'working', second: 'stop' };
+      case 'blocked': return { status: 'Blocked', icon: 'block', tone: 'blocked', second: work.context?.executionBlock?.recovery || undefined };
       case 'needs': return { primary: 'answer' };
       case 'review': return { primary: 'review' };
       default: return { status: `Done${work.updatedAt ? ' · ' + new Date(work.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}`, icon: 'check_circle', tone: 'done' };

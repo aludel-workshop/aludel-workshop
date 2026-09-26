@@ -1,7 +1,7 @@
 import { initWorkflow, workList, workOperation } from './workflow.mjs';
 import { createServer } from 'node:http';
 import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { aludelProjectId, createExternalUser, createLoginTicket, createSession, createUser, endSession, getUser, redeemLoginTicket, initAccounts, isMember, ownerUserId, requireMember, saveAvatar, sessionUser, userProjects, verifyUser } from './accounts.mjs';
 import { hostTopology } from './hosts.mjs';
 import { initOnboarding, loadCatalogs, onboarding } from './onboarding.mjs';
@@ -13,7 +13,13 @@ import { codeLinks, initCodeLinks, workspaceIsIndexable } from './code-links.mjs
 import { initPlatformOps, platformOps } from './platform-ops.mjs';
 import { codeReleases, initCodeLayer, readDocs, readSource, readStack, readVariables, starterDocs, trackedFiles } from './code-layer.mjs';
 import { agentRuns, initAgentRuns } from './agent-runs.mjs';
+import { codeCandidates, initCodeCandidates } from './code-candidates.mjs';
+import { editorBridge, initEditorBridge } from './editor-bridge.mjs';
+import { symphonyWorker, initSymphonyWorker } from './symphony-worker.mjs';
+import { providerModelCatalog } from './provider-models.mjs';
 import { extname, join, normalize, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { importCorpus } from './importer.mjs';
 import { openDatabase } from './storage.mjs';
@@ -45,12 +51,17 @@ initCodeLinks(db);
 initPlatformOps(db);
 initCodeLayer(db);
 initAgentRuns(db);
+initCodeCandidates(db);
+initEditorBridge(db);
+initSymphonyWorker(db);
 const secrets = openSecretStore(dataDirectory);
 const topology = hostTopology(process.env, port);
 const setupConfigPath = join(portalRoot, 'config', 'project-setup.json');
 const gitSetup = loadGitProfile(setupConfigPath, 'the-machine');
 const projectGitProfile = (config => config.sourceControlProfiles[config.defaultSourceControlProfile])(JSON.parse(readFileSync(setupConfigPath, 'utf8')));
 const catalogs = loadCatalogs(join(portalRoot, 'config'));
+const localSymphonyCodex = '/tmp/aludel-codex-cli-preflight/node_modules/.bin/codex';
+const modelCatalog = providerModelCatalog({ codexCommand: process.env.MACHINE_CODEX_COMMAND || (existsSync(localSymphonyCodex) ? localSymphonyCodex : 'codex') });
 const scaffoldSources = loadScaffoldSources(portalRoot);
 const workspaceRoot = join(dataDirectory, 'workspaces');
 const previews = previewManager({ db, portalRoot, workspaceRoot, logRoot: join(dataDirectory, 'preview-logs'), runtime: previewRuntime() });
@@ -89,7 +100,47 @@ const links = codeLinks({ db, know });
 const ops = platformOps({ db, backupRoot: join(dataDirectory, 'backups') });
 const codeRelease = codeReleases({ db });
 const storyRefs = projectId => know.list(projectId, 'story').map(story => ({ ...story, ref: `S${story.number}` }));
-const runs = agentRuns({ db, know, secrets, providers: catalogs.agentProviders.providers });
+const symphonyWorkspaceRoot = resolve(process.env.MACHINE_SYMPHONY_WORKSPACE_ROOT || join(dataDirectory, 'symphony-workspaces'));
+const candidates = codeCandidates({ db, candidateRoot: join(dataDirectory, 'code-candidates'), externalRoot: symphonyWorkspaceRoot });
+const candidatePreviews = previewManager({ db, portalRoot, workspaceRoot: join(dataDirectory, 'candidate-preview-workspaces'),
+  logRoot: join(dataDirectory, 'candidate-preview-logs'), dataRoot: join(dataDirectory, 'candidate-preview-data'), runtime: 'docker', kind: 'candidate' });
+const candidateHost = id => `candidate-${createHash('sha256').update(id).digest('hex').slice(0, 12)}`;
+function settleSymphonyBatch(projectId, batchId) {
+  if (!batchId) return;
+  const row = db.prepare("SELECT items_json FROM agent_batches WHERE id = ? AND project_id = ? AND execution_kind = 'symphony' AND state = 'running'").get(batchId, projectId);
+  if (!row) return;
+  const unresolved = Boolean(db.prepare("SELECT 1 FROM symphony_attempts WHERE batch_id = ? AND state IN ('authorized', 'working')").get(batchId));
+  if (!unresolved) {
+    db.prepare("UPDATE agent_batches SET state = 'done', finished_at = ? WHERE id = ?").run(new Date().toISOString(), batchId);
+    if (typeof runs !== 'undefined') runs.admit(projectId);
+  }
+}
+const worker = symphonyWorker({ db, know, candidates, workspaceRoot: symphonyWorkspaceRoot });
+const symphonyDispatchEnabled = process.env.MACHINE_SYMPHONY_DISPATCH === '1';
+const workerPoolView = projectId => ({ ...worker.poolStatus(projectId), dispatchEnabled: symphonyDispatchEnabled });
+
+const runtimeBlockedWork = (view, batches, pool) => {
+  const batchById = new Map(batches.map(batch => [batch.id, batch]));
+  const profileById = new Map(view.profiles.map(profile => [profile.id, profile]));
+  return view.work.map(item => {
+    if (item.context?.executionBlock || !item.context?.batch) return item;
+    const batch = batchById.get(item.context.batch);
+    if (batch?.state !== 'queued') return item;
+    const profile = profileById.get(batch.profileId);
+    const block = !pool.dispatchEnabled
+      ? { code: 'dispatch-disabled', reason: 'Symphony dispatch is disabled for this project.', recovery: 'deploy' }
+      : !pool.online
+        ? { code: 'host-offline', reason: 'The Symphony host is offline.', recovery: 'deploy' }
+        : (profile?.model || (profile?.effort || 'medium') !== 'medium') && !pool.profileOverrides
+          ? { code: 'profile-unsupported', reason: 'The Symphony host cannot apply this profile’s model and effort.', recovery: 'deploy' }
+          : null;
+    return block ? { ...item, status: 'blocked', context: { ...(item.context || {}), executionBlock: block } } : item;
+  });
+};
+const ensureWorkerPool = projectId => worker.ensurePool(projectId, join(dataDirectory, 'symphony', projectId, 'worker-token'));
+for (const projectId of layerProjects()) ensureWorkerPool(projectId);
+const runs = agentRuns({ db, know, worker, symphonyDispatch: symphonyDispatchEnabled });
+const editor = editorBridge({ db, know, projectSetup: (user, id) => flows.projectSetup(user, id), previewStatus: id => previews.status(id) });
 // LAY-04: routines that are due create work, and each layer's gaps become backlog items (DEC-041). At start-up, then every ten minutes.
 function tickRoutines() {
   for (const projectId of layerProjects()) {
@@ -245,7 +296,7 @@ async function api(request, response, url) {
   });
   // WORK-UX-01: each person's avatar (DiceBear Big Smile options), shown wherever work is assigned to them.
   if (url.pathname === '/api/account/avatar' && request.method === 'PUT') {
-    if (!user) return json(response, 401, { error: 'Sign in to continue.' });
+  if (!user) return json(response, 401, { error: 'Sign in to continue.' });
     return json(response, 200, { user: saveAvatar(db, user.id, (await readJson(request)).avatar ?? null) });
   }
   if (url.pathname === '/api/onboarding/catalog' && request.method === 'GET') return json(response, 200, flows.catalog());
@@ -326,6 +377,68 @@ async function api(request, response, url) {
     response.writeHead(302, { location: result.returnTo || '/#/the-machine/overview?github=installed' });
     return response.end();
   }
+  // Editor tokens are accepted only on these read-only routes, never as portal sessions or write authority.
+  if (url.pathname.startsWith('/api/editor/')) {
+    if (request.method !== 'GET') return json(response, 405, { error: 'Read only.' });
+    const { user: editorUser, projectId } = editor.authenticate(request.headers.authorization);
+    const path = url.pathname.slice('/api/editor/'.length).split('/').map(decodeURIComponent);
+    if (path[0] === 'me' && path.length === 1) return json(response, 200, { projectId, user: editorUser, tools: editor.tools }, { 'cache-control': 'no-store' });
+    if (path[0] === 'tasks' && path.length === 1) return json(response, 200, { tasks: editor.assigned(editorUser, projectId) }, { 'cache-control': 'no-store' });
+    if (path[0] === 'tasks' && path.length === 2) return json(response, 200, editor.context(editorUser, projectId, path[1]), { 'cache-control': 'no-store' });
+    if (path[0] === 'bundles' && path.length === 2) return json(response, 200, editor.saved(editorUser, projectId, path[1]), { 'cache-control': 'no-store' });
+    if (path[0] === 'records' && path.length === 2) {
+      const value = url.searchParams.get('revision');
+      return json(response, 200, editor.record(projectId, path[1], value === null ? null : Number(value)), { 'cache-control': 'no-store' });
+    }
+    if (path[0] === 'search' && path.length === 1) return json(response, 200, { results: editor.search(projectId, url.searchParams.get('q')) }, { 'cache-control': 'no-store' });
+    if (path[0] === 'environment' && path.length === 1) return json(response, 200, editor.environment(editorUser, projectId), { 'cache-control': 'no-store' });
+    return json(response, 404, { error: 'Not found.' });
+  }
+  // Symphony host credentials have no browser/session authority. Pool requests resolve their pinned profile per attempt.
+  if (url.pathname.startsWith('/api/worker/')) {
+    const workerAuth = worker.authenticate(request.headers.authorization);
+    const attemptRoute = /^\/api\/worker\/attempts\/([^/]+)(?:\/(workspace|runs|events|candidate|commit|audit|proposal|question))?$/.exec(url.pathname);
+    if (attemptRoute) {
+      const [, attemptId, operation] = attemptRoute;
+      const scope = worker.scopeForAttempt(workerAuth, attemptId);
+      if (!operation && request.method === 'GET') return json(response, 200, worker.attemptStatus(scope, attemptId), { 'cache-control': 'no-store' });
+      if (request.method === 'POST' && operation) {
+        const input = await readJson(request, ['audit', 'proposal'].includes(operation) ? 128 * 1024 : 64 * 1024);
+        const result = operation === 'workspace' ? worker.registerWorkspace(scope, { attemptId, path: input.path })
+          : operation === 'runs' ? worker.reserveRun(scope, { attemptId })
+          : operation === 'events' ? worker.appendEvent(scope, { attemptId, ...input })
+            : operation === 'commit' ? worker.commitCandidate(scope, { attemptId, message: input.message, checks: input.checks })
+              : operation === 'audit' ? worker.submitAudit(scope, { attemptId, report: input.report })
+                : operation === 'proposal' ? worker.submitProposal(scope, { attemptId, proposal: input.proposal })
+                : operation === 'question' ? worker.askQuestion(scope, { attemptId, question: input.question, reason: input.reason, options: input.options })
+                : worker.submitCandidate(scope, { attemptId, commit: input.commit, checks: input.checks });
+        if (['candidate', 'commit', 'audit', 'proposal', 'question', 'events'].includes(operation)) settleSymphonyBatch(workerAuth.projectId, worker.attemptStatus(scope, attemptId).batchId);
+        if (result.candidate) { const { path, ...candidate } = result.candidate; return json(response, 201, { attemptId, candidate }, { 'cache-control': 'no-store' }); }
+        return json(response, 200, result, { 'cache-control': 'no-store' });
+      }
+      return json(response, 405, { error: 'Method not allowed.' });
+    }
+    if (request.method !== 'GET') return json(response, 405, { error: 'Method not allowed.' });
+    if (url.pathname === '/api/worker/issues') {
+      const ids = url.searchParams.get('ids');
+      const states = url.searchParams.get('states');
+      const cursor = url.searchParams.get('cursor') || '';
+      const limit = Number(url.searchParams.get('limit') || 50);
+      if (workerAuth.pool) { worker.heartbeat(workerAuth, Number(url.searchParams.get('capacity') || 1), url.searchParams.get('profile_overrides') === '1'); runs.admit(workerAuth.projectId); }
+      return json(response, 200, worker.issues(workerAuth, { ids: ids === null ? null : ids.split(','), states: states === null ? null : states.split(','), cursor, limit }), { 'cache-control': 'no-store' });
+    }
+    const task = /^\/api\/worker\/tasks\/([a-f0-9]{64})$/.exec(url.pathname);
+    if (task) return json(response, 200, worker.taskOpen(worker.scopeForDigest(workerAuth, task[1]), task[1]), { 'cache-control': 'no-store' });
+    const digest = String(url.searchParams.get('digest') || '');
+    const scope = workerAuth.pool ? worker.scopeForDigest(workerAuth, digest) : workerAuth;
+    if (url.pathname === '/api/worker/knowledge/map') return json(response, 200, worker.knowledgeMap(scope, digest), { 'cache-control': 'no-store' });
+    if (url.pathname === '/api/worker/knowledge/search') return json(response, 200, worker.knowledgeSearch(scope, digest, url.searchParams.get('q'), url.searchParams.get('kind'), Number(url.searchParams.get('cursor') || 0)), { 'cache-control': 'no-store' });
+    const record = /^\/api\/worker\/knowledge\/records\/([^/]+)$/.exec(url.pathname);
+    if (record) return json(response, 200, worker.knowledgeRead(scope, digest, record[1], url.searchParams.has('revision') ? Number(url.searchParams.get('revision')) : null), { 'cache-control': 'no-store' });
+    const bundle = /^\/api\/worker\/bundles\/([a-f0-9]{64})$/.exec(url.pathname);
+    if (bundle) return json(response, 200, worker.activeBundle(worker.scopeForDigest(workerAuth, bundle[1]), bundle[1]), { 'cache-control': 'no-store' });
+    return json(response, 404, { error: 'Not found.' });
+  }
   if (!user) return json(response, 401, { error: 'Sign in to continue.' });
   const returnTo = () => {
     const path = safeReturnPath(url.searchParams.get('return'));
@@ -350,7 +463,71 @@ async function api(request, response, url) {
     return json(response, 201, { project: setup.project }, { 'set-cookie': draftCookie('', 0) });
   }
   if (url.pathname === '/api/projects' && request.method === 'GET') return json(response, 200, { projects: userProjects(db, user.id) });
-  const projectRoute = /^\/api\/projects\/([^/]+)\/(setup|preferences|design|pages|assets|features|stack|connections\/agent|steps|repository|skeleton|preview|knowledge|records|work|openapi\.json|platform|database|code|reconcile|agents|changes|routines|batches|docs|comments|brand-templates)(?:\/([^/]+))?$/.exec(url.pathname);
+  const candidateAcceptRoute = /^\/api\/projects\/([^/]+)\/candidates\/([^/]+)\/accept$/.exec(url.pathname);
+  if (candidateAcceptRoute) {
+    const [, projectId, candidateId] = candidateAcceptRoute;
+    requireMember(db, user, projectId);
+    if (request.method !== 'POST') return json(response, 405, { error: 'Method not allowed.' });
+    if (!db.prepare("SELECT 1 FROM project_members WHERE project_id = ? AND user_id = ? AND role = 'owner'").get(projectId, user.id))
+      return json(response, 403, { error: 'Only a project owner can accept a code candidate.' });
+    const input = await readJson(request);
+    const candidate = candidates.get(projectId, candidateId);
+    if (!candidate || candidate.commit !== input.commit || !['review', 'accepted'].includes(candidate.state))
+      return json(response, 409, { error: 'Review the exact candidate commit before acceptance.' });
+    const work = know.workById(projectId, candidate.workId);
+    if (!work || work.action !== 'platform.implement' || work.state !== 'review' || work.checks.some(check => check.verdict !== 'accept'))
+      return json(response, 409, { error: 'Accept every Work check before accepting this candidate.' });
+    const preview = candidatePreviews.status(candidateId);
+    if (preview.commit !== candidate.commit || preview.status !== 'running' || !(await candidatePreviews.probe(candidateId)).ok)
+      return json(response, 409, { error: 'The exact candidate preview must be healthy before acceptance.' });
+    const source = flows.projectSetup(user, projectId).workspacePath;
+    const head = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: source, encoding: 'utf8' });
+    const clean = spawnSync('git', ['status', '--porcelain=v1'], { cwd: source, encoding: 'utf8' });
+    if (head.status !== 0 || clean.status !== 0 || clean.stdout.trim() || ![candidate.base, candidate.commit].includes(head.stdout.trim()))
+      return json(response, 409, { error: 'The shared project changed since this candidate was built.' });
+    if (head.stdout.trim() === candidate.base) {
+      const fetched = spawnSync('git', ['fetch', '--no-tags', '--', candidate.path, candidate.commit], { cwd: source, encoding: 'utf8', timeout: 30000 });
+      if (fetched.status !== 0) return json(response, 409, { error: 'Could not fetch the candidate commit.' });
+      const merged = spawnSync('git', ['merge', '--ff-only', candidate.commit], { cwd: source, encoding: 'utf8', timeout: 30000 });
+      if (merged.status !== 0) return json(response, 409, { error: 'The candidate cannot be fast-forwarded into the project.' });
+    }
+    db.prepare("UPDATE code_candidates SET state = 'accepted', finished_at = ? WHERE id = ?").run(new Date().toISOString(), candidateId);
+    const accepted = know.updateWork(user, projectId, work.id, { state: 'done', candidateId });
+    know.appendLog(work.id, `Accepted exact code commit ${candidate.commit.slice(0, 12)} from ${candidateId}`, {}, { by: { kind: 'person', id: user.id } });
+    settleSymphonyBatch(projectId, work.context?.batch);
+    return json(response, 200, { candidate: { id: candidateId, commit: candidate.commit, state: 'accepted' }, work: accepted }, { 'cache-control': 'no-store' });
+  }
+  const candidatePreviewRoute = /^\/api\/projects\/([^/]+)\/candidates\/([^/]+)\/preview$/.exec(url.pathname);
+  if (candidatePreviewRoute) {
+    const [, projectId, candidateId] = candidatePreviewRoute;
+    requireMember(db, user, projectId);
+    const candidate = candidates.get(projectId, candidateId);
+    if (!candidate) return json(response, 404, { error: 'Candidate not found.' });
+    const link = topology.appOrigin(candidateHost(candidateId));
+    if (request.method === 'GET') return json(response, 200, { preview: candidatePreviews.status(candidateId), url: link }, { 'cache-control': 'no-store' });
+    if (request.method !== 'POST') return json(response, 405, { error: 'Method not allowed.' });
+    if (!db.prepare("SELECT 1 FROM project_members WHERE project_id = ? AND user_id = ? AND role = 'owner'").get(projectId, user.id))
+      return json(response, 403, { error: 'Only a project owner can build a code candidate preview.' });
+    const source = flows.projectSetup(user, projectId).workspacePath;
+    const detail = candidates.inspect(projectId, candidateId, source);
+    if (candidate.state !== 'submitted' || !detail.baseCurrent || !candidate.commit) return json(response, 409, { error: 'Candidate is not a current submitted commit.' });
+    const snapshot = mkdtempSync(join(tmpdir(), 'aludel-candidate-preview-'));
+    try {
+      const clone = spawnSync('git', ['clone', '--no-hardlinks', '--no-checkout', '--', candidate.path, snapshot], { encoding: 'utf8', timeout: 30000 });
+      if (clone.status !== 0) throw Object.assign(new Error('Could not snapshot the candidate commit.'), { status: 409 });
+      const checkout = spawnSync('git', ['checkout', '--detach', candidate.commit], { cwd: snapshot, encoding: 'utf8', timeout: 30000 });
+      if (checkout.status !== 0) throw Object.assign(new Error('Candidate commit is no longer available.'), { status: 409 });
+      rmSync(join(snapshot, '.git'), { recursive: true, force: true });
+      const preview = await candidatePreviews.build(candidateId, snapshot, candidate.commit);
+      if (preview.status === 'running' && (await candidatePreviews.probe(candidateId)).ok) {
+        db.prepare("UPDATE code_candidates SET state = 'review', checks_json = ?, finished_at = ? WHERE id = ? AND state = 'submitted'")
+          .run(JSON.stringify([...candidate.checks, { name: 'Docker build and /api/health', status: 'passed', detail: 'Built from exact candidate commit in an isolated container.', source: 'aludel' }]), new Date().toISOString(), candidateId);
+        know.appendLog(candidate.workId, `Candidate ${candidate.commit.slice(0, 12)} built and ready for review`, { state: 'review' });
+      }
+      return json(response, 200, { preview, url: link }, { 'cache-control': 'no-store' });
+    } finally { rmSync(snapshot, { recursive: true, force: true }); }
+  }
+  const projectRoute = /^\/api\/projects\/([^/]+)\/(setup|preferences|design|pages|assets|features|stack|connections\/agent|steps|repository|skeleton|preview|knowledge|records|work|editor|candidates|openapi\.json|platform|database|code|reconcile|agents|changes|routines|batches|docs|comments|brand-templates)(?:\/([^/]+))?$/.exec(url.pathname);
   if (projectRoute) {
     const [, rawId, section, rawItem] = projectRoute;
     const projectId = decodeURIComponent(rawId);
@@ -361,21 +538,45 @@ async function api(request, response, url) {
     if (method !== 'GET' && projectId !== aludelProjectId && ['records', 'work', 'features', 'pages', 'skeleton', 'routines', 'batches'].includes(section)) {
       response.once('finish', () => { if (response.statusCode < 400) { try { know.syncBacklog(projectId); } catch (error) { console.error(`Backlog for ${projectId}: ${error.message}`); } } });
     }
+    // Candidate evidence is project-scoped and read-only. Promotion needs a separate reviewed flow.
+    if (section === 'candidates' && method === 'GET') {
+      const workspace = flows.projectSetup(user, projectId).workspacePath;
+      if (item) { const { path, ...view } = candidates.inspect(projectId, item, workspace); return json(response, 200, view, { 'cache-control': 'no-store' }); }
+      const workId = url.searchParams.get('workId');
+      if (!workId || !know.workById(projectId, workId)) return json(response, 404, { error: 'Work item not found.' });
+      return json(response, 200, { candidates: candidates.forWork(projectId, workId).map(({ path, ...view }) => view), attempt: worker.attemptForWork(projectId, workId) }, { 'cache-control': 'no-store' });
+    }
+    // Work exposes runtime status only; the local host credential is provisioned into private data storage.
+    if (section === 'agents' && item === 'symphony-runs' && method === 'POST') {
+      const input = await readJson(request);
+      return json(response, 200, worker.extendRuns(user, projectId, String(input.workId || ''), input.expectedRunLimit), { 'cache-control': 'no-store' });
+    }
+    if (section === 'agents' && item === 'symphony' && method === 'GET') { ensureWorkerPool(projectId); return json(response, 200, workerPoolView(projectId), { 'cache-control': 'no-store' }); }
+    if (section === 'agents' && item === 'symphony' && method === 'PUT') { ensureWorkerPool(projectId); const input = await readJson(request); return json(response, 200, { ...worker.configurePool(user, projectId, input.capacity), dispatchEnabled: symphonyDispatchEnabled }, { 'cache-control': 'no-store' }); }
+    if (section === 'editor' && method === 'GET') return json(response, 200, editor.status(user, projectId));
+    if (section === 'editor' && method === 'POST') return json(response, 201, editor.issue(user, projectId), { 'cache-control': 'no-store' });
+    if (section === 'editor' && method === 'DELETE') return json(response, 200, editor.revoke(user, projectId));
     if (section === 'setup' && method === 'GET') return json(response, 200, projectView(user, projectId));
     // LAY-03: the layers read one project snapshot and write records and work items through the knowledge module.
     if (section === 'knowledge' && method === 'GET') {
+      ensureWorkerPool(projectId);
       if (projectId === aludelProjectId) return json(response, 409, { error: 'Aludel’s own knowledge moves into its layers in LAY-06.' });
       // A project made after start-up plans itself the first time its layers are opened (after onboarding chose its story packs).
       know.ensurePlan(projectId);
       know.ensureDesign(projectId);
       know.ensureFlows(projectId);
       const view = know.view(user, projectId, { builtBy: links.builtBy(projectId) });
+      const batchView = runs.view(projectId);
+      const poolView = workerPoolView(projectId);
+      const workView = runtimeBlockedWork(view, batchView, poolView);
       // PAGES-UX-01: each page's address in the generated app, so Pages › Built opens the right one.
       const pagePaths = Object.fromEntries(sitePages(know.navRoutes(projectId), know.list(projectId, 'page')).filter(page => page.id).map(page => [page.id, page.path]));
       const workspace = flows.projectSetup(user, projectId).workspacePath;
-      return json(response, 200, { setup: projectView(user, projectId), knowledge: { ...view, pagePaths, code: links.snapshot(projectId), batches: runs.view(projectId),
-        uploads: flows.uploads(projectId), brandUsage: workspaceIsIndexable(workspace) ? brandUsage(workspace, view.brand) : {} },
+      const codexModels = await modelCatalog.list('codex');
+      return json(response, 200, { setup: projectView(user, projectId), knowledge: { ...view, work: workView, pagePaths, code: links.snapshot(projectId), batches: batchView,
+        uploads: flows.uploads(projectId), symphonyProfiles: symphonyDispatchEnabled ? know.list(projectId, 'agent_profile').filter(profile => profile.active && (!profile.provider || profile.provider === 'codex')).map(profile => profile.id) : [], workerPool: poolView, brandUsage: workspaceIsIndexable(workspace) ? brandUsage(workspace, view.brand) : {} },
         catalog: { pageTypes: catalogs.pageTypes, routeIcons: catalogs.routeIcons, feels: catalogs.feels, stacks: catalogs.stacks, tools: catalogs.roles.tools, botColors, efforts,
+          providers: { codex: codexModels, 'openai-api': { models: [], fetchedAt: null, error: 'Runtime adapter unavailable.' }, anthropic: { models: [], fetchedAt: null, error: 'Runtime adapter unavailable.' } },
           brandTemplates: Object.fromEntries(Object.entries(catalogs.brandTemplates).map(([id, template]) => [id, { label: template.label, summary: template.summary, icon: template.icon, assets: template.assets.length }])) } });
     }
     // LAY-07A: the Data layer's contract as OpenAPI 3.1.
@@ -486,11 +687,26 @@ async function api(request, response, url) {
     if (section === 'work' && method === 'POST' && !item) {
       // People stage suggestions; reconcile and routine contexts are only ever written by the server.
       const input = await readJson(request);
-      return json(response, 201, know.createWork(projectId, { ...input, context: typeof input.suggestion === 'string' ? { suggestion: input.suggestion.slice(0, 400) } : null }, user.name));
+      if (input.action) {
+        const selected = know.roleView(projectId).flatMap(role => role.actions.map(action => ({ ...action, layer: role.layer }))).find(action => action.id === input.action);
+        if (!selected || input.layer && input.layer !== selected.layer || input.type && input.type !== selected.type) throw Object.assign(new Error('Choose a current role action.'), { status: 400 });
+      }
+      return json(response, 201, know.createWork(projectId, { ...input, context: typeof input.suggestion === 'string' ? { suggestion: input.suggestion.slice(0, 2000) } : null }, user.name));
     }
     if (section === 'work' && method === 'PUT' && item) {
       const input = await readJson(request);
       if (input.apply) return json(response, 200, know.applyAnswer(user, projectId, item, String(input.apply)));
+      if (typeof input.acceptBrief === 'string') {
+        const accepted = runs.acceptBrief(user, projectId, item, input.acceptBrief);
+        db.prepare("UPDATE symphony_proposals SET state = 'accepted', accepted_at = ? WHERE id = ? AND project_id = ?").run(new Date().toISOString(), input.acceptBrief, projectId);
+        settleSymphonyBatch(projectId, accepted.work.context?.batch);
+        return json(response, 200, accepted);
+      }
+      if (typeof input.acceptProposal === 'string') {
+        const accepted = worker.acceptProposal(user, projectId, item, input.acceptProposal);
+        settleSymphonyBatch(projectId, accepted.work.context?.batch);
+        return json(response, 200, accepted);
+      }
       // Staging, skipping, stopping and reassigning go through the batches, which keep running batches locked.
       if (input.stage === true) return json(response, 200, runs.stage(user, projectId, item));
       if (input.stage === false) return json(response, 200, runs.unstage(user, projectId, item));
@@ -498,13 +714,33 @@ async function api(request, response, url) {
       if (input.stop === true) return json(response, 200, runs.stopItem(user, projectId, item));
       if (input.assignee !== undefined) return json(response, 200, runs.reassign(user, projectId, item, input.assignee));
       if (typeof input.note === 'string' && input.note.trim()) know.appendLog(item, input.note.trim().slice(0, 500), {}, { by: { kind: 'person', id: user.id } });
-      return json(response, 200, know.updateWork(user, projectId, item, input));
+      if (input.sendBack && know.workById(projectId, item)?.action === 'platform.implement') {
+        const before = know.workById(projectId, item);
+        const result = know.updateWork(user, projectId, item, input);
+        const reviewCandidate = candidates.forWork(projectId, item).find(value => value.state === 'review');
+        if (reviewCandidate) {
+          db.prepare("UPDATE code_candidates SET state = 'rejected', finished_at = ? WHERE id = ?").run(new Date().toISOString(), reviewCandidate.id);
+          await candidatePreviews.stop(reviewCandidate.id);
+        }
+        settleSymphonyBatch(projectId, before.context?.batch);
+        return json(response, 200, result);
+      }
+      const before = know.workById(projectId, item);
+      const updated = know.updateWork(user, projectId, item, input);
+      if (before?.action === 'product.brief' && input.sendBack && before.context?.visionProposal?.id) {
+        runs.rejectBrief(projectId, item, before.context.visionProposal.id);
+        worker.rejectProposal(projectId, item, before.context.visionProposal.id);
+      }
+      if (before?.context?.workProposal?.id && input.sendBack) worker.rejectProposal(projectId, item, before.context.workProposal.id);
+      if (['platform.security', 'product.define', 'product.clarify', 'product.brief', 'data.contract', 'design.audit', 'pages.a11y', 'deploy.review', 'work.review'].includes(before?.action) &&
+          (input.sendBack || input.state === 'done' || input.answer !== undefined)) settleSymphonyBatch(projectId, before.context?.batch);
+      return json(response, 200, updated);
     }
     if (section === 'routines' && method === 'POST' && item) return json(response, 201, { created: know.runRoutines(projectId, { trigger: 'manual', routineId: item }) });
     // DEC-040: agent batches. Start is the owner's authorization to spend on exactly the batch's items.
     if (section === 'batches' && method === 'POST' && item) {
       const input = await readJson(request);
-      if (item === 'start') { const { batch } = runs.start(user, projectId, String(input.batchId || '')); return json(response, 202, { batch }); }
+      if (item === 'start') { const { batch } = runs.start(user, projectId, String(input.batchId || ''), input.requestedSlots ?? 1); return json(response, 202, { batch }); }
       if (item === 'stop') return json(response, 200, { batch: runs.stop(user, projectId, String(input.batchId || '')) });
       if (item === 'next') return json(response, 200, runs.next(user, projectId, input.assignee, input.count));
     }
@@ -529,7 +765,6 @@ async function api(request, response, url) {
     if (section === 'pages' && item === 'review' && method === 'POST') return json(response, 200, know.reviewFlow(projectId, { ...(await readJson(request)), assignee: { kind: 'person', id: user.id } }, user.name));
     if (section === 'pages' && method === 'PUT') { flows.saveRoutes(user, projectId, await readJson(request)); return json(response, 200, projectView(user, projectId)); }
     if (section === 'stack' && method === 'PUT') { flows.saveStack(user, projectId, await readJson(request)); return json(response, 200, projectView(user, projectId)); }
-    if (section === 'connections/agent' && method === 'GET' && item === 'models') return json(response, 200, await runs.models(projectId));
     if (section === 'connections/agent' && method === 'GET') return json(response, 200, flows.agentConnection(user, projectId));
     if (section === 'connections/agent' && method === 'PUT') return json(response, 200, await flows.saveAgentConnection(user, projectId, await readJson(request)));
     if (section === 'connections/agent' && method === 'POST') return json(response, 200, await flows.checkAgentConnection(user, projectId));
@@ -707,6 +942,15 @@ function appPage(response, status, title, message) {
 
 // <slug>.<base> serves only that project's preview. Portal APIs and cookies never exist on app hosts.
 async function serveApp(request, response, slug) {
+  if (/^candidate-[a-f0-9]{12}$/.test(slug)) {
+    const matching = db.prepare("SELECT id FROM code_candidates WHERE state IN ('submitted', 'review', 'accepted')").all()
+      .filter(row => candidateHost(row.id) === slug);
+    if (matching.length === 1) {
+      const port = await candidatePreviews.ensureRunning(matching[0].id, '');
+      if (!port) return appPage(response, 503, 'Candidate preview unavailable', 'Build this candidate from its Work item first.');
+      return candidatePreviews.proxy(request, response, port, matching[0].id);
+    }
+  }
   const project = db.prepare('SELECT p.id, p.name, s.workspace_path FROM projects p JOIN project_setup s ON s.project_id = p.id WHERE p.slug = ?').get(slug);
   if (!project?.workspace_path) return appPage(response, 404, 'No app here yet', 'There is no Aludel project at this address.');
   const port = await previews.ensureRunning(project.id, project.workspace_path);
@@ -736,6 +980,7 @@ server.listen(port, host, () => {
   console.log(`Aludel is running at ${topology.portalOrigin} (also http://${host}:${port})`);
   console.log(`Project apps are served at ${topology.appOrigin('<app>')}`);
   console.log(`Database: ${databasePath}`);
+  console.log(`Symphony Work admission: ${symphonyDispatchEnabled ? 'enabled' : 'disabled'}; worker health: Deploy › Agents`);
 });
 
-for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => { previews.stopAll(); server.close(() => { db.close(); process.exit(0); }); server.closeAllConnections?.(); });
+for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => { previews.stopAll(); candidatePreviews.stopAll(); server.close(() => { db.close(); process.exit(0); }); server.closeAllConnections?.(); });

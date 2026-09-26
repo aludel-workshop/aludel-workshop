@@ -1,0 +1,164 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+portal_dir="$repo_root/apps/portal"
+env_file="$repo_root/.env"
+pin="be10a1b79df723d6d7612b5651c8522704dafb2e"
+image="elixir:1.19"
+codex_version="0.157.0"
+verify=0
+[[ "${1:-}" == "--verify" ]] && verify=1
+
+env_value() {
+  local key="$1"
+  ENV_FILE="$env_file" ENV_KEY="$key" node -e 'try { process.loadEnvFile(process.env.ENV_FILE) } catch (error) { if (error.code !== "ENOENT") throw error }; process.stdout.write(process.env[process.env.ENV_KEY] || "")'
+}
+
+dispatch="${MACHINE_SYMPHONY_DISPATCH:-$(env_value MACHINE_SYMPHONY_DISPATCH)}"
+if [[ "$dispatch" != "1" ]]; then
+  echo "Symphony local hosts: skipped (Work dispatch is disabled)."
+  exit 0
+fi
+
+configured_data="${MACHINE_DATA_DIR:-$(env_value MACHINE_DATA_DIR)}"
+if [[ -n "$configured_data" ]]; then
+  data_dir="$(node -e 'console.log(require("node:path").resolve(process.argv[1]))' "$configured_data")"
+else
+  data_dir="$portal_dir/.data"
+fi
+runtime_root="$data_dir/symphony-host"
+database="$data_dir/machine.sqlite"
+workspace_root="${MACHINE_SYMPHONY_WORKSPACE_ROOT:-$(env_value MACHINE_SYMPHONY_WORKSPACE_ROOT)}"
+workspace_root="${workspace_root:-$data_dir/symphony-workspaces}"
+portal_port="${PORT:-$(env_value PORT)}"
+portal_port="${portal_port:-4310}"
+auth_file="${CODEX_AUTH_FILE:-$HOME/.codex/auth.json}"
+node_bin="$(command -v node)"
+node_prefix="$(cd "$(dirname "$node_bin")/.." && pwd)"
+uid_gid="$(id -u):$(id -g)"
+
+for command in docker git node npm sha256sum; do
+  command -v "$command" >/dev/null || { echo "Symphony local hosts: missing required command: $command" >&2; exit 1; }
+done
+[[ -f "$database" ]] || { echo "Symphony local hosts: portal database is missing at $database" >&2; exit 1; }
+[[ -f "$auth_file" ]] || { echo "Symphony local hosts: Codex login is missing. Run codex login first." >&2; exit 1; }
+docker info >/dev/null 2>&1 || { echo "Symphony local hosts: Docker is not running." >&2; exit 1; }
+
+mkdir -p "$runtime_root/builds" "$runtime_root/mix" "$runtime_root/home" "$runtime_root/codex-home" \
+  "$runtime_root/codex-cli" "$runtime_root/workflows" "$runtime_root/logs" "$workspace_root"
+overlay_hash="$(sha256sum \
+  "$repo_root/integrations/symphony/elixir/lib/symphony_elixir/aludel/adapter.ex" \
+  "$repo_root/integrations/symphony/profile-turn.patch" \
+  "$repo_root/integrations/symphony/runtime-block.patch" | sha256sum | cut -c1-16)"
+build_root="$runtime_root/builds/$pin-$overlay_hash"
+symphony_bin="$build_root/elixir/bin/symphony"
+
+if [[ ! -x "$symphony_bin" ]]; then
+  staging="$runtime_root/builds/.building-$pin-$overlay_hash-$$"
+  echo "Symphony local hosts: building pinned runtime $pin ($overlay_hash)..."
+  git clone --no-checkout https://github.com/openai/symphony.git "$staging"
+  git -C "$staging" checkout --detach "$pin"
+  mkdir -p "$staging/elixir/lib/symphony_elixir/aludel"
+  cp "$repo_root/integrations/symphony/elixir/lib/symphony_elixir/aludel/adapter.ex" \
+    "$staging/elixir/lib/symphony_elixir/aludel/adapter.ex"
+  git -C "$staging" apply --check "$repo_root/integrations/symphony/profile-turn.patch"
+  git -C "$staging" apply "$repo_root/integrations/symphony/profile-turn.patch"
+  git -C "$staging" apply --check "$repo_root/integrations/symphony/runtime-block.patch"
+  git -C "$staging" apply "$repo_root/integrations/symphony/runtime-block.patch"
+  docker run --rm --user "$uid_gid" -e HOME="$runtime_root/home" -e MIX_HOME="$runtime_root/mix" \
+    -v "$runtime_root:$runtime_root" -w "$staging/elixir" "$image" sh -lc \
+    'mix local.hex --force && mix local.rebar --force && mix deps.get && mix compile --warnings-as-errors && mix escript.build'
+  mv "$staging" "$build_root"
+fi
+
+installed_codex="$runtime_root/codex-cli/node_modules/.bin/codex"
+if [[ ! -x "$installed_codex" ]] || [[ "$($installed_codex --version 2>/dev/null || true)" != "codex-cli $codex_version" ]]; then
+  echo "Symphony local hosts: installing isolated Codex CLI $codex_version..."
+  npm install --prefix "$runtime_root/codex-cli" "@openai/codex@$codex_version"
+fi
+codex_entry="$(readlink -f "$installed_codex")"
+mkdir -p "$runtime_root/bin"
+codex_wrapper="$runtime_root/bin/codex"
+printf "#!/bin/sh\nexec /usr/local/bin/node \"%s\" \"\$@\"\n" "$codex_entry" > "$codex_wrapper"
+chmod 700 "$codex_wrapper"
+codex_wrapper_hash="$(sha256sum "$codex_wrapper" | cut -d " " -f 1)"
+
+gateway="$(docker run --rm "$image" getent hosts host.docker.internal | awk 'NR == 1 { print $1 }')"
+[[ -n "$gateway" ]] || { echo "Symphony local hosts: Docker host gateway was not found." >&2; exit 1; }
+started_at="$(node -e 'process.stdout.write(new Date().toISOString())')"
+pool_rows="$(DATABASE="$database" node --no-warnings -e '
+  const { DatabaseSync } = require("node:sqlite");
+  const db = new DatabaseSync(process.env.DATABASE, { readOnly: true });
+  for (const row of db.prepare(`SELECT p.id, p.slug, s.configured_capacity, s.credential_path
+    FROM symphony_pools s JOIN projects p ON p.id = s.project_id ORDER BY p.id`).all()) {
+    console.log([row.id, row.slug, row.configured_capacity, row.credential_path].join("\t"));
+  }
+  db.close();
+')"
+[[ -n "$pool_rows" ]] || { echo "Symphony local hosts: no project pools are configured; open Deploy › Agents first."; exit 0; }
+
+host_count=0
+while IFS=$'\t' read -r project_id project_slug capacity token_file; do
+  [[ -n "$project_id" ]] || continue
+  source_repo="$data_dir/workspaces/$project_id"
+  [[ -d "$source_repo/.git" ]] || { echo "Symphony local hosts: $project_slug has no local Git workspace." >&2; exit 1; }
+  [[ -f "$token_file" ]] || { echo "Symphony local hosts: $project_slug pool credential is missing." >&2; exit 1; }
+  safe_slug="$(printf '%s' "$project_slug" | tr -cs '[:alnum:]_.-' '-')"
+  safe_slug="${safe_slug#-}"
+  safe_slug="${safe_slug%-}"
+  container="aludel-symphony-$safe_slug"
+  workflow="$runtime_root/workflows/$safe_slug.md"
+  cp "$repo_root/integrations/symphony/WORKFLOW.example.md" "$workflow"
+  perl -0pi -e "s#endpoint: http://127\\.0\\.0\\.1:4310/api/worker#endpoint: http://aludel.localhost:$portal_port/api/worker#; s/max_concurrent_agents: 1/max_concurrent_agents: $capacity/" "$workflow"
+  config_hash="$(printf '%s\n' "$project_id" "$capacity" "$build_root" "$gateway" "$source_repo" "$workflow" "$portal_port" "$node_bin" "$codex_entry" "$codex_wrapper_hash" | sha256sum | cut -c1-20)"
+  existing_hash="$(docker inspect "$container" --format '{{index .Config.Labels "aludel.local-host-config"}}' 2>/dev/null || true)"
+  if [[ -n "$existing_hash" && "$existing_hash" != "$config_hash" ]] || { docker inspect "$container" >/dev/null 2>&1 && [[ -z "$existing_hash" ]]; }; then
+    docker rm -f "$container" >/dev/null
+    existing_hash=""
+  fi
+  if ! docker inspect "$container" >/dev/null 2>&1; then
+    docker run -d --name "$container" --restart unless-stopped --init --user "$uid_gid" \
+      --label "aludel.local-host-config=$config_hash" \
+      --add-host "aludel.localhost:$gateway" \
+      -e HOME="$runtime_root/home" -e CODEX_HOME="$runtime_root/codex-home" -e MIX_HOME="$runtime_root/mix" \
+      -e ALUDEL_WORKER_TOKEN_FILE="$token_file" \
+      -e ALUDEL_SOURCE_REPOSITORY="$source_repo" \
+      -e ALUDEL_WORKER_URL="http://aludel.localhost:$portal_port/api/worker" \
+      -e ALUDEL_WORKSPACE_HOOK="$repo_root/integrations/symphony/workspace-hook.mjs" \
+      -e SYMPHONY_WORKSPACE_ROOT="$workspace_root" \
+      -e PATH="$runtime_root/codex-cli/node_modules/.bin:$node_prefix/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+      -v "$runtime_root:$runtime_root" \
+      -v "$auth_file:$runtime_root/codex-home/auth.json:ro" \
+      -v "$node_bin:/usr/local/bin/node:ro" \
+      -v "$codex_wrapper:/usr/local/bin/codex:ro" \
+      -v "$node_prefix:$node_prefix:ro" \
+      -v "$repo_root/integrations/symphony:$repo_root/integrations/symphony:ro" \
+      -v "$workspace_root:$workspace_root" \
+      -v "$token_file:$token_file:ro" \
+      -v "$source_repo:$source_repo:ro" \
+      -w "$build_root/elixir" "$image" \
+      "$symphony_bin" --i-understand-that-this-will-be-running-without-the-usual-guardrails \
+      --logs-root "$runtime_root/logs/$safe_slug" "$workflow" >/dev/null
+  elif [[ "$(docker inspect "$container" --format '{{.State.Running}}')" != "true" ]]; then
+    docker start "$container" >/dev/null
+  fi
+  echo "Symphony local hosts: $project_slug worker started ($capacity slot$([[ "$capacity" == "1" ]] || printf s))."
+  host_count=$((host_count + 1))
+done <<< "$pool_rows"
+
+if [[ "$verify" == "1" ]]; then
+  echo "Symphony local hosts: waiting for $host_count fresh heartbeat(s)..."
+  for _ in $(seq 1 30); do
+    fresh="$(DATABASE="$database" STARTED_AT="$started_at" node --no-warnings -e '
+      const { DatabaseSync } = require("node:sqlite");
+      const db = new DatabaseSync(process.env.DATABASE, { readOnly: true });
+      console.log(db.prepare("SELECT count(*) AS n FROM symphony_pools WHERE last_seen_at > ? AND reported_capacity > 0").get(process.env.STARTED_AT).n);
+      db.close();
+    ')"
+    [[ "$fresh" == "$host_count" ]] && { echo "Symphony local hosts: all configured workers are online."; exit 0; }
+    sleep 1
+  done
+  echo "Symphony local hosts: workers started but heartbeat verification timed out; check Docker logs." >&2
+  exit 1
+fi

@@ -55,6 +55,8 @@ AGENTS.md                         durable repository rules; loaded automatically
 
 The worker creates this bundle from committed portal records before dispatch and stores its digest on the attempt. The agent reads `AGENTS.md`, then the manifest and task brief. It retrieves more context through a narrow portal query tool only when the manifest points to it or the task exposes a gap.
 
+**PP-01R local slice (2026-09-25):** the portal now saves a digest-addressed task context for a person's assigned work and exposes project-scoped, read-only knowledge through an editor token and MCP adapter ([evidence](evidence/pp-01r-editor-bridge.md)). It does not yet write the proposed `.machine/` files or supply a coding attempt: LAY-05/B-03B must consume the same bundle contract, pin it to the attempt and test parity with the interactive path. Keep live lookup separate from the frozen bundle; a record edit produces a new digest while the earlier context remains retrievable.
+
 Official OpenAI documentation states that Codex discovers layered `AGENTS.md` instructions from the project hierarchy and injects them into context. That makes `AGENTS.md` suitable for stable working rules, but not for volatile project state or a growing knowledge archive: [Custom instructions with AGENTS.md](https://developers.openai.com/codex/guides/agents-md).
 
 ## Retrieval model

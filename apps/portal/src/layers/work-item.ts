@@ -6,6 +6,9 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { Assignee, ProjectContext, WorkChange, WorkItem, layerLabel, priorityIcon, priorityLabel, priorityOrder, workStatusLabel } from './context';
 import { AssigneeComponent, AvatarComponent, PriorityComponent, RefChipComponent, RoleChipComponent, agentRunnable, batchOf, elapsed, isRunning, tokens } from './work-shared';
 
+interface CodingAttempt { id: string; state: string; runsStarted: number; runLimit: number; candidateId: string | null; updatedAt: string; }
+interface CodeCandidate { id: string; state: string; base: string; commit: string | null; files: string[]; checks: { name: string; status: string; detail: string; source?: string }[]; createdAt: string; workspaceOwner: string; }
+
 interface ReconcileContext { recordId: string; fromRevision: number; toRevision: number; changes: { field: string; before: unknown; after: unknown }[];
   units: { id: string; symbol: string; path: string; kind: string; calls: string[]; calledBy: string[] }[]; tests: string[]; }
 
@@ -20,7 +23,8 @@ interface ReconcileContext { recordId: string; fromRevision: number; toRevision:
       <div class="lay-item-titles"><h1 tabindex="-1">{{ work.title }}</h1>
         <div class="lay-item-meta"><aludel-priority [value]="work.priority" /><span [class]="'lay-st lay-st-' + work.status">{{ statusLabel[work.status] }}</span>
           <aludel-role-chip [layer]="work.layer" [action]="work.action" /><aludel-assignee [assignee]="work.assignee" [locked]="lock()" (changed)="reassign($event)" />
-          @for (blocker of work.blockedBy; track blocker) { <span class="lay-blocked"><mat-icon aria-hidden="true">block</mat-icon>Blocked by</span><aludel-ref [id]="blocker" /> }</div></div>
+          @for (blocker of work.blockedBy; track blocker) { <span class="lay-blocked"><mat-icon aria-hidden="true">block</mat-icon>Blocked by</span><aludel-ref [id]="blocker" /> }
+          @if (work.context?.executionBlock; as block) { <span class="lay-blocked"><mat-icon aria-hidden="true">block</mat-icon>{{ block.reason }}</span> }</div></div>
       <div class="lay-row lay-wrap">
         @switch (work.status) {
           @case ('backlog') { <button type="button" class="lay-button" (click)="update({ state: 'ready' }, work.ref + ' queued.')"><mat-icon aria-hidden="true">add</mat-icon>Queue</button> }
@@ -30,15 +34,22 @@ interface ReconcileContext { recordId: string; fromRevision: number; toRevision:
             @else { <button type="button" class="lay-button ghost" (click)="update({ stage: false }, work.ref + ' unstaged.')">Unstage</button>
               @if (work.assignee?.kind === 'person') { <button type="button" class="lay-button" (click)="update({ state: 'done' }, work.ref + ' done.')"><mat-icon aria-hidden="true">check</mat-icon>Mark done</button> } }
           }
+          @case ('blocked') {
+            @if (work.context?.executionBlock?.recovery === 'deploy') { <a class="lay-button" [href]="ctx.link('deploy', 'agents')">Open Deploy</a> }
+            @else if (work.context?.executionBlock?.recovery === 'agents') { <a class="lay-button" [href]="ctx.link('work', 'agents')">Manage agent</a> }
+            @else if (work.context?.batch) { <a class="lay-button" [href]="ctx.link('work')">Open batch to retry</a> }
+            @else { <button type="button" class="lay-button" (click)="update({ stage: true }, work.ref + ' staged to retry.')">Stage again</button> }
+          }
           @case ('working') { <button type="button" class="lay-button ghost" (click)="update({ stop: true }, 'Stopping ' + work.ref + '.')"><mat-icon aria-hidden="true">stop_circle</mat-icon>Stop</button> }
         }
       </div>
     </div>
 
     @if (work.assignee?.kind === 'agent') {
-      <section class="lay-runbox" [class.lay-runbox-live]="work.status === 'working'" aria-label="Agent run">
+      <section class="lay-runbox" [class.lay-runbox-live]="work.status === 'working'" [class.lay-runbox-blocked]="work.status === 'blocked'" aria-label="Agent run">
         <header>
-          @if (work.status === 'working') { <h2><mat-icon aria-hidden="true" class="lay-spin">progress_activity</mat-icon>{{ ctx.whoName(work.assignee) }} is working</h2><span class="lay-ticker"><strong>{{ elapsedText() }}</strong> active{{ run()?.model ? ' · ' + run()?.model : '' }}</span> }
+          @if (work.status === 'blocked') { <h2><mat-icon aria-hidden="true">block</mat-icon>Agent run blocked</h2><span class="lay-ticker">{{ work.context?.executionBlock?.reason }}</span> }
+          @else if (work.status === 'working') { <h2><mat-icon aria-hidden="true" class="lay-spin">progress_activity</mat-icon>{{ ctx.whoName(work.assignee) }} is working</h2><span class="lay-ticker"><strong>{{ elapsedText() }}</strong> active{{ run()?.model ? ' · ' + run()?.model : '' }}</span> }
           @else if (runFinished()) { <h2><mat-icon aria-hidden="true">check_circle</mat-icon>Agent run finished</h2><span class="lay-ticker">{{ run()?.model }} · {{ usageText() }}{{ run()?.finishedAt ? ' · ' + duration() : '' }}</span> }
           @else if (work.status === 'needs') { <h2><mat-icon aria-hidden="true">pause_circle</mat-icon>Paused: waiting for your answer</h2><span class="lay-ticker">{{ usageText() }}</span> }
           @else { <h2><mat-icon aria-hidden="true">schedule</mat-icon>Agent run not started</h2><span class="lay-ticker">{{ notStartedText() }}</span> }
@@ -47,7 +58,70 @@ interface ReconcileContext { recordId: string; fromRevision: number; toRevision:
           <li [class]="phaseState($index)"><div class="lay-seg"><i [style.width.%]="phaseState($index) === 'done' ? 100 : phaseState($index) === 'now' ? 50 : 0"></i></div>
             <div class="lay-phase-label"><mat-icon aria-hidden="true">{{ phaseState($index) === 'done' ? 'check' : phaseState($index) === 'now' ? 'arrow_right' : 'radio_button_unchecked' }}</mat-icon><span>{{ phase }}</span></div></li> }</ol>
         @if (work.status === 'working' && run()?.activity) { <p class="lay-now-line"><mat-icon aria-hidden="true">bolt</mat-icon>{{ run()?.activity }}…</p> }
-        @if (!agentRunnable(work) && work.status !== 'done') { <p class="lay-muted small">Agents can't run “{{ actionName() }}” yet (coding agents arrive with LAY-05). Assign it to a person to do it now.</p> }
+        @if (!agentRunnable(work, this.ctx) && work.status !== 'done') { <p class="lay-muted small">No agent runner is connected for “{{ actionName() }}”. Assign it to a person or connect the matching worker.</p> }
+      </section>
+    }
+
+    @if (work.action === 'platform.implement') {
+      <section class="lay-sec" aria-labelledby="candidate-heading"><h2 id="candidate-heading"><mat-icon aria-hidden="true">difference</mat-icon>Code candidates</h2>
+        @if (codingAttempt(); as attempt) {
+          <p class="small">Agent turns reserved: {{ attempt.runsStarted }} of {{ attempt.runLimit }} · {{ attempt.state }}</p>
+          @if (attempt.runsStarted >= attempt.runLimit && !attempt.candidateId && work.status !== 'done') {
+            <p class="lay-muted small">This authorization has no turns left. No further agent turn will start until you authorize more work.</p>
+            @if (attempt.runLimit < 12) { <button type="button" class="lay-button ghost small" (click)="authorizeMore(work, attempt)">Authorize three more turns</button> }
+          }
+        }
+        @for (candidate of codeCandidates(); track candidate.id) {
+          <article class="lay-rcheck"><div class="lay-rc-head"><strong>{{ candidate.id }}</strong><span class="lay-chip lay-info">{{ candidate.state }}</span></div>
+            <p class="small">Base {{ candidate.base.slice(0, 12) }} · candidate {{ candidate.commit?.slice(0, 12) || 'not committed' }} · {{ candidate.workspaceOwner }} workspace</p>
+            <p class="small">Changed files: {{ candidate.files.join(', ') || 'none recorded' }}</p>
+            @for (check of candidate.checks; track $index) { <p class="small">{{ check.name }}: {{ check.status }} — {{ check.detail }} @if (check.source === 'agent-report') { (agent report, unverified) }</p> }
+            <div class="lay-row lay-wrap"><button type="button" class="lay-button ghost small" (click)="inspectCandidate(candidate.id)">View diff summary</button>
+              @if (candidate.state === 'submitted') { <button type="button" class="lay-button ghost small" (click)="buildCandidatePreview(candidate.id)">Build isolated preview</button> }
+              @if (candidatePreview()?.id === candidate.id && (candidatePreview()?.status === 'running' || candidatePreview()?.status === 'stopped')) { <a class="lay-button ghost small" [href]="candidatePreview()?.url" target="_blank" rel="noopener noreferrer">Open candidate preview</a> }
+            </div>
+            @if (candidatePreview()?.id === candidate.id) { <p class="small">Preview: {{ candidatePreview()?.status }} @if (candidatePreview()?.error) { · {{ candidatePreview()?.error }} }</p> }
+            @if (candidateDiff()?.id === candidate.id) { <pre class="small">{{ candidateDiff()?.diff }}</pre><p class="small">{{ candidateDiff()?.baseCurrent ? 'Base still current' : 'Project base changed; reassessment required' }}</p> }
+          </article>
+        } @empty { <p class="lay-muted small">No code candidate submitted yet.</p> }
+        <p class="lay-muted small">A submitted commit is awaiting independent checks and a separate preview before acceptance.</p>
+      </section>
+    }
+
+    @if (work.context?.visionProposal; as proposal) {
+      @if (work.action === 'product.brief' && work.status === 'review') {
+      <section class="lay-sec" aria-labelledby="vision-proposal-heading"><h2 id="vision-proposal-heading"><mat-icon aria-hidden="true">edit_document</mat-icon>Proposed Vision claim</h2>
+        <p class="lay-muted small">{{ proposal.targetId ? 'Revise an existing claim' : 'Add a new claim' }} · Brief section: {{ proposal.section }} · drafted against Brief revision {{ proposal.briefRevision }}</p>
+        @if (proposal.targetId) { <p class="small"><strong>Current at draft time:</strong> {{ proposal.beforeText }}</p> }
+        <p class="lay-prose"><strong>Proposed:</strong> {{ proposal.text }}</p>
+        @if (proposal.note) { <p class="small"><strong>Note:</strong> {{ proposal.note }}</p> }
+        <p class="small"><strong>Basis:</strong> {{ proposal.basis }}</p>
+        <p class="lay-muted small">The Brief changes only after a Product lead accepts the checks and this exact proposal.</p>
+      </section>
+      }
+    }
+
+    @if (work.context?.workProposal; as proposal) {
+      @if (work.status === 'review') {
+      <section class="lay-sec" aria-labelledby="work-proposal-heading"><h2 id="work-proposal-heading"><mat-icon aria-hidden="true">edit_document</mat-icon>Proposed {{ actionName() }}</h2>
+        <p class="lay-prose">{{ proposal.summary }}</p>
+        <pre class="lay-prose">{{ show(proposal.content) }}</pre>
+        <p class="lay-muted small">Drafted against repository {{ proposal.repositoryCommit.slice(0, 12) }}. The draft does not change project records. Acceptance applies any permitted target change.</p>
+      </section>
+      }
+    }
+
+    @if (work.action === 'platform.security' && work.context?.auditReport; as report) {
+      <section class="lay-sec" aria-labelledby="audit-heading"><h2 id="audit-heading"><mat-icon aria-hidden="true">shield</mat-icon>Security findings for review</h2>
+        <p class="lay-prose">{{ report.summary }}</p><p class="lay-muted small">Audited commit {{ report.repositoryCommit.slice(0, 12) }}.</p>
+        @for (finding of report.findings; track $index) {
+          <article class="lay-rcheck"><div class="lay-rc-head"><strong>{{ finding.title }}</strong><span class="lay-chip lay-info">{{ finding.severity }}</span></div>
+            <p class="small"><strong>Affected:</strong> {{ finding.affected }}</p><p class="small"><strong>Evidence:</strong> {{ finding.evidence }}</p>
+            <p class="small"><strong>Suggested next action:</strong> {{ finding.recommendation }}</p></article>
+        } @empty { <p class="lay-muted small">No findings reported. Review the stated scope and checks before accepting.</p> }
+        <h3>Agent checks</h3>@for (check of report.checks; track $index) { <p class="small">{{ check.name }}: {{ check.status }}{{ check.detail ? ' — ' + check.detail : '' }}</p> }
+        @if (report.usedInputs?.length) { <h3>Knowledge used</h3><div class="lay-refs">@for (ref of report.usedInputs; track ref.id) { <aludel-ref [id]="ref.id" /><span class="lay-muted small">revision {{ ref.revision }}</span> }</div> }
+        <p class="lay-muted small">Agent claims await your review. This report did not change the code.</p>
       </section>
     }
 
@@ -68,7 +142,12 @@ interface ReconcileContext { recordId: string; fromRevision: number; toRevision:
                   <div class="lay-ev"><span class="lay-muted small">Evidence</span>
                     @for (change of evidenceFor(check.source?.id); track change.revision + change.recordId) {
                       <button type="button" class="lay-evbtn" [attr.aria-pressed]="open() === index + ':' + change.revision" (click)="toggleEvidence(index, change.revision)"><mat-icon aria-hidden="true">difference</mat-icon>{{ ctx.refInfo(change.recordId)?.label || 'Record' }} · revision {{ change.revision }}</button>
-                    } @empty { <span class="lay-muted small">No change to this record came from {{ work.ref }}.</span> }
+                    } @empty {
+                      @if (work.action === 'product.brief' && work.context?.visionProposal) {
+                        <span class="lay-muted small">Review the proposed claim above. The Brief changes after acceptance.</span>
+                      } @else if (work.context?.workProposal) { <span class="lay-muted small">Review the proposal above. It has not changed project records.</span> }
+                      @else { <span class="lay-muted small">No change to this record came from {{ work.ref }}.</span> }
+                    }
                   </div>
                   @for (change of evidenceFor(check.source?.id); track change.revision + change.recordId) {
                     @if (open() === index + ':' + change.revision) {
@@ -92,7 +171,15 @@ interface ReconcileContext { recordId: string; fromRevision: number; toRevision:
             }
             <footer><span class="lay-muted small">{{ tally().accepted }} accepted · {{ tally().rejected }} rejected · {{ tally().left }} to check</span>
               @if (tally().rejected) { <button type="button" class="lay-button danger" [disabled]="tally().left > 0" (click)="update({ sendBack: true }, work.ref + ' sent back with your notes. Stage it to try again.')">Send back with {{ tally().rejected }} rejected</button> }
-              @else { <button type="button" class="lay-button lay-button-ok" [disabled]="tally().left > 0" (click)="update({ state: 'done' }, work.ref + ' accepted.')"><mat-icon aria-hidden="true">check</mat-icon>Accept {{ work.ref }}</button> }</footer>
+              @else {
+                @if (work.action === 'platform.implement' && work.assignee?.kind === 'agent') {
+                  <button type="button" class="lay-button lay-button-ok" [disabled]="tally().left > 0 || !reviewCandidate()" (click)="acceptCodeCandidate(work)"><mat-icon aria-hidden="true">check</mat-icon>Accept exact code commit</button>
+                } @else if (work.action === 'product.brief' && work.assignee?.kind === 'agent') {
+                  <button type="button" class="lay-button lay-button-ok" [disabled]="tally().left > 0 || tally().rejected > 0 || !work.context?.visionProposal" (click)="acceptBriefProposal(work)"><mat-icon aria-hidden="true">check</mat-icon>Accept and apply Vision claim</button>
+                } @else if (work.context?.workProposal) {
+                  <button type="button" class="lay-button lay-button-ok" [disabled]="tally().left > 0 || tally().rejected > 0" (click)="acceptWorkProposal(work)"><mat-icon aria-hidden="true">check</mat-icon>Accept and apply proposal</button>
+                } @else { <button type="button" class="lay-button lay-button-ok" [disabled]="tally().left > 0" (click)="update({ state: 'done' }, work.ref + ' accepted.')"><mat-icon aria-hidden="true">check</mat-icon>Accept {{ work.ref }}</button> }
+              }</footer>
           </section>
         }
 
@@ -113,6 +200,7 @@ interface ReconcileContext { recordId: string; fromRevision: number; toRevision:
 
         <section class="lay-sec" aria-labelledby="what-heading"><h2 id="what-heading"><mat-icon aria-hidden="true">notes</mat-icon>What to do</h2>
           <p class="lay-prose">{{ action()?.description || actionName() }}@if (work.targets.length) { for } @for (target of work.targets; track target.id; let last = $last) { <aludel-ref [id]="target.id" [fallback]="target.label" />{{ last ? '.' : ', ' }} } @empty { . }</p>
+          @if (work.context?.suggestion) { <p class="lay-prose"><strong>Task brief:</strong> {{ work.context.suggestion }}</p> }
           @if (work.context?.feedback?.length) {
             <div class="lay-feedback"><strong>Sent back last time:</strong><ul>@for (note of work.context.feedback; track $index) { <li>“{{ note.check }}”: {{ note.note }} <span class="lay-muted small">({{ note.by }})</span></li> }</ul></div>
           }
@@ -226,6 +314,11 @@ export class WorkItemComponent {
   readonly runFinished = computed(() => Boolean(this.run()?.done) || this.item()?.status === 'review' || (this.item()?.status === 'done' && Boolean(this.run()?.usage)));
   readonly elapsedText = computed(() => elapsed(this.run()?.startedAt, this.ctx.now()));
   readonly changes = signal<WorkChange[]>([]);
+  readonly codeCandidates = signal<CodeCandidate[]>([]);
+  readonly codingAttempt = signal<CodingAttempt | null>(null);
+  readonly candidateDiff = signal<{ id: string; diff: string; baseCurrent: boolean } | null>(null);
+  readonly candidatePreview = signal<{ id: string; status: string; builtAt?: string | null; error?: string | null; url: string } | null>(null);
+  readonly reviewCandidate = computed(() => this.codeCandidates().find(candidate => candidate.state === 'review' && candidate.commit) || null);
   readonly reconcile = signal<ReconcileContext | null>(null);
   readonly open = signal<string | null>(null);
   readonly lock = computed(() => {
@@ -240,7 +333,7 @@ export class WorkItemComponent {
     const work = this.item(); if (!work) return null;
     if (work.blockedBy.length) return `Blocked by ${work.blockedBy.map(id => this.ctx.workById().get(id)?.ref).join(', ')}`;
     if (!work.assignee) return 'Assign it to someone first';
-    if (work.assignee.kind === 'agent' && !agentRunnable(work)) return `Agents can't run “${this.actionName()}” yet. Assign it to a person.`;
+    if (work.assignee.kind === 'agent' && !agentRunnable(work, this.ctx)) return `Agents can't run “${this.actionName()}” yet. Assign it to a person.`;
     return null;
   });
   readonly tally = computed(() => { const checks = this.item()?.checks || []; const accepted = checks.filter(check => check.verdict === 'accept').length; const rejected = checks.filter(check => check.verdict === 'reject').length; return { accepted, rejected, left: checks.length - accepted - rejected }; });
@@ -264,10 +357,61 @@ export class WorkItemComponent {
         this.loadedFor = key;
         if (fresh) { this.answerDraft = work.question?.recommendation || ''; this.whyDraft = ''; this.open.set(null); }
         void this.ctx.api<{ changes: WorkChange[] }>(`/api/projects/${encodeURIComponent(this.ctx.projectId())}/changes/${encodeURIComponent(work.id)}`).then(value => this.changes.set(value.changes), () => this.changes.set([]));
+        if (work.action === 'platform.implement') void this.ctx.api<{ candidates: CodeCandidate[]; attempt: CodingAttempt | null }>(`/api/projects/${encodeURIComponent(this.ctx.projectId())}/candidates?workId=${encodeURIComponent(work.id)}`).then(value => {
+          this.codeCandidates.set(value.candidates);
+          this.codingAttempt.set(value.attempt);
+          const candidate = value.candidates.find(entry => entry.state === 'review');
+          if (candidate) void this.ctx.api<{ preview: { status: string; builtAt?: string | null; error?: string | null }; url: string }>(
+            `/api/projects/${encodeURIComponent(this.ctx.projectId())}/candidates/${encodeURIComponent(candidate.id)}/preview`)
+            .then(status => this.candidatePreview.set({ id: candidate.id, ...status.preview, url: status.url }), () => this.candidatePreview.set(null));
+        }, () => { this.codeCandidates.set([]); this.codingAttempt.set(null); });
+        else { this.codeCandidates.set([]); this.codingAttempt.set(null); }
         if (work.type === 'reconcile') void this.ctx.api<ReconcileContext>(`/api/projects/${encodeURIComponent(this.ctx.projectId())}/reconcile/${encodeURIComponent(work.id)}`).then(value => this.reconcile.set(value?.recordId ? value : null), () => this.reconcile.set(null));
         else this.reconcile.set(null);
       });
     });
+  }
+
+  authorizeMore(work: WorkItem, attempt: CodingAttempt) {
+    void this.ctx.write(async () => {
+      const updated = await this.ctx.api<CodingAttempt>(`/api/projects/${encodeURIComponent(this.ctx.projectId())}/agents/symphony-runs`,
+        'POST', { workId: work.id, expectedRunLimit: attempt.runLimit });
+      this.codingAttempt.set(updated);
+      return updated;
+    }, `${work.ref}: three more coding turns authorized on the same pinned work.`);
+  }
+
+  acceptBriefProposal(work: WorkItem) {
+    const proposalId = work.context?.visionProposal?.id;
+    if (!proposalId) return;
+    void this.ctx.write(() => this.ctx.updateWork(work.id, { acceptBrief: proposalId }), `${work.ref} Vision claim applied.`);
+  }
+
+  acceptWorkProposal(work: WorkItem) {
+    const proposalId = work.context?.workProposal?.id;
+    if (!proposalId) return;
+    void this.ctx.write(() => this.ctx.updateWork(work.id, { acceptProposal: proposalId }), `${work.ref} proposal applied.`);
+  }
+
+  acceptCodeCandidate(work: WorkItem) {
+    const candidate = this.reviewCandidate();
+    if (!candidate?.commit) return;
+    void this.ctx.write(() => this.ctx.api(
+      `/api/projects/${encodeURIComponent(this.ctx.projectId())}/candidates/${encodeURIComponent(candidate.id)}/accept`,
+      'POST', { commit: candidate.commit }), `${work.ref} accepted at ${candidate.commit.slice(0, 12)}.`);
+  }
+
+  buildCandidatePreview(id: string) {
+    void this.ctx.write(async () => {
+      const value = await this.ctx.api<{ preview: { status: string; error?: string | null }; url: string }>(
+        `/api/projects/${encodeURIComponent(this.ctx.projectId())}/candidates/${encodeURIComponent(id)}/preview`, 'POST', {});
+      this.candidatePreview.set({ id, ...value.preview, url: value.url });
+    });
+  }
+
+  inspectCandidate(id: string) {
+    void this.ctx.api<{ id: string; diff: string; baseCurrent: boolean }>(`/api/projects/${encodeURIComponent(this.ctx.projectId())}/candidates/${encodeURIComponent(id)}`)
+      .then(value => this.candidateDiff.set(value), () => this.candidateDiff.set(null));
   }
 
   phaseState(index: number) {

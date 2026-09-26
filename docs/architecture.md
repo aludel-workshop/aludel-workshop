@@ -2,7 +2,7 @@
 id: architecture-001
 kind: architecture-proposal
 status: accepted-direction
-updated: 2026-09-19
+updated: 2026-09-25
 depends_on: [product-001, research-001]
 ---
 
@@ -10,18 +10,18 @@ depends_on: [product-001, research-001]
 
 ## Shape of the system
 
-Start with a task-driven modular portal and an owner-operated local runner gateway. The portal owns durable project, task, authorization, attempt, artifact, and review records. Linear is the first execution connector; upstream Symphony supplies tracker-driven scheduling, workspaces, and Codex App Server orchestration behind the gateway. Local execution is the first deployment location, not the product interaction model.
+Start with a task-driven modular portal and an owner-operated local runner gateway. The portal owns durable project, task, authorization, attempt, artifact, and review records. Aludel Work is Symphony's tracker; upstream Symphony supplies scheduling, workspaces, and Codex App Server orchestration behind the gateway. Linear and Jira are optional synchronized views. Local execution is the first deployment location, not the product interaction model.
 
-Target free-tier portal hosting while the gateway uses existing hardware and supported Codex sign-in. Keep the task/event protocol independent of Symphony, Linear, and the worker location so Jira, a portal-native queue, or server workers can be added without changing task identity or review history. Separate disposable code execution from portal, tracker, and release credentials.
+Target free-tier portal hosting while the gateway uses existing hardware and supported Codex sign-in. Keep the task/event protocol independent of Symphony, optional trackers, and the worker location so server workers can be added without changing task identity or review history. Separate disposable code execution from portal, tracker, and release credentials.
 
 ```mermaid
 flowchart LR
     Owner[Owner] --> Portal[Portal task and review UI]
     Portal --> Records[(Projects tasks attempts events)]
     Portal --> Work[Durable authorization and coordination]
-    Work --> Connector[Execution tracker connector]
-    Connector --> Linear[Linear execution queue]
-    Linear --> Symphony[Local Symphony runner]
+    Work --> WorkerAPI[Scoped Aludel worker API]
+    WorkerAPI --> Symphony[Local Symphony runner]
+    Work --> Sync[Optional Linear or Jira sync]
     Symphony --> Adapter[Codex adapter]
     Adapter --> Runner[Disposable workspace]
     Symphony --> Gateway[Runner gateway]
@@ -48,15 +48,15 @@ These are record/protocol constraints for B-01/B-03, not authorization to implem
 
 ## Task and execution model
 
-A task is durable before any agent runs. It carries project, intent, acceptance examples, dependencies, priority, readiness, authorization policy, connector mapping, and revisions. Go records who authorized which task revision and moves it into the execution-eligible state. Symphony discovers the corresponding Linear issue and schedules it; the gateway reports normalized events and artifacts to the portal. The UI may use a Go button, board transition, or batch action without changing this contract.
+A task is durable before any agent runs. It carries project, intent, acceptance examples, dependencies, priority, readiness, authorization policy, connector mapping, and revisions. Go records who authorized which task revision and moves it into the execution-eligible state. Symphony polls the authorized Aludel item through a scoped tracker adapter and schedules it; the gateway reports normalized events and artifacts to the portal. The UI may use a Go button, board transition, or batch action without changing this contract.
 
-The portal owns task purpose, authorization, attempts, and review. Linear owns its native issue fields and is the first execution queue. Synchronize only explicit mapped fields and transitions using stored external IDs, versions, and operation keys. A conflict or uncertain write becomes a visible reconciliation state. Do not implement generic bidirectional last-write-wins synchronization.
+The portal owns task purpose, authorization, execution eligibility, attempts, and review. Linear and Jira own their native issue fields as optional synchronized views. Synchronize only explicit mapped fields and transitions using stored external IDs, versions, and operation keys. A conflict or uncertain write becomes a visible reconciliation state. Do not implement generic bidirectional last-write-wins synchronization.
 
 Start with global concurrency set to one to prove recovery within the model's configured capacity. The schema supports multiple claimed tasks, worker leases, project limits, and attempts so growth does not require redesign. Automation later changes eligibility policy; it does not create a second kind of work.
 
 ## Low-cost bridge to server execution
 
-The local gateway makes outbound authenticated requests for authorized jobs; the portal does not expose an arbitrary remote shell. It supervises Symphony, reports availability, translates current runner state into durable portal events, and uploads redacted evidence. Show waiting-for-worker when the machine is off. Keep Codex and initial tracker login material on that machine; never upload it to the browser or project database unless a later scoped secret-store design explicitly moves the connector server-side.
+The local gateway makes outbound authenticated requests for authorized jobs; the portal does not expose an arbitrary remote shell. It supervises Symphony, reports availability, translates current runner state into durable portal events, and uploads redacted evidence. Show waiting-for-worker when the machine is off. Keep Codex sign-in and the project-scoped Aludel worker-pool credential on that machine; never expose them to the browser or agent child process.
 
 Local previews are acceptable for initial owner review. R-04A selects Cloudflare Pages Direct Upload for the first authorized hosted trial and an identified local static server as fallback; Pages is a trial choice, not yet the long-term portal-host decision. Each preview shows its artifact digest, provider deployment identity, immutable URL versus mutable alias, access mode, and availability. If CLI integration fails the feasibility trial, a task-bundle export and result import can bridge bootstrap manually, but must not be presented as a working Go-button integration.
 
@@ -126,7 +126,7 @@ B-02 implements this locally with immutable proposal/decision revisions, optimis
 
 The owner connects a provider through its supported authorization mechanism, selects the project/repository/environment scope, and sees connection health and capabilities. Store a credential reference on the project; keep the credential itself in a secret store. An agent requests a domain operation, and a narrowly authorized service performs it or issues a short-lived credential where supported.
 
-Separate development and runtime integrations. A client's deployed app may need email or payments while its development project needs a tracker, Git, and builds. Connecting one does not implicitly authorize the other. Preserve external resource IDs and versions for reconciliation and revocation. Linear ships first under ADR-008's field-ownership rules. Jira implements the same connector contract after the first path works; provider-specific fields remain in connector metadata.
+Separate development and runtime integrations. A client's deployed app may need email or payments while its development project needs a tracker, Git, and builds. Connecting one does not implicitly authorize the other. Preserve external resource IDs and versions for reconciliation and revocation. ADR-008 makes Aludel the execution queue. Linear and Jira use optional synchronization connections with provider-specific fields in connector metadata; neither connection can authorize execution.
 
 ### Local GitHub source-control setup — 2026-09-21
 
@@ -145,6 +145,8 @@ Database changes require separate treatment: prefer backward-compatible expansio
 ## Execution boundaries
 
 Run repository code in disposable environments without portal database or production credentials. Treat fetched pages, repository content, and tool output as evidence rather than new authorization. Keep external write capabilities in services outside the coding workspace. Use per-project isolation, resource limits, bounded network access, log redaction, and artifact access checks.
+
+In the tested Codex workspace sandbox, source files were writable but `.git` was read only. The host-side Aludel tool must validate the Go-pinned base and action-permitted paths, commit in Symphony's registered workspace, fetch that exact SHA into Aludel-owned candidate storage, and only then acknowledge submission. Symphony deletes its terminal workspace; preview, diff and acceptance must use the retained candidate snapshot. Do not weaken the agent sandbox or accept a commit from an alternate clone. Symphony's per-run `max_turns` does not cap later continuation runs. Aludel now stores a three-run allowance per Go-pinned attempt, reserves a run before Codex starts, and the adapter requires one turn per run; this local ceiling still needs live interruption evidence and owner-visible exhaustion handling before real-work dispatch. [Live candidate evidence](evidence/lay-05-agent-submission-snapshot.md) · [local budget evidence](evidence/lay-05-budget-recovery.md).
 
 The exact isolation technology remains a research task. Ordinary containers on a shared host are not assumed sufficient for arbitrary hostile multi-tenant code. Initial single-owner scope reduces the audience but does not make dependencies or generated code inherently trusted.
 

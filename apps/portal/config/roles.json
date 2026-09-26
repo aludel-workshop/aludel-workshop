@@ -672,21 +672,21 @@
           "routine": "security",
           "name": "Security audit",
           "description": "Findings for this release",
-          "instructions": "",
+          "instructions": "Inspect the pinned source and relevant access rules. Report severity, affected source, evidence, recommendation, checked scope and unknowns. Do not edit code.",
           "tools": [
             "read",
             "test",
             "open-preview"
           ],
           "changes": [],
-          "asks": "",
+          "asks": "Ask when the release scope or governing access decision is unclear.",
           "phases": [
             "Read context",
             "Test",
             "Report"
           ],
           "checks": [
-            "Each finding has a severity and the record it concerns"
+            "Each finding has severity, an affected source, and evidence"
           ],
           "elevated": false
         },

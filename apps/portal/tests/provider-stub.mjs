@@ -9,6 +9,7 @@ function draftFor(schema) {
   const fields = Object.keys(schema?.properties || {});
   if (fields.includes('scenarios')) return { scenarios: [{ given: 'a signed-in neighbour', when: 'they do the thing this story describes', then: 'they see it worked' }], edges: ['They lose their connection halfway'], questions: [] };
   if (fields.includes('options')) return { options: ['A tool listing', 'A person\'s profile', 'A borrow request'], recommendation: 'A tool listing', reasoning: 'Most conversations are about one tool.' };
+  if (fields.includes('section') && fields.includes('basis')) return { section: 'value', text: 'Neighbours can borrow useful tools from each other with confidence.', note: 'Proposed promise', basis: 'The project pitch says neighbours lend tools; confidence remains to validate.' };
   if (fields.includes('fields')) return { description: 'Drafted by the stand-in.', fields: [{ name: 'title', type: 'string', format: '', required: true, description: 'What it is called' }, { name: 'createdAt', type: 'string', format: 'date-time', required: true, description: '' }], states: [] };
   return {};
 }
