@@ -1,0 +1,794 @@
+<title>Aludel Work Item</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- WORK-ITEM-UX-01 prototype v1. Static and clickable. W-4 uses the real Browser Buddy request, claim and run trace (2026-09-26); run 2, W-9 and all timings beyond the real run are illustrative. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0&display=block">
+<style>
+:root{
+  --bg:#fafbff;--surface:#ffffff;--rail:#f0f4fc;--panel:#f3f6fd;--hover:#e3e9f7;--line:#dce2ef;--line-strong:#c5cee2;--ink:#141727;--muted:#52617d;
+  --primary:#3047b9;--on-primary:#ffffff;--container:#dfe5ff;--on-container:#163698;
+  --product:#6b35c9;--product-bg:#efe7ff;--platform:#0f7465;--platform-bg:#d9f3ec;--work:#8a5300;--work-bg:#fff0d4;--design:#b3245f;--design-bg:#ffe4ee;
+  --ok:#146446;--ok-bg:#d9f3e7;--warn:#6b4b00;--warn-bg:#fff0c9;--warn-line:#e0a100;--bad:#a1231f;--bad-bg:#fce1e0;
+  --p-medium:#b78103;--p-high:#e0531f;
+  --shadow:0 18px 50px #1c2a5a26;--code-bg:#141727;--code-ink:#e8ebf7;--code-add:#1d4b35;--code-del:#5a2022;--ins:#d4f5e2;--del:#fde0df;
+  --stage:#eef2fb;--stage-line:#cfd7ea;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#10121a;--surface:#181b26;--rail:#141722;--panel:#1f2331;--hover:#262b3c;--line:#2b3144;--line-strong:#3a4259;--ink:#e6e9f5;--muted:#9da8c2;
+  --primary:#a3b3ff;--on-primary:#0f1a55;--container:#2b3670;--on-container:#e0e6ff;
+  --product:#cdb1ff;--product-bg:#2d2150;--platform:#86e0cb;--platform-bg:#0f3932;--work:#ffc774;--work-bg:#3d2b0c;--design:#ffa3c6;--design-bg:#461a2e;
+  --ok:#94e2bc;--ok-bg:#12392a;--warn:#ffd680;--warn-bg:#3b2d0b;--warn-line:#b88400;--bad:#ffaca7;--bad-bg:#491a1a;
+  --p-medium:#f2c14e;--p-high:#ff9a66;
+  --shadow:0 18px 50px #00000080;--code-bg:#0b0d14;--code-ink:#dfe3f2;--code-add:#16402c;--code-del:#4d1b1d;--ins:#16402c;--del:#4d1b1d;
+  --stage:#141722;--stage-line:#2b3144;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10121a;--surface:#181b26;--rail:#141722;--panel:#1f2331;--hover:#262b3c;--line:#2b3144;--line-strong:#3a4259;--ink:#e6e9f5;--muted:#9da8c2;
+  --primary:#a3b3ff;--on-primary:#0f1a55;--container:#2b3670;--on-container:#e0e6ff;
+  --product:#cdb1ff;--product-bg:#2d2150;--platform:#86e0cb;--platform-bg:#0f3932;--work:#ffc774;--work-bg:#3d2b0c;--design:#ffa3c6;--design-bg:#461a2e;
+  --ok:#94e2bc;--ok-bg:#12392a;--warn:#ffd680;--warn-bg:#3b2d0b;--warn-line:#b88400;--bad:#ffaca7;--bad-bg:#491a1a;
+  --p-medium:#f2c14e;--p-high:#ff9a66;
+  --shadow:0 18px 50px #00000080;--code-bg:#0b0d14;--code-ink:#dfe3f2;--code-add:#16402c;--code-del:#4d1b1d;--ins:#16402c;--del:#4d1b1d;
+  --stage:#141722;--stage-line:#2b3144;color-scheme:dark}
+
+*{box-sizing:border-box}
+html,body{background:var(--bg);color:var(--ink)}
+body{margin:0;font:14px/1.5 Roboto,system-ui,-apple-system,"Segoe UI",sans-serif}
+button,input,textarea,select{font:inherit;color:inherit}
+a{color:var(--primary)}
+.ms{font-family:"Material Symbols Rounded";font-weight:normal;font-style:normal;font-size:20px;line-height:1;display:inline-block;vertical-align:middle;letter-spacing:normal;text-transform:none;white-space:nowrap;-webkit-font-smoothing:antialiased;user-select:none}
+.ms.sm{font-size:16px}.ms.xs{font-size:14px}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.mono{font-family:"Roboto Mono",ui-monospace,monospace;font-size:12.5px}
+.muted{color:var(--muted)}.small{font-size:12.5px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* prototype bar */
+.proto{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px 16px;background:var(--code-bg);color:var(--code-ink);font-size:12.5px}
+.proto b{font-weight:500;margin-right:6px}
+.proto button{border:1px solid #ffffff30;background:transparent;border-radius:999px;padding:3px 10px;cursor:pointer;color:var(--code-ink)}
+.proto button[aria-current="true"]{background:var(--code-ink);color:var(--code-bg)}
+.proto .sp{flex:1}
+
+/* shell */
+.app{display:grid;grid-template-columns:196px minmax(0,1fr);min-height:calc(100vh - 40px)}
+.rail{background:var(--rail);border-right:1px solid var(--line);padding:14px 10px;display:flex;flex-direction:column;gap:2px}
+.brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:16px;padding:4px 8px 12px}
+.proj{display:flex;gap:8px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px;margin-bottom:10px}
+.proj i{width:28px;height:28px;border-radius:7px;background:var(--design);color:#fff;display:grid;place-items:center;font-style:normal;font-weight:700;font-size:12px}
+.proj small{display:block;color:var(--muted);font-size:11.5px}
+.nav{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:8px;color:var(--ink);text-decoration:none}
+.nav[aria-current="page"]{background:var(--container);color:var(--on-container);font-weight:500}
+.main{padding:20px clamp(16px,3vw,36px) 60px;min-width:0}
+@media (max-width:860px){.app{grid-template-columns:1fr}.rail{display:none}}
+
+/* header */
+.crumb{font-size:12px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase;margin:0 0 4px}
+.crumb a{color:inherit;text-decoration:none}
+.head{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;margin-bottom:18px}
+.head h1{font-size:24px;line-height:1.25;margin:0 0 8px;font-weight:500;text-wrap:balance}
+.meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);background:var(--surface);border-radius:7px;padding:2px 8px;font-size:12.5px;white-space:nowrap;line-height:20px}
+.chip.role-product{background:var(--product-bg);color:var(--product);border-color:transparent;font-weight:500}
+.chip.role-platform{background:var(--platform-bg);color:var(--platform);border-color:transparent;font-weight:500}
+.chip.ref{font-weight:500}
+.chip.ref .ms{color:var(--muted)}
+.st{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:2px 10px;font-size:12.5px;font-weight:500;line-height:20px;white-space:nowrap}
+.st-review{background:var(--ok-bg);color:var(--ok)}.st-working{background:var(--container);color:var(--on-container)}.st-queued{background:var(--panel);color:var(--muted)}
+.st-sent{background:var(--warn-bg);color:var(--warn)}.st-failed{background:var(--bad-bg);color:var(--bad)}.st-applied{background:var(--ok-bg);color:var(--ok)}.st-handoff{background:var(--panel);color:var(--muted)}
+.prio{color:var(--p-medium)}.prio.high{color:var(--p-high)}
+.btn{display:inline-flex;align-items:center;gap:6px;border:0;border-radius:999px;padding:8px 16px;background:var(--primary);color:var(--on-primary);font-weight:500;cursor:pointer;text-decoration:none;white-space:nowrap}
+.btn.ghost{background:transparent;color:var(--primary);border:1px solid var(--line-strong)}
+.btn.ok{background:var(--ok);color:var(--surface)}
+.btn.bad{background:var(--bad);color:var(--surface)}
+.btn.sm{padding:4px 12px;font-size:12.5px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.linkbtn{border:0;background:none;color:var(--primary);cursor:pointer;padding:0;font-size:12.5px}
+
+/* avatars */
+.av{width:22px;height:22px;border-radius:50%;display:inline-grid;place-items:center;flex:none;overflow:hidden;font-size:10.5px;font-weight:700;color:#fff;background:#2f3a57}
+.av svg{width:100%;height:100%;display:block}
+.av.lg{width:32px;height:32px;font-size:13px}
+
+/* layout */
+.cols{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:24px;align-items:start}
+@media (max-width:1100px){.cols{grid-template-columns:minmax(0,1fr)}}
+.side{display:flex;flex-direction:column;gap:12px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.panel h2{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 10px;font-weight:500}
+dl.fields{display:grid;grid-template-columns:84px minmax(0,1fr);gap:9px 10px;margin:0;align-items:center}
+dl.fields dt{color:var(--muted);font-size:13px}dl.fields dd{margin:0;display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:13px}
+
+section.blk{margin-bottom:26px}
+.blk>h2{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:500;margin:0 0 10px}
+.blk>h2 .count{font-weight:400;color:var(--muted);font-size:13px}
+.blk>h2 .sp{flex:1}
+
+/* task */
+.task{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.task-row{padding:14px 18px;border-top:1px solid var(--line)}
+.task-row:first-child{border-top:0}
+.task-label{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500;margin:0 0 8px;display:flex;gap:8px;align-items:center}
+.task-label .sp{flex:1}
+.ask{display:flex;gap:10px;align-items:flex-start}
+.ask blockquote{margin:0;font-size:15px;line-height:1.55;max-width:68ch}
+.ask cite{display:block;font-style:normal;color:var(--muted);font-size:12px;margin-top:4px}
+.produces{display:flex;flex-direction:column;gap:6px}
+.prod{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.verb{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border-radius:5px;padding:1px 6px}
+.verb.rev{background:var(--container);color:var(--on-container)}.verb.new{background:var(--ok-bg);color:var(--ok)}.verb.del{background:var(--bad-bg);color:var(--bad)}.verb.chg{background:var(--warn-bg);color:var(--warn)}
+ol.crits{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.crit{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:10px;padding:9px 0;border-top:1px dashed var(--line);align-items:start}
+.crit:first-child{border-top:0}
+.crit .n{width:22px;height:22px;border-radius:50%;background:var(--panel);display:grid;place-items:center;font-size:11.5px;font-weight:500;color:var(--muted);font-variant-numeric:tabular-nums}
+.crit .t{font-size:14px}
+.crit .src{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;align-items:center}
+.srcchip{font-size:11.5px;color:var(--muted);display:inline-flex;align-items:center;gap:4px}
+.vchip{display:inline-flex;align-items:center;gap:4px;font-size:12px;border-radius:6px;padding:1px 7px;background:var(--panel);color:var(--ink);white-space:nowrap}
+.vchip .ms{font-size:15px}
+.crit.suggest{background:var(--stage);border-radius:8px;padding:9px 8px;border:1px dashed var(--stage-line);margin-top:6px}
+.lockline{display:flex;gap:8px;align-items:center;font-size:12.5px;color:var(--muted);padding-top:10px}
+.crit-state{display:inline-flex;align-items:center;gap:4px;font-size:12px;white-space:nowrap}
+.crit-state.pass{color:var(--ok)}.crit-state.fail{color:var(--bad)}.crit-state.wait{color:var(--muted)}
+
+/* runs */
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:thin}
+.tab{display:flex;align-items:center;gap:8px;border:0;background:none;padding:9px 14px 10px;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;color:var(--muted)}
+.tab[aria-selected="true"]{border-bottom-color:var(--primary);color:var(--ink);font-weight:500}
+.tab .dot{width:8px;height:8px;border-radius:50%}
+.dot.review,.dot.applied{background:var(--ok)}.dot.sent{background:var(--warn-line)}.dot.failed{background:var(--bad)}.dot.handoff{background:var(--line-strong)}
+.dot.working{background:var(--primary);animation:pulse 1.4s infinite}
+@keyframes pulse{50%{opacity:.3}}
+.runpanel{background:var(--surface);border:1px solid var(--line);border-top:0;border-radius:0 0 12px 12px;padding:16px 18px;display:flex;flex-direction:column;gap:18px}
+.runsum{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center}
+.runsum .who{display:flex;gap:8px;align-items:center;font-weight:500}
+.stat{display:flex;flex-direction:column;font-size:12px;color:var(--muted)}
+.stat b{font-size:14px;color:var(--ink);font-weight:500;font-variant-numeric:tabular-nums}
+.runsum .sp{flex:1}
+.banner{display:flex;gap:10px;border-radius:10px;padding:10px 12px;font-size:13.5px}
+.banner.sent{background:var(--warn-bg);color:var(--warn)}.banner.failed{background:var(--bad-bg);color:var(--bad)}.banner.handoff{background:var(--panel)}.banner.review{background:var(--ok-bg);color:var(--ok)}
+.banner p{margin:0}.banner .ms{flex:none}
+.banner q{color:var(--ink)}
+.sub{font-size:13px;font-weight:500;margin:0 0 8px;display:flex;align-items:center;gap:8px}
+.sub .sp{flex:1}
+.changes{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.chg{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-top:1px solid var(--line)}
+.chg:first-child{border-top:0}
+.chg-head{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.chg-head .sp{flex:1}
+.inline-diff{font-size:14px;line-height:1.6;padding-left:2px}
+del{background:var(--del);text-decoration:line-through;text-decoration-color:var(--bad);border-radius:3px;padding:0 2px}
+ins{background:var(--ins);text-decoration:none;border-radius:3px;padding:0 2px}
+.plus{color:var(--ok);font-variant-numeric:tabular-nums}.minus{color:var(--bad);font-variant-numeric:tabular-nums}
+.claims{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}
+.claim{border:1px solid var(--line);border-radius:10px;padding:8px 10px;display:flex;gap:8px;align-items:flex-start;font-size:12.5px}
+.claim .ms{font-size:18px}
+.claim.pass .ms{color:var(--ok)}.claim.fail .ms{color:var(--bad)}.claim.wait .ms{color:var(--muted)}
+.claim small{display:block;color:var(--muted)}
+
+/* timeline */
+.objs{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+details.obj{border-top:1px solid var(--line)}
+details.obj:first-child{border-top:0}
+details.obj>summary{list-style:none;display:grid;grid-template-columns:20px minmax(0,1fr) 120px 64px;gap:10px;align-items:center;padding:9px 12px;cursor:pointer}
+details.obj>summary::-webkit-details-marker{display:none}
+details.obj[open]>summary{background:var(--panel)}
+.obj .ic{font-size:18px}
+.obj.done .ic{color:var(--ok)}.obj.now .ic{color:var(--primary)}.obj.todo .ic{color:var(--line-strong)}.obj.stuck .ic{color:var(--warn-line)}
+.obj .ot{display:flex;flex-direction:column;min-width:0}
+.obj .ot small{color:var(--muted);font-size:12px}
+.obj .stumble{color:var(--warn);font-size:12px;display:flex;gap:4px;align-items:center}
+.bar{height:6px;background:var(--panel);border-radius:3px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--line-strong);border-radius:3px}
+.obj.now .bar i{background:var(--primary)}
+.obj .dur{text-align:right;font-variant-numeric:tabular-nums;font-size:12.5px;color:var(--muted)}
+.events{list-style:none;margin:0;padding:6px 12px 12px 42px;display:flex;flex-direction:column;gap:5px;font-size:12.5px}
+.events li{display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:8px;align-items:start}
+.events li .ms{font-size:15px;color:var(--muted)}
+.events li.warn .ms,.events li.warn{color:var(--warn)}
+.events li.err .ms{color:var(--bad)}
+.events li.ok .ms{color:var(--ok)}
+.events time{color:var(--muted);font-variant-numeric:tabular-nums}
+@media (max-width:600px){details.obj>summary{grid-template-columns:20px minmax(0,1fr) 54px}.obj .bar{display:none}}
+
+/* live */
+.live-head{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.live-now{display:flex;gap:10px;align-items:center;background:var(--container);color:var(--on-container);border-radius:10px;padding:10px 12px}
+.live-now .ms{animation:spin 1.6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.feed{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:260px;overflow:auto}
+.feed li{display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:8px;font-size:12.5px;align-items:start;animation:fadein .4s}
+.feed li .ms{font-size:15px;color:var(--muted)}
+.feed li.ok .ms{color:var(--ok)}.feed li.err .ms{color:var(--bad)}.feed li.warn .ms{color:var(--warn-line)}
+@keyframes fadein{from{background:var(--container)}to{background:transparent}}
+.two{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:18px}
+@media (max-width:760px){.two{grid-template-columns:minmax(0,1fr)}}
+
+/* activity */
+ol.log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+ol.log li{display:flex;gap:10px;font-size:13px;align-items:flex-start}
+ol.log time{color:var(--muted);font-size:12px;margin-left:6px}
+.comment{display:flex;gap:8px;margin-top:12px}
+.comment input{flex:1;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:7px 10px}
+
+/* review mode */
+.rvmode{display:grid;grid-template-rows:auto minmax(0,1fr);height:calc(100vh - 40px)}
+.rv-top{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--surface)}
+.rv-top h1{font-size:16px;margin:0;font-weight:500}
+.rv-top .sp{flex:1}
+.pips{display:flex;gap:4px}
+.pip{width:22px;height:6px;border-radius:3px;background:var(--line);border:0;padding:0;cursor:pointer}
+.pip.cur{outline:2px solid var(--primary);outline-offset:1px}
+.pip.accept{background:var(--ok)}.pip.reject{background:var(--bad)}
+.rv-body{display:grid;grid-template-columns:minmax(0,1fr) 420px;min-height:0}
+.viewer{display:flex;flex-direction:column;min-height:0;background:var(--stage);border-right:1px solid var(--line)}
+.vtabs{display:flex;gap:2px;padding:0 12px;background:var(--surface);border-bottom:1px solid var(--line);overflow-x:auto}
+.vpane{flex:1;overflow:auto;padding:20px}
+.stepper{display:flex;flex-direction:column;min-height:0;background:var(--surface)}
+.step{flex:1;overflow:auto;padding:18px 20px;display:flex;flex-direction:column;gap:14px}
+.step-foot{border-top:1px solid var(--line);padding:12px 20px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.step-foot .sp{flex:1}
+.kbd{font-family:"Roboto Mono",monospace;font-size:11px;border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:4px;padding:0 4px;color:var(--muted)}
+.step h2{font-size:18px;font-weight:500;margin:0;line-height:1.35;text-wrap:balance}
+.eyebrow{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500;margin:0}
+.srcbox{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--panel);font-size:13px}
+.srcbox q{display:block;margin-top:4px;font-size:13.5px}
+.evid{display:flex;flex-direction:column;gap:6px}
+.ev{display:flex;gap:8px;align-items:flex-start;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13px;background:var(--surface);cursor:pointer;text-align:left;width:100%}
+.ev:hover{background:var(--hover)}
+.ev .ms{font-size:18px}
+.ev.pass .ms{color:var(--ok)}.ev.fail .ms{color:var(--bad)}.ev.info .ms{color:var(--primary)}.ev.warn .ms{color:var(--warn-line)}
+.ev small{display:block;color:var(--muted);font-size:12px}
+.verdict{display:flex;gap:8px}
+.verdict button{flex:1;display:flex;gap:6px;align-items:center;justify-content:center;border:1px solid var(--line-strong);background:var(--surface);border-radius:10px;padding:10px;cursor:pointer;font-weight:500}
+.verdict button.yes[aria-pressed="true"]{background:var(--ok);color:var(--surface);border-color:var(--ok)}
+.verdict button.no[aria-pressed="true"]{background:var(--bad);color:var(--surface);border-color:var(--bad)}
+.verdict-note{width:100%;border:1px solid var(--bad);border-radius:8px;padding:8px 10px;background:var(--surface);min-height:64px;resize:vertical}
+.sumlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.sumlist li{display:flex;gap:8px;font-size:13px;align-items:flex-start}
+.sumlist .ms{font-size:18px}
+.sumlist .a{color:var(--ok)}.sumlist .r{color:var(--bad)}.sumlist .u{color:var(--muted)}
+@media (max-width:900px){.rvmode{height:auto}.rv-body{grid-template-columns:minmax(0,1fr)}.viewer{border-right:0;border-bottom:1px solid var(--line)}.vpane{max-height:none}}
+
+/* brief doc render */
+.doc{max-width:680px;margin:0 auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:28px 32px;box-shadow:0 1px 2px #1c2a5a12}
+.doc h3{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--product);margin:20px 0 6px;font-weight:500}
+.doc h3:first-of-type{margin-top:0}
+.doc p{margin:0 0 4px;font-size:15.5px;line-height:1.6}
+.doc .docname{font-size:22px;font-weight:500;margin:0 0 4px}
+.doc .dim{opacity:.55}
+.hl{outline:2px solid var(--primary);outline-offset:4px;border-radius:4px}
+.fieldiff{display:grid;grid-template-columns:110px minmax(0,1fr);gap:8px 12px;font-size:13.5px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;max-width:720px;margin:0 auto}
+.fieldiff dt{color:var(--muted)}.fieldiff dd{margin:0}
+
+/* code review */
+.browser{max-width:760px;margin:0 auto;background:var(--surface);border:1px solid var(--line-strong);border-radius:12px;overflow:hidden;box-shadow:var(--shadow)}
+.browser-bar{display:flex;gap:6px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line);background:var(--panel);font-size:12px;color:var(--muted)}
+.browser-bar i{width:10px;height:10px;border-radius:50%;background:var(--line-strong)}
+.browser-bar span{margin-left:8px;background:var(--surface);border-radius:6px;padding:2px 10px;flex:1}
+.desk{position:relative;height:380px;background:linear-gradient(135deg,#dfe7f7,#eef1fa);overflow:hidden;cursor:crosshair}
+:root[data-theme="dark"] .desk{background:linear-gradient(135deg,#1c2233,#232a3d)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .desk{background:linear-gradient(135deg,#1c2233,#232a3d)}}
+.petwin{position:absolute;right:18px;bottom:18px;width:300px;height:210px;background:var(--surface);border:1px solid var(--line-strong);border-radius:10px;box-shadow:var(--shadow);overflow:hidden}
+.petwin header{font-size:11.5px;padding:4px 8px;border-bottom:1px solid var(--line);color:var(--muted);display:flex;justify-content:space-between}
+.petfield{position:absolute;inset:25px 0 0 0}
+.edge{position:absolute;inset:24px;border:1px dashed var(--warn-line);border-radius:6px;pointer-events:none;opacity:0}
+.show-edge .edge{opacity:.8}
+.pet{position:absolute;width:38px;height:34px;left:0;top:0;transition:transform .08s linear}
+.preview-ctl{display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:center;margin-top:12px;font-size:12.5px}
+.tests{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
+.trow{display:grid;grid-template-columns:20px minmax(0,1fr) auto;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 12px;align-items:center;font-size:13px}
+.trow.hl2{outline:2px solid var(--primary)}
+.trow .ms{color:var(--ok);font-size:18px}
+.trow small{color:var(--muted);display:block}
+.tsum{display:flex;gap:10px;align-items:center;font-size:13px;flex-wrap:wrap}
+.difffile{max-width:880px;margin:0 auto 14px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}
+.difffile header{display:flex;gap:8px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);font-size:13px;background:var(--panel)}
+.difffile header .sp{flex:1}
+.dcode{margin:0;overflow-x:auto;font-family:"Roboto Mono",monospace;font-size:12.5px;line-height:1.6;background:var(--code-bg);color:var(--code-ink);padding:8px 0}
+.dcode span{display:block;padding:0 12px;white-space:pre}
+.dcode .a{background:var(--code-add)}.dcode .d{background:var(--code-del)}
+
+/* ledger + toast */
+.ledger{position:fixed;right:16px;top:calc(48px + env(safe-area-inset-top,0px));z-index:40;width:min(440px,calc(100vw - 32px));max-height:70vh;overflow:auto;background:var(--surface);border:1px solid var(--line-strong);border-radius:12px;box-shadow:var(--shadow);padding:14px 16px}
+.ledger h2{font-size:14px;margin:0 0 8px}
+.ledger table{border-collapse:collapse;font-size:12.5px;width:100%}
+.ledger td{border-top:1px solid var(--line);padding:6px 4px;vertical-align:top}
+.ledger td:first-child{font-weight:500;white-space:nowrap}
+.ledger a{cursor:pointer}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--code-bg);color:var(--code-ink);padding:9px 16px;border-radius:999px;font-size:13px;z-index:50}
+</style>
+
+<div class="proto" role="navigation" aria-label="Prototype screens">
+  <b>Work item · prototype v1</b>
+  <button data-screen="before">1 · Before work</button>
+  <button data-screen="w4">2 · Ready for review</button>
+  <button data-screen="rv4">3 · Review: Vision claim</button>
+  <button data-screen="w9">4 · Live run</button>
+  <button data-screen="rv9">5 · Review: code</button>
+  <span class="sp"></span>
+  <span style="color:#aab3cc">W-4 is the real request and trace; W-9 is illustrative</span>
+  <button type="button" id="ledger-btn" aria-expanded="false">Your asks D1–D10</button>
+</div>
+<div id="root"></div>
+<div class="ledger" id="ledger" hidden></div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const ms = (n, cls='') => `<span class="ms ${cls}" aria-hidden="true">${n}</span>`;
+
+// Robot avatars: one metal per profile (inline so the page needs no image host).
+const metals = { default:'#8e9ab5', light:'#c98b4f', strong:'#c9a227' };
+const names = { default:'Default agent', light:'Quick agent', strong:'Deep agent', you:'Charles' };
+function bot(kind){ const c = metals[kind];
+  return `<span class="av" title="${names[kind]}" style="background:${c}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="7" width="14" height="11" rx="3.5" fill="#fff" opacity=".92"/><circle cx="9.5" cy="12.2" r="1.7" fill="${c}"/><circle cx="14.5" cy="12.2" r="1.7" fill="${c}"/><rect x="11.3" y="3.2" width="1.4" height="3.8" fill="#fff"/><circle cx="12" cy="3.2" r="1.3" fill="#fff"/><rect x="9.5" y="15.2" width="5" height="1.1" rx=".55" fill="${c}"/></svg></span>`; }
+const person = (lg='') => `<span class="av ${lg}" title="Charles" style="background:#3a4a7a">CK</span>`;
+const who = k => k === 'you' ? person() : bot(k);
+
+const verify = {
+  read:  ['menu_book', 'Read'],
+  try:   ['touch_app', 'Try it'],
+  test:  ['science', 'Tests'],
+  scope: ['crop_free', 'Scope'],
+};
+const vchip = v => `<span class="vchip" title="How it's checked">${ms(verify[v][0])}${verify[v][1]}</span>`;
+const src = s => `<span class="srcchip">${ms(s.icon || 'bookmark','xs')}${s.text}</span>`;
+const ref = (icon, text) => `<span class="chip ref">${ms(icon,'sm')}${text}</span>`;
+
+/* ---------- W-4: real request and first trace ---------- */
+const W4 = {
+  ref:'W-4', title:'write value prop', role:['product','Product lead · Write a Brief claim'], prio:'Medium',
+  ask:"can you write the value proposition for our app? aren't going on much here except that it would be kind of cute to have an interactive pet sitting in an open window in the corner of your screen.",
+  produces:[{verb:'rev', v:'Revise', target:ref('lightbulb','Brief › Value'), note:'one claim · performer may add a new claim instead'}],
+  crits:[
+    {t:'The value is one short statement a reader could check as true or false', src:{icon:'rule', text:'Action rule · Write a Brief claim r2'}, v:'read'},
+    {t:'It says what the request asks for: an interactive pet in a small window in the corner of the screen', src:{icon:'format_quote', text:'Your request'}, v:'read'},
+    {t:'It adds no outcome the request did not ask for, such as mood, focus or productivity', src:{icon:'auto_awesome', text:'Suggested from your request · kept by you'}, v:'read'},
+    {t:'It replaces “A pet in a browser window” instead of adding a second value claim', src:{icon:'reply', text:'Added by you when sending back run 1'}, v:'scope'},
+    {t:'Nothing else in Vision changed', src:{icon:'shield', text:'Always checked'}, v:'scope'},
+  ],
+  runs:[
+    { id:1, who:'default', label:'Run 1', state:'sent', stateText:'Sent back', model:'gpt-5.6-sol · medium', time:'1m 29s', tokens:'291k', cached:'259k cached', when:'Sep 26 · 21:18',
+      banner:{cls:'sent', icon:'reply', html:'You sent it back: <q>The note says it replaces “A pet in a browser window”, but it was saved as a second claim. Revise the existing one.</q>'},
+      changes:[{verb:'new', v:'Add', target:ref('lightbulb','Brief › Value'), body:'<ins>Keep an interactive pet in a small browser window in the corner of your screen.</ins>', flag:'Its note says “replaces the broad existing label”, but the change adds a claim'}],
+      claims:[['pass','1 · Short, checkable'],['pass','2 · Matches your request'],['fail','Scope · A second value claim now exists']],
+      objs:[
+        {s:'done', t:'Open the task card', note:'1 check listed: short and checkable', d:'5s', w:6, ev:[['description','Opened task W-4, attempt 3','21:18:13'],['rule','Read the single check on the card','21:18:13']]},
+        {s:'done', t:'Check the existing Vision, stories and design direction', note:'Read 5 records · 3 searches', d:'46s', w:52, ev:[['account_tree','Looked at the project map','21:18:16'],['search','Searched “interactive pet”, “browser buddy”','21:18:22'],['menu_book','Read Brief (revision 1): Value “A pet in a browser window”','21:18:33'],['menu_book','Read story S1 and the Home page (revision 3)','21:19:09'],['search','Searched pet, screen, corner, cute, open','21:19:04']]},
+        {s:'done', t:'Keep the proposal narrow: add the requested interaction and corner placement', note:'Avoided mood, productivity and persistence claims', d:'23s', w:26, ev:[['edit_note','Drafted one claim for the Value section','21:19:32']]},
+        {s:'stuck', t:'Submit the proposal', note:'', stumble:'Saved as a new claim, not a revision', d:'3s', w:4, ev:[['upload','Submitted proposal spr-d165…','21:19:35'],['warning','Aludel scope check: note says “replaces”, change adds a claim','21:19:35','warn']]},
+      ]},
+    { id:2, who:'default', label:'Run 2', state:'review', stateText:'Ready for review', model:'gpt-5.6-sol · medium', time:'1m 12s', tokens:'188k', cached:'171k cached', when:'Sep 26 · 22:40',
+      banner:{cls:'review', icon:'rate_review', html:'Default agent finished. 5 things to check. Nothing changes in Vision until you apply it.'},
+      changes:[{verb:'rev', v:'Revise', target:ref('lightbulb','Brief › Value') + '<span class="muted small">revision 1 → 2</span>', body:'<del>A pet in a browser window.</del> <ins>A small interactive pet that lives in a browser window in the corner of your screen.</ins>'}],
+      claims:[['pass','1 · Short, checkable'],['pass','2 · Matches your request'],['pass','3 · No added outcomes'],['pass','4 · Replaces the claim'],['pass','Scope · Only Brief › Value']],
+      objs:[
+        {s:'done', t:'Read why run 1 was sent back', note:'1 note from you', d:'4s', w:5, ev:[['reply','Read your note on criterion 4','22:40:05']]},
+        {s:'done', t:'Re-read the current value claim and your request', note:'Read 2 records', d:'19s', w:22, ev:[['menu_book','Read Brief (revision 1)','22:40:09'],['menu_book','Read the W-4 request','22:40:12']]},
+        {s:'stuck', t:'Look for guidance on what a value claim should say', note:'Used the Product lead rules instead', stumble:'No Vision guide found', d:'21s', w:24, ev:[['search','Searched “value claim guidance”: no results','22:40:20','warn'],['search','Searched “value proposition”: 1 result, this item','22:40:24','warn'],['rule','Fell back to Product lead role rules (revision 2)','22:40:29']]},
+        {s:'done', t:'Revise the existing claim', note:'Revision 1 → 2', d:'16s', w:18, ev:[['edit_note','Proposed revision to Brief › Value','22:40:45']]},
+        {s:'done', t:'Check the draft against the 5 criteria', note:'5 pass (agent’s own check)', d:'10s', w:11, ev:[['fact_check','Checked each criterion and wrote evidence','22:40:55']]},
+        {s:'done', t:'Submit for review', note:'', d:'2s', w:3, ev:[['upload','Submitted proposal spr-7a1c…','22:40:57'],['verified','Aludel scope check passed: only Brief › Value changed','22:40:57','ok']]},
+      ]},
+  ],
+  log:[
+    [person(),'<b>Charles</b> created this','Sep 26 · 05:23'],
+    [person(),'<b>Charles</b> started B-1 and B-2; both were stopped before a worker picked them up','16:31–16:42'],
+    [bot('default'),'<b>Default agent</b> finished run 1','21:19'],
+    [person(),'<b>Charles</b> sent run 1 back and added criterion 4','22:31'],
+    [bot('default'),'<b>Default agent</b> finished run 2','22:40'],
+  ],
+};
+
+/* ---------- W-9: illustrative code item with three runs ---------- */
+const W9 = {
+  ref:'W-9', title:'Pet follows the cursor inside its window', role:['platform','Engineer · Build a story'], prio:'High',
+  ask:'When I move the mouse over the pet window the pet should walk over to it. It must not walk off the edge of the window. Use the walking speed from Design.',
+  produces:[
+    {verb:'chg', v:'Change', target:ref('code','src/pet/') , note:'movement and bounds'},
+    {verb:'new', v:'Add', target:ref('science','tests/pet-follow.test.ts'), note:'one test per criterion'},
+  ],
+  crits:[
+    {t:'The pet walks toward the cursor when it enters the window', src:{icon:'bookmark', text:'Story S3 · scenario 1'}, v:'test', v2:'try'},
+    {t:'It stops 24 px from the window edge and never leaves the window', src:{icon:'bookmark', text:'Story S3 · scenario 2'}, v:'test', v2:'try'},
+    {t:'It walks at the Design token motion.pet-walk (120 px/s)', src:{icon:'palette', text:'Design token · motion.pet-walk'}, v:'test'},
+    {t:'With reduced motion on, the pet turns to face the cursor instead of walking', src:{icon:'accessibility_new', text:'Principles · motion'}, v:'test', v2:'try'},
+    {t:'It reuses the existing Sprite component; no new animation library', src:{icon:'rule', text:'Action rule · Build a story r4'}, v:'read'},
+    {t:'Only src/pet/ and tests changed', src:{icon:'shield', text:'Always checked'}, v:'scope'},
+  ],
+  runs:[
+    { id:1, who:'you', label:'Run 1', state:'handoff', stateText:'Handed off', model:'You, in the editor', time:'38m', tokens:'—', cached:'', when:'Sep 24',
+      banner:{cls:'handoff', icon:'front_hand', html:'You stopped and handed it to an agent: <q>Sprite moves but I ran out of time. Branch pet-follow-wip has the start.</q>'},
+      changes:[{verb:'chg', v:'Change', target:ref('description','src/pet/pet.ts'), body:'<span class="plus">+22</span> <span class="minus">−3</span> · on branch pet-follow-wip, not submitted'}],
+      claims:[['wait','No criteria checked']],
+      objs:[{s:'done', t:'Moved the sprite toward the cursor', note:'Edited 1 file', d:'38m', w:100, ev:[['edit','Edited src/pet/pet.ts','Sep 24']]}]},
+    { id:2, who:'light', label:'Run 2', state:'failed', stateText:'Failed', model:'gpt-5.6-mini · low', time:'11m 40s', tokens:'412k', cached:'', when:'Sep 25',
+      banner:{cls:'failed', icon:'error', html:'Used all 3 turns with 2 of 6 tests failing. Its last note: <q>Movement depends on frame timing and the tests cannot control the clock.</q>'},
+      changes:[{verb:'chg', v:'Change', target:ref('description','src/pet/pet.ts'), body:'<span class="plus">+41</span> <span class="minus">−12</span> · kept for the next run'},{verb:'new', v:'Add', target:ref('science','tests/pet-follow.test.ts'), body:'<span class="plus">+88</span> · 6 tests, 2 failing'}],
+      claims:[['pass','1 · Walks toward cursor'],['fail','2 · Stays inside bounds'],['fail','3 · Speed 120 px/s'],['pass','4 · Reduced motion'],['pass','5 · Uses Sprite'],['pass','Scope']],
+      objs:[
+        {s:'done', t:'Read the handed-off branch', note:'', d:'1m 05s', w:9, ev:[['merge','Checked out pet-follow-wip','']]},
+        {s:'done', t:'Write tests for the six criteria', note:'6 tests, 4 red', d:'3m 20s', w:29, ev:[['science','Ran tests: 2 passed, 4 failed (expected before the change)','']]},
+        {s:'stuck', t:'Make the pet stop at the edge and move at 120 px/s', note:'', stumble:'Same 2 tests failed on 3 attempts', d:'7m 15s', w:62, ev:[['science','Ran tests: 4 passed, 2 failed','','err'],['science','Ran tests: 4 passed, 2 failed','','err'],['error','Turn limit reached (3 of 3)','','err']]},
+      ]},
+  ],
+  live:{ who:'strong', label:'Run 3', model:'gpt-5.6-sol · high', start: 9*60+32 },
+  log:[
+    [person(),'<b>Charles</b> created this from story S3','Sep 24 · 09:10'],
+    [person(),'<b>Charles</b> handed run 1 to Quick agent','Sep 24 · 17:52'],
+    [bot('light'),'<b>Quick agent</b> run 2 failed: turn limit','Sep 25 · 11:04'],
+    [person(),'<b>Charles</b> reassigned it to Deep agent and started B-7','Sep 26 · 22:51'],
+  ],
+};
+
+// The live run's generated plan and a scripted stream of what arrives next.
+const livePlan = [
+  {t:'Read run 2’s failure and the handed-off branch', d:'0:48', s:'done', note:'Found the frame-timing problem'},
+  {t:'Put the six criteria into tests first', d:'2:10', s:'done', note:'6 tests · 2 red, as expected'},
+  {t:'Make movement independent of frame rate', d:'3:05', s:'done', note:'Injected a clock the tests control'},
+  {t:'Stop the pet 24 px from the window edge', d:'', s:'now', note:''},
+  {t:'Reduced-motion: turn to face instead of walking', d:'', s:'todo', note:''},
+  {t:'Build the preview and run every check', d:'', s:'todo', note:''},
+];
+const liveCrit = ['pass','fail','pass','wait','pass','pass'];
+const liveScript = [
+  ['edit','Edited src/pet/bounds.ts','+18 −4'],
+  ['science','Ran tests: “stays inside bounds” 1 of 2 passed','','err'],
+  ['edit','Edited src/pet/bounds.ts: clamp uses the window’s inner size','+3 −2'],
+  ['science','Ran tests: “stays inside bounds” 2 of 2 passed','','ok', () => { liveCrit[1] = 'pass'; }],
+  ['flag','Finished “Stop the pet 24 px from the window edge”','','ok', () => { livePlan[3].s='done'; livePlan[3].d='1:52'; livePlan[3].note='2 tests green'; livePlan[4].s='now'; }],
+  ['menu_book','Read Principles › motion (revision 5)',''],
+  ['edit','Edited src/pet/pet.ts: face the cursor when reduced motion is on','+14 −1'],
+  ['science','Ran tests: “reduced motion turns instead of walking” passed','','ok', () => { liveCrit[3] = 'pass'; }],
+  ['flag','Finished “Reduced-motion: turn to face instead of walking”','','ok', () => { livePlan[4].s='done'; livePlan[4].d='1:20'; livePlan[4].note='1 test green'; livePlan[5].s='now'; }],
+  ['deployed_code','Building the preview…',''],
+];
+
+/* ---------- state ---------- */
+const state = { screen:'w4', run:{w4:2, w9:'live'}, step:0, vtab:null, verdicts:{rv4:{}, rv9:{}}, notes:{rv4:{}, rv9:{}}, feed:[], liveIdx:0, liveSec:W9.live.start, suggested:false };
+let timer = null;
+
+function toast(text){ const t = $('#toast'); t.textContent = text; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => t.hidden = true, 2600); }
+
+/* ---------- shared pieces ---------- */
+function rail(){
+  const layers = [['home','Home'],['lightbulb','Vision'],['palette','Design'],['web','Pages'],['schema','Data'],['code','Code'],['rocket_launch','Deploy'],['checklist','Work']];
+  return `<nav class="rail" aria-label="Layers"><div class="brand">${ms('deployed_code')}Aludel</div>
+    <div class="proj"><i>BB</i><div><b>Browser Buddy</b><small>Define phase</small></div></div>
+    ${layers.map(([i,l]) => `<a class="nav" href="#" ${l==='Work'?'aria-current="page"':''} onclick="return false">${ms(i)}${l}</a>`).join('')}</nav>`;
+}
+function header(item, status, action){
+  return `<p class="crumb"><a href="#">Work</a> › ${item.ref}</p>
+  <div class="head"><div><h1 tabindex="-1">${esc(item.title)}</h1>
+    <div class="meta"><span class="prio ${item.prio==='High'?'high':''}" title="${item.prio} priority">${ms(item.prio==='High'?'keyboard_double_arrow_up':'drag_handle','sm')}</span>${status}
+      <span class="chip role-${item.role[0]}">${item.role[1]}</span></div></div>
+    <div class="meta">${action}</div></div>`;
+}
+function taskBlock(item, opts={}){
+  const crits = opts.crits || item.crits;
+  const states = opts.states;
+  return `<section class="blk" aria-labelledby="task-h"><h2 id="task-h">${ms('assignment')}Task</h2>
+  <div class="task">
+    <div class="task-row"><p class="task-label">Request</p>
+      <div class="ask">${person('lg')}<div><blockquote>${esc(item.ask)}</blockquote><cite>Charles · ${item.ref==='W-4'?'Sep 26':'Sep 24, from story S3'}</cite></div></div></div>
+    <div class="task-row"><p class="task-label">Produces</p><div class="produces">
+      ${item.produces.map(p => `<div class="prod"><span class="verb ${p.verb}">${p.v}</span>${p.target}<span class="muted small">${p.note}</span></div>`).join('')}</div></div>
+    <div class="task-row"><p class="task-label">Done when <span class="count" style="text-transform:none;letter-spacing:0;font-weight:400">${crits.length} criteria</span><span class="sp"></span>
+      ${opts.editable ? `<button type="button" class="linkbtn">${ms('add','xs')} Add a criterion</button>` : ''}</p>
+      <ol class="crits">${crits.map((c,i) => `<li class="crit"><span class="n">${i+1}</span><div><div class="t">${c.t}</div>
+        <div class="src">${src(c.src)}</div></div>
+        <div class="meta" style="justify-content:flex-end">${states ? critState(states[i], c.v) : ''}${vchip(c.v)}${c.v2 ? vchip(c.v2) : ''}</div></li>`).join('')}
+      ${opts.suggest || ''}</ol>
+      <p class="lockline">${ms(opts.editable ? 'lock_open' : 'lock','sm')}${opts.editable ? 'Edit freely until you press Go. Then these are fixed for the run: the performer can add a criterion or flag one with a question, but not remove or weaken one.' : 'Fixed for this run at Go. The performer may add criteria or flag one; it cannot remove or weaken them.'}</p>
+    </div>
+  </div></section>`;
+}
+function critState(s, v){ const t = v === 'test'; return s === 'pass' ? `<span class="crit-state pass">${ms('check_circle','sm')}${t ? 'Test green' : 'Passing'}</span>` : s === 'fail' ? `<span class="crit-state fail">${ms('cancel','sm')}${t ? 'Test red' : 'Failing'}</span>` : `<span class="crit-state wait">${ms('radio_button_unchecked','sm')}Not yet</span>`; }
+function side(item, rows){
+  return `<aside class="side">
+    <section class="panel" aria-labelledby="d-h"><h2 id="d-h">Details</h2><dl class="fields">${rows.map(([k,v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl></section>
+    <section class="panel" aria-labelledby="l-h"><h2 id="l-h">Links</h2><p class="small muted" style="margin:0">Not blocked, and blocks nothing.</p><button type="button" class="linkbtn" style="margin-top:6px">${ms('add_link','xs')} Link an item</button></section>
+    <section class="panel" aria-labelledby="k-h"><h2 id="k-h">Linked knowledge</h2><div class="meta" style="flex-direction:column;align-items:flex-start">
+      ${item.ref==='W-4' ? ref('lightbulb','Brief') + ref('bookmark','S1 See my pet') + ref('web','Home page') + ref('groups','Product lead rules') : ref('bookmark','S3 Pet follows cursor') + ref('palette','motion.pet-walk') + ref('widgets','Sprite component') + ref('accessibility_new','Principles')}</div></section>
+  </aside>`;
+}
+function activity(item){
+  return `<section class="blk" aria-labelledby="act-h"><h2 id="act-h">${ms('history')}Activity <span class="count">${item.log.length}</span></h2>
+    <ol class="log">${item.log.map(([a,t,w]) => `<li>${a}<div>${t}<time>${w}</time></div></li>`).join('')}</ol>
+    <form class="comment" onsubmit="event.preventDefault();toast('Note added (prototype)')"><label class="visually-hidden" for="note" hidden>Note</label><input id="note" placeholder="Add a note…"><button class="btn ghost sm" type="submit">Add</button></form></section>`;
+}
+
+/* ---------- runs ---------- */
+function runTabs(item, key, extra=''){
+  const cur = state.run[key];
+  return `<div class="tabs" role="tablist" aria-label="Runs">${item.runs.map(r => `<button class="tab" role="tab" aria-selected="${cur===r.id}" data-run="${key}:${r.id}">${who(r.who)}${r.label}<span class="dot ${r.state}" title="${r.stateText}"></span><span class="small">${r.stateText}</span></button>`).join('')}${extra}</div>`;
+}
+function objectives(objs){
+  return `<div class="objs">${objs.map(o => `<details class="obj ${o.s}"><summary>
+      <span class="ms ic" aria-hidden="true">${o.s==='done'?'check_circle':o.s==='now'?'progress_activity':o.s==='stuck'?'error':'radio_button_unchecked'}</span>
+      <span class="ot"><span>${o.t}</span>${o.stumble ? `<span class="stumble">${ms('warning','xs')}${o.stumble}</span>` : o.note ? `<small>${o.note}</small>` : ''}</span>
+      <span class="bar" aria-hidden="true"><i style="width:${o.w||0}%"></i></span><span class="dur">${o.d||''}</span></summary>
+      ${o.ev ? `<ul class="events">${o.ev.map(e => `<li class="${e[3]||''}">${ms(e[0])}<span>${e[1]}</span><time>${e[2]}</time></li>`).join('')}</ul>` : ''}</details>`).join('')}</div>`;
+}
+function runPanel(r, reviewTarget){
+  return `<div class="runpanel" role="tabpanel">
+    <div class="runsum"><span class="who">${r.who==='you'?person('lg'):bot(r.who).replace('class="av"','class="av lg"')}${names[r.who]}</span>
+      <span class="stat">Model<b>${r.model}</b></span><span class="stat">Took<b>${r.time}</b></span><span class="stat">Tokens<b>${r.tokens}</b>${r.cached?`<span>${r.cached}</span>`:''}</span><span class="stat">Finished<b>${r.when}</b></span>
+      <span class="sp"></span>${r.state==='review' ? `<button type="button" class="btn" data-go="${reviewTarget}">${ms('rate_review','sm')}Review</button>` : ''}</div>
+    <div class="banner ${r.banner.cls}">${ms(r.banner.icon)}<p>${r.banner.html}</p></div>
+    <div><p class="sub">${ms('difference','sm')}What changed<span class="sp"></span></p>
+      <div class="changes">${r.changes.map(c => `<div class="chg"><div class="chg-head"><span class="verb ${c.verb}">${c.v}</span>${c.target}</div><div class="inline-diff">${c.body}</div>${c.flag ? `<div class="stumble small" style="color:var(--warn);display:flex;gap:4px;align-items:center">${ms('warning','xs')}${c.flag}</div>` : ''}</div>`).join('')}</div></div>
+    <div><p class="sub">${ms('fact_check','sm')}Criteria, as the performer reported them<span class="sp"></span><span class="muted small" style="font-weight:400">You decide in review</span></p>
+      <div class="claims">${r.claims.map(([s,t]) => `<div class="claim ${s}">${ms(s==='pass'?'check_circle':s==='fail'?'cancel':'radio_button_unchecked')}<span>${t}</span></div>`).join('')}</div></div>
+    <div><p class="sub">${ms('route','sm')}What happened<span class="sp"></span><span class="muted small" style="font-weight:400">${r.objs.length} objectives · open one for detail</span></p>${objectives(r.objs)}</div>
+  </div>`;
+}
+
+/* ---------- screens ---------- */
+function screenBefore(){
+  const item = W4;
+  const crits = state.suggested ? item.crits.slice(0,3).concat([item.crits[4]]) : [item.crits[0], item.crits[1], item.crits[4]];
+  const suggest = state.suggested ? '' : `<li class="crit suggest"><span class="n">${ms('auto_awesome','xs')}</span><div><div class="t">It adds no outcome the request did not ask for, such as mood, focus or productivity</div>
+      <div class="src"><span class="srcchip">${ms('auto_awesome','xs')}Suggested from your request by Product lead rules</span></div></div>
+      <div class="meta"><button type="button" class="btn ghost sm" data-act="keep">Keep</button><button type="button" class="linkbtn" data-act="dismiss">Dismiss</button></div></li>`;
+  return `<div class="app">${rail()}<main class="main">
+    ${header(item, '<span class="st st-queued">Queued</span>', `<span class="chip">${bot('default')}Default agent ${ms('expand_more','sm')}</span><button type="button" class="btn" data-act="stage">${ms('playlist_add','sm')}Stage in Default agent’s batch</button>`)}
+    <div class="cols"><div>
+      ${taskBlock(item, {editable:true, crits, suggest})}
+      <section class="blk" aria-labelledby="runs-h"><h2 id="runs-h">${ms('play_circle')}Runs</h2>
+        <div class="panel" style="display:flex;gap:12px;align-items:center">${ms('schedule')}<div><b>No runs yet.</b><div class="small muted">Each run gets its own tab here, with what it changed, what happened and its result. A live run updates as it works.</div></div></div></section>
+      ${activity({log:[item.log[0]]})}
+    </div>${side(item, [['Status','<span class="st st-queued">Queued</span>'],['Priority',`<span class="prio">${ms('drag_handle','sm')}</span>Medium`],['Assignee',bot('default')+'Default agent'],['Role','<span class="chip role-product">Product lead</span>'],['Runs','None yet'],['Created','Sep 26 · 05:23']])}</div>
+  </main></div>`;
+}
+function screenW4(){
+  const item = W4, r = item.runs.find(x => x.id === state.run.w4);
+  return `<div class="app">${rail()}<main class="main">
+    ${header(item, '<span class="st st-review">'+ms('rate_review','xs')+'Ready for review</span>', `<span class="chip">${bot('default')}Default agent ${ms('lock','xs')}</span><button type="button" class="btn" data-go="rv4">${ms('rate_review','sm')}Review run 2</button>`)}
+    <div class="cols"><div>
+      ${taskBlock(item)}
+      <section class="blk" aria-labelledby="runs-h"><h2 id="runs-h">${ms('play_circle')}Runs <span class="count">2 runs · 2 stopped before starting (see Activity)</span></h2>
+        ${runTabs(item,'w4')}${runPanel(r,'rv4')}</section>
+      ${activity(item)}
+    </div>${side(item, [['Status','<span class="st st-review">Ready for review</span>'],['Priority',`<span class="prio">${ms('drag_handle','sm')}</span>Medium`],['Assignee',bot('default')+'Default agent'],['Role','<span class="chip role-product">Product lead</span>'],['Batch','B-4 · finished'],['Runs','2 · 2m 41s · 479k tokens'],['Created','Sep 26 · 05:23']])}</div>
+  </main></div>`;
+}
+function screenW9(){
+  const item = W9, cur = state.run.w9;
+  const liveTab = `<button class="tab" role="tab" aria-selected="${cur==='live'}" data-run="w9:live">${bot('strong')}Run 3<span class="dot working"></span><span class="small">Working</span></button>`;
+  const panel = cur === 'live' ? livePanel() : runPanel(item.runs.find(x => x.id === cur), 'rv9');
+  return `<div class="app">${rail()}<main class="main">
+    ${header(item, '<span class="st st-working">'+ms('progress_activity','xs')+'Working</span>', `<span class="chip">${bot('strong')}Deep agent ${ms('lock','xs')}</span><button type="button" class="btn ghost" data-act="stop">${ms('stop_circle','sm')}Stop</button>`)}
+    <div class="cols"><div>
+      ${taskBlock(item, {states: cur==='live' ? liveCrit : null})}
+      <section class="blk" aria-labelledby="runs-h"><h2 id="runs-h">${ms('play_circle')}Runs <span class="count">3 runs</span></h2>
+        ${runTabs(item,'w9',liveTab)}${panel}</section>
+      ${activity(item)}
+    </div>${side(item, [['Status','<span class="st st-working">Working</span>'],['Priority',`<span class="prio high">${ms('keyboard_double_arrow_up','sm')}</span>High`],['Assignee',bot('strong')+'Deep agent'],['Role','<span class="chip role-platform">Engineer</span>'],['Batch','B-7 · running'],['Runs','3 · 1 live'],['Created','Sep 24 · 09:10']])}</div>
+  </main></div>`;
+}
+function fmt(s){ return `${Math.floor(s/60)}m ${String(s%60).padStart(2,'0')}s`; }
+function livePanel(){
+  const now = livePlan.find(p => p.s === 'now');
+  const done = livePlan.filter(p => p.s === 'done').length;
+  const green = liveCrit.filter(c => c === 'pass').length;
+  return `<div class="runpanel" role="tabpanel">
+    <div class="runsum"><span class="who">${bot('strong').replace('class="av"','class="av lg"')}Deep agent</span>
+      <span class="stat">Model<b>${W9.live.model}</b></span><span class="stat">Running<b id="live-t">${fmt(state.liveSec)}</b></span><span class="stat">Tokens<b id="live-k">${Math.round(120 + state.liveIdx*9)}k</b></span><span class="stat">Plan<b>${done} of ${livePlan.length}</b></span><span class="stat">Criteria<b>${green} of 6 green</b></span></div>
+    <div class="live-now">${ms('progress_activity')}<div><b>${now ? now.t : 'Wrapping up'}</b><div class="small">${state.feed[0] ? state.feed[0][1] : 'Working…'}</div></div></div>
+    <div class="two">
+      <div><p class="sub">${ms('route','sm')}Plan<span class="sp"></span><span class="muted small" style="font-weight:400">Written by Deep agent at the start of the run</span></p>
+        ${objectives(livePlan.map(p => ({s:p.s, t:p.t, note:p.note, d:p.d, w: p.s==='done' ? 100 : p.s==='now' ? 45 : 0})))}</div>
+      <div><p class="sub">${ms('stream','sm')}Live<span class="sp"></span><span class="muted small" style="font-weight:400">newest first</span></p>
+        <ul class="feed" aria-live="polite">${state.feed.map(e => `<li class="${e[3]||''}">${ms(e[0])}<span>${e[1]}</span><span class="muted small">${e[2]}</span></li>`).join('') || '<li><span></span><span class="muted">Waiting for the next event…</span></li>'}</ul></div>
+    </div>
+    <div class="banner handoff">${ms('info')}<p>Nothing is applied while it runs. When it submits, this tab becomes <b>Ready for review</b>. <button type="button" class="linkbtn" data-go="rv9">See the review this run will produce →</button></p></div>
+  </div>`;
+}
+function tickLive(){
+  state.liveSec++;
+  const t = document.getElementById('live-t'); if (t) t.textContent = fmt(state.liveSec);
+  if (state.liveSec % 4 === 0 && state.liveIdx < liveScript.length){
+    const e = liveScript[state.liveIdx++]; if (e[4]) e[4]();
+    const stamp = fmt(state.liveSec);
+    state.feed.unshift([e[0], e[1], e[2] || stamp, e[3]]);
+    if (state.screen === 'w9' && state.run.w9 === 'live') render(true);
+  }
+}
+
+/* ---------- review mode ---------- */
+const rv = {
+  rv4: { item:W4, run:'Run 2', who:'default', back:'w4', tabs:[['brief','In the Brief','lightbulb'],['fields','Field changes','difference'],['request','Your request','format_quote']],
+    steps:[
+      {look:'brief', source:{title:'Product lead rules · Write a Brief claim (revision 2)', text:'A claim is one sentence a reader could check as true or false. No slogans, no stacked benefits.'},
+       ev:[['pass','check_circle','One sentence, 17 words','Agent: “A reader can check each part: interactive, pet, browser window, corner.”','brief']]},
+      {look:'request', source:{title:'Your request', text:'…kind of cute to have an interactive pet sitting in an open window in the corner of your screen.'},
+       ev:[['pass','check_circle','Names the pet, interactive, a window, the corner','Agent: “Each element maps to a phrase in the request.”','request'],['info','visibility','Compare side by side','Opens your request on the left','request']]},
+      {look:'brief', source:{title:'Suggested from your request', text:'The request gives no reason beyond “kind of cute”, so the claim should not promise mood, focus or productivity.'},
+       ev:[['pass','check_circle','No outcome words found','Agent searched its draft for mood, focus, productivity, calm, happy','brief']]},
+      {look:'fields', source:{title:'Your note when sending back run 1', text:'The note says it replaces “A pet in a browser window”, but it was saved as a second claim. Revise the existing one.'},
+       ev:[['pass','verified','Revision of the existing claim (1 → 2)','Checked by Aludel, not the agent','fields'],['pass','verified','Value still has exactly one claim','Checked by Aludel','brief']]},
+      {look:'brief', scope:true, source:{title:'Always checked', text:'The run may change only what the item says it produces: Brief › Value.'},
+       ev:[['pass','verified','Only Brief › Value changed','Checked by Aludel against the proposal','fields'],['info','info','Read 2 records, changed 1','Reads are listed in run 2 › What happened','fields']]},
+    ]},
+  rv9: { item:W9, run:'Run 3', who:'strong', back:'w9', tabs:[['preview','Preview','web'],['tests','Tests','science'],['diff','Changes','difference']],
+    steps:[
+      {look:'preview', source:{title:'Story S3 · scenario 1', text:'Given the pet window is open, when I move the cursor into it, then the pet walks toward the cursor.'},
+       ev:[['pass','check_circle','follows the cursor when it enters','Re-run by Aludel on commit 4f2a9c1','tests:0'],['info','touch_app','Try it: move your cursor into the pet window','Opens the preview','preview']]},
+      {look:'preview', edge:true, source:{title:'Story S3 · scenario 2', text:'The pet never leaves the window, and stops a comfortable 24 px from its edge.'},
+       ev:[['pass','check_circle','stays 24 px inside every edge (2 tests)','Re-run by Aludel','tests:1'],['info','touch_app','Try it: push the cursor to a corner','The dashed line shows the 24 px margin','preview']]},
+      {look:'tests', source:{title:'Design token · motion.pet-walk (revision 2)', text:'120 px per second, ease-out on stop.'},
+       ev:[['pass','check_circle','moves at motion.pet-walk with a controlled clock','Re-run by Aludel','tests:3'],['pass','check_circle','Reads the token; no hard-coded speed','See src/pet/pet.ts','diff']]},
+      {look:'preview', source:{title:'Principles · motion (revision 5)', text:'Respect reduced motion: replace movement with a change of state.'},
+       ev:[['pass','check_circle','turns instead of walking when reduced motion is on','Re-run by Aludel','tests:4'],['info','touch_app','Try it: switch reduced motion on in the preview','','preview']]},
+      {look:'diff', source:{title:'Action rule · Build a story (revision 4)', text:'Reuse the project’s components. Adding a dependency needs its own item.'},
+       ev:[['pass','check_circle','Imports Sprite from src/components','src/pet/pet.ts, line 3','diff'],['pass','verified','package.json unchanged','Checked by Aludel','diff']]},
+      {look:'diff', scope:true, source:{title:'Always checked', text:'The run may change only what the item says it produces: src/pet/ and tests.'},
+       ev:[['pass','verified','4 files changed, all in src/pet/ or tests/','Checked by Aludel','diff']]},
+    ]},
+};
+function screenReview(key){
+  const R = rv[key], item = R.item, n = R.steps.length, i = state.step, V = state.verdicts[key];
+  const onDecision = i >= n;
+  const step = R.steps[i];
+  const vtab = state.vtab || (step ? step.look : R.tabs[0][0]);
+  const pips = R.steps.map((s,k) => `<button type="button" class="pip ${V[k]||''} ${k===i?'cur':''}" data-step="${k}" aria-label="Criterion ${k+1}${V[k]?', '+V[k]+'ed':''}"></button>`).join('') + `<button type="button" class="pip ${onDecision?'cur':''}" data-step="${n}" aria-label="Decision" style="background:var(--line-strong);width:12px"></button>`;
+  const left = viewer(key, vtab, step);
+  let right;
+  if (!onDecision){
+    const c = item.crits[i];
+    right = `<div class="step">
+      <p class="eyebrow">Criterion ${i+1} of ${n} · ${vchip(c.v)}${c.v2?' '+vchip(c.v2):''}</p>
+      <h2>${c.t}</h2>
+      <div class="srcbox"><div class="small muted" style="display:flex;gap:4px;align-items:center">${ms(c.src.icon,'xs')}Where it comes from: ${step.source.title}</div><q>${step.source.text}</q></div>
+      <div><p class="eyebrow" style="margin-bottom:6px">Evidence · click to see it on the left</p><div class="evid">
+        ${step.ev.map(e => `<button type="button" class="ev ${e[0]}" data-look="${e[4]}">${ms(e[1])}<span>${e[2]}<small>${e[3]}</small></span></button>`).join('')}</div></div>
+      <div class="verdict" role="group" aria-label="Verdict for criterion ${i+1}">
+        <button type="button" class="yes" aria-pressed="${V[i]==='accept'}" data-v="accept">${ms('check')}Accept <span class="kbd">A</span></button>
+        <button type="button" class="no" aria-pressed="${V[i]==='reject'}" data-v="reject">${ms('close')}Reject <span class="kbd">R</span></button></div>
+      ${V[i]==='reject' ? `<label class="small" for="rnote">What’s wrong? It goes back with the item.</label><textarea id="rnote" class="verdict-note" placeholder="Say what should change">${esc(state.notes[key][i]||'')}</textarea>` : ''}
+    </div>`;
+  } else {
+    const rej = R.steps.map((_,k) => V[k]==='reject' ? k : -1).filter(k => k>=0);
+    const left_ = R.steps.filter((_,k) => !V[k]).length;
+    right = `<div class="step"><p class="eyebrow">Decision</p><h2>${left_ ? `${left_} criteria still to check` : rej.length ? `Send back with ${rej.length} note${rej.length>1?'s':''}` : key==='rv4' ? 'Apply revision 2 to Brief › Value' : 'Accept commit 4f2a9c1'}</h2>
+      <ul class="sumlist">${item.crits.map((c,k) => `<li>${V[k]==='accept'?`<span class="ms a">check_circle</span>`:V[k]==='reject'?`<span class="ms r">cancel</span>`:`<span class="ms u">radio_button_unchecked</span>`}<span>${c.t}${V[k]==='reject' && state.notes[key][k] ? `<br><span class="muted small">“${esc(state.notes[key][k])}”</span>` : ''}</span></li>`).join('')}</ul>
+      <p class="small muted">${key==='rv4' ? 'Applying writes revision 2 with this review as its provenance. Sending back starts nothing; you stage it again when ready.' : 'Accepting merges this exact commit. If main has moved, Aludel re-runs the tests before merging.'}</p></div>`;
+  }
+  const foot = !onDecision
+    ? `<button type="button" class="btn ghost sm" data-nav="-1" ${i===0?'disabled':''}>${ms('arrow_back','sm')}Back</button><span class="sp"></span><span class="small muted"><span class="kbd">J</span> <span class="kbd">K</span> to move</span><button type="button" class="btn sm" data-nav="1">Next${ms('arrow_forward','sm')}</button>`
+    : (() => { const left_ = R.steps.filter((_,k) => !V[k]).length, rej = R.steps.filter((_,k) => V[k]==='reject').length;
+        return `<button type="button" class="btn ghost sm" data-nav="-1">${ms('arrow_back','sm')}Back</button><span class="sp"></span>${rej ? `<button type="button" class="btn bad" data-act="sendback" ${left_?'disabled':''}>${ms('reply','sm')}Send back</button>` : `<button type="button" class="btn ok" data-act="apply" ${left_?'disabled':''}>${ms('check','sm')}${key==='rv4'?'Apply':'Accept and merge'}</button>`}`; })();
+  return `<div class="rvmode">
+    <div class="rv-top"><button type="button" class="btn ghost sm" data-go="${R.back}" aria-label="Close review">${ms('close','sm')}</button>
+      <h1>Review ${item.ref} · ${R.run}</h1><span class="chip">${bot(R.who)}${names[R.who]}</span><span class="muted small">${esc(item.title)}</span><span class="sp"></span>
+      <div class="pips" role="group" aria-label="Progress">${pips}</div></div>
+    <div class="rv-body">
+      <div class="viewer"><div class="vtabs" role="tablist">${R.tabs.map(([k,l,ic]) => `<button class="tab" role="tab" aria-selected="${vtab===k}" data-vtab="${k}">${ms(ic,'sm')}${l}</button>`).join('')}</div>
+        <div class="vpane">${left}</div></div>
+      <div class="stepper">${right}<div class="step-foot">${foot}</div></div>
+    </div></div>`;
+}
+function viewer(key, vtab, step){
+  if (key === 'rv4'){
+    if (vtab === 'brief') return `<article class="doc"><p class="docname">Browser Buddy · Brief</p><p class="small muted" style="margin-bottom:16px">Showing revision 2 as it would read after applying. Changes are marked.</p>
+      <h3>Value</h3><p class="${step && (step.look==='brief') ? 'hl' : ''}"><del>A pet in a browser window.</del> <ins>A small interactive pet that lives in a browser window in the corner of your screen.</ins></p>
+      <div class="dim"><h3>Who it’s for</h3><p>Not written yet.</p><h3>Not doing</h3><p>Not written yet.</p></div></article>`;
+    if (vtab === 'fields') return `<dl class="fieldiff"><dt>Record</dt><dd>Brief › Value claim clm-5c34c1d7</dd><dt>Operation</dt><dd><span class="verb rev">Revise</span> revision 1 → 2</dd><dt>Text</dt><dd><del>A pet in a browser window.</del><br><ins>A small interactive pet that lives in a browser window in the corner of your screen.</ins></dd><dt>Other records</dt><dd>None changed</dd><dt>Read</dt><dd>Brief r1, W-4 request, Product lead rules r2</dd></dl>`;
+    return `<article class="doc"><p class="docname">Your request</p><p style="font-size:17px">can you write the value proposition for our app? aren't going on much here except that it would be kind of cute to have an <mark>interactive pet</mark> sitting in an <mark>open window</mark> in the <mark>corner of your screen</mark>.</p>
+      <h3>Proposed claim</h3><p>A small <mark>interactive pet</mark> that lives in a <mark>browser window</mark> in the <mark>corner of your screen</mark>.</p></article>`;
+  }
+  if (vtab === 'preview') return `<div class="browser"><div class="browser-bar"><i></i><i></i><i></i><span>preview-w9-run3.browser-buddy.localhost</span></div>
+      <div class="desk ${step && step.edge ? 'show-edge' : ''}" id="desk"><div class="petwin" id="petwin"><header><span>Browser Buddy</span><span>×</span></header><div class="petfield" id="petfield"><div class="edge"></div>
+        <svg class="pet" id="pet" viewBox="0 0 38 34" aria-label="The pet"><ellipse cx="19" cy="21" rx="15" ry="11" fill="#c98b4f"/><circle cx="13" cy="19" r="2.4" fill="#141727"/><circle cx="25" cy="19" r="2.4" fill="#141727"/><path d="M8 12 L11 4 L15 11Z M30 12 L27 4 L23 11Z" fill="#c98b4f"/><path d="M16 25 q3 2 6 0" stroke="#141727" stroke-width="1.5" fill="none"/></svg></div></div></div></div>
+      <div class="preview-ctl"><label><input type="checkbox" id="rm"> Reduced motion</label><label><input type="checkbox" id="edge" ${step && step.edge ? 'checked' : ''}> Show the 24 px margin</label><span class="muted">Built from commit 4f2a9c1 · isolated preview</span></div>`;
+  if (vtab === 'tests'){
+    const tests = [['follows the cursor when it enters','0.04s','1'],['stays 24 px inside the left and top edges','0.03s','2'],['stays 24 px inside the right and bottom edges','0.03s','2'],['moves at motion.pet-walk with a controlled clock','0.06s','3'],['turns instead of walking when reduced motion is on','0.02s','4'],['imports Sprite from src/components','0.01s','5']];
+    const hi = state.hiTest;
+    return `<div class="tests"><div class="tsum">${ms('verified')}<b>6 of 6 passed</b><span class="muted">Re-run by Aludel on commit 4f2a9c1 · the agent’s own result matched</span></div>
+      ${tests.map((t,k) => `<div class="trow ${hi===k?'hl2':''}"><span class="ms">check_circle</span><span>${t[0]}<small>tests/pet-follow.test.ts · proves criterion ${t[2]}</small></span><span class="muted small">${t[1]}</span></div>`).join('')}
+      <p class="small muted">Written in step 2 of the run from the criteria, before the code change. 2 were red then, as expected.</p></div>`;
+  }
+  const files = [
+    ['src/pet/pet.ts','chg','+31 −9',['  import { Sprite } from \'../components/sprite\';','- const SPEED = 2; // px per frame','+ const speed = tokens.motion.petWalk; // px per second','  export function step(pet, target, dt, reducedMotion) {','+   if (reducedMotion) return face(pet, target);','+   const d = Math.min(speed * dt, distance(pet, target));']],
+    ['src/pet/bounds.ts','new','+21',['+ export const MARGIN = 24;','+ export function clamp(p, win) {','+   return { x: within(p.x, MARGIN, win.width - MARGIN),','+            y: within(p.y, MARGIN, win.height - MARGIN) };','+ }']],
+    ['src/pet/clock.ts','new','+9',['+ export const clock = { now: () => performance.now() };']],
+    ['tests/pet-follow.test.ts','new','+96',['+ test(\'stays 24 px inside the right and bottom edges\', () => {','+   const p = clamp({ x: 999, y: 999 }, { width: 300, height: 185 });','+   expect(p).toEqual({ x: 276, y: 161 });','+ });']],
+  ];
+  return files.map(([f,v,n,lines]) => `<div class="difffile"><header><span class="verb ${v}">${v==='new'?'Add':'Change'}</span><span class="mono">${f}</span><span class="sp"></span><span class="mono">${n}</span></header>
+    <pre class="dcode">${lines.map(l => `<span class="${l[0]==='+'?'a':l[0]==='-'?'d':''}">${esc(l)}</span>`).join('')}</pre></div>`).join('') + `<p class="small muted" style="text-align:center">4 files · all inside src/pet/ and tests/ · package.json unchanged</p>`;
+}
+
+/* ---------- interactive preview pet ---------- */
+let petRAF = null;
+function startPet(){
+  cancelAnimationFrame(petRAF);
+  const field = document.getElementById('petfield'), pet = document.getElementById('pet'); if (!field) return;
+  const desk = document.getElementById('desk');
+  let pos = {x:40, y:60}, target = null, last = performance.now(), facing = 1;
+  desk.addEventListener('mousemove', e => { const r = field.getBoundingClientRect(); const inside = e.clientX>=r.left && e.clientX<=r.right && e.clientY>=r.top && e.clientY<=r.bottom; target = inside ? {x:e.clientX-r.left, y:e.clientY-r.top} : null; });
+  desk.addEventListener('mouseleave', () => target = null);
+  const edge = document.getElementById('edge'); edge && edge.addEventListener('change', () => desk.classList.toggle('show-edge', edge.checked));
+  const loop = now => {
+    const dt = Math.min(.05, (now-last)/1000); last = now;
+    const W = field.clientWidth, H = field.clientHeight, M = 24;
+    const rm = document.getElementById('rm')?.checked;
+    if (target){
+      const tx = Math.max(M, Math.min(W-M, target.x)), ty = Math.max(M, Math.min(H-M, target.y));
+      facing = tx < pos.x ? -1 : 1;
+      if (!rm){ const dx = tx-pos.x, dy = ty-pos.y, dist = Math.hypot(dx,dy), s = Math.min(120*dt, dist); if (dist > .5){ pos.x += dx/dist*s; pos.y += dy/dist*s; } }
+    }
+    pet.style.transform = `translate(${pos.x-19}px,${pos.y-17}px) scaleX(${facing})`;
+    petRAF = requestAnimationFrame(loop);
+  };
+  petRAF = requestAnimationFrame(loop);
+}
+
+/* ---------- ledger ---------- */
+const ledger = [
+  ['D1','Keep Details sidebar and Activity at the bottom','Every screen','w4'],
+  ['D2','High-level task at the top','Task: request, produces, done when','w4'],
+  ['D3','What happened: who, objectives, time each, changes, stumbles; compressed','Run tab › What happened (open a row); stumbles show while collapsed','w4'],
+  ['D4','See what changed and interact with the result beside its criteria','Review mode: result on the left, criterion and its source on the right','rv4'],
+  ['D5','Tabs per run, with why earlier runs weren’t applied','Run tabs with a reason banner (screens 2 and 4)','w9'],
+  ['D6','Live run as its own tab, updating','Screen 4 · Run 3','w9'],
+  ['D7','Generated progress, not hard-coded','Live plan written by the agent at the start','w9'],
+  ['D8','Review stepping through the checklist','Full-page review route, one criterion at a time','rv9'],
+  ['D9','Criteria set first; performer develops against them','Done when, fixed at Go; suggestions before Go; tests written first (screen 5, Tests)','before'],
+  ['D10','The page works before work starts','Screen 1','before'],
+];
+function renderLedger(){ $('#ledger').innerHTML = `<h2>Your asks, and where each is answered</h2><table>${ledger.map(([id,a,w,s]) => `<tr><td>${id}</td><td>${a}<br><a data-go="${s}">${w}</a></td></tr>`).join('')}</table>`; }
+
+/* ---------- render + events ---------- */
+function render(keepScroll){
+  const y = window.scrollY;
+  const s = state.screen;
+  $('#root').innerHTML = s==='before' ? screenBefore() : s==='w4' ? screenW4() : s==='w9' ? screenW9() : screenReview(s);
+  document.querySelectorAll('.proto [data-screen]').forEach(b => b.setAttribute('aria-current', b.dataset.screen === s));
+  if (s === 'rv9') startPet();
+  if (keepScroll) window.scrollTo(0, y);
+}
+function go(screen){
+  state.screen = screen; state.vtab = null; state.hiTest = null;
+  if (screen.startsWith('rv')) state.step = 0;
+  try { history.replaceState(null, '', '#' + screen); } catch (e) {}
+  clearInterval(timer); if (screen === 'w9') timer = setInterval(tickLive, 1000);
+  render(); window.scrollTo(0,0);
+}
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-screen],[data-go],[data-run],[data-act],[data-step],[data-v],[data-nav],[data-vtab],[data-look]'); if (!t) return;
+  const d = t.dataset;
+  if (d.screen) return go(d.screen);
+  if (d.go){ $('#ledger').hidden = true; return go(d.go); }
+  if (d.run){ const [k,id] = d.run.split(':'); state.run[k] = id==='live' ? 'live' : +id; return render(true); }
+  if (d.step !== undefined){ state.step = +d.step; state.vtab = null; return render(true); }
+  if (d.vtab){ state.vtab = d.vtab; return render(true); }
+  if (d.look){ const [tab, n] = d.look.split(':'); state.vtab = tab; state.hiTest = n !== undefined ? +n : null; return render(true); }
+  if (d.nav){ const n = rv[state.screen].steps.length; state.step = Math.max(0, Math.min(n, state.step + +d.nav)); state.vtab = null; return render(true); }
+  if (d.v){ const V = state.verdicts[state.screen]; V[state.step] = V[state.step] === d.v ? undefined : d.v;
+    render(true); if (V[state.step] === 'reject') document.getElementById('rnote')?.focus(); else if (V[state.step]) setTimeout(() => { state.step++; state.vtab=null; render(true); }, 250); return; }
+  const a = d.act;
+  if (a === 'keep'){ state.suggested = true; toast('Criterion kept'); return render(true); }
+  if (a === 'dismiss'){ state.suggested = true; toast('Suggestion dismissed'); return render(true); }
+  if (a === 'stage') return toast('Staged in Default agent’s batch (prototype)');
+  if (a === 'stop') return toast('Stop asks Deep agent to finish its current step (prototype)');
+  if (a === 'apply') { toast(state.screen==='rv4' ? 'Brief › Value is now revision 2. W-4 is done.' : 'Commit 4f2a9c1 merged. W-9 is done.'); return; }
+  if (a === 'sendback') { toast('Sent back with your notes. Stage it again when ready.'); return; }
+});
+document.addEventListener('input', e => { if (e.target.id === 'rnote') state.notes[state.screen][state.step] = e.target.value; });
+document.addEventListener('keydown', e => {
+  if (!state.screen.startsWith('rv') || e.target.matches('input,textarea')) return;
+  const k = e.key.toLowerCase(); const n = rv[state.screen].steps.length;
+  if (k === 'a' || k === 'r'){ if (state.step < n) document.querySelector(`[data-v="${k==='a'?'accept':'reject'}"]`)?.click(); }
+  else if (k === 'j' || e.key === 'ArrowRight'){ state.step = Math.min(n, state.step+1); state.vtab=null; render(true); }
+  else if (k === 'k' || e.key === 'ArrowLeft'){ state.step = Math.max(0, state.step-1); state.vtab=null; render(true); }
+  else if (e.key === 'Escape') go(rv[state.screen].back);
+});
+$('#ledger-btn').addEventListener('click', () => { const l = $('#ledger'); l.hidden = !l.hidden; $('#ledger-btn').setAttribute('aria-expanded', !l.hidden); });
+renderLedger();
+const start = location.hash.replace('#','');
+go(['before','w4','rv4','w9','rv9'].includes(start) ? start : 'w4');
+</script>

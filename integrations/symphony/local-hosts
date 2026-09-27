@@ -83,6 +83,7 @@ codex_wrapper="$runtime_root/bin/codex"
 printf "#!/bin/sh\nexec /usr/local/bin/node \"%s\" \"\$@\"\n" "$codex_entry" > "$codex_wrapper"
 chmod 700 "$codex_wrapper"
 codex_wrapper_hash="$(sha256sum "$codex_wrapper" | cut -d " " -f 1)"
+sandbox_security="seccomp=unconfined,no-new-privileges"
 
 gateway="$(docker run --rm "$image" getent hosts host.docker.internal | awk 'NR == 1 { print $1 }')"
 [[ -n "$gateway" ]] || { echo "Symphony local hosts: Docker host gateway was not found." >&2; exit 1; }
@@ -111,14 +112,18 @@ while IFS=$'\t' read -r project_id project_slug capacity token_file; do
   workflow="$runtime_root/workflows/$safe_slug.md"
   cp "$repo_root/integrations/symphony/WORKFLOW.example.md" "$workflow"
   perl -0pi -e "s#endpoint: http://127\\.0\\.0\\.1:4310/api/worker#endpoint: http://aludel.localhost:$portal_port/api/worker#; s/max_concurrent_agents: 1/max_concurrent_agents: $capacity/" "$workflow"
-  config_hash="$(printf '%s\n' "$project_id" "$capacity" "$build_root" "$gateway" "$source_repo" "$workflow" "$portal_port" "$node_bin" "$codex_entry" "$codex_wrapper_hash" | sha256sum | cut -c1-20)"
+  config_hash="$(printf '%s\n' "$project_id" "$capacity" "$build_root" "$gateway" "$source_repo" "$workflow" "$portal_port" "$node_bin" "$codex_entry" "$codex_wrapper_hash" "$sandbox_security" | sha256sum | cut -c1-20)"
   existing_hash="$(docker inspect "$container" --format '{{index .Config.Labels "aludel.local-host-config"}}' 2>/dev/null || true)"
   if [[ -n "$existing_hash" && "$existing_hash" != "$config_hash" ]] || { docker inspect "$container" >/dev/null 2>&1 && [[ -z "$existing_hash" ]]; }; then
     docker rm -f "$container" >/dev/null
     existing_hash=""
   fi
   if ! docker inspect "$container" >/dev/null 2>&1; then
+    # Codex uses Bubblewrap for its inner command sandbox. Docker's default seccomp profile blocks the unprivileged
+    # user namespace Bubblewrap needs. Relax that syscall filter without making the host privileged or adding a
+    # capability; no-new-privileges and the existing read-only mounts keep the outer worker boundary explicit.
     docker run -d --name "$container" --restart unless-stopped --init --user "$uid_gid" \
+      --security-opt seccomp=unconfined --security-opt no-new-privileges \
       --label "aludel.local-host-config=$config_hash" \
       --add-host "aludel.localhost:$gateway" \
       -e HOME="$runtime_root/home" -e CODEX_HOME="$runtime_root/codex-home" -e MIX_HOME="$runtime_root/mix" \
@@ -142,6 +147,10 @@ while IFS=$'\t' read -r project_id project_slug capacity token_file; do
       --logs-root "$runtime_root/logs/$safe_slug" "$workflow" >/dev/null
   elif [[ "$(docker inspect "$container" --format '{{.State.Running}}')" != "true" ]]; then
     docker start "$container" >/dev/null
+  fi
+  if ! docker exec "$container" bwrap --ro-bind / / --proc /proc --dev /dev true; then
+    echo "Symphony local hosts: $project_slug worker cannot create the Codex command sandbox." >&2
+    exit 1
   fi
   echo "Symphony local hosts: $project_slug worker started ($capacity slot$([[ "$capacity" == "1" ]] || printf s))."
   host_count=$((host_count + 1))

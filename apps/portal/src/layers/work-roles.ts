@@ -4,11 +4,12 @@ import { MatIconModule } from '@angular/material/icon';
 import { Assignee, ProjectContext, Role, WorkAction, layerLabel, lines } from './context';
 import { AssigneeComponent, RefChipComponent } from './work-shared';
 
-interface Draft { instructions: string; reads: string[]; changes: string[]; tools: string[]; asks: string; phases: string; checks: string; rationale: string; newChange: string; attach: string; }
+interface Draft { instructions: string; reads: string[]; changes: string[]; tools: string[]; asks: string; checks: string; rationale: string; newChange: string; attach: string; }
 
 // Work › Roles (WORK-UX-01): one role per layer, and the actions it performs. Each action says who takes it and carries
 // the setup anyone doing it works with: instructions, what it always reads, what it may change, its tools, what it asks
-// first, its run phases and the checks its work is reviewed against. The onboarding style only preset the assignees.
+// first and the checks its work is reviewed against. A performer now owns its plan; legacy action phases are retained only
+// so historical runs can still be rendered. The onboarding style only preset the assignees.
 @Component({
   selector: 'aludel-work-roles', standalone: true, imports: [FormsModule, MatIconModule, AssigneeComponent, RefChipComponent],
   template: `
@@ -67,8 +68,6 @@ interface Draft { instructions: string; reads: string[]; changes: string[]; tool
                   <div class="lay-setup-full"><h4><mat-icon aria-hidden="true">construction</mat-icon>Tools</h4>
                     <div class="lay-tokens">@for (tool of toolKeys(); track tool) { <label class="lay-toolchk" [for]="'tool-' + tool"><input type="checkbox" [id]="'tool-' + tool" [checked]="draft.tools.includes(tool)" (change)="toggleTool(tool, $any($event.target).checked)">{{ ctx.catalog()?.tools?.[tool] }}</label> }</div></div>
                   <div><h4><mat-icon aria-hidden="true">front_hand</mat-icon>Asks you first</h4><label class="visually-hidden" for="action-asks">Asks you first</label><textarea id="action-asks" name="asks" rows="2" [(ngModel)]="draft.asks"></textarea></div>
-                  <div><h4><mat-icon aria-hidden="true">timeline</mat-icon>Run phases</h4><label class="visually-hidden" for="action-phases">Run phases, one per line</label><textarea id="action-phases" name="phases" rows="3" [(ngModel)]="draft.phases"></textarea>
-                    <p class="lay-hint">One per line: the milestones on an agent's progress bar.</p></div>
                   <div class="lay-setup-full"><h4><mat-icon aria-hidden="true">task_alt</mat-icon>Done when</h4><label class="visually-hidden" for="action-checks">Checks, one per line</label><textarea id="action-checks" name="checks" rows="3" [(ngModel)]="draft.checks"></textarea>
                     <p class="lay-hint">One per line. New items get these checks; review goes through them one by one.</p></div>
                   <div class="lay-setup-full lay-row lay-wrap"><label class="visually-hidden" for="action-why">Why this change</label><input id="action-why" name="rationale" [(ngModel)]="draft.rationale" placeholder="Why this change (saved with the revision)" class="lay-grow">
@@ -112,9 +111,9 @@ export class WorkRolesComponent {
     });
   }
 
-  private blank(): Draft { return { instructions: '', reads: [], changes: [], tools: [], asks: '', phases: '', checks: '', rationale: '', newChange: '', attach: '' }; }
+  private blank(): Draft { return { instructions: '', reads: [], changes: [], tools: [], asks: '', checks: '', rationale: '', newChange: '', attach: '' }; }
   private open(action: WorkAction) {
-    this.draft = { instructions: action.instructions, reads: [...action.reads], changes: [...action.changes], tools: [...action.tools], asks: action.asks, phases: action.phases.join('\n'), checks: action.checks.join('\n'), rationale: '', newChange: '', attach: '' };
+    this.draft = { instructions: action.instructions, reads: [...action.reads], changes: [...action.changes], tools: [...action.tools], asks: action.asks, checks: action.checks.join('\n'), rationale: '', newChange: '', attach: '' };
     this.openAction.set(action.id);
   }
   toggle(action: WorkAction) { if (this.openAction() === action.id) this.openAction.set(null); else this.open(action); }
@@ -137,7 +136,8 @@ export class WorkRolesComponent {
   }
   saveAction(action: WorkAction) {
     if (!action.recordId) return;
-    const data = { instructions: this.draft.instructions, reads: this.draft.reads, changes: this.draft.changes, tools: this.draft.tools, asks: this.draft.asks, phases: lines(this.draft.phases), checks: lines(this.draft.checks) };
+    const data = { instructions: this.draft.instructions, reads: this.draft.reads, changes: this.draft.changes, tools: this.draft.tools, asks: this.draft.asks,
+      phases: action.phases, checks: lines(this.draft.checks) };
     void this.ctx.write(() => this.ctx.change(action.recordId!, data, action.revision, this.draft.rationale || `${action.name} setup revised`), `${action.name} saved. New work and runs use it.`)
       .then(saved => { if (saved) { const fresh = this.ctx.actionById().get(action.id); if (fresh) this.open(fresh); } });
   }

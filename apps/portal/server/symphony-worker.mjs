@@ -387,9 +387,9 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     appendEvent(scope, { attemptId, eventId: `run-${count.runs_started}`, kind: 'started' });
     const item = know.workById(scope.projectId, row.work_id);
     if (item?.action === 'platform.security' || ['product.define', 'product.clarify', 'product.brief', 'data.contract', 'design.audit', 'pages.a11y', 'deploy.review', 'work.review'].includes(item?.action)) {
-      const phases = action(scope.projectId, item.action)?.phases || ['Read context', 'Test', 'Report'];
+      // WORK-ITEM-UX-01 WI-5: progress comes from the agent's own plan (aludel_task_plan); until it reports one, the run is starting.
       know.setWorkContext(item.id, { ...item.context, run: { ...item.context?.run, startedAt: item.context?.run?.startedAt || now(),
-        phases, phase: 1, activity: item.action === 'platform.security' ? 'Auditing pinned source' : 'Preparing a review proposal', model: profile(scope.projectId, scope.profileId)?.model,
+        phases: item.context?.run?.phases || [], phase: item.context?.run?.phase ?? 0, activity: item.context?.run?.activity || 'Opening the task', model: profile(scope.projectId, scope.profileId)?.model,
         batch: row.batch_id, profileId: scope.profileId, done: false } });
     }
     return { attemptId, runsStarted: count.runs_started, runLimit: count.run_limit };

@@ -90,13 +90,29 @@ export interface WorkItem { id: string; number: number; ref: string; layer: stri
   question: { text: string; options: string[]; answer?: string; rationale?: string; answeredBy?: string; applied?: string[]; recommendation?: string; reasoning?: string } | null; documents: string[]; log: LogEntry[]; createdAt: string; updatedAt: string;
   profileId: string | null; instructions: InstructionPins | null; project: string | null; checkpoint: string | null;
   context: { reconcile?: { recordId: string; fromRevision: number; toRevision: number }; routine?: string; suggestion?: string; batch?: string; staged?: boolean; skip?: boolean;
-    feedback?: { check: string; note: string; by: string; at: string }[]; run?: RunState; executionBlock?: ExecutionBlock;
+    feedback?: { check: string; note: string; by: string; at: string }[]; reviewComment?: string | null; run?: RunState; personRun?: string; executionBlock?: ExecutionBlock;
     visionProposal?: { id: string; section: string; text: string; note: string; basis: string; targetId: string | null;
       expectedRevision: number | null; beforeText: string | null; briefRevision: number; acceptedClaimId?: string };
     workProposal?: { id: string; action: string; summary: string; content: Record<string, unknown>; usedInputs: { id: string; revision: number }[]; repositoryCommit: string };
     auditReport?: { id: string; repositoryCommit: string; summary: string; findings: { severity: string; title: string; affected: string; evidence: string; recommendation: string }[];
       checks: { name: string; status: string; detail?: string }[]; usedInputs?: { id: string; revision: number }[] } } | null; }
 export interface FieldChange { field: string; before: unknown; after: unknown; }
+// WORK-ITEM-UX-01: one started run of a work item, with the task it was given, what it produced and how it was signed.
+export type WorkRunState = 'working' | 'needs' | 'review' | 'failed' | 'stopped' | 'accepted' | 'sent' | 'closed';
+export interface RunChange { id: string; kind: 'claim' | 'proposal' | 'report' | 'file'; icon: string; name: string; op: 'created' | 'modified' | 'removed'; size: string;
+  before?: string | null; after?: string; note?: string; basis?: string; content?: Record<string, unknown>; findings?: { severity: string; title: string; affected: string; evidence: string; recommendation: string }[]; candidateId?: string; }
+export interface RunStep { seq: number; kind: 'plan' | 'progress' | 'note'; at: string; objectives?: string[]; index?: number; status?: 'active' | 'done' | 'stuck'; note?: string; text?: string; }
+export interface WorkRun { id: string; number: number; batchId: string | null; state: WorkRunState;
+  performer: { kind: 'agent' | 'person'; id: string; label: string; model: string | null; effort: string | null };
+  startedAt: string; finishedAt: string | null; turns: { used: number; limit: number };
+  task: { title: string; request: string; action: string | null; criteria: { index: number; text: string; source: { id: string; revision?: number | null } | null }[];
+    targets: { id: string; label: string; kind: string }[]; carried: { check: string; note: string; by: string }[]; carriedComment: string | null };
+  live: { phases: string[]; phase: number | null; activity: string; model: string | null; usage: { input: number; output: number } | null } | null;
+  steps: RunStep[]; blockReason: string | null; changes: RunChange[];
+  evidence: { criterion: number; type: 'change' | 'test' | 'try' | 'note'; ref: string; note: string; found: boolean; target: string | null; label: string; result?: string | null; independent?: boolean }[];
+  candidate: { id: string; state: string; commit: string | null; base: string; checks: { name: string; status: string; detail: string; source?: string }[] } | null;
+  proposalId: string | null; reportId: string | null; summary?: string | null;
+  review: { verdicts: Record<string, { value: 'accept' | 'reject' | 'skip'; note: string }>; flags: Record<string, string>; outcome: WorkRunState | null; comment: string | null; signedBy: string | null; signedAt: string | null }; }
 export interface WorkChange { recordId: string; revision: number; author: string; rationale: string | null; createdAt: string; kind: string | null; exists: boolean; fields: FieldChange[]; }
 export interface Routine extends RecordBase { key: string | null; title: string; layer: string; type: string; cadence: string; documents: string[]; enabled: boolean; nextRunAt: string | null; lastRunAt: string | null; lastWorkId: string | null; history: Revision[]; }
 export interface Knowledge {

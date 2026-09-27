@@ -17,6 +17,8 @@ defmodule SymphonyElixir.Aludel.Adapter do
   @audit_tool "aludel_submit_audit"
   @proposal_tool "aludel_submit_proposal"
   @ask_tool "aludel_task_ask"
+  @plan_tool "aludel_task_plan"
+  @progress_tool "aludel_task_progress"
   @submit_tool "aludel_submit_candidate"
   @commit_tool "aludel_commit_candidate"
   @check_schema %{
@@ -102,6 +104,23 @@ defmodule SymphonyElixir.Aludel.Adapter do
     end
   end
 
+  # WORK-ITEM-UX-01 WI-6: what the reviewer should check for each criterion, pointing only at what this submission contains.
+  @evidence_schema %{
+    "type" => "array",
+    "maxItems" => 40,
+    "items" => %{
+      "type" => "object",
+      "additionalProperties" => false,
+      "required" => ["criterion", "type", "ref"],
+      "properties" => %{
+        "criterion" => %{"type" => "integer", "minimum" => 0, "maximum" => 11},
+        "type" => %{"type" => "string", "enum" => ["change", "test", "try"]},
+        "ref" => %{"type" => "string", "minLength" => 1, "maxLength" => 300},
+        "note" => %{"type" => "string", "maxLength" => 300}
+      }
+    }
+  }
+
   @impl true
   def agent_tool_specs do
     [
@@ -156,6 +175,34 @@ defmodule SymphonyElixir.Aludel.Adapter do
         }
       },
       %{
+        "name" => @plan_tool,
+        "description" => "Report a short ordered plan anchored in this task's request and criteria, not generic action phases. The reviewer sees it as the run's progress. Report again if the plan changes.",
+        "inputSchema" => %{
+          "type" => "object",
+          "additionalProperties" => false,
+          "required" => ["attemptId", "objectives"],
+          "properties" => %{
+            "attemptId" => %{"type" => "string", "pattern" => "^att-[0-9a-f-]{36}$"},
+            "objectives" => %{"type" => "array", "minItems" => 1, "maxItems" => 12, "items" => %{"type" => "string", "minLength" => 3, "maxLength" => 160}}
+          }
+        }
+      },
+      %{
+        "name" => @progress_tool,
+        "description" => "Mark one planned objective active, done or stuck. Stuck means the objective blocks the run: it immediately ends the run as failed, and you must stop. Keep recoverable obstacles active and explain them in the note.",
+        "inputSchema" => %{
+          "type" => "object",
+          "additionalProperties" => false,
+          "required" => ["attemptId", "index", "status"],
+          "properties" => %{
+            "attemptId" => %{"type" => "string", "pattern" => "^att-[0-9a-f-]{36}$"},
+            "index" => %{"type" => "integer", "minimum" => 0, "maximum" => 11},
+            "status" => %{"type" => "string", "enum" => ["active", "done", "stuck"]},
+            "note" => %{"type" => "string", "maxLength" => 300}
+          }
+        }
+      },
+      %{
         "name" => @audit_tool,
         "description" => "Submit a read-only security findings report to Aludel Work review.",
         "inputSchema" => %{
@@ -164,6 +211,7 @@ defmodule SymphonyElixir.Aludel.Adapter do
           "required" => ["attemptId", "report"],
           "properties" => %{
             "attemptId" => %{"type" => "string", "pattern" => "^att-[0-9a-f-]{36}$"},
+            "evidence" => @evidence_schema,
             "report" => %{
               "type" => "object",
               "additionalProperties" => false,
@@ -212,6 +260,7 @@ defmodule SymphonyElixir.Aludel.Adapter do
           "required" => ["attemptId", "proposal"],
           "properties" => %{
             "attemptId" => %{"type" => "string", "pattern" => "^att-[0-9a-f-]{36}$"},
+            "evidence" => @evidence_schema,
             "proposal" => %{
               "type" => "object",
               "required" => ["summary", "content"],
@@ -248,7 +297,8 @@ defmodule SymphonyElixir.Aludel.Adapter do
           "properties" => %{
             "attemptId" => %{"type" => "string", "pattern" => "^att-[0-9a-f-]{36}$"},
             "message" => %{"type" => "string", "maxLength" => 160},
-            "checks" => %{"type" => "array", "maxItems" => 30, "items" => @check_schema}
+            "checks" => %{"type" => "array", "maxItems" => 30, "items" => @check_schema},
+            "evidence" => @evidence_schema
           }
         }
       },
@@ -262,7 +312,8 @@ defmodule SymphonyElixir.Aludel.Adapter do
           "properties" => %{
             "attemptId" => %{"type" => "string", "pattern" => "^att-[0-9a-f-]{36}$"},
             "commit" => %{"type" => "string", "pattern" => "^[a-f0-9]{40}$"},
-            "checks" => %{"type" => "array", "maxItems" => 30, "items" => @check_schema}
+            "checks" => %{"type" => "array", "maxItems" => 30, "items" => @check_schema},
+            "evidence" => @evidence_schema
           }
         }
       }
@@ -325,19 +376,38 @@ defmodule SymphonyElixir.Aludel.Adapter do
     end
   end
 
-  def execute_agent_tool(@audit_tool, %{"attemptId" => attempt_id, "report" => report}, opts) do
+  def execute_agent_tool(@plan_tool, %{"attemptId" => attempt_id, "objectives" => objectives}, opts) do
     settings = Keyword.get_lazy(opts, :tracker_settings, fn -> Config.settings!().tracker end)
 
-    case post_request("attempts/" <> attempt_id <> "/audit", %{"report" => report}, settings) do
+    case post_request("attempts/" <> attempt_id <> "/plan", %{"objectives" => objectives}, settings) do
       {:ok, result} -> tool_result(true, result)
       {:error, reason} -> tool_result(false, %{"error" => inspect(reason)})
     end
   end
 
-  def execute_agent_tool(@proposal_tool, %{"attemptId" => attempt_id, "proposal" => proposal}, opts) do
+  def execute_agent_tool(@progress_tool, %{"attemptId" => attempt_id, "index" => index, "status" => status} = args, opts) do
+    settings = Keyword.get_lazy(opts, :tracker_settings, fn -> Config.settings!().tracker end)
+    body = %{"index" => index, "status" => status, "note" => Map.get(args, "note", "")}
+
+    case post_request("attempts/" <> attempt_id <> "/progress", body, settings) do
+      {:ok, result} -> tool_result(true, result)
+      {:error, reason} -> tool_result(false, %{"error" => inspect(reason)})
+    end
+  end
+
+  def execute_agent_tool(@audit_tool, %{"attemptId" => attempt_id, "report" => report} = args, opts) do
     settings = Keyword.get_lazy(opts, :tracker_settings, fn -> Config.settings!().tracker end)
 
-    case post_request("attempts/" <> attempt_id <> "/proposal", %{"proposal" => proposal}, settings) do
+    case post_request("attempts/" <> attempt_id <> "/audit", %{"report" => report, "evidence" => Map.get(args, "evidence", [])}, settings) do
+      {:ok, result} -> tool_result(true, result)
+      {:error, reason} -> tool_result(false, %{"error" => inspect(reason)})
+    end
+  end
+
+  def execute_agent_tool(@proposal_tool, %{"attemptId" => attempt_id, "proposal" => proposal} = args, opts) do
+    settings = Keyword.get_lazy(opts, :tracker_settings, fn -> Config.settings!().tracker end)
+
+    case post_request("attempts/" <> attempt_id <> "/proposal", %{"proposal" => proposal, "evidence" => Map.get(args, "evidence", [])}, settings) do
       {:ok, result} -> tool_result(true, result)
       {:error, reason} -> tool_result(false, %{"error" => inspect(reason)})
     end
@@ -363,7 +433,7 @@ defmodule SymphonyElixir.Aludel.Adapter do
     if not String.match?(attempt_id, ~r/^att-[0-9a-f-]{36}$/) or not is_binary(message) do
       tool_result(false, %{"error" => "Invalid attempt or message"})
     else
-      case post_request("attempts/" <> attempt_id <> "/commit", %{"message" => message, "checks" => checks}, settings) do
+      case post_request("attempts/" <> attempt_id <> "/commit", %{"message" => message, "checks" => checks, "evidence" => Map.get(arguments, "evidence", [])}, settings) do
         {:ok, result} -> tool_result(true, result)
         {:error, reason} -> tool_result(false, %{"error" => inspect(reason)})
       end
@@ -379,7 +449,7 @@ defmodule SymphonyElixir.Aludel.Adapter do
               String.match?(commit, ~r/^[a-f0-9]{40}$/)) do
       tool_result(false, %{"error" => "Invalid attempt or commit"})
     else
-      case post_request("attempts/" <> attempt_id <> "/candidate", %{"commit" => commit, "checks" => checks}, settings) do
+      case post_request("attempts/" <> attempt_id <> "/candidate", %{"commit" => commit, "checks" => checks, "evidence" => Map.get(arguments, "evidence", [])}, settings) do
         {:ok, result} -> tool_result(true, result)
         {:error, reason} -> tool_result(false, %{"error" => inspect(reason)})
       end

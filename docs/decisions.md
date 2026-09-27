@@ -2,7 +2,7 @@
 id: decisions-001
 kind: decision-register
 status: active
-updated: 2026-09-24
+updated: 2026-09-27
 ---
 
 # Decision inbox
@@ -10,6 +10,15 @@ updated: 2026-09-24
 This is the seed of the portal's decision workflow. Confirmed owner answers and proposed defaults are distinct. No unanswered question silently becomes an owner decision.
 
 ## Confirmed
+
+2026-09-27 — **DEC-050: A work item is its task plus its runs; the item owns the criteria, the performer owns its plan, and a reviewer signs each run.** The owner agreed this in text, then over two prototype rounds ([work record](design/work-item/work-record.md), ledgers D1–D10, E1–E4, F1–F16 and G1–G5):
+- Criteria are fixed for a run at Go. The performer may add a criterion or flag one with a question, but may not remove or weaken one. The performer writes its own plan, and that plan is the run's progress. This revises WORK-UX-01 B3/B10: action-configured *Run phases* no longer drive progress.
+- Each run that a worker started gets its own tab, showing the task snapshot it received, its objectives, its changes, and its verdicts and flags. Authorizations that no worker picked up stay in Activity.
+- Review is a full-page stepper through the criteria. Every close is a signature with an optional comment. Accepting applies the run as a whole, through the action's existing checked boundary. Rejecting or closing applies nothing, keeps the run's outputs on its tab, and carries the flags and comment into a *Next run* draft that stays editable until Go.
+- Accept and Review are offered only for a run that reports its criteria met. A failed or stopped run can only be closed. A rejection stays until the reviewer changes it.
+- An agent question may propose criteria changes. An accepted answer changes the editable task/Next run criteria while the active run retains the immutable criteria snapshot pinned at Go; the question, answer, and amendment remain traceable.
+- Person work uses the same run and review model: a person can start work and submit a minimal review packet with a summary, changed-object references, and criterion evidence. Human runs do not invent agent telemetry.
+- **Consequences, as built:** `work_run_reviews`, `work_person_runs`, `work_person_run_reviews` and `work_run_steps` store attempts, verdicts, flags, signatures, plans, progress and evidence. The Symphony tools `aludel_task_plan` and `aludel_task_progress`, and an `evidence` argument on every submit tool, are in the pinned overlay. The item page and the `/review/:run` route are rebuilt on these ([evidence](evidence/work-item-ux-01-build.md)).
 
 2026-09-24 — **DEC-049: Platform splits into Code and Deploy; Code is a reference layer, Deploy has an Operator.** The owner, over two prototype rounds ([work record](design/platform-layer/work-record.md), ledger C1–C9 and R1–R17):
 - Code is "a handy reference for how the code connects to everything else", not a workspace: "no one will come to this code layer to do their work". There is no code editing; a change is requested and becomes Engineer work.

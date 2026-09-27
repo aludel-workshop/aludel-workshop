@@ -16,6 +16,7 @@ import { agentRuns, initAgentRuns } from './agent-runs.mjs';
 import { codeCandidates, initCodeCandidates } from './code-candidates.mjs';
 import { editorBridge, initEditorBridge } from './editor-bridge.mjs';
 import { symphonyWorker, initSymphonyWorker } from './symphony-worker.mjs';
+import { workRuns, initWorkRuns } from './work-runs.mjs';
 import { providerModelCatalog } from './provider-models.mjs';
 import { extname, join, normalize, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -54,6 +55,7 @@ initAgentRuns(db);
 initCodeCandidates(db);
 initEditorBridge(db);
 initSymphonyWorker(db);
+initWorkRuns(db);
 const secrets = openSecretStore(dataDirectory);
 const topology = hostTopology(process.env, port);
 const setupConfigPath = join(portalRoot, 'config', 'project-setup.json');
@@ -140,6 +142,38 @@ const runtimeBlockedWork = (view, batches, pool) => {
 const ensureWorkerPool = projectId => worker.ensurePool(projectId, join(dataDirectory, 'symphony', projectId, 'worker-token'));
 for (const projectId of layerProjects()) ensureWorkerPool(projectId);
 const runs = agentRuns({ db, know, worker, symphonyDispatch: symphonyDispatchEnabled });
+const runHistory = workRuns({ db, know, candidates });
+// Accepting an exact code candidate: owner only, every check accepted, a healthy preview, and a fast-forward into the project.
+async function acceptCandidate(user, projectId, candidateId, commit) {
+  if (!db.prepare("SELECT 1 FROM project_members WHERE project_id = ? AND user_id = ? AND role = 'owner'").get(projectId, user.id))
+    return { status: 403, body: { error: 'Only a project owner can accept a code candidate.' } };
+  const candidate = candidates.get(projectId, candidateId);
+  if (!candidate || candidate.commit !== commit || !['review', 'accepted'].includes(candidate.state))
+    return { status: 409, body: { error: 'Review the exact candidate commit before acceptance.' } };
+  const work = know.workById(projectId, candidate.workId);
+  if (!work || work.action !== 'platform.implement' || work.state !== 'review' || work.checks.some(check => check.verdict !== 'accept'))
+    return { status: 409, body: { error: 'Accept every Work check before accepting this candidate.' } };
+  const preview = candidatePreviews.status(candidateId);
+  if (preview.commit !== candidate.commit || preview.status !== 'running' || !(await candidatePreviews.probe(candidateId)).ok)
+    return { status: 409, body: { error: 'The exact candidate preview must be healthy before acceptance.' } };
+  const source = flows.projectSetup(user, projectId).workspacePath;
+  const head = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: source, encoding: 'utf8' });
+  const clean = spawnSync('git', ['status', '--porcelain=v1'], { cwd: source, encoding: 'utf8' });
+  if (head.status !== 0 || clean.status !== 0 || clean.stdout.trim() || ![candidate.base, candidate.commit].includes(head.stdout.trim()))
+    return { status: 409, body: { error: 'The shared project changed since this candidate was built.' } };
+  if (head.stdout.trim() === candidate.base) {
+    const fetched = spawnSync('git', ['fetch', '--no-tags', '--', candidate.path, candidate.commit], { cwd: source, encoding: 'utf8', timeout: 30000 });
+    if (fetched.status !== 0) return { status: 409, body: { error: 'Could not fetch the candidate commit.' } };
+    const merged = spawnSync('git', ['merge', '--ff-only', candidate.commit], { cwd: source, encoding: 'utf8', timeout: 30000 });
+    if (merged.status !== 0) return { status: 409, body: { error: 'The candidate cannot be fast-forwarded into the project.' } };
+  }
+  db.prepare("UPDATE code_candidates SET state = 'accepted', finished_at = ? WHERE id = ?").run(new Date().toISOString(), candidateId);
+  const accepted = know.updateWork(user, projectId, work.id, { state: 'done', candidateId });
+  know.appendLog(work.id, `Accepted exact code commit ${candidate.commit.slice(0, 12)} from ${candidateId}`, {}, { by: { kind: 'person', id: user.id } });
+  settleSymphonyBatch(projectId, work.context?.batch);
+  return { status: 200, body: { candidate: { id: candidateId, commit: candidate.commit, state: 'accepted' }, work: accepted } };
+}
+
 const editor = editorBridge({ db, know, projectSetup: (user, id) => flows.projectSetup(user, id), previewStatus: id => previews.status(id) });
 // LAY-04: routines that are due create work, and each layer's gaps become backlog items (DEC-041). At start-up, then every ten minutes.
 function tickRoutines() {
@@ -397,13 +431,21 @@ async function api(request, response, url) {
   // Symphony host credentials have no browser/session authority. Pool requests resolve their pinned profile per attempt.
   if (url.pathname.startsWith('/api/worker/')) {
     const workerAuth = worker.authenticate(request.headers.authorization);
-    const attemptRoute = /^\/api\/worker\/attempts\/([^/]+)(?:\/(workspace|runs|events|candidate|commit|audit|proposal|question))?$/.exec(url.pathname);
+    const attemptRoute = /^\/api\/worker\/attempts\/([^/]+)(?:\/(workspace|runs|events|candidate|commit|audit|proposal|question|plan|progress))?$/.exec(url.pathname);
     if (attemptRoute) {
       const [, attemptId, operation] = attemptRoute;
       const scope = worker.scopeForAttempt(workerAuth, attemptId);
       if (!operation && request.method === 'GET') return json(response, 200, worker.attemptStatus(scope, attemptId), { 'cache-control': 'no-store' });
       if (request.method === 'POST' && operation) {
         const input = await readJson(request, ['audit', 'proposal'].includes(operation) ? 128 * 1024 : 64 * 1024);
+        // WORK-ITEM-UX-01 WI-5: the agent's own plan and progress, shown as the run's objectives.
+        if (operation === 'plan') return json(response, 200, runHistory.reportPlan(workerAuth.projectId, attemptId, input.objectives), { 'cache-control': 'no-store' });
+        if (operation === 'progress') {
+          const result = runHistory.reportProgress(workerAuth.projectId, attemptId, { index: input.index, status: input.status, note: input.note });
+          if (result.terminal) settleSymphonyBatch(workerAuth.projectId, worker.attemptStatus(scope, attemptId).batchId);
+          return json(response, 200, result, { 'cache-control': 'no-store' });
+        }
+        const evidence = ['candidate', 'commit', 'audit', 'proposal'].includes(operation) ? runHistory.checkEvidence(workerAuth.projectId, attemptId, input.evidence) : [];
         const result = operation === 'workspace' ? worker.registerWorkspace(scope, { attemptId, path: input.path })
           : operation === 'runs' ? worker.reserveRun(scope, { attemptId })
           : operation === 'events' ? worker.appendEvent(scope, { attemptId, ...input })
@@ -412,6 +454,7 @@ async function api(request, response, url) {
                 : operation === 'proposal' ? worker.submitProposal(scope, { attemptId, proposal: input.proposal })
                 : operation === 'question' ? worker.askQuestion(scope, { attemptId, question: input.question, reason: input.reason, options: input.options })
                 : worker.submitCandidate(scope, { attemptId, commit: input.commit, checks: input.checks });
+        runHistory.recordEvidence(attemptId, evidence);
         if (['candidate', 'commit', 'audit', 'proposal', 'question', 'events'].includes(operation)) settleSymphonyBatch(workerAuth.projectId, worker.attemptStatus(scope, attemptId).batchId);
         if (result.candidate) { const { path, ...candidate } = result.candidate; return json(response, 201, { attemptId, candidate }, { 'cache-control': 'no-store' }); }
         return json(response, 200, result, { 'cache-control': 'no-store' });
@@ -468,34 +511,52 @@ async function api(request, response, url) {
     const [, projectId, candidateId] = candidateAcceptRoute;
     requireMember(db, user, projectId);
     if (request.method !== 'POST') return json(response, 405, { error: 'Method not allowed.' });
-    if (!db.prepare("SELECT 1 FROM project_members WHERE project_id = ? AND user_id = ? AND role = 'owner'").get(projectId, user.id))
-      return json(response, 403, { error: 'Only a project owner can accept a code candidate.' });
     const input = await readJson(request);
-    const candidate = candidates.get(projectId, candidateId);
-    if (!candidate || candidate.commit !== input.commit || !['review', 'accepted'].includes(candidate.state))
-      return json(response, 409, { error: 'Review the exact candidate commit before acceptance.' });
-    const work = know.workById(projectId, candidate.workId);
-    if (!work || work.action !== 'platform.implement' || work.state !== 'review' || work.checks.some(check => check.verdict !== 'accept'))
-      return json(response, 409, { error: 'Accept every Work check before accepting this candidate.' });
-    const preview = candidatePreviews.status(candidateId);
-    if (preview.commit !== candidate.commit || preview.status !== 'running' || !(await candidatePreviews.probe(candidateId)).ok)
-      return json(response, 409, { error: 'The exact candidate preview must be healthy before acceptance.' });
-    const source = flows.projectSetup(user, projectId).workspacePath;
-    const head = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: source, encoding: 'utf8' });
-    const clean = spawnSync('git', ['status', '--porcelain=v1'], { cwd: source, encoding: 'utf8' });
-    if (head.status !== 0 || clean.status !== 0 || clean.stdout.trim() || ![candidate.base, candidate.commit].includes(head.stdout.trim()))
-      return json(response, 409, { error: 'The shared project changed since this candidate was built.' });
-    if (head.stdout.trim() === candidate.base) {
-      const fetched = spawnSync('git', ['fetch', '--no-tags', '--', candidate.path, candidate.commit], { cwd: source, encoding: 'utf8', timeout: 30000 });
-      if (fetched.status !== 0) return json(response, 409, { error: 'Could not fetch the candidate commit.' });
-      const merged = spawnSync('git', ['merge', '--ff-only', candidate.commit], { cwd: source, encoding: 'utf8', timeout: 30000 });
-      if (merged.status !== 0) return json(response, 409, { error: 'The candidate cannot be fast-forwarded into the project.' });
+    const result = await acceptCandidate(user, projectId, candidateId, input.commit);
+    return json(response, result.status, result.body, { 'cache-control': 'no-store' });
+  }
+  // WORK-ITEM-UX-01: an item's runs, each with its own task snapshot, outputs, review and signature.
+  const runRoute = /^\/api\/projects\/([^/]+)\/work\/([^/]+)\/runs(?:\/([^/]+)\/(review|sign|submit|stop))?$/.exec(url.pathname);
+  if (runRoute) {
+    const [, rawProject, rawWork, rawAttempt, operation] = runRoute;
+    const projectId = decodeURIComponent(rawProject), workId = decodeURIComponent(rawWork), attemptId = rawAttempt ? decodeURIComponent(rawAttempt) : null;
+    requireMember(db, user, projectId);
+    if (!operation && request.method === 'GET') return json(response, 200, { runs: runHistory.list(projectId, workId) }, { 'cache-control': 'no-store' });
+    if (!operation && request.method === 'POST') {
+      const input = await readJson(request);
+      if (input.action === 'start-person') return json(response, 201, runHistory.startPerson(user, projectId, workId), { 'cache-control': 'no-store' });
+      return json(response, 400, { error: 'Unknown run action.' });
     }
-    db.prepare("UPDATE code_candidates SET state = 'accepted', finished_at = ? WHERE id = ?").run(new Date().toISOString(), candidateId);
-    const accepted = know.updateWork(user, projectId, work.id, { state: 'done', candidateId });
-    know.appendLog(work.id, `Accepted exact code commit ${candidate.commit.slice(0, 12)} from ${candidateId}`, {}, { by: { kind: 'person', id: user.id } });
-    settleSymphonyBatch(projectId, work.context?.batch);
-    return json(response, 200, { candidate: { id: candidateId, commit: candidate.commit, state: 'accepted' }, work: accepted }, { 'cache-control': 'no-store' });
+    if (operation === 'submit' && request.method === 'POST') return json(response, 200, runHistory.submitPerson(user, projectId, workId, attemptId, await readJson(request)), { 'cache-control': 'no-store' });
+    if (operation === 'stop' && request.method === 'POST') return json(response, 200, runHistory.stopPerson(user, projectId, workId, attemptId), { 'cache-control': 'no-store' });
+    if (operation === 'review' && request.method === 'PUT') return json(response, 200, runHistory.saveReview(projectId, workId, attemptId, await readJson(request)), { 'cache-control': 'no-store' });
+    if (operation === 'sign' && request.method === 'POST') {
+      const input = await readJson(request);
+      const stamp = () => new Date().toISOString();
+      const signed = await runHistory.sign(user, projectId, workId, attemptId, { outcome: String(input.outcome || ''), comment: typeof input.comment === 'string' ? input.comment : '' }, {
+        accept: async run => {
+          if (run.candidate) {
+            const result = await acceptCandidate(user, projectId, run.candidate.id, run.candidate.commit);
+            if (result.status !== 200) throw Object.assign(new Error(result.body.error), { status: result.status });
+          } else if (run.proposalId && run.changes[0]?.kind === 'claim') {
+            runs.acceptBrief(user, projectId, workId, run.proposalId);
+            db.prepare("UPDATE symphony_proposals SET state = 'accepted', accepted_at = ? WHERE id = ? AND project_id = ?").run(stamp(), run.proposalId, projectId);
+          } else if (run.proposalId) worker.acceptProposal(user, projectId, workId, run.proposalId);
+          else know.updateWork(user, projectId, workId, { state: 'done' });
+        },
+        reject: async run => {
+          if (run.candidate?.state === 'review') {
+            db.prepare("UPDATE code_candidates SET state = 'rejected', finished_at = ? WHERE id = ?").run(stamp(), run.candidate.id);
+            await candidatePreviews.stop(run.candidate.id);
+          }
+          if (run.proposalId && run.changes[0]?.kind === 'claim') runs.rejectBrief(projectId, workId, run.proposalId);
+          if (run.proposalId) worker.rejectProposal(projectId, workId, run.proposalId);
+        },
+      });
+      settleSymphonyBatch(projectId, signed.batchId);
+      return json(response, 200, { run: signed, work: know.workById(projectId, workId) }, { 'cache-control': 'no-store' });
+    }
+    return json(response, 405, { error: 'Method not allowed.' });
   }
   const candidatePreviewRoute = /^\/api\/projects\/([^/]+)\/candidates\/([^/]+)\/preview$/.exec(url.pathname);
   if (candidatePreviewRoute) {
@@ -727,6 +788,11 @@ async function api(request, response, url) {
       }
       const before = know.workById(projectId, item);
       const updated = know.updateWork(user, projectId, item, input);
+      if (before?.state === 'needs-input' && input.answer !== undefined) {
+        const interrupted = db.prepare("SELECT id FROM symphony_attempts WHERE project_id = ? AND work_id = ? AND state = 'blocked' ORDER BY created_at DESC LIMIT 1").get(projectId, item);
+        if (interrupted) runHistory.recordSignature(user, projectId, item, interrupted.id, 'close',
+          `Answered “${String(input.answer).trim().slice(0, 300)}”${input.criteriaAmendment !== undefined ? '; next-run criteria reviewed' : ''}.`);
+      }
       if (before?.action === 'product.brief' && input.sendBack && before.context?.visionProposal?.id) {
         runs.rejectBrief(projectId, item, before.context.visionProposal.id);
         worker.rejectProposal(projectId, item, before.context.visionProposal.id);

@@ -198,7 +198,9 @@ export function codeCandidates({ db, candidateRoot, externalRoot = join(candidat
     const baseCurrent = git(source, 'rev-parse', 'HEAD') === candidate.base;
     if (!candidate.commit) return { ...candidate, baseCurrent, diff: '' };
     if (git(candidate.path, 'cat-file', '-t', candidate.commit) !== 'commit') fail('Candidate commit is missing.');
-    const diff = git(candidate.path, 'diff', '--stat', candidate.base, candidate.commit);
+    // Review needs the actual immutable patch. A stat is useful metadata, but presenting it as a diff left the Changes
+    // viewer with no lines to inspect and made criterion evidence point at an empty artifact.
+    const diff = git(candidate.path, 'diff', '--no-ext-diff', '--no-color', candidate.base, candidate.commit, '--');
     return { ...candidate, baseCurrent, diff };
   }
 

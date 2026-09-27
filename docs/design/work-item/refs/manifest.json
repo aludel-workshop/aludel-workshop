@@ -1,0 +1,348 @@
+{
+  "gh-pr-conversation": {
+    "url": "https://github.com/angular/angular/pull/70953",
+    "note": "PR page: description, timeline, checks summary, reviewers sidebar",
+    "accessed": "2026-09-26T23:18:36.981Z",
+    "status": 200,
+    "finalUrl": "https://github.com/angular/angular/pull/70953",
+    "title": "perf(router): do not retain UrlTree instances in RouterLink by atscott · Pull Request #70953 · angular/angular",
+    "file": "gh-pr-conversation.png",
+    "ok": true
+  },
+  "gh-pr-files": {
+    "url": "https://github.com/angular/angular/pull/70953/files",
+    "note": "Changed files review with file tree and viewed checkboxes",
+    "accessed": "2026-09-26T23:18:41.638Z",
+    "status": 200,
+    "finalUrl": "https://github.com/angular/angular/pull/70953/files",
+    "title": "perf(router): do not retain UrlTree instances in RouterLink by atscott · Pull Request #70953 · angular/angular · GitHub",
+    "file": "gh-pr-files.png",
+    "ok": true
+  },
+  "gh-pr-checks": {
+    "url": "https://github.com/angular/angular/pull/70953/checks",
+    "note": "Checks tab: named checks with pass/fail",
+    "accessed": "2026-09-26T23:18:45.833Z",
+    "status": 200,
+    "finalUrl": "https://github.com/angular/angular/pull/70953/checks",
+    "title": "perf(router): do not retain UrlTree instances in RouterLink by atscott · Pull Request #70953 · angular/angular",
+    "file": "gh-pr-checks.png",
+    "ok": true
+  },
+  "gh-actions-job": {
+    "url": "https://github.com/angular/angular/actions/runs/36275749072/job/108498038726",
+    "note": "Job run: collapsed steps with durations, expandable logs",
+    "accessed": "2026-09-26T23:18:50.351Z",
+    "status": 200,
+    "finalUrl": "https://github.com/angular/angular/actions/runs/36275749072/job/108498038726",
+    "title": "fix(compiler): do not replace :host in declaration values · angular/angular@6e8edb3 · GitHub",
+    "file": "gh-actions-job.failed.png",
+    "ok": false,
+    "problem": "sign-in wall"
+  },
+  "gh-actions-run": {
+    "url": "https://github.com/angular/angular/actions/runs/36275749072",
+    "note": "Run summary: jobs, total duration, attempts selector",
+    "accessed": "2026-09-26T23:18:54.008Z",
+    "status": 200,
+    "finalUrl": "https://github.com/angular/angular/actions/runs/36275749072",
+    "title": "fix(compiler): do not replace :host in declaration values · angular/angular@6e8edb3 · GitHub",
+    "file": "gh-actions-run.failed.png",
+    "ok": false,
+    "problem": "sign-in wall"
+  },
+  "gh-copilot-pr": {
+    "url": "https://github.com/microsoft/CCF/pull/8448",
+    "note": "PR authored by Copilot coding agent: task, session link, agent timeline",
+    "accessed": "2026-09-26T23:18:57.264Z",
+    "status": 200,
+    "finalUrl": "https://github.com/microsoft/CCF/pull/8448",
+    "title": "Bind Locust master before launching workers by Copilot · Pull Request #8448 · microsoft/CCF",
+    "file": "gh-copilot-pr.png",
+    "ok": true
+  },
+  "gh-copilot-docs-sessions": {
+    "url": "https://docs.github.com/en/copilot/how-tos/use-copilot-agents/coding-agent/track-copilot-sessions",
+    "note": "Docs: tracking Copilot agent sessions and session logs",
+    "accessed": "2026-09-26T23:19:02.565Z",
+    "status": 200,
+    "finalUrl": "https://docs.github.com/en/copilot/how-tos/copilot-on-github/use-copilot-agents/manage-and-track-agents",
+    "title": "Managing agent sessions - GitHub Docs",
+    "file": "gh-copilot-docs-sessions.png",
+    "ok": true
+  },
+  "jira-issue": {
+    "url": "https://issues.apache.org/jira/browse/KAFKA-17000",
+    "note": "Public Jira issue: details sidebar, description, activity tabs",
+    "accessed": "2026-09-26T23:19:05.984Z",
+    "status": 200,
+    "finalUrl": "https://issues.apache.org/jira/browse/KAFKA-17000",
+    "title": "[KAFKA-17000] Occasional AuthorizerTest thread leak - ASF Jira",
+    "file": "jira-issue.png",
+    "ok": true
+  },
+  "linear-docs-issue": {
+    "url": "https://linear.app/docs/creating-issues",
+    "note": "Linear docs showing issue view",
+    "accessed": "2026-09-26T23:19:14.118Z",
+    "status": 200,
+    "finalUrl": "https://linear.app/docs/creating-issues",
+    "title": "Create issues – Linear Docs",
+    "file": "linear-docs-issue.png",
+    "ok": true
+  },
+  "linear-agents-docs": {
+    "url": "https://linear.app/docs/agents-in-linear",
+    "note": "Linear: agents working on issues, agent activity in issue",
+    "accessed": "2026-09-26T23:19:19.034Z",
+    "status": 200,
+    "finalUrl": "https://linear.app/docs/agents-in-linear",
+    "title": "AI Agents – Linear Docs",
+    "file": "linear-agents-docs.png",
+    "ok": true
+  },
+  "chromatic-review": {
+    "url": "https://www.chromatic.com/docs/review",
+    "note": "UI review: per-change accept/deny stepping",
+    "accessed": "2026-09-26T23:19:23.274Z",
+    "status": 200,
+    "finalUrl": "https://www.chromatic.com/docs/review/",
+    "title": "Review • Chromatic docs",
+    "file": "chromatic-review.png",
+    "ok": true
+  },
+  "chromatic-test": {
+    "url": "https://www.chromatic.com/docs/test",
+    "note": "Visual tests: baseline vs new, accept/deny each change",
+    "accessed": "2026-09-26T23:19:28.625Z",
+    "status": 200,
+    "finalUrl": "https://www.chromatic.com/docs/",
+    "title": "Why Chromatic? • Chromatic docs",
+    "file": "chromatic-test.png",
+    "ok": true
+  },
+  "devin-session": {
+    "url": "https://docs.devin.ai/get-started/devin-intro",
+    "note": "Devin session: plan, progress, shell/editor/browser replay",
+    "accessed": "2026-09-26T23:19:34.326Z",
+    "status": 200,
+    "finalUrl": "https://docs.devin.ai/get-started/devin-intro",
+    "title": "Introducing Devin - Devin Docs",
+    "file": "devin-session.png",
+    "ok": true
+  },
+  "jules-docs": {
+    "url": "https://jules.google/docs/",
+    "note": "Jules: plan approval before work, then progress",
+    "accessed": "2026-09-26T23:19:41.620Z",
+    "status": 200,
+    "finalUrl": "https://jules.google/docs/",
+    "title": "Getting started | Jules",
+    "file": "jules-docs.png",
+    "ok": true
+  },
+  "codex-cloud-docs": {
+    "url": "https://developers.openai.com/codex/cloud",
+    "note": "Codex cloud task: logs, diff, test evidence",
+    "accessed": "2026-09-26T23:19:44.568Z",
+    "status": 200,
+    "finalUrl": "https://learn.chatgpt.com/docs/cloud",
+    "title": "Codex cloud | ChatGPT Learn",
+    "file": "codex-cloud-docs.png",
+    "ok": true
+  },
+  "vercel-comments": {
+    "url": "https://vercel.com/docs/comments",
+    "note": "Preview deployment comments: review interacting with the result",
+    "accessed": "2026-09-26T23:19:47.244Z",
+    "status": 200,
+    "finalUrl": "https://vercel.com/docs/comments",
+    "title": "Comments Overview",
+    "file": "vercel-comments.png",
+    "ok": true
+  },
+  "gdocs-suggestions": {
+    "url": "https://support.google.com/docs/answer/6033474",
+    "note": "Suggesting mode: knowledge changes shown in context, accept/reject each",
+    "accessed": "2026-09-26T23:19:51.728Z",
+    "status": 200,
+    "finalUrl": "https://support.google.com/docs/answer/6033474",
+    "title": "Suggest edits in Google Docs - Computer - Google Docs Editors Help",
+    "file": "gdocs-suggestions.png",
+    "ok": true
+  },
+  "gh-copilot-pr-timeline": {
+    "url": "https://github.com/microsoft/CCF/pull/8448",
+    "note": "Copilot agent PR timeline: started work / session link / review requests",
+    "accessed": "2026-09-26T23:20:25.002Z",
+    "status": 200,
+    "finalUrl": "https://github.com/microsoft/CCF/pull/8448",
+    "title": "Bind Locust master before launching workers by Copilot · Pull Request #8448 · microsoft/CCF",
+    "file": "gh-copilot-pr-timeline.png",
+    "ok": true
+  },
+  "linear-agent-activity": {
+    "url": "https://linear.app/docs/agents-in-linear",
+    "note": "Linear: viewing agent activity inside the issue",
+    "accessed": "2026-09-26T23:20:30.534Z",
+    "status": 200,
+    "finalUrl": "https://linear.app/docs/agents-in-linear",
+    "title": "AI Agents – Linear Docs",
+    "file": "linear-agent-activity.png",
+    "ok": true
+  },
+  "linear-coding-sessions": {
+    "url": "https://linear.app/docs/coding-sessions",
+    "note": "Linear coding sessions: agent session inside issue",
+    "accessed": "2026-09-26T23:20:34.840Z",
+    "status": 200,
+    "finalUrl": "https://linear.app/docs/coding-sessions",
+    "title": "Coding sessions – Linear Docs",
+    "file": "linear-coding-sessions.png",
+    "ok": true
+  },
+  "linear-issue-view": {
+    "url": "https://linear.app/docs/creating-issues",
+    "note": "Linear docs issue view image",
+    "accessed": "2026-09-26T23:20:38.735Z",
+    "status": 200,
+    "finalUrl": "https://linear.app/docs/creating-issues",
+    "title": "Create issues – Linear Docs",
+    "file": "linear-issue-view.png",
+    "ok": true
+  },
+  "chromatic-review-changes": {
+    "url": "https://www.chromatic.com/docs/review",
+    "note": "Chromatic: reviewing changes",
+    "accessed": "2026-09-26T23:20:44.785Z",
+    "status": 200,
+    "finalUrl": "https://www.chromatic.com/docs/review/",
+    "title": "Review • Chromatic docs",
+    "file": "chromatic-review-changes.png",
+    "ok": true
+  },
+  "chromatic-ui-checklist": {
+    "url": "https://www.chromatic.com/docs/review",
+    "note": "Chromatic: UI checklist of change requests",
+    "accessed": "2026-09-26T23:20:49.629Z",
+    "status": 200,
+    "finalUrl": "https://www.chromatic.com/docs/review/",
+    "title": "Review • Chromatic docs",
+    "file": "chromatic-ui-checklist.png",
+    "ok": true
+  },
+  "chromatic-accept-deny": {
+    "url": "https://www.chromatic.com/docs/test",
+    "note": "Chromatic: accept/deny visual changes",
+    "accessed": "2026-09-26T23:20:54.945Z",
+    "status": 200,
+    "finalUrl": "https://www.chromatic.com/docs/",
+    "title": "Why Chromatic? • Chromatic docs",
+    "file": "chromatic-accept-deny.png",
+    "ok": true
+  },
+  "devin-interface": {
+    "url": "https://docs.devin.ai/get-started/devin-intro",
+    "note": "Devin interface: session, progress, workspace",
+    "accessed": "2026-09-26T23:21:00.270Z",
+    "status": 200,
+    "finalUrl": "https://docs.devin.ai/get-started/devin-intro",
+    "title": "Introducing Devin - Devin Docs",
+    "file": "devin-interface.png",
+    "ok": true
+  },
+  "jules-planning": {
+    "url": "https://jules.google/docs/planning",
+    "note": "Jules: plan generated by the agent, approved before execution",
+    "accessed": "2026-09-26T23:21:19.221Z",
+    "status": 404,
+    "finalUrl": "https://jules.google/docs/planning",
+    "title": "404 Not Found",
+    "file": "jules-planning.failed.png",
+    "ok": false,
+    "problem": "HTTP 404"
+  },
+  "jules-running": {
+    "url": "https://jules.google/docs/running-tasks",
+    "note": "Jules: task progress view",
+    "accessed": "2026-09-26T23:21:21.650Z",
+    "status": 200,
+    "finalUrl": "https://jules.google/docs/running-tasks",
+    "title": "Running Tasks with Jules | Jules",
+    "file": "jules-running.png",
+    "ok": true
+  },
+  "jules-review": {
+    "url": "https://jules.google/docs/reviewing-code",
+    "note": "Jules: reviewing code output",
+    "accessed": "2026-09-26T23:21:24.231Z",
+    "status": 404,
+    "finalUrl": "https://jules.google/docs/reviewing-code",
+    "title": "404 Not Found",
+    "file": "jules-review.failed.png",
+    "ok": false,
+    "problem": "HTTP 404"
+  },
+  "copilot-docs-review-output": {
+    "url": "https://docs.github.com/en/copilot/how-tos/use-copilot-agents/coding-agent/review-copilot-output",
+    "note": "Copilot: reviewing agent output",
+    "accessed": "2026-09-26T23:21:26.457Z",
+    "status": 404,
+    "finalUrl": "https://docs.github.com/en/copilot/how-tos/use-copilot-agents/coding-agent/review-copilot-output",
+    "title": "404 - GitHub Docs",
+    "file": "copilot-docs-review-output.failed.png",
+    "ok": false,
+    "problem": "HTTP 404"
+  },
+  "jules-review-plan": {
+    "url": "https://jules.google/docs/review-plan",
+    "note": "Jules: agent-generated plan reviewed and approved before execution",
+    "accessed": "2026-09-26T23:21:56.189Z",
+    "status": 200,
+    "finalUrl": "https://jules.google/docs/review-plan",
+    "title": "Reviewing plans & giving feedback | Jules",
+    "file": "jules-review-plan.png",
+    "ok": true
+  },
+  "jules-watching": {
+    "url": "https://jules.google/docs/running-tasks",
+    "note": "Jules: watching work in progress, activity feed",
+    "accessed": "2026-09-26T23:21:58.780Z",
+    "status": 200,
+    "finalUrl": "https://jules.google/docs/running-tasks",
+    "title": "Running Tasks with Jules | Jules",
+    "file": "jules-watching.png",
+    "ok": true
+  },
+  "jules-code": {
+    "url": "https://jules.google/docs/code",
+    "note": "Jules: reviewing code output",
+    "accessed": "2026-09-26T23:22:01.335Z",
+    "status": 200,
+    "finalUrl": "https://jules.google/docs/code",
+    "title": "Reviewing code changes | Jules",
+    "file": "jules-code.png",
+    "ok": true
+  },
+  "chromatic-visual-tests": {
+    "url": "https://www.chromatic.com/docs/visual-tests-workflow",
+    "note": "Chromatic: review baseline vs new snapshot, accept/deny",
+    "accessed": "2026-09-26T23:22:04.154Z",
+    "status": 404,
+    "finalUrl": "https://www.chromatic.com/docs/visual-tests-workflow",
+    "title": "Not Found • Chromatic docs",
+    "file": "chromatic-visual-tests.failed.png",
+    "ok": false,
+    "problem": "HTTP 404"
+  },
+  "chromatic-ui-checklist2": {
+    "url": "https://www.chromatic.com/docs/review",
+    "note": "Chromatic: UI checklist",
+    "accessed": "2026-09-26T23:22:11.479Z",
+    "status": 200,
+    "finalUrl": "https://www.chromatic.com/docs/review/",
+    "title": "Review • Chromatic docs",
+    "file": "chromatic-ui-checklist2.png",
+    "ok": true
+  }
+}

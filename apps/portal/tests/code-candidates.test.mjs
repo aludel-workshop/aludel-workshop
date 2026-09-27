@@ -36,7 +36,7 @@ test('candidate worktree keeps source unchanged and commits a reviewable, attrib
   assert.equal(git(repository, 'rev-parse', 'HEAD'), base, 'shared project does not move before acceptance');
   assert.equal(readFileSync(join(repository, 'app.js'), 'utf8'), 'export const value = 1;\n');
   assert.match(git(candidate.path, 'log', '-1', '--format=%B'), /Aludel-Work: W-7\nImplements: S4/);
-  assert.match(manager.inspect('p-one', candidate.id, repository).diff, /app.js/);
+  assert.match(manager.inspect('p-one', candidate.id, repository).diff, /\+export const value = 2;/);
   assert.equal(manager.inspect('p-one', candidate.id, repository).baseCurrent, true);
   assert.equal(manager.get('p-other', candidate.id), null, 'project scope is enforced');
   const discarded = manager.discard('p-one', candidate.id, repository);

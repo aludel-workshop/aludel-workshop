@@ -175,6 +175,8 @@ export function initKnowledge(db) {
   // ROADMAP-01: the plan project an item belongs to (not project_id, which is the Aludel project that owns the item),
   // and the project checkpoint it counts towards.
   for (const column of ['plan_project_id', 'checkpoint']) if (!workColumns.has(column)) db.exec(`ALTER TABLE layer_work_items ADD COLUMN ${column} TEXT`);
+  // Archived work leaves normal planning views without losing its task, runs, review or activity trail.
+  for (const column of ['archived_at', 'archived_by']) if (!workColumns.has(column)) db.exec(`ALTER TABLE layer_work_items ADD COLUMN ${column} TEXT`);
 }
 
 // ---- Validators: one per kind, fields per knowledge-structures.md ----
@@ -992,7 +994,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
   // needs you, review, done. The stored states stay as they were.
   // A running batch locks all its items in (claimed); only the one the runner has started is working, the rest wait staged.
   const statusOf = (state, context) => !['done', 'review', 'needs-input'].includes(state) && context?.executionBlock ? 'blocked' : state === 'suggested' ? 'backlog' : state === 'ready' ? (context?.batch || context?.staged ? 'staged' : 'queued')
-    : state === 'claimed' ? (context?.run?.startedAt && !context.run.done ? 'working' : 'staged') : state === 'needs-input' ? 'needs' : state;
+    : state === 'claimed' ? (context?.personRun || context?.run?.startedAt && !context.run.done ? 'working' : 'staged') : state === 'needs-input' ? 'needs' : state;
   const workRow = item => {
     if (!item) return null;
     const context = parse(item.context_json, null);
@@ -1003,9 +1005,9 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
       createdAt: item.created_at, updatedAt: item.updated_at, profileId: item.profile_id || null, instructions: parse(item.instructions_json, null), context,
       blocks: parse(item.blocks_json, []), checks: parse(item.checks_json, []), project: item.plan_project_id || null, checkpoint: item.checkpoint || null };
   };
-  const workById = (projectId, id) => workRow(db.prepare('SELECT * FROM layer_work_items WHERE id = ? AND project_id = ?').get(id, projectId));
+  const workById = (projectId, id) => workRow(db.prepare('SELECT * FROM layer_work_items WHERE id = ? AND project_id = ? AND archived_at IS NULL').get(id, projectId));
   function workList(projectId) {
-    const rows = db.prepare('SELECT * FROM layer_work_items WHERE project_id = ? ORDER BY number DESC').all(projectId).map(workRow);
+    const rows = db.prepare('SELECT * FROM layer_work_items WHERE project_id = ? AND archived_at IS NULL ORDER BY number DESC').all(projectId).map(workRow);
     // Jira's "is blocked by": the open items that list this one in their blocks.
     for (const item of rows) item.blockedBy = rows.filter(other => other.state !== 'done' && other.blocks.includes(item.id)).map(other => other.id);
     return rows;
@@ -1145,6 +1147,24 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     let checks = item.checks;
     let context = item.context;
     let answered = false;
+    if (input.archive === true) {
+      const activeBatch = item.context?.batch && db.prepare("SELECT 1 FROM agent_batches WHERE id = ? AND state IN ('queued', 'running', 'stopping')").get(item.context.batch);
+      if (['claimed', 'needs-input'].includes(item.state)) fail(`${item.ref} is active. Stop or finish its run before archiving it.`, 409);
+      if (item.state === 'review') {
+        const attempt = db.prepare('SELECT id, state FROM symphony_attempts WHERE project_id = ? AND work_id = ? ORDER BY created_at DESC LIMIT 1').get(projectId, workId);
+        const steps = attempt ? db.prepare('SELECT seq, kind, payload_json FROM work_run_steps WHERE attempt_id = ? ORDER BY seq').all(attempt.id)
+          .map(step => ({ seq: step.seq, kind: step.kind, ...parse(step.payload_json, {}) })) : [];
+        const plan = [...steps].reverse().find(step => step.kind === 'plan');
+        const progress = steps.filter(step => step.kind === 'progress' && (!plan || step.seq > plan.seq));
+        const unresolved = progress.some(step => step.status === 'stuck' && !progress.some(later => later.seq > step.seq && later.index === step.index && later.status === 'done'));
+        if (attempt?.state !== 'blocked' && !unresolved) fail(`${item.ref} is ready for review. Accept or send it back before archiving it.`, 409);
+      } else if (activeBatch) fail(`${item.ref} is active. Stop or finish its run before archiving it.`, 409);
+      const at = now();
+      entry('Archived the task');
+      db.prepare('UPDATE layer_work_items SET archived_at = ?, archived_by = ?, log_json = ?, updated_at = ? WHERE id = ? AND project_id = ? AND archived_at IS NULL')
+        .run(at, user.name, JSON.stringify(log), at, workId, projectId);
+      return { ...item, log, archivedAt: at, archivedBy: user.name };
+    }
     if (documents !== undefined) { outputs = lines(documents, 300, 'Document'); entry('Updated what this work will document'); }
     if (project !== undefined) {
       const record = project ? get(projectId, project) : null;
@@ -1175,6 +1195,12 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
       answered = true;
       if (item.state === 'needs-input' && (item.action === 'platform.security' || item.context?.batch &&
           db.prepare("SELECT execution_kind FROM agent_batches WHERE id = ?").get(item.context.batch)?.execution_kind === 'symphony')) {
+        if (input.criteriaAmendment !== undefined) {
+          const amended = Array.isArray(input.criteriaAmendment) ? input.criteriaAmendment : [];
+          if (!amended.length || amended.length > 12) fail('An amended task has one to twelve criteria.');
+          checks = amended.map(value => ({ text: text(value, 300, 'Criterion', true), source: null, verdict: null, note: '' }));
+          entry(`Amended the next run to ${checks.length} ${checks.length === 1 ? 'criterion' : 'criteria'}`);
+        }
         nextState = 'ready';
         context = { ...context, batch: undefined, run: undefined };
         answered = false; // An audit question does not apply a decision to target records.
@@ -1205,6 +1231,35 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
       entry(`Sent back: ${rejected.map(check => `“${check.text}”: ${check.note}`).join('; ')}`.slice(0, 1000));
       checks = checks.map(check => ({ ...check, verdict: null, note: '', by: null, at: null }));
       nextState = 'ready';
+    }
+    // WORK-ITEM-UX-01: a signed rejection or close reopens the task. Its notes and comment go to the next run as context.
+    if (input.reopen) {
+      if (!['review', 'ready', 'needs-input'].includes(item.state)) fail(`${item.ref} can't be reopened while it is ${item.state === 'claimed' ? 'being worked on' : item.state}.`, 409);
+      const notes = (Array.isArray(input.reopen.feedback) ? input.reopen.feedback : []).slice(0, 40)
+        .map(note => ({ check: text(note?.check, 300, 'Feedback'), note: text(note?.note, 1000, 'Feedback note'), by: user.name, at: now() }));
+      const comment = text(input.reopen.comment, 2000, 'Comment');
+      const { batch, staged, run, visionProposal, workProposal, auditReport, executionBlock, ...rest } = context || {};
+      context = { ...rest, feedback: notes, reviewComment: comment || null };
+      checks = checks.map(check => ({ ...check, verdict: null, note: '', by: null, at: null }));
+      entry(input.reopen.outcome === 'close' ? 'Closed the run; the task is open again' : `Sent back${notes.length ? ` with ${notes.length} ${notes.length === 1 ? 'flag' : 'flags'}` : ''}${comment ? `: ${comment}` : ''}`.slice(0, 1000));
+      nextState = 'ready';
+    }
+    // The task for the next run (request and criteria) stays editable until Go pins it for a worker.
+    if (input.task) {
+      if (['claimed', 'review', 'done'].includes(item.state)) fail(`${item.ref}'s task is locked while it is ${item.state === 'review' ? 'in review' : item.state === 'done' ? 'done' : 'being worked on'}.`, 409);
+      const pinned = item.context?.batch && db.prepare("SELECT state FROM agent_batches WHERE id = ? AND state IN ('queued', 'running')").get(item.context.batch);
+      if (pinned) fail(`Go has pinned this task for a worker. Stop ${item.context.batch ? 'its batch' : 'the run'} to edit it.`, 409);
+      if (input.task.request !== undefined) context = { ...(context || {}), suggestion: text(input.task.request, 2000, 'Request') };
+      if (input.task.criteria !== undefined) {
+        const list = Array.isArray(input.task.criteria) ? input.task.criteria : [];
+        if (list.length > 12) fail('Keep a task to twelve criteria or fewer.');
+        checks = list.map(value => {
+          const wording = text(typeof value === 'string' ? value : value?.text, 300, 'Criterion', true);
+          const kept = checks.find(check => check.text === wording);
+          return { text: wording, source: kept?.source || null, verdict: null, note: '' };
+        });
+      }
+      entry('Edited the task for the next run');
     }
     if (state !== undefined) {
       if (!workStates.includes(state)) fail('Unknown work state.');

@@ -2,7 +2,7 @@
 id: status-001
 kind: project-status
 status: active
-updated: 2026-09-25
+updated: 2026-09-27
 current_phase: M1
 phase_state: in-progress
 next_action: WORK-AGENTS-01
@@ -81,6 +81,12 @@ One packet at a time. B-03's worker/artifact/recovery work remains required and 
 
 ## Completed packets
 
+2026-09-27: **WORK-ITEM-UX-01 live-run correction.** Browser Buddy W-3 proved that a blocking `stuck` objective could still submit a report and appear complete. `stuck` is now terminal; failed runs retain diagnosis but cannot be accepted; the UI centers diagnostic review and exposes the pinned action. W-3 now reads as failed with its original namespace error. Focused tests pass 9/9; typecheck/build and the restarted live read model pass. The trace also proved its generic security plan came from choosing `platform.security` for a hello-world task, not missing task context. A bounded context-usage procedure was added after the diagnosis itself consumed excessive model usage. [Evidence and retrospective](evidence/work-item-ux-01-build.md).
+
+2026-09-27: **Symphony command-sandbox repair.** Docker's default seccomp profile blocked Bubblewrap inside both local workers. Hosts now use `seccomp=unconfined` with `no-new-privileges`, no privileged mode or added capabilities, and must pass a Bubblewrap smoke test before reporting started. Both workers and heartbeats pass; Browser Buddy read W-3's exact pinned commit through the repaired sandbox. No model run was started, so a new owner Go remains required for security assurance. [Evidence and retrospective](evidence/work-item-ux-01-build.md).
+
+2026-09-27: **Work-item archival.** An explicit confirmed Archive task action now removes failed/test work from normal Work and blocker views while retaining its task, runs, reports, reviews and activity with archive actor/time. Active and genuinely reviewable work is refused. Focused tests pass 10/10; typecheck/build and restarted live schema checks pass. Browser Buddy W-3 is closed and eligible but was not archived by the agent. [Evidence and retrospective](evidence/work-item-ux-01-build.md).
+
 | Packet | Result | Evidence |
 |---|---|---|
 | PP-01R | Project-scoped read-only Codex bridge: Work → Team pairing, assigned tasks and live knowledge, saved context bundles, local MCP adapter; agent-checked on a disposable portal; owner live pairing pending | [Evidence/retrospective](evidence/pp-01r-editor-bridge.md), [guide](guides/co-work-with-codex.md) |
@@ -127,6 +133,10 @@ New Operator role. Agent-checked: server 88/89 (1 pre-existing), all browser sui
 | M0 research/design | Product loop, local agent path, runner choice, recovery model, product workflow, knowledge boundary, experience architecture, and design-system strategy | [Execution plan](execution-plan.md), [decision register](decisions.md) |
 
 ## Latest handoff
+
+2026-09-27: **WORK-ITEM-UX-01 continuation is built, restarted and agent-checked.** Owner answers may amend next-run criteria without changing the active run snapshot. Person work now has first-class start → review packet → review/signature runs with no fabricated agent telemetry. Roles no longer exposes configured Run phases. The expanded disposable browser proof passes person review, keyboard/axe/narrow checks, and real code preview/tests/patch/exact-commit acceptance; it found and fixed a candidate API that returned only a diff stat. Server 116/118 (the same two pre-existing failures), focused runs 7/7, candidate tests 6/6, typecheck and build pass. `./launch-machine` rebuilt the portal, restarted both one-slot hosts and loaded the new server at `http://aludel.localhost:4310`; no batch or live model turn was started. [Evidence and retrospective](evidence/work-item-ux-01-build.md) · [work record](design/work-item/work-record.md). Next: owner-review the built flow, then use the next deliberate Go to observe plan/progress/evidence tool quality.
+
+2026-09-27: **WORK-ITEM-UX-01 is built and agent-checked (DEC-050).** A work item is its task plus its runs. Each started run has a tab with its own task snapshot, its agent-reported objectives, its changes, and its verdicts, flags and signature. Review is a full-page stepper with evidence the run names for each criterion. Rejecting or closing reopens an editable Next run carrying the notes. Symphony gained `aludel_task_plan`, `aludel_task_progress` and submit `evidence`. The hosts are rebuilt; the owner's running portal needs a `./launch-machine` restart to load it. [Evidence and retrospective](evidence/work-item-ux-01-build.md) · [work record](design/work-item/work-record.md). Next: owner review of the built page and a live Go that exercises the new tools.
 
 2026-09-25: **LAY-05 direct agent submission passed; terminal cleanup exposed a review defect.** A real Codex turn called `aludel_commit_candidate`, submitted an exact commit, and produced a healthy isolated Docker preview without moving the shared project. Symphony then deleted its terminal workspace, leaving the candidate detail route at 409; loosely shaped agent checks were stored as unnamed skipped claims. Aludel now snapshots the exact commit before acknowledging submission and requires structured check fields. Focused tests cover clone deletion, portal restart, preview and acceptance from the retained snapshot; the updated adapter compiles. These fixes still need live proof, as do owner browser review, interruption recovery and a durable turn budget. The authorized turn is spent and dispatch stays off. [Evidence and retrospective](evidence/lay-05-agent-submission-snapshot.md).
 

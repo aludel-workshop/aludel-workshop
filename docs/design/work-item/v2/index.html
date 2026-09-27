@@ -1,0 +1,926 @@
+<title>Aludel Work Item</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- WORK-ITEM-UX-01 prototype v2: owner review of v1 applied (F1-F16 in ../work-record.md). Static and clickable. W-4 run 1 uses the real request, its real single criterion and the real trace (2026-09-26); run 2 and W-9 are illustrative. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0&display=block">
+<style>
+:root{
+  --bg:#fafbff;--surface:#ffffff;--rail:#f0f4fc;--panel:#f3f6fd;--hover:#e3e9f7;--line:#dce2ef;--line-strong:#c5cee2;--ink:#141727;--muted:#52617d;
+  --primary:#3047b9;--on-primary:#ffffff;--container:#dfe5ff;--on-container:#163698;
+  --product:#6b35c9;--product-bg:#efe7ff;--platform:#0f7465;--platform-bg:#d9f3ec;--design:#b3245f;
+  --ok:#146446;--ok-bg:#d9f3e7;--warn:#6b4b00;--warn-bg:#fff0c9;--warn-line:#e0a100;--bad:#a1231f;--bad-bg:#fce1e0;
+  --p-medium:#b78103;--p-high:#e0531f;
+  --shadow:0 18px 50px #1c2a5a26;--code-bg:#141727;--code-ink:#e8ebf7;--code-add:#1d4b35;--code-del:#5a2022;--ins:#d4f5e2;--del:#fde0df;
+  --stage:#eef2fb;--stage-line:#cfd7ea;--rs-bg:#f5f7ff;--rs-line:#b9c4ec;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#10121a;--surface:#181b26;--rail:#141722;--panel:#1f2331;--hover:#262b3c;--line:#2b3144;--line-strong:#3a4259;--ink:#e6e9f5;--muted:#9da8c2;
+  --primary:#a3b3ff;--on-primary:#0f1a55;--container:#2b3670;--on-container:#e0e6ff;
+  --product:#cdb1ff;--product-bg:#2d2150;--platform:#86e0cb;--platform-bg:#0f3932;--design:#ffa3c6;
+  --ok:#94e2bc;--ok-bg:#12392a;--warn:#ffd680;--warn-bg:#3b2d0b;--warn-line:#b88400;--bad:#ffaca7;--bad-bg:#491a1a;
+  --p-medium:#f2c14e;--p-high:#ff9a66;
+  --shadow:0 18px 50px #00000080;--code-bg:#0b0d14;--code-ink:#dfe3f2;--code-add:#16402c;--code-del:#4d1b1d;--ins:#16402c;--del:#4d1b1d;
+  --stage:#141722;--stage-line:#2b3144;--rs-bg:#1b2033;--rs-line:#3a4677;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10121a;--surface:#181b26;--rail:#141722;--panel:#1f2331;--hover:#262b3c;--line:#2b3144;--line-strong:#3a4259;--ink:#e6e9f5;--muted:#9da8c2;
+  --primary:#a3b3ff;--on-primary:#0f1a55;--container:#2b3670;--on-container:#e0e6ff;
+  --product:#cdb1ff;--product-bg:#2d2150;--platform:#86e0cb;--platform-bg:#0f3932;--design:#ffa3c6;
+  --ok:#94e2bc;--ok-bg:#12392a;--warn:#ffd680;--warn-bg:#3b2d0b;--warn-line:#b88400;--bad:#ffaca7;--bad-bg:#491a1a;
+  --p-medium:#f2c14e;--p-high:#ff9a66;
+  --shadow:0 18px 50px #00000080;--code-bg:#0b0d14;--code-ink:#dfe3f2;--code-add:#16402c;--code-del:#4d1b1d;--ins:#16402c;--del:#4d1b1d;
+  --stage:#141722;--stage-line:#2b3144;--rs-bg:#1b2033;--rs-line:#3a4677;color-scheme:dark}
+
+*{box-sizing:border-box}
+html,body{background:var(--bg);color:var(--ink)}
+body{margin:0;font:14px/1.5 Roboto,system-ui,-apple-system,"Segoe UI",sans-serif}
+button,input,textarea,select{font:inherit;color:inherit}
+a{color:var(--primary)}
+.ms{font-family:"Material Symbols Rounded";font-weight:normal;font-style:normal;font-size:20px;line-height:1;display:inline-block;vertical-align:middle;letter-spacing:normal;text-transform:none;white-space:nowrap;-webkit-font-smoothing:antialiased;user-select:none}
+.ms.sm{font-size:16px}.ms.xs{font-size:14px}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.mono{font-family:"Roboto Mono",ui-monospace,monospace;font-size:12.5px}
+.muted{color:var(--muted)}.small{font-size:12.5px}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* prototype bar */
+.proto{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px 16px;background:var(--code-bg);color:var(--code-ink);font-size:12.5px}
+.proto b{font-weight:500;margin-right:6px}
+.proto button{border:1px solid #ffffff30;background:transparent;border-radius:999px;padding:3px 10px;cursor:pointer;color:var(--code-ink)}
+.proto button[aria-current="true"]{background:var(--code-ink);color:var(--code-bg)}
+.proto .sp{flex:1}
+.proto .note{color:#aab3cc}
+.substate{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:0 0 12px;font-size:12px;color:var(--muted)}
+.substate button{border:1px dashed var(--line-strong);background:transparent;border-radius:999px;padding:2px 10px;cursor:pointer;font-size:12px}
+.substate button[aria-pressed="true"]{background:var(--container);color:var(--on-container);border-style:solid;border-color:transparent}
+
+/* shell */
+.app{display:grid;grid-template-columns:196px minmax(0,1fr);min-height:calc(100vh - 40px)}
+.rail{background:var(--rail);border-right:1px solid var(--line);padding:14px 10px;display:flex;flex-direction:column;gap:2px}
+.brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:16px;padding:4px 8px 12px}
+.proj{display:flex;gap:8px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px;margin-bottom:10px}
+.proj i{width:28px;height:28px;border-radius:7px;background:var(--design);color:#fff;display:grid;place-items:center;font-style:normal;font-weight:700;font-size:12px}
+.proj small{display:block;color:var(--muted);font-size:11.5px}
+.nav{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:8px;color:var(--ink);text-decoration:none}
+.nav[aria-current="page"]{background:var(--container);color:var(--on-container);font-weight:500}
+.main{padding:20px clamp(16px,3vw,36px) 60px;min-width:0}
+.page{max-width:980px}
+@media (max-width:860px){.app{grid-template-columns:minmax(0,1fr)}.rail{display:none}}
+
+/* header */
+.crumb{font-size:12px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase;margin:0 0 4px}
+.crumb a{color:inherit;text-decoration:none}
+.head{display:flex;gap:12px 16px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+.head h1{font-size:24px;line-height:1.25;margin:0;font-weight:500;text-wrap:balance}
+.head-act{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.facts{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin:8px 0 20px;font-size:13px;color:var(--muted)}
+.facts>span{display:inline-flex;gap:5px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);background:var(--surface);border-radius:7px;padding:2px 8px;font-size:12.5px;white-space:nowrap;line-height:20px;color:var(--ink)}
+.chip.role-product{background:var(--product-bg);color:var(--product);border-color:transparent;font-weight:500}
+.chip.role-platform{background:var(--platform-bg);color:var(--platform);border-color:transparent;font-weight:500}
+.chip.pick{cursor:pointer}
+.st{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:2px 10px;font-size:12.5px;font-weight:500;line-height:20px;white-space:nowrap}
+.st .ms{font-size:14px}
+.st-review{background:var(--ok-bg);color:var(--ok)}.st-accepted{background:var(--ok-bg);color:var(--ok)}
+.st-working{background:var(--container);color:var(--on-container)}.st-queued,.st-draft,.st-handoff,.st-closed{background:var(--panel);color:var(--muted)}
+.st-sent{background:var(--warn-bg);color:var(--warn)}.st-needs{background:var(--warn-bg);color:var(--warn)}
+.st-failed,.st-incomplete{background:var(--bad-bg);color:var(--bad)}
+.prio{color:var(--p-medium)}.prio.high{color:var(--p-high)}
+.btn{display:inline-flex;align-items:center;gap:6px;border:0;border-radius:999px;padding:8px 16px;background:var(--primary);color:var(--on-primary);font-weight:500;cursor:pointer;text-decoration:none;white-space:nowrap}
+.btn.ghost{background:transparent;color:var(--primary);border:1px solid var(--line-strong)}
+.btn.ok{background:var(--ok);color:var(--surface)}
+.btn.bad{background:var(--bad);color:var(--surface)}
+.btn.badghost{background:transparent;color:var(--bad);border:1px solid var(--bad)}
+.btn.sm{padding:5px 12px;font-size:12.5px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn .n{background:var(--surface);color:var(--bad);border-radius:999px;padding:0 6px;font-size:11.5px;font-weight:700}
+.linkbtn{border:0;background:none;color:var(--primary);cursor:pointer;padding:0;font-size:12.5px;display:inline-flex;gap:4px;align-items:center}
+
+/* avatars + hover card */
+.av{width:22px;height:22px;border-radius:50%;display:inline-grid;place-items:center;flex:none;overflow:hidden;font-size:10.5px;font-weight:700;color:#fff;background:#3a4a7a}
+.av svg{width:100%;height:100%;display:block}
+.av.lg{width:30px;height:30px;font-size:12px}
+.who{position:relative;display:inline-flex;gap:8px;align-items:center;font-weight:500;cursor:default}
+.hc{position:absolute;top:calc(100% + 8px);left:0;z-index:20;width:250px;background:var(--surface);border:1px solid var(--line-strong);border-radius:12px;box-shadow:var(--shadow);padding:12px;font-weight:400;display:none}
+.who:hover .hc,.who:focus-within .hc{display:block}
+.hc b{display:block;font-weight:500}
+.hc dl{display:grid;grid-template-columns:70px 1fr;gap:4px 8px;margin:8px 0 0;font-size:12.5px}
+.hc dt{color:var(--muted)}.hc dd{margin:0}
+
+/* tab bar */
+.tabbar{display:flex;align-items:flex-end;gap:12px;border-bottom:1px solid var(--line)}
+.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:thin;flex:1;min-width:0}
+.tab{display:flex;align-items:center;gap:8px;border:0;background:none;padding:9px 14px 10px;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;color:var(--muted)}
+.tab[aria-selected="true"]{border-bottom-color:var(--primary);color:var(--ink);font-weight:500}
+.tab.draft{font-style:normal}
+.tab .dot{width:8px;height:8px;border-radius:50%;flex:none}
+.dot.review,.dot.accepted{background:var(--ok)}.dot.sent,.dot.needs{background:var(--warn-line)}.dot.failed,.dot.incomplete{background:var(--bad)}.dot.handoff,.dot.closed,.dot.draft{background:var(--line-strong)}
+.dot.working{background:var(--primary);animation:pulse 1.4s infinite}
+@keyframes pulse{50%{opacity:.3}}
+.runcount{font-size:12.5px;color:var(--muted);padding-bottom:10px;white-space:nowrap}
+
+/* the one card */
+.card{background:var(--surface);border:1px solid var(--line);border-top:0;border-radius:0 0 12px 12px;padding:16px;display:flex;flex-direction:column;gap:12px}
+
+/* run status */
+.rs{background:var(--rs-bg);border:1px solid var(--rs-line);border-radius:12px}
+.rs>:last-child{border-radius:0 0 11px 11px}
+.rs>:first-child{border-radius:11px 11px 0 0}
+.rs>:only-child{border-radius:11px}
+.rs-top{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:10px 12px}
+.rs-top .now{min-width:0;flex:1 1 220px;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rs-top .now b{font-weight:500}
+.rs-stats{display:flex;gap:14px;font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.rs-stats b{color:var(--ink);font-weight:500}
+.chev{border:0;background:none;cursor:pointer;border-radius:8px;padding:2px;color:var(--muted);display:inline-flex}
+.chev:hover{background:var(--hover)}
+.chev[aria-expanded="true"] .ms{transform:rotate(180deg)}
+.segbar{display:flex;gap:3px;padding:0 12px 10px}
+.segbar i{flex:1;height:5px;border-radius:3px;background:var(--line)}
+.segbar i.done{background:var(--primary)}
+.segbar i.now{background:linear-gradient(90deg,var(--primary) 45%,var(--line) 45%)}
+.segbar i.stuck{background:var(--warn-line)}
+.rs-act{display:flex;flex-wrap:wrap;gap:10px 12px;align-items:center;padding:10px 12px;border-top:1px solid var(--rs-line)}
+.rs-act p{margin:0;flex:1 1 260px;font-size:13.5px}
+.rs-act .btns{display:flex;gap:8px;flex-wrap:wrap}
+.rs-act.bad p{color:var(--bad)}
+.sig{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-top:1px solid var(--rs-line);font-size:13.5px}
+.sig q{display:block;margin-top:2px}
+.rs-more{border-top:1px solid var(--rs-line);background:var(--surface)}
+.objlist{list-style:none;margin:0;padding:6px 0}
+.objlist li{display:grid;grid-template-columns:20px minmax(0,1fr) auto;gap:10px;padding:6px 12px;align-items:start;font-size:13.5px}
+.objlist .ic{font-size:18px}
+.objlist .done .ic{color:var(--ok)}.objlist .now .ic{color:var(--primary)}.objlist .todo .ic{color:var(--line-strong)}.objlist .stuck .ic{color:var(--warn-line)}.objlist .err .ic{color:var(--bad)}
+.objlist small{display:block;color:var(--muted);font-size:12px}
+.objlist .stumble{color:var(--warn);font-size:12px;display:flex;gap:4px;align-items:center}
+.objlist time{color:var(--muted);font-size:12.5px;font-variant-numeric:tabular-nums}
+.logbtn{padding:4px 12px 12px 42px}
+.log{list-style:none;margin:0;padding:0 12px 12px 42px;display:flex;flex-direction:column;gap:4px;font-size:12.5px;max-height:240px;overflow:auto}
+.log li{display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:8px;align-items:start}
+.log li .ms{font-size:15px;color:var(--muted)}
+.log li.warn .ms{color:var(--warn-line)}.log li.err .ms{color:var(--bad)}.log li.ok .ms{color:var(--ok)}
+.log time{color:var(--muted);font-variant-numeric:tabular-nums}
+.log li.fresh{animation:fadein .5s}
+@keyframes fadein{from{background:var(--container)}to{background:transparent}}
+.q{padding:10px 12px;border-top:1px solid var(--rs-line);display:flex;flex-direction:column;gap:8px}
+.q h3{margin:0;font-size:14px;font-weight:500}
+.opts{display:flex;flex-direction:column;gap:6px}
+.opt{display:flex;gap:8px;align-items:center;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:7px 10px;font-size:13.5px;cursor:pointer}
+.report{margin:0 12px 12px;border:1px solid var(--bad);border-radius:10px;background:var(--surface);padding:10px 12px;font-size:13px}
+.report h4{margin:0 0 6px;font-size:13px}
+.report ul{margin:0;padding-left:18px}
+
+/* sign-off */
+.signoff{border-top:1px solid var(--rs-line);padding:12px;background:var(--surface);display:flex;flex-direction:column;gap:10px}
+.signoff h3{margin:0;font-size:15px;font-weight:500}
+.signoff textarea{width:100%;border:1px solid var(--line-strong);border-radius:8px;padding:8px 10px;background:var(--surface);min-height:60px;resize:vertical}
+.warnbox{display:flex;gap:8px;background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:8px 10px;font-size:13px}
+.flaglist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:13px}
+.flaglist li{display:flex;gap:6px;align-items:flex-start}
+.flaglist .ms{color:var(--bad);font-size:16px}
+
+/* accordion sections */
+details.acc{border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+details.acc>summary{list-style:none;display:flex;gap:10px;align-items:center;padding:10px 12px;cursor:pointer}
+details.acc>summary::-webkit-details-marker{display:none}
+details.acc>summary .ttl{font-weight:500;display:flex;gap:8px;align-items:center}
+details.acc>summary .ttl .ms{color:var(--muted)}
+details.acc>summary .sum{flex:1;min-width:0;color:var(--muted);font-size:12.5px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+details.acc>summary .cv{color:var(--muted);transition:transform .15s}
+details.acc[open]>summary .cv{transform:rotate(180deg)}
+details.acc[open]>summary{border-bottom:1px solid var(--line)}
+.acc-body{padding:12px}
+.ask{font-size:15px;line-height:1.6;max-width:70ch;margin:0}
+.ask-by{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--muted);margin-top:8px}
+.carried{margin-top:12px;background:var(--panel);border-radius:10px;padding:10px 12px;font-size:13px}
+.carried h4{margin:0 0 6px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:500}
+
+ol.crits{list-style:none;margin:0;padding:0}
+.crit{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:10px;padding:8px 0;border-top:1px dashed var(--line);align-items:start}
+.crit:first-child{border-top:0;padding-top:0}
+.crit .n{width:22px;height:22px;border-radius:50%;background:var(--panel);display:grid;place-items:center;font-size:11.5px;font-weight:500;color:var(--muted);font-variant-numeric:tabular-nums}
+.crit .n.acc{background:var(--ok);color:var(--surface)}.crit .n.rej{background:var(--bad);color:var(--surface)}
+.crit .src{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px;font-size:11.5px;color:var(--muted);align-items:center}
+.newtag{font-size:11px;font-weight:500;color:var(--primary);background:var(--container);border-radius:5px;padding:0 5px}
+.crit .res{display:flex;gap:6px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
+.cstate{display:inline-flex;align-items:center;gap:4px;font-size:12px;white-space:nowrap}
+.cstate .ms{font-size:16px}
+.cstate.pass{color:var(--ok)}.cstate.fail{color:var(--bad)}.cstate.wait{color:var(--muted)}
+.vchip{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;border-radius:6px;padding:0 6px;background:var(--panel);color:var(--muted);white-space:nowrap}
+.vchip .ms{font-size:14px}
+.crit .note{grid-column:2/4;font-size:12.5px;color:var(--bad);display:flex;gap:4px;align-items:flex-start}
+.crit.edit .t{border:1px solid var(--line);border-radius:8px;padding:5px 8px;background:var(--surface)}
+.crit.edit .t:focus{outline:2px solid var(--primary)}
+.xbtn{border:0;background:none;color:var(--muted);cursor:pointer;border-radius:6px;padding:2px}
+.xbtn:hover{background:var(--hover)}
+.suggest{margin-top:8px;background:var(--stage);border:1px dashed var(--stage-line);border-radius:8px;padding:8px}
+textarea.req{width:100%;min-height:78px;border:1px solid var(--line-strong);border-radius:8px;padding:8px 10px;background:var(--surface);font-size:15px;line-height:1.55;resize:vertical}
+
+/* changes stack */
+ul.chgs{list-style:none;margin:0;padding:0;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.chgrow{border-top:1px solid var(--line)}
+.chgrow:first-child{border-top:0}
+.chgline{display:grid;grid-template-columns:20px minmax(0,1fr) auto 30px;gap:10px;align-items:center;padding:8px 10px}
+.chgline:hover{background:var(--hover)}
+.chgline .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px}
+.chgline .nm button{border:0;background:none;padding:0;cursor:pointer;color:var(--ink);font:inherit;text-align:left}
+.chgline .nm button:hover{text-decoration:underline}
+.chgline .op{font-size:12.5px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.op .c{color:var(--ok)}.op .m{color:var(--primary)}.op .r{color:var(--bad)}
+.flagbtn{border:0;background:none;cursor:pointer;color:var(--muted);border-radius:6px;padding:3px;opacity:0}
+.chgline:hover .flagbtn,.flagbtn:focus-visible,.flagbtn.on{opacity:1}
+.flagbtn.on{color:var(--bad)}
+@media (hover:none){.flagbtn{opacity:1}}
+.flagnote{display:flex;gap:6px;align-items:center;padding:0 10px 8px 40px}
+.flagnote input{flex:1;border:1px solid var(--bad);border-radius:8px;padding:5px 8px;background:var(--surface);font-size:13px}
+.flagnote .ms{color:var(--bad)}
+.flagnote.ro{font-size:12.5px;color:var(--bad)}
+.applied{font-size:12px;color:var(--muted);margin-top:8px;display:flex;gap:6px;align-items:center}
+
+/* activity */
+section.activity{margin-top:26px}
+section.activity h2{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:500;margin:0 0 10px}
+ol.acts{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+ol.acts li{display:flex;gap:10px;font-size:13px;align-items:flex-start}
+ol.acts time{color:var(--muted);font-size:12px;margin-left:6px}
+.comment{display:flex;gap:8px;margin-top:12px}
+.comment input{flex:1;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:7px 10px}
+
+/* review mode */
+.rvmode{display:grid;grid-template-rows:auto minmax(0,1fr);height:calc(100vh - 40px)}
+.rv-top{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--surface)}
+.rv-top h1{font-size:16px;margin:0;font-weight:500}
+.rv-top .sp{flex:1}
+.pips{display:flex;gap:4px;align-items:center}
+.pip{width:22px;height:6px;border-radius:3px;background:var(--line);border:0;padding:0;cursor:pointer}
+.pip.cur{outline:2px solid var(--primary);outline-offset:1px}
+.pip.accept{background:var(--ok)}.pip.reject{background:var(--bad)}.pip.skip{background:var(--line-strong)}
+.pip.end{width:12px;background:var(--line-strong)}
+.rv-body{display:grid;grid-template-columns:minmax(0,1fr) 420px;min-height:0}
+.viewer{display:flex;flex-direction:column;min-height:0;background:var(--stage);border-right:1px solid var(--line)}
+.vtabs{display:flex;gap:2px;padding:0 12px;background:var(--surface);border-bottom:1px solid var(--line);overflow-x:auto}
+.vtabs .tab .cnt{font-size:11.5px;color:var(--muted)}
+.vpane{flex:1;overflow:auto;padding:20px}
+.stepper{display:flex;flex-direction:column;min-height:0;background:var(--surface)}
+.step{flex:1;overflow:auto;padding:18px 20px;display:flex;flex-direction:column;gap:14px}
+.step h2{font-size:18px;font-weight:500;margin:0;line-height:1.35;text-wrap:balance}
+.eyebrow{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500;margin:0;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+details.ctx{border:1px solid var(--line);border-radius:10px;background:var(--panel);font-size:13px}
+details.ctx summary{cursor:pointer;padding:8px 10px;color:var(--muted);display:flex;gap:6px;align-items:center}
+details.ctx .body{padding:0 10px 10px;display:flex;flex-direction:column;gap:8px}
+details.ctx q{display:block;font-size:13.5px;color:var(--ink)}
+.evs{display:flex;flex-direction:column;gap:6px}
+.ev{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:8px;align-items:start;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13px;background:var(--surface);cursor:pointer;text-align:left;width:100%}
+.ev:hover{background:var(--hover)}
+.ev .ms{font-size:18px;margin-top:1px}
+.ev .ty{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;color:var(--muted);display:block}
+.ev small{display:block;color:var(--muted);font-size:12px}
+.ev .res{font-size:12px;white-space:nowrap}
+.ev.change .ms{color:var(--primary)}.ev.test .ms{color:var(--ok)}.ev.try .ms{color:var(--design)}.ev.check .ms{color:var(--platform)}
+.ev .res.pass{color:var(--ok)}
+.evlegend{font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:flex-start}
+.rejnote{display:flex;flex-direction:column;gap:6px}
+.rejnote textarea{width:100%;border:1px solid var(--bad);border-radius:8px;padding:8px 10px;background:var(--surface);min-height:64px;resize:vertical}
+.verdictline{display:flex;gap:6px;align-items:center;font-size:13px;font-weight:500}
+.verdictline.a{color:var(--ok)}.verdictline.r{color:var(--bad)}
+.step-foot{border-top:1px solid var(--line);padding:10px 20px;display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap}
+.step-foot .sp{flex:1}
+.acol{display:flex;flex-direction:column;align-items:center;gap:2px}
+.skip{border:0;background:none;color:var(--muted);font-size:12px;cursor:pointer;padding:2px 6px;border-radius:6px}
+.skip:hover{background:var(--hover)}
+.kbd{font-family:"Roboto Mono",monospace;font-size:10.5px;border:1px solid currentColor;border-radius:4px;padding:0 3px;opacity:.7}
+.sumlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.sumlist li{display:flex;gap:8px;font-size:13px;align-items:flex-start}
+.sumlist .ms{font-size:18px;flex:none}
+.sumlist .a{color:var(--ok)}.sumlist .r{color:var(--bad)}.sumlist .u{color:var(--muted)}
+@media (max-width:900px){.rvmode{height:auto}.rv-body{grid-template-columns:minmax(0,1fr)}.viewer{border-right:0;border-bottom:1px solid var(--line)}}
+
+/* viewer content */
+.tcard{max-width:720px;margin:0 auto 14px;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.tcard.hl,.dfile.hl,.trow.hl{outline:2px solid var(--primary);outline-offset:2px}
+.tcard header{display:flex;gap:8px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);font-size:13px}
+.tcard header .sp{flex:1}
+.tcard .body{padding:16px 18px;display:grid;grid-template-columns:70px minmax(0,1fr);gap:10px 14px}
+.tcard .lbl{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding-top:3px}
+.tcard .was{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--bad);font-size:15px}
+.tcard .now{font-size:17px;line-height:1.55}
+.tcard foot,.tcard footer{display:block;padding:8px 14px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+ins{background:var(--ins);text-decoration:none;border-radius:3px;padding:0 2px}
+.verb{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border-radius:5px;padding:1px 6px}
+.verb.m{background:var(--container);color:var(--on-container)}.verb.c{background:var(--ok-bg);color:var(--ok)}.verb.r{background:var(--bad-bg);color:var(--bad)}
+.dfile{max-width:880px;margin:0 auto 14px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}
+.dfile header{display:flex;gap:8px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);font-size:13px;background:var(--panel)}
+.dfile header .sp{flex:1}
+.dcode{margin:0;overflow-x:auto;font-family:"Roboto Mono",monospace;font-size:12.5px;line-height:1.6;background:var(--code-bg);color:var(--code-ink);padding:8px 0}
+.dcode span{display:block;padding:0 12px;white-space:pre}
+.dcode .a{background:var(--code-add)}.dcode .d{background:var(--code-del)}
+.browser{max-width:760px;margin:0 auto;background:var(--surface);border:1px solid var(--line-strong);border-radius:12px;overflow:hidden;box-shadow:var(--shadow)}
+.browser-bar{display:flex;gap:6px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line);background:var(--panel);font-size:12px;color:var(--muted)}
+.browser-bar i{width:10px;height:10px;border-radius:50%;background:var(--line-strong)}
+.browser-bar span{margin-left:8px;background:var(--surface);border-radius:6px;padding:2px 10px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.desk{position:relative;height:360px;background:var(--stage);overflow:hidden;cursor:crosshair}
+.petwin{position:absolute;right:18px;bottom:18px;width:min(300px,80%);height:210px;background:var(--surface);border:1px solid var(--line-strong);border-radius:10px;box-shadow:var(--shadow);overflow:hidden}
+.petwin header{font-size:11.5px;padding:4px 8px;border-bottom:1px solid var(--line);color:var(--muted);display:flex;justify-content:space-between}
+.petfield{position:absolute;inset:25px 0 0 0}
+.edge{position:absolute;inset:24px;border:1px dashed var(--warn-line);border-radius:6px;pointer-events:none;opacity:0}
+.show-edge .edge{opacity:.9}
+.pet{position:absolute;width:38px;height:34px;left:0;top:0}
+.tryhint{max-width:760px;margin:0 auto 12px;display:flex;gap:8px;align-items:center;background:var(--surface);border:1px solid var(--design);border-radius:10px;padding:8px 12px;font-size:13px}
+.tryhint .ms{color:var(--design)}
+.preview-ctl{display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:center;margin-top:12px;font-size:12.5px}
+.tests{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:8px}
+.trow{display:grid;grid-template-columns:20px minmax(0,1fr) auto;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 12px;align-items:center;font-size:13px}
+.trow .ms{color:var(--ok);font-size:18px}
+.trow small{color:var(--muted);display:block}
+.tsum{display:flex;gap:8px;align-items:center;font-size:13px;flex-wrap:wrap;margin-bottom:4px}
+
+/* ledger + toast */
+.ledger{position:fixed;right:16px;top:calc(48px + env(safe-area-inset-top,0px));z-index:40;width:min(480px,calc(100vw - 32px));max-height:75vh;overflow:auto;background:var(--surface);border:1px solid var(--line-strong);border-radius:12px;box-shadow:var(--shadow);padding:14px 16px}
+.ledger h2{font-size:14px;margin:0 0 8px}
+.ledger h3{font-size:12.5px;margin:14px 0 6px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.06em}
+.ledger table{border-collapse:collapse;font-size:12.5px;width:100%}
+.ledger td,.ledger th{border-top:1px solid var(--line);padding:5px 4px;vertical-align:top;text-align:left}
+.ledger td:first-child{font-weight:500;white-space:nowrap}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--code-bg);color:var(--code-ink);padding:9px 16px;border-radius:999px;font-size:13px;z-index:50;max-width:calc(100vw - 32px)}
+</style>
+
+<div class="proto" role="navigation" aria-label="Prototype screens">
+  <b>Work item · prototype v2</b>
+  <button type="button" data-screen="before">1 · Before work</button>
+  <button type="button" data-screen="w4">2 · Ready for review</button>
+  <button type="button" data-screen="rv4">3 · Review: Vision</button>
+  <button type="button" data-screen="w9">4 · Running, asking, failed</button>
+  <button type="button" data-screen="rv9">5 · Review: code</button>
+  <span class="sp"></span>
+  <span class="note">W-4 run 1 is real; the rest is illustrative</span>
+  <button type="button" id="ledger-btn" aria-expanded="false">Your feedback F1–F16</button>
+</div>
+<div id="root"></div>
+<div class="ledger" id="ledger" hidden></div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const ms = (n, cls='') => `<span class="ms ${cls}" aria-hidden="true">${n}</span>`;
+
+/* ---------- people and agents ---------- */
+const agents = {
+  default:{ name:'Default agent', metal:'#8e9ab5', model:'gpt-5.6-sol', effort:'Medium', note:'Account default profile' },
+  light:{ name:'Quick agent', metal:'#c98b4f', model:'gpt-5.6-mini', effort:'Low', note:'Cheap first attempts' },
+  strong:{ name:'Deep agent', metal:'#c9a227', model:'gpt-5.6-sol', effort:'High', note:'For work that failed elsewhere' },
+};
+function bot(k, lg=''){ const c = agents[k].metal;
+  return `<span class="av ${lg}" style="background:${c}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="7" width="14" height="11" rx="3.5" fill="#fff" opacity=".92"/><circle cx="9.5" cy="12.2" r="1.7" fill="${c}"/><circle cx="14.5" cy="12.2" r="1.7" fill="${c}"/><rect x="11.3" y="3.2" width="1.4" height="3.8" fill="#fff"/><circle cx="12" cy="3.2" r="1.3" fill="#fff"/><rect x="9.5" y="15.2" width="5" height="1.1" rx=".55" fill="${c}"/></svg></span>`; }
+const me = (lg='') => `<span class="av ${lg}">CK</span>`;
+// The agent's name with a hover (and focus) card: the model lives here, not in the run bar (F3).
+function who(k, lg='lg'){
+  if (k === 'you') return `<span class="who">${me(lg)}Charles</span>`;
+  const a = agents[k];
+  return `<span class="who" tabindex="0">${bot(k, lg)}${a.name}<span class="hc" role="tooltip">${bot(k,'lg')}<b>${a.name}</b><span class="small muted">${a.note}</span>
+    <dl><dt>Model</dt><dd>${a.model}</dd><dt>Effort</dt><dd>${a.effort}</dd><dt>Pinned</dt><dd>Profile and instructions, at Go</dd></dl></span></span>`;
+}
+const whoName = k => k === 'you' ? 'Charles' : agents[k].name;
+
+const vt = { read:['menu_book','Read'], try:['touch_app','Try it'], test:['science','Tests'], check:['verified','Aludel check'] };
+const vchip = v => `<span class="vchip">${ms(vt[v][0])}${vt[v][1]}</span>`;
+const evType = { change:['difference','Change'], test:['science','Test'], try:['touch_app','Try it'], check:['verified','Aludel check'] };
+
+const status = {
+  draft:['draft','edit_note','Draft'], queued:['queued','schedule','Queued'], working:['working','progress_activity','Working'], needs:['needs','help','Needs your answer'],
+  review:['review','rate_review','Ready for review'], incomplete:['incomplete','error','Incomplete'], failed:['failed','error','Failed'],
+  accepted:['accepted','check_circle','Accepted'], sent:['sent','reply','Sent back'], handoff:['handoff','front_hand','Handed off'], closed:['closed','block','Closed'],
+};
+const pill = s => `<span class="st st-${status[s][0]}">${ms(status[s][1])}${status[s][2]}</span>`;
+
+/* ---------- W-4: real request, real first run ---------- */
+const REQ4 = "can you write the value proposition for our app? aren't going on much here except that it would be kind of cute to have an interactive pet sitting in an open window in the corner of your screen.";
+const C4 = [
+  { id:'c1', t:'Each claim is one short, checkable statement', src:'Action rule · Write a Brief claim', v:'read' },
+  { id:'c2', t:'The value describes an interactive pet in a small window in the corner of the screen', src:'Your request', v:'read', ctx:REQ4 },
+  { id:'c3', t:'It adds no outcome the request did not ask for, such as mood, focus or productivity', src:'Your request', v:'read', ctx:REQ4 },
+  { id:'c4', t:'The Brief keeps exactly one value claim: revise “A pet in a browser window” instead of adding another', src:'Your flag on run 1', v:'check' },
+  { id:'c5', t:'Nothing outside the Brief’s Value section changes', src:'Always checked', v:'check' },
+];
+const W4 = {
+  ref:'W-4', title:'write value prop', prio:'Medium', role:['product','Product lead · Write a Brief claim'], created:'Sep 26 by Charles', assignee:'default',
+  runs:[
+    { id:1, who:'default', state:'sent', time:'1m 29s', tokens:'291k',
+      task:{ request:REQ4, crits:[C4[0]], newIds:[] },
+      results:{ c1:'pass' }, verdicts:{ c1:'accept' },
+      objs:[
+        {s:'done', t:'Open the task card', note:'One check listed: short and checkable', d:'5s'},
+        {s:'done', t:'Check the existing Vision, stories and design direction', note:'Read 5 records, 3 searches', d:'46s'},
+        {s:'done', t:'Keep the proposal narrow: add the requested interaction and corner placement', note:'Avoided mood, productivity and persistence claims', d:'23s'},
+        {s:'stuck', t:'Submit the proposal', stumble:'Saved as a new claim; its note says it replaces the old one', d:'3s'},
+      ],
+      log:[['description','Opened task W-4, attempt 3','21:18:13'],['account_tree','Looked at the project map','21:18:16'],['search','Searched “interactive pet”, “browser buddy”','21:18:22'],['menu_book','Read Brief revision 1: Value “A pet in a browser window”','21:18:33'],['search','Searched pet, screen, corner, cute, open','21:19:04'],['menu_book','Read story S1 and the Home page (revision 3)','21:19:09'],['edit_note','Drafted one claim for the Value section','21:19:32'],['upload','Submitted proposal spr-d165d844','21:19:35'],['warning','Aludel scope check: note says “replaces”, change adds a claim','21:19:35','warn']],
+      changes:[{ id:'ch1', icon:'lightbulb', name:'Vision › Brief › Value', sub:'new claim', op:'c', opText:'Created', size:'1 sentence',
+        was:null, now:'Keep an interactive pet in a small browser window in the corner of your screen.', flag:'This adds a second value claim. It should replace “A pet in a browser window”.' }],
+      sig:{ by:'Charles', at:'Sep 26 · 22:31', outcome:'Sent back', comment:'Meets the one check it had, but the check was too thin. I added criteria for the next run.' } },
+    { id:2, who:'default', state:'review', time:'1m 12s', tokens:'188k',
+      task:{ request:REQ4, crits:C4, newIds:['c2','c3','c4','c5'], carried:['Your comment: “Meets the one check it had, but the check was too thin. I added criteria for the next run.”','Your flag on Vision › Brief › Value: “This adds a second value claim. It should replace ‘A pet in a browser window’.”','Its proposed claim, not applied'] },
+      results:{ c1:'pass', c2:'pass', c3:'pass', c4:'pass', c5:'pass' }, verdicts:{},
+      objs:[
+        {s:'done', t:'Read why run 1 was sent back', note:'Your comment and 1 flag', d:'4s'},
+        {s:'done', t:'Re-read the current value claim and the request', note:'Read 2 records', d:'19s'},
+        {s:'stuck', t:'Look for guidance on what a value claim should say', stumble:'No Vision guide found; used the Product lead rules', d:'21s'},
+        {s:'done', t:'Revise the existing claim', note:'Revision 1 → 2', d:'16s'},
+        {s:'done', t:'Check the draft against the 5 criteria', note:'Reports all 5 met', d:'10s'},
+        {s:'done', t:'Submit for review', d:'2s'},
+      ],
+      log:[['reply','Read your comment and flag from run 1','22:40:05'],['menu_book','Read Brief revision 1','22:40:09'],['search','Searched “value claim guidance”: no results','22:40:20','warn'],['rule','Used the Product lead role rules (revision 2)','22:40:29'],['edit_note','Proposed revision 2 of Brief › Value','22:40:45'],['fact_check','Checked each criterion and named its evidence','22:40:55'],['upload','Submitted proposal spr-7a1c','22:40:57'],['verified','Aludel checks passed: one value claim, nothing else changed','22:40:57','ok']],
+      changes:[{ id:'ch2', icon:'lightbulb', name:'Vision › Brief › Value', sub:'revision 1 → 2', op:'m', opText:'Modified', size:'1 sentence',
+        was:'A pet in a browser window.', now:'A small <ins>interactive</ins> pet that lives in a browser window <ins>in the corner of your screen</ins>.' }] },
+  ],
+  acts:[[me(),'<b>Charles</b> created this','Sep 26 · 05:23'],[me(),'<b>Charles</b> started B-1 and B-2; both were stopped before a worker picked them up','16:31–16:42'],[bot('default'),'<b>Default agent</b> submitted run 1','21:19'],[me(),'<b>Charles</b> sent run 1 back and edited the criteria','22:31'],[bot('default'),'<b>Default agent</b> submitted run 2','22:40']],
+};
+// Evidence the run 2 submission named for each criterion (F15). Aludel checks are added by Aludel.
+const EV4 = {
+  c1:[['change','Vision › Brief › Value','One sentence, 17 words','ch2','Agent: “Each part can be checked: interactive, pet, window, corner.”']],
+  c2:[['change','Vision › Brief › Value','Names the pet, interactive, a window, the corner','ch2','']],
+  c3:[['change','Vision › Brief › Value','No outcome words in the claim','ch2','Agent: “Searched the draft for mood, focus, productivity, calm, happy.”']],
+  c4:[['check','Value has exactly one claim','Revision of the existing claim, 1 → 2','ch2',''],['change','Vision › Brief › Value','Modified, not created','ch2','']],
+  c5:[['check','Only Brief › Value changed','Compared with every record the run touched','ch2','']],
+};
+
+/* ---------- W-9: illustrative code item ---------- */
+const REQ9 = 'When I move the mouse over the pet window the pet should walk over to it. It must not walk off the edge of the window. Use the walking speed from Design.';
+const C9 = [
+  { id:'d1', t:'The pet walks toward the cursor when the cursor enters its window', src:'Story S3 · scenario 1', v:'test', v2:'try' },
+  { id:'d2', t:'It stops 24 px from the window edge and never leaves the window', src:'Story S3 · scenario 2', v:'test', v2:'try' },
+  { id:'d3', t:'It walks at the Design token motion.pet-walk (120 px/s), not a hard-coded speed', src:'Design token · motion.pet-walk', v:'test' },
+  { id:'d4', t:'With reduced motion on, the pet turns to face the cursor instead of walking', src:'Principles · motion', v:'test', v2:'try' },
+  { id:'d5', t:'It reuses the existing Sprite component; no new animation library', src:'Action rule · Build a story', v:'read' },
+  { id:'d6', t:'Only the pet code and its tests change', src:'Always checked', v:'check' },
+];
+const W9 = {
+  ref:'W-9', title:'Pet follows the cursor inside its window', prio:'High', role:['platform','Engineer · Build a story'], created:'Sep 24 by Charles', assignee:'strong',
+  runs:[
+    { id:1, who:'you', state:'handoff', time:'38m', tokens:'—', task:{ request:REQ9, crits:C9.filter(c => c.id!=='d3'), newIds:[] }, results:{}, verdicts:{},
+      objs:[{s:'done', t:'Moved the sprite toward the cursor', note:'Edited 1 file on branch pet-follow-wip', d:'38m'}], log:[['edit','Edited src/pet/pet.ts','Sep 24']],
+      changes:[{ id:'e1', icon:'code', name:'src/pet/pet.ts', sub:'branch pet-follow-wip', op:'m', opText:'Modified', size:'+22 −3' }],
+      sig:{ by:'Charles', at:'Sep 24 · 17:52', outcome:'Handed off', comment:'Sprite moves but I ran out of time. The branch has the start.' } },
+    { id:2, who:'light', state:'closed', time:'11m 40s', tokens:'412k', task:{ request:REQ9, crits:C9.filter(c => c.id!=='d3'), newIds:[], carried:['Your hand-off note and branch pet-follow-wip'] },
+      results:{ d1:'pass', d2:'fail', d4:'pass', d5:'pass', d6:'pass' }, verdicts:{},
+      objs:[{s:'done', t:'Read the handed-off branch', d:'1m 05s'},{s:'done', t:'Write tests for the criteria first', note:'5 tests, 3 red as expected', d:'3m 20s'},{s:'err', t:'Make the pet stop at the window edge', stumble:'The same test failed on 3 turns', d:'7m 15s'}],
+      log:[['science','Ran tests: 3 passed, 2 failed','','err'],['science','Ran tests: 4 passed, 1 failed','','err'],['error','Turn limit reached (3 of 3)','','err']],
+      changes:[{ id:'e2', icon:'code', name:'src/pet/pet.ts', op:'m', opText:'Modified', size:'+41 −12', flag:'Speed is hard-coded as 2 px per frame.' },{ id:'e3', icon:'science', name:'tests/pet-follow.test.ts', op:'c', opText:'Created', size:'+88' }],
+      failure:'Turn limit reached with 1 criterion unmet.',
+      sig:{ by:'Charles', at:'Sep 25 · 11:04', outcome:'Closed after failing', comment:'Frame timing is the real problem. Moving it to Deep agent and adding the speed criterion.' } },
+  ],
+  acts:[[me(),'<b>Charles</b> created this from story S3','Sep 24 · 09:10'],[me(),'<b>Charles</b> handed run 1 off','Sep 24 · 17:52'],[bot('light'),'<b>Quick agent</b> run 2 failed: turn limit','Sep 25 · 11:04'],[me(),'<b>Charles</b> closed run 2, added a criterion and assigned Deep agent','Sep 26 · 22:48'],[me(),'<b>Charles</b> started B-7','Sep 26 · 22:51']],
+};
+const RUN9 = { id:3, who:'strong', task:{ request:REQ9, crits:C9, newIds:['d3'], carried:['Your comment on run 2: “Frame timing is the real problem…”','Your flag on src/pet/pet.ts: “Speed is hard-coded as 2 px per frame.”','Run 2’s changes, not applied'] } };
+const plan9 = [
+  {t:'Read run 2’s failure and the handed-off branch', note:'Found the frame-timing problem', d:'0:48'},
+  {t:'Put the six criteria into tests first', note:'6 tests, 3 red as expected', d:'2:10'},
+  {t:'Make movement independent of frame rate', note:'Tests now control the clock', d:'3:05'},
+  {t:'Stop the pet 24 px from the window edge', d:'1:52'},
+  {t:'Reduced motion: turn to face instead of walking', d:'1:20'},
+  {t:'Build the preview and run every check', d:'0:40'},
+];
+const EV9 = {
+  d1:[['test','follows the cursor when it enters','Re-run by Aludel on 4f2a9c1','t0',''],['try','Move your cursor into the pet window','Preview of commit 4f2a9c1','try:0','']],
+  d2:[['test','stays 24 px inside the left and top edges','Re-run by Aludel','t1',''],['test','stays 24 px inside the right and bottom edges','Re-run by Aludel','t2',''],['try','Push the cursor into a corner','The dashed line marks 24 px','try:1','']],
+  d3:[['test','moves at motion.pet-walk with a controlled clock','Re-run by Aludel','t3',''],['change','src/pet/pet.ts','Reads the token; the constant is gone','f0','']],
+  d4:[['test','turns instead of walking when reduced motion is on','Re-run by Aludel','t4',''],['try','Switch reduced motion on, then move the cursor','','try:2','']],
+  d5:[['change','src/pet/pet.ts','Imports Sprite from src/components','f0',''],['check','No dependency added','package.json unchanged','f0','']],
+  d6:[['check','Only src/pet/ and tests/ changed','4 files, all in scope','f0','']],
+};
+const CH9 = [
+  { id:'f0', icon:'code', name:'src/pet/pet.ts', op:'m', opText:'Modified', size:'+31 −9', lines:[' import { Sprite } from \'../components/sprite\';','- const SPEED = 2; // px per frame','+ const speed = tokens.motion.petWalk; // px per second',' export function step(pet, target, dt, reducedMotion) {','+   if (reducedMotion) return face(pet, target);','+   const d = Math.min(speed * dt, distance(pet, target));'] },
+  { id:'f1', icon:'code', name:'src/pet/bounds.ts', op:'c', opText:'Created', size:'+21', lines:['+ export const MARGIN = 24;','+ export function clamp(p, win) {','+   return { x: within(p.x, MARGIN, win.width - MARGIN),','+            y: within(p.y, MARGIN, win.height - MARGIN) };','+ }'] },
+  { id:'f2', icon:'code', name:'src/pet/clock.ts', op:'c', opText:'Created', size:'+9', lines:['+ export const clock = { now: () => performance.now() };'] },
+  { id:'f3', icon:'science', name:'tests/pet-follow.test.ts', op:'m', opText:'Modified', size:'+54 −6', lines:['+ test(\'moves at motion.pet-walk with a controlled clock\', () => {','+   const c = fakeClock(); step(pet, far, 1, false);','+   expect(distanceMoved(pet)).toBe(120);','+ });'] },
+];
+const TESTS9 = [['follows the cursor when it enters','d1'],['stays 24 px inside the left and top edges','d2'],['stays 24 px inside the right and bottom edges','d2'],['moves at motion.pet-walk with a controlled clock','d3'],['turns instead of walking when reduced motion is on','d4'],['imports Sprite from src/components','d5']];
+
+/* ---------- state ---------- */
+const S = {
+  screen:'w4', tab:{ w4:2, w9:3, before:'next' }, open:{}, logOpen:{}, sub9:'working',
+  flags:{},          // changeId -> note (reviewer flags on changes)
+  verdicts:{ rv4:{}, rv9:{} }, notes:{ rv4:{}, rv9:{} },
+  signing:null, signed:{}, comment:'', step:0, vtab:null, hi:null,
+  live:{ i:3, sec:9*60+32, feed:[] }, draft:null, answered:false,
+};
+function toast(t){ const el = $('#toast'); el.textContent = t; el.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => el.hidden = true, 2800); }
+
+/* ---------- shared pieces ---------- */
+function rail(){
+  const L = [['home','Home'],['lightbulb','Vision'],['palette','Design'],['web','Pages'],['schema','Data'],['code','Code'],['rocket_launch','Deploy'],['checklist','Work']];
+  return `<nav class="rail" aria-label="Layers"><div class="brand">${ms('deployed_code')}Aludel</div><div class="proj"><i>BB</i><div><b>Browser Buddy</b><small>Define phase</small></div></div>
+    ${L.map(([i,l]) => `<a class="nav" href="#" onclick="return false" ${l==='Work'?'aria-current="page"':''}>${ms(i)}${l}</a>`).join('')}</nav>`;
+}
+// Compact header (F12): title with assignee and the item-level action; the facts beneath.
+function header(item, st, action){
+  const a = item.assignee;
+  return `<p class="crumb"><a href="#" onclick="return false">Work</a> › ${item.ref}</p>
+  <div class="head"><h1 tabindex="-1">${esc(item.title)}</h1>
+    <div class="head-act"><span class="chip pick" title="Assignee">${bot(a)}${agents[a].name}${ms('expand_more','sm')}</span>${action || ''}</div></div>
+  <div class="facts"><span class="prio ${item.prio==='High'?'high':''}">${ms(item.prio==='High'?'keyboard_double_arrow_up':'drag_handle','sm')}${item.prio}</span>${pill(st)}
+    <span class="chip role-${item.role[0]}">${item.role[1]}</span><span>${ms('calendar_today','xs')}Created ${item.created}</span><span>${ms('link','xs')}No links <button type="button" class="linkbtn">Add</button></span></div>`;
+}
+function tabbar(key, tabs, count){
+  const cur = S.tab[key];
+  return `<div class="tabbar"><div class="tabs" role="tablist" aria-label="Runs" id="tabs">${tabs.map(t => `<button type="button" class="tab ${t.id==='next'?'draft':''}" role="tab" aria-selected="${cur===t.id}" data-tab="${key}:${t.id}">${t.av}${t.label}<span class="dot ${t.dot}"></span><span class="small">${t.text}</span></button>`).join('')}</div><span class="runcount">${count}</span></div>`;
+}
+function tabOf(run){ return { id:run.id, av: run.who==='you' ? me() : bot(run.who), label:`Run ${run.id}`, dot:status[run.state][0], text:status[run.state][2] }; }
+function nextTab(){ return { id:'next', av:ms('edit_note','sm'), label:'Next run', dot:'draft', text:'Draft' }; }
+
+function acc(id, icon, title, summary, body, defOpen){
+  const open = S.open[id] ?? defOpen;
+  return `<details class="acc" data-acc="${id}" ${open ? 'open' : ''}><summary><span class="ttl">${ms(icon,'sm')}${title}</span><span class="sum">${summary}</span>${ms('expand_more','cv')}</summary><div class="acc-body">${body}</div></details>`;
+}
+function taskSection(key, task, runId){
+  const carried = task.carried ? `<div class="carried"><h4>Carried in from the previous run</h4><ul style="margin:0;padding-left:18px">${task.carried.map(c => `<li>${c}</li>`).join('')}</ul></div>` : '';
+  return acc(`${key}-${runId}-task`, 'assignment', 'Task', 'What this run was given', `<p class="ask">${esc(task.request)}</p><div class="ask-by">${me()}Charles${runId>1 ? ` · unchanged since run 1` : ''}</div>${carried}`, true);
+}
+function critSection(key, run, reviewKey){
+  const crits = run.task.crits, res = run.results || {}, V = reviewKey ? S.verdicts[reviewKey] : run.verdicts || {}, N = reviewKey ? S.notes[reviewKey] : {};
+  const met = crits.filter(c => res[c.id]==='pass').length, fl = crits.filter(c => V[c.id]==='reject').length;
+  const newN = crits.filter(c => run.task.newIds.includes(c.id)).length;
+  const sum = `${crits.length} criteria${newN ? ` · ${newN} new` : ''}${Object.values(res).some(Boolean) ? (run.state==='working'||run.state==='needs' ? ` · ${met} passing so far` : ` · agent reports ${met} met`) : ''}${fl ? ` · ${fl} flagged` : ''}`;
+  const body = `<ol class="crits">${crits.map((c,i) => { const v = V[c.id], r = res[c.id];
+    return `<li class="crit"><span class="n ${v==='accept'?'acc':v==='reject'?'rej':''}">${v==='accept'?ms('check','xs'):v==='reject'?ms('close','xs'):i+1}</span>
+      <div><div>${c.t}</div><div class="src">${ms('bookmark','xs')}${c.src}${run.task.newIds.includes(c.id) ? `<span class="newtag">New in run ${run.id}</span>` : ''}</div></div>
+      <div class="res">${r ? `<span class="cstate ${r==='pass'?'pass':'fail'}">${ms(r==='pass'?'check_circle':'cancel')}${run.state==='working'||run.state==='needs' ? (r==='pass'?'Passing':'Failing') : (r==='pass'?'Agent: met':'Agent: not met')}</span>` : ''}${vchip(c.v)}${c.v2?vchip(c.v2):''}</div>
+      ${v==='reject' && N[c.id] ? `<div class="note">${ms('flag','xs')}${esc(N[c.id])}</div>` : ''}</li>`; }).join('')}</ol>`;
+  return acc(`${key}-${run.id}-crit`, 'fact_check', 'Criteria', sum, body, false);
+}
+function changeSection(key, run, editable, reviewTarget){
+  const chs = run.changes || [];
+  const counts = { c:0, m:0, r:0 }; chs.forEach(c => counts[c.op]++);
+  const flags = chs.filter(c => (editable ? S.flags[c.id] !== undefined : c.flag)).length;
+  const sum = chs.length ? [counts.c && `${counts.c} created`, counts.m && `${counts.m} modified`, counts.r && `${counts.r} removed`].filter(Boolean).join(' · ') + (flags ? ` · ${flags} flagged` : '') : 'No changes';
+  const body = chs.length ? `<ul class="chgs">${chs.map(c => { const f = editable ? S.flags[c.id] : c.flag;
+    return `<li class="chgrow"><div class="chgline">${ms(c.icon,'sm')}<span class="nm">${reviewTarget ? `<button type="button" data-openchange="${reviewTarget}:${c.id}">${c.name}</button>` : c.name}${c.sub ? ` <span class="muted small">${c.sub}</span>` : ''}</span>
+      <span class="op"><span class="${c.op}">${c.opText}</span> · ${c.size}</span>
+      ${editable ? `<button type="button" class="flagbtn ${f!==undefined?'on':''}" data-flag="${c.id}" aria-label="${f!==undefined?'Remove flag from':'Flag'} ${c.name}" title="Flag this change">${ms('flag','sm')}</button>` : (f ? `<span class="flagbtn on" style="opacity:1" title="Flagged">${ms('flag','sm')}</span>` : '<span></span>')}</div>
+      ${f !== undefined && f !== null ? (editable ? `<div class="flagnote">${ms('subdirectory_arrow_right','sm')}<label class="vh" for="fn-${c.id}">Flag note for ${c.name}</label><input id="fn-${c.id}" data-flagnote="${c.id}" value="${esc(f)}" placeholder="What’s wrong with this change?"></div>` : `<div class="flagnote ro">${ms('subdirectory_arrow_right','xs')}${esc(f)}</div>`) : ''}</li>`; }).join('')}</ul>
+    <p class="applied">${ms('info','xs')}${run.state==='accepted' ? 'Applied when the run was accepted.' : run.state==='review' ? 'Nothing is applied until you accept this run.' : 'Not applied. Kept here and passed to the next run as context.'}</p>` : `<p class="muted small" style="margin:0">This run has not changed anything yet.</p>`;
+  return acc(`${key}-${run.id}-chg`, 'difference', 'Changes', sum, body, false);
+}
+function objList(objs, key){
+  const icon = s => s==='done'?'check_circle':s==='now'?'progress_activity':s==='stuck'?'warning':s==='err'?'error':'radio_button_unchecked';
+  const lk = S.logOpen[key];
+  return `<ol class="objlist">${objs.map(o => `<li class="${o.s}">${ms(icon(o.s),'ic')}<div>${o.t}${o.stumble ? `<span class="stumble">${ms('warning','xs')}${o.stumble}</span>` : o.note ? `<small>${o.note}</small>` : ''}</div><time>${o.d||''}</time></li>`).join('')}</ol>
+    <div class="logbtn"><button type="button" class="linkbtn" data-log="${key}">${ms(lk?'expand_less':'terminal','xs')}${lk?'Hide the agent log':'Open the agent log'}</button></div>`;
+}
+function logList(items, key){ return S.logOpen[key] ? `<ol class="log" aria-live="polite">${items.map(e => `<li class="${e[3]||''} ${e[4]?'fresh':''}">${ms(e[0])}<span>${e[1]}</span><time>${e[2]}</time></li>`).join('')}</ol>` : ''; }
+function segbar(objs){ return `<div class="segbar" aria-hidden="true">${objs.map(o => `<i class="${o.s==='done'?'done':o.s==='now'?'now':o.s==='stuck'?'stuck':''}"></i>`).join('')}</div>`; }
+
+/* ---------- run status (F3, F4, F8) ---------- */
+function runStatus(key, run, opts){
+  const k = `${key}-${run.id}`, exp = S.open[k+'-rs'] ?? false;
+  const objs = opts.objs || run.objs, state = opts.state || run.state;
+  const top = `<div class="rs-top">${who(run.who)}${pill(state)}${opts.now ? `<span class="now">${opts.now}</span>` : '<span class="now"></span>'}
+    <span class="rs-stats"><span><b ${opts.timerId?`id="${opts.timerId}"`:''}>${opts.time || run.time}</b> ${state==='working'?'active':'total'}</span><span><b>${opts.tokens || run.tokens}</b> tokens</span></span>
+    <button type="button" class="chev" data-rs="${k}" aria-expanded="${exp}" aria-label="${exp?'Hide':'Show'} objectives">${ms('expand_more')}</button></div>`;
+  const bar = state==='working' || state==='needs' ? segbar(objs) : '';
+  const more = exp ? `<div class="rs-more">${objList(objs, k)}${logList(opts.log || run.log, k)}</div>` : '';
+  return `<section class="rs" aria-label="Run status">${top}${bar}${opts.action || ''}${opts.signoff || ''}${more}</section>`;
+}
+function sigRow(sig){ const icon = sig.outcome==='Accepted' ? 'verified' : sig.outcome==='Handed off' ? 'front_hand' : 'draw';
+  return `<div class="sig">${me('lg')}<div><b>${sig.outcome}</b> by ${sig.by} · <span class="muted">${sig.at}</span>${sig.comment ? `<q>${esc(sig.comment)}</q>` : ''}</div>${ms(icon)}</div>`; }
+
+// Actions for a run waiting on the reviewer (F8): Review is primary; Reject grows with flags; Accept confirms through the sign-off.
+function reviewActions(reviewKey, run){
+  const flagN = countFlags(reviewKey, run);
+  const checked = Object.values(S.verdicts[reviewKey]).filter(v => v && v !== 'skip').length, total = run.task.crits.length;
+  return `<div class="rs-act"><p>${whoName(run.who)} reports all ${total} criteria met${checked ? ` · you’ve checked ${checked} of ${total}` : ''}. Nothing is applied until you accept.</p>
+    <div class="btns"><button type="button" class="btn ${flagN ? 'bad' : 'badghost'} sm" data-sign="${reviewKey}:reject">${ms('reply','sm')}Reject${flagN ? ` <span class="n">${flagN} flag${flagN>1?'s':''}</span>` : ''}</button>
+      <button type="button" class="btn ghost sm" data-sign="${reviewKey}:accept">${ms('check','sm')}Accept</button>
+      <button type="button" class="btn sm" data-go="${reviewKey}">${ms('rate_review','sm')}Review</button></div></div>`;
+}
+function countFlags(reviewKey, run){
+  const V = S.verdicts[reviewKey];
+  return Object.values(V).filter(v => v==='reject').length + (run.changes || []).filter(c => S.flags[c.id] !== undefined).length;
+}
+function signoff(reviewKey, run){
+  if (!S.signing || S.signing.key !== reviewKey) return '';
+  const accept = S.signing.kind === 'accept';
+  const V = S.verdicts[reviewKey], N = S.notes[reviewKey];
+  const critFlags = run.task.crits.filter(c => V[c.id]==='reject').map(c => [c.t, N[c.id]]);
+  const chFlags = (run.changes || []).filter(c => S.flags[c.id] !== undefined).map(c => [c.name, S.flags[c.id]]);
+  const flags = critFlags.concat(chFlags);
+  const unchecked = run.task.crits.filter(c => !V[c.id] || V[c.id]==='skip').length;
+  const warn = accept && (flags.length || unchecked) ? `<div class="warnbox">${ms('warning','sm')}<span>${flags.length ? `${flags.length} flag${flags.length>1?'s':''} will be dropped. ` : ''}${unchecked ? `You haven’t checked ${unchecked} of ${run.task.crits.length} criteria yourself. ` : ''}Accept anyway?</span></div>` : '';
+  return `<div class="signoff"><h3>${accept ? `Accept run ${run.id}` : `Send back run ${run.id}`}</h3>
+    ${warn}
+    ${flags.length ? `<ul class="flaglist">${flags.map(([t,n]) => `<li>${ms('flag')}<span><b>${t}</b>${n ? `: ${esc(n)}` : ''}</span></li>`).join('')}</ul>` : ''}
+    <p class="small muted" style="margin:0">${accept ? `Applies ${run.changes.length} change${run.changes.length>1?'s':''} and closes ${reviewKey==='rv4'?'W-4':'W-9'}. Your signature and comment are kept as the provenance.` : 'Nothing is applied. The changes, your flags and your comment stay in this tab and go to the next run as context. The task reopens as a Next run tab.'}</p>
+    <label class="small" for="signc">Overall comment (optional)</label><textarea id="signc" placeholder="${accept ? 'Anything to note for the record' : 'What should the next run do differently?'}">${esc(S.comment)}</textarea>
+    <div class="btns" style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn ${accept?'ok':'bad'}" data-confirm="${reviewKey}:${S.signing.kind}">${ms('draw','sm')}${accept ? 'Sign and accept' : 'Sign and send back'}</button><button type="button" class="btn ghost" data-cancel>Cancel</button></div></div>`;
+}
+
+/* ---------- screens ---------- */
+function page(inner){ return `<div class="app">${rail()}<main class="main"><div class="page">${inner}</div></main></div>`; }
+function activity(item){ return `<section class="activity" aria-labelledby="act-h"><h2 id="act-h">${ms('history')}Activity <span class="muted small">${item.acts.length}</span></h2>
+  <ol class="acts">${item.acts.map(([a,t,w]) => `<li>${a}<div>${t}<time>${w}</time></div></li>`).join('')}</ol>
+  <form class="comment" data-note><label class="vh" for="note">Add a note to the activity</label><input id="note" placeholder="Add a note…"><button class="btn ghost sm" type="submit">Add</button></form></section>`; }
+
+// The editable Next run tab (F9): request and criteria, editable until a worker starts it.
+function draftCard(item, base){
+  if (!S.draft) S.draft = { request: base.request, crits: base.crits.map(c => ({...c})), suggest: base.suggest || null, carried: base.carried || null };
+  const D = S.draft;
+  return `<div class="card">
+    <section class="rs" aria-label="Next run"><div class="rs-top">${who(item.assignee)}${pill('draft')}<span class="now">Editable until a worker starts it. Then this becomes Run ${item.nextId}, locked to exactly what you see.</span></div></section>
+    ${acc('draft-task','assignment','Task','Your request', `<label class="vh" for="req">Request</label><textarea id="req" class="req" data-draft="request">${esc(D.request)}</textarea>${D.carried ? `<div class="carried"><h4>Carried in from run ${item.nextId-1}</h4><ul style="margin:0;padding-left:18px">${D.carried.map(c => `<li>${c}</li>`).join('')}</ul></div>` : ''}`, true)}
+    ${acc('draft-crit','fact_check','Criteria', `${D.crits.length} criteria · editable`, `<ol class="crits">${D.crits.map((c,i) => `<li class="crit edit"><span class="n">${i+1}</span><div><div class="t" contenteditable="true" data-critedit="${i}" role="textbox" aria-label="Criterion ${i+1}">${esc(c.t)}</div><div class="src">${ms('bookmark','xs')}${c.src}</div></div><div class="res">${vchip(c.v)}<button type="button" class="xbtn" data-critdel="${i}" aria-label="Remove criterion ${i+1}">${ms('close','sm')}</button></div></li>`).join('')}</ol>
+      ${D.suggest ? `<div class="suggest crit"><span class="n">${ms('auto_awesome','xs')}</span><div><div>${D.suggest.t}</div><div class="src">${ms('auto_awesome','xs')}Suggested from your request</div></div><div class="res"><button type="button" class="btn ghost sm" data-keep>Keep</button><button type="button" class="linkbtn" data-dismiss>Dismiss</button></div></div>` : ''}
+      <p style="margin:10px 0 0"><button type="button" class="linkbtn" data-critadd>${ms('add','xs')}Add a criterion</button></p>`, true)}
+  </div>`;
+}
+
+function screenBefore(){
+  const item = { ...W4, nextId:1 };
+  const base = { request:REQ4, crits:[C4[0], {...C4[4]}], suggest:C4[2] };
+  return page(`${header(item, 'draft', `<button type="button" class="btn" data-stage>${ms('playlist_add','sm')}Stage in Default agent’s batch</button>`)}
+    ${tabbar('before', [nextTab()], 'No runs yet')}${draftCard(item, base)}${activity({ acts:[W4.acts[0]] })}`);
+}
+
+function screenW4(){
+  const signedBack = S.signed.rv4 === 'reject', signedOk = S.signed.rv4 === 'accept';
+  const runs = W4.runs.map(r => r.id===2 && S.signed.rv4 ? { ...r, state: signedOk ? 'accepted' : 'sent', sig:{ by:'Charles', at:'just now', outcome: signedOk ? 'Accepted' : 'Sent back', comment:S.lastComment } } : r);
+  const tabs = runs.map(tabOf).concat(signedBack ? [nextTab()] : []);
+  const cur = S.tab.w4;
+  const st = signedOk ? 'accepted' : signedBack ? 'queued' : 'review';
+  let card;
+  if (cur === 'next'){
+    return page(`${header({ ...W4 }, 'queued', `<button type="button" class="btn" data-stage>${ms('playlist_add','sm')}Stage in Default agent’s batch</button>`)}${tabbar('w4', tabs, `${runs.length} runs`)}${draftCard({ ...W4, nextId:3 }, { request:REQ4, crits:C4, carried:[S.lastComment ? `Your comment: “${esc(S.lastComment)}”` : 'Your sign-off on run 2', ...countFlagTexts('rv4', runs[1]), 'Run 2’s proposed claim, not applied'] })}${activity(W4)}`);
+  }
+  const run = runs.find(r => r.id === cur);
+  const live = run.state === 'review';
+  const action = live ? reviewActions('rv4', run) : '';
+  card = `<div class="card">${runStatus('w4', run, { action: live ? action : sigRow(run.sig), signoff: live ? signoff('rv4', run) : '' })}
+    ${taskSection('w4', run.task, run.id)}${critSection('w4', run, live ? 'rv4' : null)}${changeSection('w4', run, live, live ? 'rv4' : null)}</div>`;
+  return page(`${header(W4, st, '')}${tabbar('w4', tabs, `${runs.length} runs`)}${card}${activity(W4)}`);
+}
+function countFlagTexts(key, run){ const V = S.verdicts[key], N = S.notes[key];
+  return run.task.crits.filter(c => V[c.id]==='reject').map(c => `Your flag on criterion “${c.t}”${N[c.id] ? `: ${esc(N[c.id])}` : ''}`).concat((run.changes||[]).filter(c => S.flags[c.id] !== undefined).map(c => `Your flag on ${c.name}${S.flags[c.id] ? `: ${esc(S.flags[c.id])}` : ''}`)); }
+
+function fmt(s){ return `${Math.floor(s/60)}m ${String(s%60).padStart(2,'0')}s`; }
+function screenW9(){
+  const sub = S.sub9, cur = S.tab.w9;
+  const liveState = sub==='working' ? 'working' : sub==='asking' ? (S.answered ? 'working' : 'needs') : 'failed';
+  const run3 = { ...RUN9, state:liveState };
+  const tabs = W9.runs.map(tabOf).concat([tabOf(run3)]);
+  const switcher = `<div class="substate" role="group" aria-label="Prototype: run 3 state">Prototype, run 3 state:
+    ${[['working','Working'],['asking','Asking a question'],['failed','Failed']].map(([k,l]) => `<button type="button" data-sub="${k}" aria-pressed="${sub===k}">${l}</button>`).join('')}</div>`;
+  let card;
+  if (cur === 3){
+    const i = S.live.i;
+    const objs = plan9.map((p,k) => ({ ...p, s: sub==='failed' ? (k<3?'done':k===3?'err':'todo') : k<i ? 'done' : k===i ? 'now' : 'todo', d: k<i || (sub==='failed' && k<3) ? p.d : '' }));
+    if (sub === 'failed') objs[3].stumble = 'Preview build failed: port 5173 in use';
+    const results = {}; C9.forEach((c,k) => results[c.id] = sub==='failed' ? (['d2','d4'].includes(c.id) ? 'fail' : 'pass') : (k < i+1 || c.id==='d5' || c.id==='d6') ? 'pass' : undefined);
+    const nowObj = objs.find(o => o.s==='now');
+    let action = '', opts = { objs, log: S.live.feed.concat(baseLog9), timerId:'live-t', time: fmt(S.live.sec), tokens: `${120 + S.live.feed.length*9}k` };
+    if (liveState === 'working'){ opts.now = `<b>${nowObj ? nowObj.t : 'Wrapping up'}</b> <span class="muted">· ${S.live.feed[0] ? S.live.feed[0][1] : 'working'}</span>`;
+      action = `<div class="rs-act"><p class="muted small">Nothing is applied while it runs. When it submits, this becomes Ready for review.</p><div class="btns"><button type="button" class="btn ghost sm" data-stop>${ms('stop_circle','sm')}Stop</button></div></div>`; }
+    else if (liveState === 'needs'){ opts.now = `<b>Paused on:</b> ${objs[3].t}`;
+      action = `<div class="q"><h3>${ms('help','sm')} The window can be resized to 200 × 120 px. With a 24 px margin the pet has almost no room. Keep 24 px at every size?</h3>
+        <div class="small muted">Deep agent recommends the second option: small windows are allowed by Pages › Pet window.</div>
+        <div class="opts" role="radiogroup" aria-label="Answer">${['Keep 24 px at every size','Use 24 px, shrinking to 8 px below 300 px wide','Set a minimum window size of 300 × 200 px'].map((o,k) => `<label class="opt"><input type="radio" name="qa" ${k===1?'checked':''}>${o}${k===1?' <span class="newtag">Recommended</span>':''}</label>`).join('')}</div>
+        <div class="btns" style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn sm" data-answer>Answer and resume</button><button type="button" class="btn ghost sm" data-stop>${ms('stop_circle','sm')}Stop</button><span class="small muted" style="align-self:center">Your answer is added to the run’s task as a decision.</span></div></div>`; }
+    else { opts.now = `<b>Failed</b> <span class="muted">while building the preview</span>`;
+      action = `<div class="rs-act bad"><p>${ms('error','sm')} Failed: the preview could not start (port 5173 in use). 4 of 6 criteria met; 2 need the preview.</p>
+        <div class="btns"><button type="button" class="btn ghost sm" data-report>${ms('description','sm')}${S.reportOpen ? 'Hide report' : 'Error report'}</button><button type="button" class="btn sm" data-closerun>${ms('draw','sm')}Close run</button></div></div>
+        ${S.reportOpen ? `<div class="report"><h4>Error report</h4><ul><li>Step “Build the preview” exited with code 1: <span class="mono">EADDRINUSE 127.0.0.1:5173</span></li><li>A preview from run 2 was still running on the same port (Deploy › Previews).</li><li>Tests for criteria 1, 3, 5 and 6 passed on commit 4f2a9c1. Criteria 2 and 4 need the preview to try.</li><li>Suggested fix: stop the old preview, then stage again. No task change needed.</li></ul></div>` : ''}`; }
+    card = `<div class="card">${runStatus('w9', run3, { ...opts, action })}${taskSection('w9', run3.task, 3)}${critSection('w9', { ...run3, results }, null)}${changeSection('w9', { ...run3, changes: CH9.slice(0, sub==='failed' ? 4 : Math.min(4, i)) }, false, null)}</div>`;
+  } else {
+    const run = W9.runs.find(r => r.id === cur);
+    const act = run.failure ? `<div class="rs-act bad"><p>${ms('error','sm')} ${run.failure}</p></div>` : '';
+    card = `<div class="card">${runStatus('w9', run, { action: act + sigRow(run.sig) })}${taskSection('w9', run.task, run.id)}${critSection('w9', run, null)}${changeSection('w9', run, false, null)}</div>`;
+  }
+  const st = liveState==='needs' ? 'needs' : liveState;
+  const headAct = liveState==='failed' ? '' : '';
+  return page(`${header(W9, st, headAct)}${switcher}${tabbar('w9', tabs, '3 runs')}${card}${activity(W9)}`);
+}
+const baseLog9 = [['science','Ran tests: 6 of 6 written, 3 red as expected','2:58'],['edit','Edited src/pet/pet.ts: movement uses elapsed time','5:10'],['science','Ran tests: frame-rate test passed','6:03','ok'],['merge','Read run 2’s changes and your flag','0:21']];
+const liveScript = [
+  ['edit','Edited src/pet/bounds.ts','+18 −4'],['science','Ran tests: “stays inside bounds” 1 of 2 passed','','err'],['edit','Edited src/pet/bounds.ts: clamp to the inner size','+3 −2'],
+  ['science','Ran tests: “stays inside bounds” 2 of 2 passed','','ok', () => S.live.i = 4],['menu_book','Read Principles › motion (revision 5)',''],
+  ['edit','Edited src/pet/pet.ts: face the cursor with reduced motion','+14 −1'],['science','Ran tests: reduced-motion test passed','','ok', () => S.live.i = 5],['deployed_code','Building the preview…',''],
+];
+let timer = null;
+function tick(){
+  if (S.screen !== 'w9' || S.sub9 === 'failed' || (S.sub9 === 'asking' && !S.answered)) return;
+  S.live.sec++; const t = document.getElementById('live-t'); if (t) t.textContent = fmt(S.live.sec);
+  if (S.live.sec % 4 === 0 && S.live.j < liveScript.length){
+    const e = liveScript[S.live.j++]; if (e[4]) e[4]();
+    S.live.feed.forEach(f => f[4] = false);
+    S.live.feed.unshift([e[0], e[1], fmt(S.live.sec), e[3] || '', true]);
+    if (S.tab.w9 === 3) render(true);
+  }
+}
+
+/* ---------- review mode (F14-F16) ---------- */
+const RV = {
+  rv4:{ item:W4, run:W4.runs[1], crits:C4, ev:EV4, back:'w4', tabs:()=>[['changes','Changes','difference',1]] },
+  rv9:{ item:W9, run:{ ...RUN9, state:'review', time:'11m 07s', tokens:'214k', changes:CH9 }, crits:C9, ev:EV9, back:'w9', tabs:()=>[['preview','Preview','web'],['tests','Tests','science',6],['changes','Changes','difference',4]] },
+};
+function screenReview(key){
+  const R = RV[key], n = R.crits.length, i = S.step, V = S.verdicts[key], N = S.notes[key];
+  const onEnd = i >= n, c = R.crits[i];
+  const first = !onEnd && R.ev[c.id][0];
+  const vtab = S.vtab || (onEnd ? R.tabs()[0][0] : lookTab(first[3]));
+  const pips = R.crits.map((cc,k) => `<button type="button" class="pip ${V[cc.id]||''} ${k===i?'cur':''}" data-step="${k}" aria-label="Criterion ${k+1}${V[cc.id]?': '+V[cc.id]:''}"></button>`).join('') + `<button type="button" class="pip end ${onEnd?'cur':''}" data-step="${n}" aria-label="Sign off"></button>`;
+  let right, foot;
+  if (!onEnd){
+    const v = V[c.id];
+    right = `<div class="step"><p class="eyebrow">Criterion ${i+1} of ${n} ${vchip(c.v)}${c.v2?vchip(c.v2):''}${R.run.task.newIds.includes(c.id) ? `<span class="newtag">New in run ${R.run.id}</span>` : ''}</p>
+      <h2>${c.t}</h2>
+      <div><p class="eyebrow" style="margin-bottom:6px">To verify, check</p><div class="evs">
+        ${R.ev[c.id].map(e => `<button type="button" class="ev ${e[0]}" data-look="${e[3]}">${ms(evType[e[0]][0])}<span><span class="ty">${evType[e[0]][1]}</span>${e[1]}<small>${e[2]}</small>${e[4] ? `<small><i>${e[4]}</i></small>` : ''}</span><span class="res ${e[0]==='test'||e[0]==='check'?'pass':''}">${e[0]==='test'?'Passed':e[0]==='check'?'Passed':e[0]==='try'?'Open':'View'}</span></button>`).join('')}</div></div>
+      <p class="evlegend">${ms('info','xs')}<span>The run named this evidence when it submitted. Each item must point at something it produced; Aludel re-runs tests and adds its own checks.</span></p>
+      <details class="ctx"><summary>${ms('bookmark','xs')}Context: ${c.src}</summary><div class="body">${c.ctx ? `<q>${esc(c.ctx)}</q>` : `<q>${srcText(c)}</q>`}<span class="small muted">Shown for reference. You’re reviewing the result, not this.</span></div></details>
+      ${v==='accept' ? `<p class="verdictline a">${ms('check_circle','sm')}You accepted this</p>` : ''}
+      ${v==='skip' ? `<p class="verdictline" style="color:var(--muted)">${ms('redo','sm')}Skipped</p>` : ''}
+      ${v==='reject' ? `<div class="rejnote"><p class="verdictline r" style="margin:0">${ms('flag','sm')}Flagged. Say what’s wrong; it goes to the next run.</p><label class="vh" for="rn">Flag note</label><textarea id="rn" data-rnote="${c.id}" placeholder="What should change?">${esc(N[c.id]||'')}</textarea></div>` : ''}
+    </div>`;
+    foot = `<button type="button" class="btn ghost sm" data-nav="-1" ${i===0?'disabled':''}>${ms('arrow_back','sm')}Back</button><span class="sp"></span>
+      <button type="button" class="btn ${v==='reject'?'bad':'badghost'}" data-v="reject">${ms('flag','sm')}Reject <span class="kbd">R</span></button>
+      <span class="acol"><button type="button" class="btn ${v==='accept'?'ok':''}" data-v="accept">${ms('check','sm')}Accept <span class="kbd">A</span></button><button type="button" class="skip" data-v="skip">Skip</button></span>`;
+  } else {
+    const rej = R.crits.filter(cc => V[cc.id]==='reject'), un = R.crits.filter(cc => !V[cc.id] || V[cc.id]==='skip');
+    const chFlags = (R.run.changes||[]).filter(ch => S.flags[ch.id] !== undefined);
+    const flagN = rej.length + chFlags.length;
+    const kind = flagN ? 'reject' : 'accept';
+    right = `<div class="step"><p class="eyebrow">Sign off · run ${R.run.id}</p><h2>${flagN ? `Send back with ${flagN} flag${flagN>1?'s':''}` : un.length ? `${un.length} not checked by you` : 'Everything checks out'}</h2>
+      <ul class="sumlist">${R.crits.map(cc => `<li>${V[cc.id]==='accept'?'<span class="ms a">check_circle</span>':V[cc.id]==='reject'?'<span class="ms r">flag</span>':'<span class="ms u">radio_button_unchecked</span>'}<span>${cc.t}${V[cc.id]==='reject'&&N[cc.id]?`<br><span class="muted small">${esc(N[cc.id])}</span>`:''}${V[cc.id]==='skip'?' <span class="muted small">(skipped)</span>':''}</span></li>`).join('')}
+        ${chFlags.map(ch => `<li><span class="ms r">flag</span><span>${ch.name}<br><span class="muted small">${esc(S.flags[ch.id])}</span></span></li>`).join('')}</ul>
+      ${!flagN && un.length ? `<div class="warnbox">${ms('warning','sm')}<span>Accepting now signs for ${un.length} criteria you didn’t check.</span></div>` : ''}
+      <label class="small" for="signc2">Overall comment (optional)</label><textarea id="signc2" class="req" style="font-size:14px;min-height:70px" placeholder="${flagN ? 'What should the next run do differently?' : 'Anything to note for the record'}">${esc(S.comment)}</textarea>
+      <p class="small muted" style="margin:0">${flagN ? 'Nothing is applied. The task reopens as a Next run tab with your flags and comment carried in.' : `Applies the run’s ${R.run.changes.length} change${R.run.changes.length>1?'s':''} and closes the item.`}</p></div>`;
+    foot = `<button type="button" class="btn ghost sm" data-nav="-1">${ms('arrow_back','sm')}Back</button><span class="sp"></span>
+      <button type="button" class="btn ${kind==='accept'?'ok':'bad'}" data-confirm="${key}:${kind}">${ms('draw','sm')}${kind==='accept' ? 'Sign and accept' : 'Sign and send back'}</button>`;
+  }
+  return `<div class="rvmode"><div class="rv-top"><button type="button" class="btn ghost sm" data-go="${R.back}" aria-label="Close review">${ms('close','sm')}</button>
+      <h1>Review ${R.item.ref} · Run ${R.run.id}</h1>${who(R.run.who,'')}<span class="muted small">${esc(R.item.title)}</span><span class="sp"></span><div class="pips" role="group" aria-label="Progress">${pips}</div></div>
+    <div class="rv-body"><div class="viewer"><div class="vtabs" role="tablist" aria-label="What the run produced">${R.tabs().map(([k,l,ic,cnt]) => `<button type="button" class="tab" role="tab" aria-selected="${vtab===k}" data-vtab="${k}">${ms(ic,'sm')}${l}${cnt?` <span class="cnt">${cnt}</span>`:''}</button>`).join('')}</div>
+      <div class="vpane">${viewer(key, vtab)}</div></div>
+      <div class="stepper">${right}<div class="step-foot">${foot}</div></div></div></div>`;
+}
+function srcText(c){ return { 'Action rule · Write a Brief claim':'A claim is one sentence a reader could check as true or false. No slogans, no stacked benefits.', 'Your flag on run 1':'This adds a second value claim. It should replace “A pet in a browser window”.', 'Always checked':'A run may change only what its criteria call for.', 'Story S3 · scenario 1':'Given the pet window is open, when I move the cursor into it, then the pet walks toward the cursor.', 'Story S3 · scenario 2':'The pet never leaves the window and stops a comfortable 24 px from its edge.', 'Design token · motion.pet-walk':'120 px per second, ease-out on stop.', 'Principles · motion':'Respect reduced motion: replace movement with a change of state.', 'Action rule · Build a story':'Reuse the project’s components. Adding a dependency needs its own item.' }[c.src] || c.src; }
+function lookTab(ref){ return ref.startsWith('try') ? 'preview' : ref.startsWith('t') && /^t\d/.test(ref) ? 'tests' : 'changes'; }
+function viewer(key, vtab){
+  const hi = S.hi;
+  if (vtab === 'changes'){
+    const chs = RV[key].run.changes;
+    return chs.map(c => c.was !== undefined && (c.now) && c.icon==='lightbulb'
+      ? `<article class="tcard ${hi===c.id?'hl':''}"><header>${ms(c.icon,'sm')}<b>${c.name}</b><span class="sp"></span><span class="verb ${c.op}">${c.opText}</span><span class="muted small">${c.sub||''}</span>${flagBtn(c)}</header>
+          <div class="body">${c.was ? `<span class="lbl">Was</span><span class="was">${c.was}</span>` : ''}<span class="lbl">${c.was ? 'Now' : 'New'}</span><span class="now">${c.now}</span></div>
+          ${S.flags[c.id] !== undefined ? `<div class="flagnote" style="padding:0 14px 10px">${ms('flag','sm')}<input data-flagnote="${c.id}" value="${esc(S.flags[c.id])}" placeholder="What’s wrong with this change?" aria-label="Flag note"></div>` : ''}
+          <footer>Proposed by run ${RV[key].run.id}. Not applied until you accept.</footer></article>`
+      : `<div class="dfile ${hi===c.id?'hl':''}"><header><span class="verb ${c.op}">${c.opText}</span><span class="mono">${c.name}</span><span class="sp"></span><span class="mono">${c.size}</span>${flagBtn(c)}</header>
+          ${S.flags[c.id] !== undefined ? `<div class="flagnote" style="padding:8px 12px">${ms('flag','sm')}<input data-flagnote="${c.id}" value="${esc(S.flags[c.id])}" placeholder="What’s wrong with this change?" aria-label="Flag note"></div>` : ''}
+          <pre class="dcode">${c.lines.map(l => `<span class="${l[0]==='+'?'a':l[0]==='-'?'d':''}">${esc(l)}</span>`).join('')}</pre></div>`).join('');
+  }
+  if (vtab === 'tests') return `<div class="tests"><div class="tsum">${ms('verified')}<b>6 of 6 passed</b><span class="muted">Re-run by Aludel on commit 4f2a9c1 · matches the agent’s result</span></div>
+      ${TESTS9.map((t,k) => `<div class="trow ${hi==='t'+k?'hl':''}"><span class="ms">check_circle</span><span>${t[0]}<small>tests/pet-follow.test.ts · for criterion ${C9.findIndex(c => c.id===t[1])+1}</small></span><span class="muted small">0.0${k+2}s</span></div>`).join('')}
+      <p class="small muted">Written from the criteria before the code change, in step 2 of the run.</p></div>`;
+  const hints = ['Move your cursor into the pet window. The pet should walk to it.','Push the cursor into a corner. The pet should stop at the dashed line.','Switch reduced motion on, then move the cursor. The pet should turn, not walk.'];
+  const h = hi && hi.startsWith('try:') ? +hi.split(':')[1] : null;
+  return `${h !== null ? `<div class="tryhint">${ms('touch_app')}<span>${hints[h]}</span></div>` : ''}
+    <div class="browser"><div class="browser-bar"><i></i><i></i><i></i><span>preview-w9-run3.browser-buddy.localhost</span></div>
+      <div class="desk ${h===1?'show-edge':''}" id="desk"><div class="petwin"><header><span>Browser Buddy</span><span>×</span></header><div class="petfield" id="petfield"><div class="edge"></div>
+        <svg class="pet" id="pet" viewBox="0 0 38 34" role="img" aria-label="The pet"><ellipse cx="19" cy="21" rx="15" ry="11" fill="#c98b4f"/><circle cx="13" cy="19" r="2.4" fill="#141727"/><circle cx="25" cy="19" r="2.4" fill="#141727"/><path d="M8 12 L11 4 L15 11Z M30 12 L27 4 L23 11Z" fill="#c98b4f"/><path d="M16 25 q3 2 6 0" stroke="#141727" stroke-width="1.5" fill="none"/></svg></div></div></div></div>
+    <div class="preview-ctl"><label><input type="checkbox" id="rm" ${h===2?'checked':''}> Reduced motion</label><label><input type="checkbox" id="edgebox" ${h===1?'checked':''}> Show the 24 px margin</label><span class="muted">Built from commit 4f2a9c1 · isolated preview</span></div>`;
+}
+function flagBtn(c){ const on = S.flags[c.id] !== undefined; return `<button type="button" class="flagbtn ${on?'on':''}" style="opacity:1" data-flag="${c.id}" aria-label="${on?'Remove flag':'Flag this change'}" title="Flag this change">${ms('flag','sm')}</button>`; }
+
+let raf = null;
+function startPet(){
+  cancelAnimationFrame(raf);
+  const field = document.getElementById('petfield'), pet = document.getElementById('pet'), desk = document.getElementById('desk'); if (!field) return;
+  let pos = { x:40, y:60 }, target = null, last = performance.now(), facing = 1;
+  desk.addEventListener('pointermove', e => { const r = field.getBoundingClientRect(); target = (e.clientX>=r.left && e.clientX<=r.right && e.clientY>=r.top && e.clientY<=r.bottom) ? { x:e.clientX-r.left, y:e.clientY-r.top } : null; });
+  desk.addEventListener('pointerleave', () => target = null);
+  document.getElementById('edgebox')?.addEventListener('change', e => desk.classList.toggle('show-edge', e.target.checked));
+  const loop = now => {
+    const dt = Math.min(.05, (now-last)/1000); last = now;
+    const W = field.clientWidth, H = field.clientHeight, M = 24, rm = document.getElementById('rm')?.checked;
+    if (target){ const tx = Math.max(M, Math.min(W-M, target.x)), ty = Math.max(M, Math.min(H-M, target.y)); facing = target.x < pos.x ? -1 : 1;
+      if (!rm){ const dx = tx-pos.x, dy = ty-pos.y, d = Math.hypot(dx,dy), s = Math.min(120*dt, d); if (d > .5){ pos.x += dx/d*s; pos.y += dy/d*s; } } }
+    pet.style.transform = `translate(${pos.x-19}px,${pos.y-17}px) scaleX(${facing})`;
+    raf = requestAnimationFrame(loop);
+  };
+  raf = requestAnimationFrame(loop);
+}
+
+/* ---------- ledger ---------- */
+const LEDGER = [
+  ['F1','Task is per run','Each run tab shows the request and criteria it received; “New in run n” marks changes','w4'],
+  ['F2','One card under the tabs','No task block above, no sidebar','w4'],
+  ['F3','Compact run status: agent (model on hover), objective bar, time, tokens, status; expand for objectives and the agent log','Run status bar; chevron expands; “Open the agent log”','w9'],
+  ['F4','Finished: reviewer action and info; questions; failures with a report','Screen 2 (review), screen 4 (asking, failed)','w9'],
+  ['F5','Accordion: Task open, Criteria and Changes closed with summaries','All run tabs','w4'],
+  ['F6','Drop Produces; criteria say what must happen','Criteria only','w4'],
+  ['F7','Compact change stack, hover flag with note; flags make Reject prominent; accept with flags confirms','Screen 2 › Changes; Reject shows the flag count; sign-off warns','w4'],
+  ['F8','Decide Accept / Reject / Review / error handling; closing is a signature with a comment','Run actions table below','w4'],
+  ['F9','Reopened task gets an editable Next run tab (also before any work)','Screen 1; appears after you send back on screen 2','before'],
+  ['F10','Activity below the card','All screens','w4'],
+  ['F11','Rejected runs keep their changes and notes; the next run gets them','Run 1 tabs; “Carried in” lists','w4'],
+  ['F12','Compact header, run count beside the tabs','All item screens','w4'],
+  ['F13','Tabs start scrolled right','Narrow the window on screen 4','w9'],
+  ['F14','Intentional review tabs; request as context; friendlier text-change card','Screen 3: Changes only; screen 5: Preview, Tests, Changes','rv4'],
+  ['F15','Typed evidence and how it’s made','Change, Test, Try it, Aludel check','rv9'],
+  ['F16','Back, Reject, Accept in the bottom bar; Skip under Accept','Screens 3 and 5','rv9'],
+];
+function renderLedger(){
+  $('#ledger').innerHTML = `<h2>Your feedback, and where v2 answers it</h2><table>${LEDGER.map(([id,a,w,s]) => `<tr><td>${id}</td><td>${a}<br><a href="#${s}" data-go="${s}">${w}</a></td></tr>`).join('')}</table>
+  <h3>Run actions (my call, for you to confirm)</h3><table><tr><th>Run state</th><th>Primary</th><th>Also</th><th>Accept?</th></tr>
+  <tr><td>Working</td><td>—</td><td>Stop</td><td>No</td></tr><tr><td>Needs an answer</td><td>Answer</td><td>Stop</td><td>No</td></tr>
+  <tr><td>Ready for review</td><td>Review</td><td>Accept, Reject</td><td>Yes; warns on flags or unchecked criteria</td></tr>
+  <tr><td>Incomplete (agent says criteria unmet)</td><td>Close run</td><td>Review, to inspect</td><td>No</td></tr>
+  <tr><td>Failed or stopped</td><td>Close run</td><td>Error report, agent log</td><td>No</td></tr>
+  <tr><td>Closed</td><td>—</td><td>Read-only, signature shown</td><td>—</td></tr></table>
+  <p class="small muted">Every close is a signature. Accept applies the run’s changes and closes the item; any other close reopens the task as a Next run tab. Runs are accepted whole, never partly.</p>`;
+}
+
+/* ---------- render and events ---------- */
+function render(keep){
+  const y = window.scrollY, s = S.screen;
+  $('#root').innerHTML = s==='before' ? screenBefore() : s==='w4' ? screenW4() : s==='w9' ? screenW9() : screenReview(s);
+  document.querySelectorAll('.proto [data-screen]').forEach(b => b.setAttribute('aria-current', b.dataset.screen === s));
+  if (s === 'rv9') startPet();
+  if (keep) window.scrollTo(0, y);
+}
+function go(s){
+  S.screen = s; S.vtab = null; S.hi = null; S.signing = null; S.reportOpen = false;
+  if (s.startsWith('rv')) { S.step = 0; S.comment = ''; }
+  if (s === 'before') S.draft = null;
+  if (s === 'w9' && !S.live.j){ S.live.j = 0; }
+  try { history.replaceState(null, '', '#' + s); } catch (e) {}
+  clearInterval(timer); if (s === 'w9') timer = setInterval(tick, 1000);
+  render(); window.scrollTo(0,0);
+  const t = document.getElementById('tabs'); if (t) t.scrollLeft = t.scrollWidth; // F13: newest run in view
+}
+function sign(key, kind){
+  const comment = (document.getElementById('signc') || document.getElementById('signc2'))?.value || '';
+  S.lastComment = comment; S.signed[key] = kind; S.signing = null;
+  const item = key === 'rv4' ? W4 : W9; item.acts.push([me(), `<b>Charles</b> signed run ${RV[key].run.id}: ${kind === 'accept' ? 'accepted' : 'sent back'}${comment ? ` · “${esc(comment)}”` : ''}`, 'just now']);
+  if (key === 'rv4'){ S.screen = 'w4'; S.tab.w4 = kind === 'reject' ? 'next' : 2; S.draft = null;
+    toast(kind === 'accept' ? 'Signed. Brief › Value is now revision 2 and W-4 is done.' : 'Signed and sent back. The task is open again in Next run.'); }
+  else { S.screen = 'w9'; toast(kind === 'accept' ? 'Signed. Commit 4f2a9c1 merged and W-9 is done (prototype).' : 'Signed and sent back (prototype).'); }
+  try { history.replaceState(null, '', '#' + S.screen); } catch (e) {}
+  render(); window.scrollTo(0,0);
+  const t = document.getElementById('tabs'); if (t) t.scrollLeft = t.scrollWidth;
+}
+document.addEventListener('click', e => {
+  const t = e.target.closest('button,a,[data-acc] > summary'); if (!t) return;
+  const d = t.dataset;
+  if (t.matches('[data-acc] > summary')){ e.preventDefault(); const det = t.parentElement; S.open[det.dataset.acc] = !det.open; render(true); return; }
+  if (d.screen) return go(d.screen);
+  if (d.go){ e.preventDefault(); $('#ledger').hidden = true; return go(d.go); }
+  if (d.tab){ const [k,id] = d.tab.split(':'); S.tab[k] = id === 'next' ? 'next' : +id; S.signing = null; return render(true); }
+  if (d.rs){ S.open[d.rs+'-rs'] = !(S.open[d.rs+'-rs'] ?? false); return render(true); }
+  if (d.log){ S.logOpen[d.log] = !S.logOpen[d.log]; return render(true); }
+  if (d.flag){ if (S.flags[d.flag] === undefined) S.flags[d.flag] = ''; else delete S.flags[d.flag]; render(true); document.querySelector(`[data-flagnote="${d.flag}"]`)?.focus(); return; }
+  if (d.sign){ const [k,kind] = d.sign.split(':'); S.signing = { key:k, kind }; S.comment = ''; render(true); document.getElementById('signc')?.focus(); return; }
+  if (d.confirm){ const [k,kind] = d.confirm.split(':'); return sign(k, kind); }
+  if ('cancel' in d){ S.signing = null; return render(true); }
+  if (d.openchange){ const [k,id] = d.openchange.split(':'); go(k); S.vtab = 'changes'; S.hi = id; S.step = 0; return render(); }
+  if (d.step !== undefined){ S.step = +d.step; S.vtab = null; S.hi = null; return render(true); }
+  if (d.vtab){ S.vtab = d.vtab; S.hi = null; return render(true); }
+  if (d.look){ S.hi = d.look; S.vtab = lookTab(d.look); return render(true); }
+  if (d.nav){ const n = RV[S.screen].crits.length; S.step = Math.max(0, Math.min(n, S.step + +d.nav)); S.vtab = null; S.hi = null; return render(true); }
+  if (d.v){ const R = RV[S.screen], c = R.crits[S.step], V = S.verdicts[S.screen];
+    if (d.v === 'reject'){ V[c.id] = V[c.id] === 'reject' ? undefined : 'reject'; render(true); document.getElementById('rn')?.focus(); return; }
+    V[c.id] = d.v; S.step++; S.vtab = null; S.hi = null; return render(true); }
+  if (d.sub){ S.sub9 = d.sub; S.answered = false; S.reportOpen = false; return render(true); }
+  if ('answer' in d){ S.answered = true; toast('Answered. Deep agent resumes with your decision added to the task.'); return render(true); }
+  if ('stop' in d) return toast('Stop asks Deep agent to finish its current step, then the run ends as Stopped (prototype).');
+  if ('report' in d){ S.reportOpen = !S.reportOpen; return render(true); }
+  if ('closerun' in d){ toast('Close run asks for your signature, then reopens the task as Next run (prototype).'); return; }
+  if ('stage' in d) return toast('Staged. It stays editable until a worker starts it (prototype).');
+  if ('keep' in d){ S.draft.crits.splice(S.draft.crits.length-1, 0, S.draft.suggest); S.draft.suggest = null; return render(true); }
+  if ('dismiss' in d){ S.draft.suggest = null; return render(true); }
+  if (d.critdel !== undefined){ S.draft.crits.splice(+d.critdel, 1); return render(true); }
+  if ('critadd' in d){ S.draft.crits.push({ t:'', src:'Added by you', v:'read' }); render(true); const els = document.querySelectorAll('[data-critedit]'); els[els.length-1]?.focus(); return; }
+});
+document.addEventListener('input', e => {
+  const d = e.target.dataset;
+  if (d.flagnote !== undefined) S.flags[d.flagnote] = e.target.value;
+  if (d.rnote) S.notes[S.screen][d.rnote] = e.target.value;
+  if (d.draft) S.draft.request = e.target.value;
+  if (d.critedit !== undefined) S.draft.crits[+d.critedit].t = e.target.textContent;
+  if (e.target.id === 'signc' || e.target.id === 'signc2') S.comment = e.target.value;
+});
+document.addEventListener('submit', e => { e.preventDefault(); if (e.target.matches('[data-note]')) toast('Note added to the activity (prototype)'); });
+document.addEventListener('keydown', e => {
+  if (!S.screen.startsWith('rv') || e.target.matches('input,textarea,[contenteditable]')) return;
+  const k = e.key.toLowerCase(), n = RV[S.screen].crits.length;
+  if ((k === 'a' || k === 'r') && S.step < n) document.querySelector(`[data-v="${k==='a'?'accept':'reject'}"]`)?.click();
+  else if (k === 'j' || e.key === 'ArrowRight'){ S.step = Math.min(n, S.step+1); S.vtab = null; S.hi = null; render(true); }
+  else if (k === 'k' || e.key === 'ArrowLeft'){ S.step = Math.max(0, S.step-1); S.vtab = null; S.hi = null; render(true); }
+  else if (e.key === 'Escape') go(RV[S.screen].back);
+});
+$('#ledger-btn').addEventListener('click', () => { const l = $('#ledger'); l.hidden = !l.hidden; $('#ledger-btn').setAttribute('aria-expanded', String(!l.hidden)); });
+renderLedger();
+const h0 = location.hash.replace('#','');
+go(['before','w4','rv4','w9','rv9'].includes(h0) ? h0 : 'w4');
+</script>
