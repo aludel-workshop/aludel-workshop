@@ -25,6 +25,7 @@ import { fileURLToPath } from 'node:url';
 import { importCorpus } from './importer.mjs';
 import { openDatabase } from './storage.mjs';
 import { initPagesLayerApp, pagesDocumentList, pagesDocumentRead, pagesDocumentUpdate, pagesConnections, pagesConnectionCreate, pagesConnectionUpdate } from './pages-layer-app.mjs';
+import { initPagesReconciliation, pagesReconciliationView, pagesGapDecision, reconcilePagesFlow } from './pages-reconciliation.mjs';
 import { initLayerContract, layerDescriptors, layerInstances, updateLayerInstance, layerCatalog, layerOutputRead, layerMigrationInventory } from './layer-contract.mjs';
 import { answerDecision, createProposal, ensureB02Fixture, getDecision, getProposal, listDecisions, listDownstreamRecords, listProposals, reassessRecord, reviseProposal } from './product-records.mjs';
 import { openSecretStore } from './secret-store.mjs';
@@ -60,6 +61,7 @@ initSymphonyWorker(db);
 initWorkRuns(db);
 initLayerContract(db);
 initPagesLayerApp(db);
+initPagesReconciliation(db);
 const secrets = openSecretStore(dataDirectory);
 const topology = hostTopology(process.env, port);
 const setupConfigPath = join(portalRoot, 'config', 'project-setup.json');
@@ -182,7 +184,7 @@ const editor = editorBridge({ db, know, projectSetup: (user, id) => flows.projec
 // LAY-04: routines that are due create work, and each layer's gaps become backlog items (DEC-041). At start-up, then every ten minutes.
 function tickRoutines() {
   for (const projectId of layerProjects()) {
-    try { know.runRoutines(projectId); know.syncBacklog(projectId); } catch (error) { console.error(`Routines for ${projectId}: ${error.message}`); }
+    try { know.runRoutines(projectId); know.syncBacklog(projectId); reconcilePagesFlow(db, know, projectId); } catch (error) { console.error(`Routines for ${projectId}: ${error.message}`); }
   }
 }
 tickRoutines();
@@ -510,6 +512,18 @@ async function api(request, response, url) {
     return json(response, 201, { project: setup.project }, { 'set-cookie': draftCookie('', 0) });
   }
   if (url.pathname === '/api/projects' && request.method === 'GET') return json(response, 200, { projects: userProjects(db, user.id) });
+  const pagesReconcileRoute = /^\/api\/projects\/([^/]+)\/layers\/pages\/reconciliation(?:\/([^/]+))?$/.exec(url.pathname);
+  if (pagesReconcileRoute) {
+    const projectId = decodeURIComponent(pagesReconcileRoute[1]);
+    if (request.method === 'GET' && !pagesReconcileRoute[2]) return json(response, 200, pagesReconciliationView(db, user.id, projectId), { 'cache-control': 'no-store' });
+    if (request.method === 'POST' && pagesReconcileRoute[2] === 'run') {
+      pagesReconciliationView(db, user.id, projectId);
+      if (db.prepare('SELECT role FROM project_members WHERE project_id = ? AND user_id = ?').get(projectId, user.id)?.role !== 'owner') return json(response, 403, { error: 'Project owner required.' });
+      return json(response, 200, reconcilePagesFlow(db, know, projectId, { trigger: 'manual' }), { 'cache-control': 'no-store' });
+    }
+    if (request.method === 'POST' && pagesReconcileRoute[2])
+      return json(response, 200, pagesGapDecision(db, user.id, projectId, decodeURIComponent(pagesReconcileRoute[2]), await readJson(request)), { 'cache-control': 'no-store' });
+  }
   const pagesRunsRoute = /^\/api\/projects\/([^/]+)\/layers\/pages\/routines\/([^/]+)\/runs$/.exec(url.pathname);
   if (pagesRunsRoute && request.method === 'GET') {
     const projectId = decodeURIComponent(pagesRunsRoute[1]), routineId = decodeURIComponent(pagesRunsRoute[2]);
@@ -534,7 +548,11 @@ async function api(request, response, url) {
     const projectId = decodeURIComponent(pagesConnectionRoute[1]), id = pagesConnectionRoute[2] ? decodeURIComponent(pagesConnectionRoute[2]) : null;
     if (request.method === 'GET' && !id) return json(response, 200, { connections: pagesConnections(db, user.id, projectId) }, { 'cache-control': 'no-store' });
     if (request.method === 'POST' && !id) { const input = await readJson(request); return json(response, 201, pagesConnectionCreate(db, user.id, projectId, input.sourceKey), { 'cache-control': 'no-store' }); }
-    if (request.method === 'PUT' && id) return json(response, 200, pagesConnectionUpdate(db, user.id, projectId, id, await readJson(request)), { 'cache-control': 'no-store' });
+    if (request.method === 'PUT' && id) {
+      const updated = pagesConnectionUpdate(db, user.id, projectId, id, await readJson(request));
+      reconcilePagesFlow(db, know, projectId);
+      return json(response, 200, updated, { 'cache-control': 'no-store' });
+    }
     return json(response, 405, { error: 'Method not allowed.' });
   }
   const layerRoute = /^\/api\/projects\/([^/]+)\/layers(?:\/([^/]+)\/outputs\/([^/]+)\/([^/]+))?$/.exec(url.pathname);
@@ -552,6 +570,7 @@ async function api(request, response, url) {
       const updated = updateLayerInstance(db, user.id, projectId, decodeURIComponent(instanceRoute[2]), await readJson(request));
       if (updated.enabled && updated.key === 'product') { know.ensureProject(projectId, { pitch: flows.projectSetup(user, projectId).project.description, seedRoutines: false }); know.ensurePlan(projectId); }
       if (updated.enabled && updated.key === 'design') know.ensureDesign(projectId);
+      if (['product','pages'].includes(updated.key)) reconcilePagesFlow(db, know, projectId);
       return json(response, 200, updated, { 'cache-control': 'no-store' });
     }
     return json(response, 405, { error: 'Method not allowed.' });
@@ -650,7 +669,7 @@ async function api(request, response, url) {
     const method = request.method;
     // After any successful change to a project's layers, the gaps they reveal become backlog items (DEC-041).
     if (method !== 'GET' && projectId !== aludelProjectId && ['records', 'work', 'features', 'pages', 'skeleton', 'routines', 'batches'].includes(section)) {
-      response.once('finish', () => { if (response.statusCode < 400) { try { know.syncBacklog(projectId); } catch (error) { console.error(`Backlog for ${projectId}: ${error.message}`); } } });
+      response.once('finish', () => { if (response.statusCode < 400) { try { know.syncBacklog(projectId); reconcilePagesFlow(db, know, projectId); } catch (error) { console.error(`Backlog for ${projectId}: ${error.message}`); } } });
     }
     // Candidate evidence is project-scoped and read-only. Promotion needs a separate reviewed flow.
     if (section === 'candidates' && method === 'GET') {

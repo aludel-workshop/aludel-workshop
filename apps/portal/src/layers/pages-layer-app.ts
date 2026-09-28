@@ -5,6 +5,8 @@ import { ProjectContext, Routine, WorkItem, workStatusLabel } from './context';
 interface LayerDocSummary { key: string; groupName: string; title: string; revision: number; updatedAt: string; }
 interface LayerDoc extends LayerDocSummary { content: string; }
 interface Connection { id: string; sourceKey: string; status: 'proposed' | 'active' | 'inactive'; mapping: string; instructions: string; reaction: string; question: string; answer: string; revision: number; sourceAvailable: boolean; reviewedBy: string | null; reviewedAt: string | null; }
+interface Gap { key: string; sourceId: string; status: string; workItemId: string | null; sourceRevision: number; policyRevision: number; reason: string | null; updatedAt: string; }
+interface Reconciliation { coverage: string; policyRevision: number | null; gaps: Gap[]; lastReceipt: { createdAt: string } | null; }
 interface RoutineRun { id: number; ranAt: string; trigger: string; workItemId: string | null; workTitle: string | null; workState: string | null; }
 
 @Component({
@@ -53,7 +55,7 @@ interface RoutineRun { id: number; ranAt: string; trigger: string; workItemId: s
               <label class="lay-pa-field">Capabilities · one per line <textarea [(ngModel)]="routineCapabilities" rows="3" [readonly]="!canManage()"></textarea></label>
               <label class="lay-pa-field">Allowed outputs · one per line <textarea [(ngModel)]="routineOutputs" rows="3" [readonly]="!canManage()"></textarea></label>
               @if (canManage()) { <button type="button" class="lay-button" (click)="saveRoutine(routine)" [disabled]="busy() || !routineTitle.trim()">Save definition</button> }
-              <p class="lay-muted small">Execution is unavailable in this candidate packet. Editing a definition grants no new Work authority.</p>
+              <p class="lay-muted small">The reviewed Vision → Pages coverage utility runs after relevant changes. Agent routines still require a compatible Work adapter and a deliberate Go.</p>
             </section><aside class="lay-card"><h3>History</h3>
               <h4>Definition revisions</h4><ul class="lay-list">@for (entry of routine.history; track entry.revision) { <li class="lay-pa-history-row">r{{ entry.revision }} · {{ entry.rationale || 'Updated' }} · {{ entry.createdAt?.slice(0,10) }}</li> } @empty { <li class="lay-muted">No revisions yet.</li> }</ul>
               <h4>Runs and Work</h4><ul class="lay-list">@for (run of routineRuns(); track run.id) { <li class="lay-pa-history-row">{{ run.ranAt.slice(0,10) }} · {{ run.trigger }} · {{ run.workState || 'Recorded' }} @if (run.workItemId) { <a [href]="ctx.link('work','item',run.workItemId)" (click)="ctx.go(ctx.link('work','item',run.workItemId),$event)">Open Work item</a> }</li> } @empty { <li class="lay-muted">No runs for this routine.</li> }</ul>
@@ -63,7 +65,7 @@ interface RoutineRun { id: number; ranAt: string; trigger: string; workItemId: s
             <div class="lay-pa-table-wrap"><table><thead><tr><th>Routine</th><th>Executor</th><th>Trigger</th><th>Revision</th><th>Last run</th><th>State</th></tr></thead><tbody>
               @for (routine of routines(); track routine.id) { <tr><td><a [href]="ctx.link('pages','operations','routines',routine.id)" (click)="ctx.go(ctx.link('pages','operations','routines',routine.id),$event)">{{ routine.title }}</a></td><td>{{ routine.executor || 'Utility' }}</td><td>{{ routine.trigger || 'schedule' }}</td><td>r{{ routine.revision }}</td><td>{{ routine.lastRunAt?.slice(0,10) || 'Never' }}</td><td>{{ routine.enabled ? 'Defined' : 'Paused' }}</td></tr> }
               @empty { <tr><td colspan="6" class="lay-muted">No Pages routines. Create a definition when there is a bounded check to perform.</td></tr> }
-            </tbody></table></div><p class="lay-muted small">Run controls arrive with the LAT-05 execution and reconciliation kernel.</p>
+            </tbody></table></div><p class="lay-muted small">Reviewed Vision → Pages coverage runs automatically after relevant changes. Agent routines remain unavailable.</p>
           }
         }
         @case ('connections') {
@@ -82,7 +84,16 @@ interface RoutineRun { id: number; ranAt: string; trigger: string; workItemId: s
                 @if (connection.status !== 'active') { <button type="button" class="lay-button ghost" (click)="reviewConnection(connection)" [disabled]="busy() || !connection.sourceAvailable">Review and activate</button> }
                 @else { <button type="button" class="lay-link-button" (click)="deactivateConnection(connection)" [disabled]="busy()">Deactivate</button> }
               </div> }
-            </section><aside class="lay-card"><h3>Review boundary</h3><p>An active document names a reviewed mapping at an exact revision. Future Pages routines may read it; this packet does not run a sync.</p><p class="lay-muted">{{ connection.reviewedAt ? 'Last activated ' + connection.reviewedAt.slice(0,10) : 'Awaiting review.' }}</p></aside></div>
+            </section><aside class="lay-card"><h3>Review and coverage</h3><p>An active document names a reviewed mapping at an exact revision. It stages Pages suggestions in Work; it cannot start an agent.</p><p class="lay-muted">{{ connection.reviewedAt ? 'Last activated ' + connection.reviewedAt.slice(0,10) : 'Awaiting review.' }}</p>
+              @if (connection.sourceKey === 'product') {
+                <p>Flow coverage: {{ reconciliation()?.coverage || 'Loading' }} @if (reconciliation()?.policyRevision) { · policy r{{ reconciliation()?.policyRevision }} }</p>
+                @if (canManage() && reconciliation()?.coverage === 'active') { <button type="button" class="lay-button ghost" (click)="runCoverage()" [disabled]="busy()">Check coverage now</button> }
+                <ul class="lay-list">@for (gap of reconciliation()?.gaps || []; track gap.key) { <li class="lay-pa-history-row"><strong>{{ gap.status }}</strong> · {{ gap.sourceId }} · source r{{ gap.sourceRevision }} @if (gap.workItemId) { <a [href]="ctx.link('work','item',gap.workItemId)" (click)="ctx.go(ctx.link('work','item',gap.workItemId),$event)">Open Work</a> }
+                  @if (canManage() && ['open','pending-review','degraded'].includes(gap.status)) { <label class="lay-pa-field">Reason <input [ngModel]="gapReasons()[gap.key] || ''" (ngModelChange)="setGapReason(gap.key,$event)"></label><button type="button" class="lay-link-button" (click)="decideGap(gap,'exception')" [disabled]="busy() || !gapReasons()[gap.key]?.trim()">Keep as exception</button><button type="button" class="lay-link-button" (click)="decideGap(gap,'rejected')" [disabled]="busy() || !gapReasons()[gap.key]?.trim()">Reject relation</button> }
+                  @if (canManage() && ['exception','rejected'].includes(gap.status)) { <button type="button" class="lay-link-button" (click)="decideGap(gap,'reopen')" [disabled]="busy()">Reopen</button> }
+                </li> } @empty { <li class="lay-muted">No observed story-to-flow gaps.</li> }</ul>
+              }
+            </aside></div>
           } @else {
             <h2>Connections</h2><p class="lay-muted">A neighboring app publishes outputs. Pages may draft an interpretation; no relationship is assumed when it is added.</p>
             <div class="lay-pa-two">@for (layer of neighbors(); track layer.key) { <article class="lay-card"><h3>{{ layer.name }} → Pages</h3><p>{{ layer.description }}</p>
@@ -112,6 +123,8 @@ export class PagesLayerAppComponent implements OnInit {
   readonly docDraft = signal('');
   readonly connections = signal<Connection[]>([]);
   readonly routineRuns = signal<RoutineRun[]>([]);
+  readonly reconciliation = signal<Reconciliation | null>(null);
+  readonly gapReasons = signal<Record<string,string>>({});
   readonly busy = signal(false);
   readonly canManage = computed(() => this.ctx.session()?.projects.find(project => project.id === this.ctx.projectId())?.role === 'owner');
   readonly operation = computed(() => this.ctx.segments()[2] || 'board');
@@ -132,11 +145,12 @@ export class PagesLayerAppComponent implements OnInit {
     effect(() => { const routine = this.selectedRoutine(); if (routine && routine.id !== this.lastRoutineId) { this.lastRoutineId = routine.id; this.prepareRoutine(routine); void this.loadRuns(routine.id); } else if (!routine) this.lastRoutineId = ''; });
     effect(() => { const connection = this.selectedConnection(); if (connection && connection.id !== this.lastConnectionId) { this.lastConnectionId = connection.id; this.prepareConnection(connection); } else if (!connection) this.lastConnectionId = ''; });
   }
-  async ngOnInit() { await Promise.all([this.loadDocs(), this.loadConnections()]); }
+  async ngOnInit() { await Promise.all([this.loadDocs(), this.loadConnections(), this.loadReconciliation()]); }
   private path(suffix: string) { return `/api/projects/${encodeURIComponent(this.ctx.projectId())}/layers/pages/${suffix}`; }
   private async loadDocs() { try { this.documents.set((await this.ctx.api<{ documents: LayerDocSummary[] }>(this.path('documents'))).documents); } catch (error) { this.ctx.error.set(String(error)); } }
   private async loadDoc(key: string) { try { const doc = await this.ctx.api<LayerDoc>(this.path(`documents/${encodeURIComponent(key)}`)); if (this.docKey() === key) { this.selectedDoc.set(doc); this.docDraft.set(doc.content); this.previousDoc.set(null); } } catch (error) { this.ctx.error.set(String(error)); } }
   private async loadConnections() { try { this.connections.set((await this.ctx.api<{ connections: Connection[] }>(this.path('connections'))).connections); } catch (error) { this.ctx.error.set(String(error)); } }
+  private async loadReconciliation() { try { this.reconciliation.set(await this.ctx.api<Reconciliation>(this.path('reconciliation'))); } catch (error) { this.ctx.error.set(String(error)); } }
   private async loadRuns(id: string) { try { this.routineRuns.set((await this.ctx.api<{ runs: RoutineRun[] }>(this.path(`routines/${encodeURIComponent(id)}/runs`))).runs); } catch { this.routineRuns.set([]); } }
   docsByGroup(group: string) { return this.documents().filter(doc => doc.groupName === group.toLowerCase()); }
   layerName(key: string) { return this.ctx.layerInstances().find(item => item.key === key)?.name || key; }
@@ -146,10 +160,13 @@ export class PagesLayerAppComponent implements OnInit {
   private prepareRoutine(r: Routine) { this.routineTitle=r.title; this.routineExecutor=r.executor||'utility'; this.routineTrigger=r.trigger||'schedule'; this.routineCadence=r.cadence; this.routineInstructionDoc=r.instructionDoc||''; this.routineReads=(r.allowedReads||[]).join('\n'); this.routineCapabilities=(r.capabilities||[]).join('\n'); this.routineOutputs=(r.outputKinds||[]).join('\n'); }
   async newRoutine() { this.busy.set(true); let id=''; const ok=await this.ctx.write(async()=>{ const created=await this.ctx.record('routine',{title:'New Pages routine',layer:'pages',type:'audit',cadence:'monthly',documents:[],enabled:false,executor:'utility',trigger:'manual',instructionDoc:'routine-method',allowedReads:[],capabilities:[],outputKinds:[]}) as Routine; id=created.id; },'Routine definition created.'); this.busy.set(false); if(ok&&id)this.ctx.go(this.ctx.link('pages','operations','routines',id)); }
   async saveRoutine(r: Routine) { this.busy.set(true); await this.ctx.write(()=>this.ctx.change(r.id,{title:this.routineTitle,executor:this.routineExecutor,trigger:this.routineTrigger,cadence:this.routineCadence,instructionDoc:this.routineInstructionDoc||null,allowedReads:this.routineReads.split('\n').map(v=>v.trim()).filter(Boolean),capabilities:this.routineCapabilities.split('\n').map(v=>v.trim()).filter(Boolean),outputKinds:this.routineOutputs.split('\n').map(v=>v.trim()).filter(Boolean)},r.revision,'Updated Pages routine definition'),'Routine saved as a new revision.'); this.busy.set(false); }
+  setGapReason(key: string, reason: string) { this.gapReasons.update(current => ({ ...current, [key]: reason })); }
+  async runCoverage() { this.busy.set(true); await this.ctx.write(() => this.ctx.api(this.path('reconciliation/run'),'POST',{}), 'Pages coverage checked.'); await this.loadReconciliation(); this.busy.set(false); }
+  async decideGap(gap: Gap, decision: 'exception' | 'rejected' | 'reopen') { this.busy.set(true); await this.ctx.write(() => this.ctx.api(this.path(`reconciliation/${encodeURIComponent(gap.key)}`),'POST',{ decision, reason: this.gapReasons()[gap.key] || '', expectedUpdatedAt: gap.updatedAt }), 'Gap decision recorded.'); await this.loadReconciliation(); this.busy.set(false); }
   private prepareConnection(c: Connection) { this.connectionMapping=c.mapping; this.connectionInstructions=c.instructions; this.connectionReaction=c.reaction; this.connectionQuestion=c.question; this.connectionAnswer=c.answer; }
   private connectionBody(c: Connection) { return {expectedRevision:c.revision,mapping:this.connectionMapping,instructions:this.connectionInstructions,reaction:this.connectionReaction,question:this.connectionQuestion,answer:this.connectionAnswer}; }
   async draftConnection(key: string) { this.busy.set(true); let id=''; const ok=await this.ctx.write(async()=>{const c=await this.ctx.api<Connection>(this.path('connections'),'POST',{sourceKey:key});id=c.id;},'Connection draft created.'); await this.loadConnections(); this.busy.set(false); if(ok&&id)this.ctx.go(this.ctx.link('pages','operations','connections',id)); }
-  async saveConnection(c: Connection) { this.busy.set(true); await this.ctx.write(()=>this.ctx.api(this.path(`connections/${c.id}`),'PUT',this.connectionBody(c)),'Connection document saved.'); await this.loadConnections(); this.busy.set(false); }
-  async reviewConnection(c: Connection) { this.busy.set(true); await this.ctx.write(()=>this.ctx.api(this.path(`connections/${c.id}`),'PUT',{...this.connectionBody(c),status:'active'}),'Connection reviewed and active for future runs.'); await this.loadConnections(); this.busy.set(false); }
-  async deactivateConnection(c: Connection) { this.busy.set(true); await this.ctx.write(()=>this.ctx.api(this.path(`connections/${c.id}`),'PUT',{expectedRevision:c.revision,status:'inactive'}),'Connection deactivated.'); await this.loadConnections(); this.busy.set(false); }
+  async saveConnection(c: Connection) { this.busy.set(true); await this.ctx.write(()=>this.ctx.api(this.path(`connections/${c.id}`),'PUT',this.connectionBody(c)),'Connection document saved.'); await Promise.all([this.loadConnections(), this.loadReconciliation()]); this.busy.set(false); }
+  async reviewConnection(c: Connection) { this.busy.set(true); await this.ctx.write(()=>this.ctx.api(this.path(`connections/${c.id}`),'PUT',{...this.connectionBody(c),status:'active'}),'Connection reviewed and active for future runs.'); await Promise.all([this.loadConnections(), this.loadReconciliation()]); this.busy.set(false); }
+  async deactivateConnection(c: Connection) { this.busy.set(true); await this.ctx.write(()=>this.ctx.api(this.path(`connections/${c.id}`),'PUT',{expectedRevision:c.revision,status:'inactive'}),'Connection deactivated.'); await Promise.all([this.loadConnections(), this.loadReconciliation()]); this.busy.set(false); }
 }
