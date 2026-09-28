@@ -2,7 +2,7 @@
 id: status-001
 kind: project-status
 status: active
-updated: 2026-09-27
+updated: 2026-09-28
 current_phase: M1
 phase_state: in-progress
 next_action: WORK-AGENTS-01
@@ -12,7 +12,7 @@ next_action: WORK-AGENTS-01
 
 ## Objective
 
-Turn the running local portal foundation into the first complete request → deliberate authorization → real agent-built preview → owner review loop, while moving mutable product records out of hand-edited Markdown.
+Build and compare an isolated layer-app candidate while preserving the running portal and its existing Work loop.
 
 ## Next action
 
@@ -42,6 +42,8 @@ One packet at a time. B-03's worker/artifact/recovery work remains required and 
 - **M3 generality:** Q-003 needs a representative second-product brief.
 
 ## Current facts and evidence
+
+- 2026-09-28: **LAT-04 completed locally on isolated candidate commit `02d0670`.** Explicit catalog selection permits zero or one layer; Home adds/removes apps, and Pages has versioned Knowledge, Operations board, routines and reviewed connection documents while native Map/Pages/Flows remain. Full server tests passed 128/128; typecheck/build and wide/390px browser journeys with axe passed. [Evidence and retrospective](evidence/lat-04/README.md). WORK-AGENTS-01 remains the next dependency before LAT-05 agent execution; owner acceptance and promotion remain open.
 
 - PW-02 adds revisioned Direction, outcome Roadmap and Features records, then migrates primary navigation to Overview / Product / Work with utility destinations. Its primary-source reference study changed the implemented composition; product edits retain provenance, stale only exact dependents and never authorize Work. Node 24 typecheck/build, six server/domain suites, Product wide/narrow axe/browser checks and the existing Work lifecycle regression pass. [Evidence/retrospective](evidence/pw-02-product-workspace.md) · [research and references](design/project-workspace/pw-02/research.md).
 
