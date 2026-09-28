@@ -1,3 +1,4 @@
+import { createLayerInstances } from './layer-contract.mjs';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -230,6 +231,7 @@ export function onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot, cr
           .run(projectId, created, row.id);
         if (!claimed.changes) fail('This idea already became a project.', 409);
         db.prepare(`INSERT INTO project_members(project_id, user_id, role, created_at) VALUES (?, ?, 'owner', ?)`).run(projectId, user.id, created);
+        createLayerInstances(db, projectId, created);
         db.prepare(`INSERT INTO project_setup(project_id, profile, stack_preset, stack_options_json, workspace_path, completed_steps_json, created_by, created_at, updated_at)
           VALUES (?, ?, ?, ?, ?, '["profile","idea","account"]', ?, ?, ?)`).run(projectId, row.profile, catalogs.stacks.default,
           JSON.stringify(Object.fromEntries(Object.entries(catalogs.stacks.presets[catalogs.stacks.default].options).map(([key, option]) => [key, option.default]))),

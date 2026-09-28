@@ -408,7 +408,8 @@ const cadenceDays = { weekly: 7, monthly: 30 };
 // Types whose output is a change to their target records, so closing them checks for a revision made from the item.
 // Implement, reconcile, review and audit produce code, links or findings; LAY-05 verifies those.
 const verifiedTypes = ['define', 'spec', 'plan', 'design', 'research', 'configure'];
-const kinds = Object.keys(validators);
+export const knowledgeKinds = Object.freeze(Object.keys(validators));
+const kinds = knowledgeKinds;
 const prefixes = { vision_section: 'vis', persona: 'per', phase: 'pha', activity: 'act', step: 'stp', story: 'sto', spec: 'spc', research: 'res', doc: 'doc', page: 'pag', flow: 'flw', page_map: 'pmp',
   data_object: 'obj', data_operation: 'opr', access_rule: 'acc', agent_profile: 'agt', project_instructions: 'ins', routine: 'rtn', role: 'rol', work_action: 'wac',
   brief_claim: 'clm', source: 'src', finding: 'fnd', insight: 'isg', evidence_link: 'evl', project: 'prj', design_tokens: 'tok', component: 'cmp', brand_asset: 'bra' };

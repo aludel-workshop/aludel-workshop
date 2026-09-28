@@ -24,6 +24,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { importCorpus } from './importer.mjs';
 import { openDatabase } from './storage.mjs';
+import { initLayerContract, layerDescriptors, layerOutputRead, layerMigrationInventory } from './layer-contract.mjs';
 import { answerDecision, createProposal, ensureB02Fixture, getDecision, getProposal, listDecisions, listDownstreamRecords, listProposals, reassessRecord, reviseProposal } from './product-records.mjs';
 import { openSecretStore } from './secret-store.mjs';
 import { githubIntegration, initGithubIdentities } from './github-integration.mjs';
@@ -56,6 +57,7 @@ initCodeCandidates(db);
 initEditorBridge(db);
 initSymphonyWorker(db);
 initWorkRuns(db);
+initLayerContract(db);
 const secrets = openSecretStore(dataDirectory);
 const topology = hostTopology(process.env, port);
 const setupConfigPath = join(portalRoot, 'config', 'project-setup.json');
@@ -506,6 +508,15 @@ async function api(request, response, url) {
     return json(response, 201, { project: setup.project }, { 'set-cookie': draftCookie('', 0) });
   }
   if (url.pathname === '/api/projects' && request.method === 'GET') return json(response, 200, { projects: userProjects(db, user.id) });
+  const layerRoute = /^\/api\/projects\/([^/]+)\/layers(?:\/([^/]+)\/outputs\/([^/]+)\/([^/]+))?$/.exec(url.pathname);
+  if (layerRoute && request.method === 'GET') {
+    const [, projectId, layerKey, kind, recordId] = layerRoute.map(value => value ? decodeURIComponent(value) : value);
+    if (!layerKey) return json(response, 200, { layers: layerDescriptors(db, user.id, projectId) }, { 'cache-control': 'no-store' });
+    return json(response, 200, layerOutputRead(db, user.id, projectId, layerKey, kind, recordId), { 'cache-control': 'no-store' });
+  }
+  const inventoryRoute = /^\/api\/projects\/([^/]+)\/layers-inventory$/.exec(url.pathname);
+  if (inventoryRoute && request.method === 'GET') return json(response, 200, layerMigrationInventory(db, user.id, decodeURIComponent(inventoryRoute[1])), { 'cache-control': 'no-store' });
+
   const candidateAcceptRoute = /^\/api\/projects\/([^/]+)\/candidates\/([^/]+)\/accept$/.exec(url.pathname);
   if (candidateAcceptRoute) {
     const [, projectId, candidateId] = candidateAcceptRoute;
