@@ -1,4 +1,4 @@
-import { createLayerInstances } from './layer-contract.mjs';
+import { createLayerInstances, layerCatalog } from './layer-contract.mjs';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -81,6 +81,10 @@ export function initOnboarding(db) {
   // DESIGN-UX-01: what an upload is for. Reference media (onboarding) and brand images go into the generated app; Library images do not.
   const assetColumns = new Set(db.prepare('PRAGMA table_info(project_assets)').all().map(column => column.name));
   if (!assetColumns.has('purpose')) db.exec("ALTER TABLE project_assets ADD COLUMN purpose TEXT NOT NULL DEFAULT 'reference'");
+  const draftColumns = new Set(db.prepare('PRAGMA table_info(onboarding_drafts)').all().map(column => column.name));
+  if (!draftColumns.has('layers_json')) db.exec("ALTER TABLE onboarding_drafts ADD COLUMN layers_json TEXT NOT NULL DEFAULT '[]'");
+  if (!draftColumns.has('layers_selected')) db.exec('ALTER TABLE onboarding_drafts ADD COLUMN layers_selected INTEGER NOT NULL DEFAULT 0');
+  if (!setupColumns.has('layer_onboarding_version')) db.exec('ALTER TABLE project_setup ADD COLUMN layer_onboarding_version INTEGER NOT NULL DEFAULT 0');
   db.prepare('DELETE FROM onboarding_drafts WHERE claimed_project_id IS NULL AND expires_at < ?').run(now());
 }
 
@@ -114,7 +118,7 @@ export function agentKeyChecker(env = process.env, request = fetch) {
 export function onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot, createWorkspace, know, checkAgentKey = agentKeyChecker() }) {
   const agentProviders = catalogs.agentProviders.providers;
   const draftRow = token => token ? db.prepare('SELECT * FROM onboarding_drafts WHERE token_hash = ? AND expires_at > ?').get(digest(token), now()) : null;
-  const draftView = row => row && { profile: row.profile, name: row.name, pitch: row.pitch, claimedProjectId: row.claimed_project_id };
+  const draftView = row => row && { profile: row.profile, name: row.name, pitch: row.pitch, layers: parse(row.layers_json, []), layersSelected: Boolean(row.layers_selected), claimedProjectId: row.claimed_project_id };
 
   function effectivePreferences(profile, overrides) {
     const defaults = catalogs.profiles[profile]?.defaults || catalogs.profiles.dreamer.defaults;
@@ -181,7 +185,7 @@ export function onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot, cr
   const api = {
     catalog() {
       return {
-        preferences: catalogs.preferences, profiles: catalogs.profiles, feels: catalogs.feels, features: catalogs.packs,
+        preferences: catalogs.preferences, profiles: catalogs.profiles, feels: catalogs.feels, features: catalogs.packs, layers: layerCatalog,
         stacks: catalogs.stacks, pageTypes: catalogs.pageTypes, routeIcons: catalogs.routeIcons, agentProviders: Object.fromEntries(Object.entries(agentProviders).map(([id, value]) => [id, { label: value.label, secret: value.secret, keyUrl: value.keyUrl, limitsUrl: value.limitsUrl, docsUrl: value.docsUrl, steps: value.steps, limits: value.limits }]))
       };
     },
@@ -194,16 +198,19 @@ export function onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot, cr
       const profile = input.profile === undefined ? existing?.profile : validateProfile(input.profile);
       let { name = existing?.name || '', pitch = existing?.pitch || '' } = input;
       if (input.name !== undefined || input.pitch !== undefined) ({ name, pitch } = validateIdea({ name, pitch }));
+      const selected = input.layers === undefined ? parse(existing?.layers_json, []) : input.layers;
+      if (!Array.isArray(selected) || selected.some(key => typeof key !== 'string' || !layerCatalog.some(layer => layer.key === key)) || new Set(selected).size !== selected.length)
+        fail('Choose layers from the available catalog.');
       const updated = now();
       const expires = new Date(Date.now() + draftMaxAge * 1000).toISOString();
       if (existing) {
-        db.prepare('UPDATE onboarding_drafts SET profile = ?, name = ?, pitch = ?, updated_at = ?, expires_at = ? WHERE id = ?')
-          .run(profile || null, name, pitch, updated, expires, existing.id);
+        db.prepare('UPDATE onboarding_drafts SET profile = ?, name = ?, pitch = ?, layers_json = ?, layers_selected = ?, updated_at = ?, expires_at = ? WHERE id = ?')
+          .run(profile || null, name, pitch, JSON.stringify(selected), input.layers === undefined ? existing.layers_selected : 1, updated, expires, existing.id);
         return { draft: draftView(draftRow(token)), token: null };
       }
       const newToken = randomBytes(32).toString('base64url');
-      db.prepare(`INSERT INTO onboarding_drafts(id, token_hash, profile, name, pitch, created_at, updated_at, expires_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(`draft-${randomUUID()}`, digest(newToken), profile || null, name, pitch, updated, updated, expires);
+      db.prepare(`INSERT INTO onboarding_drafts(id, token_hash, profile, name, pitch, layers_json, layers_selected, created_at, updated_at, expires_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(`draft-${randomUUID()}`, digest(newToken), profile || null, name, pitch, JSON.stringify(selected), input.layers === undefined ? 0 : 1, updated, updated, expires);
       return { draft: draftView(draftRow(newToken)), token: newToken, maxAge: draftMaxAge };
     },
 
@@ -231,16 +238,16 @@ export function onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot, cr
           .run(projectId, created, row.id);
         if (!claimed.changes) fail('This idea already became a project.', 409);
         db.prepare(`INSERT INTO project_members(project_id, user_id, role, created_at) VALUES (?, ?, 'owner', ?)`).run(projectId, user.id, created);
-        createLayerInstances(db, projectId, created);
-        db.prepare(`INSERT INTO project_setup(project_id, profile, stack_preset, stack_options_json, workspace_path, completed_steps_json, created_by, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, '["profile","idea","account"]', ?, ?, ?)`).run(projectId, row.profile, catalogs.stacks.default,
+        createLayerInstances(db, projectId, created, row.layers_selected ? parse(row.layers_json, []) : null);
+        db.prepare(`INSERT INTO project_setup(project_id, profile, stack_preset, stack_options_json, workspace_path, completed_steps_json, layer_onboarding_version, created_by, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(projectId, row.profile, catalogs.stacks.default,
           JSON.stringify(Object.fromEntries(Object.entries(catalogs.stacks.presets[catalogs.stacks.default].options).map(([key, option]) => [key, option.default]))),
-          workspacePath, user.id, created, created);
+          workspacePath, row.layers_selected ? '["profile","idea","layers","account"]' : '["profile","idea","account"]', row.layers_selected ? 1 : 0, user.id, created, created);
         db.exec('COMMIT');
       } catch (error) { db.exec('ROLLBACK'); throw error; }
       saveProductRecord(db, projectId, 'direction', null, { title: name, summary: pitch, audience: '', outcomes: [], constraints: [], success: [] });
-      know.ensureProject(projectId, { pitch });
-      know.seedPages(projectId, null);
+      // Older direct-claim clients retain the original scaffold; explicit catalog selection owns the blank start.
+      if (!row.layers_selected) { know.ensureProject(projectId, { pitch }); know.seedPages(projectId, null); }
       createWorkspace(api.projectSetup(user, projectId), authorIdentity);
       return api.projectSetup(user, projectId);
     },
@@ -292,6 +299,8 @@ export function onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot, cr
 
     saveDesign(user, projectId, { feel, theme, accent, notes = '', navigation }) {
       requireMember(db, user, projectId);
+      const setup = setupRow(projectId);
+      if (setup.layer_onboarding_version && !db.prepare("SELECT 1 FROM layer_instances WHERE project_id = ? AND layer_key = 'design' AND enabled = 1").get(projectId)) fail('Add Design before setting its look.', 409);
       if (!catalogs.feels[feel]) fail('Choose a starting feel.');
       if (!['light', 'dark', 'system'].includes(theme)) fail('Choose light, dark or match the device.');
       const accentColor = String(accent || catalogs.feels[feel].accent).trim().toLowerCase();
@@ -302,7 +311,7 @@ export function onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot, cr
       db.prepare('UPDATE project_setup SET feel = ?, theme = ?, design_notes = ?, navigation = COALESCE(?, navigation), updated_at = ? WHERE project_id = ?')
         .run(feel, theme, String(notes).trim(), navigation || null, updated, projectId);
       db.prepare('UPDATE projects SET accent_color = ?, updated_at = ? WHERE id = ?').run(accentColor, updated, projectId);
-      know.seedPages(projectId, feel);
+      if (!setup.layer_onboarding_version) know.seedPages(projectId, feel);
       know.syncDesignFromLook?.(projectId);
       markStep(projectId, 'look');
       return api.projectSetup(user, projectId);
@@ -362,6 +371,7 @@ export function onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot, cr
 
     saveFeatures(user, projectId, { picks = [], custom = [] }) {
       requireMember(db, user, projectId);
+      if (setupRow(projectId).layer_onboarding_version) fail('The story-pack picker is off in this layer-app candidate.', 409);
       if (!Array.isArray(picks) || !Array.isArray(custom)) fail('Choose story packs from the list.');
       if (custom.length > 30) fail('Add up to 30 story ideas at a time.');
       know.applyPacks(projectId, picks, { customIdeas: custom });
@@ -379,6 +389,7 @@ export function onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot, cr
 
     saveRoutes(user, projectId, { routes, navigation, reassign = {} }) {
       requireMember(db, user, projectId);
+      if (setupRow(projectId).layer_onboarding_version && !db.prepare("SELECT 1 FROM layer_instances WHERE project_id = ? AND layer_key = 'pages' AND enabled = 1").get(projectId)) fail('Add Pages before editing its navigation.', 409);
       if (navigation !== undefined && !['sidebar', 'top'].includes(navigation)) fail('Choose side or top navigation.');
       know.saveNavRoutes(projectId, routes, { reassign, author: user.name });
       if (navigation) db.prepare('UPDATE project_setup SET navigation = ?, updated_at = ? WHERE project_id = ?').run(navigation, now(), projectId);

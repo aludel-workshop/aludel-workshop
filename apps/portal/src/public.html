@@ -135,9 +135,29 @@
       </section>
     }
 
+    @case ('layers') {
+      <section class="pub-layer-selection" aria-labelledby="layer-select-heading">
+        <p class="eyebrow">Step 3 · Layer apps</p>
+        <h1 id="layer-select-heading" tabindex="-1">Which layers should {{ appName }} start with?</h1>
+        <p class="pub-lead">Pick the kinds of work you need now. Starting with none is fine; you can add a layer from Home later.</p>
+        <div class="pub-layer-catalog">
+          @for (item of catalog()?.layers || []; track item.key) {
+            <label class="pub-layer-choice" [class.selected]="selectedLayers().includes(item.key)">
+              <input type="checkbox" [checked]="selectedLayers().includes(item.key)" (change)="toggleLayer(item.key)">
+              <mat-icon aria-hidden="true">{{ item.icon }}</mat-icon>
+              <span><small>{{ item.category }}</small><strong>{{ item.name }}</strong><span>{{ item.description }}</span></span>
+            </label>
+          }
+        </div>
+        <p class="field-hint">These are the built-in layer apps available in this local candidate. More app types can join the catalog later.</p>
+        <div class="pub-actions pub-footer-actions"><a mat-button href="/start/idea" (click)="go('/start/idea', $event)">Back</a>
+          <button mat-flat-button type="button" (click)="saveLayers()" [disabled]="busy()">{{ selectedLayers().length ? 'Continue with ' + selectedLayers().length + ' layers' : 'Start with no layers' }}<mat-icon iconPositionEnd aria-hidden="true">arrow_forward</mat-icon></button></div>
+      </section>
+    }
+
     @case ('account') {
       <section class="pub-narrow" aria-labelledby="account-heading">
-        <p class="eyebrow">Step 3 · Account</p>
+        <p class="eyebrow">Step 4 · Account</p>
         @if (session()?.authenticated) {
           <h1 id="account-heading" tabindex="-1">Save {{ appName }} to your account</h1>
           <p class="pub-lead">You're signed in as {{ session()?.user?.name }}{{ session()?.user?.email ? ' (' + session()?.user?.email + ')' : '' }}.</p>
@@ -150,7 +170,7 @@
             <p class="field-hint">You'll approve access on github.com and come straight back. Aludel never sees your GitHub password.</p>
             @if (!emailForm()) { <button mat-button type="button" class="pub-email-toggle" (click)="emailForm.set(true)">Use an email and password instead</button> }
           } @else if (accountMode() !== 'owner') {
-            <p class="pub-lead">Your idea is saved. Create an Aludel account (or sign in) to keep it. You'll connect GitHub on the next step.</p>
+            <p class="pub-lead">Your idea is saved. Create an Aludel account (or sign in) to keep it. Your selected layers can be set up locally after this step; GitHub is optional in this candidate.</p>
           }
           @if (!session()?.githubSignIn || emailForm() || accountMode() === 'owner') {
           <form (ngSubmit)="submitAccount()" class="pub-email-form">
@@ -185,7 +205,7 @@
     @case ('github') {
       @if (setup(); as current) {
         <section class="pub-narrow" aria-labelledby="github-heading">
-          <p class="eyebrow">Step 4 · GitHub</p>
+          <p class="eyebrow">Step 5 · GitHub</p>
           <h1 id="github-heading" tabindex="-1">Give {{ current.project.name }} a home on GitHub</h1>
           <p class="pub-lead">Connect the GitHub account you'll use for your repositories. Aludel creates the repository and pushes the first commit for you.</p>
           <div class="pub-status-card">
@@ -234,7 +254,7 @@
     @case ('agent') {
       @if (setup(); as current) {
         <section class="pub-narrow" aria-labelledby="agent-step-heading">
-          <p class="eyebrow">Step 5 · Agent · optional</p>
+          <p class="eyebrow">Step 6 · Agent · optional</p>
           <h1 id="agent-step-heading" tabindex="-1">{{ preferences()['agentSetup'] === 'optional' ? 'Want an agent on hand?' : 'Connect an agent' }}</h1>
           <p class="pub-lead">{{ preferences()['agentSetup'] === 'optional' ? 'No AI is required. Connect one now or later if you ever want to delegate a task.' : 'An agent does the implementation work you authorize. Aludel uses the same connection for every project, including itself.' }}</p>
           <aludel-agent-connection [projectId]="current.project.id" [projectName]="current.project.name" heading="Agent for {{ current.project.name }}" description="Paste an API key from your Anthropic or OpenAI account. It takes about five minutes, and you can skip it for now." (changed)="agentChanged($event)"></aludel-agent-connection>
@@ -249,8 +269,8 @@
       @if (setup(); as current) {
         <div class="pub-workbench">
           <section class="pub-panel" aria-labelledby="look-heading">
-            <p class="eyebrow">Step 6 · Look & feel · optional</p>
-            <h1 id="look-heading" tabindex="-1">Choose a starting feel</h1>
+            <p class="eyebrow">Step 7 · Design layer setup · optional</p>
+            <h1 id="look-heading" tabindex="-1">Set up Design</h1>
             <p class="pub-panel-lead">A feel sets type, shape, colour and navigation, not features. Watch your app take shape on the right.</p>
             <fieldset class="pub-feel-list">
               <legend class="visually-hidden">Starting feel</legend>
@@ -301,7 +321,7 @@
       @if (setup(); as current) {
         <div class="pub-workbench">
           <section class="pub-panel" aria-labelledby="pages-heading">
-            <p class="eyebrow">Step 8 · Pages · optional</p>
+            <p class="eyebrow">Step 8 · Pages layer setup · optional</p>
             <h1 id="pages-heading" tabindex="-1">Shape the navigation</h1>
             <p class="pub-panel-lead">These are the main places in {{ current.project.name }}, the ones in its navigation. Edit them right in the preview.</p>
             <ul class="pub-howto">
@@ -332,55 +352,6 @@
             </div>
           </section>
           <ng-container *ngTemplateOutlet="stage; context: { mode: 'pages', current: current }" />
-        </div>
-      }
-    }
-
-    @case ('features') {
-      @if (setup(); as current) {
-        <div class="pub-workbench">
-          <section class="pub-panel" aria-labelledby="features-heading">
-            <p class="eyebrow">Step 7 · Functionality · optional</p>
-            <h1 id="features-heading" tabindex="-1">What should {{ current.project.name }} be able to do?</h1>
-            <p class="pub-panel-lead">Each story pack adds real stories to your story map and proposes where they live in the app. They're yours to change afterwards.</p>
-            <fieldset class="pub-feature-list">
-              <legend class="visually-hidden">Story packs</legend>
-              @for (item of featureEntries(); track item.id) {
-                <label class="pub-feature" [class.selected]="picks.has(item.id)">
-                  <input type="checkbox" [checked]="picks.has(item.id)" (change)="togglePick(item.id)">
-                  <mat-icon aria-hidden="true">{{ item.icon }}</mat-icon>
-                  <span><strong>{{ item.label }}</strong><small>{{ item.summary }} · {{ item.stories.length }} stories{{ templateCount(item) ? ' · ' + templateCount(item) + ' built by the template' : '' }}</small></span>
-                </label>
-                @if (picks.has(item.id)) {
-                  <ul class="pub-pack-stories" [attr.aria-label]="item.label + ' stories'">
-                    @for (story of item.stories; track $index) { <li><span class="pub-phase">{{ phaseLabel(story.phase) }}</span>{{ story.title }}@if (story.template) { <em class="pub-badge">template</em> }</li> }
-                  </ul>
-                }
-              }
-            </fieldset>
-            <label class="pub-toggle"><input type="checkbox" [checked]="details()" (change)="details.set(!details())"> More details</label>
-            @if (details()) {
-              <section class="pub-custom" aria-labelledby="custom-heading">
-                <h2 id="custom-heading">Your own story ideas</h2>
-                @if (customFeatures().length) {
-                  <ul class="pub-assets">
-                    @for (item of customFeatures(); track item.id) {
-                      <li><mat-icon aria-hidden="true">lightbulb</mat-icon><span><strong>{{ item.title }}</strong><small>{{ phaseLabel(item.phase) }}</small></span>
-                        <button mat-icon-button type="button" (click)="removeFeature(item.id)" [attr.aria-label]="'Remove ' + item.title"><mat-icon>delete</mat-icon></button></li>
-                    }
-                  </ul>
-                }
-                <mat-form-field appearance="outline" class="wide-field"><mat-label>Someone can…</mat-label><input matInput name="newFeatureTitle" [(ngModel)]="newFeatureTitle" maxlength="160"></mat-form-field>
-                <mat-form-field appearance="outline" class="wide-field"><mat-label>Why it matters</mat-label><textarea matInput name="newFeatureSummary" [(ngModel)]="newFeatureSummary" rows="2" maxlength="400"></textarea></mat-form-field>
-                <button mat-stroked-button type="button" (click)="saveFeatures(false)" [disabled]="busy() || !newFeatureTitle.trim()"><mat-icon aria-hidden="true">add</mat-icon>Add story idea</button>
-              </section>
-            }
-            <div class="pub-panel-actions">
-              <button mat-button type="button" (click)="markAndNext('features')">Skip</button>
-              <button mat-flat-button type="button" (click)="saveFeatures()" [disabled]="busy()">Save and continue<mat-icon iconPositionEnd aria-hidden="true">arrow_forward</mat-icon></button>
-            </div>
-          </section>
-          <ng-container *ngTemplateOutlet="stage; context: { mode: 'look', current: current }" />
         </div>
       }
     }

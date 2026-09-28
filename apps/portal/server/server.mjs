@@ -24,7 +24,8 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { importCorpus } from './importer.mjs';
 import { openDatabase } from './storage.mjs';
-import { initLayerContract, layerDescriptors, layerInstances, updateLayerInstance, layerOutputRead, layerMigrationInventory } from './layer-contract.mjs';
+import { initPagesLayerApp, pagesDocumentList, pagesDocumentRead, pagesDocumentUpdate, pagesConnections, pagesConnectionCreate, pagesConnectionUpdate } from './pages-layer-app.mjs';
+import { initLayerContract, layerDescriptors, layerInstances, updateLayerInstance, layerCatalog, layerOutputRead, layerMigrationInventory } from './layer-contract.mjs';
 import { answerDecision, createProposal, ensureB02Fixture, getDecision, getProposal, listDecisions, listDownstreamRecords, listProposals, reassessRecord, reviseProposal } from './product-records.mjs';
 import { openSecretStore } from './secret-store.mjs';
 import { githubIntegration, initGithubIdentities } from './github-integration.mjs';
@@ -58,6 +59,7 @@ initEditorBridge(db);
 initSymphonyWorker(db);
 initWorkRuns(db);
 initLayerContract(db);
+initPagesLayerApp(db);
 const secrets = openSecretStore(dataDirectory);
 const topology = hostTopology(process.env, port);
 const setupConfigPath = join(portalRoot, 'config', 'project-setup.json');
@@ -81,13 +83,13 @@ const know = knowledge({ db, catalogs, packs: catalogs.packs });
 const flows = onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot: join(dataDirectory, 'project-assets'), createWorkspace, know });
 // One-time: projects created before the layers (LAY-03) get phases, a vision and page records from their onboarding data.
 for (const project of db.prepare(`SELECT p.id, p.description, s.feel FROM projects p JOIN project_setup s ON s.project_id = p.id
-  WHERE p.id <> 'the-machine' AND NOT EXISTS (SELECT 1 FROM knowledge_records k WHERE k.project_id = p.id AND k.kind = 'phase')`).all()) {
+  WHERE p.id <> 'the-machine' AND s.layer_onboarding_version = 0 AND NOT EXISTS (SELECT 1 FROM knowledge_records k WHERE k.project_id = p.id AND k.kind = 'phase')`).all()) {
   know.ensureProject(project.id, { pitch: project.description });
   know.seedPages(project.id, project.feel);
 }
 // LAY-07: projects from before the Data layer and agent profiles get them (idempotent), before code links start listening.
 const layerProjects = () => db.prepare("SELECT p.id FROM projects p JOIN project_setup s ON s.project_id = p.id WHERE p.id <> 'the-machine'").all().map(row => row.id);
-for (const projectId of layerProjects()) {
+for (const projectId of layerProjects().filter(id => !db.prepare('SELECT layer_onboarding_version FROM project_setup WHERE project_id = ?').get(id)?.layer_onboarding_version)) {
   know.ensureAgents(projectId);
   know.ensurePackData(projectId);
   know.ensureRoutines(projectId);
@@ -508,18 +510,50 @@ async function api(request, response, url) {
     return json(response, 201, { project: setup.project }, { 'set-cookie': draftCookie('', 0) });
   }
   if (url.pathname === '/api/projects' && request.method === 'GET') return json(response, 200, { projects: userProjects(db, user.id) });
+  const pagesRunsRoute = /^\/api\/projects\/([^/]+)\/layers\/pages\/routines\/([^/]+)\/runs$/.exec(url.pathname);
+  if (pagesRunsRoute && request.method === 'GET') {
+    const projectId = decodeURIComponent(pagesRunsRoute[1]), routineId = decodeURIComponent(pagesRunsRoute[2]);
+    requireMember(db, user, projectId);
+    if (!layerInstances(db, user.id, projectId).some(layer => layer.key === 'pages' && layer.enabled)
+      || !know.list(projectId, 'routine').some(routine => routine.id === routineId && routine.layer === 'pages'))
+      return json(response, 404, { error: 'Pages routine not found.' });
+    return json(response, 200, { runs: db.prepare(`SELECT r.id, r.ran_at AS ranAt, r.trigger, r.work_item_id AS workItemId,
+      w.title AS workTitle, w.state AS workState FROM routine_runs r LEFT JOIN layer_work_items w ON w.id = r.work_item_id
+      WHERE r.project_id = ? AND r.routine_id = ? ORDER BY r.id DESC`).all(projectId, routineId) }, { 'cache-control': 'no-store' });
+  }
+  const pagesDocRoute = /^\/api\/projects\/([^/]+)\/layers\/pages\/documents(?:\/([^/]+))?$/.exec(url.pathname);
+  if (pagesDocRoute) {
+    const projectId = decodeURIComponent(pagesDocRoute[1]), key = pagesDocRoute[2] ? decodeURIComponent(pagesDocRoute[2]) : null;
+    if (request.method === 'GET' && !key) return json(response, 200, { documents: pagesDocumentList(db, user.id, projectId) }, { 'cache-control': 'no-store' });
+    if (request.method === 'GET' && key) return json(response, 200, pagesDocumentRead(db, user.id, projectId, key, url.searchParams.has('revision') ? Number(url.searchParams.get('revision')) : null), { 'cache-control': 'no-store' });
+    if (request.method === 'PUT' && key) return json(response, 200, pagesDocumentUpdate(db, user.id, projectId, key, await readJson(request)), { 'cache-control': 'no-store' });
+    return json(response, 405, { error: 'Method not allowed.' });
+  }
+  const pagesConnectionRoute = /^\/api\/projects\/([^/]+)\/layers\/pages\/connections(?:\/([^/]+))?$/.exec(url.pathname);
+  if (pagesConnectionRoute) {
+    const projectId = decodeURIComponent(pagesConnectionRoute[1]), id = pagesConnectionRoute[2] ? decodeURIComponent(pagesConnectionRoute[2]) : null;
+    if (request.method === 'GET' && !id) return json(response, 200, { connections: pagesConnections(db, user.id, projectId) }, { 'cache-control': 'no-store' });
+    if (request.method === 'POST' && !id) { const input = await readJson(request); return json(response, 201, pagesConnectionCreate(db, user.id, projectId, input.sourceKey), { 'cache-control': 'no-store' }); }
+    if (request.method === 'PUT' && id) return json(response, 200, pagesConnectionUpdate(db, user.id, projectId, id, await readJson(request)), { 'cache-control': 'no-store' });
+    return json(response, 405, { error: 'Method not allowed.' });
+  }
   const layerRoute = /^\/api\/projects\/([^/]+)\/layers(?:\/([^/]+)\/outputs\/([^/]+)\/([^/]+))?$/.exec(url.pathname);
   if (layerRoute && request.method === 'GET') {
     const [, projectId, layerKey, kind, recordId] = layerRoute.map(value => value ? decodeURIComponent(value) : value);
     if (!layerKey) return json(response, 200, { layers: layerDescriptors(db, user.id, projectId) }, { 'cache-control': 'no-store' });
     return json(response, 200, layerOutputRead(db, user.id, projectId, layerKey, kind, recordId), { 'cache-control': 'no-store' });
   }
+  if (url.pathname === '/api/layer-catalog' && request.method === 'GET') return json(response, 200, { layers: layerCatalog });
   const instanceRoute = /^\/api\/projects\/([^/]+)\/layer-instances(?:\/([^/]+))?$/.exec(url.pathname);
   if (instanceRoute) {
     const projectId = decodeURIComponent(instanceRoute[1]);
     if (request.method === 'GET' && !instanceRoute[2]) return json(response, 200, { layers: layerInstances(db, user.id, projectId) }, { 'cache-control': 'no-store' });
-    if (request.method === 'PUT' && instanceRoute[2]) return json(response, 200,
-      updateLayerInstance(db, user.id, projectId, decodeURIComponent(instanceRoute[2]), await readJson(request)), { 'cache-control': 'no-store' });
+    if (request.method === 'PUT' && instanceRoute[2]) {
+      const updated = updateLayerInstance(db, user.id, projectId, decodeURIComponent(instanceRoute[2]), await readJson(request));
+      if (updated.enabled && updated.key === 'product') { know.ensureProject(projectId, { pitch: flows.projectSetup(user, projectId).project.description, seedRoutines: false }); know.ensurePlan(projectId); }
+      if (updated.enabled && updated.key === 'design') know.ensureDesign(projectId);
+      return json(response, 200, updated, { 'cache-control': 'no-store' });
+    }
     return json(response, 405, { error: 'Method not allowed.' });
   }
   const inventoryRoute = /^\/api\/projects\/([^/]+)\/layers-inventory$/.exec(url.pathname);
@@ -642,9 +676,10 @@ async function api(request, response, url) {
       ensureWorkerPool(projectId);
       if (projectId === aludelProjectId) return json(response, 409, { error: 'Aludel’s own knowledge moves into its layers in LAY-06.' });
       // A project made after start-up plans itself the first time its layers are opened (after onboarding chose its story packs).
-      know.ensurePlan(projectId);
-      know.ensureDesign(projectId);
-      know.ensureFlows(projectId);
+      const active = new Set(layerInstances(db, user.id, projectId).filter(layer => layer.enabled).map(layer => layer.key));
+      if (active.has('product')) know.ensurePlan(projectId);
+      if (active.has('design')) know.ensureDesign(projectId);
+      if (active.has('pages') && active.has('product')) know.ensureFlows(projectId);
       const view = know.view(user, projectId, { builtBy: links.builtBy(projectId) });
       const batchView = runs.view(projectId);
       const poolView = workerPoolView(projectId);

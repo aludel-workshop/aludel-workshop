@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
 import { createServer } from 'node:http';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -36,6 +36,9 @@ test('security audit: Go, scoped reads, question, new Go, read-only report, revi
     const profile = know.defaultProfile(projectId);
     const workerRoot = join(root, 'worker');
     const worker = symphonyWorker({ db, know, workspaceRoot: workerRoot });
+    const poolCredential = join(root, 'worker-pool-token');
+    worker.ensurePool(projectId, poolCredential);
+    worker.heartbeat(worker.authenticate('Bearer ' + readFileSync(poolCredential, 'utf8').trim()), 1, true);
     const credential = worker.issueToken(owner, projectId, profile.id).token;
     const scope = worker.authenticate('Bearer ' + credential);
     const runs = agentRuns({ db, know, secrets: openSecretStore(root), providers: catalogs.agentProviders.providers, worker, symphonyDispatch: true,
@@ -101,6 +104,8 @@ test('security audit: Go, scoped reads, question, new Go, read-only report, revi
     assert.equal(know.workById(projectId, work.id).state, 'ready');
     runs.stage(owner, projectId, work.id);
     batchId = runs.view(projectId).find(value => value.state === 'draft' && value.id !== batchId).id;
+    const activePool = worker.poolStatus(projectId).credentialPath;
+    worker.heartbeat(worker.authenticate('Bearer ' + readFileSync(activePool, 'utf8').trim()), 1, true);
     runs.start(owner, projectId, batchId);
     issue = worker.issues(scope, { states: ['Ready'] }).issues[0];
     assert.notEqual(issue.native_ref.attempt_id, asked.attemptId);

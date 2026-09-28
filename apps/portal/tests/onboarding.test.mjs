@@ -28,13 +28,16 @@ function fixture() {
   // Key checks never leave the test: this stand-in accepts any key ending in 1234.
   const checkAgentKey = async (provider, key) => key.endsWith('1234') ? { ok: true } : { ok: false, reason: 'rejected' };
   const flows = onboarding({ db, catalogs, secrets: openSecretStore(root), workspaceRoot: join(root, 'workspaces'), assetRoot: join(root, 'assets'), createWorkspace: setup => created.push(setup.project.id), know, checkAgentKey });
+  flows.seedLegacyFixture = id => { db.prepare('UPDATE project_setup SET layer_onboarding_version = 0 WHERE project_id = ?').run(id); know.ensureProject(id, { pitch: 'Neighbours lend and borrow tools they rarely use.' }); know.seedPages(id, null); };
   return { db, flows, created, know };
 }
 
 function startProject(flows, user, name = 'Tool Share', profile = 'dreamer') {
   const { token } = flows.saveDraft(null, { profile });
-  flows.saveDraft(token, { name, pitch: 'Neighbours lend and borrow tools they rarely use.' });
-  return { token, setup: flows.claimDraft(token, user, user) };
+  flows.saveDraft(token, { name, pitch: 'Neighbours lend and borrow tools they rarely use.', layers: ['product','design','pages','data','platform','deploy'] });
+  const setup = flows.claimDraft(token, user, user);
+  flows.seedLegacyFixture(setup.project.id);
+  return { token, setup: flows.projectSetup(user, setup.project.id) };
 }
 
 test('accounts hash passwords, reject duplicates and resolve sessions to users', () => {
@@ -315,4 +318,17 @@ test('the skeleton is deterministic, builds pages from the navigation and never 
   assert.deepEqual(JSON.parse(files['aludel.json']).pages.map(page => page.label), ['Home', 'Sign in', 'Messages']);
   assert.ok(Object.keys(initialFiles(current, catalogs, gitProfile, urls)).every(path => !path.includes('node_modules')));
   assert.equal(Object.values(files).some(content => /MACHINE_GITHUB|machine_session/.test(content)), false);
+});
+
+test('a new candidate project may start with no layers or layer-owned output records', () => {
+  const { db, flows, know } = fixture();
+  const ada = createUser(db, { email: 'blank@example.com', name: 'Blank', password: 'correct-horse-battery' });
+  const { token } = flows.saveDraft(null, { profile: 'planner', name: 'Blank Studio', pitch: 'A workspace that chooses its layers later.', layers: [] });
+  const setup = flows.claimDraft(token, ada, ada);
+  const id = setup.project.id;
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM layer_instances WHERE project_id = ? AND enabled = 1').get(id).n, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM knowledge_records WHERE project_id = ?').get(id).n, 0);
+  assert.deepEqual(know.navRoutes(id), []);
+  assert.throws(() => flows.saveFeatures(ada, id, { picks: ['accounts'] }), { status: 409 });
+  assert.throws(() => flows.saveDesign(ada, id, { feel: 'marketplace', theme: 'light' }), { status: 409 });
 });

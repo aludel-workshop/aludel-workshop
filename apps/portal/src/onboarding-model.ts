@@ -1,6 +1,6 @@
 export interface SessionUser { id: string; email: string | null; name: string; owner: boolean; avatar?: Record<string, string | number> | null; }
 export interface ProjectSummary { id: string; slug: string; name: string; description: string; accent_color: string; role: string; updated_at: string; }
-export interface Draft { profile: string | null; name: string; pitch: string; claimedProjectId: string | null; }
+export interface Draft { profile: string | null; name: string; pitch: string; layers: string[]; layersSelected: boolean; claimedProjectId: string | null; }
 export interface Session { authenticated: boolean; user: SessionUser | null; setupRequired: boolean; aludelMember: boolean; githubSignIn: boolean; projects: ProjectSummary[]; draft: Draft | null; }
 
 export interface PreferenceDefinition { label: string; values: Record<string, string>; }
@@ -15,6 +15,7 @@ export interface FeaturePick { label: string; summary: string; icon: string; sto
 export interface StackPreset { label: string; summary: string; available: boolean; recommended?: boolean; unavailableReason?: string; layers?: Record<string, string>; options?: Record<string, { label: string; default: boolean }>; }
 export interface AgentProvider { label: string; secret: string | null; keyUrl: string; limitsUrl: string; docsUrl: string; steps: string[]; limits: string; }
 export interface Catalog {
+  layers: { key: string; name: string; path: string; category: string; icon: string; description: string }[];
   preferences: Record<string, PreferenceDefinition>;
   profiles: Record<string, Profile>;
   feels: Record<string, Feel>;

@@ -34,7 +34,7 @@ const localLayers = [{ id: 'product', icon: 'lightbulb', label: 'Vision' }, { id
       <a class="lay-brand" href="/projects"><mat-icon aria-hidden="true">deployed_code</mat-icon>Aludel</a>
       @if (ctx.setup(); as setup) {
         <a class="lay-project" [href]="ctx.link()" (click)="ctx.go(ctx.link(), $event)"><span class="lay-mark" [style.background]="markColor()" [style.color]="markText()" aria-hidden="true">{{ initials(setup.project.name) }}</span>
-          <span><strong>{{ setup.project.name }}</strong><small>{{ currentPhase() }} milestone</small></span></a>
+          <span><strong>{{ setup.project.name }}</strong>@if (currentPhase()) { <small>{{ currentPhase() }} milestone</small> } @else { <small>{{ activeLayerCount() }} layer apps</small> }</span></a>
       }
       <nav class="lay-nav" aria-label="Project navigation">
         <a class="lay-lc-home" [href]="ctx.link()" (click)="ctx.go(ctx.link(), $event)" [class.active]="layer() === 'home'" [attr.aria-current]="layer() === 'home' ? 'page' : null"><span class="lay-tile"><mat-icon aria-hidden="true">home</mat-icon></span>Home</a>
@@ -92,14 +92,15 @@ const localLayers = [{ id: 'product', icon: 'lightbulb', label: 'Vision' }, { id
         @if (missing()) {
           <h1 tabindex="-1">Project not found</h1><p>You don't have access to this project, or it doesn't exist. <a href="/projects">Your apps</a></p>
         } @else if (ctx.data() && ctx.setup(); as ready) {
-          @if (localLayer()) {
+          @if (localLayer() && activeLocalLayer()) {
             <nav class="lay-shared-tabs" [attr.aria-label]="localLayer()?.label + ' shared views'">
               <a [href]="ctx.link(layer())" (click)="ctx.go(ctx.link(layer()), $event)" [class.active]="!sharedTab()" [attr.aria-current]="!sharedTab() ? 'page' : null">Outputs</a>
               <a [href]="ctx.link(layer(), 'operations')" (click)="ctx.go(ctx.link(layer(), 'operations'), $event)" [class.active]="sharedTab() === 'operations'" [attr.aria-current]="sharedTab() === 'operations' ? 'page' : null">Operations</a>
               <a [href]="ctx.link(layer(), 'knowledge')" (click)="ctx.go(ctx.link(layer(), 'knowledge'), $event)" [class.active]="sharedTab() === 'knowledge'" [attr.aria-current]="sharedTab() === 'knowledge' ? 'page' : null">Knowledge</a>
             </nav>
           }
-          @if (sharedTab()) { <aludel-shared-layer-slot [layerKey]="layer()" [slot]="sharedTab()" /> }
+          @if (localLayer() && !activeLocalLayer()) { <p class="lay-eyebrow">Layer app</p><h1 tabindex="-1">{{ localLayer()?.label }} is not in this project</h1><p>Add it from Home when you need it.</p><a [href]="ctx.link()" (click)="ctx.go(ctx.link(), $event)">Go to Home</a> }
+          @else if (sharedTab()) { <aludel-shared-layer-slot [layerKey]="layer()" [slot]="sharedTab()" /> }
           @else { @switch (layer()) {
             @case ('product') { <aludel-product-layer /> }
             @case ('design') { <aludel-design-layer /> }
@@ -132,9 +133,10 @@ export class ProjectShellComponent implements OnInit {
   readonly ctx = inject(ProjectContext);
   private readonly changeDetector = inject(ChangeDetectorRef);
   readonly initialSession = input.required<Session>();
-  readonly visibleLayers = computed(() => this.ctx.layerInstances().filter(layer => layer.enabled && layer.visible)
+  readonly visibleLayers = computed(() => this.ctx.layerInstances().filter(layer => layer.enabled)
     .map(layer => localLayers.find(item => item.id === layer.key)).filter((item): item is typeof localLayers[number] => !!item));
   readonly localLayer = computed(() => localLayers.find(item => item.id === this.layer()) || null);
+  readonly activeLocalLayer = computed(() => this.ctx.layerInstances().some(item => item.key === this.layer() && item.enabled));
   readonly sharedTab = computed(() => this.localLayer() && ['operations', 'knowledge'].includes(this.ctx.segments()[1]) ? this.ctx.segments()[1] : '');
   readonly menu = signal(false);
   readonly missing = signal(false);
@@ -154,7 +156,8 @@ export class ProjectShellComponent implements OnInit {
   readonly needsYou = computed(() => (this.ctx.data()?.work || []).filter(item => item.status === 'needs' || item.status === 'review'));
   private readonly sanitizer = inject(DomSanitizer);
   readonly myAvatar = computed(() => this.sanitizer.bypassSecurityTrustUrl(personAvatar(this.user()?.avatar as PersonAvatar | null, this.user()?.name || 'you')));
-  readonly currentPhase = computed(() => this.ctx.data()?.phases.find(phase => phase.current)?.label || 'Demo');
+  readonly currentPhase = computed(() => this.ctx.layerInstances().some(layer => layer.key === 'product' && layer.enabled) ? this.ctx.data()?.phases.find(phase => phase.current)?.label || '' : '');
+  readonly activeLayerCount = computed(() => this.ctx.layerInstances().filter(layer => layer.enabled).length);
   // Milestones replaced phases in the language (ROADMAP-01).
   readonly results = computed(() => {
     const term = this.q().trim().toLowerCase(); const data = this.ctx.data();
@@ -171,7 +174,10 @@ export class ProjectShellComponent implements OnInit {
       { label: 'Code', hits: data.code.units.filter(unit => unit.kind !== 'const').map(unit => ({ text: unit.symbol, sub: `${unit.path} · ${unitStateLabel[unit.state]}`, href: this.ctx.link('platform', 'explorer', unit.id) })) },
       { label: 'Work', hits: data.work.map(item => ({ text: `${item.ref} ${item.title}`, sub: workStatusLabel[item.status], href: this.ctx.link('work', 'items', item.id) })) }
     ];
-    return groups.map(group => ({ ...group, hits: group.hits.filter(hit => `${hit.text} ${hit.sub}`.toLowerCase().includes(term)).slice(0, 5) })).filter(group => group.hits.length);
+    const ownerByGroup: Record<string, string> = { Brief: 'product', Projects: 'product', 'Story map': 'product', Documents: 'product', Pages: 'pages', Data: 'data', Code: 'platform' };
+    const active = new Set(this.ctx.layerInstances().filter(item => item.enabled).map(item => item.key));
+    return groups.filter(group => !ownerByGroup[group.label] || active.has(ownerByGroup[group.label]))
+      .map(group => ({ ...group, hits: group.hits.filter(hit => `${hit.text} ${hit.sub}`.toLowerCase().includes(term)).slice(0, 5) })).filter(group => group.hits.length);
   });
 
   constructor() {

@@ -399,8 +399,14 @@ const validators = {
     if (!layers.includes(data.layer)) fail('Unknown layer.');
     if (!workTypes.includes(data.type)) fail('Unknown work type.');
     if (!cadences.includes(data.cadence)) fail(`Choose how often: ${cadences.join(', ')}.`);
+    const executor = data.executor || 'utility', trigger = data.trigger || 'schedule';
+    if (!['utility', 'agent'].includes(executor)) fail('Choose a utility or agent executor.');
+    if (!['manual', 'schedule', 'output-change'].includes(trigger)) fail('Choose a supported trigger.');
     return { key: data.key ? text(data.key, 40, 'Key') : null, title: text(data.title, 120, 'Routine', true), layer: data.layer, type: data.type, cadence: data.cadence,
-      documents: lines(data.documents, 300, 'Document'), enabled: data.enabled !== false };
+      documents: lines(data.documents, 300, 'Document'), enabled: data.enabled !== false, executor, trigger,
+      instructionDoc: data.instructionDoc ? text(data.instructionDoc, 80, 'Instruction document') : null,
+      allowedReads: lines(data.allowedReads, 80, 'Allowed read').slice(0, 20), capabilities: lines(data.capabilities, 80, 'Capability').slice(0, 20),
+      outputKinds: lines(data.outputKinds, 80, 'Allowed output').slice(0, 20) };
   }
 };
 export const cadences = ['weekly', 'monthly', 'before-release'];
@@ -595,7 +601,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
   const get = (projectId, id) => { const record = row(id); return record && record.project_id === projectId ? hydrate(record) : null; };
 
   // ---- Seeds ----
-  function ensureProject(projectId, { pitch = '' } = {}) {
+  function ensureProject(projectId, { pitch = '', seedRoutines = true } = {}) {
     if (!list(projectId, 'phase').length) {
       insert(projectId, 'phase', { key: 'demo', label: 'Demo', goal: 'A clickable core flow with sample data.', appetite: '1 week', exit: 'The core flow works end to end', current: true });
       insert(projectId, 'phase', { key: 'mvp', label: 'MVP', goal: 'Real people use it for real.', appetite: '3 weeks', exit: 'Testers complete the core flow with real data' });
@@ -605,7 +611,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     if (!list(projectId, 'brief_claim').length && !list(projectId, 'vision_section').length && pitch.trim()) insert(projectId, 'brief_claim', { section: 'value', text: pitch.trim().slice(0, 400) }, { rationale: 'From the elevator pitch in onboarding' });
     ensureBrief(projectId);
     ensureAgents(projectId);
-    ensureRoutines(projectId);
+    if (seedRoutines) ensureRoutines(projectId);
   }
 
   // ---- Vision › Brief (ROADMAP-01): claims per section, migrated once from the older vision sections ----
@@ -1441,7 +1447,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
   }
   const lastRun = routineId => db.prepare('SELECT * FROM routine_runs WHERE routine_id = ? ORDER BY id DESC LIMIT 1').get(routineId) || null;
   function nextRunAt(routine) {
-    if (!routine.enabled || routine.cadence === 'before-release') return null;
+    if (!routine.enabled || routine.trigger !== 'schedule' || routine.cadence === 'before-release') return null;
     const from = lastRun(routine.id)?.ran_at || db.prepare('SELECT created_at FROM knowledge_records WHERE id = ?').get(routine.id).created_at;
     return new Date(Date.parse(from) + cadenceDays[routine.cadence] * 86400000).toISOString();
   }
@@ -1449,7 +1455,8 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
   function runRoutines(projectId, { trigger = 'schedule', at = now(), routineId = null } = {}) {
     const created = [];
     for (const routine of list(projectId, 'routine')) {
-      if (routineId ? routine.id !== routineId : !routine.enabled) continue;
+      if ((!routine.enabled && !routineId) || (routineId && routine.id !== routineId)) continue;
+      if (!routineId && trigger === 'schedule' && routine.trigger !== 'schedule') continue;
       if (!routineId && trigger === 'schedule' && (routine.cadence === 'before-release' || nextRunAt(routine) > at)) continue;
       if (!routineId && trigger === 'release' && routine.cadence !== 'before-release') continue;
       const open = workList(projectId).find(item => item.context?.routine === routine.id && item.state !== 'done');

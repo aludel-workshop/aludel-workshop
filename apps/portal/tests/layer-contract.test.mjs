@@ -62,15 +62,21 @@ test('migration is idempotent and scoped descriptors preserve native records', a
   } finally { copied.close(); }
 });
 
-test('layer preferences are owner-scoped and do not hide native outputs', () => {
+test('optional layer apps are owner-scoped and preserve native outputs across removal', () => {
   initLayerContract(db);
-  assert.equal(layerInstances(db, 'owner', 'a').length, 6);
-  assert.equal(updateLayerInstance(db, 'owner', 'a', 'pages', { visible: false, dashboardVisible: false }).visible, false);
-  assert.equal(layerInstances(db, 'owner', 'a').find(layer => layer.key === 'pages').dashboardVisible, false);
+  db.prepare('INSERT INTO projects(id) VALUES (?)').run('empty');
+  db.prepare('INSERT INTO project_members(project_id,user_id,role) VALUES (?,?,?)').run('empty', 'owner', 'owner');
+  assert.equal(createLayerInstances(db, 'empty', undefined, []), 6);
+  assert.equal(layerDescriptors(db, 'owner', 'empty').length, 0);
+  assert.equal(initLayerContract(db).inserted, 0, 'startup backfill does not activate unselected apps');
+  assert.equal(updateLayerInstance(db, 'owner', 'empty', 'pages', { enabled: true }).enabled, true);
+  assert.deepEqual(layerDescriptors(db, 'owner', 'empty').map(layer => layer.key), ['pages']);
+  assert.equal(updateLayerInstance(db, 'owner', 'a', 'pages', { enabled: false }).enabled, false);
+  assert.throws(() => layerOutputRead(db, 'owner', 'a', 'pages', 'page', 'page-a'), { status: 404 });
+  assert.equal(updateLayerInstance(db, 'owner', 'a', 'pages', { enabled: true }).enabled, true);
   assert.equal(layerOutputRead(db, 'owner', 'a', 'pages', 'page', 'page-a').revision, 3);
-  assert.throws(() => updateLayerInstance(db, 'viewer', 'a', 'pages', { visible: true }), { status: 403 });
-  assert.throws(() => updateLayerInstance(db, 'other', 'a', 'pages', { visible: true }), { status: 404 });
-  assert.throws(() => updateLayerInstance(db, 'owner', 'a', 'library', { visible: false }), { status: 404 });
-  assert.throws(() => updateLayerInstance(db, 'owner', 'a', 'pages', { enabled: false }), { status: 400 });
-  assert.equal(updateLayerInstance(db, 'owner', 'a', 'pages', { visible: true, dashboardVisible: true }).visible, true);
+  assert.throws(() => updateLayerInstance(db, 'viewer', 'a', 'pages', { enabled: false }), { status: 403 });
+  assert.throws(() => updateLayerInstance(db, 'other', 'a', 'pages', { enabled: false }), { status: 404 });
+  assert.throws(() => updateLayerInstance(db, 'owner', 'a', 'library', { enabled: false }), { status: 404 });
+  assert.throws(() => updateLayerInstance(db, 'owner', 'a', 'pages', { visible: false }), { status: 400 });
 });

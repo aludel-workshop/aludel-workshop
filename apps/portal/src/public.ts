@@ -15,16 +15,16 @@ type Step = { id: string; label: string; optional: boolean };
 const steps: Step[] = [
   { id: 'profile', label: 'Working style', optional: false },
   { id: 'idea', label: 'Your idea', optional: false },
+  { id: 'layers', label: 'Layers', optional: false },
   { id: 'account', label: 'Account', optional: false },
   { id: 'github', label: 'GitHub', optional: false },
   { id: 'agent', label: 'Agent', optional: true },
   { id: 'look', label: 'Look & feel', optional: true },
-  { id: 'features', label: 'Functionality', optional: true },
   { id: 'pages', label: 'Pages', optional: true },
   { id: 'stack', label: 'Build', optional: false }
 ];
 // From Look & feel onward, settings sit beside a live proto-site of the app.
-const splitSteps = new Set(['look', 'pages', 'features', 'stack']);
+const splitSteps = new Set(['look', 'pages', 'stack']);
 
 // Only the project's own app origin (from the server's topology) is ever framed.
 @Pipe({ name: 'safeUrl', standalone: true })
@@ -53,6 +53,8 @@ export class PublicComponent implements OnDestroy {
   readonly details = signal(false);
   readonly accountMode = signal<'sign-up' | 'sign-in' | 'owner'>('sign-up');
   readonly emailForm = signal(false);
+  readonly selectedLayers = signal<string[]>([]);
+  readonly activeLayers = signal<string[]>([]);
   readonly segments = computed(() => this.path().split('/').filter(Boolean));
   readonly view = computed(() => {
     const [first, second, third] = this.segments();
@@ -61,7 +63,7 @@ export class PublicComponent implements OnDestroy {
     if (first === 'projects') return second ? 'moved' : 'projects';
     if (first === 'start') {
       if (!second) return 'profile';
-      if (second === 'idea' || second === 'account') return second;
+      if (second === 'idea' || second === 'layers' || second === 'account') return second;
       if (third === 'build') return 'stack';
       return third && steps.some(step => step.id === third) ? third : 'github';
     }
@@ -69,7 +71,7 @@ export class PublicComponent implements OnDestroy {
   });
   readonly projectId = computed(() => {
     const [first, second] = this.segments();
-    return (first === 'start' && second && !['idea', 'account'].includes(second)) || (first === 'projects' && second) ? decodeURIComponent(second) : '';
+    return (first === 'start' && second && !['idea', 'layers', 'account'].includes(second)) || (first === 'projects' && second) ? decodeURIComponent(second) : '';
   });
   readonly stepIndex = computed(() => steps.findIndex(step => step.id === this.view()));
   readonly isStep = computed(() => this.stepIndex() >= 0);
@@ -149,22 +151,38 @@ export class PublicComponent implements OnDestroy {
 
   stepPath(stepId: string) {
     if (stepId === 'profile') return '/start';
-    if (stepId === 'idea' || stepId === 'account') return `/start/${stepId}`;
+    if (stepId === 'idea' || stepId === 'layers' || stepId === 'account') return `/start/${stepId}`;
     return `/start/${encodeURIComponent(this.projectId())}/${stepId}`;
   }
 
   stepState(step: Step, index: number) {
     if (index === this.stepIndex()) return 'current';
     const done = this.setup()?.completedSteps || [];
-    if (index < 3 && (this.projectId() || index < this.stepIndex())) return 'done';
+    if (index < 4 && (this.projectId() || index < this.stepIndex())) return 'done';
     return done.includes(step.id) ? 'done' : index < this.stepIndex() ? 'skipped' : 'upcoming';
   }
 
-  canOpenStep(index: number) { return index < 3 ? !this.projectId() && index <= this.stepIndex() : Boolean(this.projectId()); }
+  canOpenStep(index: number) {
+    if (index < 4) return !this.projectId() && index <= this.stepIndex();
+    const step = steps[index]?.id;
+    return Boolean(this.projectId()) && (step !== 'look' || this.activeLayers().includes('design'))
+      && (step !== 'pages' || this.activeLayers().includes('pages'))
+      && (step !== 'stack' || this.activeLayers().some(key => ['platform', 'deploy'].includes(key)));
+  }
 
   next() {
-    const following = steps[this.stepIndex() + 1];
+    const remaining = steps.slice(this.stepIndex() + 1);
+    const following = remaining.find(step => (step.id !== 'look' || this.activeLayers().includes('design'))
+      && (step.id !== 'pages' || this.activeLayers().includes('pages'))
+      && (step.id !== 'stack' || this.activeLayers().some(key => ['platform', 'deploy'].includes(key))));
     if (following) this.go(this.stepPath(following.id));
+    else this.openClaimedProject();
+  }
+
+  private openClaimedProject() {
+    const project = this.session()?.projects.find(item => item.id === this.projectId());
+    if (project) location.assign(`/p/${encodeURIComponent(project.slug)}`);
+    else this.go('/projects');
   }
 
   private async api<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
@@ -198,19 +216,22 @@ export class PublicComponent implements OnDestroy {
         return;
       }
       document.title = view === 'landing' ? 'Aludel · Turn ideas into working apps' : 'Aludel';
-      if (['profile', 'idea', 'account'].includes(view)) {
+      if (['profile', 'idea', 'layers', 'account'].includes(view)) {
         const draft = session?.draft;
         this.profile = draft?.profile || this.profile;
         this.appName = draft?.name || this.appName;
         this.pitch = draft?.pitch || this.pitch;
+        this.selectedLayers.set(draft?.layers || []);
         if (view !== 'profile' && !draft?.profile) { this.go('/start'); return; }
-        if (view === 'account' && !(draft?.name)) { this.go('/start/idea'); return; }
+        if (['layers', 'account'].includes(view) && !(draft?.name)) { this.go('/start/idea'); return; }
         if (session?.authenticated === false && view === 'account') this.accountMode.set('sign-up');
       }
       if ((view === 'projects' || this.projectId()) && !session?.authenticated) { this.go('/login'); return; }
       if (this.projectId()) {
         const setup = await this.api<ProjectSetup>(`/api/projects/${encodeURIComponent(this.projectId())}/setup`);
         this.applySetup(setup, true);
+        this.activeLayers.set((await this.api<{ layers: { key: string; enabled: boolean }[] }>(`/api/projects/${encodeURIComponent(this.projectId())}/layer-instances`)).layers.filter(layer => layer.enabled).map(layer => layer.key));
+        if (!this.canOpenStep(this.stepIndex())) { this.openClaimedProject(); return; }
         if (view === 'stack') this.pollPreview();
       } else this.setup.set(null);
       setTimeout(() => document.querySelector<HTMLElement>('main h1')?.focus({ preventScroll: true }), 30);
@@ -256,6 +277,18 @@ export class PublicComponent implements OnDestroy {
     return this.run(async () => {
       const value = await this.api<{ draft: Session['draft'] }>('/api/onboarding/draft', 'PUT', { name: this.appName, pitch: this.pitch });
       this.session.update(session => session && { ...session, draft: value.draft });
+      this.go('/start/layers');
+    });
+  }
+
+  toggleLayer(key: string) {
+    this.selectedLayers.update(current => current.includes(key) ? current.filter(item => item !== key) : [...current, key]);
+  }
+
+  saveLayers() {
+    return this.run(async () => {
+      const value = await this.api<{ draft: Session['draft'] }>('/api/onboarding/draft', 'PUT', { layers: this.selectedLayers() });
+      this.session.update(session => session && { ...session, draft: value.draft });
       this.go('/start/account');
     });
   }
@@ -282,7 +315,9 @@ export class PublicComponent implements OnDestroy {
       }
       this.password = ''; this.confirmPassword = ''; this.ownerKey = '';
       await this.refreshSession();
-      if (result.project?.id) this.go(`/start/${encodeURIComponent(result.project.id)}/github`);
+      if (result.project?.id) {
+        this.afterClaim(result.project.id);
+      }
       else if (this.view() === 'login') this.afterLogin();
       else await this.claim();
     });
@@ -291,7 +326,14 @@ export class PublicComponent implements OnDestroy {
   private async claim() {
     const result = await this.api<{ project: { id: string } }>('/api/onboarding/claim', 'POST', {});
     await this.refreshSession();
-    this.go(`/start/${encodeURIComponent(result.project.id)}/github`);
+    this.afterClaim(result.project.id);
+  }
+
+  private afterClaim(projectId: string) {
+    if (!this.selectedLayers().length) {
+      const project = this.session()?.projects.find(item => item.id === projectId);
+      location.assign(project ? `/p/${encodeURIComponent(project.slug)}` : '/projects');
+    } else this.go(`/start/${encodeURIComponent(projectId)}/github`);
   }
 
   continueSignedIn() { return this.run(() => this.claim()); }
@@ -417,6 +459,7 @@ export class PublicComponent implements OnDestroy {
   private async savePages(reassign: Record<string, string> = {}) {
     if (this.pagesTimer) { clearTimeout(this.pagesTimer); this.pagesTimer = null; }
     if (this.pendingDelete()) return;
+    if (!this.routes().length && !this.setup()?.pages.routes.length) { this.pagesSaved.set('saved'); return; }
     this.pagesSaved.set('saving');
     try {
       const setup = await this.api<ProjectSetup>(`/api/projects/${encodeURIComponent(this.projectId())}/pages`, 'PUT', { routes: this.routes(), navigation: this.navigation, reassign });
@@ -435,7 +478,7 @@ export class PublicComponent implements OnDestroy {
 
   continueFromPages() {
     return this.run(async () => {
-      await this.savePages();
+      if (this.pagesSaved() !== 'saved') await this.savePages();
       if (this.pagesSaved() !== 'saved') return;
       this.applySetup(await this.api<ProjectSetup>(`/api/projects/${encodeURIComponent(this.projectId())}/steps/pages`, 'POST', {}));
       this.next();

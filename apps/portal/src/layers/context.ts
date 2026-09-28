@@ -114,8 +114,8 @@ export interface WorkRun { id: string; number: number; batchId: string | null; s
   proposalId: string | null; reportId: string | null; summary?: string | null;
   review: { verdicts: Record<string, { value: 'accept' | 'reject' | 'skip'; note: string }>; flags: Record<string, string>; outcome: WorkRunState | null; comment: string | null; signedBy: string | null; signedAt: string | null }; }
 export interface WorkChange { recordId: string; revision: number; author: string; rationale: string | null; createdAt: string; kind: string | null; exists: boolean; fields: FieldChange[]; }
-export interface Routine extends RecordBase { key: string | null; title: string; layer: string; type: string; cadence: string; documents: string[]; enabled: boolean; nextRunAt: string | null; lastRunAt: string | null; lastWorkId: string | null; history: Revision[]; }
-export interface LayerInstance { key: string; name: string; path: string; enabled: boolean; visible: boolean; dashboardVisible: boolean; }
+export interface Routine extends RecordBase { key: string | null; title: string; layer: string; type: string; cadence: string; documents: string[]; enabled: boolean; executor?: 'utility' | 'agent'; trigger?: 'manual' | 'schedule' | 'output-change'; instructionDoc?: string | null; allowedReads?: string[]; capabilities?: string[]; outputKinds?: string[]; nextRunAt: string | null; lastRunAt: string | null; lastWorkId: string | null; history: Revision[]; }
+export interface LayerInstance { key: string; name: string; path: string; category: string; icon: string; description: string; enabled: boolean; visible: boolean; dashboardVisible: boolean; }
 export interface Knowledge {
   vision: Record<string, VisionSection>; personas: Persona[]; phases: Phase[]; activities: Activity[]; stories: Story[]; specs: Spec[];
   research: Research[]; docs: Doc[]; pages: Page[]; work: WorkItem[]; selectedPacks: string[];
@@ -397,7 +397,7 @@ export class ProjectContext {
     this.setup.set(value.setup); this.data.set(value.knowledge); this.catalog.set(value.catalog); this.layerInstances.set(instances.layers);
   }
 
-  setLayerPreference(key: string, settings: { visible?: boolean; dashboardVisible?: boolean }) {
+  setLayerPreference(key: string, settings: { enabled?: boolean; dashboardVisible?: boolean }) {
     return this.api<LayerInstance>(`/api/projects/${encodeURIComponent(this.projectId())}/layer-instances/${encodeURIComponent(key)}`, 'PUT', settings);
   }
 
