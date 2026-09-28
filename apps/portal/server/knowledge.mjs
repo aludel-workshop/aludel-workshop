@@ -1270,7 +1270,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     }
     if (state !== undefined) {
       if (!workStates.includes(state)) fail('Unknown work state.');
-      if (state === 'review' && ['product.define', 'product.clarify', 'data.contract', 'design.audit', 'pages.a11y', 'deploy.review', 'work.review'].includes(item.action) && item.assignee?.kind === 'agent' && !item.context?.workProposal?.id)
+      if (state === 'review' && ['product.define', 'product.clarify', 'data.contract', 'design.audit', 'pages.a11y', 'pages.flows', 'deploy.review', 'work.review'].includes(item.action) && item.assignee?.kind === 'agent' && !item.context?.workProposal?.id)
         fail('Submit a Work proposal before reviewing this agent task.', 409);
       if (state === 'review' && item.action === 'product.brief' && item.assignee?.kind === 'agent' && !item.context?.visionProposal?.id)
         fail('Submit a Vision proposal before reviewing this work.', 409);
@@ -1278,7 +1278,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
           !db.prepare("SELECT 1 FROM code_candidates WHERE project_id = ? AND work_id = ? AND state = 'review' LIMIT 1").get(projectId, workId))
         fail('Build and check a code candidate before reviewing this work.', 409);
       if (state === 'done') {
-        if (['product.define', 'product.clarify', 'data.contract', 'design.audit', 'pages.a11y', 'deploy.review', 'work.review'].includes(item.action) && item.assignee?.kind === 'agent' &&
+        if (['product.define', 'product.clarify', 'data.contract', 'design.audit', 'pages.a11y', 'pages.flows', 'deploy.review', 'work.review'].includes(item.action) && item.assignee?.kind === 'agent' &&
             (item.state !== 'review' || !input.proposalId || !db.prepare("SELECT 1 FROM symphony_proposals WHERE id = ? AND project_id = ? AND work_id = ? AND state = 'accepted'").get(input.proposalId, projectId, workId)))
           fail('Accept the exact Work proposal before closing this agent task.', 409);
         if (item.action === 'product.brief' && item.assignee?.kind === 'agent' && (item.state !== 'review' || !input.visionProposalId ||
@@ -1292,7 +1292,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
         if (!outputs.length && !checks.length) fail('Name what this work checks or documents before closing it (DEC-036: logs are not documentation).', 409);
         if (item.state === 'review' && checks.some(check => check.verdict !== 'accept')) fail('Accept every check before accepting the work, or send it back.', 409);
         if (item.state === 'review' && item.action && !mayDo(user, projectId, item.action)) fail(`Only a lead of the ${catalogs.roles.roles.find(role => role.layer === item.action.split('.')[0])?.name || 'role'} can accept ${item.ref}: its action is elevated.`, 403);
-        if (verifiedTypes.includes(item.type) && item.assignee?.kind !== 'template') {
+        if (verifiedTypes.includes(item.type) && item.assignee?.kind !== 'template' && !(item.action === 'pages.flows' && item.assignee?.kind === 'agent' && input.proposalId)) {
           const missing = item.targets.filter(target => !db.prepare('SELECT 1 FROM knowledge_revisions WHERE record_id = ? AND work_item_id = ?').get(target.id, item.id));
           if (missing.length) fail(`${missing.map(target => `“${target.label}”`).join(', ')} ${missing.length === 1 ? 'has' : 'have'} no change from ${item.ref} yet. Edit ${missing.length === 1 ? 'it' : 'them'} from this item (or apply the answer), then close it.`, 409);
         }

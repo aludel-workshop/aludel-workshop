@@ -30,7 +30,7 @@ export function initAgentRuns(db) {
   if (!columns.has('authorized_at')) db.exec('ALTER TABLE agent_batches ADD COLUMN authorized_at TEXT');
 }
 
-const symphonyActions = new Set(['platform.implement', 'platform.security', 'product.define', 'product.clarify', 'product.brief', 'data.contract', 'design.audit', 'pages.a11y', 'deploy.review', 'work.review']);
+const symphonyActions = new Set(['platform.implement', 'platform.security', 'product.define', 'product.clarify', 'product.brief', 'data.contract', 'design.audit', 'pages.a11y', 'pages.flows', 'deploy.review', 'work.review']);
 
 export function agentRuns({ db, know, worker = null, symphonyDispatch = false }) {
   const batchRow = row => row && { id: row.id, number: row.number, ref: `B-${row.number}`, state: row.state, limit: row.item_limit, profileId: row.profile_id || null, createdAt: row.created_at, requestedSlots: row.requested_slots || 1, authorizedAt: row.authorized_at || null,
@@ -113,6 +113,7 @@ export function agentRuns({ db, know, worker = null, symphonyDispatch = false })
     if (!(symphonyActions.has(entry.action) && symphonyCompatible(projectId, entry.assignee.id))) fail(`Agents can't run “${actionLabel(projectId, entry.action)}” yet. Assign ${entry.ref} to a person.`, 409);
     if (entry.question && !entry.question.answer && entry.action !== 'product.clarify') fail('Answer the open question before staging this agent task.', 409);
     if (entry.action === 'product.clarify' && (!entry.question || entry.question.answer)) fail('Draft answers only for an open question.', 409);
+    if (entry.action === 'pages.flows' && (entry.targets.length !== 1 || entry.targets[0].kind !== 'story')) fail('Link one Vision story before an agent proposes a Pages flow.', 409);
     if (entry.action === 'product.define' && !entry.targets.some(target => target.kind === 'story')) fail('Link a story before an agent writes acceptance.', 409);
     if (entry.action === 'product.brief' && (entry.targets.length > 1 || entry.targets.some(target => target.kind !== 'brief_claim')))
       fail('Link at most one Vision Brief claim, or leave the target empty to propose a new claim.', 409);

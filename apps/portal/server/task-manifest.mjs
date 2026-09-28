@@ -11,8 +11,9 @@ export function compileTaskManifest(bundle) {
   const coding = action.id === 'platform.implement' && action.tools?.includes('code') && action.changes?.some(value => value.startsWith('Code › '));
   const audit = action.id === 'platform.security' && action.tools?.includes('read') && !action.changes?.length;
   const proposal = ['product.define', 'product.clarify', 'product.brief', 'data.contract'].includes(action.id) && action.tools?.includes('read');
+  const pagesFlow = action.id === 'pages.flows' && action.tools?.includes('read') && action.tools?.includes('revise');
   const assessment = ['design.audit', 'pages.a11y', 'deploy.review', 'work.review'].includes(action.id) && action.tools?.includes('read') && !action.changes?.length;
-  if (!coding && !audit && !proposal && !assessment) fail('This action has no task output adapter.');
+  if (!coding && !audit && !proposal && !assessment && !pagesFlow) fail('This action has no task output adapter.');
   if (action.id === 'product.clarify' && (!work.question || work.question.answer)) fail('Clarification needs an open question.');
   const inputs = (work.targets || []).map(target => {
     const source = sources.find(record => record.id === target.id && record.kind === target.kind);
@@ -27,15 +28,18 @@ export function compileTaskManifest(bundle) {
     guidance: { project: guidance.project, role: guidance.role.instructions, action: action.instructions, profile: guidance.profile.instructions,
       method: audit ? 'Inspect only the pinned source and relevant knowledge. Report severity, affected source, evidence, recommendation, checked scope and unknowns. Ask if a decision blocks the result.' :
         coding ? 'Implement only the allowed code surface, run relevant checks, and submit the exact candidate commit.' :
+        pagesFlow ? 'Draft a Pages flow using existing pinned pages and the target story. Submit a proposal for Work review; do not change Pages records.' :
         assessment ? 'Inspect the task scope and relevant project knowledge. Submit a findings report for lead review. Do not change project records or repository files.' :
         'Read the task and relevant project knowledge. Submit a bounded proposal for Work review. Do not change project records or repository files. Ask if a decision blocks the result.' },
+    origin: work.context?.policy ? { layer: work.layer, routineId: work.context.routine || null, gapKey: work.context.gap || null, receipt: work.context.receipt || null, policy: work.context.policy, source: work.context.source } : { layer: work.layer },
+    controls: bundle.controlPins || [],
     requiredInputs: inputs,
     contextSeeds: sources.filter(record => record.kind === 'doc' && !(work.targets || []).some(target => target.id === record.id))
       .slice(0, 12).map(record => ({ id: record.id, kind: record.kind, revision: record.revision, summary: summary(record) })),
     outputs: audit ? [{ key: 'findings', kind: 'security_finding_report', operation: 'submit_for_review', reviewer: 'project owner',
       checks: work.checks.map(check => check.text) }] : coding ? [{ key: 'code', kind: 'code_candidate', operation: 'commit_for_review', reviewer: 'project owner', checks: work.checks.map(check => check.text) }] :
-      [{ key: 'proposal', kind: assessment ? 'review_report' : action.id === 'product.brief' ? 'vision_claim_proposal' : 'work_proposal', operation: 'submit_for_review', reviewer: 'role lead',
-        shape: assessment ? 'summary; content: scope, findings[{title,evidence,recommendation}], optional uncertainty; usedInputs' :
+      [{ key: 'proposal', kind: pagesFlow ? 'pages_flow_proposal' : assessment ? 'review_report' : action.id === 'product.brief' ? 'vision_claim_proposal' : 'work_proposal', operation: 'submit_for_review', reviewer: 'role lead',
+        shape: pagesFlow ? 'summary; content: title, steps[{page,story,name,trigger?}]; usedInputs must include story and every page' : assessment ? 'summary; content: scope, findings[{title,evidence,recommendation}], optional uncertainty; usedInputs' :
           action.id === 'product.brief' ? 'summary; content: section, text, note, basis; usedInputs' :
           action.id === 'product.define' ? 'summary; content: scenarios[{given,when,then}], optional edges[], questions[]; usedInputs' :
           action.id === 'product.clarify' ? 'summary; content: options[2..4], recommendation, reasoning; usedInputs' :

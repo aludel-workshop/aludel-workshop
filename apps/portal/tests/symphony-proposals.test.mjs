@@ -8,6 +8,7 @@ import test from 'node:test';
 import { createUser, initAccounts } from '../server/accounts.mjs';
 import { agentRuns, initAgentRuns } from '../server/agent-runs.mjs';
 import { initKnowledge, knowledge } from '../server/knowledge.mjs';
+import { initPagesLayerApp } from '../server/pages-layer-app.mjs';
 import { initOnboarding, loadCatalogs, onboarding } from '../server/onboarding.mjs';
 import { ensureProductWorkspace } from '../server/product-workspace.mjs';
 import { openSecretStore } from '../server/secret-store.mjs';
@@ -19,7 +20,7 @@ const git = (cwd, ...args) => execFileSync('git', args, { cwd, stdio: 'pipe' }).
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'aludel-proposal-'));
   const db = openDatabase(join(root, 'machine.sqlite'));
-  initWorkflow(db); ensureProductWorkspace(db); initAccounts(db); initOnboarding(db); initKnowledge(db); initAgentRuns(db); initSymphonyWorker(db);
+  initWorkflow(db); ensureProductWorkspace(db); initAccounts(db); initOnboarding(db); initKnowledge(db); initPagesLayerApp(db); initAgentRuns(db); initSymphonyWorker(db);
   const catalogs = loadCatalogs(new URL('../config', import.meta.url).pathname);
   const know = knowledge({ db, catalogs, packs: catalogs.packs });
   const flows = onboarding({ db, catalogs, secrets: openSecretStore(root), workspaceRoot: join(root, 'workspaces'), assetRoot: join(root, 'assets'), createWorkspace: () => {}, know });
@@ -41,9 +42,9 @@ function fixture() {
   const scope = worker.authenticate('Bearer ' + credential);
   const runs = agentRuns({ db, know, secrets: openSecretStore(root), providers: catalogs.agentProviders.providers, worker, symphonyDispatch: true,
     callModel: async () => { throw new Error('Legacy model caller must never run'); } });
-  const start = (action, targets = [], question = null) => {
+  const start = (action, targets = [], question = null, context = null) => {
     const work = know.createWork(projectId, { action, title: `Test ${action}`, assignee: { kind: 'agent', id: profile.id }, targets,
-      checks: ['The proposed output is accurate'], ...(question ? { question } : {}) }, owner.name);
+      checks: ['The proposed output is accurate'], ...(question ? { question } : {}), ...(context ? { context } : {}) }, owner.name);
     if (work.state === 'suggested') know.updateWork(owner, projectId, work.id, { state: 'ready' });
     runs.stage(owner, projectId, work.id);
     const batch = runs.view(projectId).find(value => value.state === 'draft');
@@ -284,5 +285,38 @@ test('a project with Symphony dispatch disabled cannot fall back to the legacy m
       assignee: { kind: 'agent', id: f.profile.id } }, f.owner.name);
     if (item.state === 'suggested') f.know.updateWork(f.owner, f.projectId, item.id, { state: 'ready' });
     assert.throws(() => alternate.stage(f.owner, f.projectId, item.id), /Agents can't run/);
+  } finally { f.close(); }
+});
+
+
+test('Pages-origin Work pins reviewed policy and applies a proposed flow only after checked acceptance', () => {
+  const f = fixture();
+  try {
+    const story = f.know.insert(f.projectId, 'story', { title: 'Find a route', phase: 'demo' });
+    const page = f.know.insert(f.projectId, 'page', { label: 'Find', icon: 'article', pageType: 'detail', status: 'planned' });
+    f.db.prepare(`INSERT INTO layer_connections(id,project_id,receiving_key,source_key,status,mapping,instructions,reaction,question,answer,revision,reviewed_by,reviewed_at,updated_at)
+      VALUES ('policy',?,'pages','product','active','flow-candidate','','','','',2,?,?,?)`).run(f.projectId, f.owner.id, new Date().toISOString(), new Date().toISOString());
+    const context = { routine: 'rtn-pages', gap: `pages:flow-story:${story.id}`, receipt: 'receipt-1', policy: { id: 'policy', revision: 2 }, source: { id: story.id, revision: story.revision } };
+    const { work, issue, card } = f.start('pages.flows', [{ id: story.id, kind: 'story', label: story.title }], null, context);
+    assert.equal(card.outputs[0].kind, 'pages_flow_proposal');
+    assert.deepEqual(card.controls, [context.policy]);
+    assert.equal(card.origin.gapKey, context.gap);
+    const proposal = { summary: 'Map the find route story through its existing page.', content: {
+      title: 'Find route', steps: [{ page: page.id, story: story.id, name: 'Find', trigger: 'Open search' }] },
+      usedInputs: [{ id: story.id, revision: story.revision }, { id: page.id, revision: page.revision }] };
+    assert.throws(() => f.worker.submitProposal(f.scope, { attemptId: issue.native_ref.attempt_id, proposal: { ...proposal, usedInputs: proposal.usedInputs.slice(0, 1) } }), /each Pages step page/);
+    const submitted = f.worker.submitProposal(f.scope, { attemptId: issue.native_ref.attempt_id, proposal });
+    assert.equal(f.know.list(f.projectId, 'flow').length, 0);
+    assert.throws(() => f.worker.acceptProposal(f.owner, f.projectId, work.id, submitted.proposalId), /check/);
+    f.know.updateWork(f.owner, f.projectId, work.id, { verdict: { index: 0, value: 'accept' } });
+    f.db.prepare("UPDATE layer_connections SET revision = 3 WHERE id = 'policy'").run();
+    assert.throws(() => f.worker.acceptProposal(f.owner, f.projectId, work.id, submitted.proposalId), /policy changed/);
+    assert.equal(f.know.list(f.projectId, 'flow').length, 0);
+    f.db.prepare("UPDATE layer_connections SET revision = 2 WHERE id = 'policy'").run();
+    f.worker.acceptProposal(f.owner, f.projectId, work.id, submitted.proposalId);
+    const flow = f.know.list(f.projectId, 'flow')[0];
+    assert.equal(flow.steps[0].story, story.id);
+    assert.equal(flow.steps[0].page, page.id);
+    assert.equal(f.know.workById(f.projectId, work.id).state, 'done');
   } finally { f.close(); }
 });

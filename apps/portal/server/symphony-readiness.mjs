@@ -11,8 +11,9 @@ export function symphonyIssue({ project, item, batch, action, bundle, repository
   const coding = action.id === 'platform.implement' && action.tools?.includes('code') && action.changes?.some(change => change.startsWith('Code › '));
   const audit = action.id === 'platform.security' && action.tools?.includes('read') && !action.changes?.length;
   const proposal = ['product.define', 'product.clarify', 'product.brief', 'data.contract'].includes(action.id) && action.tools?.includes('read');
+  const pagesFlow = action.id === 'pages.flows' && action.tools?.includes('read') && action.tools?.includes('revise');
   const assessment = ['design.audit', 'pages.a11y', 'deploy.review', 'work.review'].includes(action.id) && action.tools?.includes('read') && !action.changes?.length;
-  if (action.id !== item.action || action.elevated && !['product.brief', 'deploy.review', 'work.review'].includes(action.id) || !(coding || audit || proposal || assessment)) return null;
+  if (action.id !== item.action || action.elevated && !['product.brief', 'deploy.review', 'work.review'].includes(action.id) || !(coding || audit || proposal || assessment || pagesFlow)) return null;
   if (bundle.work?.id !== item.id || bundle.project?.id !== project.id || bundle.repository?.commit !== repositoryCommit) return null;
   if (bundle.guidance?.action?.id !== action.id || !bundle.guidance.action.revision) return null;
   const identifier = `${safe(project.slug).toUpperCase()}-${safe(item.ref)}`;
