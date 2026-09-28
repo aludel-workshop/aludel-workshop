@@ -4,7 +4,7 @@ import { DatabaseSync, backup } from 'node:sqlite';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { initLayerContract, createLayerInstances, layerDescriptors, layerOutputRead, layerMigrationInventory, validateLayerDeclarations } from '../server/layer-contract.mjs';
+import { initLayerContract, createLayerInstances, layerDescriptors, layerInstances, updateLayerInstance, layerOutputRead, layerMigrationInventory, validateLayerDeclarations } from '../server/layer-contract.mjs';
 
 const directory = mkdtempSync(join(tmpdir(), 'lat02-'));
 const sourcePath = join(directory, 'source.sqlite');
@@ -13,7 +13,7 @@ const db = new DatabaseSync(sourcePath);
 test.after(() => { db.close(); rmSync(directory, { recursive: true, force: true }); });
 db.exec(`
   CREATE TABLE projects (id TEXT PRIMARY KEY);
-  CREATE TABLE project_members (project_id TEXT, user_id TEXT);
+  CREATE TABLE project_members (project_id TEXT, user_id TEXT, role TEXT);
   CREATE TABLE knowledge_records (id TEXT PRIMARY KEY, project_id TEXT, kind TEXT, revision INTEGER, data_json TEXT);
   CREATE TABLE layer_work_items (project_id TEXT);
   CREATE TABLE routine_runs (project_id TEXT);
@@ -22,7 +22,7 @@ db.exec(`
   CREATE TABLE code_releases (id TEXT, project_id TEXT, commit_sha TEXT);
   CREATE TABLE releases (id TEXT, project_id TEXT, state TEXT);
   INSERT INTO projects VALUES ('a'), ('b');
-  INSERT INTO project_members VALUES ('a', 'owner'), ('b', 'other');
+  INSERT INTO project_members VALUES ('a', 'owner', 'owner'), ('a', 'viewer', 'viewer'), ('b', 'other', 'owner');
   INSERT INTO knowledge_records VALUES ('page-a', 'a', 'page', 3, '{"title":"A"}'), ('page-b', 'b', 'page', 7, '{"title":"B"}'), ('story-a', 'a', 'story', 2, '{}');
   INSERT INTO code_units VALUES ('unit-a', 'a', 'abc');
 `);
@@ -39,7 +39,7 @@ test('migration is idempotent and scoped descriptors preserve native records', a
   assert.equal(initLayerContract(db).inserted, 12);
   assert.equal(initLayerContract(db).inserted, 0);
   db.prepare('INSERT INTO projects(id) VALUES (?)').run('c');
-  db.prepare('INSERT INTO project_members(project_id,user_id) VALUES (?,?)').run('c', 'owner');
+  db.prepare('INSERT INTO project_members(project_id,user_id,role) VALUES (?,?,?)').run('c', 'owner', 'owner');
   assert.equal(createLayerInstances(db, 'c'), 6);
   assert.equal(createLayerInstances(db, 'c'), 0);
   assert.equal(layerDescriptors(db, 'owner', 'c').length, 6);
@@ -60,4 +60,17 @@ test('migration is idempotent and scoped descriptors preserve native records', a
     assert.deepEqual(after.knowledge, before.knowledge);
     assert.deepEqual(after.descriptors, before.descriptors);
   } finally { copied.close(); }
+});
+
+test('layer preferences are owner-scoped and do not hide native outputs', () => {
+  initLayerContract(db);
+  assert.equal(layerInstances(db, 'owner', 'a').length, 6);
+  assert.equal(updateLayerInstance(db, 'owner', 'a', 'pages', { visible: false, dashboardVisible: false }).visible, false);
+  assert.equal(layerInstances(db, 'owner', 'a').find(layer => layer.key === 'pages').dashboardVisible, false);
+  assert.equal(layerOutputRead(db, 'owner', 'a', 'pages', 'page', 'page-a').revision, 3);
+  assert.throws(() => updateLayerInstance(db, 'viewer', 'a', 'pages', { visible: true }), { status: 403 });
+  assert.throws(() => updateLayerInstance(db, 'other', 'a', 'pages', { visible: true }), { status: 404 });
+  assert.throws(() => updateLayerInstance(db, 'owner', 'a', 'library', { visible: false }), { status: 404 });
+  assert.throws(() => updateLayerInstance(db, 'owner', 'a', 'pages', { enabled: false }), { status: 400 });
+  assert.equal(updateLayerInstance(db, 'owner', 'a', 'pages', { visible: true, dashboardVisible: true }).visible, true);
 });

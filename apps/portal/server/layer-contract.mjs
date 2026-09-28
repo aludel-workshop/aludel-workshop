@@ -44,9 +44,14 @@ function ensureLayerTable(db) {
   db.exec(`CREATE TABLE IF NOT EXISTS layer_instances (
     project_id TEXT NOT NULL REFERENCES projects(id), layer_key TEXT NOT NULL,
     enabled INTEGER NOT NULL DEFAULT 1 CHECK(enabled IN (0, 1)),
-    descriptor_version INTEGER NOT NULL DEFAULT 1 CHECK(descriptor_version > 0), created_at TEXT NOT NULL,
+    descriptor_version INTEGER NOT NULL DEFAULT 1 CHECK(descriptor_version > 0),
+    visible INTEGER NOT NULL DEFAULT 1 CHECK(visible IN (0, 1)),
+    dashboard_visible INTEGER NOT NULL DEFAULT 1 CHECK(dashboard_visible IN (0, 1)), created_at TEXT NOT NULL,
     PRIMARY KEY(project_id, layer_key)
   )`);
+  const columns = new Set(db.prepare('PRAGMA table_info(layer_instances)').all().map(column => column.name));
+  if (!columns.has('visible')) db.exec('ALTER TABLE layer_instances ADD COLUMN visible INTEGER NOT NULL DEFAULT 1 CHECK(visible IN (0, 1))');
+  if (!columns.has('dashboard_visible')) db.exec('ALTER TABLE layer_instances ADD COLUMN dashboard_visible INTEGER NOT NULL DEFAULT 1 CHECK(dashboard_visible IN (0, 1))');
 }
 export function createLayerInstances(db, projectId, created = new Date().toISOString()) {
   ensureLayerTable(db);
@@ -88,6 +93,33 @@ function outputCount(db, projectId, kind) {
     return db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE project_id = ?`).get(projectId).n;
   }
   return db.prepare('SELECT COUNT(*) AS n FROM knowledge_records WHERE project_id = ? AND kind = ?').get(projectId, kind).n;
+}
+export function layerInstances(db, userId, projectId) {
+  member(db, userId, projectId);
+  ensureLayerTable(db);
+  return db.prepare('SELECT layer_key, enabled, visible, dashboard_visible FROM layer_instances WHERE project_id = ? ORDER BY rowid').all(projectId)
+    .map(row => {
+      const declaration = layerDeclarations.find(layer => layer.key === row.layer_key);
+      if (!declaration) fail('Unknown layer instance.');
+      return { key: row.layer_key, name: declaration.name, path: declaration.path,
+        enabled: !!row.enabled, visible: !!row.visible, dashboardVisible: !!row.dashboard_visible };
+    });
+}
+export function updateLayerInstance(db, userId, projectId, key, settings) {
+  member(db, userId, projectId);
+  if (!db.prepare("SELECT 1 FROM project_members WHERE user_id = ? AND project_id = ? AND role = 'owner'").get(userId, projectId)) fail('Project owner required.', 403);
+  if (!layerDeclarations.some(layer => layer.key === key)) fail('Layer not found.', 404);
+  if (!settings || typeof settings !== 'object' || Array.isArray(settings)
+    || !Object.keys(settings).length || Object.keys(settings).some(field => !['visible', 'dashboardVisible'].includes(field))
+    || Object.values(settings).some(value => typeof value !== 'boolean')) fail('Invalid layer settings.');
+  const row = db.prepare('SELECT 1 FROM layer_instances WHERE project_id = ? AND layer_key = ? AND enabled = 1').get(projectId, key);
+  if (!row) fail('Layer not found.', 404);
+  const updates = [];
+  const values = [];
+  if (Object.hasOwn(settings, 'visible')) { updates.push('visible = ?'); values.push(Number(settings.visible)); }
+  if (Object.hasOwn(settings, 'dashboardVisible')) { updates.push('dashboard_visible = ?'); values.push(Number(settings.dashboardVisible)); }
+  db.prepare(`UPDATE layer_instances SET ${updates.join(', ')} WHERE project_id = ? AND layer_key = ?`).run(...values, projectId, key);
+  return layerInstances(db, userId, projectId).find(layer => layer.key === key);
 }
 export function layerDescriptors(db, userId, projectId) {
   member(db, userId, projectId);

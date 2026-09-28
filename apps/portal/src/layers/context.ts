@@ -115,6 +115,7 @@ export interface WorkRun { id: string; number: number; batchId: string | null; s
   review: { verdicts: Record<string, { value: 'accept' | 'reject' | 'skip'; note: string }>; flags: Record<string, string>; outcome: WorkRunState | null; comment: string | null; signedBy: string | null; signedAt: string | null }; }
 export interface WorkChange { recordId: string; revision: number; author: string; rationale: string | null; createdAt: string; kind: string | null; exists: boolean; fields: FieldChange[]; }
 export interface Routine extends RecordBase { key: string | null; title: string; layer: string; type: string; cadence: string; documents: string[]; enabled: boolean; nextRunAt: string | null; lastRunAt: string | null; lastWorkId: string | null; history: Revision[]; }
+export interface LayerInstance { key: string; name: string; path: string; enabled: boolean; visible: boolean; dashboardVisible: boolean; }
 export interface Knowledge {
   vision: Record<string, VisionSection>; personas: Persona[]; phases: Phase[]; activities: Activity[]; stories: Story[]; specs: Spec[];
   research: Research[]; docs: Doc[]; pages: Page[]; work: WorkItem[]; selectedPacks: string[];
@@ -178,6 +179,7 @@ export class ProjectContext {
   readonly setup = signal<ProjectSetup | null>(null);
   readonly data = signal<Knowledge | null>(null);
   readonly catalog = signal<Catalog | null>(null);
+  readonly layerInstances = signal<LayerInstance[]>([]);
   readonly error = signal('');
   readonly notice = signal('');
   readonly path = signal(location.pathname);
@@ -388,8 +390,15 @@ export class ProjectContext {
   next(assignee: Assignee, count: number) { return this.api<{ added: string[] }>(`/api/projects/${encodeURIComponent(this.projectId())}/batches/next`, 'POST', { assignee, count }); }
 
   async reload() {
-    const value = await this.api<{ setup: ProjectSetup; knowledge: Knowledge; catalog: Catalog }>(`/api/projects/${encodeURIComponent(this.projectId())}/knowledge`);
-    this.setup.set(value.setup); this.data.set(value.knowledge); this.catalog.set(value.catalog);
+    const [value, instances] = await Promise.all([
+      this.api<{ setup: ProjectSetup; knowledge: Knowledge; catalog: Catalog }>(`/api/projects/${encodeURIComponent(this.projectId())}/knowledge`),
+      this.api<{ layers: LayerInstance[] }>(`/api/projects/${encodeURIComponent(this.projectId())}/layer-instances`)
+    ]);
+    this.setup.set(value.setup); this.data.set(value.knowledge); this.catalog.set(value.catalog); this.layerInstances.set(instances.layers);
+  }
+
+  setLayerPreference(key: string, settings: { visible?: boolean; dashboardVisible?: boolean }) {
+    return this.api<LayerInstance>(`/api/projects/${encodeURIComponent(this.projectId())}/layer-instances/${encodeURIComponent(key)}`, 'PUT', settings);
   }
 
   // Every write goes through here: errors surface in the shell, success reloads the whole snapshot.

@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { ProjectContext, layerLabel, statusLabel, statusOrder, workStatusLabel } from './context';
 
 // Home: the project's pulse across every layer (current phase, what needs you, the app, recent changes).
@@ -8,6 +8,23 @@ import { ProjectContext, layerLabel, statusLabel, statusOrder, workStatusLabel }
   <p class="lay-eyebrow">{{ ctx.setup()?.project?.name }} · Home</p>
   <h1 tabindex="-1">{{ ctx.setup()?.project?.name }}</h1>
   <p class="lay-lead">{{ valueStatement() }}</p>
+  <section class="lay-card lay-layer-manager" aria-labelledby="home-layers">
+    <div class="lay-row lay-wrap"><h2 id="home-layers" class="lay-flat">Your layers</h2><p class="lay-muted lay-flat">Choose which layers appear in the rail and on Home. Their records and links remain available.</p></div>
+    <div class="lay-layer-controls">
+      @for (layer of ctx.layerInstances(); track layer.key) {
+        <div class="lay-layer-control">
+          <a [href]="ctx.link(layer.key)" (click)="ctx.go(ctx.link(layer.key), $event)">{{ layer.name }}</a>
+          <label><input type="checkbox" [checked]="layer.visible" [disabled]="saving() === layer.key || !canManage()" (change)="setPreference(layer.key, 'visible', $event)"> In rail</label>
+          <label><input type="checkbox" [checked]="layer.dashboardVisible" [disabled]="saving() === layer.key || !canManage()" (change)="setPreference(layer.key, 'dashboardVisible', $event)"> On Home</label>
+        </div>
+      }
+    </div>
+  </section>
+  @if (homeLayers().length) {
+    <div class="lay-home-layer-cards" aria-label="Layer cards">
+      @for (layer of homeLayers(); track layer.key) { <a class="lay-card" [href]="ctx.link(layer.key)" (click)="ctx.go(ctx.link(layer.key), $event)"><strong>{{ layer.name }}</strong><span>Open {{ layer.name }}</span></a> }
+    </div>
+  }
   <div class="lay-grid lay-g3">
     <section class="lay-card lay-wide" aria-labelledby="home-phase">
       <div class="lay-row"><h2 id="home-phase" class="lay-flat">{{ currentPhase() }} milestone</h2><span class="lay-chip lay-plain">{{ phaseStories().length }} stories</span>
@@ -40,6 +57,15 @@ import { ProjectContext, layerLabel, statusLabel, statusOrder, workStatusLabel }
 })
 export class HomeLayerComponent {
   readonly ctx = inject(ProjectContext);
+  readonly saving = signal('');
+  readonly canManage = computed(() => this.ctx.session()?.projects.find(project => project.id === this.ctx.projectId())?.role === 'owner');
+  readonly homeLayers = computed(() => this.ctx.layerInstances().filter(layer => layer.enabled && layer.dashboardVisible));
+  async setPreference(key: string, field: 'visible' | 'dashboardVisible', event: Event) {
+    const checked = (event.target as HTMLInputElement).checked;
+    this.saving.set(key);
+    await this.ctx.write(() => this.ctx.setLayerPreference(key, { [field]: checked }), 'Layer preferences saved.');
+    this.saving.set('');
+  }
   readonly statusLabel = statusLabel;
   readonly workStatusLabel = workStatusLabel;
   readonly layerLabel = layerLabel;

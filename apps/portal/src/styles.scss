@@ -1678,3 +1678,17 @@ aludel-finding,aludel-evidence{display:contents}aludel-finding{display:block}.la
 
 .wr-step label,.wi-signoff label,.wi-question label{font-size:14px}
 .wr-ev.missing{border-style:dashed;opacity:.8}.wr-ev.missing small{color:var(--machine-blocked-ink)}.wr-ev:disabled{cursor:default}
+/* LAT-03: shared layer navigation and editable project-level visibility. */
+.lay-nav-divider{display:block;height:1px;margin:7px 12px;background:var(--machine-line)}
+.lay-shared-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 18px;padding-bottom:12px;border-bottom:1px solid var(--machine-line)}
+.lay-shared-tabs a{padding:7px 12px;border-radius:999px;color:var(--machine-muted);text-decoration:none;font-weight:600}
+.lay-shared-tabs a:hover,.lay-shared-tabs a:focus-visible{background:var(--machine-panel)}
+.lay-shared-tabs a.active{background:var(--machine-accent);color:#fff}
+.lay-layer-manager{margin:0 0 18px}.lay-layer-manager .lay-row{align-items:baseline}.lay-layer-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 20px;margin-top:16px}
+.lay-layer-control{display:flex;align-items:center;gap:16px;min-height:42px;border-top:1px solid var(--machine-line)}
+.lay-layer-control>a{min-width:80px;font-weight:700}.lay-layer-control label{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;font-size:13px;cursor:pointer}
+.lay-layer-control input{accent-color:var(--machine-accent)}
+.lay-home-layer-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:18px}
+.lay-home-layer-cards a{display:flex;flex-direction:column;gap:4px;color:var(--machine-ink);text-decoration:none}.lay-home-layer-cards a:hover,.lay-home-layer-cards a:focus-visible{border-color:var(--machine-accent)}.lay-home-layer-cards span{color:var(--machine-muted);font-size:13px}
+@media(max-width:800px){.lay-nav-divider{width:1px;height:24px;margin:5px 2px}.lay-layer-controls{grid-template-columns:1fr}.lay-home-layer-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:480px){.lay-layer-control{flex-wrap:wrap;gap:4px 12px;padding:8px 0}.lay-layer-control>a{width:100%}.lay-home-layer-cards{grid-template-columns:1fr}}
