@@ -452,8 +452,8 @@ async function api(request, response, url) {
           return json(response, 200, result, { 'cache-control': 'no-store' });
         }
         const evidence = ['candidate', 'commit', 'audit', 'proposal'].includes(operation) ? runHistory.checkEvidence(workerAuth.projectId, attemptId, input.evidence) : [];
-        const result = operation === 'workspace' ? worker.registerWorkspace(scope, { attemptId, path: input.path })
-          : operation === 'runs' ? worker.reserveRun(scope, { attemptId })
+        const result = operation === 'workspace' ? worker.registerWorkspace(scope, { attemptId, path: input.path, hostId: input.hostId })
+          : operation === 'runs' ? worker.reserveRun(scope, { attemptId, hostId: input.hostId })
           : operation === 'events' ? worker.appendEvent(scope, { attemptId, ...input })
             : operation === 'commit' ? worker.commitCandidate(scope, { attemptId, message: input.message, checks: input.checks })
               : operation === 'audit' ? worker.submitAudit(scope, { attemptId, report: input.report })

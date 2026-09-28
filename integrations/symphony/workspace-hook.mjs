@@ -14,6 +14,7 @@ const source = resolve(process.env.ALUDEL_SOURCE_REPOSITORY || '');
 const endpoint = String(process.env.ALUDEL_WORKER_URL || '').replace(/\/$/, '');
 const token = process.env.ALUDEL_WORKER_TOKEN_FILE ? readFileSync(process.env.ALUDEL_WORKER_TOKEN_FILE, 'utf8').trim() : process.env.ALUDEL_WORKER_TOKEN;
 const identifier = basename(workspace);
+const hostId = process.env.ALUDEL_HOST_ID || process.env.HOSTNAME || 'local-host';
 if (!token || !/^[A-Za-z0-9_-]{10,100}$/.test(identifier) || !endpoint || !process.env.ALUDEL_SOURCE_REPOSITORY) fail('Aludel workspace hook is not configured.');
 const url = new URL(endpoint + '/issues');
 if (!['http:', 'https:'].includes(url.protocol) || url.protocol === 'http:' && !['127.0.0.1', 'localhost', 'aludel.localhost', '[::1]'].includes(url.hostname)) fail('Aludel worker URL must be local HTTP or HTTPS.');
@@ -44,19 +45,21 @@ if (!existsSync(join(workspace, '.git'))) {
 
 const registration = await fetch(new URL(endpoint + `/attempts/${attemptId}/workspace`), {
   method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-  body: JSON.stringify({ path: workspace }), signal: AbortSignal.timeout(10_000),
+  body: JSON.stringify({ path: workspace, hostId }), signal: AbortSignal.timeout(10_000),
 });
 if (!registration.ok) fail(`Aludel workspace registration failed (${registration.status}).`);
 if (phase === 'start-run') {
   const reservation = await fetch(new URL(endpoint + `/attempts/${attemptId}/runs`), {
     method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-    body: '{}', signal: AbortSignal.timeout(10_000),
+    body: JSON.stringify({ hostId }), signal: AbortSignal.timeout(10_000),
   });
   if (!reservation.ok) fail(`Aludel run reservation failed (${reservation.status}).`);
 }
 } catch (error) {
   const message = String(error?.message || error || 'Symphony workspace preparation failed.').replace(/\s+/g, ' ').slice(0, 500);
   try {
+    // A losing host must not block the winner's authorized attempt.
+    if (/registration failed \(409\)|reservation failed \(409\)/.test(message)) throw error;
     await fetch(new URL(endpoint + '/attempts/' + attemptId + '/events'), {
       method: 'POST', headers: { authorization: 'Bearer ' + token, 'content-type': 'application/json' },
       body: JSON.stringify({ eventId: 'hook-' + phase + '-' + Date.now(), kind: 'error', message }), signal: AbortSignal.timeout(10_000),

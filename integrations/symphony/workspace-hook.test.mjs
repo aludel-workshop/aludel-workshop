@@ -23,6 +23,7 @@ test('workspace hook checks out the exact Go commit and preserves a reused works
   git(source, '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'later');
   const registrations = [];
   let reservations = 0;
+  let errorEvents = 0;
   const attemptId = 'att-00000000-0000-4000-8000-000000000001';
   const server = createServer((request, response) => {
     assert.equal(request.headers.authorization, 'Bearer test-worker-token');
@@ -30,20 +31,21 @@ test('workspace hook checks out the exact Go commit and preserves a reused works
     if (request.method === 'POST' && request.url === `/api/worker/attempts/${attemptId}/workspace`) {
       let body = '';
       request.on('data', chunk => { body += chunk; });
-      request.on('end', () => { registrations.push(JSON.parse(body)); response.end(JSON.stringify({ registered: true })); });
+      request.on('end', () => { const claim = JSON.parse(body); registrations.push(claim); response.statusCode = claim.hostId === 'test-host' ? 200 : 409; response.end(JSON.stringify({ registered: response.statusCode === 200 })); });
       return;
     }
     if (request.method === 'POST' && request.url === `/api/worker/attempts/${attemptId}/runs`) {
       reservations++; response.end(JSON.stringify({ runsStarted: reservations, runLimit: 2 })); return;
     }
+    if (request.method === 'POST' && request.url === `/api/worker/attempts/${attemptId}/events`) { errorEvents++; response.end('{}'); return; }
     response.end(JSON.stringify({ issues: [{ identifier: 'BUDDY-BOX-W-7', native_ref: { repository_commit: base, attempt_id: attemptId } }], nextCursor: null }));
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const hook = new URL('./workspace-hook.mjs', import.meta.url).pathname;
   const credentialPath = join(root, 'worker-token'); writeFileSync(credentialPath, 'test-worker-token\n', { mode: 0o600 });
-  const env = { ...process.env, ALUDEL_WORKER_TOKEN: '', ALUDEL_WORKER_TOKEN_FILE: credentialPath, ALUDEL_WORKER_URL: `http://127.0.0.1:${server.address().port}/api/worker`, ALUDEL_SOURCE_REPOSITORY: source };
-  const run = (cwd, phase) => new Promise(resolve => {
-    const child = spawn(process.execPath, [hook, phase], { cwd, env, timeout: 10_000 });
+  const env = { ...process.env, ALUDEL_WORKER_TOKEN: '', ALUDEL_WORKER_TOKEN_FILE: credentialPath, ALUDEL_WORKER_URL: `http://127.0.0.1:${server.address().port}/api/worker`, ALUDEL_SOURCE_REPOSITORY: source, ALUDEL_HOST_ID: 'test-host' };
+  const run = (cwd, phase, extraEnv = {}) => new Promise(resolve => {
+    const child = spawn(process.execPath, [hook, phase], { cwd, env: { ...env, ...extraEnv }, timeout: 10_000 });
     let stderr = '';
     child.stderr.on('data', chunk => { stderr += chunk; });
     child.on('close', status => resolve({ status, stderr }));
@@ -56,7 +58,10 @@ test('workspace hook checks out the exact Go commit and preserves a reused works
     const second = await run(workspace, 'start-run');
     assert.equal(second.status, 0, second.stderr);
     assert.equal(git(workspace, 'status', '--porcelain').includes('local.txt'), true);
-    assert.deepEqual(registrations, [{ path: workspace }, { path: workspace }]);
+    assert.deepEqual(registrations, [{ path: workspace, hostId: 'test-host' }, { path: workspace, hostId: 'test-host' }]);
+    const losingHost = await run(workspace, 'start-run', { ALUDEL_HOST_ID: 'other-host' });
+    assert.notEqual(losingHost.status, 0);
+    assert.equal(errorEvents, 0, 'a claim loser must not block the winning attempt');
     assert.equal(reservations, 1, 'only before_run consumes the durable allowance');
     const wrong = join(root, 'WRONG-W-7'); mkdirSync(wrong);
     const rejected = await run(wrong, 'start-run');

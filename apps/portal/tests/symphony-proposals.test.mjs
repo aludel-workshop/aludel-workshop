@@ -42,7 +42,7 @@ function fixture() {
   const scope = worker.authenticate('Bearer ' + credential);
   const runs = agentRuns({ db, know, secrets: openSecretStore(root), providers: catalogs.agentProviders.providers, worker, symphonyDispatch: true,
     callModel: async () => { throw new Error('Legacy model caller must never run'); } });
-  const start = (action, targets = [], question = null, context = null) => {
+  const start = (action, targets = [], question = null, context = null, deferRun = false) => {
     const work = know.createWork(projectId, { action, title: `Test ${action}`, assignee: { kind: 'agent', id: profile.id }, targets,
       checks: ['The proposed output is accurate'], ...(question ? { question } : {}), ...(context ? { context } : {}) }, owner.name);
     if (work.state === 'suggested') know.updateWork(owner, projectId, work.id, { state: 'ready' });
@@ -55,8 +55,10 @@ function fixture() {
     const clone = join(workerRoot, issue.identifier);
     git(root, 'clone', workspace, clone); git(clone, 'checkout', '--detach', issue.native_ref.repository_commit);
     writeFileSync(join(clone, '.git', 'aludel-base'), issue.native_ref.repository_commit + '\n');
-    worker.registerWorkspace(scope, { attemptId: issue.native_ref.attempt_id, path: clone });
-    worker.reserveRun(scope, { attemptId: issue.native_ref.attempt_id });
+    if (!deferRun) {
+      worker.registerWorkspace(scope, { attemptId: issue.native_ref.attempt_id, path: clone });
+      worker.reserveRun(scope, { attemptId: issue.native_ref.attempt_id });
+    }
     return { work, batch, issue, card, clone };
   };
   return { root, db, know, owner, projectId, profile, worker, scope, credential, runs, start, workspace,
@@ -318,5 +320,24 @@ test('Pages-origin Work pins reviewed policy and applies a proposed flow only af
     assert.equal(flow.steps[0].story, story.id);
     assert.equal(flow.steps[0].page, page.id);
     assert.equal(f.know.workById(f.projectId, work.id).state, 'done');
+  } finally { f.close(); }
+});
+
+
+test('two hosts racing for one Go-pinned attempt have one workspace claim and one runnable owner', async () => {
+  const f = fixture();
+  try {
+    const { issue, clone } = f.start('product.brief', [], null, null, true);
+    const attemptId = issue.native_ref.attempt_id;
+    const hosts = ['host-a', 'host-b'];
+    const outcomes = await Promise.allSettled(hosts.map(hostId => Promise.resolve().then(() =>
+      f.worker.registerWorkspace(f.scope, { attemptId, path: clone, hostId }))));
+    assert.equal(outcomes.filter(result => result.status === 'fulfilled').length, 1);
+    assert.equal(outcomes.filter(result => result.status === 'rejected' && result.reason.status === 409).length, 1);
+    const winner = hosts[outcomes.findIndex(result => result.status === 'fulfilled')];
+    const loser = hosts.find(host => host !== winner);
+    assert.throws(() => f.worker.reserveRun(f.scope, { attemptId, hostId: loser }), /claimed by another host/);
+    assert.equal(f.worker.reserveRun(f.scope, { attemptId, hostId: winner }).runsStarted, 1);
+    assert.equal(f.worker.attemptStatus(f.scope, attemptId).state, 'working');
   } finally { f.close(); }
 });

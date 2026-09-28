@@ -57,6 +57,7 @@ export function initSymphonyWorker(db) {
   const tokenColumns = db.prepare('PRAGMA table_info(symphony_worker_tokens)').all().map(row => row.name);
   if (!tokenColumns.includes('last_seen_at')) db.exec('ALTER TABLE symphony_worker_tokens ADD COLUMN last_seen_at TEXT');
   const columns = db.prepare('PRAGMA table_info(symphony_attempts)').all().map(row => row.name);
+  if (!columns.includes('host_id')) db.exec('ALTER TABLE symphony_attempts ADD COLUMN host_id TEXT');
   if (!columns.includes('run_limit')) db.exec('ALTER TABLE symphony_attempts ADD COLUMN run_limit INTEGER NOT NULL DEFAULT 3');
   if (!columns.includes('runs_started')) {
     db.exec('ALTER TABLE symphony_attempts ADD COLUMN runs_started INTEGER NOT NULL DEFAULT 0');
@@ -363,8 +364,9 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     }
     return { attemptId, eventId, recorded: Boolean(recorded.changes) };
   }
-  function registerWorkspace(scope, { attemptId, path }) {
+  function registerWorkspace(scope, { attemptId, path, hostId = 'legacy' }) {
     const row = attempt(scope, attemptId);
+    if (!/^[A-Za-z0-9._-]{1,100}$/.test(hostId)) fail('A stable host ID is required.', 400);
     const issue = current(scope, row.work_id);
     if (!issue || issue.native_ref.attempt_id !== attemptId) fail('This attempt is no longer authorized.', 409);
     if (!workspaceRoot) fail('Symphony workspace root is not configured.', 409);
@@ -381,14 +383,17 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     if (marker !== issue.native_ref.repository_commit) fail('Workspace base differs from Go.', 409);
     if (spawnSync('git', ['merge-base', '--is-ancestor', marker, head], { cwd: actual, stdio: 'ignore' }).status !== 0) fail('Workspace HEAD does not descend from Go.', 409);
     if (row.workspace_path && row.workspace_path !== actual) fail('Attempt already belongs to a different workspace.', 409);
-    db.prepare("UPDATE symphony_attempts SET workspace_path = ?, state = 'working', updated_at = ? WHERE id = ?").run(actual, now(), attemptId);
+    const claimed = db.prepare("UPDATE symphony_attempts SET workspace_path = ?, host_id = ?, state = 'working', updated_at = ? WHERE id = ? AND (host_id IS NULL OR host_id = ?)")
+      .run(actual, hostId, now(), attemptId, hostId);
+    if (!claimed.changes) fail('This attempt is claimed by another host.', 409);
     appendEvent(scope, { attemptId, eventId: 'workspace-ready', kind: 'started' });
     return { attemptId, registered: true };
   }
   // Called once by the trusted before_run hook. A reservation is consumed before Codex starts;
   // an uncertain crash cannot replay the same run for free. WORKFLOW must set max_turns: 1.
-  function reserveRun(scope, { attemptId }) {
+  function reserveRun(scope, { attemptId, hostId = 'legacy' }) {
     const row = attempt(scope, attemptId);
+    if (row.host_id !== hostId) fail('This attempt is claimed by another host.', 409);
     const issue = current(scope, row.work_id);
     if (!issue || issue.native_ref.attempt_id !== attemptId || !row.workspace_path || row.state !== 'working') fail('This attempt is not ready for another run.', 409);
     const updated = db.prepare("UPDATE symphony_attempts SET runs_started = runs_started + 1, updated_at = ? WHERE id = ? AND state = 'working' AND runs_started < run_limit")

@@ -128,6 +128,7 @@ while IFS=$'\t' read -r project_id project_slug capacity token_file; do
       --add-host "aludel.localhost:$gateway" \
       -e HOME="$runtime_root/home" -e CODEX_HOME="$runtime_root/codex-home" -e MIX_HOME="$runtime_root/mix" \
       -e ALUDEL_WORKER_TOKEN_FILE="$token_file" \
+      -e ALUDEL_HOST_ID="$container" \
       -e ALUDEL_SOURCE_REPOSITORY="$source_repo" \
       -e ALUDEL_WORKER_URL="http://aludel.localhost:$portal_port/api/worker" \
       -e ALUDEL_WORKSPACE_HOOK="$repo_root/integrations/symphony/workspace-hook.mjs" \
