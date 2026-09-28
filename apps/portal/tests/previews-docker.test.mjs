@@ -11,7 +11,7 @@ import { initCodeCandidates } from '../server/code-candidates.mjs';
 import { createUser, initAccounts } from '../server/accounts.mjs';
 import { initKnowledge, knowledge } from '../server/knowledge.mjs';
 import { initOnboarding, loadCatalogs, onboarding } from '../server/onboarding.mjs';
-import { containerLimits, previewManager, previewRuntime } from '../server/previews.mjs';
+import { containerLimits, previewImageName, previewManager, previewRuntime } from '../server/previews.mjs';
 import { ensureProductWorkspace } from '../server/product-workspace.mjs';
 import { copyMedia, loadScaffoldSources, skeletonFiles, writeBinaries, writeFiles } from '../server/scaffold.mjs';
 import { openSecretStore } from '../server/secret-store.mjs';
@@ -49,6 +49,14 @@ function generatedApp(root) {
   writeFiles(workspace, generated.files); writeBinaries(workspace, generated.binaries); copyMedia(workspace, generated.media);
   return { db, project, workspace, auth: Boolean(setup.stack.options?.auth), files: generated.files };
 }
+
+test('preview image tags are isolated by portal instance and preview kind', () => {
+  const current = previewImageName('/tmp/aludel-current/workspaces', 'project', 'same-project');
+  const candidate = previewImageName('/tmp/aludel-layer-model/workspaces', 'project', 'same-project');
+  const review = previewImageName('/tmp/aludel-layer-model/workspaces', 'candidate', 'same-project');
+  assert.notEqual(current, candidate);
+  assert.notEqual(candidate, review);
+});
 
 test('the skeleton declares how it runs, without setting its own limits', () => {
   const root = mkdtempSync(join(tmpdir(), 'aludel-container-files-'));
@@ -106,7 +114,7 @@ test('a preview builds from the app\'s Dockerfile and runs in one limited contai
     assert.equal((await post(again, '/api/sign-in', { email: 'a@b.co', password: 'longenough1' })).status, 200);
   } finally {
     previews.stopAll(); other.stopAll();
-    docker('image', 'rm', '-f', `aludel-preview/${project.id}`);
+    docker('image', 'rm', '-f', previewImageName(join(root, 'workspaces'), 'project', project.id));
     rmSync(root, { recursive: true, force: true });
   }
 });
@@ -134,7 +142,7 @@ test('candidate preview has separate container, image, state and runtime data', 
     assert.equal(db.prepare('SELECT count(*) AS count FROM app_previews WHERE project_id = ?').get(project.id).count, 0);
   } finally {
     candidate.stopAll(); projectPreview.stopAll();
-    docker('image', 'rm', '-f', `aludel-candidate/${candidateId}`);
+    docker('image', 'rm', '-f', previewImageName(join(root, 'candidate-workspaces'), 'candidate', candidateId));
     rmSync(root, { recursive: true, force: true });
   }
 });

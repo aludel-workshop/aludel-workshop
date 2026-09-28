@@ -29,6 +29,11 @@ export function previewRuntime(environment = process.env, docker = 'docker') {
   return spawnSync(docker, ['info', '--format', '{{.ServerVersion}}'], { stdio: 'ignore', timeout: 5000 }).status === 0 ? 'docker' : 'process';
 }
 
+export const previewInstanceId = (workspaceRoot, kind = 'project') =>
+  createHash('sha256').update(workspaceRoot + (kind === 'candidate' ? ':candidate' : '')).digest('hex').slice(0, 12);
+export const previewImageName = (workspaceRoot, kind, projectId) =>
+  `aludel-${kind === 'candidate' ? 'candidate' : 'preview'}/${previewInstanceId(workspaceRoot, kind)}-${projectId}`;
+
 export function previewManager({ db, portalRoot, workspaceRoot, logRoot, runtime = 'process', docker = 'docker', limits = containerLimits, kind = 'project', dataRoot = null }) {
   if (!['project', 'candidate'].includes(kind)) throw new Error('Unknown preview kind.');
   const table = kind === 'candidate' ? 'candidate_previews' : 'app_previews';
@@ -47,9 +52,10 @@ export function previewManager({ db, portalRoot, workspaceRoot, logRoot, runtime
   const sharedModules = join(workspaceRoot, 'node_modules');
   if (runtime === 'process' && !existsSync(sharedModules)) symlinkSync(join(portalRoot, 'node_modules'), sharedModules, 'dir');
   // Containers carry the portal instance they belong to, so a second portal (tests, another checkout) never touches them.
-  const instance = createHash('sha256').update(workspaceRoot + (kind === 'candidate' ? ':candidate' : '')).digest('hex').slice(0, 12);
+  const instance = previewInstanceId(workspaceRoot, kind);
   const containerName = projectId => `aludel-${instance}-${projectId}`;
-  const imageName = projectId => kind === 'candidate' ? `aludel-candidate/${projectId}` : `aludel-preview/${projectId}`;
+  // Image tags must be instance-scoped too: two portal worktrees may use the same project ID.
+  const imageName = projectId => previewImageName(workspaceRoot, kind, projectId);
   const dockerSync = args => spawnSync(docker, args, { encoding: 'utf8', timeout: 30000 });
   // Like child processes, containers don't outlive the portal: previews come back on demand from their last image.
   if (runtime === 'docker') {

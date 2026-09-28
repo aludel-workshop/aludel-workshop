@@ -1,0 +1,37 @@
+[
+  {
+    "label": "current",
+    "url": "http://aludel.localhost:4310/",
+    "status": 200,
+    "title": "Aludel · Turn ideas into working apps",
+    "heading": [
+      "Turn an idea into an app you can click around."
+    ],
+    "cookies": []
+  },
+  {
+    "label": "candidate",
+    "url": "http://aludel.layers.localhost:4311/",
+    "status": 200,
+    "title": "Aludel · Turn ideas into working apps",
+    "heading": [
+      "Turn an idea into an app you can click around."
+    ],
+    "cookies": []
+  },
+  {
+    "check": "draft-cookie-isolation",
+    "saved": {
+      "status": 200,
+      "name": "LAT 01 Fixture"
+    },
+    "candidateDraft": "LAT 01 Fixture",
+    "currentDraft": null,
+    "cookies": [
+      {
+        "name": "aludel_draft",
+        "domain": "aludel.layers.localhost"
+      }
+    ]
+  }
+]

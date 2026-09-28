@@ -13,6 +13,7 @@ import { initOnboarding, loadCatalogs, onboarding } from '../server/onboarding.m
 import { ensureProductWorkspace } from '../server/product-workspace.mjs';
 import { openSecretStore } from '../server/secret-store.mjs';
 import { openDatabase } from '../server/storage.mjs';
+import { previewImageName } from '../server/previews.mjs';
 import { initSymphonyWorker, symphonyWorker } from '../server/symphony-worker.mjs';
 import { initWorkflow } from '../server/workflow.mjs';
 
@@ -317,7 +318,7 @@ test('worker token scopes pinned coding work; ID refresh withdraws skipped and s
   worker.revoke(owner, projectId, profile.id);
   assert.throws(() => worker.authenticate('Bearer ' + nextToken.token), error => error.status === 401);
   db.close();
-  spawnSync('docker', ['image', 'rm', '-f', `aludel-candidate/${submitted.candidate.id}`], { stdio: 'ignore' });
+  spawnSync('docker', ['image', 'rm', '-f', previewImageName(join(root, 'candidate-preview-workspaces'), 'candidate', submitted.candidate.id)], { stdio: 'ignore' });
   rmSync(root, { recursive: true, force: true });
 });
 
