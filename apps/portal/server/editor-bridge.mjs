@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { getUser, requireMember } from './accounts.mjs';
+import { compileTaskManifest } from './task-manifest.mjs';
 
 const sha = value => createHash('sha256').update(value).digest('hex');
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
@@ -76,12 +77,17 @@ export function editorBridge({ db, know, projectSetup, previewStatus }) {
     const instructions = know.agentExport(projectId);
     const profile = item.profileId ? know.get(projectId, item.profileId) : know.defaultProfile(projectId);
     const soloAvailable = ['product.define', 'product.clarify', 'data.contract'].includes(item.action);
-    const content = { schemaVersion: 1, project: project(projectId), work: item, sources: [...targets, ...docs.filter(doc => !targets.some(target => target.id === doc.id))],
+    const content = { schemaVersion: 1, performer: { kind: 'person', id: user.id, name: user.name }, batch: { id: `person-${workId}` }, project: project(projectId), work: item, sources: [...targets, ...docs.filter(doc => !targets.some(target => target.id === doc.id))],
       guidance: { principles: instructions.principles, project: instructions.instructions, role: role ? { id: role.id, revision: role.revision, name: role.name, instructions: role.instructions } : null,
         action: action ? { id: action.id, revision: action.revision, name: action.name, instructions: action.instructions, reads: action.reads, changes: action.changes, tools: action.tools, asks: action.asks } : null },
-      repository: { commit: head(setup.workspacePath) }, tools,
+      repository: { commit: head(setup.workspacePath) }, instructionPins: {}, tools,
       soloPreview: { availableNow: soloAvailable, profile: profile ? { id: profile.id, revision: profile.revision, name: profile.name, instructions: profile.instructions, model: profile.model, effort: profile.effort } : null,
         note: soloAvailable ? 'The current draft runner can take this action when assigned to an agent.' : 'A solo coding runner for this action arrives with LAY-05.' } };
+    try { content.taskOpen = compileTaskManifest(content); }
+    catch (error) {
+      if (error.status !== 409) throw error;
+      content.taskOpen = { available: false, reason: error.message };
+    }
     const encoded = JSON.stringify(content);
     const digest = sha(encoded);
     db.prepare('INSERT INTO editor_contexts(digest, project_id, work_id, content_json, created_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(digest) DO NOTHING')

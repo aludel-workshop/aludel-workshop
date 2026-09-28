@@ -5,8 +5,9 @@ const summary = record => String(record.summary || record.description || record.
 
 export function compileTaskManifest(bundle) {
   const { project, work, guidance, sources, repository, instructionPins } = bundle;
-  if (!project?.id || !work?.id || !guidance?.role?.revision || !guidance?.action?.revision || !guidance?.profile?.revision ||
-      !/^[a-f0-9]{40}$/.test(repository?.commit || '')) fail('The task is missing pinned inputs.');
+  const person = bundle.performer?.kind === 'person';
+  if (!project?.id || !work?.id || !guidance?.role?.revision || !guidance?.action?.revision || (!person && !guidance?.profile?.revision) ||
+      (!person && !/^[a-f0-9]{40}$/.test(repository?.commit || ''))) fail('The task is missing pinned inputs.');
   const action = guidance.action;
   const coding = action.id === 'platform.implement' && action.tools?.includes('code') && action.changes?.some(value => value.startsWith('Code › '));
   const audit = action.id === 'platform.security' && action.tools?.includes('read') && !action.changes?.length;
@@ -23,9 +24,9 @@ export function compileTaskManifest(bundle) {
   return {
     schemaVersion: 'aludel-task-open-v1',
     identity: { projectId: project.id, workId: work.id, workRef: work.ref, batchId: bundle.batch.id },
-    task: { title: work.title, brief: work.context?.suggestion || '', answeredQuestion: work.question?.answer ? { question: work.question.text, answer: work.question.answer } : null, openQuestion: work.action === 'product.clarify' && work.question && !work.question.answer ? work.question.text : null, role: { id: guidance.role.id, revision: guidance.role.revision, name: guidance.role.name },
-      action: { id: action.id, revision: action.revision, name: action.name }, profile: { id: guidance.profile.id, revision: guidance.profile.revision, name: guidance.profile.name, provider: guidance.profile.provider || 'codex', model: guidance.profile.model || '', effort: guidance.profile.effort || 'medium' } },
-    guidance: { project: guidance.project, role: guidance.role.instructions, action: action.instructions, profile: guidance.profile.instructions,
+    task: { performer: person ? bundle.performer : { kind: 'agent', id: guidance.profile.id }, title: work.title, brief: work.context?.suggestion || '', answeredQuestion: work.question?.answer ? { question: work.question.text, answer: work.question.answer } : null, openQuestion: work.action === 'product.clarify' && work.question && !work.question.answer ? work.question.text : null, role: { id: guidance.role.id, revision: guidance.role.revision, name: guidance.role.name },
+      action: { id: action.id, revision: action.revision, name: action.name }, profile: person ? null : { id: guidance.profile.id, revision: guidance.profile.revision, name: guidance.profile.name, provider: guidance.profile.provider || 'codex', model: guidance.profile.model || '', effort: guidance.profile.effort || 'medium' } },
+    guidance: { project: guidance.project, role: guidance.role.instructions, action: action.instructions, profile: person ? '' : guidance.profile.instructions,
       method: audit ? 'Inspect only the pinned source and relevant knowledge. Report severity, affected source, evidence, recommendation, checked scope and unknowns. Ask if a decision blocks the result.' :
         coding ? 'Implement only the allowed code surface, run relevant checks, and submit the exact candidate commit.' :
         pagesFlow ? 'Draft a Pages flow using existing pinned pages and the target story. Submit a proposal for Work review; do not change Pages records.' :
@@ -45,8 +46,8 @@ export function compileTaskManifest(bundle) {
           action.id === 'product.clarify' ? 'summary; content: options[2..4], recommendation, reasoning; usedInputs' :
           'summary; content: description, fields[{name,type,required,description,format?}], optional states[]; usedInputs',
         checks: work.checks.map(check => check.text) }],
-    capabilities: { knowledge: ['map', 'search', 'read'], repository: coding ? 'scoped code candidate' : 'read-only pinned commit',
-      submit: audit ? 'security_report' : coding ? 'code_candidate' : 'work_proposal' },
-    runtime: { repositoryCommit: repository.commit, instructionPins, staleInputs: 'withdraw this attempt when a pinned input changes' }
+    capabilities: { knowledge: ['map', 'search', 'read'], repository: person ? 'read-only through editor bridge' : coding ? 'scoped code candidate' : 'read-only pinned commit',
+      submit: person ? 'none through editor bridge' : audit ? 'security_report' : coding ? 'code_candidate' : 'work_proposal' },
+    runtime: { authorization: person ? 'context-only; Work owns starting and submission' : 'Go-pinned attempt', repositoryCommit: repository.commit, instructionPins, staleInputs: 'withdraw this attempt when a pinned input changes' }
   };
 }
