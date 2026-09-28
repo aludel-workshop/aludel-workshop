@@ -60,10 +60,11 @@ test('source disappearance degrades coverage; rejected and excepted gaps stay qu
   try {
     reconcilePagesFlow(f.db, f.know, 'a');
     let view = pagesReconciliationView(f.db, 'owner', 'a');
-    assert.throws(() => pagesGapDecision(f.db, 'viewer', 'a', view.gaps[0].key, { decision: 'exception', reason: 'Intentional', expectedUpdatedAt: view.gaps[0].updatedAt }), { status: 403 });
-    pagesGapDecision(f.db, 'owner', 'a', view.gaps[0].key, { decision: 'exception', reason: 'Intentional', expectedUpdatedAt: view.gaps[0].updatedAt });
+    assert.throws(() => pagesGapDecision(f.db, f.know, 'viewer', 'a', view.gaps[0].key, { decision: 'exception', reason: 'Intentional', expectedUpdatedAt: view.gaps[0].updatedAt }), { status: 403 });
+    pagesGapDecision(f.db, f.know, 'owner', 'a', view.gaps[0].key, { decision: 'exception', reason: 'Intentional', expectedUpdatedAt: view.gaps[0].updatedAt });
     view = pagesReconciliationView(f.db, 'owner', 'a');
-    pagesGapDecision(f.db, 'owner', 'a', view.gaps[1].key, { decision: 'rejected', reason: 'Wrong relation', expectedUpdatedAt: view.gaps[1].updatedAt });
+    pagesGapDecision(f.db, f.know, 'owner', 'a', view.gaps[1].key, { decision: 'rejected', reason: 'Wrong relation', expectedUpdatedAt: view.gaps[1].updatedAt });
+    assert.deepEqual([...f.work.values()].map(item => item.state), ['done', 'done']);
     f.db.prepare("UPDATE layer_instances SET enabled = 0 WHERE layer_key = 'product'").run();
     assert.equal(reconcilePagesFlow(f.db, f.know, 'a').coverage, 'degraded');
     assert.equal(pagesReconciliationView(f.db, 'viewer', 'a').coverage, 'degraded');
@@ -114,4 +115,16 @@ test('the real Pages connection stages Work and a flow edit closes its untouched
     assert.ok(resolved.closed.includes(item.id));
     assert.equal(know.workById(project.id, item.id).state, 'done');
   } finally { db.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+
+test('a touched Work suggestion cannot be silently quieted by a gap decision', () => {
+  const f = fixture();
+  try {
+    reconcilePagesFlow(f.db, f.know, 'a');
+    const gap = pagesReconciliationView(f.db, 'owner', 'a').gaps[0];
+    f.work.get(gap.workItemId).log.push({ text: 'Owner changed task' });
+    assert.throws(() => pagesGapDecision(f.db, f.know, 'owner', 'a', gap.key, { decision: 'exception', reason: 'Intentional', expectedUpdatedAt: gap.updatedAt }), { status: 409 });
+    assert.equal(pagesReconciliationView(f.db, 'owner', 'a').gaps[0].status, 'open');
+  } finally { f.db.close(); }
 });

@@ -522,7 +522,7 @@ async function api(request, response, url) {
       return json(response, 200, reconcilePagesFlow(db, know, projectId, { trigger: 'manual' }), { 'cache-control': 'no-store' });
     }
     if (request.method === 'POST' && pagesReconcileRoute[2])
-      return json(response, 200, pagesGapDecision(db, user.id, projectId, decodeURIComponent(pagesReconcileRoute[2]), await readJson(request)), { 'cache-control': 'no-store' });
+      return json(response, 200, pagesGapDecision(db, know, user.id, projectId, decodeURIComponent(pagesReconcileRoute[2]), await readJson(request)), { 'cache-control': 'no-store' });
   }
   const pagesRunsRoute = /^\/api\/projects\/([^/]+)\/layers\/pages\/routines\/([^/]+)\/runs$/.exec(url.pathname);
   if (pagesRunsRoute && request.method === 'GET') {

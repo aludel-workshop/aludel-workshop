@@ -42,7 +42,7 @@ export function pagesReconciliationView(db, userId, projectId) {
     lastReceipt: db.prepare('SELECT receipt_key AS key, policy_revision AS policyRevision, inputs_json AS inputs, created_at AS createdAt FROM layer_trigger_receipts WHERE project_id = ? ORDER BY rowid DESC LIMIT 1').get(projectId) || null };
 }
 
-export function pagesGapDecision(db, userId, projectId, key, input) {
+export function pagesGapDecision(db, know, userId, projectId, key, input) {
   member(db, userId, projectId, true);
   if (!['exception','rejected','reopen'].includes(input?.decision)) fail('Choose exception, rejected or reopen.');
   const row = db.prepare('SELECT * FROM layer_gap_ledger WHERE project_id = ? AND gap_key = ?').get(projectId, key);
@@ -51,8 +51,16 @@ export function pagesGapDecision(db, userId, projectId, key, input) {
   const next = input.decision === 'reopen' ? 'open' : input.decision;
   const reason = typeof input.reason === 'string' ? input.reason.trim().slice(0, 1000) : '';
   if (next !== 'open' && !reason) fail('Record why this gap is quiet.');
-  db.prepare('UPDATE layer_gap_ledger SET status = ?, reason = ?, updated_at = ? WHERE project_id = ? AND gap_key = ?')
-    .run(next, reason || null, stamp(), projectId, key);
+  const item = row.work_item_id ? know.workById(projectId, row.work_item_id) : null;
+  if (next !== 'open' && item && item.state !== 'done' && (item.state !== 'suggested' || item.log.length !== 1))
+    fail('This Work item has been touched. Resolve it in Work before quieting the gap.', 409);
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    if (next !== 'open' && item?.state === 'suggested') know.appendLog(item.id, `Done: ${next} flow relation — ${reason}`, { state: 'done' });
+    db.prepare('UPDATE layer_gap_ledger SET status = ?, reason = ?, updated_at = ? WHERE project_id = ? AND gap_key = ?')
+      .run(next, reason || null, stamp(), projectId, key);
+    db.exec('COMMIT');
+  } catch (error) { db.exec('ROLLBACK'); throw error; }
   return pagesReconciliationView(db, userId, projectId);
 }
 
