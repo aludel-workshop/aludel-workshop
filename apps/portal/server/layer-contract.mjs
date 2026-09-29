@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { knowledgeKinds } from './knowledge.mjs';
-import { compiledLat06Actions } from './lat06-actions.mjs';
+import { compiledLocalActions, combinedLegacyInventory } from './lat07-actions.mjs';
 // LAT-02: built-in layer declarations describe existing authorities; they do not grant writes.
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const own = Object.hasOwn;
@@ -142,8 +142,10 @@ export function layerDescriptors(db, userId, projectId) {
     .map(row => instance(db, projectId, row.layer_key))
     .map(layer => ({ key: layer.key, name: layer.name, path: layer.path, authority: layer.authority, version: layer.version,
       outputs: layer.outputs.map(kind => ({ kind, count: outputCount(db, projectId, kind), revision: projections[kind] ? 'content-hash' : 'revision' })),
-      actions: compiledLat06Actions.filter(action => action.layer === layer.key).map(action => ({ id: action.id, revision: action.revision, title: action.title, purpose: action.purpose,
-        result: action.result, elevated: action.permissions.elevated, agentAvailable: action.agentRunnable, humanAvailable: action.humanRunnable })) }));
+      actions: compiledLocalActions.filter(action => action.layer === layer.key).map(action => ({ id: action.id, revision: action.revision, title: action.title, purpose: action.purpose,
+        result: action.result, permissions: action.permissions, checks: action.checks, elevated: action.permissions.elevated, agentAvailable: action.agentRunnable, humanAvailable: action.humanRunnable,
+        unavailableReason: combinedLegacyInventory[action.id]?.reason || (!action.agentRunnable && !action.humanRunnable ? 'No checked adapter is registered.' : null) })),
+      legacy: Object.entries(combinedLegacyInventory).filter(([id]) => id.startsWith(`${layer.key}.`)).map(([id, entry]) => ({ id, ...entry })) }));
 }
 export function layerOutputRead(db, userId, projectId, key, kind, id) {
   member(db, userId, projectId);

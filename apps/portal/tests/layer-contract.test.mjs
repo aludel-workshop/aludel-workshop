@@ -25,6 +25,9 @@ db.exec(`
   INSERT INTO project_members VALUES ('a', 'owner', 'owner'), ('a', 'viewer', 'viewer'), ('b', 'other', 'owner');
   INSERT INTO knowledge_records VALUES ('page-a', 'a', 'page', 3, '{"title":"A"}'), ('page-b', 'b', 'page', 7, '{"title":"B"}'), ('story-a', 'a', 'story', 2, '{}');
   INSERT INTO code_units VALUES ('unit-a', 'a', 'abc');
+  INSERT INTO knowledge_records VALUES ('tokens-a', 'a', 'design_tokens', 4, '{"name":"Tokens"}'), ('object-a', 'a', 'data_object', 5, '{"name":"Orders"}');
+  INSERT INTO code_releases VALUES ('code-release-a', 'a', 'commit-123');
+  INSERT INTO releases VALUES ('release-a', 'a', 'unavailable');
 `);
 
 test('declarations reject unknown kinds, duplicate kinds and wrong authority', () => {
@@ -46,6 +49,16 @@ test('migration is idempotent and scoped descriptors preserve native records', a
   assert.equal(layerDescriptors(db, 'owner', 'a').find(layer => layer.key === 'pages').outputs.find(output => output.kind === 'page').count, 1);
   assert.deepEqual(layerOutputRead(db, 'owner', 'a', 'pages', 'page', 'page-a').data, { title: 'A' });
   assert.match(layerOutputRead(db, 'owner', 'a', 'platform', 'code_unit', 'unit-a').revision, /^[a-f0-9]{64}$/);
+  assert.equal(layerOutputRead(db, 'owner', 'a', 'design', 'design_tokens', 'tokens-a').revision, 4);
+  assert.equal(layerOutputRead(db, 'owner', 'a', 'data', 'data_object', 'object-a').revision, 5);
+  assert.match(layerOutputRead(db, 'owner', 'a', 'platform', 'code_release', 'code-release-a').revision, /^[a-f0-9]{64}$/);
+  assert.match(layerOutputRead(db, 'owner', 'a', 'deploy', 'release', 'release-a').revision, /^[a-f0-9]{64}$/);
+  for (const key of ['design', 'data', 'platform', 'deploy']) {
+    const descriptor = layerDescriptors(db, 'owner', 'a').find(layer => layer.key === key);
+    assert.ok(descriptor.actions.length, key);
+    assert.ok(descriptor.actions.some(action => action.unavailableReason), key);
+    assert.ok(descriptor.outputs.some(output => output.count > 0), key);
+  }
   assert.throws(() => layerOutputRead(db, 'owner', 'a', 'pages', 'page', 'page-b'), { status: 404 });
   assert.throws(() => layerOutputRead(db, 'owner', 'a', 'pages', 'story', 'story-a'), { status: 404 });
   assert.throws(() => layerDescriptors(db, 'other', 'a'), { status: 404 });
