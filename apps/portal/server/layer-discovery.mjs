@@ -3,6 +3,7 @@
 // a connection policy.
 import { createHash } from 'node:crypto';
 import { layerDeclarations } from './layer-contract.mjs';
+import { projectLayerDefinition } from './layer-registry.mjs';
 
 export function initLayerDiscovery(db) {
   db.exec(`CREATE TABLE IF NOT EXISTS layer_discovery_receipts (
@@ -23,8 +24,8 @@ export function stageLayerDiscovery(db, know, projectId) {
     if (db.prepare(`SELECT 1 FROM layer_discovery_receipts WHERE project_id = ? AND receiving_key = ? AND topology_digest = ?`)
       .get(projectId, receiver.key, digest)) continue;
     const sources = installed.filter(item => item.key !== receiver.key);
-    const receiverName = layerDeclarations.find(item => item.key === receiver.key)?.name || receiver.key;
-    const names = sources.map(item => layerDeclarations.find(layer => layer.key === item.key)?.name || item.key);
+    const receiverName = projectLayerDefinition(db,projectId,receiver.key)?.name || receiver.key;
+    const names = sources.map(item => projectLayerDefinition(db,projectId,item.key)?.name || item.key);
     const item = know.createWork(projectId, {
       action: `${receiver.key}.discover`, layer: receiver.key, type: 'audit', state: 'ready',
       title: `Explore ${names.join(', ')} for ${receiverName}`.slice(0, 160),
@@ -56,16 +57,17 @@ const projectionTables = { code_unit:'code_units', trace_link:'trace_links', cod
 // withdraws the Go snapshot before submission or acceptance.
 export function discoverySourceSnapshot(db,projectId,sourceKeys) {
   return sourceKeys.map(key => {
-    const declaration=layerDeclarations.find(layer => layer.key===key);
+    const declaration=projectLayerDefinition(db,projectId,key) || layerDeclarations.find(layer => layer.key===key);
     if (!declaration) throw Object.assign(new Error('Unknown source layer.'),{status:409});
     const kinds=declaration.outputs.map(kind => {
       const table=projectionTables[kind];
-      const rows=table && db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table)
+      const rows=kind==='markdown_document' ? db.prepare('SELECT f.id,f.path,f.revision,f.content_sha,(SELECT r.content FROM markdown_file_revisions r WHERE r.file_id=f.id AND r.revision=f.revision) AS content FROM markdown_files f WHERE f.project_id=? AND f.layer_key=? AND f.deleted=0 ORDER BY f.path').all(projectId,key)
+        : table && db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table)
         ? db.prepare(`SELECT * FROM ${table} WHERE project_id=? ORDER BY id`).all(projectId)
         : !table ? db.prepare('SELECT id,revision,data_json FROM knowledge_records WHERE project_id=? AND kind=? ORDER BY id').all(projectId,kind) : [];
-      const records=rows.map(row => ({ id:row.id, revision:table ? createHash('sha256').update(JSON.stringify(row)).digest('hex') : row.revision,
-        summary:table ? '' : String((() => {try { const data=JSON.parse(row.data_json);return data.title||data.name||data.label||data.text||data.description||kind;}catch{return kind;}})()).slice(0,160) }));
-      return { kind, count:records.length, records:records.slice(0,100), fingerprint:createHash('sha256').update(JSON.stringify(records)).digest('hex') };
+      const records=rows.map(row => ({ id:row.id, revision:kind==='markdown_document' ? row.revision : table ? createHash('sha256').update(JSON.stringify(row)).digest('hex') : row.revision,
+        summary:kind==='markdown_document' ? row.path : table ? '' : String((() => {try { const data=JSON.parse(row.data_json);return data.title||data.name||data.label||data.text||data.description||kind;}catch{return kind;}})()).slice(0,160) }));
+      return { kind, count:records.length, records:records.slice(0,100).map((record,index)=>kind==='markdown_document' ? {...record,excerpt:String(rows[index].content||'').slice(0,2000),truncated:String(rows[index].content||'').length>2000} : record), fingerprint:createHash('sha256').update(JSON.stringify(records)).digest('hex') };
     });
     return { key, kinds };
   });

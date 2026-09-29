@@ -2,9 +2,12 @@
 // Historical records and run pins stay immutable; admission reads this ledger.
 import { compiledLocalActions, combinedLegacyInventory } from './lat07-actions.mjs';
 import { seedActionAssignee } from './layer-action-contract.mjs';
+import { actionForProject, actionsForDefinition, projectLayerDefinition } from './layer-registry.mjs';
 
 const fail = (message, status = 409) => { throw Object.assign(new Error(message), { status }); };
 const actions = new Map(compiledLocalActions.map(action => [action.id, action]));
+const projectAction = (db, projectId, id) => actions.get(id) || actionForProject(db, projectId, id);
+const layerActions = (db, projectId, key) => [...compiledLocalActions.filter(action => action.layer === key), ...actionsForDefinition(projectLayerDefinition(db, projectId, key))];
 const parse = value => { try { return JSON.parse(value); } catch { return {}; } };
 const styles = new Set(['dreamer', 'planner', 'tinkerer']);
 const now = () => new Date().toISOString();
@@ -63,7 +66,7 @@ export function migrateActionProject(db, projectId) {
   return transaction(() => {
     let installed = 0, granted = 0, mapped = 0, blocked = 0;
     for (const layer of db.prepare('SELECT layer_key FROM layer_instances WHERE project_id = ? AND enabled = 1').all(projectId)) {
-      for (const action of compiledLocalActions.filter(entry => entry.layer === layer.layer_key)) {
+      for (const action of layerActions(db, projectId, layer.layer_key)) {
         const old = oldByKey.get(action.id);
         // Keep a legacy edited assignee only when it still resolves to a member or active profile.
         const saved = old?.data.assignee;
@@ -105,7 +108,7 @@ export function migrateActionProject(db, projectId) {
 }
 
 export function actionGrant(db, actor, projectId, actionId, level = 'normal') {
-  const action = actions.get(actionId);
+  const action = projectAction(db, projectId, actionId);
   if (!action || !['normal', 'elevated'].includes(level)) fail('Unknown layer action.', 404);
   const installed = db.prepare('SELECT action_revision FROM layer_action_installations WHERE project_id = ? AND action_id = ?').get(projectId, actionId);
   if (!action.humanRunnable && !action.agentRunnable) fail('No checked adapter is registered.');
@@ -126,7 +129,7 @@ export function workActionMigration(db, projectId, workId) {
   if (!row) fail('This Work item has no checked action mapping.');
   if (row.disposition !== 'mapped') fail(row.reason || 'This historical action requires reassessment.');
   const action = db.prepare('SELECT action_revision FROM layer_action_installations WHERE project_id = ? AND action_id = ?').get(projectId, row.action_id);
-  const current = actions.get(row.action_id);
+  const current = projectAction(db, projectId, row.action_id);
   if (!action || !current || action.action_revision !== row.action_revision || current.revision !== row.action_revision ||
       !db.prepare('SELECT 1 FROM layer_instances WHERE project_id = ? AND layer_key = ? AND enabled = 1').get(projectId, current.layer))
     fail('This Work action or installed layer changed.');
@@ -136,7 +139,7 @@ export function workActionMigration(db, projectId, workId) {
 export function recordNewWorkAction(db, projectId, workId, legacyActionId) {
   if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_work_migration'").get()) return;
   const entry = combinedLegacyInventory[legacyActionId];
-  const action = entry?.disposition === 'recreated' ? actions.get(entry.action) : actions.get(legacyActionId);
+  const action = entry?.disposition === 'recreated' ? projectAction(db, projectId, entry.action) : projectAction(db, projectId, legacyActionId);
   const installed = action && db.prepare('SELECT action_revision FROM layer_action_installations WHERE project_id = ? AND action_id = ?').get(projectId, action.id);
   const disposition = installed?.action_revision === action?.revision && (action.humanRunnable || action.agentRunnable) ? 'mapped' : 'blocked';
   db.prepare(`INSERT OR IGNORE INTO layer_work_migration
@@ -156,7 +159,7 @@ export function setProjectWorkStyle(db, actor, projectId, style) {
 export function layerActionSettings(db, actor, projectId, layerKey) {
   if (!actor?.id || !db.prepare('SELECT 1 FROM project_members WHERE project_id = ? AND user_id = ?').get(projectId, actor.id)) fail('Project not found.', 404);
   if (!db.prepare('SELECT 1 FROM layer_instances WHERE project_id = ? AND layer_key = ? AND enabled = 1').get(projectId, layerKey)) fail('Layer not found.', 404);
-  return compiledLocalActions.filter(action => action.layer === layerKey).map(action => {
+  return layerActions(db, projectId, layerKey).map(action => {
     const installed = db.prepare('SELECT * FROM layer_action_installations WHERE project_id = ? AND action_id = ?').get(projectId, action.id);
     return { id: action.id, revision: action.revision, title: action.title, purpose: action.purpose, elevated: action.permissions.elevated,
       available: action.humanRunnable || action.agentRunnable, assignee: installed?.assignee_id ? { kind: installed.assignee_kind, id: installed.assignee_id } : null,
@@ -167,7 +170,7 @@ export function layerActionSettings(db, actor, projectId, layerKey) {
 
 export function setActionAssignee(db, actor, projectId, actionId, assignee) {
   if (!actor?.id || !db.prepare("SELECT 1 FROM project_members WHERE project_id = ? AND user_id = ? AND role = 'owner'").get(projectId, actor.id)) fail('Project owner required.', 403);
-  const action = actions.get(actionId);
+  const action = projectAction(db, projectId, actionId);
   if (!action) fail('Action not found.', 404);
   const installed = db.prepare('SELECT 1 FROM layer_action_installations WHERE project_id = ? AND action_id = ?').get(projectId, actionId);
   if (!installed) fail('Action is not installed.');
@@ -198,7 +201,7 @@ export function setLayerActionGrant(db, actor, projectId, { userId, layerKey, ac
 
 export function setActionMethod(db, actor, projectId, actionId, method, expectedRevision) {
   if (!actor?.id || !db.prepare("SELECT 1 FROM project_members WHERE project_id = ? AND user_id = ? AND role = 'owner'").get(projectId, actor.id)) fail('Project owner required.', 403);
-  if (!actions.has(actionId) || typeof method !== 'string' || method.length > 8000 || !method.trim()) fail('Use a current action and a concise method.', 400);
+  if (!projectAction(db, projectId, actionId) || typeof method !== 'string' || method.length > 8000 || !method.trim()) fail('Use a current action and a concise method.', 400);
   const row = db.prepare('SELECT method_revision FROM layer_action_installations WHERE project_id = ? AND action_id = ?').get(projectId, actionId);
   if (!row) fail('Action is not installed.', 404);
   if (row.method_revision !== expectedRevision) fail('This action method changed. Reload before saving.');

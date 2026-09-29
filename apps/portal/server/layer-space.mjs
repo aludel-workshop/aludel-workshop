@@ -4,6 +4,7 @@
 import { randomBytes } from 'node:crypto';
 import { layerDeclarations } from './layer-contract.mjs';
 import { compiledLocalActions } from './lat07-actions.mjs';
+import { actionsForDefinition, projectLayerDefinition } from './layer-registry.mjs';
 import { pagesDocumentList, pagesDocumentRead, pagesDocumentUpdate, pagesConnections, pagesConnectionCreate, pagesConnectionUpdate } from './pages-layer-app.mjs';
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
@@ -12,18 +13,18 @@ const clean = (value, max, name) => {
   if (typeof value !== 'string' || value.length > max) fail(`${name} must be text under ${max} characters.`);
   return value.trim();
 };
-const layer = key => layerDeclarations.find(item => item.key === key);
+const layer = (db, projectId, key) => projectLayerDefinition(db, projectId, key) || layerDeclarations.find(item => item.key === key);
 function allowed(db, userId, projectId, layerKey, owner = false) {
-  if (!layer(layerKey)) fail('Layer not found.', 404);
+  if (!layer(db,projectId,layerKey)) fail('Layer not found.', 404);
   const member = db.prepare('SELECT role FROM project_members WHERE user_id = ? AND project_id = ?').get(userId, projectId);
   if (!member) fail('Project not found.', 404);
   if (owner && member.role !== 'owner') fail('Project owner required.', 403);
   if (!db.prepare('SELECT 1 FROM layer_instances WHERE project_id = ? AND layer_key = ? AND enabled = 1').get(projectId, layerKey))
     fail('Layer is not installed.', 404);
 }
-function defaults(layerKey) {
-  const definition = layer(layerKey);
-  const actions = compiledLocalActions.filter(item => item.layer === layerKey);
+function defaults(db,projectId,layerKey) {
+  const definition = layer(db,projectId,layerKey);
+  const actions = [...compiledLocalActions.filter(item => item.layer === layerKey),...actionsForDefinition(definition)];
   return [
     ...definition.outputs.map(kind => ['outputs', `output-${kind}`, `${kind.replaceAll('_', ' ')} output`,
       `${definition.name} owns ${kind} output identities and revisions. Open the native ${definition.name} view to inspect actual records. This document describes the contract; it does not create an output.`]),
@@ -43,7 +44,7 @@ function seed(db, projectId, layerKey) {
     VALUES (?,?,?,?,?,?,1,?) ON CONFLICT DO NOTHING`);
   const history = db.prepare(`INSERT INTO layer_document_revisions(project_id,layer_key,doc_key,revision,content,author_id,created_at)
     VALUES (?,?,?,1,?,'built-in',?) ON CONFLICT DO NOTHING`);
-  for (const [group,key,title,content] of defaults(layerKey)) {
+  for (const [group,key,title,content] of defaults(db,projectId,layerKey)) {
     insert.run(projectId,layerKey,key,group,title,content,at);
     history.run(projectId,layerKey,key,content,at);
   }
@@ -98,7 +99,7 @@ export function layerConnections(db,userId,projectId,receivingKey) {
     .map(row => ({...row,sourceAvailable:available(db,projectId,row.sourceKey)}));
 }
 export function proposeLayerConnection(db,projectId,receivingKey,sourceKey,authorId='discovery-routine') {
-  if (!layer(receivingKey) || !layer(sourceKey) || receivingKey === sourceKey || !available(db,projectId,receivingKey) || !available(db,projectId,sourceKey))
+  if (!layer(db,projectId,receivingKey) || !layer(db,projectId,sourceKey) || receivingKey === sourceKey || !available(db,projectId,receivingKey) || !available(db,projectId,sourceKey))
     fail('Choose installed source and receiving layers.');
   const existing = db.prepare('SELECT id FROM layer_connections WHERE project_id=? AND receiving_key=? AND source_key=?').get(projectId,receivingKey,sourceKey);
   if (existing) return existing.id;

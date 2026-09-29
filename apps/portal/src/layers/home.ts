@@ -32,7 +32,8 @@ import { ProjectContext, layerLabel, statusLabel, statusOrder, workStatusLabel }
       }
     </div>
     @if (!availableLayers().length) { <p class="lay-muted">All available local layer apps are in this project.</p> }
-    <p class="lay-muted small">The current catalog contains six built-in apps. Removing one keeps its records so you can add it back.</p>
+    @if (canManage()) { <form class="lay-md-create-layer" (submit)="createLayer($event)"><h3>Create a layer app</h3><p class="lay-muted small">Start with a Markdown file workspace. This project owns its definition and output.</p><label for="custom-layer-name">Layer name</label><div><input id="custom-layer-name" name="customLayerName" [value]="newLayerName()" (input)="newLayerName.set($any($event.target).value)" placeholder="Research"><button class="lay-button" type="submit" [disabled]="saving() === 'custom' || !newLayerName().trim()">Create layer</button></div></form> }
+    <p class="lay-muted small">Removing a layer keeps its records so you can add it back.</p>
   </section>
   @if (homeLayers().length) {
     <div class="lay-home-layer-cards" aria-label="Layer cards">
@@ -71,6 +72,15 @@ import { ProjectContext, layerLabel, statusLabel, statusOrder, workStatusLabel }
 export class HomeLayerComponent {
   readonly ctx = inject(ProjectContext);
   readonly saving = signal('');
+  readonly newLayerName = signal('');
+  async createLayer(event: Event) {
+    event.preventDefault(); const name=this.newLayerName().trim(); if(!name)return;
+    this.saving.set('custom');
+    try {const layer=await this.ctx.api<{key:string}>(`/api/projects/${encodeURIComponent(this.ctx.projectId())}/layer-definitions`,'POST',{name});
+      this.newLayerName.set('');await this.ctx.reload();this.ctx.go(this.ctx.link(layer.key));this.ctx.notice.set(`${name} added.`);}
+    catch(error){this.ctx.error.set(error instanceof Error?error.message:String(error));}
+    finally{this.saving.set('');}
+  }
   readonly canManage = computed(() => this.ctx.session()?.projects.find(project => project.id === this.ctx.projectId())?.role === 'owner');
   readonly activeLayers = computed(() => this.ctx.layerInstances().filter(layer => layer.enabled));
   readonly availableLayers = computed(() => this.ctx.layerInstances().filter(layer => !layer.enabled));

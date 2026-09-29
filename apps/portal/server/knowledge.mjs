@@ -11,6 +11,7 @@ import { join } from 'node:path';
 import { requireMember } from './accounts.mjs';
 import { actionGrant, recordNewWorkAction } from './lat08-migration.mjs';
 import { compiledLocalActions } from './lat07-actions.mjs';
+import { actionForProject, actionsForDefinition, projectLayerDefinition, projectLayerDefinitions } from './layer-registry.mjs';
 import { cleanBrandAsset, cleanComponent, cleanTokens, componentStatus, ensureDesign as seedDesign, syncTokensFromLook } from './design.mjs';
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
@@ -398,7 +399,7 @@ const validators = {
   project_instructions: data => ({ body: text(data.body, 8000, 'Project instructions') }),
   // Work › Routines (LAY-04C): a definition only; runs are recorded in routine_runs, not as revisions.
   routine: data => {
-    if (!layers.includes(data.layer)) fail('Unknown layer.');
+    if (!layers.includes(data.layer) && !/^[a-z][a-z0-9_]{2,31}$/.test(data.layer)) fail('Unknown layer.');
     if (!workTypes.includes(data.type)) fail('Unknown work type.');
     if (!cadences.includes(data.cadence)) fail(`Choose how often: ${cadences.join(', ')}.`);
     const executor = data.executor || 'utility', trigger = data.trigger || 'schedule';
@@ -486,6 +487,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
   function insert(projectId, kind, data, { parentId = null, position, author = 'Aludel', rationale = null, workItemId = null } = {}) {
     if (!kinds.includes(kind)) fail('Unknown record kind.');
     const clean = validators[kind](data, catalogs);
+    if (kind === 'routine' && !layers.includes(clean.layer) && !projectLayerDefinition(db,projectId,clean.layer)) fail('Install the routine layer first.',409);
     checkReferences(projectId, kind, clean);
     checkDesign(projectId, kind, clean, { parentId });
     if (['story', 'spec', 'project'].includes(kind) && !clean.number) clean.number = counter(projectId, kind);
@@ -525,6 +527,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     if (!current || current.project_id !== projectId) fail('Record not found.', 404);
     if (expectedRevision !== undefined && Number(expectedRevision) !== current.revision) fail('This record changed since you opened it. Reload to see the latest; your edit is kept.', 409);
     const merged = validators[current.kind]({ ...parse(current.data_json, {}), ...changes }, catalogs);
+    if (current.kind === 'routine' && !layers.includes(merged.layer) && !projectLayerDefinition(db,projectId,merged.layer)) fail('Install the routine layer first.',409);
     checkReferences(projectId, current.kind, merged);
     checkDesign(projectId, current.kind, merged, { id, parentId: parentId ?? current.parent_id });
     if (current.kind === 'project') checkProjectDeps(projectId, id, merged.deps);
@@ -1058,13 +1061,13 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
       return { id: record.id, kind: record.kind, label: text(target.label, 160, 'Target') || record.kind };
     });
     const question = input.question ? { text: text(input.question.text, 400, 'Question', true), options: lines(input.question.options, 200, 'Option') } : null;
-    const installedAction = compiledLocalActions.find(action => action.id === input.action);
+    const installedAction = compiledLocalActions.find(action => action.id === input.action) || actionForProject(db,projectId,input.action);
     const actionId = catalogs.roles.actions.has(input.action) || installedAction ? input.action : actionIdFor(input.layer, input.type, { question, routineKey: input.routineKey });
-    const definition = catalogs.roles.actions.get(actionId) || (installedAction ? { layer: installedAction.layer, type: 'audit', checks: installedAction.checks } : null);
+    const definition = catalogs.roles.actions.get(actionId) || (installedAction ? { layer: installedAction.layer, type: installedAction.key === 'edit' ? 'implement' : 'audit', checks: installedAction.checks } : null);
     if (!definition) fail('Action not found.', 404);
     const layer = input.layer ?? definition.layer;
     const type = input.type ?? definition.type;
-    if (!layers.includes(layer)) fail('Unknown layer.');
+    if (!projectLayerDefinition(db,projectId,layer) && !layers.includes(layer)) fail('Unknown layer.');
     if (!workTypes.includes(type)) fail('Unknown work type.');
     if (!workStates.includes(input.state || 'ready')) fail('Unknown work state.');
     if (input.priority !== undefined && !priorities.includes(input.priority)) fail(`Choose a priority: ${priorities.join(', ')}.`);
@@ -1355,7 +1358,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
   function workChanges(projectId, workId) {
     const item = workById(projectId, workId);
     if (!item) fail('Work item not found.', 404);
-    return db.prepare('SELECT record_id AS recordId, revision, author, rationale, created_at AS createdAt FROM knowledge_revisions WHERE work_item_id = ? ORDER BY created_at').all(workId).map(entry => {
+    const knowledgeChanges = db.prepare('SELECT record_id AS recordId, revision, author, rationale, created_at AS createdAt FROM knowledge_revisions WHERE work_item_id = ? ORDER BY created_at').all(workId).map(entry => {
       const record = row(entry.recordId);
       const after = revisionData(entry.recordId, entry.revision) || {};
       const before = entry.revision > 1 ? revisionData(entry.recordId, entry.revision - 1) || {} : {};
@@ -1363,6 +1366,12 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
         .map(field => ({ field, before: before[field] ?? null, after: after[field] ?? null }));
       return { ...entry, kind: record?.kind || null, exists: Boolean(record), fields };
     });
+    const fileChanges = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='markdown_file_revisions'").get()
+      ? db.prepare(`SELECT r.file_id AS recordId,r.revision,r.path,r.operation,r.author_id AS author,r.created_at AS createdAt,f.deleted
+          FROM markdown_file_revisions r JOIN markdown_files f ON f.id=r.file_id WHERE r.work_id=? AND f.project_id=? ORDER BY r.created_at`).all(workId,projectId).map(entry => ({
+            recordId:entry.recordId,revision:entry.revision,author:entry.author,rationale:entry.operation,createdAt:entry.createdAt,
+            kind:'markdown_document',exists:!entry.deleted,fields:[{field:'path',before:null,after:entry.path},{field:'operation',before:null,after:entry.operation}]})) : [];
+    return [...knowledgeChanges,...fileChanges].sort((a,b)=>a.createdAt.localeCompare(b.createdAt));
   }
 
   // An edit made "from" a work item carries its id, so closing the item can verify the change happened (LAY-04A).
@@ -1471,16 +1480,18 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     return new Date(Date.parse(from) + cadenceDays[routine.cadence] * 86400000).toISOString();
   }
   // Runs what is due (schedule), every before-release routine (release) or one routine now (manual). One open item per routine.
-  function runRoutines(projectId, { trigger = 'schedule', at = now(), routineId = null } = {}) {
+  function runRoutines(projectId, { trigger = 'schedule', at = now(), routineId = null, layerKey = null } = {}) {
     const created = [];
     for (const routine of list(projectId, 'routine')) {
-      if ((!routine.enabled && !routineId) || (routineId && routine.id !== routineId)) continue;
+      if ((!routine.enabled && !routineId) || (routineId && routine.id !== routineId) || (layerKey && routine.layer !== layerKey)) continue;
+      if (!routineId && trigger === 'output-change' && routine.trigger !== 'output-change') continue;
       if (!routineId && trigger === 'schedule' && routine.trigger !== 'schedule') continue;
       if (!routineId && trigger === 'schedule' && (routine.cadence === 'before-release' || nextRunAt(routine) > at)) continue;
       if (!routineId && trigger === 'release' && routine.cadence !== 'before-release') continue;
       const open = workList(projectId).find(item => item.context?.routine === routine.id && item.state !== 'done');
       if (open) { if (routineId) fail(`${open.ref} from this routine is still open.`, 409); continue; }
-      const item = createWork(projectId, { layer: routine.layer, type: routine.type, state: 'ready', title: `${routine.title} · ${at.slice(0, 10)}`, targets: [], documents: routine.documents,
+      const custom = projectLayerDefinition(db,projectId,routine.layer)?.outputProvider === 'markdown-files';
+      const item = createWork(projectId, { action:custom ? `${routine.layer}.edit` : undefined, layer: routine.layer, type: routine.type, state: 'ready', title: `${routine.title} · ${at.slice(0, 10)}`, targets: [], documents: routine.documents,
         context: { routine: routine.id }, routineKey: routine.key, logText: `Created by the “${routine.title}” routine (${trigger === 'schedule' ? routine.cadence : trigger})` });
       db.prepare('INSERT INTO routine_runs(routine_id, project_id, ran_at, trigger, work_item_id) VALUES (?, ?, ?, ?, ?)').run(routine.id, projectId, at, trigger, item.id);
       created.push(item);
@@ -1553,11 +1564,11 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
       projectInstructions: list(projectId, 'project_instructions')[0] || null,
       roles: roleView(projectId),
       layerActions: db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_action_installations'").get()
-        ? compiledLocalActions.filter(action => action.humanRunnable || action.agentRunnable).flatMap(action => {
+        ? [...compiledLocalActions, ...projectLayerDefinitions(db,projectId).flatMap(actionsForDefinition)].filter(action => action.humanRunnable || action.agentRunnable).flatMap(action => {
           const installed = db.prepare('SELECT assignee_kind, assignee_id FROM layer_action_installations WHERE project_id = ? AND action_id = ?').get(projectId, action.id);
           const legacy = catalogs.roles.actions.get(action.id);
-          return installed && legacy ? [{ id: action.id, layer: action.layer, name: action.title, description: action.purpose,
-            type: legacy.type, changes: legacy.changes || [], checks: action.checks, elevated: action.permissions.elevated,
+          return installed ? [{ id: action.id, layer: action.layer, name: action.title, description: action.purpose,
+            type: legacy?.type || (action.key === 'edit' ? 'implement' : 'audit'), changes: legacy?.changes || [], checks: action.checks, elevated: action.permissions.elevated,
             assignee: installed.assignee_id ? { kind: installed.assignee_kind, id: installed.assignee_id } : null,
             agentRunnable: action.agentRunnable, humanRunnable: action.humanRunnable }] : [];
         }) : [],

@@ -1,5 +1,6 @@
 import { workActionMigration } from './lat08-migration.mjs';
 import { compiledLocalActions } from './lat07-actions.mjs';
+import { actionForProject } from './layer-registry.mjs';
 // Work batches stage human tasks or Go-pin explicit agent actions for Symphony.
 // Record changes are accepted at the checked output boundary, never during an agent turn.
 
@@ -35,6 +36,7 @@ export function initAgentRuns(db) {
 const symphonyActions = new Set([...compiledLocalActions.filter(action => action.id.endsWith('.discover') && action.agentRunnable).map(action => action.id), 'platform.implement', 'platform.security', 'product.define', 'product.clarify', 'product.brief', 'data.contract', 'design.audit', 'pages.a11y', 'pages.flows', 'deploy.review', 'work.review']);
 
 export function agentRuns({ db, know, worker = null, symphonyDispatch = false }) {
+  const runnable = (projectId, actionId) => symphonyActions.has(actionId) || Boolean(actionForProject(db,projectId,actionId)?.agentRunnable);
   const batchRow = row => row && { id: row.id, number: row.number, ref: `B-${row.number}`, state: row.state, limit: row.item_limit, profileId: row.profile_id || null, createdAt: row.created_at, requestedSlots: row.requested_slots || 1, authorizedAt: row.authorized_at || null,
     startedAt: row.started_at, finishedAt: row.finished_at, startedBy: row.started_by, note: row.note, snapshot: parse(row.items_json, []) };
   const getBatch = (projectId, id) => batchRow(db.prepare('SELECT * FROM agent_batches WHERE id = ? AND project_id = ?').get(id, projectId));
@@ -113,7 +115,7 @@ export function agentRuns({ db, know, worker = null, symphonyDispatch = false })
       return know.appendLog(workId, `Staged in ${entry.assignee.id === user.id ? 'your' : `${entry.assignee.label}'s`} list`, {}, { by: { kind: 'person', id: user.id } });
     }
     if (entry.assignee.kind !== 'agent') fail(`${entry.ref} can't be staged.`, 409);
-    if (!(symphonyActions.has(entry.action) && symphonyCompatible(projectId, entry.assignee.id))) fail(`Agents can't run “${actionLabel(projectId, entry.action)}” yet. Assign ${entry.ref} to a person.`, 409);
+    if (!(runnable(projectId,entry.action) && symphonyCompatible(projectId, entry.assignee.id))) fail(`Agents can't run “${actionLabel(projectId, entry.action)}” yet. Assign ${entry.ref} to a person.`, 409);
     if (entry.question && !entry.question.answer && entry.action !== 'product.clarify') fail('Answer the open question before staging this agent task.', 409);
     if (entry.action === 'product.clarify' && (!entry.question || entry.question.answer)) fail('Draft answers only for an open question.', 409);
     if (entry.action === 'pages.flows' && (entry.targets.length > 1 || entry.targets.some(target => target.kind !== 'story'))) fail('A Pages flow may link at most one Vision story.', 409);
@@ -142,7 +144,7 @@ export function agentRuns({ db, know, worker = null, symphonyDispatch = false })
     const milestone = know.list(projectId, 'phase').find(phase => phase.current)?.key || 'demo';
     const projects = new Map(know.list(projectId, 'project').map(project => [project.id, project]));
     const candidates = know.workList(projectId).filter(entry => entry.status === 'queued' && !entry.blockedBy.length && entry.assignee?.kind === assignee.kind && entry.assignee?.id === assignee.id
-      && projects.get(entry.project)?.milestone === milestone && (assignee.kind !== 'agent' || symphonyActions.has(entry.action) && symphonyCompatible(projectId, assignee.id))).sort(byPriority);
+      && projects.get(entry.project)?.milestone === milestone && (assignee.kind !== 'agent' || runnable(projectId,entry.action) && symphonyCompatible(projectId, assignee.id))).sort(byPriority);
     const added = [];
     for (const entry of candidates) {
       if (added.length >= limit) break;
@@ -255,7 +257,7 @@ export function agentRuns({ db, know, worker = null, symphonyDispatch = false })
     if (!items.length) fail('Stage work in the batch first.', 409);
     if (db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_work_migration'").get()) for (const entry of items) workActionMigration(db, projectId, entry.id);
     if (slots > items.length) fail('A batch cannot reserve more workers than it has items.', 409);
-    if (!items.every(entry => symphonyActions.has(entry.action))) fail('This batch contains an action without a Symphony output adapter.', 409);
+    if (!items.every(entry => runnable(projectId,entry.action))) fail('This batch contains an action without a Symphony output adapter.', 409);
     if (!symphonyCompatible(projectId, batch.profileId)) fail('This profile needs a supported Symphony provider.', 409);
     const profile = profileOf(projectId, batch.profileId);
     if (!profile || profile.active === false) fail('This batch’s profile is deactivated.', 409);

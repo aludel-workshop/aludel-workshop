@@ -9,6 +9,7 @@ import { symphonyIssue } from './symphony-readiness.mjs';
 import { compileTaskManifest } from './task-manifest.mjs';
 import { briefSections } from './knowledge.mjs';
 import { compiledLocalActions } from './lat07-actions.mjs';
+import { actionForProject, projectLayerDefinition } from './layer-registry.mjs';
 import { layerDeclarations } from './layer-contract.mjs';
 import { discoverySourceSnapshot } from './layer-discovery.mjs';
 import { applyDiscoveryProposal } from './layer-space.mjs';
@@ -77,8 +78,8 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
   const project = id => db.prepare('SELECT id, slug, name, description FROM projects WHERE id = ?').get(id);
   const profile = (projectId, id) => know.list(projectId, 'agent_profile').find(entry => entry.id === id);
   const action = (projectId, id) => know.roleView(projectId).flatMap(role => role.actions).find(entry => entry.id === id) ||
-    (id?.endsWith('.discover') && compiledLocalActions.some(candidate => candidate.id === id) ?
-      { id, revision: 1, name: 'Discover neighboring layers', instructions: compiledLocalActions.find(candidate => candidate.id === id).method,
+    (id?.endsWith('.discover') && (compiledLocalActions.some(candidate => candidate.id === id) || actionForProject(db,projectId,id)) ?
+      { id, revision: 1, name: 'Discover neighboring layers', instructions: (compiledLocalActions.find(candidate => candidate.id === id) || actionForProject(db,projectId,id)).method,
         reads: [], changes: [], tools: ['read'], asks: '' } : null);
   const batch = (projectId, id) => {
     const row = db.prepare('SELECT * FROM agent_batches WHERE id = ? AND project_id = ?').get(id, projectId);
@@ -190,7 +191,7 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     const source = db.prepare('SELECT workspace_path FROM project_setup WHERE project_id = ?').get(projectId)?.workspace_path;
     if (!entry || !workerProfile || !taskAction || entry.assignee?.id !== profileId || !source) fail('Task context is incomplete.', 409);
     if (db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_work_migration'").get()) workActionMigration(db, projectId, workId);
-    const layerAction = compiledLocalActions.find(candidate => candidate.id === entry.action) || null;
+    const layerAction = compiledLocalActions.find(candidate => candidate.id === entry.action) || actionForProject(db,projectId,entry.action) || null;
     const method = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_action_installations'").get()
       ? db.prepare('SELECT method_text, method_revision, action_revision FROM layer_action_installations WHERE project_id = ? AND action_id = ?').get(projectId, entry.action) : null;
     if (method && method.action_revision !== layerAction?.revision) fail('The installed layer action revision changed.', 409);
@@ -204,7 +205,7 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     } catch (error) { if (error.status === 409) throw error; fail('Project repository is not ready.', 409); }
     if (!/^[a-f0-9]{40}$/.test(commit)) fail('Project repository is not ready.', 409);
     const role = know.roleView(projectId).find(value => value.actions.some(candidate => candidate.id === entry.action)) ||
-      (entry.action?.endsWith('.discover') ? { id: entry.layer, revision: 1, name: layerDeclarations.find(layer => layer.key === entry.layer)?.name || entry.layer, instructions: 'Inspect neighboring outputs and propose a receiving policy for review.' } : null);
+      (entry.action?.endsWith('.discover') ? { id: entry.layer, revision: 1, name: projectLayerDefinition(db,projectId,entry.layer)?.name || entry.layer, instructions: 'Inspect neighboring outputs and propose a receiving policy for review.' } : null);
     const targets = (entry.targets || []).map(target => know.get(projectId, target.id)).filter(Boolean);
     const docs = know.list(projectId, 'doc').filter(doc => doc.agents && !targets.some(target => target.id === doc.id));
     const briefClaims = entry.action === 'product.brief' ? know.list(projectId, 'brief_claim').filter(claim => !targets.some(target => target.id === claim.id)) : [];

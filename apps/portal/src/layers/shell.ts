@@ -18,6 +18,7 @@ import { HomeLayerComponent } from './home';
 import { LibraryComponent } from './library';
 import { EvidencePanelComponent } from './evidence';
 import { SharedLayerSlotComponent } from './shared-layer-slot';
+import { MarkdownLayerComponent } from './markdown-layer';
 
 // ROADMAP-01 (DEC-043): Product is shown as Vision (URLs /vision/…; the internal layer key stays `product`), and each layer has one colour.
 const localLayers = [{ id: 'product', icon: 'lightbulb', label: 'Vision' }, { id: 'design', icon: 'palette', label: 'Design' }, { id: 'pages', icon: 'web', label: 'Pages' }, { id: 'data', icon: 'schema', label: 'Data' }, { id: 'platform', icon: 'code', label: 'Code' }, { id: 'deploy', icon: 'rocket_launch', label: 'Deploy' }];
@@ -25,7 +26,7 @@ const localLayers = [{ id: 'product', icon: 'lightbulb', label: 'Vision' }, { id
 // LAY-02: every project's workspace at /p/<slug>/<layer>/<tab>/<id>. The layer comes first (DEC-036).
 @Component({
   selector: 'aludel-project-shell', standalone: true,
-  imports: [FormsModule, MatIconModule, AvatarEditorComponent, HomeLayerComponent, ProductLayerComponent, DesignLayerComponent, PagesLayerComponent, DataLayerComponent, CodeLayerComponent, DeployLayerComponent, WorkLayerComponent, LibraryComponent, EvidencePanelComponent, SharedLayerSlotComponent],
+  imports: [FormsModule, MatIconModule, AvatarEditorComponent, HomeLayerComponent, ProductLayerComponent, DesignLayerComponent, PagesLayerComponent, DataLayerComponent, CodeLayerComponent, DeployLayerComponent, WorkLayerComponent, LibraryComponent, EvidencePanelComponent, SharedLayerSlotComponent, MarkdownLayerComponent],
   providers: [ProjectContext],
   template: `
   <a class="skip-link" href="#lay-main">Skip to content</a>
@@ -93,13 +94,13 @@ const localLayers = [{ id: 'product', icon: 'lightbulb', label: 'Vision' }, { id
           <h1 tabindex="-1">Project not found</h1><p>You don't have access to this project, or it doesn't exist. <a href="/projects">Your apps</a></p>
         } @else if (ctx.data() && ctx.setup(); as ready) {
           @if (localLayer() && activeLocalLayer()) {
-            <nav class="lay-shared-tabs" [attr.aria-label]="localLayer()?.label + ' shared views'">
-              <a [href]="ctx.link(layer())" (click)="ctx.go(ctx.link(layer()), $event)" [class.active]="!sharedTab()" [attr.aria-current]="!sharedTab() ? 'page' : null">Outputs</a>
+            <nav class="lay-shared-tabs" [attr.aria-label]="localLayer()?.name + ' shared views'">
+              <a [href]="ctx.link(layer())" (click)="ctx.go(ctx.link(layer()), $event)" [class.active]="!sharedTab()" [attr.aria-current]="!sharedTab() ? 'page' : null">{{ localLayer()?.editorAdapter === 'markdown-editor' ? 'Editor' : 'Outputs' }}</a>
               <a [href]="ctx.link(layer(), 'operations')" (click)="ctx.go(ctx.link(layer(), 'operations'), $event)" [class.active]="sharedTab() === 'operations'" [attr.aria-current]="sharedTab() === 'operations' ? 'page' : null">Operations</a>
               <a [href]="ctx.link(layer(), 'knowledge')" (click)="ctx.go(ctx.link(layer(), 'knowledge'), $event)" [class.active]="sharedTab() === 'knowledge'" [attr.aria-current]="sharedTab() === 'knowledge' ? 'page' : null">Knowledge</a>
             </nav>
           }
-          @if (localLayer() && !activeLocalLayer()) { <p class="lay-eyebrow">Layer app</p><h1 tabindex="-1">{{ localLayer()?.label }} is not in this project</h1><p>Add it from Home when you need it.</p><a [href]="ctx.link()" (click)="ctx.go(ctx.link(), $event)">Go to Home</a> }
+          @if (localLayer() && !activeLocalLayer()) { <p class="lay-eyebrow">Layer app</p><h1 tabindex="-1">{{ localLayer()?.name }} is not in this project</h1><p>Add it from Home when you need it.</p><a [href]="ctx.link()" (click)="ctx.go(ctx.link(), $event)">Go to Home</a> }
           @else if (sharedTab()) { <aludel-shared-layer-slot [layerKey]="layer()" [slot]="sharedTab()" /> }
           @else { @switch (layer()) {
             @case ('product') { <aludel-product-layer /> }
@@ -124,7 +125,7 @@ const localLayers = [{ id: 'product', icon: 'lightbulb', label: 'Vision' }, { id
                 <aludel-avatar-editor class="lay-wide" />
                 <section class="lay-card"><h2>Your apps</h2><ul class="lay-list">@for (project of ctx.session()?.projects || []; track project.id) { <li><a class="lay-item" [href]="project.id === 'the-machine' ? '/#/the-machine/overview' : '/p/' + project.slug"><span class="lay-body-text"><strong>{{ project.name }}</strong><small>{{ project.role }}</small></span></a></li> }</ul></section></div>
             }
-            @default { <aludel-home-layer /> }
+            @default { @if (localLayer()?.editorAdapter === 'markdown-editor') { <aludel-markdown-layer [layerKey]="layer()" /> } @else { <aludel-home-layer /> } }
           } }
         } @else { <p class="lay-muted">Loading…</p> }
         @if (ctx.data()) { <aludel-evidence-panel /> }
@@ -137,8 +138,8 @@ export class ProjectShellComponent implements OnInit {
   private readonly changeDetector = inject(ChangeDetectorRef);
   readonly initialSession = input.required<Session>();
   readonly visibleLayers = computed(() => this.ctx.layerInstances().filter(layer => layer.enabled)
-    .map(layer => localLayers.find(item => item.id === layer.key)).filter((item): item is typeof localLayers[number] => !!item));
-  readonly localLayer = computed(() => localLayers.find(item => item.id === this.layer()) || null);
+    .map(layer => ({ id: layer.key, icon: layer.icon, label: layer.name })));
+  readonly localLayer = computed(() => this.ctx.layerInstances().find(item => item.key === this.layer()) || null);
   readonly activeLocalLayer = computed(() => this.ctx.layerInstances().some(item => item.key === this.layer() && item.enabled));
   readonly sharedTab = computed(() => this.localLayer() && ['operations', 'knowledge'].includes(this.ctx.segments()[1]) ? this.ctx.segments()[1] : '');
   readonly menu = signal(false);

@@ -116,7 +116,7 @@ export interface WorkRun { id: string; number: number; batchId: string | null; s
   review: { verdicts: Record<string, { value: 'accept' | 'reject' | 'skip'; note: string }>; flags: Record<string, string>; outcome: WorkRunState | null; comment: string | null; signedBy: string | null; signedAt: string | null }; }
 export interface WorkChange { recordId: string; revision: number; author: string; rationale: string | null; createdAt: string; kind: string | null; exists: boolean; fields: FieldChange[]; }
 export interface Routine extends RecordBase { key: string | null; title: string; layer: string; type: string; cadence: string; documents: string[]; enabled: boolean; executor?: 'utility' | 'agent'; trigger?: 'manual' | 'schedule' | 'output-change'; instructionDoc?: string | null; allowedReads?: string[]; capabilities?: string[]; outputKinds?: string[]; nextRunAt: string | null; lastRunAt: string | null; lastWorkId: string | null; history: Revision[]; }
-export interface LayerInstance { key: string; name: string; path: string; category: string; icon: string; description: string; enabled: boolean; visible: boolean; dashboardVisible: boolean; }
+export interface LayerInstance { key: string; name: string; path: string; category: string; icon: string; description: string; enabled: boolean; visible: boolean; dashboardVisible: boolean; outputProvider: string; editorAdapter: string; builtIn: boolean; }
 export interface Knowledge {
   vision: Record<string, VisionSection>; personas: Persona[]; phases: Phase[]; activities: Activity[]; stories: Story[]; specs: Spec[];
   research: Research[]; docs: Doc[]; pages: Page[]; work: WorkItem[]; selectedPacks: string[];
@@ -196,7 +196,7 @@ export class ProjectContext {
   readonly workById = computed(() => new Map((this.data()?.work || []).map(item => [item.id, item])));
   readonly memberById = computed(() => new Map((this.data()?.members || []).map(member => [member.id, member])));
   readonly actionById = computed(() => { const map = new Map((this.data()?.roles || []).flatMap(role => role.actions.map(action => [action.id, action] as [string, WorkAction])));
-    for (const action of this.data()?.layerActions || []) { const legacy = map.get(action.id); if (legacy) map.set(action.id, { ...legacy, ...action }); } return map; });
+    for (const action of this.data()?.layerActions || []) { const legacy = map.get(action.id); map.set(action.id, { recordId:null,revision:1,routine:null,instructions:'',reads:[],tools:[],asks:'',phases:[],...legacy,...action }); } return map; });
   readonly roleByLayer = computed(() => new Map((this.data()?.roles || []).map(role => [role.layer, role])));
   readonly claimById = computed(() => new Map((this.data()?.claims || []).map(claim => [claim.id, claim])));
   readonly insightById = computed(() => new Map((this.data()?.insights || []).map(insight => [insight.id, insight])));

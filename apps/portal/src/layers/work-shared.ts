@@ -11,7 +11,7 @@ import { Assignee, Batch, ProjectContext, WorkItem, layerLabel, priorityIcon, pr
 
 // Only explicitly adapted actions and compatible profiles can be staged; host capacity is checked when queued work starts.
 const symphonyActions = new Set(['platform.implement', 'platform.security', 'product.define', 'product.clarify', 'product.brief', 'data.contract', 'design.audit', 'pages.a11y', 'deploy.review', 'work.review']);
-export const agentRunnable = (item: WorkItem, ctx: ProjectContext) => Boolean(item.action && symphonyActions.has(item.action) &&
+export const agentRunnable = (item: WorkItem, ctx: ProjectContext) => Boolean(item.action && (symphonyActions.has(item.action) || ctx.data()?.layerActions.some(action => action.id === item.action && action.agentRunnable)) &&
   item.assignee?.kind === 'agent' && ctx.data()?.symphonyProfiles?.includes(item.assignee.id || '') &&
   (item.action !== 'product.clarify' || Boolean(item.question && !item.question.answer)) &&
   (item.action !== 'product.brief' || item.targets.length <= 1 && item.targets.every(target => target.kind === 'brief_claim')) &&

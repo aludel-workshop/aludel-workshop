@@ -262,7 +262,7 @@ export function workRuns({ db, know, candidates = null }) {
     return available.filter(change => !wanted.size || wanted.has(`${change.recordId}:${change.revision}`)).map(change => {
       const record = know.get(projectId, change.recordId);
       return { id: `${change.recordId}:${change.revision}`, kind: 'proposal', icon: 'edit_note',
-        name: record?.name || record?.title || record?.label || change.recordId, op: change.revision === 1 ? 'created' : 'modified',
+        name: record?.name || record?.title || record?.label || (change.kind === 'markdown_document' ? String(change.fields.find(field => field.field === 'path')?.after || change.recordId) : change.recordId), op: change.revision === 1 ? 'created' : 'modified',
         size: `${change.fields.length} ${change.fields.length === 1 ? 'field' : 'fields'}`,
         after: change.rationale || '', content: Object.fromEntries(change.fields.map(field => [field.field, field.after])) };
     });

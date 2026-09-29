@@ -26,6 +26,8 @@ import { importCorpus } from './importer.mjs';
 import { openDatabase } from './storage.mjs';
 import { initPagesLayerApp, pagesDocumentList, pagesDocumentRead, pagesDocumentUpdate, pagesConnections, pagesConnectionCreate, pagesConnectionUpdate } from './pages-layer-app.mjs';
 import { initLayerDiscovery, stageLayerDiscovery, layerDiscoveryStatus } from './layer-discovery.mjs';
+import { actionForProject, createMarkdownDefinition, projectLayerDefinitions } from './layer-registry.mjs';
+import { initMarkdownLayer, markdownTree, markdownRead, markdownFolderCreate, markdownFolderMove, markdownFolderDelete, markdownFileCreate, markdownFileSave, markdownFileMove, markdownFileDelete } from './markdown-layer.mjs';
 import { layerDocumentList, layerDocumentRead, layerDocumentUpdate, layerConnections, layerConnectionCreate, layerConnectionUpdate, layerRoutineRuns } from './layer-space.mjs';
 import { initPagesReconciliation, pagesReconciliationView, pagesGapDecision, reconcilePagesFlow } from './pages-reconciliation.mjs';
 import { initPagesCodeObservations, codeRouteObservations, recordCodeRouteObservation, pagesObservationRelations, proposePagesObservationRelation, reviewPagesObservationRelation, stagePagesFlowFromObservation } from './pages-code-observations.mjs';
@@ -65,6 +67,7 @@ initEditorBridge(db);
 initSymphonyWorker(db);
 initWorkRuns(db);
 initLayerContract(db);
+initMarkdownLayer(db);
 initActionMigration(db);
 initPagesLayerApp(db);
 initPagesReconciliation(db);
@@ -602,6 +605,36 @@ async function api(request, response, url) {
     }
     return json(response, 405, { error: 'Method not allowed.' });
   }
+  const definitionsRoute = /^\/api\/projects\/([^/]+)\/layer-definitions$/.exec(url.pathname);
+  if (definitionsRoute) {
+    const projectId=decodeURIComponent(definitionsRoute[1]);
+    if(request.method==='GET'){requireMember(db,user,projectId);return json(response,200,{layers:projectLayerDefinitions(db,projectId)}, {'cache-control':'no-store'});}
+    if(request.method==='POST'){
+      const definition=createMarkdownDefinition(db,user.id,projectId,await readJson(request));
+      migrateActionProject(db,projectId);
+      stageLayerDiscovery(db,know,projectId);
+      return json(response,201,definition,{'cache-control':'no-store'});
+    }
+    return json(response,405,{error:'Method not allowed.'});
+  }
+  const markdownRoute = /^\/api\/projects\/([^/]+)\/layers\/([^/]+)\/markdown\/(tree|folders|files)(?:\/([^/]+))?(?:\/(move))?$/.exec(url.pathname);
+  if(markdownRoute){
+    const projectId=decodeURIComponent(markdownRoute[1]),key=decodeURIComponent(markdownRoute[2]),section=markdownRoute[3],fileId=markdownRoute[4]?decodeURIComponent(markdownRoute[4]):null;
+    if(section==='tree'&&request.method==='GET')return json(response,200,markdownTree(db,dataDirectory,user.id,projectId,key),{'cache-control':'no-store'});
+    if(section==='folders'){
+      if(request.method==='POST'&&!fileId){const created=markdownFolderCreate(db,dataDirectory,user.id,projectId,key,(await readJson(request)).path);know.runRoutines(projectId,{trigger:'output-change',layerKey:key});return json(response,201,created);}
+      if(request.method==='PUT'&&!fileId){const input=await readJson(request);const moved=markdownFolderMove(db,dataDirectory,user.id,projectId,key,input.from,input.to);know.runRoutines(projectId,{trigger:'output-change',layerKey:key});return json(response,200,moved);}
+      if(request.method==='DELETE'&&!fileId){const deleted=markdownFolderDelete(db,dataDirectory,user.id,projectId,key,url.searchParams.get('path'));know.runRoutines(projectId,{trigger:'output-change',layerKey:key});return json(response,200,deleted);}
+    }
+    if(section==='files'){
+      if(request.method==='POST'&&!fileId){const input=await readJson(request);const created=markdownFileCreate(db,dataDirectory,user.id,projectId,key,input.path,input.content||'',input.workId||null);know.runRoutines(projectId,{trigger:'output-change',layerKey:key});return json(response,201,created);}
+      if(request.method==='GET'&&fileId&&!markdownRoute[5])return json(response,200,markdownRead(db,dataDirectory,user.id,projectId,key,fileId,url.searchParams.has('revision')?Number(url.searchParams.get('revision')):null),{'cache-control':'no-store'});
+      if(request.method==='PUT'&&fileId&&!markdownRoute[5]){const saved=markdownFileSave(db,dataDirectory,user.id,projectId,key,fileId,await readJson(request));know.runRoutines(projectId,{trigger:'output-change',layerKey:key});return json(response,200,saved);}
+      if(request.method==='POST'&&fileId&&markdownRoute[5]==='move'){const moved=markdownFileMove(db,dataDirectory,user.id,projectId,key,fileId,await readJson(request));know.runRoutines(projectId,{trigger:'output-change',layerKey:key});return json(response,200,moved);}
+      if(request.method==='DELETE'&&fileId&&!markdownRoute[5]){const deleted=markdownFileDelete(db,dataDirectory,user.id,projectId,key,fileId,Number(url.searchParams.get('expectedRevision')));know.runRoutines(projectId,{trigger:'output-change',layerKey:key});return json(response,200,deleted);}
+    }
+    return json(response,405,{error:'Method not allowed.'});
+  }
   const discoveryRoute = /^\/api\/projects\/([^/]+)\/layers\/([^/]+)\/discovery$/.exec(url.pathname);
   if (discoveryRoute && request.method === 'GET') return json(response, 200, { runs: layerDiscoveryStatus(db,user.id,decodeURIComponent(discoveryRoute[1]),decodeURIComponent(discoveryRoute[2])) }, { 'cache-control': 'no-store' });
   const layerSpaceRoute = /^\/api\/projects\/([^/]+)\/layers\/([^/]+)\/(documents|connections|routines)(?:\/([^/]+))?(?:\/(runs))?$/.exec(url.pathname);
@@ -928,7 +961,7 @@ async function api(request, response, url) {
         const selected = know.view(user, projectId).layerActions.find(action => action.id === input.action);
         if (!selected || input.layer && input.layer !== selected.layer || input.type && input.type !== selected.type) throw Object.assign(new Error('Choose an installed layer action.'), { status: 400 });
       }
-      return json(response, 201, know.createWork(projectId, { ...input, context: typeof input.suggestion === 'string' ? { suggestion: input.suggestion.slice(0, 2000) } : null }, user.name));
+      return json(response, 201, know.createWork(projectId, { ...input, context: typeof input.suggestion === 'string' ? { suggestion: input.suggestion.slice(0, 2000) } : (actionForProject(db,projectId,input.action)?.key === 'edit' && typeof input.context?.markdownPath === 'string' ? { markdownPath: input.context.markdownPath.slice(0,240), markdownFileId: typeof input.context.markdownFileId === 'string' ? input.context.markdownFileId.slice(0,80) : null, markdownRevision: Number.isInteger(input.context.markdownRevision) ? input.context.markdownRevision : null } : null) }, user.name));
     }
     if (section === 'work' && method === 'PUT' && item) {
       const input = await readJson(request);
