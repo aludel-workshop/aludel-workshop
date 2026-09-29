@@ -1,3 +1,4 @@
+import { workActionMigration } from './lat08-migration.mjs';
 // Symphony worker boundary. A local pool credential is scoped to one project; each claimed attempt pins its own profile.
 // Polling reads only Go-snapshotted work and never grants authorization itself.
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
@@ -7,7 +8,7 @@ import { basename, dirname } from 'node:path';
 import { symphonyIssue } from './symphony-readiness.mjs';
 import { compileTaskManifest } from './task-manifest.mjs';
 import { briefSections } from './knowledge.mjs';
-import { compiledLat06Actions } from './lat06-actions.mjs';
+import { compiledLocalActions } from './lat07-actions.mjs';
 
 const hash = value => createHash('sha256').update(value).digest('hex');
 const now = () => new Date().toISOString();
@@ -182,8 +183,12 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     const taskAction = entry && action(projectId, entry.action);
     const source = db.prepare('SELECT workspace_path FROM project_setup WHERE project_id = ?').get(projectId)?.workspace_path;
     if (!entry || !workerProfile || !taskAction || entry.assignee?.id !== profileId || !source) fail('Task context is incomplete.', 409);
-    const layerAction = compiledLat06Actions.find(candidate => candidate.id === entry.action) || null;
-    if (layerAction && (!layerAction.agentRunnable || !db.prepare("SELECT 1 FROM layer_instances WHERE project_id = ? AND layer_key = ? AND enabled = 1").get(projectId, layerAction.layer)))
+    if (db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_work_migration'").get()) workActionMigration(db, projectId, workId);
+    const layerAction = compiledLocalActions.find(candidate => candidate.id === entry.action) || null;
+    const method = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_action_installations'").get()
+      ? db.prepare('SELECT method_text, method_revision, action_revision FROM layer_action_installations WHERE project_id = ? AND action_id = ?').get(projectId, entry.action) : null;
+    if (method && method.action_revision !== layerAction?.revision) fail('The installed layer action revision changed.', 409);
+    if (db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_work_migration'").get() && layerAction && (!layerAction.agentRunnable || !db.prepare("SELECT 1 FROM layer_instances WHERE project_id = ? AND layer_key = ? AND enabled = 1").get(projectId, layerAction.layer)))
       fail('This layer action has no installed, registered agent adapter.', 409);
     let commit;
     try {
@@ -218,8 +223,9 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     const content = { controlPins, codeObservation, schemaVersion: 1, project: project(projectId), work: entry, batch: { id: batchId },
       sources: [...targets, ...briefClaims, ...docs], briefRevision: entry.action === 'product.brief' ? know.briefRevision(projectId) : null, sharedDocs: know.list(projectId, 'doc').filter(doc => doc.agents).map(doc => ({ id: doc.id, revision: doc.revision })), instructionPins: know.instructionPins(projectId, workerProfile, entry.action), guidance: { principles: instructions.principles, project: instructions.instructions,
         role: role && { id: role.id, revision: role.revision, name: role.name, instructions: role.instructions },
-        layerAction: layerAction && { id: layerAction.id, revision: layerAction.revision, adapter: layerAction.adapter, result: layerAction.result, permissions: layerAction.permissions },
-        action: { id: taskAction.id, revision: taskAction.revision, name: taskAction.name, instructions: taskAction.instructions,
+        layerAction: layerAction && { id: layerAction.id, revision: layerAction.revision, adapter: layerAction.adapter, result: layerAction.result, permissions: layerAction.permissions,
+          methodRevision: method?.method_revision || null, method: method?.method_text || layerAction.method || '' },
+        action: { id: taskAction.id, revision: taskAction.revision, name: taskAction.name, instructions: method?.method_text ?? taskAction.instructions,
           reads: taskAction.reads, changes: taskAction.changes, tools: taskAction.tools, asks: taskAction.asks },
         profile: { id: workerProfile.id, revision: workerProfile.revision, name: workerProfile.name, instructions: workerProfile.instructions,
           provider: workerProfile.provider || 'codex', model: workerProfile.model, effort: workerProfile.effort } }, repository: { commit } };
@@ -254,7 +260,7 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
       ['routine', 'gap', 'receipt', 'policy', 'source', 'observationRelation', 'codeObservation'].map(key => bundle.work.context?.[key] || null))) return false;
     if (!same(project(projectId), bundle.project)) return false;
     if (entry.action === 'product.brief' && know.briefRevision(projectId) !== bundle.briefRevision) return false;
-    if (!same(know.instructionPins(projectId, profile(projectId, profileId), entry.action), bundle.instructionPins)) return false;
+    if (!same(know.instructionPins(projectId, profile(projectId, profileId), entry.action, { legacyRole: Boolean(bundle.instructionPins?.role) }), bundle.instructionPins)) return false;
     if (!same(know.list(projectId, 'doc').filter(doc => doc.agents).map(doc => ({ id: doc.id, revision: doc.revision })), bundle.sharedDocs)) return false;
     if (bundle.sources.some(source => know.get(projectId, source.id)?.revision !== source.revision)) return false;
     if (bundle.controlPins?.some(control => { const row = db.prepare('SELECT revision, status FROM layer_connections WHERE id = ? AND project_id = ?').get(control.id, projectId); return !row || row.revision !== control.revision || row.status !== 'active'; })) return false;
@@ -326,7 +332,7 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
       ['routine', 'gap', 'receipt', 'policy', 'source', 'observationRelation', 'codeObservation'].map(key => bundle.work.context?.[key] || null))) return null;
     if (!same(project(scope.projectId), bundle.project)) return null;
     if (bundle.work.action === 'product.brief' && know.briefRevision(scope.projectId) !== bundle.briefRevision) return null;
-    if (!same(know.instructionPins(scope.projectId, profile(scope.projectId, scope.profileId), entry.action), bundle.instructionPins)) return null;
+    if (!same(know.instructionPins(scope.projectId, profile(scope.projectId, scope.profileId), entry.action, { legacyRole: Boolean(bundle.instructionPins?.role) }), bundle.instructionPins)) return null;
     if (!same(know.list(scope.projectId, 'doc').filter(doc => doc.agents).map(doc => ({ id: doc.id, revision: doc.revision })), bundle.sharedDocs)) return null;
     if (bundle.sources.some(source => know.get(scope.projectId, source.id)?.revision !== source.revision)) return null;
     if (bundle.controlPins?.some(control => { const row = db.prepare('SELECT revision, status FROM layer_connections WHERE id = ? AND project_id = ?').get(control.id, scope.projectId); return !row || row.revision !== control.revision || row.status !== 'active'; })) return null;

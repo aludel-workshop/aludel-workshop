@@ -9,6 +9,8 @@ import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { requireMember } from './accounts.mjs';
+import { actionGrant, recordNewWorkAction } from './lat08-migration.mjs';
+import { compiledLocalActions } from './lat07-actions.mjs';
 import { cleanBrandAsset, cleanComponent, cleanTokens, componentStatus, ensureDesign as seedDesign, syncTokensFromLook } from './design.mjs';
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
@@ -786,8 +788,12 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     }
     fail('Assign the item to a person or an agent profile.');
   }
-  // Elevated actions (the shield) are for leads of their role; the project owner may do anything (ROADMAP-01).
+  // LAT-08: installed layer grants replace role-lead admission. Old test/fixture databases
+  // without the migration table retain their legacy boundary until migrated.
   function mayDo(user, projectId, actionId) {
+    if (db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_action_installations'").get()) {
+      try { actionGrant(db, user, projectId, actionId); return true; } catch { return false; }
+    }
     const action = actionRecord(projectId, actionId);
     const elevated = action ? action.elevated ?? Boolean(catalogs.roles.actions.get(actionId)?.elevated) : Boolean(catalogs.roles.actions.get(actionId)?.elevated);
     if (!elevated) return true;
@@ -796,17 +802,19 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     return Boolean(role?.members?.some(member => member.id === user.id && member.lead));
   }
   function defaultAssignee(projectId, actionId) {
-    const assignee = actionRecord(projectId, actionId)?.assignee;
+    const installed = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_action_installations'").get()
+      ? db.prepare('SELECT assignee_kind, assignee_id FROM layer_action_installations WHERE project_id = ? AND action_id = ?').get(projectId, actionId) : null;
+    const assignee = installed ? installed.assignee_id ? { kind: installed.assignee_kind, id: installed.assignee_id } : null : actionRecord(projectId, actionId)?.assignee;
     try { return resolveAssignee(projectId, assignee); } catch { return null; }
   }
 
   // What an agent reads, in order: product principles, project instructions, the role's, the action's, then its profile's
   // own. Pinned when a run starts, so later edits never change a run in progress.
-  function instructionPins(projectId, profile, actionId) {
+  function instructionPins(projectId, profile, actionId, { legacyRole = false } = {}) {
     const principleClaims = list(projectId, 'brief_claim').filter(claim => claim.section === 'principles');
     const project = list(projectId, 'project_instructions')[0];
     const action = actionRecord(projectId, actionId);
-    const role = action?.parentId ? get(projectId, action.parentId) : null;
+    const role = (legacyRole || !db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_action_installations'").get()) && action?.parentId ? get(projectId, action.parentId) : null;
     const pin = record => record ? { id: record.id, revision: record.revision } : null;
     // Principles are several Brief claims; the pin is the Brief's revision, with the first principle as its record.
     return { principles: principleClaims.length ? { id: principleClaims[0].id, revision: briefRevision(projectId) } : null, project: pin(project), role: pin(role), action: action ? { ...pin(action), key: action.key } : null, profile: pin(profile) };
@@ -1005,8 +1013,10 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
   const workRow = item => {
     if (!item) return null;
     const context = parse(item.context_json, null);
+    const migration = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_work_migration'").get()
+      ? db.prepare('SELECT action_id AS actionId, action_revision AS actionRevision, disposition, reason FROM layer_work_migration WHERE project_id = ? AND work_id = ?').get(item.project_id, item.id) : null;
     return { id: item.id, number: item.number, ref: `W-${item.number}`, layer: item.layer, type: item.type, action: item.action || null, title: item.title, state: item.state,
-      status: statusOf(item.state, context), priority: priorities.includes(item.priority) ? item.priority : 'medium',
+      status: migration?.disposition === 'blocked' && item.state !== 'done' ? 'blocked' : statusOf(item.state, context), migration, priority: priorities.includes(item.priority) ? item.priority : 'medium',
       assignee: item.assignee_kind ? { kind: item.assignee_kind, id: item.assignee_id || (item.assignee_kind === 'agent' ? item.profile_id : null), label: item.assignee_label } : null,
       targets: parse(item.targets_json, []), question: parse(item.question_json, null), documents: parse(item.documents_json, []), log: parse(item.log_json, []),
       createdAt: item.created_at, updatedAt: item.updated_at, profileId: item.profile_id || null, instructions: parse(item.instructions_json, null), context,
@@ -1070,6 +1080,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
         JSON.stringify(lines(input.documents, 300, 'Document')), JSON.stringify([{ at: created, text: input.logText || `Created by ${author}`, refs: targets.map(target => target.id) }]), created, created,
         input.context && typeof input.context === 'object' ? JSON.stringify(input.context) : null, actionId, assignee?.id || null, assignee?.kind === 'agent' ? assignee.id : null,
         input.priority || priorityLevel(projectId, type, targets), '[]', JSON.stringify(checks), projectRecord?.id || null);
+    recordNewWorkAction(db, projectId, id, actionId);
     return workById(projectId, id);
   }
 
@@ -1293,7 +1304,11 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
           fail('Accept an exact, independently checked code candidate before closing this work.', 409);
         if (!outputs.length && !checks.length) fail('Name what this work checks or documents before closing it (DEC-036: logs are not documentation).', 409);
         if (item.state === 'review' && checks.some(check => check.verdict !== 'accept')) fail('Accept every check before accepting the work, or send it back.', 409);
-        if (item.state === 'review' && item.action && !mayDo(user, projectId, item.action)) fail(`Only a lead of the ${catalogs.roles.roles.find(role => role.layer === item.action.split('.')[0])?.name || 'role'} can accept ${item.ref}: its action is elevated.`, 403);
+        if (item.state === 'review' && item.action && !mayDo(user, projectId, item.action)) {
+          const migrated = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_action_installations'").get();
+          fail(migrated ? `A grant for ${item.action} is required to accept ${item.ref}.`
+            : `Only a lead of the ${catalogs.roles.roles.find(role => role.layer === item.action.split('.')[0])?.name || 'role'} can accept ${item.ref}: its action is elevated.`, 403);
+        }
         if (verifiedTypes.includes(item.type) && item.assignee?.kind !== 'template' && !(item.action === 'pages.flows' && item.assignee?.kind === 'agent' && input.proposalId)) {
           const missing = item.targets.filter(target => !db.prepare('SELECT 1 FROM knowledge_revisions WHERE record_id = ? AND work_item_id = ?').get(target.id, item.id));
           if (missing.length) fail(`${missing.map(target => `“${target.label}”`).join(', ')} ${missing.length === 1 ? 'has' : 'have'} no change from ${item.ref} yet. Edit ${missing.length === 1 ? 'it' : 'them'} from this item (or apply the answer), then close it.`, 409);
@@ -1534,7 +1549,19 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
       access: list(projectId, 'access_rule'),
       profiles: profiles(projectId).map(({ workTypes: legacyTypes, writes, approvalRequired, budget, icon, role, accountId, ...profile }) => ({ ...profile, history: history(profile.id) })),
       projectInstructions: list(projectId, 'project_instructions')[0] || null,
-      roles: roleView(projectId), members: members(projectId), workTypes, routines: routineView(projectId),
+      roles: roleView(projectId),
+      layerActions: db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_action_installations'").get()
+        ? compiledLocalActions.filter(action => action.humanRunnable || action.agentRunnable).flatMap(action => {
+          const installed = db.prepare('SELECT assignee_kind, assignee_id FROM layer_action_installations WHERE project_id = ? AND action_id = ?').get(projectId, action.id);
+          const legacy = catalogs.roles.actions.get(action.id);
+          return installed && legacy ? [{ id: action.id, layer: action.layer, name: action.title, description: action.purpose,
+            type: legacy.type, changes: legacy.changes || [], checks: action.checks, elevated: action.permissions.elevated,
+            assignee: installed.assignee_id ? { kind: installed.assignee_kind, id: installed.assignee_id } : null,
+            agentRunnable: action.agentRunnable, humanRunnable: action.humanRunnable }] : [];
+        }) : [],
+      layerGrants: db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_action_grants'").get()
+        ? db.prepare('SELECT user_id AS userId, layer_key AS layer, action_id AS actionId, level FROM layer_action_grants WHERE project_id = ? ORDER BY layer_key, level').all(projectId) : [],
+      members: members(projectId), workTypes, routines: routineView(projectId),
       services: Object.entries(catalogs.services || {}).map(([key, service]) => ({ key, ...service, stories: stories.filter(story => story.services.includes(key)).map(story => story.id) }))
     };
   }

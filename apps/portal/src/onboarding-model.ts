@@ -38,7 +38,7 @@ export interface PreviewStatus { status: string; commit?: string | null; builtAt
 
 export interface ProjectSetup {
   project: { id: string; slug: string; name: string; description: string; accent_color: string };
-  profile: string; overrides: Record<string, string>; preferences: Record<string, string>;
+  profile: string; workStyle: string; overrides: Record<string, string>; preferences: Record<string, string>;
   design: { feel: string | null; theme: 'light' | 'dark' | 'system'; accent: string; notes: string; navigation: 'sidebar' | 'top' };
   pages: { routes: PageRoute[]; seeded: boolean };
   stack: { preset: string | null; options: Record<string, boolean> };

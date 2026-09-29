@@ -74,6 +74,11 @@ test('security audit: Go, scoped reads, question, new Go, read-only report, revi
       const opened = await fetch(origin + '/api/worker/tasks/' + card.digest, { headers: auth });
       assert.equal(opened.status, 200, await opened.clone().text());
       assert.equal((await opened.json()).task.action.id, 'platform.security');
+      const sourceRead = await fetch(origin + '/api/worker/attempts/' + issue.native_ref.attempt_id + '/source?path=README.md', { headers: auth });
+      assert.equal(sourceRead.status, 200, await sourceRead.clone().text());
+      assert.equal((await sourceRead.json()).text, 'Audit base\n');
+      const secretRead = await fetch(origin + '/api/worker/attempts/' + issue.native_ref.attempt_id + '/source?path=.env', { headers: auth });
+      assert.equal(secretRead.status, 404);
       const mapped = await fetch(origin + '/api/worker/knowledge/map?digest=' + card.digest, { headers: auth });
       assert.equal(mapped.status, 200);
       assert.ok((await mapped.json()).kinds.some(value => value.kind === 'doc'));

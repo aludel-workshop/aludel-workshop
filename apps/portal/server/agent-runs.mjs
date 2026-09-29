@@ -1,3 +1,4 @@
+import { workActionMigration } from './lat08-migration.mjs';
 // Work batches stage human tasks or Go-pin explicit agent actions for Symphony.
 // Record changes are accepted at the checked output boundary, never during an agent turn.
 
@@ -100,6 +101,7 @@ export function agentRuns({ db, know, worker = null, symphonyDispatch = false })
   function stage(user, projectId, workId) {
     const entry = item(projectId, workId);
     if (!entry) fail('Work item not found.', 404);
+    if (db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_work_migration'").get()) workActionMigration(db, projectId, workId);
     if (entry.state === 'suggested') fail(`Queue ${entry.ref} before staging it.`, 409);
     if (entry.state !== 'ready' || entry.context?.batch || entry.context?.staged) fail(`${entry.ref} is ${entry.state === 'done' ? 'done' : 'already staged or being worked on'}.`, 409);
     const blockers = know.blockersOf(projectId, workId);
@@ -250,6 +252,7 @@ export function agentRuns({ db, know, worker = null, symphonyDispatch = false })
     if (!Number.isInteger(slots) || slots < 1 || slots > (pool?.configured || 1)) fail(`Choose between 1 and ${pool?.configured || 1} worker slots.`);
     const items = itemsOf(projectId, batch.id).filter(entry => entry.state === 'ready');
     if (!items.length) fail('Stage work in the batch first.', 409);
+    if (db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_work_migration'").get()) for (const entry of items) workActionMigration(db, projectId, entry.id);
     if (slots > items.length) fail('A batch cannot reserve more workers than it has items.', 409);
     if (!items.every(entry => symphonyActions.has(entry.action))) fail('This batch contains an action without a Symphony output adapter.', 409);
     if (!symphonyCompatible(projectId, batch.profileId)) fail('This profile needs a supported Symphony provider.', 409);

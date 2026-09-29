@@ -147,7 +147,8 @@ test('worker token scopes pinned coding work; ID refresh withdraws skipped and s
   assert.equal(worker.registerWorkspace(scope, { attemptId: secondAttempt, path: clone }).registered, true, 'workspace registration is idempotent');
   assert.deepEqual(worker.reserveRun(scope, { attemptId: secondAttempt }), { attemptId: secondAttempt, runsStarted: 1, runLimit: 3 });
   assert.equal(worker.issues(scope, { states: ['Ready'] }).issues.length, 1, 'one reserved run still leaves work resumable');
-  writeFileSync(join(clone, 'resume.txt'), 'preserve pending work\n');
+  mkdirSync(join(clone, 'src'), { recursive: true });
+  writeFileSync(join(clone, 'src', 'resume.txt'), 'preserve pending work\n');
   const resumedPortal = spawn(process.execPath, [new URL('../server/server.mjs', import.meta.url).pathname], {
     env: { ...process.env, MACHINE_DATA_DIR: root, MACHINE_PORT: String(port), MACHINE_PREVIEW_RUNTIME: 'process' }, stdio: 'ignore'
   });
@@ -164,7 +165,7 @@ test('worker token scopes pinned coding work; ID refresh withdraws skipped and s
     });
     assert.equal(resumed.status, 200, await resumed.clone().text());
     assert.equal((await resumed.json()).runsStarted, 2);
-    assert.equal(git(clone, 'status', '--porcelain').includes('resume.txt'), true, 'restart retained unfinished workspace edits');
+    assert.equal(existsSync(join(clone, 'src', 'resume.txt')), true, 'restart retained unfinished workspace edits');
   } finally {
     resumedPortal.kill();
     await new Promise(resolve => resumedPortal.once('exit', resolve));

@@ -1,7 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
-import { ProjectContext, WorkAction, WorkItem, lines, priorityOrder } from './context';
+import { ProjectContext, LayerWorkAction, WorkItem, layerLabel, lines, priorityOrder } from './context';
 
 // A task starts with an existing action. Its freeform brief can narrow the job, but cannot change that action's permissions.
 @Component({
@@ -12,10 +12,10 @@ import { ProjectContext, WorkAction, WorkItem, lines, priorityOrder } from './co
   <p class="lay-lead">Choose an action, then describe this piece of work. The action sets what an agent may read and change; your brief sets the task.</p>
   <form class="lay-card lay-form" (ngSubmit)="create()">
     <div class="lay-row lay-wrap lay-fields">
-      <label>Role<select name="role" [ngModel]="role()" (ngModelChange)="changeRole($event)" required>
-        @for (entry of ctx.data()?.roles || []; track entry.layer) { <option [value]="entry.layer">{{ entry.name }}</option> }
+      <label>Layer<select name="role" [ngModel]="role()" (ngModelChange)="changeRole($event)" required>
+        @for (entry of layerKeys(); track entry) { <option [value]="entry">{{ layerName(entry) }}</option> }
       </select></label>
-      <label>Action<select name="action" [ngModel]="action()" (ngModelChange)="changeAction($event)" required>
+      <label>Action<select name="action" [ngModel]="selectedAction()?.id || ''" (ngModelChange)="changeAction($event)" required>
         @for (entry of actions(); track entry.id) { <option [value]="entry.id">{{ entry.name }}</option> }
       </select></label>
       <label>Priority<select name="priority" [(ngModel)]="priority">@for (entry of priorities; track entry) { <option [value]="entry">{{ entry }}</option> }</select></label>
@@ -40,7 +40,7 @@ import { ProjectContext, WorkAction, WorkItem, lines, priorityOrder } from './co
     <label>Review checks, one per line<textarea name="checks" [(ngModel)]="checks" rows="3" placeholder="How will you know it is done?"></textarea></label>
     @if (assignedAgent() && !runnable()) { <p class="lay-lock-note lay-lock-warn">This task is not ready for an agent run. It may need a linked target record, a connected agent, or an execution contract for this action. You can still create it for planning.</p> }
     @if (assignedAgent() && !target) { <p class="lay-muted small">Link a target record when the agent needs specific project context.</p> }
-    <div class="lay-row lay-wrap"><button type="submit" class="lay-button" [disabled]="!title.trim() || !action()">Create task</button>
+    <div class="lay-row lay-wrap"><button type="submit" class="lay-button" [disabled]="!title.trim() || !selectedAction()">Create task</button>
       <span class="lay-muted small">Creating a task does not start an agent.</span></div>
   </form>`
 })
@@ -49,8 +49,9 @@ export class WorkCreateComponent {
   readonly priorities = priorityOrder;
   readonly role = signal('product');
   readonly action = signal('product.define');
-  readonly actions = computed(() => this.ctx.roleByLayer().get(this.role())?.actions || []);
-  readonly selectedAction = computed<WorkAction | null>(() => this.actions().find(entry => entry.id === this.action()) || null);
+  readonly layerKeys = computed(() => [...new Set((this.ctx.data()?.layerActions || []).map(action => action.layer))]);
+  readonly actions = computed(() => (this.ctx.data()?.layerActions || []).filter(action => action.layer === this.role()));
+  readonly selectedAction = computed<LayerWorkAction | null>(() => this.actions().find(entry => entry.id === this.action()) || this.actions()[0] || null);
   readonly targets = computed(() => {
     const data = this.ctx.data(); if (!data) return [];
     return [
@@ -66,15 +67,16 @@ export class WorkCreateComponent {
   });
   title = ''; brief = ''; target = ''; assignee = ''; state = 'ready'; priority = 'medium'; outputs = ''; checks = '';
   changeRole(layer: string) { this.role.set(layer); this.changeAction(this.actions()[0]?.id || ''); }
+  layerName(layer: string) { return layerLabel[layer] || layer; }
   changeAction(id: string) { this.action.set(id); this.checks = this.selectedAction()?.checks.join('\n') || ''; }
   assignedAgent() {
     if (this.assignee) return this.assignee.startsWith('agent:');
     return this.selectedAction()?.assignee?.kind === 'agent';
   }
   runnable() {
-    const id = this.action();
+    const id = this.selectedAction()?.id || '';
     const profileId = this.assignee.startsWith('agent:') ? this.assignee.slice(6) : this.selectedAction()?.assignee?.id;
-    if (!profileId || !this.ctx.data()?.symphonyProfiles?.includes(profileId)) return false;
+    if (!this.selectedAction()?.agentRunnable || !profileId || !this.ctx.data()?.symphonyProfiles?.includes(profileId)) return false;
     const story = this.ctx.data()?.stories.some(entry => entry.id === this.target);
     const object = this.ctx.data()?.objects.some(entry => entry.id === this.target);
     if (id === 'product.define' || id === 'platform.implement') return Boolean(story);

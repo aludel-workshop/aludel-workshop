@@ -37,7 +37,7 @@ export const lat07LayerActions = [
   { key: 'platform', outputs: ['code_unit', 'trace_link', 'code_release', 'code_route_observation'], actions: [
     action('implement', 'Implement a code change', 'Prepare a reviewed candidate against a pinned project repository commit.', { kind: 'code_unit', operation: 'candidate' },
       [read('platform', 'code_unit'), read('platform', 'trace_link')], ['Base commit and changed files are pinned', 'Tests are reported'],
-      { layer: 'platform', fileReads: ['**'], fileWrites: ['src/**', 'app/**', 'apps/**', 'tests/**'], requiredInputs: ['repository-commit'] }),
+      { layer: 'platform', fileReads: ['**'], fileWrites: ['src/**', 'app/**', 'apps/**', 'tests/**', 'server.mjs', 'README.md'], requiredInputs: ['repository-commit'] }),
     action('reconcile', 'Reconcile code links', 'Report mismatches between pinned Code units and linked layer records.', { owner: 'work', kind: 'report', operation: 'report' },
       [read('platform', 'code_unit'), read('platform', 'trace_link')], ['Each mismatch cites a source revision', 'No link is silently changed'],
       { layer: 'platform', fileReads: ['**'], requiredInputs: ['repository-commit'] }),
@@ -66,11 +66,11 @@ export const lat07LegacyInventory = Object.freeze({
   'data.operations': { disposition: 'unavailable', action: 'data.operations', reason: 'Typed operation proposal adapter is not registered.' },
   'data.access': { disposition: 'unavailable', action: 'data.access', reason: 'Access-rule adapter and elevated grant are not registered.' },
   'data.review': { disposition: 'retired', reason: 'Shared Work owns signed review.' },
-  'platform.implement': { disposition: 'unavailable', action: 'platform.implement', reason: 'Code candidate adapter and repository write grant are not registered.' },
+  'platform.implement': { disposition: 'recreated', action: 'platform.implement' },
   'platform.reconcile': { disposition: 'unavailable', action: 'platform.reconcile', reason: 'Pinned Code reconciliation report adapter is not registered.' },
   'platform.docs': { disposition: 'unavailable', action: 'platform.docs', reason: 'Documentation candidate adapter is not registered.' },
   'platform.dependencies': { disposition: 'unavailable', action: 'platform.dependencies', reason: 'Dependency candidate adapter and elevated grant are not registered.' },
-  'platform.security': { disposition: 'unavailable', action: 'platform.security', reason: 'Security report adapter is not registered.' },
+  'platform.security': { disposition: 'recreated', action: 'platform.security' },
   'platform.review': { disposition: 'retired', reason: 'Shared Work owns signed review.' },
   'deploy.configure': { disposition: 'unavailable', reason: 'Configuration is an external effect; no checked Deploy adapter or grant exists.' },
   'deploy.promote': { disposition: 'unavailable', reason: 'Promotion requires separate owner release authorization and an effect adapter.' },
@@ -78,10 +78,14 @@ export const lat07LegacyInventory = Object.freeze({
   'deploy.review': { disposition: 'retired', reason: 'Shared Work owns signed review.' }
 });
 export const combinedLegacyInventory = Object.freeze({ ...lat06LegacyInventory, ...lat07LegacyInventory });
+export const lat08CodeAdapters = [
+  { id: 'platform_implement', layer: 'platform', owner: 'platform', kind: 'code_unit', operation: 'candidate', performers: ['agent'] },
+  { id: 'platform_security', layer: 'platform', owner: 'work', kind: 'report', operation: 'report', performers: ['agent'] }
+];
 export const compiledLocalActions = compileLayerActions([
   ...lat06LayerActions.filter(layer => layer.key !== 'platform'),
   ...lat07LayerActions.filter(layer => layer.key !== 'platform'),
   { ...lat06LayerActions.find(layer => layer.key === 'platform'),
     outputs: lat07LayerActions.find(layer => layer.key === 'platform').outputs,
     actions: [...lat06LayerActions.find(layer => layer.key === 'platform').actions, ...lat07LayerActions.find(layer => layer.key === 'platform').actions] }
-], { registeredAdapters: lat06Adapters });
+], { registeredAdapters: [...lat06Adapters, ...lat08CodeAdapters] });

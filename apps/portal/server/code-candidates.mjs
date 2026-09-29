@@ -4,6 +4,7 @@ import { mkdirSync, rmSync, realpathSync, existsSync, lstatSync } from 'node:fs'
 import { resolve, join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { checkPinnedActionEffect } from './code-action-gateway.mjs';
 
 const now = () => new Date().toISOString();
 const sensitivePath = /(^|\/)(\.env(?:\.|$)|[^/]+\.(?:pem|key|p12|sqlite|sqlite3|db)$|\.data(?:\/|$))/i;
@@ -95,6 +96,7 @@ export function codeCandidates({ db, candidateRoot, externalRoot = join(candidat
     if (!files.length) fail('Coding run made no file changes.');
     const disallowed = files.filter(file => !allowedPath(file, candidate.changes) || (existsSync(join(path, file)) && lstatSync(join(path, file)).isSymbolicLink()));
     if (disallowed.length) fail(`Action may not change: ${disallowed.slice(0, 10).join(', ')}`);
+    checkPinnedActionEffect(db, projectId, candidate.workId, 'commit-candidate', files, candidate.base);
     git(path, 'add', '--', ...files);
     const staged = git(path, 'diff', '--cached', '--name-only', '-z').split('\0').filter(Boolean);
     if (staged.some(file => !allowedPath(file, candidate.changes))) fail('Staged changes exceed the action permission.');
@@ -162,6 +164,7 @@ export function codeCandidates({ db, candidateRoot, externalRoot = join(candidat
     if (!files.length) fail('Candidate commit has no changes.');
     const disallowed = files.filter(file => !allowedPath(file, changes || []));
     if (disallowed.length) fail(`Action may not change: ${disallowed.slice(0, 10).join(', ')}`);
+    checkPinnedActionEffect(db, projectId, workId, 'commit-candidate', files, base);
     const message = git(path, 'show', '-s', '--format=%B', commit);
     const trailers = message.split('\n').filter(line => /^Aludel-Work: /.test(line)).map(line => line.slice('Aludel-Work: '.length).trim());
     if (!trailers.includes(workId) && !trailers.includes(workRef)) fail('Candidate commit does not name this Aludel work item.');

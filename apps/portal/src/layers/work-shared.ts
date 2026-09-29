@@ -148,18 +148,19 @@ export class PriorityComponent {
   readonly icon = priorityIcon;
 }
 
-// "Engineer · Build stories": the role (from the layer) and the action, one chip, linking to the action in Roles.
+// Layer action chip opens its owning Operations view.
 @Component({
   selector: 'aludel-role-chip', standalone: true, imports: [MatIconModule],
-  template: `<a [class]="'lay-rolechip lay-l-' + layer()" [href]="ctx.link('work', 'roles', action() || '')" (click)="ctx.go(ctx.link('work', 'roles', action() || ''), $event)" [attr.title]="title()">
-    <mat-icon aria-hidden="true">{{ layerIcon[layer()] }}</mat-icon><span>{{ ctx.roleByLayer().get(layer())?.name }}</span>@if (actionName()) { <span class="lay-rolechip-act">· {{ actionName() }}</span> }</a>`
+  template: `<a [class]="'lay-rolechip lay-l-' + layer()" [href]="ctx.link(layer(), 'operations')" (click)="ctx.go(ctx.link(layer(), 'operations'), $event)" [attr.title]="title()">
+    <mat-icon aria-hidden="true">{{ layerIcon[layer()] }}</mat-icon><span>{{ layerLabel[layer()] }}</span>@if (actionName()) { <span class="lay-rolechip-act">· {{ actionName() }}</span> }</a>`
 })
 export class RoleChipComponent {
   readonly ctx = inject(ProjectContext);
   readonly layer = input.required<string>();
   readonly action = input<string | null>(null);
   readonly actionName = computed(() => this.ctx.actionById().get(this.action() || '')?.name || '');
-  readonly title = computed(() => `${layerLabel[this.layer()]} layer role`);
+  readonly title = computed(() => `${layerLabel[this.layer()]} action setup`);
+  readonly layerLabel = layerLabel;
   readonly layerIcon: Record<string, string> = { product: 'lightbulb', design: 'palette', pages: 'web', data: 'schema', platform: 'dns', work: 'checklist' };
 }
 

@@ -27,6 +27,8 @@ import { openDatabase } from './storage.mjs';
 import { initPagesLayerApp, pagesDocumentList, pagesDocumentRead, pagesDocumentUpdate, pagesConnections, pagesConnectionCreate, pagesConnectionUpdate } from './pages-layer-app.mjs';
 import { initPagesReconciliation, pagesReconciliationView, pagesGapDecision, reconcilePagesFlow } from './pages-reconciliation.mjs';
 import { initPagesCodeObservations, codeRouteObservations, recordCodeRouteObservation, pagesObservationRelations, proposePagesObservationRelation, reviewPagesObservationRelation, stagePagesFlowFromObservation } from './pages-code-observations.mjs';
+import { initActionMigration, migrateActionProject, layerActionSettings, setActionAssignee, setProjectWorkStyle, setLayerActionGrant, setActionMethod } from './lat08-migration.mjs';
+import { readActionSource, readAttemptSource, checkPinnedActionEffect } from './code-action-gateway.mjs';
 import { initLayerContract, layerDescriptors, layerInstances, updateLayerInstance, layerCatalog, layerOutputRead, layerMigrationInventory } from './layer-contract.mjs';
 import { answerDecision, createProposal, ensureB02Fixture, getDecision, getProposal, listDecisions, listDownstreamRecords, listProposals, reassessRecord, reviseProposal } from './product-records.mjs';
 import { openSecretStore } from './secret-store.mjs';
@@ -61,6 +63,7 @@ initEditorBridge(db);
 initSymphonyWorker(db);
 initWorkRuns(db);
 initLayerContract(db);
+initActionMigration(db);
 initPagesLayerApp(db);
 initPagesReconciliation(db);
 initPagesCodeObservations(db);
@@ -106,6 +109,7 @@ for (const projectId of layerProjects().filter(id => !db.prepare('SELECT layer_o
   // DESIGN-UX-01: the token set, template component contracts, starter brand assets and documents.
   know.ensureDesign(projectId);
 }
+for (const projectId of layerProjects()) migrateActionProject(db, projectId);
 const links = codeLinks({ db, know });
 const ops = platformOps({ db, backupRoot: join(dataDirectory, 'backups') });
 const codeRelease = codeReleases({ db });
@@ -162,6 +166,7 @@ async function acceptCandidate(user, projectId, candidateId, commit) {
   const work = know.workById(projectId, candidate.workId);
   if (!work || work.action !== 'platform.implement' || work.state !== 'review' || work.checks.some(check => check.verdict !== 'accept'))
     return { status: 409, body: { error: 'Accept every Work check before accepting this candidate.' } };
+  checkPinnedActionEffect(db, projectId, candidate.workId, 'commit-candidate', candidate.files, candidate.base);
   const preview = candidatePreviews.status(candidateId);
   if (preview.commit !== candidate.commit || preview.status !== 'running' || !(await candidatePreviews.probe(candidateId)).ok)
     return { status: 409, body: { error: 'The exact candidate preview must be healthy before acceptance.' } };
@@ -440,11 +445,12 @@ async function api(request, response, url) {
   // Symphony host credentials have no browser/session authority. Pool requests resolve their pinned profile per attempt.
   if (url.pathname.startsWith('/api/worker/')) {
     const workerAuth = worker.authenticate(request.headers.authorization);
-    const attemptRoute = /^\/api\/worker\/attempts\/([^/]+)(?:\/(workspace|runs|events|candidate|commit|audit|proposal|question|plan|progress))?$/.exec(url.pathname);
+    const attemptRoute = /^\/api\/worker\/attempts\/([^/]+)(?:\/(workspace|runs|events|candidate|commit|audit|proposal|question|plan|progress|source))?$/.exec(url.pathname);
     if (attemptRoute) {
       const [, attemptId, operation] = attemptRoute;
       const scope = worker.scopeForAttempt(workerAuth, attemptId);
       if (!operation && request.method === 'GET') return json(response, 200, worker.attemptStatus(scope, attemptId), { 'cache-control': 'no-store' });
+      if (operation === 'source' && request.method === 'GET') return json(response, 200, readAttemptSource(db, scope, attemptId, url.searchParams.get('path')), { 'cache-control': 'no-store' });
       if (request.method === 'POST' && operation) {
         const input = await readJson(request, ['audit', 'proposal'].includes(operation) ? 128 * 1024 : 64 * 1024);
         // WORK-ITEM-UX-01 WI-5: the agent's own plan and progress, shown as the run's objectives.
@@ -512,6 +518,8 @@ async function api(request, response, url) {
   if (url.pathname === '/api/onboarding/claim' && request.method === 'POST') {
     const token = cookie(request).aludel_draft;
     const setup = flows.claimDraft(token, user, user);
+    know.ensureAgents(setup.project.id);
+    migrateActionProject(db, setup.project.id);
     return json(response, 201, { project: setup.project }, { 'set-cookie': draftCookie('', 0) });
   }
   if (url.pathname === '/api/projects' && request.method === 'GET') return json(response, 200, { projects: userProjects(db, user.id) });
@@ -526,6 +534,12 @@ async function api(request, response, url) {
       return json(response, 201, recordCodeRouteObservation(db, user.id, projectId, workspace, await readJson(request)), { 'cache-control': 'no-store' });
     }
     return json(response, 405, { error: 'Method not allowed.' });
+  }
+  const actionSourceRoute = /^\/api\/projects\/([^/]+)\/layers\/code\/action-source$/.exec(url.pathname);
+  if (actionSourceRoute && request.method === 'GET') {
+    const projectId = decodeURIComponent(actionSourceRoute[1]);
+    return json(response, 200, readActionSource(db, user, projectId, url.searchParams.get('action'),
+      url.searchParams.get('commit'), url.searchParams.get('path')), { 'cache-control': 'no-store' });
   }
   const pagesCodeRelationRoute = /^\/api\/projects\/([^/]+)\/layers\/pages\/code-relations(?:\/([^/]+)\/(review|stage))?$/.exec(url.pathname);
   if (pagesCodeRelationRoute) {
@@ -592,6 +606,31 @@ async function api(request, response, url) {
     return json(response, 200, layerOutputRead(db, user.id, projectId, layerKey, kind, recordId), { 'cache-control': 'no-store' });
   }
   if (url.pathname === '/api/layer-catalog' && request.method === 'GET') return json(response, 200, { layers: layerCatalog });
+  const workStyleRoute = /^\/api\/projects\/([^/]+)\/work-style$/.exec(url.pathname);
+  if (workStyleRoute && request.method === 'PUT') {
+    const projectId = decodeURIComponent(workStyleRoute[1]);
+    return json(response, 200, setProjectWorkStyle(db, user, projectId, (await readJson(request)).workStyle));
+  }
+  const layerGrantRoute = /^\/api\/projects\/([^/]+)\/layer-grants$/.exec(url.pathname);
+  if (layerGrantRoute && request.method === 'PUT') {
+    const projectId = decodeURIComponent(layerGrantRoute[1]);
+    return json(response, 200, setLayerActionGrant(db, user, projectId, await readJson(request)));
+  }
+  const layerActionRoute = /^\/api\/projects\/([^/]+)\/layer-actions\/([^/]+)(?:\/([^/]+))?$/.exec(url.pathname);
+  if (layerActionRoute) {
+    const projectId = decodeURIComponent(layerActionRoute[1]);
+    const layerKey = decodeURIComponent(layerActionRoute[2]);
+    if (request.method === 'GET' && !layerActionRoute[3]) return json(response, 200, { actions: layerActionSettings(db, user, projectId, layerKey) }, { 'cache-control': 'no-store' });
+    if (request.method === 'PUT' && layerActionRoute[3]) {
+      const actionId = decodeURIComponent(layerActionRoute[3]);
+      if (!actionId.startsWith(`${layerKey}.`)) return json(response, 404, { error: 'Action not found.' });
+      const input = await readJson(request);
+      if (Object.hasOwn(input, 'method')) return json(response, 200, setActionMethod(db, user, projectId, actionId, input.method, input.expectedRevision));
+      if (Object.hasOwn(input, 'assignee')) return json(response, 200, setActionAssignee(db, user, projectId, actionId, input.assignee));
+      return json(response, 400, { error: 'Choose method or default assignee.' });
+    }
+    return json(response, 405, { error: 'Method not allowed.' });
+  }
   const instanceRoute = /^\/api\/projects\/([^/]+)\/layer-instances(?:\/([^/]+))?$/.exec(url.pathname);
   if (instanceRoute) {
     const projectId = decodeURIComponent(instanceRoute[1]);
@@ -600,6 +639,7 @@ async function api(request, response, url) {
       const updated = updateLayerInstance(db, user.id, projectId, decodeURIComponent(instanceRoute[2]), await readJson(request));
       if (updated.enabled && updated.key === 'product') { know.ensureProject(projectId, { pitch: flows.projectSetup(user, projectId).project.description, seedRoutines: false }); know.ensurePlan(projectId); }
       if (updated.enabled && updated.key === 'design') know.ensureDesign(projectId);
+      if (updated.enabled) migrateActionProject(db, projectId);
       if (['product','pages'].includes(updated.key)) reconcilePagesFlow(db, know, projectId);
       return json(response, 200, updated, { 'cache-control': 'no-store' });
     }
@@ -831,11 +871,13 @@ async function api(request, response, url) {
     }
     if (section === 'records' && method === 'POST' && !item) {
       const input = await readJson(request);
+      if (['role', 'work_action'].includes(input.kind)) return json(response, 409, { error: 'Historical role records are read-only. Configure actions in their layer.' });
       const work = know.openWorkItem(projectId, input.workItemId);
       return json(response, 201, know.insert(projectId, String(input.kind || ''), input.data || {}, { parentId: input.parentId || null, author: user.name, rationale: input.rationale || null, workItemId: work?.id || null }));
     }
     if (section === 'records' && method === 'PUT' && item) {
       const input = await readJson(request);
+      if (['role', 'work_action'].includes(know.get(projectId, item)?.kind)) return json(response, 409, { error: 'Historical role records are read-only. Configure actions in their layer.' });
       const work = know.openWorkItem(projectId, input.workItemId);
       return json(response, 200, know.update(projectId, item, input.data || {}, { expectedRevision: input.expectedRevision, author: user.name, rationale: input.rationale || null, position: input.position, parentId: input.parentId, workItemId: work?.id || null }));
     }
@@ -853,8 +895,8 @@ async function api(request, response, url) {
       // People stage suggestions; reconcile and routine contexts are only ever written by the server.
       const input = await readJson(request);
       if (input.action) {
-        const selected = know.roleView(projectId).flatMap(role => role.actions.map(action => ({ ...action, layer: role.layer }))).find(action => action.id === input.action);
-        if (!selected || input.layer && input.layer !== selected.layer || input.type && input.type !== selected.type) throw Object.assign(new Error('Choose a current role action.'), { status: 400 });
+        const selected = know.view(user, projectId).layerActions.find(action => action.id === input.action);
+        if (!selected || input.layer && input.layer !== selected.layer || input.type && input.type !== selected.type) throw Object.assign(new Error('Choose an installed layer action.'), { status: 400 });
       }
       return json(response, 201, know.createWork(projectId, { ...input, context: typeof input.suggestion === 'string' ? { suggestion: input.suggestion.slice(0, 2000) } : null }, user.name));
     }

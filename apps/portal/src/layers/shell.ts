@@ -18,6 +18,7 @@ import { HomeLayerComponent } from './home';
 import { LibraryComponent } from './library';
 import { EvidencePanelComponent } from './evidence';
 import { SharedLayerSlotComponent } from './shared-layer-slot';
+import { LayerActionSettingsComponent } from './layer-action-settings';
 
 // ROADMAP-01 (DEC-043): Product is shown as Vision (URLs /vision/…; the internal layer key stays `product`), and each layer has one colour.
 const localLayers = [{ id: 'product', icon: 'lightbulb', label: 'Vision' }, { id: 'design', icon: 'palette', label: 'Design' }, { id: 'pages', icon: 'web', label: 'Pages' }, { id: 'data', icon: 'schema', label: 'Data' }, { id: 'platform', icon: 'code', label: 'Code' }, { id: 'deploy', icon: 'rocket_launch', label: 'Deploy' }];
@@ -25,7 +26,7 @@ const localLayers = [{ id: 'product', icon: 'lightbulb', label: 'Vision' }, { id
 // LAY-02: every project's workspace at /p/<slug>/<layer>/<tab>/<id>. The layer comes first (DEC-036).
 @Component({
   selector: 'aludel-project-shell', standalone: true,
-  imports: [FormsModule, MatIconModule, AvatarEditorComponent, HomeLayerComponent, ProductLayerComponent, DesignLayerComponent, PagesLayerComponent, DataLayerComponent, CodeLayerComponent, DeployLayerComponent, WorkLayerComponent, LibraryComponent, EvidencePanelComponent, SharedLayerSlotComponent],
+  imports: [FormsModule, MatIconModule, AvatarEditorComponent, HomeLayerComponent, ProductLayerComponent, DesignLayerComponent, PagesLayerComponent, DataLayerComponent, CodeLayerComponent, DeployLayerComponent, WorkLayerComponent, LibraryComponent, EvidencePanelComponent, SharedLayerSlotComponent, LayerActionSettingsComponent],
   providers: [ProjectContext],
   template: `
   <a class="skip-link" href="#lay-main">Skip to content</a>
@@ -100,7 +101,7 @@ const localLayers = [{ id: 'product', icon: 'lightbulb', label: 'Vision' }, { id
             </nav>
           }
           @if (localLayer() && !activeLocalLayer()) { <p class="lay-eyebrow">Layer app</p><h1 tabindex="-1">{{ localLayer()?.label }} is not in this project</h1><p>Add it from Home when you need it.</p><a [href]="ctx.link()" (click)="ctx.go(ctx.link(), $event)">Go to Home</a> }
-          @else if (sharedTab()) { <aludel-shared-layer-slot [layerKey]="layer()" [slot]="sharedTab()" /> }
+          @else if (sharedTab()) { <aludel-shared-layer-slot [layerKey]="layer()" [slot]="sharedTab()" /> @if (sharedTab() === 'operations') { <aludel-layer-action-settings [layerKey]="layer()" /> } }
           @else { @switch (layer()) {
             @case ('product') { <aludel-product-layer /> }
             @case ('design') { <aludel-design-layer /> }
@@ -113,7 +114,10 @@ const localLayers = [{ id: 'product', icon: 'lightbulb', label: 'Vision' }, { id
             @case ('settings') {
               <p class="lay-eyebrow">Settings</p><h1 tabindex="-1">{{ ctx.setup()?.project?.name }} settings</h1>
               <div class="lay-grid lay-g2"><section class="lay-card"><h2>Project</h2><dl class="lay-kv"><dt>Name</dt><dd>{{ ctx.setup()?.project?.name }}</dd><dt>Address</dt><dd><code>{{ ctx.setup()?.urls?.app }}</code></dd><dt>Members</dt><dd>You (owner)</dd></dl></section>
-                <section class="lay-card"><h2>Who does what</h2><p>Each kind of work goes to a person or an agent profile, set per action. <a [href]="ctx.link('work', 'roles')" (click)="ctx.go(ctx.link('work', 'roles'), $event)">Work › Roles</a></p></section></div>
+                <section class="lay-card"><h2>Work style</h2><p>New layers use this style to seed action defaults. Existing assignments stay as they are.</p>
+                <label for="project-work-style">Style</label><select id="project-work-style" [value]="ctx.setup()?.workStyle || 'planner'" (change)="saveWorkStyle($event)">
+                  <option value="dreamer">Dreamer</option><option value="planner">Planner</option><option value="tinkerer">Tinkerer</option></select>
+                <p class="lay-muted">Set each action’s default assignee in its layer’s Operations tab. Work shows tasks and assignments across layers.</p></section></div>
             }
             @case ('account') {
               <p class="lay-eyebrow">Account</p><h1 tabindex="-1">{{ user()?.name }}</h1>
@@ -195,6 +199,12 @@ export class ProjectShellComponent implements OnInit {
 
   readonly markColor = computed(() => readableAccent(this.ctx.setup()?.project.accent_color || '#3047b9', '#ffffff'));
   readonly markText = computed(() => contrastText(this.markColor()));
+
+  saveWorkStyle(event: Event) {
+    const workStyle = (event.target as HTMLSelectElement).value;
+    void this.ctx.write(() => this.ctx.api(`/api/projects/${encodeURIComponent(this.ctx.projectId())}/work-style`, 'PUT', { workStyle }),
+      'Work style saved. Existing assignments are unchanged.');
+  }
 
   initials(name: string) { return name.split(/\s+/).map(word => word[0] || '').join('').slice(0, 2).toUpperCase(); }
 

@@ -260,7 +260,7 @@ export function onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot, cr
       const product = getProductWorkspace(db, projectId);
       return {
         project,
-        profile: setup.profile, overrides, preferences: effectivePreferences(setup.profile, overrides),
+        profile: setup.profile, workStyle: setup.work_style || setup.profile, overrides, preferences: effectivePreferences(setup.profile, overrides),
         design: { feel: setup.feel, theme: setup.theme, accent: project.accent_color, notes: setup.design_notes,
           navigation: setup.navigation || catalogs.feels[setup.feel || 'sleek-saas'].navigation },
         pages: routesFor(projectId, setup),

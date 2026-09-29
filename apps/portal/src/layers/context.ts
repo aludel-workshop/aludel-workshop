@@ -67,8 +67,9 @@ export interface AgentProfile extends RecordBase { key: string | null; name: str
   context: string[]; limits: ProfileLimits; active: boolean; history: Revision[]; }
 export interface Pin { id: string; revision: number; key?: string; }
 export interface InstructionPins { principles: Pin | null; project: Pin | null; role: Pin | null; action: Pin | null; profile: Pin | null; }
-// Work › Roles: one role per layer, and the actions it performs, each with its own setup.
+// Historical Work roles remain readable; installed actions are owned by their layers.
 export interface Assignee { kind: 'person' | 'agent' | 'template'; id: string | null; label?: string; }
+export interface LayerWorkAction { id: string; layer: string; name: string; description: string; type: string; changes: string[]; checks: string[]; elevated: boolean; assignee: Assignee | null; agentRunnable: boolean; humanRunnable: boolean; }
 export interface WorkAction { id: string; recordId: string | null; revision: number; name: string; description: string; type: string; routine: string | null; assignee: Assignee | null;
   instructions: string; reads: string[]; changes: string[]; tools: string[]; asks: string; phases: string[]; checks: string[]; elevated: boolean; }
 export interface Role { id: string | null; layer: string; name: string; blurb: string; instructions: string; revision: number; members: { id: string; lead: boolean }[]; actions: WorkAction[]; }
@@ -88,7 +89,7 @@ export interface RunState { phases?: string[]; phase?: number; activity?: string
 export interface WorkItem { id: string; number: number; ref: string; layer: string; type: string; action: string | null; title: string; state: string; status: WorkStatus; priority: string;
   assignee: Assignee | null; targets: WorkTarget[]; blocks: string[]; blockedBy: string[]; checks: WorkCheck[];
   question: { text: string; options: string[]; answer?: string; rationale?: string; answeredBy?: string; applied?: string[]; recommendation?: string; reasoning?: string } | null; documents: string[]; log: LogEntry[]; createdAt: string; updatedAt: string;
-  profileId: string | null; instructions: InstructionPins | null; project: string | null; checkpoint: string | null;
+  profileId: string | null; instructions: InstructionPins | null; migration?: { actionId: string | null; actionRevision: number | null; disposition: 'mapped' | 'blocked'; reason: string | null } | null; project: string | null; checkpoint: string | null;
   context: { reconcile?: { recordId: string; fromRevision: number; toRevision: number }; routine?: string; suggestion?: string; batch?: string; staged?: boolean; skip?: boolean;
     feedback?: { check: string; note: string; by: string; at: string }[]; reviewComment?: string | null; run?: RunState; personRun?: string; executionBlock?: ExecutionBlock;
     visionProposal?: { id: string; section: string; text: string; note: string; basis: string; targetId: string | null;
@@ -123,7 +124,7 @@ export interface Knowledge {
   packs: Record<string, { label: string; summary: string; icon: string; stories: number; template: number }>;
   objects: DataObject[]; operations: DataOperation[]; access: AccessRule[]; services: Service[];
   profiles: AgentProfile[]; projectInstructions: (RecordBase & { body: string }) | null; workTypes: string[];
-  roles: Role[]; members: Member[];
+  roles: Role[]; layerActions: LayerWorkAction[]; layerGrants: { userId: string; layer: string; actionId: string; level: 'normal' | 'elevated' }[]; members: Member[];
   code: { indexedAt: string | null; units: CodeUnit[] };
   routines: Routine[]; batches: Batch[]; symphonyProfiles: string[]; workerPool: WorkerPool;
   claims: Claim[]; briefRevision: number; sources: Source[]; findings: Finding[]; insights: Insight[]; evidence: EvidenceLink[]; projects: PlanProject[];
@@ -194,7 +195,8 @@ export class ProjectContext {
   readonly unitById = computed(() => new Map((this.data()?.code.units || []).map(unit => [unit.id, unit])));
   readonly workById = computed(() => new Map((this.data()?.work || []).map(item => [item.id, item])));
   readonly memberById = computed(() => new Map((this.data()?.members || []).map(member => [member.id, member])));
-  readonly actionById = computed(() => new Map((this.data()?.roles || []).flatMap(role => role.actions.map(action => [action.id, action] as [string, WorkAction]))));
+  readonly actionById = computed(() => { const map = new Map((this.data()?.roles || []).flatMap(role => role.actions.map(action => [action.id, action] as [string, WorkAction])));
+    for (const action of this.data()?.layerActions || []) { const legacy = map.get(action.id); if (legacy) map.set(action.id, { ...legacy, ...action }); } return map; });
   readonly roleByLayer = computed(() => new Map((this.data()?.roles || []).map(role => [role.layer, role])));
   readonly claimById = computed(() => new Map((this.data()?.claims || []).map(claim => [claim.id, claim])));
   readonly insightById = computed(() => new Map((this.data()?.insights || []).map(insight => [insight.id, insight])));
@@ -268,7 +270,8 @@ export class ProjectContext {
     if (kind === 'data_operation') return this.link('data', 'api', id);
     if (kind === 'agent_profile') return this.link('work', 'agents', id);
     if (kind === 'work_item') return this.link('work', 'item', id);
-    if (kind === 'role' || kind === 'work_action') return this.link('work', 'roles', id);
+    if (kind === 'role' || kind === 'work_action') { const role = this.data()?.roles.find(entry => entry.id === id || entry.actions.some(action => action.recordId === id));
+      return role ? this.link(role.layer, 'operations') : this.link('work', 'items'); }
     if (kind === 'project_instructions') return this.link('work', 'agents');
     if (kind === 'doc') return this.link('library', 'docs', id);
     if (kind === 'component') return this.link('design', 'components', id);
@@ -341,9 +344,9 @@ export class ProjectContext {
     if (work) return info('work_item', 'Work item', 'task_alt', 'work', `${work.ref} ${work.title}`, work.title, { status: workStatusLabel[work.status], where: 'Work',
       facts: [['Priority', priorityLabel[work.priority]], ['Assignee', this.whoName(work.assignee)], ...(work.blockedBy.length ? [['Blocked by', work.blockedBy.map(other => this.workById().get(other)?.ref).join(', ')] as [string, string]] : [])] });
     const role = data.roles.find(entry => entry.id === id);
-    if (role) return info('role', 'Role instructions', 'menu_book', 'work', `${role.name} instructions`, `${role.name} instructions`, { where: 'Work › Roles', note: role.instructions, facts: [['Revision', String(role.revision)]] });
+    if (role) return info('role', 'Role instructions', 'menu_book', 'work', `${role.name} instructions`, `${role.name} instructions`, { where: `${layerLabel[role.layer]} › Operations · historical role`, note: role.instructions, facts: [['Revision', String(role.revision)]] });
     const action = data.roles.flatMap(entry => entry.actions).find(entry => entry.recordId === id);
-    if (action) return info('work_action', 'Action', 'tune', 'work', action.name, action.name, { where: 'Work › Roles', note: action.instructions || action.description, href: this.link('work', 'roles', action.id), facts: [['Revision', String(action.revision)]] });
+    if (action) return info('work_action', 'Action', 'tune', 'work', action.name, action.name, { where: 'Historical Work action', note: action.instructions || action.description, href: this.recordHref('work_action', id), facts: [['Revision', String(action.revision)]] });
     if (data.projectInstructions?.id === id) return info('project_instructions', 'Project instructions', 'menu_book', 'work', 'Project instructions', 'Project instructions', { where: 'Work › Agents', note: data.projectInstructions.body.slice(0, 240) });
     const unit = this.unitById().get(id);
     if (unit) return info('code_unit', 'Code unit', 'code', 'platform', unit.symbol, unit.symbol, { status: unitStateLabel[unit.state], where: 'Code › Explorer', facts: [['Path', unit.path], ['Kind', unit.kind]] });
