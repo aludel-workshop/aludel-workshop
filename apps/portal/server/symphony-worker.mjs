@@ -9,6 +9,9 @@ import { symphonyIssue } from './symphony-readiness.mjs';
 import { compileTaskManifest } from './task-manifest.mjs';
 import { briefSections } from './knowledge.mjs';
 import { compiledLocalActions } from './lat07-actions.mjs';
+import { layerDeclarations } from './layer-contract.mjs';
+import { discoverySourceSnapshot } from './layer-discovery.mjs';
+import { applyDiscoveryProposal } from './layer-space.mjs';
 
 const hash = value => createHash('sha256').update(value).digest('hex');
 const now = () => new Date().toISOString();
@@ -73,7 +76,10 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
   const atomic = fn => { db.exec('BEGIN IMMEDIATE'); try { const value = fn(); db.exec('COMMIT'); return value; } catch (error) { db.exec('ROLLBACK'); throw error; } };
   const project = id => db.prepare('SELECT id, slug, name, description FROM projects WHERE id = ?').get(id);
   const profile = (projectId, id) => know.list(projectId, 'agent_profile').find(entry => entry.id === id);
-  const action = (projectId, id) => know.roleView(projectId).flatMap(role => role.actions).find(entry => entry.id === id);
+  const action = (projectId, id) => know.roleView(projectId).flatMap(role => role.actions).find(entry => entry.id === id) ||
+    (id?.endsWith('.discover') && compiledLocalActions.some(candidate => candidate.id === id) ?
+      { id, revision: 1, name: 'Discover neighboring layers', instructions: compiledLocalActions.find(candidate => candidate.id === id).method,
+        reads: [], changes: [], tools: ['read'], asks: '' } : null);
   const batch = (projectId, id) => {
     const row = db.prepare('SELECT * FROM agent_batches WHERE id = ? AND project_id = ?').get(id, projectId);
     return row && { id: row.id, ref: `B-${row.number}`, state: row.state, profileId: row.profile_id, requestedSlots: row.requested_slots || 1, snapshot: parse(row.items_json) || [], startedAt: row.started_at };
@@ -197,7 +203,8 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
       commit = run('rev-parse', 'HEAD');
     } catch (error) { if (error.status === 409) throw error; fail('Project repository is not ready.', 409); }
     if (!/^[a-f0-9]{40}$/.test(commit)) fail('Project repository is not ready.', 409);
-    const role = know.roleView(projectId).find(value => value.actions.some(candidate => candidate.id === entry.action));
+    const role = know.roleView(projectId).find(value => value.actions.some(candidate => candidate.id === entry.action)) ||
+      (entry.action?.endsWith('.discover') ? { id: entry.layer, revision: 1, name: layerDeclarations.find(layer => layer.key === entry.layer)?.name || entry.layer, instructions: 'Inspect neighboring outputs and propose a receiving policy for review.' } : null);
     const targets = (entry.targets || []).map(target => know.get(projectId, target.id)).filter(Boolean);
     const docs = know.list(projectId, 'doc').filter(doc => doc.agents && !targets.some(target => target.id === doc.id));
     const briefClaims = entry.action === 'product.brief' ? know.list(projectId, 'brief_claim').filter(claim => !targets.some(target => target.id === claim.id)) : [];
@@ -220,7 +227,12 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
       const row = db.prepare('SELECT revision, status, receiving_key, source_key FROM layer_connections WHERE id = ? AND project_id = ?').get(control.id, projectId);
       if (!row || row.revision !== control.revision || row.status !== 'active' || row.receiving_key !== 'pages' || row.source_key !== 'product') fail('The originating layer policy changed.', 409);
     }
-    const content = { controlPins, codeObservation, schemaVersion: 1, project: project(projectId), work: entry, batch: { id: batchId },
+    const discovery = entry.context?.discovery;
+    if (discovery) {
+      const installed = db.prepare('SELECT layer_key AS key, descriptor_version AS version FROM layer_instances WHERE project_id = ? AND enabled = 1 ORDER BY layer_key').all(projectId);
+      if (hash(JSON.stringify(installed)) !== discovery.topologyDigest) fail('Installed layers changed. Use the newer discovery task.', 409);
+    }
+    const content = { controlPins, codeObservation, layerDiscovery: discovery ? { ...discovery, sources: discoverySourceSnapshot(db,projectId,discovery.sourceKeys) } : null, schemaVersion: 1, project: project(projectId), work: entry, batch: { id: batchId },
       sources: [...targets, ...briefClaims, ...docs], briefRevision: entry.action === 'product.brief' ? know.briefRevision(projectId) : null, sharedDocs: know.list(projectId, 'doc').filter(doc => doc.agents).map(doc => ({ id: doc.id, revision: doc.revision })), instructionPins: know.instructionPins(projectId, workerProfile, entry.action), guidance: { principles: instructions.principles, project: instructions.instructions,
         role: role && { id: role.id, revision: role.revision, name: role.name, instructions: role.instructions },
         layerAction: layerAction && { id: layerAction.id, revision: layerAction.revision, adapter: layerAction.adapter, result: layerAction.result, permissions: layerAction.permissions,
@@ -256,8 +268,8 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     const bundle = JSON.parse(row.content_json);
     const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
     for (const key of ['title', 'action', 'priority', 'targets', 'question', 'checks']) if (!same(entry[key], bundle.work[key])) return false;
-    if (!same(['routine', 'gap', 'receipt', 'policy', 'source', 'observationRelation', 'codeObservation'].map(key => entry.context?.[key] || null),
-      ['routine', 'gap', 'receipt', 'policy', 'source', 'observationRelation', 'codeObservation'].map(key => bundle.work.context?.[key] || null))) return false;
+    if (!same(['routine', 'gap', 'receipt', 'policy', 'source', 'observationRelation', 'codeObservation', 'discovery'].map(key => entry.context?.[key] || null),
+      ['routine', 'gap', 'receipt', 'policy', 'source', 'observationRelation', 'codeObservation', 'discovery'].map(key => bundle.work.context?.[key] || null))) return false;
     if (!same(project(projectId), bundle.project)) return false;
     if (entry.action === 'product.brief' && know.briefRevision(projectId) !== bundle.briefRevision) return false;
     if (!same(know.instructionPins(projectId, profile(projectId, profileId), entry.action, { legacyRole: Boolean(bundle.instructionPins?.role) }), bundle.instructionPins)) return false;
@@ -265,6 +277,7 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     if (bundle.sources.some(source => know.get(projectId, source.id)?.revision !== source.revision)) return false;
     if (bundle.controlPins?.some(control => { const row = db.prepare('SELECT revision, status FROM layer_connections WHERE id = ? AND project_id = ?').get(control.id, projectId); return !row || row.revision !== control.revision || row.status !== 'active'; })) return false;
     if (bundle.codeObservation && !codeObservationCurrent(projectId, bundle.codeObservation)) return false;
+    if (bundle.layerDiscovery) { const installed = db.prepare('SELECT layer_key AS key, descriptor_version AS version FROM layer_instances WHERE project_id = ? AND enabled = 1 ORDER BY layer_key').all(projectId); if (hash(JSON.stringify(installed)) !== bundle.layerDiscovery.topologyDigest || JSON.stringify(discoverySourceSnapshot(db,projectId,bundle.layerDiscovery.sourceKeys)) !== JSON.stringify(bundle.layerDiscovery.sources)) return false; }
     const source = db.prepare('SELECT workspace_path FROM project_setup WHERE project_id = ?').get(projectId)?.workspace_path;
     try {
       if (execFileSync('git', ['rev-parse', 'HEAD'], { cwd: source, timeout: 2500, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim() !== bundle.repository.commit) return false;
@@ -284,16 +297,18 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     return { digest, attemptId: issue.native_ref.attempt_id, ...compileTaskManifest(bundle) };
   }
   const readableKinds = ['brief_claim', 'story', 'spec', 'page', 'doc', 'research', 'source', 'finding', 'insight', 'data_object', 'data_operation', 'access_rule', 'component', 'project'];
+  const scopedKinds = bundle => bundle.layerDiscovery ? [...new Set(['doc', ...layerDeclarations.filter(layer => layer.authority === 'knowledge_records' && [bundle.work.layer,...bundle.layerDiscovery.sourceKeys].includes(layer.key)).flatMap(layer => layer.outputs)])] : readableKinds;
   function knowledgeMap(scope, digest) {
-    activeBundle(scope, digest);
-    return { kinds: readableKinds.map(kind => ({ kind, count: know.list(scope.projectId, kind).length })) };
+    const bundle=activeBundle(scope, digest);
+    return { kinds: scopedKinds(bundle).map(kind => ({ kind, count: know.list(scope.projectId, kind).length })) };
   }
   function knowledgeSearch(scope, digest, query, kind = null, cursor = 0) {
-    activeBundle(scope, digest);
+    const bundle=activeBundle(scope, digest);
+    const allowed=scopedKinds(bundle);
     const needle = String(query || '').trim().toLowerCase();
     if (needle.length < 2 || needle.length > 100 || !Number.isInteger(cursor) || cursor < 0 || cursor > 10000 ||
-        kind && !readableKinds.includes(kind)) fail('Invalid knowledge search.');
-    const kinds = kind ? [kind] : readableKinds;
+        kind && !allowed.includes(kind)) fail('Invalid knowledge search.');
+    const kinds = kind ? [kind] : allowed;
     const matches = kinds.flatMap(value => know.list(scope.projectId, value)).filter(record =>
       [record.title, record.name, record.label, record.text, record.description, record.body, record.summary, record.sentence]
         .filter(Boolean).join(' ').toLowerCase().includes(needle)).sort((a, b) => a.id.localeCompare(b.id));
@@ -301,9 +316,9 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
       nextCursor: matches.length > cursor + 20 ? cursor + 20 : null };
   }
   function knowledgeRead(scope, digest, id, revision = null) {
-    activeBundle(scope, digest);
+    const bundle=activeBundle(scope, digest);
     const record = know.get(scope.projectId, id);
-    if (!record || !readableKinds.includes(record.kind)) fail('Record not found.', 404);
+    if (!record || !scopedKinds(bundle).includes(record.kind)) fail('Record not found.', 404);
     if (revision === null) return { id, kind: record.kind, revision: record.revision, currentRevision: record.revision, data: record };
     if (!Number.isInteger(revision) || revision < 1 || revision > record.revision) fail('Revision not found.', 404);
     const data = know.revisionData(id, revision);
@@ -328,8 +343,8 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     // A changed task, target, instruction, profile or shared HEAD withdraws this exact Go snapshot.
     const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
     for (const key of ['title', 'action', 'priority', 'targets', 'question', 'checks']) if (!same(entry[key], bundle.work[key])) return null;
-    if (!same(['routine', 'gap', 'receipt', 'policy', 'source', 'observationRelation', 'codeObservation'].map(key => entry.context?.[key] || null),
-      ['routine', 'gap', 'receipt', 'policy', 'source', 'observationRelation', 'codeObservation'].map(key => bundle.work.context?.[key] || null))) return null;
+    if (!same(['routine', 'gap', 'receipt', 'policy', 'source', 'observationRelation', 'codeObservation', 'discovery'].map(key => entry.context?.[key] || null),
+      ['routine', 'gap', 'receipt', 'policy', 'source', 'observationRelation', 'codeObservation', 'discovery'].map(key => bundle.work.context?.[key] || null))) return null;
     if (!same(project(scope.projectId), bundle.project)) return null;
     if (bundle.work.action === 'product.brief' && know.briefRevision(scope.projectId) !== bundle.briefRevision) return null;
     if (!same(know.instructionPins(scope.projectId, profile(scope.projectId, scope.profileId), entry.action, { legacyRole: Boolean(bundle.instructionPins?.role) }), bundle.instructionPins)) return null;
@@ -337,6 +352,7 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     if (bundle.sources.some(source => know.get(scope.projectId, source.id)?.revision !== source.revision)) return null;
     if (bundle.controlPins?.some(control => { const row = db.prepare('SELECT revision, status FROM layer_connections WHERE id = ? AND project_id = ?').get(control.id, scope.projectId); return !row || row.revision !== control.revision || row.status !== 'active'; })) return null;
     if (bundle.codeObservation && !codeObservationCurrent(scope.projectId, bundle.codeObservation)) return null;
+    if (bundle.layerDiscovery) { const installed = db.prepare('SELECT layer_key AS key, descriptor_version AS version FROM layer_instances WHERE project_id = ? AND enabled = 1 ORDER BY layer_key').all(scope.projectId); if (hash(JSON.stringify(installed)) !== bundle.layerDiscovery.topologyDigest || !same(discoverySourceSnapshot(db,scope.projectId,bundle.layerDiscovery.sourceKeys),bundle.layerDiscovery.sources)) return null; }
     const source = db.prepare('SELECT workspace_path FROM project_setup WHERE project_id = ?').get(scope.projectId)?.workspace_path;
     try {
       if (execFileSync('git', ['rev-parse', 'HEAD'], { cwd: source, timeout: 2500, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim() !== bundle.repository.commit) return null;
@@ -554,7 +570,7 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     const issue = current(scope, row.work_id);
     const bundle = saved(scope, row.bundle_digest);
     const actionId = bundle.guidance.action.id;
-    if (!['product.define', 'product.clarify', 'product.brief', 'data.contract', 'design.audit', 'pages.a11y', 'pages.flows', 'deploy.review', 'work.review'].includes(actionId) || !issue ||
+    if (!(actionId.endsWith('.discover') || ['product.define', 'product.clarify', 'product.brief', 'data.contract', 'design.audit', 'pages.a11y', 'pages.flows', 'deploy.review', 'work.review'].includes(actionId)) || !issue ||
         issue.native_ref.attempt_id !== attemptId || !row.workspace_path || row.state !== 'working' || row.runs_started < 1)
       fail('This proposal attempt is not ready to submit.', 409);
     if (!proposal || typeof proposal !== 'object' || Array.isArray(proposal) ||
@@ -563,7 +579,19 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
         Buffer.byteLength(JSON.stringify(proposal)) > 30000) fail('Provide a bounded summary and structured content.');
     const content = proposal.content;
     const targets = bundle.work.targets || [];
-    if (actionId === 'product.brief') {
+    if (actionId.endsWith('.discover')) {
+      const discovery = bundle.layerDiscovery;
+      if (!discovery || !Array.isArray(content.connections) || content.connections.length !== discovery.sourceKeys.length ||
+          new Set(content.connections.map(connection => connection.sourceKey)).size !== discovery.sourceKeys.length ||
+          !content.connections.every(connection => discovery.sourceKeys.includes(connection.sourceKey) &&
+            ['reference-only','candidate-input'].includes(connection.mapping) &&
+            typeof connection.instructions === 'string' && connection.instructions.trim() && connection.instructions.length <= 4000 &&
+            typeof connection.reaction === 'string' && connection.reaction.trim() && connection.reaction.length <= 2000 &&
+            typeof connection.evidence === 'string' && connection.evidence.trim() && connection.evidence.length <= 2000 &&
+            (!connection.question || typeof connection.question === 'string' && connection.question.length <= 1000) &&
+            (!connection.answer || typeof connection.answer === 'string' && connection.answer.length <= 1000)))
+        fail('Discovery proposal needs one evidenced, bounded receiving policy per installed neighbor.');
+    } else if (actionId === 'product.brief') {
       if (targets.length > 1 || targets.some(target => target.kind !== 'brief_claim') ||
           !briefSections.includes(content.section) || typeof content.text !== 'string' || !content.text.trim() || content.text.length > 400 ||
           typeof content.note !== 'string' || content.note.length > 200 || typeof content.basis !== 'string' || !content.basis.trim() || content.basis.length > 1000)
@@ -666,7 +694,11 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     try {
       let acceptedFlowId = null;
       const options = { author: user.name, rationale: `Accepted ${entry.ref} proposal`, workItemId: entry.id };
-      if (row.action_id === 'product.define') {
+      if (row.action_id.endsWith('.discover')) {
+        const installed = db.prepare('SELECT layer_key AS key, descriptor_version AS version FROM layer_instances WHERE project_id = ? AND enabled = 1 ORDER BY layer_key').all(projectId);
+        if (hash(JSON.stringify(installed)) !== bundle.layerDiscovery?.topologyDigest || JSON.stringify(discoverySourceSnapshot(db,projectId,bundle.layerDiscovery.sourceKeys)) !== JSON.stringify(bundle.layerDiscovery.sources)) fail('Source outputs or installed layers changed. Reassess this proposal.', 409);
+        applyDiscoveryProposal(db, projectId, entry.layer, content.connections, user.id);
+      } else if (row.action_id === 'product.define') {
         const record = know.get(projectId, bundle.work.targets[0].id);
         know.update(projectId, record.id, { acceptance: [...record.acceptance, ...content.scenarios],
           edges: [...new Set([...record.edges, ...(Array.isArray(content.edges) ? content.edges.filter(value => typeof value === 'string').slice(0, 12) : [])])],

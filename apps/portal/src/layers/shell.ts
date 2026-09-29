@@ -18,7 +18,6 @@ import { HomeLayerComponent } from './home';
 import { LibraryComponent } from './library';
 import { EvidencePanelComponent } from './evidence';
 import { SharedLayerSlotComponent } from './shared-layer-slot';
-import { LayerActionSettingsComponent } from './layer-action-settings';
 
 // ROADMAP-01 (DEC-043): Product is shown as Vision (URLs /vision/…; the internal layer key stays `product`), and each layer has one colour.
 const localLayers = [{ id: 'product', icon: 'lightbulb', label: 'Vision' }, { id: 'design', icon: 'palette', label: 'Design' }, { id: 'pages', icon: 'web', label: 'Pages' }, { id: 'data', icon: 'schema', label: 'Data' }, { id: 'platform', icon: 'code', label: 'Code' }, { id: 'deploy', icon: 'rocket_launch', label: 'Deploy' }];
@@ -26,7 +25,7 @@ const localLayers = [{ id: 'product', icon: 'lightbulb', label: 'Vision' }, { id
 // LAY-02: every project's workspace at /p/<slug>/<layer>/<tab>/<id>. The layer comes first (DEC-036).
 @Component({
   selector: 'aludel-project-shell', standalone: true,
-  imports: [FormsModule, MatIconModule, AvatarEditorComponent, HomeLayerComponent, ProductLayerComponent, DesignLayerComponent, PagesLayerComponent, DataLayerComponent, CodeLayerComponent, DeployLayerComponent, WorkLayerComponent, LibraryComponent, EvidencePanelComponent, SharedLayerSlotComponent, LayerActionSettingsComponent],
+  imports: [FormsModule, MatIconModule, AvatarEditorComponent, HomeLayerComponent, ProductLayerComponent, DesignLayerComponent, PagesLayerComponent, DataLayerComponent, CodeLayerComponent, DeployLayerComponent, WorkLayerComponent, LibraryComponent, EvidencePanelComponent, SharedLayerSlotComponent],
   providers: [ProjectContext],
   template: `
   <a class="skip-link" href="#lay-main">Skip to content</a>
@@ -101,7 +100,7 @@ const localLayers = [{ id: 'product', icon: 'lightbulb', label: 'Vision' }, { id
             </nav>
           }
           @if (localLayer() && !activeLocalLayer()) { <p class="lay-eyebrow">Layer app</p><h1 tabindex="-1">{{ localLayer()?.label }} is not in this project</h1><p>Add it from Home when you need it.</p><a [href]="ctx.link()" (click)="ctx.go(ctx.link(), $event)">Go to Home</a> }
-          @else if (sharedTab()) { <aludel-shared-layer-slot [layerKey]="layer()" [slot]="sharedTab()" /> @if (sharedTab() === 'operations') { <aludel-layer-action-settings [layerKey]="layer()" /> } }
+          @else if (sharedTab()) { <aludel-shared-layer-slot [layerKey]="layer()" [slot]="sharedTab()" /> }
           @else { @switch (layer()) {
             @case ('product') { <aludel-product-layer /> }
             @case ('design') { <aludel-design-layer /> }

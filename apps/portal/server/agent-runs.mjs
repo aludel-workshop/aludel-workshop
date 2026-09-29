@@ -1,4 +1,5 @@
 import { workActionMigration } from './lat08-migration.mjs';
+import { compiledLocalActions } from './lat07-actions.mjs';
 // Work batches stage human tasks or Go-pin explicit agent actions for Symphony.
 // Record changes are accepted at the checked output boundary, never during an agent turn.
 
@@ -31,7 +32,7 @@ export function initAgentRuns(db) {
   if (!columns.has('authorized_at')) db.exec('ALTER TABLE agent_batches ADD COLUMN authorized_at TEXT');
 }
 
-const symphonyActions = new Set(['platform.implement', 'platform.security', 'product.define', 'product.clarify', 'product.brief', 'data.contract', 'design.audit', 'pages.a11y', 'pages.flows', 'deploy.review', 'work.review']);
+const symphonyActions = new Set([...compiledLocalActions.filter(action => action.id.endsWith('.discover') && action.agentRunnable).map(action => action.id), 'platform.implement', 'platform.security', 'product.define', 'product.clarify', 'product.brief', 'data.contract', 'design.audit', 'pages.a11y', 'pages.flows', 'deploy.review', 'work.review']);
 
 export function agentRuns({ db, know, worker = null, symphonyDispatch = false }) {
   const batchRow = row => row && { id: row.id, number: row.number, ref: `B-${row.number}`, state: row.state, limit: row.item_limit, profileId: row.profile_id || null, createdAt: row.created_at, requestedSlots: row.requested_slots || 1, authorizedAt: row.authorized_at || null,

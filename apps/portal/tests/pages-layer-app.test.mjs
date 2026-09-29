@@ -15,7 +15,8 @@ initPagesLayerApp(db);
 
 test('Pages documents seed once, retain exact revisions and owner scope', () => {
   const docs = pagesDocumentList(db, 'owner', 'a');
-  assert.equal(docs.length, 7);
+  assert.equal(docs.length, 8);
+  assert.ok(docs.some(doc => doc.key === 'connection-method' && doc.groupName === 'connections'));
   const first = pagesDocumentRead(db, 'owner', 'a', 'map');
   const saved = pagesDocumentUpdate(db, 'owner', 'a', 'map', { content: 'A revised Pages map contract.', expectedRevision: 1 });
   assert.equal(saved.revision, 2);

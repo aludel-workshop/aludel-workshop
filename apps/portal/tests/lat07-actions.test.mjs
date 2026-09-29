@@ -18,10 +18,10 @@ test('every remaining built-in legacy action has an explicit, truthful dispositi
   }
 });
 
-test('remaining layer actions publish typed outputs and explicit effect/read boundaries without runnable adapters', () => {
+test('remaining layer actions publish typed outputs and explicit effect/read boundaries with only registered runnable adapters', () => {
   for (const layer of layers) assert.ok([...actions.values()].some(action => action.layer === layer), layer);
   for (const action of [...actions.values()].filter(action => layers.has(action.layer) && action.id !== 'platform.observe_route')) {
-    if (['platform.implement', 'platform.security'].includes(action.id)) assert.equal(action.agentRunnable, true, action.id);
+    if (['platform.implement', 'platform.security'].includes(action.id) || action.id.endsWith('.discover')) assert.equal(action.agentRunnable, true, action.id);
     else assert.equal(action.agentRunnable, false, action.id);
     assert.equal(action.humanRunnable, false, action.id);
     assert.deepEqual(action.permissions.effects.length, 1);

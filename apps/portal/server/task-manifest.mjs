@@ -13,7 +13,7 @@ export function compileTaskManifest(bundle) {
   const audit = action.id === 'platform.security' && action.tools?.includes('read') && !action.changes?.length;
   const proposal = ['product.define', 'product.clarify', 'product.brief', 'data.contract'].includes(action.id) && action.tools?.includes('read');
   const pagesFlow = action.id === 'pages.flows' && action.tools?.includes('read') && action.tools?.includes('revise');
-  const assessment = ['design.audit', 'pages.a11y', 'deploy.review', 'work.review'].includes(action.id) && action.tools?.includes('read') && !action.changes?.length;
+  const assessment = action.id.endsWith('.discover') && action.tools?.includes('read') && !action.changes?.length || ['design.audit', 'pages.a11y', 'deploy.review', 'work.review'].includes(action.id) && action.tools?.includes('read') && !action.changes?.length;
   if (!coding && !audit && !proposal && !assessment && !pagesFlow) fail('This action has no task output adapter.');
   if (action.id === 'product.clarify' && (!work.question || work.question.answer)) fail('Clarification needs an open question.');
   const inputs = (work.targets || []).map(target => {
@@ -30,17 +30,18 @@ export function compileTaskManifest(bundle) {
       method: audit ? 'Inspect only the pinned source and relevant knowledge. Report severity, affected source, evidence, recommendation, checked scope and unknowns. Ask if a decision blocks the result.' :
         coding ? 'Implement only the allowed code surface, run relevant checks, and submit the exact candidate commit.' :
         pagesFlow ? 'Draft a Pages flow using existing pinned pages. Use a Vision story only when one is linked to this task. Submit a proposal for Work review; do not change Pages records.' :
+        action.id.endsWith('.discover') ? 'Inspect every named installed neighbor and its current outputs. Propose a separate receiving policy for each source. State missing evidence and response to source changes. Do not activate a policy or edit project records.' :
         assessment ? 'Inspect the task scope and relevant project knowledge. Submit a findings report for lead review. Do not change project records or repository files.' :
         'Read the task and relevant project knowledge. Submit a bounded proposal for Work review. Do not change project records or repository files. Ask if a decision blocks the result.' },
-    origin: work.context?.policy ? { layer: work.layer, routineId: work.context.routine || null, gapKey: work.context.gap || null, receipt: work.context.receipt || null, policy: work.context.policy, source: work.context.source } : bundle.codeObservation ? { layer: 'platform', kind: 'code-route-observation', relation: { id: bundle.codeObservation.relationId, revision: bundle.codeObservation.relationRevision }, observation: bundle.codeObservation } : { layer: work.layer },
+    origin: work.context?.discovery ? { layer: work.layer, discovery: work.context.discovery, sources: bundle.layerDiscovery?.sources || [] } : work.context?.policy ? { layer: work.layer, routineId: work.context.routine || null, gapKey: work.context.gap || null, receipt: work.context.receipt || null, policy: work.context.policy, source: work.context.source } : bundle.codeObservation ? { layer: 'platform', kind: 'code-route-observation', relation: { id: bundle.codeObservation.relationId, revision: bundle.codeObservation.relationRevision }, observation: bundle.codeObservation } : { layer: work.layer },
     controls: bundle.controlPins || [],
     requiredInputs: inputs,
     contextSeeds: sources.filter(record => record.kind === 'doc' && !(work.targets || []).some(target => target.id === record.id))
       .slice(0, 12).map(record => ({ id: record.id, kind: record.kind, revision: record.revision, summary: summary(record) })),
     outputs: audit ? [{ key: 'findings', kind: 'security_finding_report', operation: 'submit_for_review', reviewer: 'project owner',
       checks: work.checks.map(check => check.text) }] : coding ? [{ key: 'code', kind: 'code_candidate', operation: 'commit_for_review', reviewer: 'project owner', checks: work.checks.map(check => check.text) }] :
-      [{ key: 'proposal', kind: pagesFlow ? 'pages_flow_proposal' : assessment ? 'review_report' : action.id === 'product.brief' ? 'vision_claim_proposal' : 'work_proposal', operation: 'submit_for_review', reviewer: 'role lead',
-        shape: pagesFlow ? 'summary; content: title, steps[{page,name,trigger?,story?}]; usedInputs must include every page and any linked story' : assessment ? 'summary; content: scope, findings[{title,evidence,recommendation}], optional uncertainty; usedInputs' :
+      [{ key: 'proposal', kind: pagesFlow ? 'pages_flow_proposal' : action.id.endsWith('.discover') ? 'layer_connection_proposal' : assessment ? 'review_report' : action.id === 'product.brief' ? 'vision_claim_proposal' : 'work_proposal', operation: 'submit_for_review', reviewer: 'role lead',
+        shape: action.id.endsWith('.discover') ? 'summary; content: connections[{sourceKey,mapping:reference-only|candidate-input,instructions,reaction,question?,answer?,evidence}]; one connection for each named source; usedInputs for any cited records' : pagesFlow ? 'summary; content: title, steps[{page,name,trigger?,story?}]; usedInputs must include every page and any linked story' : assessment ? 'summary; content: scope, findings[{title,evidence,recommendation}], optional uncertainty; usedInputs' :
           action.id === 'product.brief' ? 'summary; content: section, text, note, basis; usedInputs' :
           action.id === 'product.define' ? 'summary; content: scenarios[{given,when,then}], optional edges[], questions[]; usedInputs' :
           action.id === 'product.clarify' ? 'summary; content: options[2..4], recommendation, reasoning; usedInputs' :

@@ -82,10 +82,25 @@ export const lat08CodeAdapters = [
   { id: 'platform_implement', layer: 'platform', owner: 'platform', kind: 'code_unit', operation: 'candidate', performers: ['agent'] },
   { id: 'platform_security', layer: 'platform', owner: 'work', kind: 'report', operation: 'report', performers: ['agent'] }
 ];
-export const compiledLocalActions = compileLayerActions([
+const baseLayers = [
   ...lat06LayerActions.filter(layer => layer.key !== 'platform'),
   ...lat07LayerActions.filter(layer => layer.key !== 'platform'),
   { ...lat06LayerActions.find(layer => layer.key === 'platform'),
     outputs: lat07LayerActions.find(layer => layer.key === 'platform').outputs,
     actions: [...lat06LayerActions.find(layer => layer.key === 'platform').actions, ...lat07LayerActions.find(layer => layer.key === 'platform').actions] }
-], { registeredAdapters: [...lat06Adapters, ...lat08CodeAdapters] });
+];
+// Every layer can inspect a newly installed neighbor and propose its own
+// receiving policy. The action submits a report through Work; it cannot activate
+// a connection, authorize itself, or write another layer's outputs.
+const discoveryReads = baseLayers.flatMap(layer => layer.outputs.map(kind => ({ layer: layer.key, kind })));
+const discoveryAction = layer => ({ key: 'discover', revision: 1, title: `Explore neighboring layers for ${layer.key}`,
+  purpose: 'Examine installed neighbor output types and propose a receiving-layer connection policy for review.',
+  result: { owner: 'work', kind: 'report', operation: 'report' }, adapter: `${layer.key}_discover`,
+  permissions: { elevated: false, reads: discoveryReads, fileReads: ['**'], fileWrites: [], effects: ['submit-report'] },
+  checks: ['Source output identity and revision are cited', 'The receiving-layer use and uncertainty are explicit', 'No policy is activated without review'],
+  initialAssignee: { dreamer: 'agent', planner: 'agent', tinkerer: 'agent' }, requiredInputs: [], optionalInputs: ['installed-neighbor'],
+  reviewer: 'project-owner', applicability: 'installed-layer',
+  method: 'Inspect the named installed neighbor and its exact available outputs. Propose whether and how those outputs could inform this layer. Name missing evidence and change response. Submit for Work review; do not activate a connection.' });
+export const compiledLocalActions = compileLayerActions(baseLayers.map(layer => ({ ...layer, actions: [...layer.actions, discoveryAction(layer)] })),
+  { registeredAdapters: [...lat06Adapters, ...lat08CodeAdapters,
+    ...baseLayers.map(layer => ({ id: `${layer.key}_discover`, layer: layer.key, owner: 'work', kind: 'report', operation: 'report', performers: ['agent'] }))] });

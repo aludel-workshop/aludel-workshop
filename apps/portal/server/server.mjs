@@ -25,6 +25,8 @@ import { fileURLToPath } from 'node:url';
 import { importCorpus } from './importer.mjs';
 import { openDatabase } from './storage.mjs';
 import { initPagesLayerApp, pagesDocumentList, pagesDocumentRead, pagesDocumentUpdate, pagesConnections, pagesConnectionCreate, pagesConnectionUpdate } from './pages-layer-app.mjs';
+import { initLayerDiscovery, stageLayerDiscovery, layerDiscoveryStatus } from './layer-discovery.mjs';
+import { layerDocumentList, layerDocumentRead, layerDocumentUpdate, layerConnections, layerConnectionCreate, layerConnectionUpdate, layerRoutineRuns } from './layer-space.mjs';
 import { initPagesReconciliation, pagesReconciliationView, pagesGapDecision, reconcilePagesFlow } from './pages-reconciliation.mjs';
 import { initPagesCodeObservations, codeRouteObservations, recordCodeRouteObservation, pagesObservationRelations, proposePagesObservationRelation, reviewPagesObservationRelation, stagePagesFlowFromObservation } from './pages-code-observations.mjs';
 import { initActionMigration, migrateActionProject, layerActionSettings, setActionAssignee, setProjectWorkStyle, setLayerActionGrant, setActionMethod } from './lat08-migration.mjs';
@@ -67,6 +69,7 @@ initActionMigration(db);
 initPagesLayerApp(db);
 initPagesReconciliation(db);
 initPagesCodeObservations(db);
+initLayerDiscovery(db);
 const secrets = openSecretStore(dataDirectory);
 const topology = hostTopology(process.env, port);
 const setupConfigPath = join(portalRoot, 'config', 'project-setup.json');
@@ -599,6 +602,31 @@ async function api(request, response, url) {
     }
     return json(response, 405, { error: 'Method not allowed.' });
   }
+  const discoveryRoute = /^\/api\/projects\/([^/]+)\/layers\/([^/]+)\/discovery$/.exec(url.pathname);
+  if (discoveryRoute && request.method === 'GET') return json(response, 200, { runs: layerDiscoveryStatus(db,user.id,decodeURIComponent(discoveryRoute[1]),decodeURIComponent(discoveryRoute[2])) }, { 'cache-control': 'no-store' });
+  const layerSpaceRoute = /^\/api\/projects\/([^/]+)\/layers\/([^/]+)\/(documents|connections|routines)(?:\/([^/]+))?(?:\/(runs))?$/.exec(url.pathname);
+  if (layerSpaceRoute) {
+    const projectId = decodeURIComponent(layerSpaceRoute[1]), layerKey = decodeURIComponent(layerSpaceRoute[2]);
+    const section = layerSpaceRoute[3], id = layerSpaceRoute[4] ? decodeURIComponent(layerSpaceRoute[4]) : null;
+    if (section === 'documents') {
+      if (request.method === 'GET' && !id) return json(response, 200, { documents: layerDocumentList(db,user.id,projectId,layerKey) }, { 'cache-control': 'no-store' });
+      if (request.method === 'GET' && id) return json(response, 200, layerDocumentRead(db,user.id,projectId,layerKey,id,
+        url.searchParams.has('revision') ? Number(url.searchParams.get('revision')) : null), { 'cache-control': 'no-store' });
+      if (request.method === 'PUT' && id) return json(response, 200, layerDocumentUpdate(db,user.id,projectId,layerKey,id,await readJson(request)), { 'cache-control': 'no-store' });
+    }
+    if (section === 'connections') {
+      if (request.method === 'GET' && !id) return json(response, 200, { connections: layerConnections(db,user.id,projectId,layerKey) }, { 'cache-control': 'no-store' });
+      if (request.method === 'POST' && !id) return json(response, 201, layerConnectionCreate(db,user.id,projectId,layerKey,(await readJson(request)).sourceKey), { 'cache-control': 'no-store' });
+      if (request.method === 'PUT' && id) {
+        const updated = layerConnectionUpdate(db,user.id,projectId,layerKey,id,await readJson(request));
+        if (layerKey === 'pages') reconcilePagesFlow(db,know,projectId);
+        return json(response, 200, updated, { 'cache-control': 'no-store' });
+      }
+    }
+    if (section === 'routines' && id && layerSpaceRoute[5] === 'runs' && request.method === 'GET')
+      return json(response, 200, { runs: layerRoutineRuns(db,user.id,projectId,layerKey,id) }, { 'cache-control': 'no-store' });
+    return json(response, 405, { error: 'Method not allowed.' });
+  }
   const layerRoute = /^\/api\/projects\/([^/]+)\/layers(?:\/([^/]+)\/outputs\/([^/]+)\/([^/]+))?$/.exec(url.pathname);
   if (layerRoute && request.method === 'GET') {
     const [, projectId, layerKey, kind, recordId] = layerRoute.map(value => value ? decodeURIComponent(value) : value);
@@ -640,6 +668,7 @@ async function api(request, response, url) {
       if (updated.enabled && updated.key === 'product') { know.ensureProject(projectId, { pitch: flows.projectSetup(user, projectId).project.description, seedRoutines: false }); know.ensurePlan(projectId); }
       if (updated.enabled && updated.key === 'design') know.ensureDesign(projectId);
       if (updated.enabled) migrateActionProject(db, projectId);
+      stageLayerDiscovery(db, know, projectId);
       if (['product','pages'].includes(updated.key)) reconcilePagesFlow(db, know, projectId);
       return json(response, 200, updated, { 'cache-control': 'no-store' });
     }
@@ -770,6 +799,7 @@ async function api(request, response, url) {
       if (active.has('product')) know.ensurePlan(projectId);
       if (active.has('design')) know.ensureDesign(projectId);
       if (active.has('pages') && active.has('product')) know.ensureFlows(projectId);
+      stageLayerDiscovery(db, know, projectId);
       const view = know.view(user, projectId, { builtBy: links.builtBy(projectId) });
       const batchView = runs.view(projectId);
       const poolView = workerPoolView(projectId);

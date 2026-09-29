@@ -16,6 +16,8 @@ import { ensureProductWorkspace } from '../server/product-workspace.mjs';
 import { openSecretStore } from '../server/secret-store.mjs';
 import { openDatabase } from '../server/storage.mjs';
 import { initSymphonyWorker, symphonyWorker } from '../server/symphony-worker.mjs';
+import { initActionMigration, migrateActionProject } from '../server/lat08-migration.mjs';
+import { stageLayerDiscovery } from '../server/layer-discovery.mjs';
 import { initWorkflow } from '../server/workflow.mjs';
 
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, stdio: 'pipe' }).toString().trim();
@@ -437,4 +439,47 @@ test('two hosts racing for one Go-pinned attempt have one workspace claim and on
     assert.equal(f.worker.reserveRun(f.scope, { attemptId, hostId: winner }).runsStarted, 1);
     assert.equal(f.worker.attemptStatus(f.scope, attemptId).state, 'working');
   } finally { f.close(); }
+});
+
+
+test('layer discovery Go submits reviewed receiving policies without activating them', () => {
+  const f=fixture();
+  try {
+    initActionMigration(f.db); migrateActionProject(f.db,f.projectId);
+    const staged=stageLayerDiscovery(f.db,f.know,f.projectId);
+    const discovery=staged.find(item=>item.layer==='product');
+    assert.ok(discovery);
+    assert.equal(discovery.assignee?.kind,'agent');
+    const {work,issue,card}=f.start('product.discover',[],null,null,false,discovery);
+    assert.equal(card.outputs[0].kind,'layer_connection_proposal');
+    assert.deepEqual(card.origin.discovery.sourceKeys.slice().sort(),['data','deploy','design','pages','platform']);
+    const connections=card.origin.discovery.sourceKeys.map(sourceKey=>({sourceKey,mapping:'reference-only',
+      instructions:`Inspect ${sourceKey} outputs as evidence for Vision.`,reaction:'Reassess when its outputs change.',
+      evidence:`${sourceKey} declared outputs and pinned source snapshot were inspected.`}));
+    const proposal={summary:'Propose bounded receiving policies for all installed neighbors.',content:{connections},usedInputs:[]};
+    const submitted=f.worker.submitProposal(f.scope,{attemptId:issue.native_ref.attempt_id,proposal});
+    assert.equal(f.db.prepare("SELECT COUNT(*) AS n FROM layer_connections WHERE project_id=? AND receiving_key='product'").get(f.projectId).n,0);
+    assert.throws(()=>f.worker.acceptProposal(f.owner,f.projectId,work.id,submitted.proposalId),/check/);
+    for(let index=0;index<f.know.workById(f.projectId,work.id).checks.length;index++)
+      f.know.updateWork(f.owner,f.projectId,work.id,{verdict:{index,value:'accept'}});
+    f.worker.acceptProposal(f.owner,f.projectId,work.id,submitted.proposalId);
+    assert.equal(f.db.prepare("SELECT COUNT(*) AS n FROM layer_connections WHERE project_id=? AND receiving_key='product' AND status='proposed'").get(f.projectId).n,5);
+    assert.equal(f.know.workById(f.projectId,work.id).state,'done');
+  } finally { f.close(); }
+});
+
+test('discovery knowledge gateway follows the installed layer graph', () => {
+  const f=fixture();
+  try {
+    f.db.prepare("UPDATE layer_instances SET enabled=0 WHERE project_id=? AND layer_key NOT IN ('product','pages')").run(f.projectId);
+    initActionMigration(f.db);migrateActionProject(f.db,f.projectId);
+    const discovery=stageLayerDiscovery(f.db,f.know,f.projectId).find(item=>item.layer==='product');
+    const {issue,card}=f.start('product.discover',[],null,null,false,discovery);
+    assert.deepEqual(card.origin.discovery.sourceKeys,['pages']);
+    const kinds=f.worker.knowledgeMap(f.scope,issue.native_ref.bundle_digest).kinds.map(entry=>entry.kind);
+    assert.ok(kinds.includes('page'));
+    assert.ok(kinds.includes('story'));
+    assert.equal(kinds.includes('data_object'),false);
+    assert.throws(()=>f.worker.knowledgeSearch(f.scope,issue.native_ref.bundle_digest,'object','data_object'),/Invalid knowledge search/);
+  } finally {f.close();}
 });

@@ -1058,8 +1058,10 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
       return { id: record.id, kind: record.kind, label: text(target.label, 160, 'Target') || record.kind };
     });
     const question = input.question ? { text: text(input.question.text, 400, 'Question', true), options: lines(input.question.options, 200, 'Option') } : null;
-    const actionId = catalogs.roles.actions.has(input.action) ? input.action : actionIdFor(input.layer, input.type, { question, routineKey: input.routineKey });
-    const definition = catalogs.roles.actions.get(actionId);
+    const installedAction = compiledLocalActions.find(action => action.id === input.action);
+    const actionId = catalogs.roles.actions.has(input.action) || installedAction ? input.action : actionIdFor(input.layer, input.type, { question, routineKey: input.routineKey });
+    const definition = catalogs.roles.actions.get(actionId) || (installedAction ? { layer: installedAction.layer, type: 'audit', checks: installedAction.checks } : null);
+    if (!definition) fail('Action not found.', 404);
     const layer = input.layer ?? definition.layer;
     const type = input.type ?? definition.type;
     if (!layers.includes(layer)) fail('Unknown layer.');
@@ -1283,7 +1285,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     }
     if (state !== undefined) {
       if (!workStates.includes(state)) fail('Unknown work state.');
-      if (state === 'review' && ['product.define', 'product.clarify', 'data.contract', 'design.audit', 'pages.a11y', 'pages.flows', 'deploy.review', 'work.review'].includes(item.action) && item.assignee?.kind === 'agent' && !item.context?.workProposal?.id)
+      if (state === 'review' && (item.action?.endsWith('.discover') || ['product.define', 'product.clarify', 'data.contract', 'design.audit', 'pages.a11y', 'pages.flows', 'deploy.review', 'work.review'].includes(item.action)) && item.assignee?.kind === 'agent' && !item.context?.workProposal?.id)
         fail('Submit a Work proposal before reviewing this agent task.', 409);
       if (state === 'review' && item.action === 'product.brief' && item.assignee?.kind === 'agent' && !item.context?.visionProposal?.id)
         fail('Submit a Vision proposal before reviewing this work.', 409);
@@ -1291,7 +1293,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
           !db.prepare("SELECT 1 FROM code_candidates WHERE project_id = ? AND work_id = ? AND state = 'review' LIMIT 1").get(projectId, workId))
         fail('Build and check a code candidate before reviewing this work.', 409);
       if (state === 'done') {
-        if (['product.define', 'product.clarify', 'data.contract', 'design.audit', 'pages.a11y', 'pages.flows', 'deploy.review', 'work.review'].includes(item.action) && item.assignee?.kind === 'agent' &&
+        if ((item.action?.endsWith('.discover') || ['product.define', 'product.clarify', 'data.contract', 'design.audit', 'pages.a11y', 'pages.flows', 'deploy.review', 'work.review'].includes(item.action)) && item.assignee?.kind === 'agent' &&
             (item.state !== 'review' || !input.proposalId || !db.prepare("SELECT 1 FROM symphony_proposals WHERE id = ? AND project_id = ? AND work_id = ? AND state = 'accepted'").get(input.proposalId, projectId, workId)))
           fail('Accept the exact Work proposal before closing this agent task.', 409);
         if (item.action === 'product.brief' && item.assignee?.kind === 'agent' && (item.state !== 'review' || !input.visionProposalId ||

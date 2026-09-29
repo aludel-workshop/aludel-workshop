@@ -13,6 +13,7 @@ const defaults = [
   ['methods', 'page-method', 'Page design method', 'Start from a page blank. Describe the visitor job, choose sections from the project design system when available, and inspect desktop and phone states. Record a layout or behavior change as a Work item before implementation.'],
   ['methods', 'flow-method', 'Flow review method', 'Arrange pages into a journey, walk the flow at desktop and phone sizes, record observations at the affected step, and review the exact flow revision. Missing neighbor layers are questions, not automatic requirements.'],
   ['routines', 'routine-method', 'Routine instructions', 'A Pages routine names its trigger, executor, allowed reads and outputs before it can run. Runs enter Work with exact input revisions. LAT-05 will enable execution and reconciliation; editing this document cannot authorize a run.'],
+  ['connections', 'connection-method', 'Connection review method', 'Inspect a neighboring layer’s current output identities and revisions. Propose a receiving policy with uncertainty and response to change. Owner review activates the policy; discovery Work alone cannot activate it.'],
   ['resources', 'review-checks', 'Review checklist', 'Check purpose, page states, navigation, accessible focus, narrow width and a complete flow. Link evidence to the exact page or flow revision. A passing checklist does not accept or deploy the app.']
 ];
 
