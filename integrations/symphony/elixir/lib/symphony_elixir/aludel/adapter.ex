@@ -40,7 +40,7 @@ defmodule SymphonyElixir.Aludel.Adapter do
     cond do
       is_nil(uri) or is_nil(uri.host) or
           not (uri.scheme == "https" or
-                   (uri.scheme == "http" and uri.host in ["localhost", "aludel.localhost", "127.0.0.1", "::1"])) ->
+                   (uri.scheme == "http" and uri.host in ["localhost", "aludel.localhost", "aludel.layers.localhost", "127.0.0.1", "::1"])) ->
         {:error, :invalid_aludel_endpoint}
 
       not is_list(settings.active_states) or "Ready" not in settings.active_states ->

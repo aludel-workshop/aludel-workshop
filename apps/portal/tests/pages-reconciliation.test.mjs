@@ -108,6 +108,7 @@ test('the real Pages connection stages Work and a flow edit closes its untouched
     const item = run.created.find(item => item.targets.some(target => target.id === story.id));
     assert.ok(item);
     assert.equal(item.action, 'pages.flows');
+    assert.ok(know.defaultProfile(project.id), 'Work initializes its profile when Pages emits the first task');
     assert.equal(know.workById(project.id, item.id).state, 'suggested');
     const page = know.insert(project.id, 'page', { label: 'Find', icon: 'article', pageType: 'detail', inNav: false, status: 'planned' });
     know.insert(project.id, 'flow', { title: 'Find route', steps: [{ page: page.id, story: story.id, name: 'Find' }] });

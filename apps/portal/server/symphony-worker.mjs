@@ -321,7 +321,9 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     const active = current(scope, workId);
     if (active) {
       const allowance = db.prepare('SELECT run_limit, runs_started FROM symphony_attempts WHERE id = ?').get(active.native_ref.attempt_id);
-      if (allowance && allowance.runs_started < allowance.run_limit) return active;
+      const finished = allowance && db.prepare('SELECT 1 FROM symphony_attempt_events WHERE attempt_id = ? AND event_id = ?')
+        .get(active.native_ref.attempt_id, `run-${allowance.runs_started}-finished`);
+      if (allowance && (allowance.runs_started < allowance.run_limit || allowance.runs_started > 0 && !finished)) return active;
     }
     const row = db.prepare('SELECT digest, batch_id, content_json FROM symphony_bundles WHERE project_id = ? AND profile_id = ? AND work_id = ? ORDER BY created_at DESC LIMIT 1')
       .get(scope.projectId, scope.profileId, workId);
@@ -348,7 +350,8 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
   }
   function appendEvent(scope, { attemptId, eventId, kind, threadId = null, turnId = null, message = null }) {
     const row = attempt(scope, attemptId);
-    if (!/^[A-Za-z0-9_-]{1,100}$/.test(eventId || '') || !['started', 'progress', 'blocked', 'error', 'submitted', 'reconciled', 'authorized'].includes(kind)) fail('Invalid attempt event.');
+    if (!/^[A-Za-z0-9_-]{1,100}$/.test(eventId || '') || !['started', 'progress', 'blocked', 'error', 'submitted', 'reconciled', 'authorized', 'finished'].includes(kind)) fail('Invalid attempt event.');
+    if (kind === 'finished' && (eventId !== `run-${row.runs_started}-finished` || row.runs_started < 1)) fail('Invalid run completion event.', 409);
     const short = value => value === null ? null : String(value).slice(0, 100);
     const recorded = db.prepare('INSERT OR IGNORE INTO symphony_attempt_events VALUES (?, ?, ?, ?, ?, ?)')
       .run(attemptId, eventId, kind, short(threadId), short(turnId), now());

@@ -1040,6 +1040,8 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
   }
 
   function createWork(projectId, input, author = 'Aludel') {
+    // Optional layer apps can originate the first task before legacy project seeding. Work owns its shared profiles and roles.
+    if (!defaultProfile(projectId)) ensureAgents(projectId);
     const targets = (Array.isArray(input.targets) ? input.targets : []).map(target => {
       const record = row(target.id);
       if (!record || record.project_id !== projectId) fail('A work target was not found.', 404);

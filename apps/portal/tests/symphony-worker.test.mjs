@@ -170,7 +170,9 @@ test('worker token scopes pinned coding work; ID refresh withdraws skipped and s
     await new Promise(resolve => resumedPortal.once('exit', resolve));
   }
   assert.equal(worker.reserveRun(scope, { attemptId: secondAttempt }).runsStarted, 3);
-  assert.equal(worker.issues(scope, { states: ['Ready'] }).issues.length, 0, 'exhaustion withdraws dispatch');
+  assert.equal(worker.issues(scope, { states: ['Ready'] }).issues.length, 1, 'the final reserved turn remains routed while it runs');
+  worker.appendEvent(scope, { attemptId: secondAttempt, eventId: 'run-3-finished', kind: 'finished' });
+  assert.equal(worker.issues(scope, { states: ['Ready'] }).issues.length, 0, 'completion of the final turn withdraws dispatch');
   assert.equal(worker.issues(scope, { ids: [secondIssue.id] }).issues[0].state, 'Blocked');
   assert.deepEqual({ runsStarted: worker.attemptForWork(projectId, work.id).runsStarted, candidateId: worker.attemptForWork(projectId, work.id).candidateId },
     { runsStarted: 3, candidateId: null }, 'owner-facing attempt summary shows exhaustion before a candidate exists');

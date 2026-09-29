@@ -123,7 +123,8 @@ function settleSymphonyBatch(projectId, batchId) {
     if (typeof runs !== 'undefined') runs.admit(projectId);
   }
 }
-const worker = symphonyWorker({ db, know, candidates, workspaceRoot: symphonyWorkspaceRoot });
+const worker = symphonyWorker({ db, know, candidates, workspaceRoot: symphonyWorkspaceRoot,
+  runLimit: Number(process.env.MACHINE_SYMPHONY_RUN_LIMIT || 3) });
 const symphonyDispatchEnabled = process.env.MACHINE_SYMPHONY_DISPATCH === '1';
 const workerPoolView = projectId => ({ ...worker.poolStatus(projectId), dispatchEnabled: symphonyDispatchEnabled });
 
@@ -692,6 +693,7 @@ async function api(request, response, url) {
     if (section === 'setup' && method === 'GET') return json(response, 200, projectView(user, projectId));
     // LAY-03: the layers read one project snapshot and write records and work items through the knowledge module.
     if (section === 'knowledge' && method === 'GET') {
+      know.ensureAgents(projectId);
       ensureWorkerPool(projectId);
       if (projectId === aludelProjectId) return json(response, 409, { error: 'Aludel’s own knowledge moves into its layers in LAY-06.' });
       // A project made after start-up plans itself the first time its layers are opened (after onboarding chose its story packs).
@@ -871,7 +873,7 @@ async function api(request, response, url) {
         worker.rejectProposal(projectId, item, before.context.visionProposal.id);
       }
       if (before?.context?.workProposal?.id && input.sendBack) worker.rejectProposal(projectId, item, before.context.workProposal.id);
-      if (['platform.security', 'product.define', 'product.clarify', 'product.brief', 'data.contract', 'design.audit', 'pages.a11y', 'deploy.review', 'work.review'].includes(before?.action) &&
+      if (['platform.security', 'product.define', 'product.clarify', 'product.brief', 'data.contract', 'design.audit', 'pages.a11y', 'pages.flows', 'deploy.review', 'work.review'].includes(before?.action) &&
           (input.sendBack || input.state === 'done' || input.answer !== undefined)) settleSymphonyBatch(projectId, before.context?.batch);
       return json(response, 200, updated);
     }

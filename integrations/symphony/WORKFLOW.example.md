@@ -15,6 +15,8 @@ hooks:
     node "$ALUDEL_WORKSPACE_HOOK" prepare
   before_run: |
     node "$ALUDEL_WORKSPACE_HOOK" start-run
+  after_run: |
+    node "$ALUDEL_WORKSPACE_HOOK" finish-run
 agent:
   max_concurrent_agents: 1
   max_turns: 1

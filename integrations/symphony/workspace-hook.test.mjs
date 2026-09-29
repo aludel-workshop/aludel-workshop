@@ -63,6 +63,9 @@ test('workspace hook checks out the exact Go commit and preserves a reused works
     assert.notEqual(losingHost.status, 0);
     assert.equal(errorEvents, 0, 'a claim loser must not block the winning attempt');
     assert.equal(reservations, 1, 'only before_run consumes the durable allowance');
+    const finished = await run(workspace, 'finish-run');
+    assert.equal(finished.status, 0, finished.stderr);
+    assert.equal(errorEvents, 1, 'after_run reports completion without reserving another turn');
     const wrong = join(root, 'WRONG-W-7'); mkdirSync(wrong);
     const rejected = await run(wrong, 'start-run');
     assert.notEqual(rejected.status, 0, 'an unrelated workspace cannot borrow this issue');
