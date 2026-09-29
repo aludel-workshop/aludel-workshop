@@ -1,7 +1,7 @@
 // Groundwork for LAT layer-owned actions. This validates declarations; the current
 // role-backed Work runtime remains authoritative until the layer migration packets.
 const keyPattern = /^[a-z][a-z0-9_]*$/;
-const effectFor = { propose: 'submit-proposal', report: 'submit-report', candidate: 'commit-candidate' };
+const effectFor = { propose: 'submit-proposal', report: 'submit-report', candidate: 'commit-candidate', observe: 'record-observation' };
 const styles = ['dreamer', 'planner', 'tinkerer'];
 const fail = message => { throw new Error(message); };
 const unique = values => new Set(values).size === values.length;

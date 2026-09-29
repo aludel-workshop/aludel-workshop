@@ -1,0 +1,18 @@
+{
+  "projectId": "p-8bdcc19ec9",
+  "sourcePath": "src/routes/browse.ts",
+  "statuses": [
+    "useful",
+    "wrong"
+  ],
+  "errors": [],
+  "checks": [
+    "source pin",
+    "wrong relation retained",
+    "useful relation staged once",
+    "Work link",
+    "wide axe",
+    "390 axe",
+    "no overflow"
+  ]
+}

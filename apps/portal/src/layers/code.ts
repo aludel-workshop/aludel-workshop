@@ -7,6 +7,7 @@ import { RefChipComponent } from './work-shared';
 // Code (PLATFORM-UX-01): a reference for how the code connects to everything else. Nobody writes code here; a change is
 // requested and becomes Engineer work. Everything is read from the repository and the code index (LAY-07D).
 interface RepoFile { path: string; size: number; }
+interface CodeObservation { id: string; repository_commit: string; source_path: string; blob_sha: string; marker: string; route: string; observed_at: string; }
 interface Stack { name: string | null; node: string | null; dependencies: { name: string; version: string }[]; devDependencies: { name: string; version: string }[]; images: string[]; healthcheck: boolean; composeServices: string[]; ci: string[]; languages: { name: string; bytes: number }[]; }
 interface DocSource { kind: string; id: string; revision: number | null; current: number | null; state: string; }
 interface DocSection { heading: string; level: number; line: number; sources: DocSource[]; state: string; }
@@ -102,6 +103,20 @@ export function markdownBlocks(text: string) {
           <section class="lay-card"><h2>Latest release</h2>@if (latest(); as r) { <p class="small lay-flat"><a [href]="ctx.link('platform', 'releases', r.version)" (click)="ctx.go(ctx.link('platform', 'releases', r.version), $event)">v{{ r.version }}</a> · <code>{{ r.commit }}</code> · {{ when(r.createdAt) }}</p> } @else { <p class="lay-muted small">None yet. Releases are made on purpose.</p> }</section>
         </div>
       </div>
+      <section class="lay-card" aria-label="Code route observations"><h2>Code observations</h2>
+        <p class="lay-muted">Pin a committed screen or route source. Pages can review its relevance separately; an observation alone does not define intended flow.</p>
+        @if (canManage()) {
+          <details><summary>Record a screen or route</summary>
+            <div class="lay-pa-two"><label class="lay-pa-field">Tracked source path <input [(ngModel)]="observationPath" placeholder="src/routes/browse.ts"></label>
+              <label class="lay-pa-field">Screen or route label <input [(ngModel)]="observationRoute" placeholder="Browse route"></label></div>
+            <label class="lay-pa-field">Exact marker in the committed file <input [(ngModel)]="observationMarker" placeholder="A component selector or route declaration"></label>
+            <button type="button" class="lay-button" (click)="recordObservation()" [disabled]="observationBusy() || !observationPath.trim() || !observationRoute.trim() || !observationMarker.trim()">Record pinned observation</button>
+          </details>
+        }
+        <ul class="lay-list">@for (observation of observations(); track observation.id) { <li class="lay-pa-history-row"><strong>{{ observation.route }}</strong> · <code>{{ observation.source_path }}</code> · commit <code>{{ observation.repository_commit.slice(0,8) }}</code> · blob <code>{{ observation.blob_sha.slice(0,8) }}</code></li> }
+          @empty { <li class="lay-muted">No Code observations recorded.</li> }</ul>
+        <a [href]="ctx.link('pages','operations','connections')" (click)="ctx.go(ctx.link('pages','operations','connections'),$event)">Review Code relations in Pages</a>
+      </section>
     }
     @case ('explorer') {
       <div class="lay-ds-editor lay-ds-three lay-cx-ex">
@@ -286,6 +301,10 @@ export class CodeLayerComponent implements OnInit {
   readonly statusLabel = statusLabel;
   readonly sourceLabel: Record<string, string> = { manifest: 'build manifest', trailer: 'commit trailer', test: 'test name' };
   readonly files = signal<RepoFile[]>([]);
+  readonly observations = signal<CodeObservation[]>([]);
+  readonly observationBusy = signal(false);
+  readonly canManage = computed(() => this.ctx.session()?.projects.find(project => project.id === this.ctx.projectId())?.role === 'owner');
+  observationPath = ''; observationMarker = ''; observationRoute = '';
   readonly stack = signal<Stack | null>(null);
   readonly docs = signal<Docs | null>(null);
   readonly releases = signal<CodeRelease[]>([]);
@@ -412,10 +431,17 @@ export class CodeLayerComponent implements OnInit {
     effect(() => { const tab = this.tab(); untracked(() => { if (tab === 'docs' || tab === 'overview') void this.loadDocs(); if (tab === 'releases' || tab === 'overview') void this.loadReleases(); if ((tab === 'tests' || tab === 'overview') && !this.ci()) void this.loadCi(); }); });
   }
   async ngOnInit() {
+    void this.loadObservations();
     try { const value = await this.ctx.api<{ files: RepoFile[]; stack: Stack }>(`${this.base()}/code/files`); this.files.set(value.files); this.stack.set(value.stack); }
     catch (error) { this.ctx.error.set(error instanceof Error ? error.message : String(error)); }
   }
   private base() { return `/api/projects/${encodeURIComponent(this.ctx.projectId())}`; }
+  private observationPathApi() { return `${this.base()}/layers/code/route-observations`; }
+  async loadObservations() { try { this.observations.set((await this.ctx.api<{ observations: CodeObservation[] }>(this.observationPathApi())).observations); } catch (error) { this.ctx.error.set(String(error)); } }
+  async recordObservation() { this.observationBusy.set(true); const ok = await this.ctx.write(() => this.ctx.api(this.observationPathApi(), 'POST',
+    { path: this.observationPath.trim(), marker: this.observationMarker.trim(), route: this.observationRoute.trim() }), 'Pinned Code observation recorded.');
+    if (ok) { this.observationPath = ''; this.observationMarker = ''; this.observationRoute = ''; await this.loadObservations(); }
+    this.observationBusy.set(false); }
   async loadSource(path: string) {
     this.source.set(null); this.sourceError.set('');
     if (!path) return;

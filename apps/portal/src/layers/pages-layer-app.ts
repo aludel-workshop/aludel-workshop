@@ -8,6 +8,8 @@ interface Connection { id: string; sourceKey: string; status: 'proposed' | 'acti
 interface Gap { key: string; sourceId: string; status: string; workItemId: string | null; sourceRevision: number; policyRevision: number; reason: string | null; updatedAt: string; }
 interface Reconciliation { coverage: string; policyRevision: number | null; gaps: Gap[]; lastReceipt: { createdAt: string } | null; }
 interface RoutineRun { id: number; ranAt: string; trigger: string; workItemId: string | null; workTitle: string | null; workState: string | null; }
+interface CodeObservation { id: string; repository_commit: string; source_path: string; blob_sha: string; marker: string; route: string; observed_at: string; }
+interface CodeRelation { id: string; observation_id: string; status: 'proposed' | 'useful' | 'wrong'; rationale: string; revision: number; work_item_id: string | null; reviewed_at: string | null; route: string; source_path: string; repository_commit: string; }
 
 @Component({
   selector: 'aludel-pages-layer-app', standalone: true, imports: [FormsModule],
@@ -100,6 +102,33 @@ interface RoutineRun { id: number; ranAt: string; trigger: string; workItemId: s
                 @if (connectionFor(layer.key); as existing) { <p>{{ existing.status }} · r{{ existing.revision }}</p><a [href]="ctx.link('pages','operations','connections',existing.id)" (click)="ctx.go(ctx.link('pages','operations','connections',existing.id),$event)">Open document</a> }
                 @else if (canManage()) { <button type="button" class="lay-button ghost" (click)="draftConnection(layer.key)" [disabled]="busy()">Draft connection</button> }
               </article> } @empty { <div class="lay-card"><h3>No neighboring layers</h3><p>Pages can work alone. Add another layer from Home if the project needs one.</p><a [href]="ctx.link()" (click)="ctx.go(ctx.link(),$event)">Open Home catalog</a></div> }</div>
+            <section class="lay-card" aria-label="Code observations and Pages relations">
+              <h3>Code observations → Pages candidates</h3>
+              <p class="lay-muted">Code records what a committed screen contains. Pages separately decides whether that observation is useful for an intended flow. A useful relation can suggest Work; it cannot start an agent or create a flow.</p>
+              @if (!codeInstalled()) { <p class="lay-pa-warning">Code is not installed. Earlier observations and relation decisions remain readable.</p> }
+              @if (codeInstalled()) { <p><a [href]="ctx.link('platform','overview')" (click)="ctx.go(ctx.link('platform','overview'),$event)">Record a Code observation in Code</a></p> }
+              @for (observation of codeObservations(); track observation.id) {
+                <article class="lay-card"><h4>{{ observation.route }}</h4><p class="lay-muted small"><code>{{ observation.source_path }}</code> · commit <code>{{ observation.repository_commit.slice(0,8) }}</code> · blob <code>{{ observation.blob_sha.slice(0,8) }}</code></p>
+                  <p class="small">Observed marker: <code>{{ observation.marker }}</code></p>
+                  @if (canManage() && codeInstalled()) { <button type="button" class="lay-button ghost small" (click)="selectedObservationId.set(observation.id)">Propose Pages relation</button> }
+                  @if (selectedObservationId() === observation.id) {
+                    <label class="lay-pa-field">Why this Code observation may inform Pages <textarea [(ngModel)]="codeRelationDraft" rows="2"></textarea></label>
+                    <button type="button" class="lay-button" (click)="proposeCodeRelation(observation.id)" [disabled]="busy() || !codeRelationDraft.trim()">Save proposed relation</button>
+                  }
+                  <ul class="lay-list">@for (relation of relationsFor(observation.id); track relation.id) {
+                    <li class="lay-pa-history-row"><strong>{{ relation.status }}</strong> · r{{ relation.revision }} · {{ relation.rationale }}
+                      @if (relation.work_item_id) { <a [href]="ctx.link('work','item',relation.work_item_id)" (click)="ctx.go(ctx.link('work','item',relation.work_item_id),$event)">Open Work item</a> }
+                      @if (canManage() && relation.status === 'proposed') {
+                        <label class="lay-pa-field">Review reason <input [ngModel]="codeReviewReasons()[relation.id] || ''" (ngModelChange)="setCodeReviewReason(relation.id,$event)"></label>
+                        <div class="lay-row lay-wrap"><button type="button" class="lay-button ghost small" (click)="reviewCodeRelation(relation,'useful')" [disabled]="busy() || !codeInstalled() || !codeReviewReasons()[relation.id]?.trim()">Useful candidate</button>
+                          <button type="button" class="lay-button ghost small" (click)="reviewCodeRelation(relation,'wrong')" [disabled]="busy() || !codeReviewReasons()[relation.id]?.trim()">Wrong relation</button></div>
+                      }
+                      @if (canManage() && codeInstalled() && relation.status === 'useful' && !relation.work_item_id) { <button type="button" class="lay-button ghost small" (click)="stageCodeRelation(relation)" [disabled]="busy()">Suggest Pages task in Work</button> }
+                    </li>
+                  } @empty { <li class="lay-muted">No Pages relation proposed for this observation.</li> }</ul>
+                </article>
+              } @empty { <p class="lay-muted">No Code observations recorded for this project.</p> }
+            </section>
           }
         }
         @default {
@@ -122,6 +151,11 @@ export class PagesLayerAppComponent implements OnInit {
   readonly previousDoc = signal<LayerDoc | null>(null);
   readonly docDraft = signal('');
   readonly connections = signal<Connection[]>([]);
+  readonly codeObservations = signal<CodeObservation[]>([]);
+  readonly codeRelations = signal<CodeRelation[]>([]);
+  readonly codeReviewReasons = signal<Record<string,string>>({});
+  readonly selectedObservationId = signal('');
+  readonly codeInstalled = computed(() => this.ctx.layerInstances().some(layer => layer.key === 'platform' && layer.enabled));
   readonly routineRuns = signal<RoutineRun[]>([]);
   readonly reconciliation = signal<Reconciliation | null>(null);
   readonly gapReasons = signal<Record<string,string>>({});
@@ -139,22 +173,36 @@ export class PagesLayerAppComponent implements OnInit {
   routineTitle = ''; routineExecutor = 'utility'; routineTrigger = 'manual'; routineCadence = 'monthly'; routineInstructionDoc = '';
   routineReads = ''; routineCapabilities = ''; routineOutputs = '';
   connectionMapping = 'reference-only'; connectionInstructions = ''; connectionReaction = ''; connectionQuestion = ''; connectionAnswer = '';
+  codeRelationDraft = '';
   private lastRoutineId = ''; private lastConnectionId = '';
   constructor() {
     effect(() => { const key = this.slot() === 'knowledge' ? this.docKey() : ''; if (key) void this.loadDoc(key); });
     effect(() => { const routine = this.selectedRoutine(); if (routine && routine.id !== this.lastRoutineId) { this.lastRoutineId = routine.id; this.prepareRoutine(routine); void this.loadRuns(routine.id); } else if (!routine) this.lastRoutineId = ''; });
     effect(() => { const connection = this.selectedConnection(); if (connection && connection.id !== this.lastConnectionId) { this.lastConnectionId = connection.id; this.prepareConnection(connection); } else if (!connection) this.lastConnectionId = ''; });
   }
-  async ngOnInit() { await Promise.all([this.loadDocs(), this.loadConnections(), this.loadReconciliation()]); }
+  async ngOnInit() { await Promise.all([this.loadDocs(), this.loadConnections(), this.loadReconciliation(), this.loadCodeObservations(), this.loadCodeRelations()]); }
   private path(suffix: string) { return `/api/projects/${encodeURIComponent(this.ctx.projectId())}/layers/pages/${suffix}`; }
+  private codePath() { return `/api/projects/${encodeURIComponent(this.ctx.projectId())}/layers/code/route-observations`; }
   private async loadDocs() { try { this.documents.set((await this.ctx.api<{ documents: LayerDocSummary[] }>(this.path('documents'))).documents); } catch (error) { this.ctx.error.set(String(error)); } }
   private async loadDoc(key: string) { try { const doc = await this.ctx.api<LayerDoc>(this.path(`documents/${encodeURIComponent(key)}`)); if (this.docKey() === key) { this.selectedDoc.set(doc); this.docDraft.set(doc.content); this.previousDoc.set(null); } } catch (error) { this.ctx.error.set(String(error)); } }
   private async loadConnections() { try { this.connections.set((await this.ctx.api<{ connections: Connection[] }>(this.path('connections'))).connections); } catch (error) { this.ctx.error.set(String(error)); } }
   private async loadReconciliation() { try { this.reconciliation.set(await this.ctx.api<Reconciliation>(this.path('reconciliation'))); } catch (error) { this.ctx.error.set(String(error)); } }
+  private async loadCodeObservations() { try { this.codeObservations.set((await this.ctx.api<{ observations: CodeObservation[] }>(this.codePath())).observations); } catch (error) { this.ctx.error.set(String(error)); } }
+  private async loadCodeRelations() { try { this.codeRelations.set((await this.ctx.api<{ relations: CodeRelation[] }>(this.path('code-relations'))).relations); } catch (error) { this.ctx.error.set(String(error)); } }
   private async loadRuns(id: string) { try { this.routineRuns.set((await this.ctx.api<{ runs: RoutineRun[] }>(this.path(`routines/${encodeURIComponent(id)}/runs`))).runs); } catch { this.routineRuns.set([]); } }
   docsByGroup(group: string) { return this.documents().filter(doc => doc.groupName === group.toLowerCase()); }
   layerName(key: string) { return this.ctx.layerInstances().find(item => item.key === key)?.name || key; }
   connectionFor(key: string) { return this.connections().find(item => item.sourceKey === key) || null; }
+  relationsFor(observationId: string) { return this.codeRelations().filter(relation => relation.observation_id === observationId); }
+  setCodeReviewReason(id: string, reason: string) { this.codeReviewReasons.update(current => ({ ...current, [id]: reason })); }
+  async proposeCodeRelation(observationId: string) { this.busy.set(true); const ok = await this.ctx.write(() => this.ctx.api(this.path('code-relations'), 'POST',
+    { observationId, rationale: this.codeRelationDraft.trim() }), 'Pages relation saved for review.');
+    if (ok) { this.selectedObservationId.set(''); this.codeRelationDraft = ''; await this.loadCodeRelations(); } this.busy.set(false); }
+  async reviewCodeRelation(relation: CodeRelation, verdict: 'useful' | 'wrong') { this.busy.set(true); const ok = await this.ctx.write(() => this.ctx.api(this.path(`code-relations/${relation.id}/review`), 'POST',
+    { expectedRevision: relation.revision, verdict, reason: this.codeReviewReasons()[relation.id] || '' }), 'Pages relation review recorded.');
+    if (ok) await this.loadCodeRelations(); this.busy.set(false); }
+  async stageCodeRelation(relation: CodeRelation) { this.busy.set(true); const ok = await this.ctx.write(() => this.ctx.api(this.path(`code-relations/${relation.id}/stage`), 'POST', {}),
+    'Pages suggestion added to Work.'); if (ok) await this.loadCodeRelations(); this.busy.set(false); }
   async saveDoc() { const doc = this.selectedDoc(); if (!doc) return; this.busy.set(true); const ok = await this.ctx.write(() => this.ctx.api(this.path(`documents/${doc.key}`),'PUT',{ content:this.docDraft(),expectedRevision:doc.revision }), 'Document saved as a new revision.'); if (ok) { await this.loadDocs(); await this.loadDoc(doc.key); } this.busy.set(false); }
   async showPrevious(doc: LayerDoc) { try { this.previousDoc.set(await this.ctx.api<LayerDoc>(this.path(`documents/${doc.key}?revision=${doc.revision-1}`))); } catch (error) { this.ctx.error.set(String(error)); } }
   private prepareRoutine(r: Routine) { this.routineTitle=r.title; this.routineExecutor=r.executor||'utility'; this.routineTrigger=r.trigger||'schedule'; this.routineCadence=r.cadence; this.routineInstructionDoc=r.instructionDoc||''; this.routineReads=(r.allowedReads||[]).join('\n'); this.routineCapabilities=(r.capabilities||[]).join('\n'); this.routineOutputs=(r.outputKinds||[]).join('\n'); }

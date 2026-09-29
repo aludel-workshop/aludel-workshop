@@ -9,6 +9,8 @@ import { createUser, initAccounts } from '../server/accounts.mjs';
 import { agentRuns, initAgentRuns } from '../server/agent-runs.mjs';
 import { initKnowledge, knowledge } from '../server/knowledge.mjs';
 import { initPagesLayerApp } from '../server/pages-layer-app.mjs';
+import { initLayerContract } from '../server/layer-contract.mjs';
+import { initPagesCodeObservations, recordCodeRouteObservation, proposePagesObservationRelation, reviewPagesObservationRelation, stagePagesFlowFromObservation } from '../server/pages-code-observations.mjs';
 import { initOnboarding, loadCatalogs, onboarding } from '../server/onboarding.mjs';
 import { ensureProductWorkspace } from '../server/product-workspace.mjs';
 import { openSecretStore } from '../server/secret-store.mjs';
@@ -20,7 +22,7 @@ const git = (cwd, ...args) => execFileSync('git', args, { cwd, stdio: 'pipe' }).
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'aludel-proposal-'));
   const db = openDatabase(join(root, 'machine.sqlite'));
-  initWorkflow(db); ensureProductWorkspace(db); initAccounts(db); initOnboarding(db); initKnowledge(db); initPagesLayerApp(db); initAgentRuns(db); initSymphonyWorker(db);
+  initWorkflow(db); ensureProductWorkspace(db); initAccounts(db); initOnboarding(db); initKnowledge(db); initLayerContract(db); initPagesLayerApp(db); initPagesCodeObservations(db); initAgentRuns(db); initSymphonyWorker(db);
   const catalogs = loadCatalogs(new URL('../config', import.meta.url).pathname);
   const know = knowledge({ db, catalogs, packs: catalogs.packs });
   const flows = onboarding({ db, catalogs, secrets: openSecretStore(root), workspaceRoot: join(root, 'workspaces'), assetRoot: join(root, 'assets'), createWorkspace: () => {}, know });
@@ -28,11 +30,15 @@ function fixture() {
   const { token } = flows.saveDraft(null, { profile: 'planner' });
   flows.saveDraft(token, { name: 'Proposal Test', pitch: 'A disposable product.' });
   const projectId = flows.claimDraft(token, owner, owner).project.id;
+  initLayerContract(db);
   know.ensureAgents(projectId); know.ensurePackData(projectId); know.ensureRoutines(projectId); know.migrateWork(projectId);
   know.ensureBrief(projectId); know.ensureLibrary(projectId); know.ensurePlan(projectId); know.ensureDesign(projectId);
   const workspace = db.prepare('SELECT workspace_path FROM project_setup WHERE project_id = ?').get(projectId).workspace_path;
   mkdirSync(workspace, { recursive: true }); git(workspace, 'init', '-q');
-  writeFileSync(join(workspace, 'README.md'), 'Pinned base\n'); git(workspace, 'add', '.');
+  writeFileSync(join(workspace, 'README.md'), 'Pinned base\n');
+  mkdirSync(join(workspace, 'src/routes'), { recursive: true });
+  writeFileSync(join(workspace, 'src/routes/browse.ts'), "export const browseRoute = '/browse';\n");
+  git(workspace, 'add', '.');
   git(workspace, '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'initial');
   const profile = know.defaultProfile(projectId);
   know.update(projectId, profile.id, { model: '', effort: 'medium' }, { rationale: 'Legacy profile-scoped worker fixture has no per-turn override signal' });
@@ -42,8 +48,8 @@ function fixture() {
   const scope = worker.authenticate('Bearer ' + credential);
   const runs = agentRuns({ db, know, secrets: openSecretStore(root), providers: catalogs.agentProviders.providers, worker, symphonyDispatch: true,
     callModel: async () => { throw new Error('Legacy model caller must never run'); } });
-  const start = (action, targets = [], question = null, context = null, deferRun = false) => {
-    const work = know.createWork(projectId, { action, title: `Test ${action}`, assignee: { kind: 'agent', id: profile.id }, targets,
+  const start = (action, targets = [], question = null, context = null, deferRun = false, existing = null) => {
+    const work = existing || know.createWork(projectId, { action, title: `Test ${action}`, assignee: { kind: 'agent', id: profile.id }, targets,
       checks: ['The proposed output is accurate'], ...(question ? { question } : {}), ...(context ? { context } : {}) }, owner.name);
     if (work.state === 'suggested') know.updateWork(owner, projectId, work.id, { state: 'ready' });
     runs.stage(owner, projectId, work.id);
@@ -323,6 +329,97 @@ test('Pages-origin Work pins reviewed policy and applies a proposed flow only af
   } finally { f.close(); }
 });
 
+
+test('a direct Pages request without Vision reaches the same Go, proposal and checked review boundary', () => {
+  const f = fixture();
+  try {
+    f.db.prepare("UPDATE layer_instances SET enabled = 0 WHERE project_id = ? AND layer_key = 'product'").run(f.projectId);
+    assert.equal(f.db.prepare("SELECT enabled FROM layer_instances WHERE project_id = ? AND layer_key = 'product'").get(f.projectId).enabled, 0);
+    const page = f.know.insert(f.projectId, 'page', { label: 'Browse', icon: 'article', pageType: 'list', status: 'planned' });
+    const { work, issue, card } = f.start('pages.flows');
+    assert.deepEqual(card.requiredInputs, []);
+    assert.deepEqual(card.controls, []);
+    const proposal = { summary: 'Map a direct browse journey through the existing page.', content: {
+      title: 'Browse', steps: [{ page: page.id, name: 'Browse tools', trigger: 'Open browse' }] },
+      usedInputs: [{ id: page.id, revision: page.revision }] };
+    assert.throws(() => f.worker.submitProposal(f.scope, { attemptId: issue.native_ref.attempt_id,
+      proposal: { ...proposal, content: { ...proposal.content, steps: [{ ...proposal.content.steps[0], story: 'sto-unpinned' }] } } }), /Pages flow proposal/);
+    assert.throws(() => f.worker.submitProposal(f.scope, { attemptId: issue.native_ref.attempt_id,
+      proposal: { ...proposal, usedInputs: [] } }), /each Pages step page/);
+    const submitted = f.worker.submitProposal(f.scope, { attemptId: issue.native_ref.attempt_id, proposal });
+    assert.equal(f.know.list(f.projectId, 'flow').length, 0);
+    assert.throws(() => f.worker.acceptProposal(f.owner, f.projectId, work.id, submitted.proposalId), /check/);
+    f.know.updateWork(f.owner, f.projectId, work.id, { verdict: { index: 0, value: 'accept' } });
+    const accepted = f.worker.acceptProposal(f.owner, f.projectId, work.id, submitted.proposalId);
+    const flow = f.know.get(f.projectId, accepted.flowId);
+    assert.equal(flow.steps[0].page, page.id);
+    assert.equal(flow.steps[0].story, null);
+    assert.equal(f.know.workById(f.projectId, work.id).state, 'done');
+  } finally { f.close(); }
+});
+
+test('pinned Code route observation can yield a reviewed Pages flow; wrong relation retains its source', () => {
+  const f = fixture();
+  try {
+    f.db.prepare("UPDATE layer_instances SET enabled = 0 WHERE project_id = ? AND layer_key = 'product'").run(f.projectId);
+    const observed = recordCodeRouteObservation(f.db, f.owner.id, f.projectId, f.workspace,
+      { path: 'src/routes/browse.ts', marker: "export const browseRoute = '/browse';", route: '/browse' });
+    assert.match(observed.commit, /^[a-f0-9]{40}$/);
+    const wrong = proposePagesObservationRelation(f.db, f.owner.id, f.projectId, observed.id, 'This route might be an admin workflow.');
+    const rejected = reviewPagesObservationRelation(f.db, f.owner.id, f.projectId, wrong.id,
+      { expectedRevision: 1, verdict: 'wrong', reason: 'The route does not show the visitor journey.' });
+    assert.equal(rejected.observation_id, observed.id);
+    assert.throws(() => stagePagesFlowFromObservation(f.db, f.know, f.owner.id, f.projectId, wrong.id), /useful/);
+    const useful = proposePagesObservationRelation(f.db, f.owner.id, f.projectId, observed.id, 'Review the route as a possible visitor path.');
+    reviewPagesObservationRelation(f.db, f.owner.id, f.projectId, useful.id,
+      { expectedRevision: 1, verdict: 'useful', reason: 'The pinned route warrants a separate Pages intent review.' });
+    const suggested = stagePagesFlowFromObservation(f.db, f.know, f.owner.id, f.projectId, useful.id);
+    assert.equal(stagePagesFlowFromObservation(f.db, f.know, f.owner.id, f.projectId, useful.id).id, suggested.id);
+    f.know.updateWork(f.owner, f.projectId, suggested.id, { state: 'ready' });
+    f.know.updateWork(f.owner, f.projectId, suggested.id, { assignee: { kind: 'agent', id: f.profile.id } });
+    const page = f.know.insert(f.projectId, 'page', { label: 'Browse', icon: 'article', pageType: 'list', status: 'planned' });
+    const { work, issue, card } = f.start('pages.flows', [], null, null, false, f.know.workById(f.projectId, suggested.id));
+    assert.equal(card.origin.kind, 'code-route-observation');
+    assert.equal(card.origin.observation.repositoryCommit, observed.commit);
+    assert.equal(card.origin.relation.id, useful.id);
+    const proposal = { summary: 'Review an intended browse journey through the existing page.', content: {
+      title: 'Browse', steps: [{ page: page.id, name: 'Browse tools' }] },
+      usedInputs: [{ id: page.id, revision: page.revision }] };
+    const submitted = f.worker.submitProposal(f.scope, { attemptId: issue.native_ref.attempt_id, proposal });
+    assert.equal(f.know.list(f.projectId, 'flow').length, 0);
+    f.know.updateWork(f.owner, f.projectId, work.id, { verdict: { index: 0, value: 'accept' } });
+    const accepted = f.worker.acceptProposal(f.owner, f.projectId, work.id, submitted.proposalId);
+    assert.ok(accepted.flowId);
+    assert.equal(f.know.get(f.projectId, accepted.flowId).steps[0].story, null);
+    assert.equal(f.db.prepare('SELECT status FROM pages_observation_relations WHERE id = ?').get(wrong.id).status, 'wrong');
+  } finally { f.close(); }
+});
+
+test('a changed Code relation withdraws the pinned attempt and prevents stale flow acceptance', () => {
+  const f = fixture();
+  try {
+    const observed = recordCodeRouteObservation(f.db, f.owner.id, f.projectId, f.workspace,
+      { path: 'src/routes/browse.ts', marker: "export const browseRoute = '/browse';", route: '/browse' });
+    const relation = proposePagesObservationRelation(f.db, f.owner.id, f.projectId, observed.id, 'Possible visitor route.');
+    reviewPagesObservationRelation(f.db, f.owner.id, f.projectId, relation.id,
+      { expectedRevision: 1, verdict: 'useful', reason: 'Review as a candidate, not as accepted intent.' });
+    const suggested = stagePagesFlowFromObservation(f.db, f.know, f.owner.id, f.projectId, relation.id);
+    f.know.updateWork(f.owner, f.projectId, suggested.id, { state: 'ready' });
+    f.know.updateWork(f.owner, f.projectId, suggested.id, { assignee: { kind: 'agent', id: f.profile.id } });
+    const page = f.know.insert(f.projectId, 'page', { label: 'Browse', icon: 'article', pageType: 'list', status: 'planned' });
+    const { work, issue } = f.start('pages.flows', [], null, null, false, f.know.workById(f.projectId, suggested.id));
+    const proposal = { summary: 'Map a visitor browse flow from the existing page.', content: {
+      title: 'Browse', steps: [{ page: page.id, name: 'Browse tools' }] },
+      usedInputs: [{ id: page.id, revision: page.revision }] };
+    const submitted = f.worker.submitProposal(f.scope, { attemptId: issue.native_ref.attempt_id, proposal });
+    f.know.updateWork(f.owner, f.projectId, work.id, { verdict: { index: 0, value: 'accept' } });
+    reviewPagesObservationRelation(f.db, f.owner.id, f.projectId, relation.id,
+      { expectedRevision: 2, verdict: 'wrong', reason: 'The observed route does not express the intended visitor path.' });
+    assert.throws(() => f.worker.acceptProposal(f.owner, f.projectId, work.id, submitted.proposalId), /Code relation changed/);
+    assert.equal(f.know.list(f.projectId, 'flow').length, 0);
+    assert.equal(f.know.workById(f.projectId, work.id).state, 'review');
+  } finally { f.close(); }
+});
 
 test('two hosts racing for one Go-pinned attempt have one workspace claim and one runnable owner', async () => {
   const f = fixture();

@@ -26,6 +26,7 @@ import { importCorpus } from './importer.mjs';
 import { openDatabase } from './storage.mjs';
 import { initPagesLayerApp, pagesDocumentList, pagesDocumentRead, pagesDocumentUpdate, pagesConnections, pagesConnectionCreate, pagesConnectionUpdate } from './pages-layer-app.mjs';
 import { initPagesReconciliation, pagesReconciliationView, pagesGapDecision, reconcilePagesFlow } from './pages-reconciliation.mjs';
+import { initPagesCodeObservations, codeRouteObservations, recordCodeRouteObservation, pagesObservationRelations, proposePagesObservationRelation, reviewPagesObservationRelation, stagePagesFlowFromObservation } from './pages-code-observations.mjs';
 import { initLayerContract, layerDescriptors, layerInstances, updateLayerInstance, layerCatalog, layerOutputRead, layerMigrationInventory } from './layer-contract.mjs';
 import { answerDecision, createProposal, ensureB02Fixture, getDecision, getProposal, listDecisions, listDownstreamRecords, listProposals, reassessRecord, reviseProposal } from './product-records.mjs';
 import { openSecretStore } from './secret-store.mjs';
@@ -62,6 +63,7 @@ initWorkRuns(db);
 initLayerContract(db);
 initPagesLayerApp(db);
 initPagesReconciliation(db);
+initPagesCodeObservations(db);
 const secrets = openSecretStore(dataDirectory);
 const topology = hostTopology(process.env, port);
 const setupConfigPath = join(portalRoot, 'config', 'project-setup.json');
@@ -513,6 +515,33 @@ async function api(request, response, url) {
     return json(response, 201, { project: setup.project }, { 'set-cookie': draftCookie('', 0) });
   }
   if (url.pathname === '/api/projects' && request.method === 'GET') return json(response, 200, { projects: userProjects(db, user.id) });
+  const codeObservationRoute = /^\/api\/projects\/([^/]+)\/layers\/code\/route-observations$/.exec(url.pathname);
+  if (codeObservationRoute) {
+    const projectId = decodeURIComponent(codeObservationRoute[1]);
+    if (request.method === 'GET') return json(response, 200, { observations: codeRouteObservations(db, user.id, projectId) }, { 'cache-control': 'no-store' });
+    if (request.method === 'POST') {
+      requireMember(db, user, projectId);
+      const workspace = db.prepare('SELECT workspace_path FROM project_setup WHERE project_id = ?').get(projectId)?.workspace_path;
+      if (!workspace) return json(response, 409, { error: 'Project repository is unavailable.' });
+      return json(response, 201, recordCodeRouteObservation(db, user.id, projectId, workspace, await readJson(request)), { 'cache-control': 'no-store' });
+    }
+    return json(response, 405, { error: 'Method not allowed.' });
+  }
+  const pagesCodeRelationRoute = /^\/api\/projects\/([^/]+)\/layers\/pages\/code-relations(?:\/([^/]+)\/(review|stage))?$/.exec(url.pathname);
+  if (pagesCodeRelationRoute) {
+    const projectId = decodeURIComponent(pagesCodeRelationRoute[1]);
+    const relationId = pagesCodeRelationRoute[2] && decodeURIComponent(pagesCodeRelationRoute[2]);
+    if (request.method === 'GET' && !relationId) return json(response, 200, { relations: pagesObservationRelations(db, user.id, projectId) }, { 'cache-control': 'no-store' });
+    if (request.method === 'POST' && !relationId) {
+      const input = await readJson(request);
+      return json(response, 201, proposePagesObservationRelation(db, user.id, projectId, input.observationId, input.rationale), { 'cache-control': 'no-store' });
+    }
+    if (request.method === 'POST' && pagesCodeRelationRoute[3] === 'review')
+      return json(response, 200, reviewPagesObservationRelation(db, user.id, projectId, relationId, await readJson(request)), { 'cache-control': 'no-store' });
+    if (request.method === 'POST' && pagesCodeRelationRoute[3] === 'stage')
+      return json(response, 200, stagePagesFlowFromObservation(db, know, user.id, projectId, relationId), { 'cache-control': 'no-store' });
+    return json(response, 405, { error: 'Method not allowed.' });
+  }
   const pagesReconcileRoute = /^\/api\/projects\/([^/]+)\/layers\/pages\/reconciliation(?:\/([^/]+))?$/.exec(url.pathname);
   if (pagesReconcileRoute) {
     const projectId = decodeURIComponent(pagesReconcileRoute[1]);

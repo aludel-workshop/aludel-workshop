@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { knowledgeKinds } from './knowledge.mjs';
+import { compiledLat06Actions } from './lat06-actions.mjs';
 // LAT-02: built-in layer declarations describe existing authorities; they do not grant writes.
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const own = Object.hasOwn;
@@ -8,13 +9,14 @@ const declarations = [
   { key: 'design', name: 'Design', outputs: ['design_tokens', 'component', 'brand_asset'], authority: 'knowledge_records', path: '/design' },
   { key: 'pages', name: 'Pages', outputs: ['page_map', 'page', 'flow'], authority: 'knowledge_records', path: '/pages' },
   { key: 'data', name: 'Data', outputs: ['data_object', 'data_operation', 'access_rule'], authority: 'knowledge_records', path: '/data' },
-  { key: 'platform', name: 'Code', outputs: ['code_unit', 'trace_link', 'code_release'], authority: 'code_projection', path: '/code' },
+  { key: 'platform', name: 'Code', outputs: ['code_unit', 'trace_link', 'code_release', 'code_route_observation'], authority: 'code_projection', path: '/code' },
   { key: 'deploy', name: 'Deploy', outputs: ['release'], authority: 'runtime_projection', path: '/deploy' }
 ];
 const projections = {
   code_unit: { table: 'code_units', revision: 'hash' },
   trace_link: { table: 'trace_links', revision: 'updated_at' },
   code_release: { table: 'code_releases', revision: 'commit_sha' },
+  code_route_observation: { table: 'code_route_observations', revision: 'blob_sha' },
   release: { table: 'releases', revision: 'state' }
 };
 const sharedKinds = ['source', 'finding', 'insight', 'evidence_link', 'doc', 'agent_profile', 'role', 'work_action', 'project_instructions', 'routine'];
@@ -102,6 +104,7 @@ function instance(db, projectId, key) {
 function outputCount(db, projectId, kind) {
   if (own(projections, kind)) {
     const { table } = projections[kind];
+    if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table)) return 0;
     return db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE project_id = ?`).get(projectId).n;
   }
   return db.prepare('SELECT COUNT(*) AS n FROM knowledge_records WHERE project_id = ? AND kind = ?').get(projectId, kind).n;
@@ -138,7 +141,9 @@ export function layerDescriptors(db, userId, projectId) {
   return db.prepare('SELECT layer_key FROM layer_instances WHERE project_id = ? AND enabled = 1 ORDER BY rowid').all(projectId)
     .map(row => instance(db, projectId, row.layer_key))
     .map(layer => ({ key: layer.key, name: layer.name, path: layer.path, authority: layer.authority, version: layer.version,
-      outputs: layer.outputs.map(kind => ({ kind, count: outputCount(db, projectId, kind), revision: projections[kind] ? 'content-hash' : 'revision' })) }));
+      outputs: layer.outputs.map(kind => ({ kind, count: outputCount(db, projectId, kind), revision: projections[kind] ? 'content-hash' : 'revision' })),
+      actions: compiledLat06Actions.filter(action => action.layer === layer.key).map(action => ({ id: action.id, revision: action.revision, title: action.title, purpose: action.purpose,
+        result: action.result, elevated: action.permissions.elevated, agentAvailable: action.agentRunnable, humanAvailable: action.humanRunnable })) }));
 }
 export function layerOutputRead(db, userId, projectId, key, kind, id) {
   member(db, userId, projectId);
@@ -146,6 +151,7 @@ export function layerOutputRead(db, userId, projectId, key, kind, id) {
   if (!layer.outputs.includes(kind)) fail('Output not found.', 404);
   if (own(projections, kind)) {
     const { table } = projections[kind];
+    if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table)) fail('Output not found.', 404);
     const row = db.prepare(`SELECT * FROM ${table} WHERE project_id = ? AND id = ?`).get(projectId, id);
     if (!row) fail('Output not found.', 404);
     // Projection reads return identity and revision only. Existing native endpoints own detailed views.

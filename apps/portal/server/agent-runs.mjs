@@ -113,7 +113,7 @@ export function agentRuns({ db, know, worker = null, symphonyDispatch = false })
     if (!(symphonyActions.has(entry.action) && symphonyCompatible(projectId, entry.assignee.id))) fail(`Agents can't run “${actionLabel(projectId, entry.action)}” yet. Assign ${entry.ref} to a person.`, 409);
     if (entry.question && !entry.question.answer && entry.action !== 'product.clarify') fail('Answer the open question before staging this agent task.', 409);
     if (entry.action === 'product.clarify' && (!entry.question || entry.question.answer)) fail('Draft answers only for an open question.', 409);
-    if (entry.action === 'pages.flows' && (entry.targets.length !== 1 || entry.targets[0].kind !== 'story')) fail('Link one Vision story before an agent proposes a Pages flow.', 409);
+    if (entry.action === 'pages.flows' && (entry.targets.length > 1 || entry.targets.some(target => target.kind !== 'story'))) fail('A Pages flow may link at most one Vision story.', 409);
     if (entry.action === 'product.define' && !entry.targets.some(target => target.kind === 'story')) fail('Link a story before an agent writes acceptance.', 409);
     if (entry.action === 'product.brief' && (entry.targets.length > 1 || entry.targets.some(target => target.kind !== 'brief_claim')))
       fail('Link at most one Vision Brief claim, or leave the target empty to propose a new claim.', 409);
