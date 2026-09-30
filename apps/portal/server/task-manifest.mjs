@@ -54,7 +54,7 @@ function compileLayerTask(bundle) {
       evidence: 'For each criterion (by index from 0), name what shows it is met: type change with ref = a record ID or title you staged, or a repository file path you committed; type test with ref = a test name exactly as reported to aludel_layer_commit. note says what the reviewer should check. Review shows each criterion with this evidence.',
       followUpLayers: guidance.followUpLayers || [], checks: (work.checks || []).map(check => check.text) }],
     capabilities: { knowledge: ['map', 'search', 'read'], layerApi: scope.key, layerRepository: { checkout: 'layer/', base: layerPackage.commit, commitTool: 'aludel_layer_commit', writable: writablePatterns },
-      repository: 'read-only pinned commit', submit: 'layer_api_draft' },
+      repository: 'project repository: read-only pinned commit (your layer is writable in layer/)', submit: 'layer_api_draft' },
     runtime: { authorization: 'Go-pinned attempt', repositoryCommit: repository.commit, instructionPins, staleInputs: 'withdraw this attempt when a pinned input changes' }
   };
 }

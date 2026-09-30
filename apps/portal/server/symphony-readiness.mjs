@@ -3,6 +3,11 @@
 const priority = { highest: 1, high: 2, medium: 3, low: 4, lowest: 5 };
 const safe = value => String(value || '').replace(/[^A-Za-z0-9_-]/g, '-').replace(/-+/g, '-').slice(0, 70);
 
+// LAYER-TOOLS-02: a layer task makes its changes, staged for review. The read-only proposal wording is only for actions;
+// given to a layer task it led a live agent to describe the changes instead of making them.
+const layerBrief = key => `Open the task card. This is a ${key} layer task: make the requested changes. Change ${key} data only with aludel_layer_call, ` +
+  'and the layer itself only in layer/, committed with aludel_layer_commit after its tests. Everything is staged for review; submit with aludel_submit_proposal and evidence for each criterion. ' +
+  'Do not change other project records or the project repository.';
 export function symphonyIssue({ project, item, batch, action, bundle, repositoryCommit }) {
   // DEC-057: a layer-scoped item is pinned to its layer's change scope instead of an action.
   const layerScoped = item?.scope === 'layer';
@@ -27,7 +32,7 @@ export function symphonyIssue({ project, item, batch, action, bundle, repository
   const identifier = `${safe(project.slug).toUpperCase()}-${safe(item.ref)}`;
   return {
     id: `${project.id}:${item.id}`, identifier, title: item.title,
-    description: `Aludel work ${item.ref}. Authorized batch ${batch.ref}. Context digest ${bundle.digest}. Repository base ${repositoryCommit}. ${audit ? 'Open the task card before auditing. Submit a findings report; do not change files.' : coding ? 'Read the pinned Aludel task bundle before changing files.' : 'Open the task card. Submit a review proposal; do not change project records or files.'}`,
+    description: `Aludel work ${item.ref}. Authorized batch ${batch.ref}. Context digest ${bundle.digest}. Repository base ${repositoryCommit}. ${layerScoped ? layerBrief(item.layer) : audit ? 'Open the task card before auditing. Submit a findings report; do not change files.' : coding ? 'Read the pinned Aludel task bundle before changing files.' : 'Open the task card. Submit a review proposal; do not change project records or files.'}`,
     priority: priority[item.priority] ?? 3, state: 'Ready', dispatchable: true,
     url: null, branch_name: null, labels: ['aludel-ready', `profile-${safe(batch.profileId)}`],
     native_ref: { project_id: project.id, work_id: item.id, batch_id: batch.id, bundle_digest: bundle.digest, repository_commit: repositoryCommit,

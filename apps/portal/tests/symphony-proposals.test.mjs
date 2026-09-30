@@ -707,6 +707,8 @@ test('a layer-scoped Pages task changes Pages only through its API; review shows
   assert.ok(card.outputs[0].operations.some(op => op.operationId === 'updateFlow' && op.writes === 'flow'));
   assert.ok(card.outputs[0].followUpLayers.some(layer => layer.key === 'platform'));
   assert.match(card.outputs[0].evidence, /For each criterion/, "a layer card asks for evidence per criterion");
+  assert.match(issue.description, /make the requested changes.*aludel_layer_call.*aludel_layer_commit/, "a layer task is told to make its changes, not to describe them");
+  assert.doesNotMatch(issue.description, /do not change project records or files/);
   const attemptId = issue.native_ref.attempt_id;
   const call = (operation, body = {}, id = null) => f.worker.callLayer(f.scope, { attemptId, operation, id, body });
   assert.throws(() => call('createFlow', { flow: { title: 'x'.repeat(61) } }), /Flow name must be under 60 characters/);
