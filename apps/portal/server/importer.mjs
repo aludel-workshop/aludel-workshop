@@ -34,7 +34,9 @@ function localLinks(source) {
     .filter(target => target && !/^(?:https?:|mailto:|app:|#)/i.test(target));
 }
 
-export function importCorpus(db, { root, docsDirectory = join(root, 'docs') }) {
+// The corpus is the-machine's own documents, so the import runs as that project (PROJECT-DB-01).
+export function importCorpus(db, options) { return db.withProject ? db.withProject('the-machine', () => importInto(db, options)) : importInto(db, options); }
+function importInto(db, { root, docsDirectory = join(root, 'docs') }) {
   const startedAt = new Date().toISOString();
   const run = db.prepare('INSERT INTO import_runs(started_at, status) VALUES (?, ?)').run(startedAt, 'running');
   const runId = Number(run.lastInsertRowid);
@@ -64,15 +66,20 @@ export function importCorpus(db, { root, docsDirectory = join(root, 'docs') }) {
       if (document.current_hash === hash && existing) {
         unchanged++;
       } else {
-        const nextRevision = (db.prepare('SELECT COALESCE(MAX(revision), 0) AS revision FROM source_revisions WHERE document_id = ?').get(document.id).revision || 0) + 1;
-        const revision = db.prepare(`INSERT INTO source_revisions
-          (document_id, revision, content_hash, raw_content, metadata_json, imported_at, import_run_id)
-          VALUES (?, ?, ?, ?, ?, ?, ?)`)
-          .run(document.id, nextRevision, hash, source, JSON.stringify(meta), startedAt, runId);
+        // A document that returns to content it had before points back at that revision rather than duplicating it.
+        const earlier = db.prepare('SELECT id FROM source_revisions WHERE document_id = ? AND content_hash = ?').get(document.id, hash);
+        let revisionId = earlier?.id;
+        if (!earlier) {
+          const nextRevision = (db.prepare('SELECT COALESCE(MAX(revision), 0) AS revision FROM source_revisions WHERE document_id = ?').get(document.id).revision || 0) + 1;
+          revisionId = Number(db.prepare(`INSERT INTO source_revisions
+            (document_id, revision, content_hash, raw_content, metadata_json, imported_at, import_run_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?)`)
+            .run(document.id, nextRevision, hash, source, JSON.stringify(meta), startedAt, runId).lastInsertRowid);
+          revisions++;
+        }
         db.prepare(`UPDATE source_documents SET title = ?, kind = ?, status = ?, current_hash = ?,
           current_revision_id = ?, imported_at = ? WHERE id = ?`)
-          .run(title, meta.kind || 'source-document', meta.status || 'unclassified', hash, Number(revision.lastInsertRowid), startedAt, document.id);
-        revisions++;
+          .run(title, meta.kind || 'source-document', meta.status || 'unclassified', hash, revisionId, startedAt, document.id);
       }
 
       db.prepare('DELETE FROM source_links WHERE source_document_id = ?').run(document.id);

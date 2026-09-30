@@ -41,7 +41,8 @@ const after = await knowledge();
 const flow = after.flows.find(value => value.title === 'Find a tool');
 assert.deepEqual(flow.steps.map(step => step.page), [seed.pages.browse, seed.pages.detail]);
 assert.equal(after.pages.find(value => value.id === seed.pages.detail).description, 'Everything a neighbour needs before borrowing.');
-const db = new DatabaseSync(join(data, 'machine.sqlite'), { readOnly: true });
+// PROJECT-DB-01: a project's layer bindings are in its own database.
+const db = new DatabaseSync(join(data, 'projects', `${seed.projectId}.sqlite`), { readOnly: true });
 const binding = db.prepare("SELECT repository_path AS repo, accepted_commit AS accepted FROM layer_package_bindings WHERE project_id = ? AND layer_key = 'pages'").get(seed.projectId);
 db.close();
 const git = (...args) => execFileSync('git', ['-C', binding.repo, ...args]).toString().trim();

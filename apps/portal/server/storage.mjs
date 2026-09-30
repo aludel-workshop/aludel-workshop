@@ -1,11 +1,8 @@
-import { DatabaseSync } from 'node:sqlite';
-import { mkdirSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { openProjectStore } from './project-store.mjs';
 
+// PROJECT-DB-01: the platform database at `path`, with each project's data in its own database beside it (project-store.mjs).
 export function openDatabase(path) {
-  mkdirSync(dirname(path), { recursive: true });
-  const db = new DatabaseSync(path);
-  db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;');
+  const db = openProjectStore(path);
   db.exec(`
     CREATE TABLE IF NOT EXISTS projects (
       id TEXT PRIMARY KEY, slug TEXT NOT NULL UNIQUE, name TEXT NOT NULL, description TEXT NOT NULL,

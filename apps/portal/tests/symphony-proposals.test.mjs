@@ -1045,7 +1045,7 @@ test('a Markdown layer from before layer repositories moves into its own reposit
     const [file] = md.tree(f.owner.id, f.projectId, legacy.key).files;
     assert.equal(file.path, 'visits/monday.md');
     assert.equal(md.read(f.owner.id, f.projectId, legacy.key, file.id).content, '# Monday\n\nTwo visits.');
-    assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM markdown_adoptions').get().n, 1);
+    assert.equal(f.db.withProject(f.projectId, () => f.db.prepare('SELECT COUNT(*) AS n FROM markdown_adoptions').get().n), 1);
     assert.equal(adoptMarkdownLayer({ db: f.db, know: f.know, dataDirectory: data, projectId: f.projectId, key: legacy.key }).commit, pkg.commit, 'adoption runs once');
     assert.equal(md.tree(f.owner.id, f.projectId, legacy.key).files.length, 1);
   } finally {
@@ -1069,7 +1069,7 @@ test('an agent works on a Markdown layer through the same staged API, review and
   const doc = call('createDocument', { document: { path: 'interviews/summary.md', content: '# Summary' } });
   assert.throws(() => call('createDocument', { document: { path: 'interviews/summary.md', content: '' } }), /already exists/, 'staged records count');
   const submitted = f.worker.submitProposal(f.scope, { attemptId, proposal: { summary: 'Add an interview summary under a new folder.', content: {} } });
-  assert.equal(f.db.prepare("SELECT COUNT(*) AS n FROM knowledge_records WHERE kind LIKE 'markdown_%'").get().n, 0);
+  assert.equal(f.db.withProject(f.projectId, () => f.db.prepare("SELECT COUNT(*) AS n FROM knowledge_records WHERE kind LIKE 'markdown_%'").get().n), 0);
   f.know.updateWork(f.owner, f.projectId, work.id, { verdict: { index: 0, value: 'accept' } });
   f.worker.acceptProposal(f.owner, f.projectId, work.id, submitted.proposalId);
   const md = markdownOutputs({ db: f.db, know: f.know, dataDirectory: process.env.MACHINE_DATA_DIR });

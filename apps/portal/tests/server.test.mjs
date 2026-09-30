@@ -13,6 +13,7 @@ test('Markdown import is idempotent and preserves changed source revisions', () 
   writeFileSync(join(docs, 'a.md'), '---\nid: a-001\nkind: note\nstatus: active\n---\n# A\n\nSee [B](b.md).\n');
   writeFileSync(join(docs, 'b.md'), '---\nid: b-001\nkind: note\nstatus: active\n---\n# B\n');
   const db = openDatabase(join(root, 'data', 'test.sqlite'));
+  db.useProject('the-machine');
 
   const first = importCorpus(db, { root, docsDirectory: docs });
   assert.equal(first.documents_created, 2);

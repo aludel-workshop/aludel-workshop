@@ -335,6 +335,7 @@ test('existing Symphony attempts migrate to a durable run allowance', () => {
     state TEXT NOT NULL, workspace_path TEXT, candidate_id TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
     UNIQUE(project_id, work_id, batch_id)
   )`);
+  db.prepare("INSERT INTO projects(id, slug, name, description, created_at, updated_at) VALUES ('p', 'p', 'P', 'P', 'now', 'now')").run();
   db.prepare("INSERT INTO symphony_attempts VALUES ('att-old', 'p', 'a', 'w', 'b', 'digest', 'working', NULL, NULL, 'now', 'now')").run();
   initSymphonyWorker(db);
   const row = db.prepare("SELECT runs_started, run_limit FROM symphony_attempts WHERE id = 'att-old'").get();

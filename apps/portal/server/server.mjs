@@ -90,7 +90,8 @@ const secrets = openSecretStore(dataDirectory);
 const topology = hostTopology(process.env, port);
 // A layer's views may embed their own project's running app (the Pages Built view), never the portal.
 const views = layerUi({ dataDirectory, layerOrigin: topology.layerOrigin, portalOrigin: topology.portalOrigin, appOriginFor: label => {
-  const row = db.prepare("SELECT p.slug FROM layer_instances i JOIN projects p ON p.id = i.project_id WHERE 'i-' || replace(i.instance_id, '-', '') = ?").get(label);
+  const instance = db.prepare("SELECT project_id FROM layer_instances WHERE 'i-' || replace(instance_id, '-', '') = ?").get(label);
+  const row = instance && db.prepare('SELECT slug FROM projects WHERE id = ?').get(instance.project_id);
   return row ? topology.appOrigin(row.slug) : null; } });
 const setupConfigPath = join(portalRoot, 'config', 'project-setup.json');
 const gitSetup = loadGitProfile(setupConfigPath, 'the-machine');
@@ -103,7 +104,8 @@ const workspaceRoot = join(dataDirectory, 'workspaces');
 const previews = previewManager({ db, portalRoot, workspaceRoot, logRoot: join(dataDirectory, 'preview-logs'), runtime: previewRuntime() });
 // LAYER-BASE-01 B6: the project's Pages views run in their own frame, which the app's preview bridge also answers.
 const appUrls = slug => {
-  const instance = db.prepare("SELECT i.instance_id FROM layer_instances i JOIN projects p ON p.id = i.project_id WHERE p.slug = ? AND i.layer_key = 'pages'").get(slug)?.instance_id;
+  const projectId = db.prepare('SELECT id FROM projects WHERE slug = ?').get(slug)?.id;
+  const instance = projectId && db.prepare("SELECT instance_id FROM layer_instances WHERE project_id = ? AND layer_key = 'pages'").get(projectId)?.instance_id;
   return { portal: topology.portalOrigin, app: topology.appOrigin(slug), frames: instance ? [topology.layerOrigin(frameLabel(instance))] : [] };
 };
 const commitIdentity = user => ({ name: user?.name || 'Aludel', email: user?.email || 'owner@aludel.invalid' });
@@ -117,7 +119,8 @@ const know = knowledge({ db, catalogs, packs: catalogs.packs });
 const flows = onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot: join(dataDirectory, 'project-assets'), createWorkspace, know });
 // One-time: projects created before the layers (LAY-03) get phases, a vision and page records from their onboarding data.
 for (const project of db.prepare(`SELECT p.id, p.description, s.feel FROM projects p JOIN project_setup s ON s.project_id = p.id
-  WHERE p.id <> 'the-machine' AND s.layer_onboarding_version = 0 AND NOT EXISTS (SELECT 1 FROM knowledge_records k WHERE k.project_id = p.id AND k.kind = 'phase')`).all()) {
+  WHERE p.id <> 'the-machine' AND s.layer_onboarding_version = 0`).all()
+  .filter(project => !db.prepare("SELECT 1 FROM knowledge_records WHERE project_id = ? AND kind = 'phase'").get(project.id))) {
   know.ensureProject(project.id, { pitch: project.description });
   know.seedPages(project.id, project.feel);
 }
@@ -1378,18 +1381,37 @@ async function serveApp(request, response, slug) {
 const server = createServer(async (request, response) => {
   try {
     const target = topology.classify(request.headers.host);
-    if (target.kind === 'app') return await serveApp(request, response, target.slug);
-    if (target.kind === 'layers') return views.serve(request, response, new URL(request.url, `http://${host}:${port}`).pathname, target.label);
-    if (target.kind !== 'portal') return appPage(response, 421, 'Unknown address', 'This host is not served by Aludel.');
-    const url = new URL(request.url, `http://${host}:${port}`);
-    if (url.pathname.startsWith('/api/')) await api(request, response, url);
-    else serveStatic(response, url.pathname);
+    // PROJECT-DB-01: each request runs with its project as the current project, so its statements reach only that
+    // project's database. The project comes from the URL, the worker credential or the app host.
+    const projectId = requestProject(request, target);
+    if (projectId) return await db.withProject(projectId, () => handle(request, response, target));
+    return await handle(request, response, target);
   } catch (error) {
     if (!error.status) console.error(error);
     if (!response.headersSent) json(response, error.status || 500, { error: error.status ? error.message : 'The local portal could not complete that operation.', currentRevision: error.currentRevision });
     else response.end();
   }
 });
+function requestProject(request, target) {
+  const known = id => id && db.prepare('SELECT 1 FROM projects WHERE id = ?').get(id) ? id : null;
+  if (target.kind === 'app') return db.prepare('SELECT id FROM projects WHERE slug = ?').get(target.slug)?.id || null;
+  if (target.kind !== 'portal') return null;
+  const path = new URL(request.url, 'http://portal').pathname;
+  const scoped = /^\/api\/projects\/([^/]+)/.exec(path);
+  if (scoped) return known(decodeURIComponent(scoped[1]));
+  if (path.startsWith('/api/worker/')) { try { return worker.authenticate(request.headers.authorization).projectId; } catch { return null; } }
+  return null;
+}
+async function handle(request, response, target) {
+  {
+    if (target.kind === 'app') return await serveApp(request, response, target.slug);
+    if (target.kind === 'layers') return views.serve(request, response, new URL(request.url, `http://${host}:${port}`).pathname, target.label);
+    if (target.kind !== 'portal') return appPage(response, 421, 'Unknown address', 'This host is not served by Aludel.');
+    const url = new URL(request.url, `http://${host}:${port}`);
+    if (url.pathname.startsWith('/api/')) await api(request, response, url);
+    else serveStatic(response, url.pathname);
+  }
+}
 
 server.listen(port, host, () => {
   console.log(`Aludel is running at ${topology.portalOrigin} (also http://${host}:${port})`);
