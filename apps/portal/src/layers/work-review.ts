@@ -45,6 +45,7 @@ const evidenceType: Record<Evidence['type'], [string, string]> = { change: ['dif
                       @switch (change.kind) {
                         @case ('claim') { <dl class="wr-text">@if (change.before) { <dt>Was</dt><dd class="wr-was">{{ change.before }}</dd> }<dt>{{ change.before ? 'Now' : 'New' }}</dt><dd class="wr-now">{{ change.after }}</dd>
                           @if (change.note) { <dt>Note</dt><dd class="small">{{ change.note }}</dd> }@if (change.basis) { <dt>Basis</dt><dd class="small">{{ change.basis }}</dd> }</dl> }
+                        @case ('flow-revision') { <div class="wr-flow-revision"><section><h3>Previous</h3><pre class="wr-diff">{{ change.before }}</pre></section><section><h3>Proposed</h3><pre class="wr-diff">{{ change.after }}</pre></section></div> }
                         @case ('proposal') { <p class="lay-prose">{{ change.after }}</p><dl class="lay-fieldiff">@for (field of fields(change); track field[0]) { <dt>{{ field[0] }}</dt><dd>{{ field[1] }}</dd> }</dl> }
                         @case ('report') { <p class="lay-prose">{{ change.after }}</p>
                           @for (finding of change.findings || []; track $index) { <div class="wr-finding"><strong>{{ finding.title }}</strong> <span class="lay-chip lay-info">{{ finding.severity }}</span><p class="small"><strong>Affected:</strong> {{ finding.affected }}</p><p class="small"><strong>Evidence:</strong> {{ finding.evidence }}</p><p class="small"><strong>Suggested:</strong> {{ finding.recommendation }}</p></div> }

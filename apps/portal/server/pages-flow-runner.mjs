@@ -8,7 +8,8 @@ import { pagesPackageForProject } from './layer-package.mjs';
 // Each accepted source revision needs its own review. Existing installs retain their pin.
 const reviewedSources = new Map([
   ['e88409c78e790e8d4fdccc2ef4db043b6d3c39d3', '249643ad5110143af8193251bc8887f1f55c3c272ff553e199d2eeaf58b24728'],
-  ['7b18537648f872f3309b6d1dd2d3fca65d38d8c1', '51524ef9a737bfcad29e7a3eb491630a333fdb03538982190aa337f11cb71dd1']
+  ['7b18537648f872f3309b6d1dd2d3fca65d38d8c1', '51524ef9a737bfcad29e7a3eb491630a333fdb03538982190aa337f11cb71dd1'],
+  ['ae93312c96299c3b855024911f33362ab5cfecb9', '51524ef9a737bfcad29e7a3eb491630a333fdb03538982190aa337f11cb71dd1']
 ]);
 const entry = 'server/flow-change.mjs';
 const child = `

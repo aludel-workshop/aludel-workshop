@@ -57,7 +57,12 @@ export function workRuns({ db, know, candidates = null }) {
         ? parse(db.prepare('SELECT content_json FROM vision_proposals WHERE id = ?').get(proposal.id)?.content_json, null) : null);
       if (vision) changes.push({ id: proposal.id, kind: 'claim', icon: 'lightbulb', name: `Vision › Brief › ${sectionName(vision.section)}`,
         op: vision.targetId ? 'modified' : 'created', size: '1 claim', before: vision.beforeText || null, after: vision.text, note: vision.note || '', basis: vision.basis || '' });
-      else {
+      else if (proposal.action_id === 'pages.flows' && content.semanticReview) {
+        const review = content.semanticReview;
+        changes.push({ id:proposal.id, kind:'flow-revision', icon:'route', name:`Pages › Flow › ${review.before.title}`,
+          op:'modified', size:`r${review.target.expectedRevision} → r${review.target.acceptedRevision}`,
+          before:JSON.stringify(review.before,null,2), after:JSON.stringify(review.after,null,2) });
+      } else {
         const targets = bundle?.work?.targets || [];
         changes.push({ id: proposal.id, kind: 'proposal', icon: 'edit_document', name: targets.length ? targets.map(target => target.label).join(', ') : content.summary || proposal.action_id,
           op: targets.length ? 'modified' : 'created', size: `${Object.keys(content.content || {}).length} fields`, after: content.summary || '', content: content.content || {} });

@@ -100,7 +100,7 @@ export interface WorkItem { id: string; number: number; ref: string; layer: stri
 export interface FieldChange { field: string; before: unknown; after: unknown; }
 // WORK-ITEM-UX-01: one started run of a work item, with the task it was given, what it produced and how it was signed.
 export type WorkRunState = 'working' | 'needs' | 'review' | 'failed' | 'stopped' | 'accepted' | 'sent' | 'closed';
-export interface RunChange { id: string; kind: 'claim' | 'proposal' | 'report' | 'file'; icon: string; name: string; op: 'created' | 'modified' | 'removed'; size: string;
+export interface RunChange { id: string; kind: 'claim' | 'proposal' | 'flow-revision' | 'report' | 'file'; icon: string; name: string; op: 'created' | 'modified' | 'removed'; size: string;
   before?: string | null; after?: string; note?: string; basis?: string; content?: Record<string, unknown>; findings?: { severity: string; title: string; affected: string; evidence: string; recommendation: string }[]; candidateId?: string; }
 export interface RunStep { seq: number; kind: 'plan' | 'progress' | 'note'; at: string; objectives?: string[]; index?: number; status?: 'active' | 'done' | 'stuck'; note?: string; text?: string; }
 export interface WorkRun { id: string; number: number; batchId: string | null; state: WorkRunState;

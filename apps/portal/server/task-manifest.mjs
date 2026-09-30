@@ -13,6 +13,7 @@ export function compileTaskManifest(bundle) {
   const audit = action.id === 'platform.security' && action.tools?.includes('read') && !action.changes?.length;
   const proposal = ['product.define', 'product.clarify', 'product.brief', 'data.contract'].includes(action.id) && action.tools?.includes('read');
   const pagesFlow = action.id === 'pages.flows' && action.tools?.includes('read') && action.tools?.includes('revise');
+  const reviseFlow = pagesFlow && work.targets?.length === 1 && work.targets[0].kind === 'flow';
   const assessment = action.id.endsWith('.discover') && action.tools?.includes('read') && !action.changes?.length || ['design.audit', 'pages.a11y', 'deploy.review', 'work.review'].includes(action.id) && action.tools?.includes('read') && !action.changes?.length;
   if (!coding && !audit && !proposal && !assessment && !pagesFlow) fail('This action has no task output adapter.');
   if (action.id === 'product.clarify' && (!work.question || work.question.answer)) fail('Clarification needs an open question.');
@@ -21,6 +22,11 @@ export function compileTaskManifest(bundle) {
     if (!source?.revision) fail('A task target has no pinned project revision.');
     return { id: source.id, kind: source.kind, revision: source.revision, summary: summary(source) };
   });
+  for (const ref of bundle.flowInputs || []) {
+    const source = sources.find(record => record.id === ref.id && record.kind === ref.kind && record.revision === ref.revision);
+    if (!source) fail('A referenced flow input has no pinned project revision.');
+    inputs.push({ id:ref.id, kind:ref.kind, revision:ref.revision, summary:summary(source) });
+  }
   return {
     schemaVersion: 'aludel-task-open-v1',
     identity: { projectId: project.id, workId: work.id, workRef: work.ref, batchId: bundle.batch.id },
@@ -29,7 +35,7 @@ export function compileTaskManifest(bundle) {
     guidance: { project: guidance.project, role: guidance.role.instructions, action: action.instructions, profile: person ? '' : guidance.profile.instructions,
       method: audit ? 'Inspect only the pinned source and relevant knowledge. Report severity, affected source, evidence, recommendation, checked scope and unknowns. Ask if a decision blocks the result.' :
         coding ? 'Implement only the allowed code surface, run relevant checks, and submit the exact candidate commit.' :
-        pagesFlow ? 'Draft a Pages flow using existing pinned pages. Use a Vision story only when one is linked to this task. Submit a proposal for Work review; do not change Pages records.' :
+        pagesFlow ? reviseFlow ? 'Revise the pinned existing Pages flow. Preserve its ID, cite every current page, persona, activity or story used, and submit title and complete steps for Previous/Proposed Work review. A Vision story is optional. Do not change Pages records.' : 'Draft a Pages flow using existing pinned pages. Use a Vision story only when one is linked to this task. Submit a proposal for Work review; do not change Pages records.' :
         action.id.endsWith('.discover') ? 'Read this layer’s identity and every neighbor’s identity, outputs and reciprocal connection view. Propose a separate receiving policy for each source. State missing evidence and response to source changes. Do not activate a policy or edit project records.' :
         assessment ? 'Inspect the task scope and relevant project knowledge. Submit a findings report for lead review. Do not change project records or repository files.' :
         'Read the task and relevant project knowledge. Submit a bounded proposal for Work review. Do not change project records or repository files. Ask if a decision blocks the result.' },
@@ -47,7 +53,7 @@ export function compileTaskManifest(bundle) {
     outputs: audit ? [{ key: 'findings', kind: 'security_finding_report', operation: 'submit_for_review', reviewer: 'project owner',
       checks: work.checks.map(check => check.text) }] : coding ? [{ key: 'code', kind: 'code_candidate', operation: 'commit_for_review', reviewer: 'project owner', checks: work.checks.map(check => check.text) }] :
       [{ key: 'proposal', kind: pagesFlow ? 'pages_flow_proposal' : action.id.endsWith('.discover') ? 'layer_connection_proposal' : assessment ? 'review_report' : action.id === 'product.brief' ? 'vision_claim_proposal' : 'work_proposal', operation: 'submit_for_review', reviewer: 'role lead',
-        shape: action.id.endsWith('.discover') ? 'summary; content: connections[{sourceKey,mapping:reference-only|candidate-input,instructions,reaction,question?,answer?,evidence}]; one connection for each named source; usedInputs for any cited records' : pagesFlow ? 'summary; content: title, steps[{page,name,trigger?,story?}]; usedInputs must include every page and any linked story' : assessment ? 'summary; content: scope, findings[{title,evidence,recommendation}], optional uncertainty; usedInputs' :
+        shape: action.id.endsWith('.discover') ? 'summary; content: connections[{sourceKey,mapping:reference-only|candidate-input,instructions,reaction,question?,answer?,evidence}]; one connection for each named source; usedInputs for any cited records' : pagesFlow ? reviseFlow ? 'summary; content: title, steps[{page?,persona?,story?,name?,trigger?,why?}]; usedInputs must include the target flow and every referenced record at its current revision' : 'summary; content: title, steps[{page,name,trigger?,story?}]; usedInputs must include every page and any linked story' : assessment ? 'summary; content: scope, findings[{title,evidence,recommendation}], optional uncertainty; usedInputs' :
           action.id === 'product.brief' ? 'summary; content: section, text, note, basis; usedInputs' :
           action.id === 'product.define' ? 'summary; content: scenarios[{given,when,then}], optional edges[], questions[]; usedInputs' :
           action.id === 'product.clarify' ? 'summary; content: options[2..4], recommendation, reasoning; usedInputs' :

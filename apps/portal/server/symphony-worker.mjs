@@ -12,6 +12,8 @@ import { briefSections } from './knowledge.mjs';
 import { compiledLocalActions } from './lat07-actions.mjs';
 import { actionForProject, projectLayerDefinition } from './layer-registry.mjs';
 import { layerDeclarations, layerInstanceId } from './layer-contract.mjs';
+import { pagesFlowSnapshot, pagesFlowBaseInputs } from './pages-flow-work.mjs';
+import { runPagesFlowCandidate } from './pages-flow-runner.mjs';
 import { activeLayerTopology, discoverySourceSnapshot } from './layer-discovery.mjs';
 import { applyDiscoveryProposal } from './layer-space.mjs';
 
@@ -208,6 +210,8 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     const role = know.roleView(projectId).find(value => value.actions.some(candidate => candidate.id === entry.action)) ||
       (entry.action?.endsWith('.discover') ? { id: entry.layer, revision: 1, name: projectLayerDefinition(db,projectId,entry.layer)?.name || entry.layer, instructions: 'Inspect neighboring outputs and propose a receiving policy for review.' } : null);
     const targets = (entry.targets || []).map(target => know.get(projectId, target.id)).filter(Boolean);
+    const flowTarget = entry.action === 'pages.flows' && entry.targets.length === 1 && entry.targets[0].kind === 'flow' ? entry.targets[0] : null;
+    const flowInputs = flowTarget ? pagesFlowBaseInputs(pagesFlowSnapshot(db, know, projectId, flowTarget.id)) : [];
     const docs = know.list(projectId, 'doc').filter(doc => doc.agents && !targets.some(target => target.id === doc.id));
     const briefClaims = entry.action === 'product.brief' ? know.list(projectId, 'brief_claim').filter(claim => !targets.some(target => target.id === claim.id)) : [];
     const instructions = know.agentExport(projectId);
@@ -235,12 +239,13 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
       if (hash(JSON.stringify(installed)) !== discovery.topologyDigest) fail('Installed layers changed. Use the newer discovery task.', 409);
     }
     const layerPackage = layerPackageTaskContext(db, projectId, layerAction?.layer || entry.layer);
+    if (flowTarget && !layerPackage) fail('Revising a Pages flow requires an installed reviewed Pages package.', 409);
     const configuredMethod = method?.method_text || layerAction?.method || '';
     const methodPath = layerPackage && configuredMethod.match(new RegExp(`^${layerPackage.key}/([a-z][a-z0-9-]*)$`));
     const layerMethodText = methodPath ? layerPackage.documents.find(doc => doc.path === `knowledge/${methodPath[1]}.md`)?.markdown : configuredMethod;
     if (methodPath && !layerMethodText) fail('The pinned layer action method is missing from its package.', 409);
-    const content = { layerPackage, controlPins, codeObservation, layerDiscovery: discovery ? { ...discovery, receiver:projectLayerDefinition(db,projectId,entry.layer), sources: discoverySourceSnapshot(db,projectId,discovery.sourceKeys,entry.layer) } : null, schemaVersion: 1, project: project(projectId), work: entry, batch: { id: batchId },
-      sources: [...targets, ...briefClaims, ...docs], briefRevision: entry.action === 'product.brief' ? know.briefRevision(projectId) : null, sharedDocs: know.list(projectId, 'doc').filter(doc => doc.agents).map(doc => ({ id: doc.id, revision: doc.revision })), instructionPins: know.instructionPins(projectId, workerProfile, entry.action), guidance: { principles: instructions.principles, project: instructions.instructions,
+    const content = { layerPackage, flowInputs, controlPins, codeObservation, layerDiscovery: discovery ? { ...discovery, receiver:projectLayerDefinition(db,projectId,entry.layer), sources: discoverySourceSnapshot(db,projectId,discovery.sourceKeys,entry.layer) } : null, schemaVersion: 1, project: project(projectId), work: entry, batch: { id: batchId },
+      sources: [...targets, ...flowInputs.map(ref => know.get(projectId, ref.id)).filter(Boolean), ...briefClaims, ...docs], briefRevision: entry.action === 'product.brief' ? know.briefRevision(projectId) : null, sharedDocs: know.list(projectId, 'doc').filter(doc => doc.agents).map(doc => ({ id: doc.id, revision: doc.revision })), instructionPins: know.instructionPins(projectId, workerProfile, entry.action), guidance: { principles: instructions.principles, project: instructions.instructions,
         role: role && { id: role.id, revision: role.revision, name: role.name, instructions: role.instructions },
         layerAction: layerAction && { id: layerAction.id, revision: layerAction.revision, adapter: layerAction.adapter, result: layerAction.result, permissions: layerAction.permissions,
           methodRevision: method?.method_revision || null, method: layerMethodText },
@@ -306,7 +311,8 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     return { digest, attemptId: issue.native_ref.attempt_id, ...compileTaskManifest(bundle) };
   }
   const readableKinds = ['brief_claim', 'story', 'spec', 'page', 'doc', 'research', 'source', 'finding', 'insight', 'data_object', 'data_operation', 'access_rule', 'component', 'project'];
-  const scopedKinds = bundle => bundle.layerDiscovery ? [...new Set(['doc', ...layerDeclarations.filter(layer => layer.authority === 'knowledge_records' && [bundle.work.layer,...bundle.layerDiscovery.sourceKeys].includes(layer.key)).flatMap(layer => layer.outputs)])] : readableKinds;
+  const scopedKinds = bundle => bundle.layerDiscovery ? [...new Set(['doc', ...layerDeclarations.filter(layer => layer.authority === 'knowledge_records' && [bundle.work.layer,...bundle.layerDiscovery.sourceKeys].includes(layer.key)).flatMap(layer => layer.outputs)])] :
+    bundle.work.action === 'pages.flows' && bundle.work.targets?.[0]?.kind === 'flow' ? [...readableKinds, 'flow', 'persona', 'activity'] : readableKinds;
   function knowledgeMap(scope, digest) {
     const bundle=activeBundle(scope, digest);
     return { kinds: scopedKinds(bundle).map(kind => ({ kind, count: know.list(scope.projectId, kind).length })) };
@@ -618,7 +624,12 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
           !content.options.includes(content.recommendation) || typeof content.reasoning !== 'string' || !content.reasoning.trim() || content.reasoning.length > 1000)
         fail('Clarification proposal needs two to four options, a recommendation and a reason.');
     } else if (actionId === 'pages.flows') {
-      if (targets.length > 1 || targets.some(target => target.kind !== 'story') || typeof content.title !== 'string' || !content.title.trim() || content.title.length > 60 ||
+      const revise = targets.length === 1 && targets[0].kind === 'flow';
+      if (revise) {
+        if (typeof content.title !== 'string' || !content.title.trim() || content.title.length > 60 ||
+            !Array.isArray(content.steps) || content.steps.length > 40)
+          fail('Pages flow revision needs a title and no more than forty steps.');
+      } else if (targets.length > 1 || targets.some(target => target.kind !== 'story') || typeof content.title !== 'string' || !content.title.trim() || content.title.length > 60 ||
           !Array.isArray(content.steps) || content.steps.length < 1 || content.steps.length > 20 || !content.steps.every(step =>
             step && (targets[0] ? step.story === targets[0].id : (step.story === null || step.story === undefined)) && typeof step.page === 'string' && know.get(scope.projectId, step.page)?.kind === 'page' &&
             typeof step.name === 'string' && step.name.trim() && step.name.length <= 60 && (!step.trigger || typeof step.trigger === 'string' && step.trigger.length <= 80)))
@@ -639,9 +650,21 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
         fail('Data contract proposal needs one object and bounded, typed fields.');
     }
     const usedInputs = proposal.usedInputs || [];
-    if (!Array.isArray(usedInputs) || usedInputs.length > 40 || !usedInputs.every(ref =>
+    if (!Array.isArray(usedInputs) || usedInputs.length > (actionId === 'pages.flows' && targets[0]?.kind === 'flow' ? 160 : 40) || !usedInputs.every(ref =>
         ref && typeof ref.id === 'string' && Number.isInteger(ref.revision) && ref.revision > 0)) fail('Invalid used inputs.');
-    if (actionId === 'pages.flows') for (const step of content.steps) {
+    const reviseFlow = actionId === 'pages.flows' && targets.length === 1 && targets[0].kind === 'flow';
+    let semanticChange = null, semanticReview = null;
+    if (reviseFlow) {
+      const target = bundle.sources.find(source => source.id === targets[0].id && source.kind === 'flow');
+      const snapshot = pagesFlowSnapshot(db, know, scope.projectId, targets[0].id, content);
+      if (!target || snapshot.current.revision !== target.revision || bundle.layerPackage?.commit !== layerPackageForProject(db,scope.projectId,'pages')?.commit)
+        fail('The target flow or Pages source changed. Authorize a fresh run.', 409);
+      semanticChange = runPagesFlowCandidate(db, scope.projectId, 'propose', { workId:row.work_id, ...snapshot, next:content });
+      semanticReview = runPagesFlowCandidate(db, scope.projectId, 'review', { change:semanticChange, ...snapshot });
+      for (const ref of semanticChange.usedInputs) if (!usedInputs.some(input => input.id === ref.id && input.revision === ref.revision))
+        fail('Include every referenced flow input and its current revision.', 409);
+    }
+    if (actionId === 'pages.flows' && !reviseFlow) for (const step of content.steps) {
       const page = know.get(scope.projectId, step.page);
       if (!usedInputs.some(ref => ref.id === page.id && ref.revision === page.revision)) fail('Include each Pages step page and its revision in used inputs.');
     }
@@ -657,6 +680,7 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     if (clean || head !== bundle.repository.commit) fail('Read-only proposal workspace changed.', 409);
     const id = `spr-${randomUUID()}`;
     const result = { id, action: actionId, summary: proposal.summary.trim(), content, usedInputs,
+      ...(semanticChange ? { semanticChange, semanticReview } : {}),
       repositoryCommit: bundle.repository.commit, submission: proposal };
     atomic(() => {
       db.prepare("INSERT INTO symphony_proposals VALUES (?, ?, ?, ?, ?, ?, 'submitted', ?, NULL)")
@@ -677,7 +701,8 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
       db.prepare('UPDATE layer_work_items SET checks_json = ? WHERE id = ?').run(JSON.stringify(checks), row.work_id);
       know.appendLog(row.work_id, `Submitted ${bundle.guidance.action.name} proposal for review`, { state: 'review', context: { ...entry.context,
         ...(result.visionProposal ? { visionProposal: result.visionProposal } : { workProposal: { id, action: actionId,
-          summary: result.summary, content, usedInputs, repositoryCommit: result.repositoryCommit } }),
+          summary: result.summary, content, usedInputs, repositoryCommit: result.repositoryCommit,
+          ...(semanticReview ? { semanticReview } : {}) } }),
         run: { ...entry.context?.run, activity: 'Submitted proposal', finishedAt: now(), done: true } } },
         { by: { kind: 'agent', id: scope.profileId }, refs: targets.map(target => target.id) });
       appendEvent(scope, { attemptId, eventId: id, kind: 'submitted' });
@@ -700,7 +725,8 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
       if (!pinned || know.get(projectId, target.id)?.revision !== pinned.revision)
         fail('A target changed since this proposal was drafted. Send it back and authorize a fresh run.', 409);
     }
-    const content = JSON.parse(row.content_json).content;
+    const submitted = JSON.parse(row.content_json);
+    const content = submitted.content;
     db.exec('BEGIN IMMEDIATE');
     try {
       let acceptedFlowId = null;
@@ -735,7 +761,16 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
         }
         for (const ref of JSON.parse(row.content_json).usedInputs || []) if (know.get(projectId, ref.id)?.revision !== ref.revision)
           fail('A used input changed. Send this proposal back.', 409);
-        acceptedFlowId = know.insert(projectId, 'flow', { title: content.title, steps: content.steps, review: { state: 'none', work: entry.ref } }, options).id;
+        if (bundle.work.targets.length === 1 && bundle.work.targets[0].kind === 'flow') {
+          const target = bundle.work.targets[0];
+          if (!submitted.semanticChange || !submitted.semanticReview || submitted.semanticChange.workId !== workId)
+            fail('The reviewed flow change is missing.', 409);
+          const snapshot = pagesFlowSnapshot(db, know, projectId, target.id, content);
+          const review = runPagesFlowCandidate(db, projectId, 'review', { change:submitted.semanticChange, ...snapshot });
+          if (JSON.stringify(review) !== JSON.stringify(submitted.semanticReview))
+            fail('The reviewed flow result changed. Send this proposal back.', 409);
+          acceptedFlowId = know.update(projectId, target.id, review.after, { ...options, expectedRevision:review.target.expectedRevision }).id;
+        } else acceptedFlowId = know.insert(projectId, 'flow', { title: content.title, steps: content.steps, review: { state: 'none', work: entry.ref } }, options).id;
     } else if (['design.audit', 'pages.a11y', 'deploy.review', 'work.review'].includes(row.action_id)) {
         // Read-only review outputs are the accepted report itself; no target record is changed.
       } else if (row.action_id === 'product.clarify') {

@@ -66,6 +66,7 @@ export class WorkCreateComponent {
       ...data.stories.map(entry => ({ id: entry.id, label: `Story · ${entry.ref} ${entry.title}` })),
       ...data.claims.map(entry => ({ id: entry.id, label: `Vision · ${entry.text}` })),
       ...data.pages.map(entry => ({ id: entry.id, label: `Page · ${entry.label}` })),
+      ...data.flows.map(entry => ({ id: entry.id, label: `Flow · ${entry.title}` })),
       ...data.components.map(entry => ({ id: entry.id, label: `Component · ${entry.name}` })),
       ...data.objects.map(entry => ({ id: entry.id, label: `Object · ${entry.name}` })),
       ...data.operations.map(entry => ({ id: entry.id, label: `API · ${entry.operationId}` })),
@@ -93,9 +94,11 @@ export class WorkCreateComponent {
     if (!this.selectedAction()?.agentRunnable || !profileId || !this.ctx.data()?.symphonyProfiles?.includes(profileId)) return false;
     const story = this.ctx.data()?.stories.some(entry => entry.id === this.target);
     const object = this.ctx.data()?.objects.some(entry => entry.id === this.target);
+    const flow = this.ctx.data()?.flows.some(entry => entry.id === this.target);
     if (id === 'product.define' || id === 'platform.implement') return Boolean(story);
     if (id === 'data.contract') return Boolean(object);
     if (id === 'product.brief') return !this.target || Boolean(this.ctx.data()?.claims.some(entry => entry.id === this.target));
+    if (id === 'pages.flows') return !this.target || Boolean(story || flow && this.ctx.layerInstances().find(entry => entry.key === 'pages')?.packageCommit);
     return ['platform.security', 'design.audit', 'pages.a11y', 'deploy.review', 'work.review'].includes(id);
   }
   create() {

@@ -1,6 +1,7 @@
 import { workActionMigration } from './lat08-migration.mjs';
 import { compiledLocalActions } from './lat07-actions.mjs';
 import { actionForProject } from './layer-registry.mjs';
+import { pagesPackageForProject } from './layer-package.mjs';
 // Work batches stage human tasks or Go-pin explicit agent actions for Symphony.
 // Record changes are accepted at the checked output boundary, never during an agent turn.
 
@@ -118,7 +119,10 @@ export function agentRuns({ db, know, worker = null, symphonyDispatch = false })
     if (!(runnable(projectId,entry.action) && symphonyCompatible(projectId, entry.assignee.id))) fail(`Agents can't run “${actionLabel(projectId, entry.action)}” yet. Assign ${entry.ref} to a person.`, 409);
     if (entry.question && !entry.question.answer && entry.action !== 'product.clarify') fail('Answer the open question before staging this agent task.', 409);
     if (entry.action === 'product.clarify' && (!entry.question || entry.question.answer)) fail('Draft answers only for an open question.', 409);
-    if (entry.action === 'pages.flows' && (entry.targets.length > 1 || entry.targets.some(target => target.kind !== 'story'))) fail('A Pages flow may link at most one Vision story.', 409);
+    if (entry.action === 'pages.flows' && !(entry.targets.length === 0 || entry.targets.length === 1 && ['story','flow'].includes(entry.targets[0].kind)))
+      fail('A Pages flow may target one existing flow or link one optional Vision story.', 409);
+    if (entry.action === 'pages.flows' && entry.targets[0]?.kind === 'flow' && !pagesPackageForProject(db, projectId))
+      fail('Install a reviewed Pages package before an agent revises an existing flow.', 409);
     if (entry.action === 'product.define' && !entry.targets.some(target => target.kind === 'story')) fail('Link a story before an agent writes acceptance.', 409);
     if (entry.action === 'product.brief' && (entry.targets.length > 1 || entry.targets.some(target => target.kind !== 'brief_claim')))
       fail('Link at most one Vision Brief claim, or leave the target empty to propose a new claim.', 409);

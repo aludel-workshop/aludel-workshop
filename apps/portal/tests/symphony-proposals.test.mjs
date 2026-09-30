@@ -20,12 +20,13 @@ import { initSymphonyWorker, symphonyWorker } from '../server/symphony-worker.mj
 import { initActionMigration, migrateActionProject } from '../server/lat08-migration.mjs';
 import { stageLayerDiscovery } from '../server/layer-discovery.mjs';
 import { initWorkflow } from '../server/workflow.mjs';
+import { initWorkRuns, workRuns } from '../server/work-runs.mjs';
 
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, stdio: 'pipe' }).toString().trim();
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'aludel-proposal-'));
   const db = openDatabase(join(root, 'machine.sqlite'));
-  initWorkflow(db); ensureProductWorkspace(db); initAccounts(db); initOnboarding(db); initKnowledge(db); initLayerContract(db); initPagesLayerApp(db); initPagesCodeObservations(db); initAgentRuns(db); initSymphonyWorker(db);
+  initWorkflow(db); ensureProductWorkspace(db); initAccounts(db); initOnboarding(db); initKnowledge(db); initLayerContract(db); initPagesLayerApp(db); initPagesCodeObservations(db); initAgentRuns(db); initSymphonyWorker(db); initWorkRuns(db);
   const catalogs = loadCatalogs(new URL('../config', import.meta.url).pathname);
   const know = knowledge({ db, catalogs, packs: catalogs.packs });
   const flows = onboarding({ db, catalogs, secrets: openSecretStore(root), workspaceRoot: join(root, 'workspaces'), assetRoot: join(root, 'assets'), createWorkspace: () => {}, know });
@@ -527,8 +528,8 @@ test('Pages flow task includes exact installed layer method and repository Knowl
       assignee: { kind: 'agent', id: f.profile.id }, targets: [{ id: existingFlow.id, kind: 'flow', label: existingFlow.title }],
       checks: ['Preserve the flow identity and explain the changed steps'] }, f.owner.name);
     if (modify.state === 'suggested') f.know.updateWork(f.owner, f.projectId, modify.id, { state: 'ready' });
-    assert.throws(() => f.runs.stage(f.owner, f.projectId, modify.id), /at most one Vision story/,
-      'the current agent adapter cannot modify an existing flow');
+    assert.equal(f.runs.stage(f.owner, f.projectId, modify.id).context.batch !== undefined, true,
+      'an existing flow can be staged without a Vision story');
     assert.ok(f.worker.current(f.scope, work.id));
     f.db.prepare("UPDATE layer_package_bindings SET accepted_commit = ? WHERE project_id = ? AND layer_key = 'pages'")
       .run('aabcfff1f457f8fe4517ea4ec8aef23263e38371', f.projectId);
@@ -539,4 +540,131 @@ test('Pages flow task includes exact installed layer method and repository Knowl
     if (oldData === undefined) delete process.env.MACHINE_DATA_DIR; else process.env.MACHINE_DATA_DIR = oldData;
     if (oldTemplates === undefined) delete process.env.MACHINE_PAGES_TEMPLATE_ENABLED; else process.env.MACHINE_PAGES_TEMPLATE_ENABLED = oldTemplates;
   }
+});
+
+
+test('a flow-only Pages task reviews Previous/Proposed and atomically revises one existing flow', async () => {
+  const data = mkdtempSync(join(tmpdir(), 'aludel-pages-revise-'));
+  const oldData = process.env.MACHINE_DATA_DIR, oldTemplates = process.env.MACHINE_PAGES_TEMPLATE_ENABLED;
+  process.env.MACHINE_DATA_DIR = data;
+  process.env.MACHINE_PAGES_TEMPLATE_ENABLED = '1';
+  let f;
+  try {
+    f = fixture();
+    f.db.prepare("UPDATE layer_instances SET enabled = 0 WHERE project_id = ? AND layer_key = 'product'").run(f.projectId);
+    const page = f.know.insert(f.projectId,'page',{label:'Browse',icon:'article',pageType:'list',status:'planned'});
+    const second = f.know.insert(f.projectId,'page',{label:'Detail',icon:'article',pageType:'detail',status:'planned'});
+    const flow = f.know.insert(f.projectId,'flow',{title:'Browse',steps:[{page:page.id,name:'Browse'}]});
+    const {work,issue,card} = f.start('pages.flows',[{id:flow.id,kind:'flow',label:flow.title}]);
+    assert.equal(card.requiredInputs[0].id,flow.id);
+    assert.ok(card.requiredInputs.some(ref=>ref.id===page.id && ref.revision===page.revision));
+    assert.match(card.guidance.method,/Vision story is optional/);
+    assert.equal(card.outputs[0].kind,'pages_flow_proposal');
+    const proposal = {summary:'Revise the existing browse flow with a missing decision page.',content:{title:'Browse and decide',steps:[
+      {page:null,name:'Decision gap',why:'No decision page yet'},
+      {page:second.id,name:'Inspect detail'}]},usedInputs:[
+      {id:flow.id,revision:flow.revision},{id:page.id,revision:page.revision},{id:second.id,revision:second.revision}]};
+    assert.throws(()=>f.worker.submitProposal(f.scope,{attemptId:issue.native_ref.attempt_id,proposal:{...proposal,usedInputs:proposal.usedInputs.slice(0,2)}}),/every referenced flow input/);
+    const submitted=f.worker.submitProposal(f.scope,{attemptId:issue.native_ref.attempt_id,proposal});
+    assert.equal(f.know.get(f.projectId,flow.id).revision,flow.revision);
+    assert.equal(f.know.list(f.projectId,'flow').length,1);
+    const history=workRuns({db:f.db,know:f.know});
+    const reviewed=history.list(f.projectId,work.id)[0].changes[0];
+    assert.equal(reviewed.kind,'flow-revision');
+    assert.equal(JSON.parse(reviewed.before).title,'Browse');
+    assert.equal(JSON.parse(reviewed.after).steps[0].page,null);
+    assert.throws(()=>f.worker.acceptProposal(f.owner,f.projectId,work.id,submitted.proposalId),/check/);
+    const signed=await history.sign(f.owner,f.projectId,work.id,issue.native_ref.attempt_id,{outcome:'accept',comment:'The gap is clear.'},
+      {accept:()=>f.worker.acceptProposal(f.owner,f.projectId,work.id,submitted.proposalId)});
+    assert.equal(signed.review.outcome,'accepted');
+    assert.equal(f.know.get(f.projectId,flow.id).revision,flow.revision+1);
+    assert.equal(f.know.list(f.projectId,'flow').length,1);
+    assert.equal(f.know.workById(f.projectId,work.id).state,'done');
+    assert.equal(f.db.prepare('SELECT work_item_id FROM knowledge_revisions WHERE record_id=? AND revision=?').get(flow.id,flow.revision+1).work_item_id,work.id);
+    const recoveredWorker=symphonyWorker({db:f.db,know:f.know,workspaceRoot:join(f.root,'worker')});
+    assert.equal(recoveredWorker.acceptProposal(f.owner,f.projectId,work.id,submitted.proposalId).proposalId,submitted.proposalId);
+    assert.equal(f.db.prepare('SELECT count(*) AS count FROM knowledge_revisions WHERE record_id=?').get(flow.id).count,2);
+  } finally {
+    f?.close(); rmSync(data,{recursive:true,force:true});
+    if (oldData===undefined) delete process.env.MACHINE_DATA_DIR; else process.env.MACHINE_DATA_DIR=oldData;
+    if (oldTemplates===undefined) delete process.env.MACHINE_PAGES_TEMPLATE_ENABLED; else process.env.MACHINE_PAGES_TEMPLATE_ENABLED=oldTemplates;
+  }
+});
+
+
+test('revising a flow rejects changed source, foreign instance and stale page without partial acceptance', () => {
+  const data = mkdtempSync(join(tmpdir(), 'aludel-pages-revise-stale-'));
+  const oldData=process.env.MACHINE_DATA_DIR, oldTemplates=process.env.MACHINE_PAGES_TEMPLATE_ENABLED;
+  process.env.MACHINE_DATA_DIR=data; process.env.MACHINE_PAGES_TEMPLATE_ENABLED='1';
+  let f;
+  try {
+    f=fixture();
+    const page=f.know.insert(f.projectId,'page',{label:'Browse',icon:'article',pageType:'list',status:'planned'});
+    const flow=f.know.insert(f.projectId,'flow',{title:'Browse',steps:[{page:page.id,name:'Browse'}]});
+    const {work,issue}=f.start('pages.flows',[{id:flow.id,kind:'flow',label:flow.title}]);
+    const proposal={summary:'Revise the existing browse flow without a Vision story.',content:{title:'Browse again',steps:[{page:page.id,name:'Revised browse'}]},
+      usedInputs:[{id:flow.id,revision:flow.revision},{id:page.id,revision:page.revision}]};
+    const submitted=f.worker.submitProposal(f.scope,{attemptId:issue.native_ref.attempt_id,proposal});
+    f.know.updateWork(f.owner,f.projectId,work.id,{verdict:{index:0,value:'accept'}});
+    const newPin='ae93312c96299c3b855024911f33362ab5cfecb9', oldPin='e88409c78e790e8d4fdccc2ef4db043b6d3c39d3';
+    f.db.prepare("UPDATE layer_package_bindings SET accepted_commit=? WHERE project_id=? AND layer_key='pages'").run(oldPin,f.projectId);
+    assert.throws(()=>f.worker.acceptProposal(f.owner,f.projectId,work.id,submitted.proposalId),/installed source|source.*changed/);
+    f.db.prepare("UPDATE layer_package_bindings SET accepted_commit=? WHERE project_id=? AND layer_key='pages'").run(newPin,f.projectId);
+    const instance=f.db.prepare('SELECT layer_instance_id FROM knowledge_records WHERE id=?').get(flow.id).layer_instance_id;
+    f.db.prepare('UPDATE knowledge_records SET layer_instance_id=? WHERE id=?').run('foreign-instance',flow.id);
+    assert.throws(()=>f.worker.acceptProposal(f.owner,f.projectId,work.id,submitted.proposalId),/target changed|target flow|changed since/);
+    f.db.prepare('UPDATE knowledge_records SET layer_instance_id=? WHERE id=?').run(instance,flow.id);
+    f.know.update(f.projectId,page.id,{notes:'Page changed after proposal'},{expectedRevision:page.revision});
+    assert.throws(()=>f.worker.acceptProposal(f.owner,f.projectId,work.id,submitted.proposalId),/used input changed/);
+    assert.equal(f.know.get(f.projectId,flow.id).revision,flow.revision);
+    assert.equal(f.know.workById(f.projectId,work.id).state,'review');
+    assert.equal(f.db.prepare('SELECT state FROM symphony_proposals WHERE id=?').get(submitted.proposalId).state,'submitted');
+    assert.equal(f.db.prepare('SELECT count(*) AS count FROM knowledge_revisions WHERE record_id=?').get(flow.id).count,1);
+  } finally {
+    f?.close(); rmSync(data,{recursive:true,force:true});
+    if (oldData===undefined) delete process.env.MACHINE_DATA_DIR; else process.env.MACHINE_DATA_DIR=oldData;
+    if (oldTemplates===undefined) delete process.env.MACHINE_PAGES_TEMPLATE_ENABLED; else process.env.MACHINE_PAGES_TEMPLATE_ENABLED=oldTemplates;
+  }
+});
+
+
+test('a cited persona revision is mandatory and stale persona denies flow acceptance', () => {
+  const data=mkdtempSync(join(tmpdir(),'aludel-pages-revise-persona-'));
+  const oldData=process.env.MACHINE_DATA_DIR, oldTemplates=process.env.MACHINE_PAGES_TEMPLATE_ENABLED;
+  process.env.MACHINE_DATA_DIR=data; process.env.MACHINE_PAGES_TEMPLATE_ENABLED='1';
+  let f;
+  try {
+    f=fixture();
+    const persona=f.know.insert(f.projectId,'persona',{name:'Shopper'});
+    const page=f.know.insert(f.projectId,'page',{label:'Browse',icon:'article',pageType:'list',status:'planned'});
+    const flow=f.know.insert(f.projectId,'flow',{title:'Browse',persona:persona.id,steps:[{page:page.id,persona:persona.id,name:'Browse'}]});
+    const {work,issue,card}=f.start('pages.flows',[{id:flow.id,kind:'flow',label:flow.title}]);
+    assert.ok(card.requiredInputs.some(ref=>ref.id===persona.id && ref.revision===persona.revision));
+    const proposal={summary:'Revise the flow while keeping the cited shopper persona.',content:{title:'Browse again',steps:[{page:page.id,persona:persona.id,name:'Browse again'}]},
+      usedInputs:[{id:flow.id,revision:flow.revision},{id:page.id,revision:page.revision},{id:persona.id,revision:persona.revision}]};
+    assert.throws(()=>f.worker.submitProposal(f.scope,{attemptId:issue.native_ref.attempt_id,proposal:{...proposal,usedInputs:proposal.usedInputs.slice(0,2)}}),/every referenced flow input/);
+    const submitted=f.worker.submitProposal(f.scope,{attemptId:issue.native_ref.attempt_id,proposal});
+    f.know.updateWork(f.owner,f.projectId,work.id,{verdict:{index:0,value:'accept'}});
+    f.know.update(f.projectId,persona.id,{note:'Changed after submission'},{expectedRevision:persona.revision});
+    assert.throws(()=>f.worker.acceptProposal(f.owner,f.projectId,work.id,submitted.proposalId),/used input changed/);
+    assert.equal(f.know.get(f.projectId,flow.id).revision,flow.revision);
+    assert.equal(f.know.workById(f.projectId,work.id).state,'review');
+  } finally {
+    f?.close(); rmSync(data,{recursive:true,force:true});
+    if (oldData===undefined) delete process.env.MACHINE_DATA_DIR; else process.env.MACHINE_DATA_DIR=oldData;
+    if (oldTemplates===undefined) delete process.env.MACHINE_PAGES_TEMPLATE_ENABLED; else process.env.MACHINE_PAGES_TEMPLATE_ENABLED=oldTemplates;
+  }
+});
+
+test('an existing-flow agent task waits for a reviewed Pages package but still needs no story', () => {
+  const f=fixture();
+  try {
+    const page=f.know.insert(f.projectId,'page',{label:'Browse',icon:'article',pageType:'list',status:'planned'});
+    const flow=f.know.insert(f.projectId,'flow',{title:'Browse',steps:[{page:page.id,name:'Browse'}]});
+    const work=f.know.createWork(f.projectId,{action:'pages.flows',title:'Revise browse',
+      assignee:{kind:'agent',id:f.profile.id},targets:[{id:flow.id,kind:'flow',label:flow.title}],checks:['Preserve the flow ID']},f.owner.name);
+    if (work.state==='suggested') f.know.updateWork(f.owner,f.projectId,work.id,{state:'ready'});
+    assert.throws(()=>f.runs.stage(f.owner,f.projectId,work.id),/Install a reviewed Pages package/);
+    assert.equal(f.know.workById(f.projectId,work.id).state,'ready');
+  } finally { f.close(); }
 });
