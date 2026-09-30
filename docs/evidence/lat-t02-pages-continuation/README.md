@@ -2,7 +2,7 @@
 
 ## Scope and revisions
 
-The owner directed Pages-specific data, code, shared design language, same-task agent packet and build-note migration work before moving to other templates, plus a GitHub publication investigation. This remains an isolated local candidate. The Pages source repository is pinned at `7a168a1f081a406ec095b893af9c5b21da3db5f2` (prior UX/doc/theme commits in its history). This candidate follows the earlier source extraction `f6adc8e813aead602304080e1f0e18584e84d66d`. No original project data, retained LAT-08 candidate, GitHub account or provider was changed.
+The owner directed Pages-specific data, code, shared design language, same-task agent packet and build-note migration work before moving to other templates, plus a GitHub publication investigation. This remains an isolated local candidate. The Pages source repository is pinned at `10604c43a615511cd579b8976d7d2e120033e742` (prior UX/doc/theme commits in its history). This candidate follows the earlier source extraction `f6adc8e813aead602304080e1f0e18584e84d66d`. No original project data, retained LAT-08 candidate, GitHub account or provider was changed.
 
 The template now also has `docs/source-inventory.md`, a file-level account of remaining Pages-specific portal branches and the order for extracting them.
 
@@ -45,3 +45,7 @@ The real worker test passes using a disposable project and no provider turn. Thi
 **Reusable change:** compare actual model-facing packets on identical saved bundles and preserve an executable negative fixture for an unsupported owner task. Sweep owner notes into template docs with a source/status ledger, and check extracted UI against a named host theme API. The packet/compiler and browser tests support these changes for Pages; they do not prove general layer SDK isolation, model usefulness, safe server adapters or migration of original data.
 
 **Roadmap effect:** implement a checked per-project UI/server extension boundary, a revise-flow adapter, historical-deletion recovery and same-fixture authority cutover before Pages is called self-contained. GitHub provider binding and template generation follow a reviewable local flow. LAT-08 owner review/original-data gates remain open; this continuation does not close LAT-T01 or LAT-T02.
+
+## Q-011 follow-up — 2026-09-29
+
+The owner challenged Git-file authority for complex Pages outputs. The template data document now treats the tested deterministic files as an export/restore primitive, while [the revised comparison](../../../../docs/design/layer-app-transition/pages-output-authority.md) proposes a structured output store and database-backed semantic change sets. This is a design correction, not a runtime cutover or a passed branch/merge test. Q-011 remains unconfirmed.
