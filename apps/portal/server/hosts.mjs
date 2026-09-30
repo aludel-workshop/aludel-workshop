@@ -1,6 +1,6 @@
 // DEC-033: the portal lives at aludel.<base> and each project preview at <slug>.<base>.
 // Nothing here assumes localhost: a hosted deployment sets the base domain, scheme and public port.
-export const reservedSlugs = new Set(['aludel', 'www', 'api', 'admin', 'app', 'the-machine', 'localhost', 'mail', 'static']);
+export const reservedSlugs = new Set(['aludel', 'www', 'api', 'admin', 'app', 'the-machine', 'localhost', 'mail', 'static', 'layers']);
 const legacyPortalHosts = new Set(['127.0.0.1', 'localhost', '[::1]']);
 
 export function hostTopology(environment = process.env, listenPort = 4310) {
@@ -14,9 +14,14 @@ export function hostTopology(environment = process.env, listenPort = 4310) {
     baseDomain,
     portalOrigin: origin(portalHost),
     appOrigin: slug => origin(`${slug}.${baseDomain}`),
+    // LAYER-BASE-01 B6: each layer instance's own views, served into a sandboxed frame from that instance's own origin.
+    layerOrigin: label => origin(`${label}.layers.${baseDomain}`),
+    layerOrigins: origin(`*.layers.${baseDomain}`),
     classify(hostHeader = '') {
       const host = String(hostHeader).toLowerCase().replace(/:\d+$/, '');
       if (host === portalHost || host === baseDomain || legacyPortalHosts.has(host)) return { kind: 'portal', host };
+      const layer = new RegExp(`^(i-[0-9a-f]{32})\\.layers\\.${baseDomain.replace(/\./g, '\\.')}$`).exec(host);
+      if (layer) return { kind: 'layers', label: layer[1], host };
       if (host.endsWith(`.${baseDomain}`)) {
         const label = host.slice(0, -(baseDomain.length + 1));
         if (/^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/.test(label) && !reservedSlugs.has(label)) return { kind: 'app', slug: label, host };

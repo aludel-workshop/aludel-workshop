@@ -113,10 +113,18 @@ try {
   const tooLong = await context.request.put(`${portal}/api/projects/${projectId}/records/${page1.id}`, { data: { data: { label: 'x'.repeat(31) }, expectedRevision: page1.revision } });
   assert.equal(tooLong.status(), 400);
   assert.match((await tooLong.json()).error, /Page name must be under 30 characters/);
+  // A layer frame's calls, as the portal carries them, may do only what frames are allowed: not Access, not another layer's records.
+  const asFrame = { 'x-aludel-layer-frame': 'pages' };
+  assert.equal((await context.request.put(`${portal}/api/projects/${projectId}/layer-access/pages`, { headers: asFrame, data: { userId: 'x', elevated: true } })).status(), 403);
+  assert.equal((await context.request.post(`${portal}/api/projects/${projectId}/records`, { headers: asFrame, data: { kind: 'story', data: { title: 'Not Pages' } } })).status(), 403);
+  assert.equal((await context.request.get(`${portal}/api/projects/${projectId}/knowledge`, { headers: asFrame })).status(), 200);
   const renamed = await context.request.post(`${portal}/api/projects/${projectId}/layers/pages/api/updatePage`, { data: { id: page1.id, body: { expectedRevision: page1.revision, changes: { label: 'All tools' } } } });
   assert.ok(renamed.ok(), await renamed.text());
   await page.goto(`${base}/pages`);
-  await page.waitForFunction(() => [...document.querySelectorAll('main input, main textarea')].some(field => field.value === 'All tools'));
+  // Pages' own views run in its layer frame when the layer comes from its repository.
+  await page.locator('iframe.lay-frame-view, .lay-pg-host').first().waitFor({ timeout: 60000 });
+  const pagesView = await page.locator('iframe.lay-frame-view').count() ? await (await page.locator('iframe.lay-frame-view').elementHandle()).contentFrame() : page;
+  await pagesView.waitForFunction(() => [...document.querySelectorAll('input, textarea')].some(field => field.value === 'All tools'), null, { timeout: 30000 });
   await shot('pages-after-rename');
 
   // Tasks: Access replaces Actions for the layer-scoped Pages layer.

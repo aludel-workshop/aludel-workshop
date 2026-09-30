@@ -161,7 +161,8 @@ test('the scaffold routes every page, renders spec sections marked for Pages, an
   assert.deepEqual(generated.sections.map(section => [section.name, section.kind, section.title, section.action, section.leadsTo]), [['Start', 'button', 'Talk it over', 'New message', '/tool-detail']],
     'Ready sections only, with their component’s preview kind and the target page’s path');
   assert.equal(site.portal, 'http://aludel.localhost:4310');
-  assert.match(files['src/aludel-bridge.ts'], /event\.origin !== site\.portal/, 'the bridge answers only its portal');
+  assert.match(files['src/aludel-bridge.ts'], /const trusted = \[site\.portal, \.\.\.\(site\.frames \|\| \[\]\)\];/, 'the bridge trusts its portal and this project\'s Pages views');
+  assert.match(files['src/aludel-bridge.ts'], /if \(!trusted\.includes\(event\.origin\)/, 'and nothing else');
   assert.match(files['src/aludel-bridge.ts'], /window\.parent !== window/);
   assert.match(files['src/main.ts'], /import '\.\/aludel-bridge';/);
   assert.match(files['src/app.html'], /\[attr\.data-aludel-page\]="current\.id"/);

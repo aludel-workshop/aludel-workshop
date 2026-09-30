@@ -1,4 +1,4 @@
-# One base layer repository; every layer is a fork (LAYER-BASE-01 B1–B5, B7) — 2026-09-30
+# One base layer repository; every layer is a fork (LAYER-BASE-01 B1–B7) — 2026-09-30
 
 ## Authorization and readiness
 
@@ -56,11 +56,44 @@ The scope, the packet order and the open B6 choice are recorded in the root [wor
 - Browser, with and without templates: **pages**, **layer-bar** and **markdown-editor** all pass. With templates on, the Markdown journey runs on a forked Markdown instance through its API.
 - `layer-scope` journey passes, including a sandbox branch and its Tests tab (screenshot inspected).
 
+## B6: layer views from their own repository, in a sandboxed frame (owner chose option (a))
+
+- **Build.** `tools/build-layer-ui.mjs` compiles an instance's `ui/` files, as listed in its manifest at the pinned commit, into a separate bundle. It uses the portal's own host modules, the ones `@aludel/host/*` imports resolve to, and executes nothing from the repository. Viewport units are rewritten to follow the portal's viewport. Builds are keyed by commit, layer and the portal's frame-SDK digest, so instances on one template commit share a build. Builds run at startup, after an accepted merge, and on first view; one takes about 6 s.
+- **Frame.**
+  - Each instance's views are served from its own origin (`i-<instance>.layers.<base>`) with `sandbox allow-scripts allow-forms allow-same-origin`, no network (`connect-src 'none'`), no forms, and no top navigation.
+  - The frame may embed only its own project's app and may be framed only by the portal.
+  - The portal's session cookie is host-only (`SameSite=Strict`), so the frame never has it.
+  - The frame root carries the shell's theme tokens and the main column's typography.
+- **Bridge.** Inside the frame, `FrameProjectContext` is the portal's own `ProjectContext`, with network access, navigation, images, and notices, errors and unsaved marks carried to the portal page by messages. The portal:
+  - posts only to the frame's origin and accepts messages only from it;
+  - forwards calls with `x-aludel-layer-frame`, which the server checks against the allowlist: project reads, this layer's API and records, creating Work, and for Pages its three host features;
+  - mirrors notices and errors, and sizes the frame to its content.
+- **Layer views are shown this way** whenever the instance's repository declares `ui`. Without templates, the compiled-in Pages remains.
+- **UX regressions the full Pages journey found in the frame, all fixed:**
+  - missing shell theme tokens (radii, lines, muted backgrounds);
+  - icon font class not set (icons showed as text);
+  - a doubled reload that re-rendered a newly focused field (the title typed into it was lost and Enter created a second blank);
+  - `autofocus` ignored in cross-origin frames (focused by script instead);
+  - the Built view's nested app losing its origin under the sandbox (fixed by per-instance origins);
+  - the app's preview bridge answering only the portal (now also this project's Pages frame).
+- **Measured:** Pages first render with a warm build, median **214 ms framed vs 135 ms** in the portal (local, 5 loads each). Moving between Map, Pages and Flows keeps the frame.
+- **Checks:**
+  - Server suite **192/192**, with new frame tests for the allowlist matrix, per-instance host classification, served CSP and path safety, and a real build shared across instances.
+  - Typecheck and build pass.
+  - The full **pages** journey runs inside the frame (made frame-aware without changing its steps; it also runs axe inside the frame and checks 390px width there). It passed **3/3** with templates on, and passes with templates off.
+  - **layer-bar** and **markdown-editor** pass in both modes.
+  - **layer-scope** passes, including real HTTP checks that frame-marked calls to Access or another layer's records get 403.
+- **Limits:**
+  - About 80 ms more on a full load.
+  - Drags that leave the frame stop tracking.
+  - The test waits for the new blank's title to take focus before typing: focus arrives 60 ms after render, as in the portal, but the frame's extra hop made a zero-delay test race it.
+  - Layers without their own `ui` still use host views; generated views from a layer's API are not built yet.
+  - Apps generated before this change need their preview regenerated before the Built view's inspection works from the frame.
+
 ## Limits
 
-- **B6 is not done: layer UI is still compiled into the portal from the Pages template pin.** Server-side layer parts (charter, Knowledge, API document, handler, flow rule) come from each instance's `main`. A merged `ui/` change is pinned but not shown.
 - The other five built-in layers have no template branch yet (LAT-T03), so they get no repository.
-- A base-template layer that adds outputs has no host view for them until B6's API-derived views exist.
+- A base-template layer that adds outputs but no `ui/` has no view for them; views derived from a layer's API remain to be built.
 - The Symphony tools (`aludel_layer_call`, `aludel_layer_commit`) are not compiled; the hook's layer checkout is tested.
 - Charter edits in Manage still write the database, not the repository.
 - Template updates don't reach existing instances (deferred by the owner).

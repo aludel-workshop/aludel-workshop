@@ -35,7 +35,8 @@ import { initPagesCodeObservations, codeRouteObservations, recordCodeRouteObserv
 import { initActionMigration, migrateActionProject, layerActionSettings, setActionAssignee, setProjectWorkStyle, setLayerActionGrant, setActionMethod } from './lat08-migration.mjs';
 import { readActionSource, readAttemptSource, checkPinnedActionEffect } from './code-action-gateway.mjs';
 import { decideFollowUp, hasElevated, initLayerScope, layerAccess, requireElevated, setLayerDefaultAssignee, setLayerElevated } from './layer-scope.mjs';
-import { applyOperation, layerApi, layerApiForKind, recordOperations } from './layer-api.mjs';
+import { applyOperation, kindOwners, layerApi, layerApiForKind, recordOperations } from './layer-api.mjs';
+import { frameAllows, frameLabel, layerUi } from './layer-ui.mjs';
 import { initLayerContract, layerDescriptors, layerInstances, updateLayerInstance, layerCatalog, layerOutputRead, layerMigrationInventory } from './layer-contract.mjs';
 import { answerDecision, createProposal, ensureB02Fixture, getDecision, getProposal, listDecisions, listDownstreamRecords, listProposals, reassessRecord, reviseProposal } from './product-records.mjs';
 import { openSecretStore } from './secret-store.mjs';
@@ -87,6 +88,10 @@ initPagesCodeObservations(db);
 initLayerDiscovery(db);
 const secrets = openSecretStore(dataDirectory);
 const topology = hostTopology(process.env, port);
+// A layer's views may embed their own project's running app (the Pages Built view), never the portal.
+const views = layerUi({ dataDirectory, layerOrigin: topology.layerOrigin, portalOrigin: topology.portalOrigin, appOriginFor: label => {
+  const row = db.prepare("SELECT p.slug FROM layer_instances i JOIN projects p ON p.id = i.project_id WHERE 'i-' || replace(i.instance_id, '-', '') = ?").get(label);
+  return row ? topology.appOrigin(row.slug) : null; } });
 const setupConfigPath = join(portalRoot, 'config', 'project-setup.json');
 const gitSetup = loadGitProfile(setupConfigPath, 'the-machine');
 const projectGitProfile = (config => config.sourceControlProfiles[config.defaultSourceControlProfile])(JSON.parse(readFileSync(setupConfigPath, 'utf8')));
@@ -96,7 +101,11 @@ const modelCatalog = providerModelCatalog({ codexCommand: process.env.MACHINE_CO
 const scaffoldSources = loadScaffoldSources(portalRoot);
 const workspaceRoot = join(dataDirectory, 'workspaces');
 const previews = previewManager({ db, portalRoot, workspaceRoot, logRoot: join(dataDirectory, 'preview-logs'), runtime: previewRuntime() });
-const appUrls = slug => ({ portal: topology.portalOrigin, app: topology.appOrigin(slug) });
+// LAYER-BASE-01 B6: the project's Pages views run in their own frame, which the app's preview bridge also answers.
+const appUrls = slug => {
+  const instance = db.prepare("SELECT i.instance_id FROM layer_instances i JOIN projects p ON p.id = i.project_id WHERE p.slug = ? AND i.layer_key = 'pages'").get(slug)?.instance_id;
+  return { portal: topology.portalOrigin, app: topology.appOrigin(slug), frames: instance ? [topology.layerOrigin(frameLabel(instance))] : [] };
+};
 const commitIdentity = user => ({ name: user?.name || 'Aludel', email: user?.email || 'owner@aludel.invalid' });
 // A new project's repository starts local; GitHub publishing is a later, separate step.
 function createWorkspace(setup, user) {
@@ -132,6 +141,8 @@ for (const projectId of layerProjects()) migrateActionProject(db, projectId);
 for (const projectId of layerProjects()) for (const layer of projectLayerDefinitions(db, projectId).filter(entry => !entry.builtIn && entry.outputProvider === 'markdown-files'))
   try { adoptMarkdownLayer({ db, know, dataDirectory, projectId, key: layer.key }); } catch (error) { console.error(`Could not move the ${layer.key} layer into its repository: ${error.message}`); }
 const markdown = markdownOutputs({ db, know, dataDirectory });
+// Build every installed layer's views at its pinned commit; instances on the same template commit share one build.
+for (const projectId of layerProjects()) for (const layer of projectLayerDefinitions(db, projectId)) try { views.status(db, projectId, layer.key); } catch { /* shown on the layer */ }
 const links = codeLinks({ db, know });
 const ops = platformOps({ db, backupRoot: join(dataDirectory, 'backups') });
 const codeRelease = codeReleases({ db });
@@ -356,6 +367,13 @@ function overview() {
 
 async function api(request, response, url) {
   const user = currentUser(request);
+  // LAYER-BASE-01 B6: a call the portal page carries for a layer's sandboxed frame may do only what frames are allowed.
+  const frameLayer = request.headers['x-aludel-layer-frame'];
+  if (frameLayer !== undefined) {
+    const project = /^\/api\/projects\/([^/]+)\//.exec(url.pathname);
+    if (!project || !/^[a-z][a-z0-9_]{2,31}$/.test(String(frameLayer)) || !frameAllows({ key: String(frameLayer), projectId: decodeURIComponent(project[1]), method: request.method, pathname: url.pathname }))
+      return json(response, 403, { error: 'A layer view cannot do that.' });
+  }
   if (url.pathname === '/api/session' && request.method === 'GET') return json(response, 200, {
     authenticated: Boolean(user), user,
     setupRequired: !db.prepare('SELECT id FROM auth_config WHERE id = 1').get(),
@@ -726,6 +744,13 @@ async function api(request, response, url) {
     const projectId = decodeURIComponent(layerGrantRoute[1]);
     return json(response, 200, setLayerActionGrant(db, user, projectId, await readJson(request)));
   }
+  // LAYER-BASE-01 B6: the state of a layer's own views, built from its pinned commit; asking starts a missing build.
+  const layerUiRoute = /^\/api\/projects\/([^/]+)\/layers\/([^/]+)\/ui$/.exec(url.pathname);
+  if (layerUiRoute && request.method === 'GET') {
+    const [projectId, layerKey] = layerUiRoute.slice(1).map(decodeURIComponent);
+    requireMember(db, user, projectId);
+    return json(response, 200, views.status(db, projectId, layerKey), { 'cache-control': 'no-store' });
+  }
   // PAGES-API-01: a layer's API. GET returns its OpenAPI document; POST calls one operation and applies it at once.
   const layerApiRoute = /^\/api\/projects\/([^/]+)\/layers\/([^/]+)\/api(?:\/([A-Za-z][A-Za-z0-9]*))?$/.exec(url.pathname);
   if (layerApiRoute) {
@@ -846,6 +871,8 @@ async function api(request, response, url) {
         },
       });
       settleSymphonyBatch(projectId, signed.batchId);
+      // An accepted merge moves the layer's main; build its views now so the next visit is ready.
+      if (signing?.scope === 'layer') views.status(db, projectId, signing.layer);
       return json(response, 200, { run: signed, work: know.workById(projectId, workId) }, { 'cache-control': 'no-store' });
     }
     return json(response, 405, { error: 'Method not allowed.' });
@@ -1020,8 +1047,11 @@ async function api(request, response, url) {
       writeFiles(setup.workspacePath, { 'docs/agents.md': agentsGuide(setup, catalogs) });
       return json(response, 200, { written: 'docs/agents.md', committed: false });
     }
+    // A layer frame changes only records its own layer owns.
+    const frameOwns = kind => request.headers['x-aludel-layer-frame'] === undefined || kindOwners(db, projectId, kind).some(owner => owner.key === request.headers['x-aludel-layer-frame']);
     if (section === 'records' && method === 'POST' && !item) {
       const input = await readJson(request);
+      if (!frameOwns(String(input.kind || ''))) return json(response, 403, { error: 'A layer view changes only its own records.' });
       if (['role', 'work_action'].includes(input.kind)) return json(response, 409, { error: 'Historical role records are read-only. Configure actions in their layer.' });
       const work = know.openWorkItem(projectId, input.workItemId);
       // A kind a layer's API owns changes only through that API.
@@ -1031,6 +1061,7 @@ async function api(request, response, url) {
         author: user.name, rationale: input.rationale || null, workItemId: work?.id || null }).record);
       return json(response, 201, know.insert(projectId, String(input.kind || ''), input.data || {}, { parentId: input.parentId || null, author: user.name, rationale: input.rationale || null, workItemId: work?.id || null }));
     }
+    if (section === 'records' && ['PUT', 'DELETE'].includes(method) && item && !frameOwns(know.get(projectId, item)?.kind || '')) return json(response, 403, { error: 'A layer view changes only its own records.' });
     if (section === 'records' && method === 'PUT' && item) {
       const input = await readJson(request);
       if (['role', 'work_action'].includes(know.get(projectId, item)?.kind)) return json(response, 409, { error: 'Historical role records are read-only. Configure actions in their layer.' });
@@ -1311,7 +1342,7 @@ function serveStatic(response, pathname) {
 function serveFile(response, path) {
   const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml' }[extname(path)] || 'application/octet-stream';
   const body = readFileSync(path);
-  response.writeHead(200, { 'content-type': mime, 'content-length': body.length, 'x-content-type-options': 'nosniff', 'content-security-policy': `default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-src ${topology.appOrigin('*')}; frame-ancestors 'self'` });
+  response.writeHead(200, { 'content-type': mime, 'content-length': body.length, 'x-content-type-options': 'nosniff', 'content-security-policy': `default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-src ${topology.appOrigin('*')} ${topology.layerOrigins}; frame-ancestors 'self'` });
   response.end(body);
 }
 
@@ -1348,6 +1379,7 @@ const server = createServer(async (request, response) => {
   try {
     const target = topology.classify(request.headers.host);
     if (target.kind === 'app') return await serveApp(request, response, target.slug);
+    if (target.kind === 'layers') return views.serve(request, response, new URL(request.url, `http://${host}:${port}`).pathname, target.label);
     if (target.kind !== 'portal') return appPage(response, 421, 'Unknown address', 'This host is not served by Aludel.');
     const url = new URL(request.url, `http://${host}:${port}`);
     if (url.pathname.startsWith('/api/')) await api(request, response, url);

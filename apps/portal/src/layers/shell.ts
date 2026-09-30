@@ -9,6 +9,7 @@ import { AvatarEditorComponent } from './avatar-editor';
 import { PersonAvatar, ProjectContext, dataStatusLabel, phaseName, sectionTitle, statusLabel, unitStateLabel, workStatusLabel } from './context';
 import { DesignLayerComponent } from './design';
 import { PagesLayerComponent } from '../installed/pages/pages';
+import { LayerFrameComponent } from './layer-frame';
 import { DataLayerComponent } from './data';
 import { CodeLayerComponent } from './code';
 import { DeployLayerComponent } from './deploy';
@@ -32,7 +33,7 @@ const localLayers = [{ id: 'product', icon: 'lightbulb', label: 'Vision' }, { id
 // LAY-02: every project's workspace at /p/<slug>/<layer>/<tab>/<id>. The layer comes first (DEC-036).
 @Component({
   selector: 'aludel-project-shell', standalone: true,
-  imports: [FormsModule, MatIconModule, AvatarEditorComponent, HomeLayerComponent, ProductLayerComponent, DesignLayerComponent, PagesLayerComponent, DataLayerComponent, CodeLayerComponent, DeployLayerComponent, WorkLayerComponent, LibraryComponent, EvidencePanelComponent, MarkdownLayerComponent, LayerTasksComponent, LayerKnowledgeComponent, LayerManageComponent],
+  imports: [FormsModule, MatIconModule, LayerFrameComponent, AvatarEditorComponent, HomeLayerComponent, ProductLayerComponent, DesignLayerComponent, PagesLayerComponent, DataLayerComponent, CodeLayerComponent, DeployLayerComponent, WorkLayerComponent, LibraryComponent, EvidencePanelComponent, MarkdownLayerComponent, LayerTasksComponent, LayerKnowledgeComponent, LayerManageComponent],
   providers: [ProjectContext],
   template: `
   <a class="skip-link" href="#lay-main">Skip to content</a>
@@ -132,6 +133,7 @@ const localLayers = [{ id: 'product', icon: 'lightbulb', label: 'Vision' }, { id
           @else if (space() === 'tasks') { <aludel-layer-tasks [layerKey]="layer()" /> }
           @else if (space() === 'knowledge') { <aludel-layer-knowledge [layerKey]="layer()" /> }
           @else if (space() === 'manage') { <aludel-layer-manage [layerKey]="layer()" /> }
+          @else if (localLayer()?.frameUi) { <aludel-layer-frame [layerKey]="layer()" /> }
           @else { @switch (layer()) {
             @case ('product') { <aludel-product-layer /> }
             @case ('design') { <aludel-design-layer /> }
