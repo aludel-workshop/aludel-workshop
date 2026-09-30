@@ -670,6 +670,7 @@ test('an existing-flow agent task waits for a reviewed Pages package but still n
 });
 
 // ---- DEC-057: layer-scoped Work, elevated access and agent follow-ups ----
+import { saveLayerCharter } from '../server/layer-registry.mjs';
 import { decideFollowUp, initLayerScope, layerAccess, setLayerDefaultAssignee, setLayerElevated } from '../server/layer-scope.mjs';
 import { applyOperation, layerApi } from '../server/layer-api.mjs';
 
@@ -757,6 +758,31 @@ test('a layer-scoped Pages task changes Pages only through its API; review shows
     { kind: 'agent', profileId: f.profile.id, layer: 'pages', workRef: work.ref });
   assert.match(decided.work.log[0].text, /from the Pages layer as a follow-up to W-\d+; accepted by designer/);
   assert.equal(decideFollowUp(f.db, f.know, member, f.projectId, work.id, run.followUps[0].id, 'dismiss').followUp.state, 'created', 'a decided follow-up stays decided');
+}));
+
+test('T03-G1: a layer-scoped run reads other layers through the Library, and a cited Knowledge revision gates acceptance', () => withPagesTemplate(async f => {
+  const story = f.know.insert(f.projectId, 'story', { title: 'Someone can compare tool conditions before borrowing', phase: 'demo' });
+  const work = layerTask(f, 'Add a comparison step');
+  const { issue, card } = f.start(null, [], null, null, false, work);
+  assert.match(card.library, /Library/);
+  const digest = issue.native_ref.bundle_digest, attemptId = issue.native_ref.attempt_id;
+  const found = f.worker.knowledgeSearch(f.scope, digest, story.title.slice(0, 40));
+  const hit = found.results.find(entry => entry.id === story.id);
+  assert.deepEqual([hit.layer, hit.source], ['product', 'output'], 'a Vision story is found as a Library output');
+  const charterHit = f.worker.knowledgeSearch(f.scope, digest, 'charter').results.find(entry => entry.id === 'k:product:identity');
+  assert.equal(charterHit.source, 'knowledge', "Vision's charter is published to the Library");
+  const charter = f.worker.knowledgeRead(f.scope, digest, 'k:product:identity');
+  assert.match(charter.data.content, /#/);
+  assert.equal(f.worker.knowledgeRead(f.scope, digest, story.id).layer, 'product');
+
+  const detail = f.know.insert(f.projectId, 'page', { label: 'Compare', icon: 'article', pageType: 'detail', status: 'planned' });
+  f.worker.callLayer(f.scope, { attemptId, operation: 'createFlow', body: { flow: { title: 'Compare tools', steps: [{ page: detail.id, name: 'Compare', story: story.id }] } } });
+  const submitted = f.worker.submitProposal(f.scope, { attemptId, proposal: { summary: 'Add a comparison journey.', content: {},
+    usedInputs: [{ id: story.id, revision: story.revision }, { id: 'k:product:identity', revision: charter.revision }] } });
+  const charterNow = f.db.prepare("SELECT identity_revision AS revision FROM layer_definitions WHERE project_id = ? AND layer_key = 'product'").get(f.projectId).revision;
+  saveLayerCharter(f.db, f.owner.id, f.projectId, 'product', { expectedRevision: charterNow, content: `${charter.data.content}\n\n## Note\n\nComparisons matter.` });
+  f.know.updateWork(f.owner, f.projectId, work.id, { verdict: { index: 0, value: 'accept' } });
+  assert.throws(() => f.worker.acceptProposal(f.owner, f.projectId, work.id, submitted.proposalId), /used input changed/);
 }));
 
 test('a staged draft is refused when a record it changes moved on, a reference is gone, or the layer source changed', () => withPagesTemplate(async f => {

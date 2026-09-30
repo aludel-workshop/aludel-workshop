@@ -53,6 +53,7 @@ function compileLayerTask(bundle) {
       shape: 'Stage changes with aludel_layer_call, then aludel_submit_proposal { proposal: { summary; content: { notes? }; followUps[0..5]: { layer, title, brief, why }; usedInputs? }; evidence[]: { criterion, type: change|test, ref, note } }',
       evidence: 'For each criterion (by index from 0), name what shows it is met: type change with ref = a record ID or title you staged, or a repository file path you committed; type test with ref = a test name exactly as reported to aludel_layer_commit. note says what the reviewer should check. Review shows each criterion with this evidence.',
       followUpLayers: guidance.followUpLayers || [], checks: (work.checks || []).map(check => check.text) }],
+    library: 'Other layers are read only through the Library (DEC-059): knowledge search covers every installed layer\'s outputs and Knowledge (charters, methods, policies; ids like k:<layer>:<doc>) and research. Cite what you relied on in usedInputs with its revision.',
     capabilities: { knowledge: ['map', 'search', 'read'], layerApi: scope.key, layerRepository: { checkout: 'layer/', base: layerPackage.commit, commitTool: 'aludel_layer_commit', writable: writablePatterns },
       repository: 'project repository: read-only pinned commit (your layer is writable in layer/)', submit: 'layer_api_draft' },
     runtime: { authorization: 'Go-pinned attempt', repositoryCommit: repository.commit, instructionPins, staleInputs: 'withdraw this attempt when a pinned input changes' }

@@ -805,6 +805,9 @@ aludel-project-shell{
 .lay-card.lay-flush{padding:0}
 .lay-insrow{display:block;padding:12px 16px;border-top:1px solid var(--machine-line);color:var(--machine-ink);text-decoration:none}.lay-insrow:first-child{border-top:0}.lay-insrow:hover{background:var(--machine-panel)}
 .lay-insrow strong{font-size:15.5px;font-weight:500}
+.lay-insrow>small{display:block;margin-top:4px}
+.lay-libfields{display:grid;grid-template-columns:minmax(96px,max-content) 1fr;gap:8px 16px;margin:0}.lay-libfields dt{color:var(--machine-muted);text-transform:capitalize}.lay-libfields dd{margin:0;overflow-wrap:anywhere}
+@media (max-width:600px){.lay-libfields{grid-template-columns:1fr}.lay-libfields dd{margin-bottom:8px}}
 .lay-meta3{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;margin-top:4px;font-size:13px;color:var(--machine-muted)}.lay-meta3>span{display:inline-flex;align-items:center;gap:4px}.lay-meta3 mat-icon{width:15px;height:15px;font-size:15px}
 .lay-itag{display:inline-flex;align-items:center;gap:3px;padding:0 8px;border-radius:999px;background:var(--lay-library-bg);color:var(--lay-library);font-size:12px;font-weight:500;line-height:22px}
 .lay-itag button{display:inline-grid;padding:0;border:0;background:none;color:inherit;cursor:pointer}.lay-itag mat-icon{width:14px;height:14px;font-size:14px}

@@ -79,13 +79,13 @@ export function layerUi({ dataDirectory, layerOrigin, portalOrigin, appOriginFor
 }
 
 // What the portal page may do for a layer's frame, checked on the server for every call it carries. Reads of the project
-// the person can already see; this layer's own API and records; creating Work; and, for Pages, the Pages host features it
+// the person can already see, including the Library (DEC-059); this layer's own API and records; creating Work; and, for Pages, the Pages host features it
 // still relies on. Everything else is refused.
 export function frameAllows({ key, projectId, method, pathname }) {
   const project = `/api/projects/${encodeURIComponent(projectId)}`;
   if (!pathname.startsWith(project + '/')) return false;
   const rest = pathname.slice(project.length);
-  if (method === 'GET') return rest === '/knowledge' || rest === '/layer-instances' || /^\/assets\/[^/]+$/.test(rest) || rest === `/layers/${key}/api`;
+  if (method === 'GET') return rest === '/knowledge' || rest === '/layer-instances' || rest === '/library' || rest === '/library/entry' || /^\/assets\/[^/]+$/.test(rest) || rest === `/layers/${key}/api`;
   if (/^\/records(?:\/[^/]+)?$/.test(rest)) return ['POST', 'PUT', 'DELETE'].includes(method);
   if (method === 'POST' && new RegExp(`^/layers/${key}/api/[A-Za-z][A-Za-z0-9]*$`).test(rest)) return true;
   if (method === 'POST' && rest === '/work') return true;

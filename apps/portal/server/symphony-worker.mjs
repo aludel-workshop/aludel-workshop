@@ -13,6 +13,7 @@ import { compiledLocalActions } from './lat07-actions.mjs';
 import { actionForProject, projectLayerDefinition } from './layer-registry.mjs';
 import { layerDeclarations, layerInstanceId } from './layer-contract.mjs';
 import { pagesFlowSnapshot, pagesFlowBaseInputs } from './pages-flow-work.mjs';
+import { library, libraryKinds } from './library.mjs';
 import { runPagesFlowCandidate } from './pages-flow-runner.mjs';
 import { activeLayerTopology, discoverySourceSnapshot } from './layer-discovery.mjs';
 import { applyDiscoveryProposal } from './layer-space.mjs';
@@ -357,6 +358,14 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     const issue = current(scope, bundle.work.id);
     return { digest, attemptId: issue.native_ref.attempt_id, ...compileTaskManifest(bundle) };
   }
+  // DEC-059: a layer-scoped run reads other layers through the Library: every installed layer's outputs and Knowledge,
+  // and research. Kinds no layer publishes (project docs) keep the older record path.
+  const pool = library({ db, know });
+  const libraryRef = id => typeof id === 'string' && id.startsWith('k:');
+  const currentRevision = (projectId, id) => libraryRef(id) ? pool.read(projectId, null, id).currentRevision : know.get(projectId, id)?.revision;
+  const publishedKind = (projectId, kind) => !!kind && (libraryKinds.includes(kind) ||
+    db.prepare('SELECT output_kinds_json AS outputs FROM layer_definitions d JOIN layer_instances i ON i.project_id = d.project_id AND i.layer_key = d.layer_key WHERE d.project_id = ? AND i.enabled = 1').all(projectId)
+      .some(row => (JSON.parse(row.outputs || '[]')).includes(kind)));
   const readableKinds = ['brief_claim', 'story', 'spec', 'page', 'doc', 'research', 'source', 'finding', 'insight', 'data_object', 'data_operation', 'access_rule', 'component', 'project'];
   // DEC-054/057: a layer-scoped task reads project-wide; only its writes are scoped to its layer.
   const projectKinds = projectId => [...new Set([...readableKinds, 'flow', 'persona', 'activity',
@@ -373,6 +382,14 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     const needle = String(query || '').trim().toLowerCase();
     if (needle.length < 2 || needle.length > 100 || !Number.isInteger(cursor) || cursor < 0 || cursor > 10000 ||
         kind && !allowed.includes(kind)) fail('Invalid knowledge search.');
+    if (bundle.guidance?.layerScope) {
+      const found = pool.search(scope.projectId, null, { q: needle, kind, cursor, limit: 20 });
+      const published = new Set(found.results.map(entry => entry.ref));
+      const legacy = cursor ? [] : (kind ? [kind] : allowed).filter(value => !publishedKind(scope.projectId, value)).flatMap(value => know.list(scope.projectId, value))
+        .filter(record => !published.has(record.id) && [record.title, record.name, record.text, record.body, record.summary].filter(Boolean).join(' ').toLowerCase().includes(needle)).slice(0, 20);
+      return { results: [...found.results.map(entry => ({ id: entry.ref, kind: entry.kind, revision: entry.revision, summary: entry.title, layer: entry.layer.key, source: entry.source, excerpt: entry.excerpt })),
+        ...legacy.map(record => ({ id: record.id, kind: record.kind, revision: record.revision, summary: String(record.title || record.name || '').slice(0, 200) }))], nextCursor: found.nextCursor };
+    }
     const kinds = kind ? [kind] : allowed;
     const matches = kinds.flatMap(value => know.list(scope.projectId, value)).filter(record =>
       [record.title, record.name, record.label, record.text, record.description, record.body, record.summary, record.sentence]
@@ -382,6 +399,10 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
   }
   function knowledgeRead(scope, digest, id, revision = null) {
     const bundle=activeBundle(scope, digest);
+    if (bundle.guidance?.layerScope && (libraryRef(id) || publishedKind(scope.projectId, know.get(scope.projectId, id)?.kind))) {
+      const entry = pool.read(scope.projectId, null, id, revision);
+      return { id, kind: entry.kind, revision: entry.revision, currentRevision: entry.currentRevision, layer: entry.layer.key, data: entry.data ?? { title: entry.title, content: entry.content } };
+    }
     const record = know.get(scope.projectId, id);
     if (!record || !scopedKinds(bundle).includes(record.kind)) fail('Record not found.', 404);
     if (revision === null) return { id, kind: record.kind, revision: record.revision, currentRevision: record.revision, data: record };
@@ -700,7 +721,7 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
       const policy = db.prepare('SELECT revision, status FROM layer_connections WHERE id = ? AND project_id = ?').get(control.id, projectId);
       if (!policy || policy.revision !== control.revision || policy.status !== 'active') fail('The originating layer policy changed. Send this back.', 409);
     }
-    for (const ref of submitted.usedInputs || []) if (know.get(projectId, ref.id)?.revision !== ref.revision) fail('A used input changed. Send this back.', 409);
+    for (const ref of submitted.usedInputs || []) if (currentRevision(projectId, ref.id) !== ref.revision) fail('A used input changed. Send this back.', 409);
     // Staged data was checked under the layer's rules at the run's base, so it applies only while those rules are the pin.
     // A run that changes only the repository merges onto a moved main instead.
     const api = layerApi(db, projectId, bundle.guidance.layerScope.key);

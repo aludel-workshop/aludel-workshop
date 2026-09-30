@@ -6,6 +6,7 @@ import { aludelProjectId, createExternalUser, createLoginTicket, createSession, 
 import { hostTopology } from './hosts.mjs';
 import { initOnboarding, loadCatalogs, onboarding } from './onboarding.mjs';
 import { botColors, efforts, initKnowledge, knowledge } from './knowledge.mjs';
+import { library } from './library.mjs';
 import { previewManager, previewRuntime } from './previews.mjs';
 import { agentsGuide, copyMedia, initialFiles, loadScaffoldSources, sitePages, skeletonFiles, workflowPaths, writeBinaries, writeFiles } from './scaffold.mjs';
 import { brandUsage, componentStatus } from './design.mjs';
@@ -116,6 +117,7 @@ function createWorkspace(setup, user) {
   commitWorkspace({ repository: setup.workspacePath, profile: projectGitProfile, message: `chore: start ${setup.project.name} with Aludel`, ...commitIdentity(user) });
 }
 const know = knowledge({ db, catalogs, packs: catalogs.packs });
+const pool = library({ db, know });
 const flows = onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot: join(dataDirectory, 'project-assets'), createWorkspace, know });
 // One-time: projects created before the layers (LAY-03) get phases, a vision and page records from their onboarding data.
 for (const project of db.prepare(`SELECT p.id, p.description, s.feel FROM projects p JOIN project_setup s ON s.project_id = p.id
@@ -910,7 +912,7 @@ async function api(request, response, url) {
       return json(response, 200, { preview, url: link }, { 'cache-control': 'no-store' });
     } finally { rmSync(snapshot, { recursive: true, force: true }); }
   }
-  const projectRoute = /^\/api\/projects\/([^/]+)\/(setup|preferences|design|pages|assets|features|stack|connections\/agent|steps|repository|skeleton|preview|knowledge|records|work|editor|candidates|openapi\.json|platform|database|code|reconcile|agents|changes|routines|batches|docs|comments|brand-templates)(?:\/([^/]+))?$/.exec(url.pathname);
+  const projectRoute = /^\/api\/projects\/([^/]+)\/(setup|preferences|design|pages|assets|features|stack|connections\/agent|steps|repository|skeleton|preview|knowledge|records|work|editor|candidates|openapi\.json|platform|database|code|reconcile|agents|changes|routines|batches|docs|comments|brand-templates|library)(?:\/([^/]+))?$/.exec(url.pathname);
   if (projectRoute) {
     const [, rawId, section, rawItem] = projectRoute;
     const projectId = decodeURIComponent(rawId);
@@ -940,6 +942,16 @@ async function api(request, response, url) {
     if (section === 'editor' && method === 'POST') return json(response, 201, editor.issue(user, projectId), { 'cache-control': 'no-store' });
     if (section === 'editor' && method === 'DELETE') return json(response, 200, editor.revoke(user, projectId));
     if (section === 'setup' && method === 'GET') return json(response, 200, projectView(user, projectId));
+    // DEC-059: the Library pools every layer's accepted outputs and Knowledge with research; layers read each other here.
+    if (section === 'library' && !item && method === 'GET') {
+      const param = name => url.searchParams.get(name) || null;
+      return json(response, 200, pool.search(projectId, user.id, { q: param('q') || '', layer: param('layer'), kind: param('kind'), source: param('source'),
+        cursor: Number(param('cursor') || 0), limit: Number(param('limit') || 50) }), { 'cache-control': 'no-store' });
+    }
+    if (section === 'library' && item === 'entry' && method === 'GET') {
+      const revision = url.searchParams.get('revision');
+      return json(response, 200, pool.read(projectId, user.id, url.searchParams.get('ref'), revision === null ? null : Number(revision)), { 'cache-control': 'no-store' });
+    }
     // LAY-03: the layers read one project snapshot and write records and work items through the knowledge module.
     if (section === 'knowledge' && method === 'GET') {
       know.ensureAgents(projectId);

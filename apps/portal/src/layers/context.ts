@@ -190,6 +190,11 @@ export const dataStatusLabel: Record<string, string> = { proposed: 'Proposed', c
 export const unitStateLabel: Record<string, string> = { healthy: 'Healthy', suspect: 'Suspect', untraced: 'Untraced', dead: 'Unused' };
 
 // One project's state for every layer component. Layers never fetch on their own; they call api() then reload().
+export type LibrarySource = 'output' | 'knowledge' | 'library';
+export type LibraryEntry = { ref: string; source: LibrarySource; layer: { key: string; name: string; instanceId: string | null }; kind: string; title: string;
+  revision: number; updatedAt: string | null; excerpt: string };
+export type LibraryRead = Omit<LibraryEntry, 'excerpt' | 'updatedAt'> & { currentRevision: number; content?: string; data?: Record<string, unknown> };
+
 @Injectable()
 export class ProjectContext {
   readonly session = signal<Session | null>(null);
@@ -406,6 +411,14 @@ export class ProjectContext {
   }
 
   // Evidence and documents write through here too.
+  // DEC-059: the Library pools every installed layer's outputs and Knowledge with its own research and documents.
+  librarySearch(query: { q?: string; layer?: string; kind?: string; source?: string; cursor?: number }) {
+    const params = new URLSearchParams(Object.entries(query).filter(([, value]) => value !== undefined && value !== '').map(([key, value]) => [key, String(value)]));
+    return this.api<{ results: LibraryEntry[]; total: number; nextCursor: number | null }>(`/api/projects/${encodeURIComponent(this.projectId())}/library?${params}`);
+  }
+  libraryRead(ref: string, revision: number | null = null) {
+    return this.api<LibraryRead>(`/api/projects/${encodeURIComponent(this.projectId())}/library/entry?ref=${encodeURIComponent(ref)}${revision === null ? '' : `&revision=${revision}`}`);
+  }
   comment(insightId: string, text: string) { return this.api(`/api/projects/${encodeURIComponent(this.projectId())}/comments/${encodeURIComponent(insightId)}`, 'POST', { text }); }
   generate(generator: string, id = '') { return this.api<Doc>(`/api/projects/${encodeURIComponent(this.projectId())}/docs${id ? '/' + encodeURIComponent(id) : ''}`, 'POST', { generator }); }
   next(assignee: Assignee, count: number, layer: string | null = null) { return this.api<{ added: string[] }>(`/api/projects/${encodeURIComponent(this.projectId())}/batches/next`, 'POST', { assignee, count, ...(layer ? { layer } : {}) }); }
