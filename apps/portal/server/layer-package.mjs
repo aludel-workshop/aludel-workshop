@@ -56,7 +56,7 @@ function binding(db, projectId, key) {
   const row = db.prepare('SELECT repository_path AS repo, accepted_commit AS acceptedCommit FROM layer_package_bindings WHERE project_id=? AND layer_instance_id=? AND layer_key=?').get(projectId,rowId.instance_id,key);
   return row ? { repo: row.repo, commit: row.acceptedCommit } : null;
 }
-function packageAt(repo, commit, key) {
+export function packageAt(repo, commit, key) {
   if (!/^[0-9a-f]{40}$/.test(commit) || git(repo, 'rev-parse', '--verify', `${commit}^{commit}`) !== commit) throw new Error('Layer package commit is unavailable.');
   const manifest = JSON.parse(git(repo, 'show', `${commit}:layer.json`));
   const tabs = manifest.tabs;

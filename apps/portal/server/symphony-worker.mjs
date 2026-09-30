@@ -17,7 +17,8 @@ import { runPagesFlowCandidate } from './pages-flow-runner.mjs';
 import { activeLayerTopology, discoverySourceSnapshot } from './layer-discovery.mjs';
 import { applyDiscoveryProposal } from './layer-space.mjs';
 import { checkFollowUps, layerWorkScope, recordFollowUps, requireElevated } from './layer-scope.mjs';
-import { checkDraftCurrent, draftChanges, initLayerApi, layerApi, stageOperation } from './layer-api.mjs';
+import { checkDraftCurrent, draftChanges, initLayerApi, initSourceReviews, layerApi, stageOperation } from './layer-api.mjs';
+import { acceptSourceCandidate, buildSourceCandidate, hasSourceDraft, initLayerSource, settleSourceCheckout, sourceCall } from './layer-source.mjs';
 
 const hash = value => createHash('sha256').update(value).digest('hex');
 const now = () => new Date().toISOString();
@@ -28,7 +29,7 @@ const validChecks = checks => Array.isArray(checks) && checks.length <= 30 && ch
   ['passed', 'failed', 'skipped'].includes(check.status) && (check.detail === undefined || typeof check.detail === 'string' && check.detail.length <= 500));
 
 export function initSymphonyWorker(db) {
-  initLayerApi(db);
+  initLayerApi(db); initSourceReviews(db); initLayerSource(db);
   db.exec(`CREATE TABLE IF NOT EXISTS symphony_worker_tokens (
     token_hash TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id), profile_id TEXT NOT NULL,
     created_by TEXT NOT NULL REFERENCES users(id), created_at TEXT NOT NULL, expires_at TEXT NOT NULL, last_seen_at TEXT
@@ -640,6 +641,15 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     if (typeof operation !== 'string' || !body || typeof body !== 'object' || Array.isArray(body)) fail('Name an operation and pass its body.');
     return stageOperation({ db, catalogs: know.catalogs, api: runLayerApi(scope, row, bundle), projectId: scope.projectId, attemptId, operationId: operation, id, body });
   }
+  // LAYER-SOURCE-01: the run's own layer repository, read and edited against the pinned commit plus this run's draft.
+  function callLayerSource(scope, { attemptId, action, path = null, content = null }) {
+    const row = attempt(scope, attemptId);
+    const bundle = saved(scope, row.bundle_digest);
+    const issue = current(scope, row.work_id);
+    if (!bundle.guidance.layerScope || !issue || issue.native_ref.attempt_id !== attemptId || row.state !== 'working' || row.runs_started < 1)
+      fail('This attempt cannot edit its layer repository now.', 409);
+    return sourceCall(db, { projectId: scope.projectId, key: bundle.guidance.layerScope.key, attemptId, baseCommit: bundle.layerPackage.commit, action, path, content });
+  }
   function submitLayerChanges(scope, row, bundle, proposal) {
     const content = proposal.content;
     if (content.changes !== undefined) fail('Make changes by calling the layer API (aludel_layer_call); the submission carries notes and follow-ups.');
@@ -647,13 +657,15 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     const followUps = checkFollowUps(db, scope.projectId, proposal.followUps);
     checkDraftCurrent(db, runLayerApi(scope, row, bundle), scope.projectId, row.id);
     const changes = draftChanges(db, scope.projectId, row.id);
-    if (!changes.length && !content.notes?.trim() && !followUps.length) fail('Stage at least one change, or submit a note or a follow-up.');
+    const source = hasSourceDraft(db, row.id) ? { ...buildSourceCandidate(db, { projectId: scope.projectId, key: bundle.guidance.layerScope.key, attemptId: row.id,
+      baseCommit: bundle.layerPackage.commit, message: `${bundle.work.ref}: ${proposal.summary.trim()}` }), attempt: row.id } : null;
+    if (!changes.length && !source && !content.notes?.trim() && !followUps.length) fail('Stage at least one change, or submit a note or a follow-up.');
     const usedInputs = proposal.usedInputs || [];
     if (!Array.isArray(usedInputs) || usedInputs.length > 200 || !usedInputs.every(ref => ref && typeof ref.id === 'string' && Number.isInteger(ref.revision) && ref.revision > 0))
       fail('Invalid used inputs.');
     for (const ref of usedInputs) if (knowledgeRead(scope, row.bundle_digest, ref.id, ref.revision).currentRevision !== ref.revision)
       fail('A used record changed; reassess before submitting.', 409);
-    return { changes, notes: content.notes?.trim() || '', followUps, usedInputs };
+    return { changes, source, notes: content.notes?.trim() || '', followUps, usedInputs };
   }
   // Commits the reviewed draft as it was reviewed, only if nothing it read or changes moved on.
   function acceptLayerChanges(user, projectId, entry, submitted, bundle, options) {
@@ -671,9 +683,17 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     if (JSON.stringify(staged) !== JSON.stringify(submitted.changes)) fail('The staged changes differ from what was reviewed. Send this back.', 409);
     // References were checked against current records and the draft above; created records go first so updates can point at them.
     const ordered = [...submitted.changes].sort((a, b) => (a.op === 'create' ? 0 : 1) - (b.op === 'create' ? 0 : 1));
-    return ordered.map(change => change.op === 'create'
+    const applied = ordered.map(change => change.op === 'create'
       ? know.insert(projectId, change.kind, change.after, { ...options, id: change.id, prepared: { data: change.after, references: [] } }).id
       : know.update(projectId, change.id, change.after, { ...options, expectedRevision: change.baseRevision, prepared: { data: change.after, references: [] } }).id);
+    // Data applies under the rules it was checked with; then the reviewed layer commit becomes the pin.
+    const key = bundle.guidance.layerScope.key;
+    const instance = db.prepare('SELECT instance_id FROM layer_instances WHERE project_id = ? AND layer_key = ?').get(projectId, key)?.instance_id;
+    const source = submitted.source ? acceptSourceCandidate(db, { projectId, key, source: submitted.source, reviewer: user.name, workId: entry.id, catalogs: know.catalogs,
+      owner: Boolean(db.prepare("SELECT 1 FROM project_members WHERE project_id = ? AND user_id = ? AND role = 'owner'").get(projectId, user.id)),
+      recordsOf: kind => db.prepare('SELECT id, data_json FROM knowledge_records WHERE project_id = ? AND kind = ? AND layer_instance_id = ?').all(projectId, kind, instance)
+        .map(record => ({ id: record.id, data: JSON.parse(record.data_json) })) }) : null;
+    return { applied, source };
   }
   function readOnlyWorkspace(row, bundle) {
     let clean, head;
@@ -702,7 +722,7 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
       const checked = submitLayerChanges(scope, row, bundle, proposal);
       readOnlyWorkspace(row, bundle);
       const id = `spr-${randomUUID()}`, layerKey = bundle.guidance.layerScope.key;
-      const result = { id, action: `layer:${layerKey}`, scope: 'layer', layer: layerKey, summary: proposal.summary.trim(), changes: checked.changes, notes: checked.notes,
+      const result = { id, action: `layer:${layerKey}`, scope: 'layer', layer: layerKey, summary: proposal.summary.trim(), changes: checked.changes, source: checked.source, notes: checked.notes,
         followUps: checked.followUps, usedInputs: checked.usedInputs, repositoryCommit: bundle.repository.commit, submission: proposal };
       atomic(() => {
         db.prepare("INSERT INTO symphony_proposals VALUES (?, ?, ?, ?, ?, ?, 'submitted', ?, NULL)")
@@ -865,7 +885,8 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
       let acceptedFlowId = null;
       const options = { author: user.name, rationale: `Accepted ${entry.ref} proposal`, workItemId: entry.id };
       let appliedIds = [];
-      if (layerScoped) appliedIds = acceptLayerChanges(user, projectId, entry, submitted, bundle, options);
+      let accepted = null;
+      if (layerScoped) { accepted = acceptLayerChanges(user, projectId, entry, submitted, bundle, options); appliedIds = accepted.applied; }
       else if (row.action_id.endsWith('.discover')) {
         const installed = activeLayerTopology(db,projectId);
         if (hash(JSON.stringify(installed)) !== bundle.layerDiscovery?.topologyDigest || JSON.stringify(discoverySourceSnapshot(db,projectId,bundle.layerDiscovery.sourceKeys,bundle.work.layer)) !== JSON.stringify(bundle.layerDiscovery.sources)) fail('Source outputs or installed layers changed. Reassess this proposal.', 409);
@@ -918,7 +939,8 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
         refs: [...bundle.work.targets.map(target => target.id), ...(acceptedFlowId ? [acceptedFlowId] : []), ...appliedIds] });
       const work = know.updateWork(user, projectId, workId, { state: 'done', proposalId });
       db.exec('COMMIT');
-      return { work, proposalId, ...(acceptedFlowId ? { flowId: acceptedFlowId } : {}), ...(layerScoped ? { applied: appliedIds } : {}) };
+      if (accepted?.source) settleSourceCheckout(accepted.source.repo, accepted.source.commit);
+      return { work, proposalId, ...(acceptedFlowId ? { flowId: acceptedFlowId } : {}), ...(layerScoped ? { applied: appliedIds, sourceCommit: accepted.source?.commit || null } : {}) };
     } catch (error) { db.exec('ROLLBACK'); throw error; }
   }
   function rejectProposal(projectId, workId, proposalId) {
@@ -996,5 +1018,5 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     const page = ready.slice(0, limit);
     return { issues: page, nextCursor: ready.length > limit ? page.at(-1).id : null };
   }
-  return { ensurePool, poolStatus, configurePool, heartbeat, scopeForDigest, scopeForAttempt, pinnedCurrent, issueToken, revoke, status, hasConnection, authenticate, pin, saved, activeBundle, taskOpen, knowledgeMap, knowledgeSearch, knowledgeRead, current, issues, registerWorkspace, reserveRun, submitCandidate, submitAudit, submitProposal, acceptProposal, rejectProposal, callLayer, askQuestion, commitCandidate, appendEvent, attemptStatus, attemptForWork, extendRuns };
+  return { ensurePool, poolStatus, configurePool, heartbeat, scopeForDigest, scopeForAttempt, pinnedCurrent, issueToken, revoke, status, hasConnection, authenticate, pin, saved, activeBundle, taskOpen, knowledgeMap, knowledgeSearch, knowledgeRead, current, issues, registerWorkspace, reserveRun, submitCandidate, submitAudit, submitProposal, acceptProposal, rejectProposal, callLayer, callLayerSource, askQuestion, commitCandidate, appendEvent, attemptStatus, attemptForWork, extendRuns };
 }

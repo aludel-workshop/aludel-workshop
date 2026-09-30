@@ -17,6 +17,7 @@ defmodule SymphonyElixir.Aludel.Adapter do
   @audit_tool "aludel_submit_audit"
   @proposal_tool "aludel_submit_proposal"
   @layer_tool "aludel_layer_call"
+  @layer_source_tool "aludel_layer_source"
   @ask_tool "aludel_task_ask"
   @plan_tool "aludel_task_plan"
   @progress_tool "aludel_task_progress"
@@ -309,6 +310,22 @@ defmodule SymphonyElixir.Aludel.Adapter do
         }
       },
       %{
+        "name" => @layer_source_tool,
+        "description" =>
+          "List, read, write or delete a file in this task's layer repository. Edits are staged for this run and submitted as one commit; api/, server/, ui/, tests/ and layer.json changes need the project owner's review.",
+        "inputSchema" => %{
+          "type" => "object",
+          "additionalProperties" => false,
+          "required" => ["attemptId", "action"],
+          "properties" => %{
+            "attemptId" => %{"type" => "string", "pattern" => "^att-[0-9a-f-]{36}$"},
+            "action" => %{"type" => "string", "enum" => ["list", "read", "write", "delete"]},
+            "path" => %{"type" => "string", "maxLength" => 160},
+            "content" => %{"type" => "string", "maxLength" => 204_800}
+          }
+        }
+      },
+      %{
         "name" => @context_tool,
         "description" => "Read the pinned Aludel context for this authorized Work item by its digest.",
         "inputSchema" => %{
@@ -439,6 +456,17 @@ defmodule SymphonyElixir.Aludel.Adapter do
     settings = Keyword.get_lazy(opts, :tracker_settings, fn -> Config.settings!().tracker end)
 
     case post_request("attempts/" <> attempt_id <> "/proposal", %{"proposal" => proposal, "evidence" => Map.get(args, "evidence", [])}, settings) do
+      {:ok, result} -> tool_result(true, result)
+      {:error, reason} -> tool_result(false, %{"error" => inspect(reason)})
+    end
+  end
+
+  @impl true
+  def execute_agent_tool(@layer_source_tool, %{"attemptId" => attempt_id, "action" => action} = args, opts) do
+    settings = Keyword.get_lazy(opts, :tracker_settings, fn -> Config.settings!().tracker end)
+    payload = %{"action" => action, "path" => Map.get(args, "path"), "content" => Map.get(args, "content")}
+
+    case post_request("attempts/" <> attempt_id <> "/layer-source", payload, settings) do
       {:ok, result} -> tool_result(true, result)
       {:error, reason} -> tool_result(false, %{"error" => inspect(reason)})
     end

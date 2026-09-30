@@ -73,6 +73,10 @@ export function workRuns({ db, know, candidates = null }) {
             name: `${layerName(projectId, content.layer)} › ${kindName[change.kind] || change.kind} › ${label}`, op: change.op === 'create' ? 'created' : 'modified',
             size: change.op === 'create' ? '' : `${fields.length} ${fields.length === 1 ? 'field' : 'fields'} · r${change.baseRevision}`, fields });
         }
+        // LAYER-SOURCE-01: files the run changed in its layer's repository, as one reviewed commit.
+        for (const file of content.source?.files || []) changes.push({ id: `${proposal.id}:src:${file.path}`, kind: 'source', icon: file.ownerReview ? 'code' : 'description',
+          name: `${layerName(projectId, content.layer)} repository › ${file.path}`, op: file.status === 'added' ? 'created' : file.status === 'deleted' ? 'removed' : 'modified',
+          size: `+${file.added} −${file.removed}`, diff: file.diff, ownerReview: file.ownerReview, commit: content.source.commit });
         if (content.notes) changes.push({ id: `${proposal.id}:notes`, kind: 'report', icon: 'notes', name: 'Notes', op: 'created', size: '', after: content.notes });
       } else if (vision) changes.push({ id: proposal.id, kind: 'claim', icon: 'lightbulb', name: `Vision › Brief › ${sectionName(vision.section)}`,
         op: vision.targetId ? 'modified' : 'created', size: '1 claim', before: vision.beforeText || null, after: vision.text, note: vision.note || '', basis: vision.basis || '' });

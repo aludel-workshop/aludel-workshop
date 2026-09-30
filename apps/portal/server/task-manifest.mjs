@@ -1,3 +1,4 @@
+import { writablePatterns } from './layer-source.mjs';
 // Compact, model-facing view of a Go-pinned bundle. Effects come from explicit adapters,
 // never from free-form role/action text or the task brief.
 const fail = message => { throw Object.assign(new Error(message), { status: 409 }); };
@@ -32,6 +33,8 @@ function compileLayerTask(bundle) {
       method: `Do this task as the ${scope.key} layer. Its charter and Knowledge below are your method. Read whatever project records help (reads are project-wide). ` +
         `Change ${scope.key} data only by calling its API with aludel_layer_call (operation, id for a path id, body). The API document under layerApi defines every operation and schema. ` +
         'Your writes are staged for this run, reads include what you staged, and nothing applies until an elevated reviewer accepts the run. ' +
+        `You may also edit this layer's own repository (its Knowledge, docs, API document and code) with aludel_layer_source (list, read, write, delete); edits are staged and submitted as one commit. ` +
+        'Changes to api/, server/, ui/, tests/ or layer.json change what the layer runs or may do: the project owner reviews them, and the new rules must still accept every existing record. ' +
         'If something outside this layer should change, or a separate task would help, propose it as a follow-up with a clear reason instead of doing it. ' +
         'Ask a question when a decision blocks the result. Do not change project records or repository files directly.' },
     layerSource: { key: layerPackage.key, instanceId: layerPackage.instanceId, commit: layerPackage.commit, charter: layerPackage.charter,
@@ -47,7 +50,8 @@ function compileLayerTask(bundle) {
     outputs: [{ key: 'changes', kind: 'layer_api_draft', operation: 'submit_for_review', reviewer: `elevated ${scope.key} reviewer`, operations,
       shape: 'Stage changes with aludel_layer_call, then aludel_submit_proposal { summary; content: { notes? }; followUps[0..5]: { layer, title, brief, why }; usedInputs? }',
       followUpLayers: guidance.followUpLayers || [], checks: (work.checks || []).map(check => check.text) }],
-    capabilities: { knowledge: ['map', 'search', 'read'], layerApi: scope.key, repository: 'read-only pinned commit', submit: 'layer_api_draft' },
+    capabilities: { knowledge: ['map', 'search', 'read'], layerApi: scope.key, layerSource: { tool: 'aludel_layer_source', base: layerPackage.commit, writable: writablePatterns },
+      repository: 'read-only pinned commit', submit: 'layer_api_draft' },
     runtime: { authorization: 'Go-pinned attempt', repositoryCommit: repository.commit, instructionPins, staleInputs: 'withdraw this attempt when a pinned input changes' }
   };
 }

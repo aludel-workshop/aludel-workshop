@@ -45,6 +45,8 @@ const evidenceType: Record<Evidence['type'], [string, string]> = { change: ['dif
                       @switch (change.kind) {
                         @case ('claim') { <dl class="wr-text">@if (change.before) { <dt>Was</dt><dd class="wr-was">{{ change.before }}</dd> }<dt>{{ change.before ? 'Now' : 'New' }}</dt><dd class="wr-now">{{ change.after }}</dd>
                           @if (change.note) { <dt>Note</dt><dd class="small">{{ change.note }}</dd> }@if (change.basis) { <dt>Basis</dt><dd class="small">{{ change.basis }}</dd> }</dl> }
+                        @case ('source') { @if (change.ownerReview) { <p class="wi-warn wr-owner"><mat-icon aria-hidden="true">shield_person</mat-icon>Changes what this layer runs or may do. The project owner accepts it.</p> }
+                          <pre class="wr-diff" [class.wr-diff-wrap]="!change.ownerReview">@for (line of (change.diff || '').split('\n'); track $index) {<span [class]="line[0] === '+' && !line.startsWith('+++') ? 'a' : line[0] === '-' && !line.startsWith('---') ? 'd' : line.startsWith('@@') ? 'h' : ''">{{ line }}</span>}</pre> }
                         @case ('record') { <table class="wr-fields"><thead><tr><th scope="col">Field</th>@if (change.op !== 'created') { <th scope="col">Previous</th> }<th scope="col">{{ change.op === 'created' ? 'Value' : 'Proposed' }}</th></tr></thead>
                           <tbody>@for (field of change.fields || []; track field.name) { <tr><th scope="row">{{ field.name }}</th>@if (change.op !== 'created') { <td><pre>{{ field.before }}</pre></td> }<td><pre>{{ field.after }}</pre></td></tr> }
                           @empty { <tr><td colspan="3" class="lay-muted small">No field changes.</td></tr> }</tbody></table> }

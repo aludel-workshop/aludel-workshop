@@ -71,6 +71,8 @@ worker.reserveRun(scope, { attemptId: issue.native_ref.attempt_id });
 const attempt = issue.native_ref.attempt_id;
 worker.callLayer(scope, { attemptId: attempt, operation: 'createFlow', body: { flow: { title: 'Find a tool', steps: [{ page: page1.id, name: 'Browse tools', trigger: 'Open Tools' }, { page: page2.id, name: 'Read the detail' }] } } });
 worker.callLayer(scope, { attemptId: attempt, operation: 'updatePage', id: page2.id, body: { changes: { description: 'Everything a neighbour needs before borrowing.' } } });
+const method = worker.callLayerSource(scope, { attemptId: attempt, action: 'read', path: 'knowledge/flow-method.md' }).content;
+worker.callLayerSource(scope, { attemptId: attempt, action: 'write', path: 'knowledge/flow-method.md', content: `${method.trim()}\n\nName the goal before the first step.\n` });
 worker.submitProposal(scope, { attemptId: attempt, proposal: {
   summary: 'Map finding a tool from the list to its detail page.', content: { notes: 'Detail has no borrow action yet.' },
   followUps: [
@@ -135,6 +137,9 @@ try {
   const fields = page.locator('table.wr-fields');
   await fields.first().waitFor();
   assert.equal(await fields.count(), 2, 'one field table per changed record');
+  const sourceDiff = page.locator('article.wr-change', { hasText: 'repository › knowledge/flow-method.md' }).locator('pre.wr-diff');
+  await sourceDiff.getByText('+Name the goal before the first step.').waitFor();
+  assert.equal(await page.locator('.wr-owner').count(), 0, 'a Knowledge edit needs no owner review');
   await fields.nth(1).getByRole('rowheader', { name: 'description' }).waitFor();
   await shot('changes');
   await page.getByRole('tab', { name: /Follow-ups/ }).click();
@@ -162,6 +167,8 @@ try {
   const reopened = openDatabase(join(root, 'machine.sqlite'));
   assert.equal(reopened.prepare("SELECT COUNT(*) AS n FROM knowledge_records WHERE project_id = ? AND kind = 'flow'").get(projectId).n, 1);
   assert.match(reopened.prepare('SELECT data_json FROM knowledge_records WHERE id = ?').get(page2.id).data_json, /before borrowing/);
+  const pin = reopened.prepare("SELECT repository_path AS repo, accepted_commit AS \"commit\" FROM layer_package_bindings WHERE project_id = ? AND layer_key = 'pages'").get(projectId);
+  assert.match(execFileSync('git', ['-C', pin.repo, 'show', `${pin.commit}:knowledge/flow-method.md`], { encoding: 'utf8' }), /Name the goal before the first step/, 'acceptance moved the layer pin');
   reopened.close();
 
   // Phone width: the review tabs and follow-ups stay within the page.

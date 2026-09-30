@@ -52,9 +52,6 @@ function compile(key, repo, commit, manifest) {
   };
   const spec = JSON.parse(read(manifest.api.spec));
   const source = read(manifest.api.handler);
-  // Each handler revision needs its own review before it can run; an unreviewed commit has no API.
-  if (createHash('sha256').update(source).digest('hex') !== reviewedSources[key]?.[commit]?.[manifest.api.handler])
-    fail(`The ${key} API handler at this commit has not passed host review.`, 409);
   if (spec.openapi !== '3.1.0' || !spec.paths || !spec.components?.schemas) fail('The layer API is not an OpenAPI 3.1 document.', 500);
   const ajv = new Ajv2020({ strict: false, verbose: true, allErrors: true });
   ajv.addSchema({ $id: 'layer', components: spec.components, paths: spec.paths });
@@ -74,9 +71,21 @@ function compile(key, repo, commit, manifest) {
       validate: body ? ajv.getSchema(pointer(['paths', path, method, 'requestBody', 'content', 'application/json', 'schema'])) : null });
   }
   const records = new Map(Object.entries(spec['x-aludel-records'] || {}).map(([kind, ref]) => [kind, ajv.getSchema(`layer${ref}`)]));
-  const api = { key, commit, spec, source, operations, records };
+  const api = { key, commit, spec, source, digest: createHash('sha256').update(source).digest('hex'), handlerPath: manifest.api.handler, operations, records };
   cache.set(cacheKey, api);
   return api;
+}
+
+// A source file may run on the host only once its exact bytes were reviewed: by the host's own list, or by the project
+// owner accepting the layer commit that introduced them (LAYER-SOURCE-01).
+export function initSourceReviews(db) {
+  db.exec(`CREATE TABLE IF NOT EXISTS layer_source_reviews (project_id TEXT NOT NULL, layer_key TEXT NOT NULL, path TEXT NOT NULL, digest TEXT NOT NULL,
+    reviewed_by TEXT NOT NULL, reviewed_at TEXT NOT NULL, work_id TEXT, PRIMARY KEY(project_id, layer_key, path, digest))`);
+}
+export function sourceReviewed(db, projectId, key, path, digest) {
+  if (reviewedSources[key]?.[path]?.includes(digest)) return true;
+  return Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_source_reviews'").get() &&
+    db.prepare('SELECT 1 FROM layer_source_reviews WHERE project_id = ? AND layer_key = ? AND path = ? AND digest = ?').get(projectId, key, path, digest));
 }
 
 // The installed layer's API, or null when its source publishes none (the host's own rules then apply).
@@ -84,8 +93,12 @@ export function layerApi(db, projectId, key) {
   let pkg;
   try { pkg = layerPackageForProject(db, projectId, key); } catch { return null; }
   if (!pkg?.manifest?.api) return null;
-  return compile(key, pkg.repo, pkg.commit, pkg.manifest);
+  const api = compile(key, pkg.repo, pkg.commit, pkg.manifest);
+  if (!sourceReviewed(db, projectId, key, api.handlerPath, api.digest)) fail(`The ${key} API handler at this commit has not passed review.`, 409);
+  return api;
 }
+// Compiles a layer API at any commit of its repository, for checking a candidate before it is accepted.
+export function layerApiAt(key, repo, commit, manifest) { return compile(key, repo, commit, manifest); }
 
 function handle(api, call, args) {
   const payload = JSON.stringify({ source: api.source, call, args });

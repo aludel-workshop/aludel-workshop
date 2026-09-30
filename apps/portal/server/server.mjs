@@ -456,15 +456,16 @@ async function api(request, response, url) {
   // Symphony host credentials have no browser/session authority. Pool requests resolve their pinned profile per attempt.
   if (url.pathname.startsWith('/api/worker/')) {
     const workerAuth = worker.authenticate(request.headers.authorization);
-    const attemptRoute = /^\/api\/worker\/attempts\/([^/]+)(?:\/(workspace|runs|events|candidate|commit|audit|proposal|question|plan|progress|source|layer))?$/.exec(url.pathname);
+    const attemptRoute = /^\/api\/worker\/attempts\/([^/]+)(?:\/(workspace|runs|events|candidate|commit|audit|proposal|question|plan|progress|source|layer|layer-source))?$/.exec(url.pathname);
     if (attemptRoute) {
       const [, attemptId, operation] = attemptRoute;
       const scope = worker.scopeForAttempt(workerAuth, attemptId);
       if (!operation && request.method === 'GET') return json(response, 200, worker.attemptStatus(scope, attemptId), { 'cache-control': 'no-store' });
       if (operation === 'source' && request.method === 'GET') return json(response, 200, readAttemptSource(db, scope, attemptId, url.searchParams.get('path')), { 'cache-control': 'no-store' });
       if (request.method === 'POST' && operation) {
-        const input = await readJson(request, ['audit', 'proposal'].includes(operation) ? 128 * 1024 : 64 * 1024);
+        const input = await readJson(request, ['audit', 'proposal'].includes(operation) ? 128 * 1024 : operation === 'layer-source' ? 256 * 1024 : 64 * 1024);
         // PAGES-API-01: a layer-scoped run calls its layer's API; writes stage in the run's draft until review.
+        if (operation === 'layer-source') return json(response, 200, worker.callLayerSource(scope, { attemptId, action: input.action, path: input.path ?? null, content: input.content ?? null }), { 'cache-control': 'no-store' });
         if (operation === 'layer') return json(response, 200, worker.callLayer(scope, { attemptId, operation: input.operation, id: input.id ?? null, body: input.body ?? {} }), { 'cache-control': 'no-store' });
         // WORK-ITEM-UX-01 WI-5: the agent's own plan and progress, shown as the run's objectives.
         if (operation === 'plan') return json(response, 200, runHistory.reportPlan(workerAuth.projectId, attemptId, input.objectives), { 'cache-control': 'no-store' });
