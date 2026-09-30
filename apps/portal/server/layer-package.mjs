@@ -2,7 +2,7 @@
 // only exact, validated commits supply declarations and Knowledge. Repository scripts never run here.
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, mkdtempSync, renameSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -10,13 +10,19 @@ const portal = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const candidate = resolve(portal, '../..');
 const keyPattern = /^[a-z][a-z0-9_]{2,31}$/;
 const enabled = () => process.env.MACHINE_LAYER_TEMPLATES_ENABLED === '1' || process.env.MACHINE_PAGES_TEMPLATE_ENABLED === '1';
-const configured = key => {
+// LAYER-BASE-01: one base layer repository; templates are its branches, each pinned to a commit here. Built-in layers
+// name their template; a layer added later chooses one. Every installed instance is a fork of its template.
+const catalog = () => JSON.parse(readFileSync(join(portal, 'config/layer-templates.json'), 'utf8'));
+export const layerTemplates = () => enabled() ? Object.keys(catalog().templates) : [];
+const configured = (key, template = null) => {
   if (!enabled()) return null;
   if (!keyPattern.test(key)) throw new Error('Invalid layer package key.');
-  const pin = JSON.parse(readFileSync(join(portal, 'config/layer-template-pins.json'), 'utf8'))[key];
+  const config = catalog();
+  const name = template || config.builtIn[key];
+  const pin = name && config.templates[name];
   if (!pin) return null;
-  if (!/^[0-9a-f]{40}$/.test(pin.commit) || typeof pin.repo !== 'string') throw new Error('Layer template pin is invalid.');
-  return { commit: pin.commit, repo: resolve(candidate, pin.repo) };
+  if (!/^[0-9a-f]{40}$/.test(pin.commit) || typeof config.repo !== 'string') throw new Error('Layer template pin is invalid.');
+  return { template: name, branch: pin.branch, commit: pin.commit, repo: resolve(candidate, config.repo) };
 };
 const git = (repo, ...args) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8', maxBuffer: 1024 * 1024 }).trimEnd();
 const projectRoot = (projectId,instanceId) => join(resolve(process.env.MACHINE_DATA_DIR || join(portal, '.data')), 'layer-repos', createHash('sha256').update(projectId).digest('hex').slice(0, 20), instanceId);
@@ -32,6 +38,8 @@ export function initLayerPackages(db) {
   )`);
   const columns = new Set(db.prepare('PRAGMA table_info(layer_package_bindings)').all().map(row => row.name));
   if (!columns.has('layer_instance_id')) db.exec('ALTER TABLE layer_package_bindings ADD COLUMN layer_instance_id TEXT');
+  // LAYER-BASE-01: the template branch and commit an instance was forked from, for later template updates.
+  for (const column of ['template', 'template_commit']) if (!columns.has(column)) db.exec(`ALTER TABLE layer_package_bindings ADD COLUMN ${column} TEXT`);
   if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='layer_instances'").get()) return;
   db.exec(`UPDATE layer_package_bindings SET layer_instance_id = (
     SELECT instance_id FROM layer_instances WHERE layer_instances.project_id = layer_package_bindings.project_id
@@ -56,16 +64,24 @@ function binding(db, projectId, key) {
   const row = db.prepare('SELECT repository_path AS repo, accepted_commit AS acceptedCommit FROM layer_package_bindings WHERE project_id=? AND layer_instance_id=? AND layer_key=?').get(projectId,rowId.instance_id,key);
   return row ? { repo: row.repo, commit: row.acceptedCommit } : null;
 }
+// Commits are immutable, so a validated package at one is kept.
+const packages = new Map();
 export function packageAt(repo, commit, key) {
+  const cacheKey = `${repo}@${commit}#${key}`;
+  if (!packages.has(cacheKey)) { const value = readPackage(repo, commit, key); packages.set(cacheKey, value); return value; }
+  return packages.get(cacheKey);
+}
+function readPackage(repo, commit, key) {
   if (!/^[0-9a-f]{40}$/.test(commit) || git(repo, 'rev-parse', '--verify', `${commit}^{commit}`) !== commit) throw new Error('Layer package commit is unavailable.');
   const manifest = JSON.parse(git(repo, 'show', `${commit}:layer.json`));
   const tabs = manifest.tabs;
+  // A base layer may start with no outputs and no tabs of its own; the host still provides Tasks, Knowledge and Manage.
   if (manifest.schemaVersion !== 1 || manifest.hostSdkVersion !== 1 || manifest.key !== key || typeof manifest.name !== 'string' || !manifest.name.trim()
       || typeof manifest.path !== 'string' || !/^\/[a-z][a-z0-9-]*$/.test(manifest.path)
       || !['knowledge_records','code_projection','runtime_projection'].includes(manifest.authority)
       || typeof manifest.outputProvider !== 'string' || typeof manifest.editorAdapter !== 'string'
-      || !Array.isArray(manifest.outputs) || !manifest.outputs.length || !manifest.outputs.every(kind => typeof kind === 'string' && /^[a-z][a-z0-9_]*$/.test(kind))
-      || !Array.isArray(tabs) || !tabs.length || new Set(tabs.map(tab => tab.key)).size !== tabs.length
+      || !Array.isArray(manifest.outputs) || !manifest.outputs.every(kind => typeof kind === 'string' && /^[a-z][a-z0-9_]*$/.test(kind))
+      || !Array.isArray(tabs) || new Set(tabs.map(tab => tab.key)).size !== tabs.length
       || !tabs.every(tab => /^[a-z][a-z0-9-]*$/.test(tab.key) && typeof tab.label === 'string' && tab.label.trim().length > 0 && tab.label.length <= 40)
       || !manifest.knowledge || !Array.isArray(manifest.knowledge.documents)) throw new Error('Invalid layer package manifest.');
   // DEC-057: a package may opt into layer-scoped Work; the host adapter registry still bounds its change kinds.
@@ -88,8 +104,10 @@ export function packageAt(repo, commit, key) {
   }
   return { manifest, charter, repo, commit };
 }
-export function ensureLayerPackage(db, projectId, key) {
-  const pin = configured(key);
+// Forks the layer's template into this instance's own repository. Its `main` starts at the template commit; an install
+// commit makes the manifest this instance's (key, name, path) when they differ. `main` is what the host builds and serves.
+export function ensureLayerPackage(db, projectId, key, { template = null, name = null, path = null } = {}) {
+  const pin = configured(key, template);
   if (!pin) return null;
   const existing = binding(db, projectId, key);
   if (existing) return packageAt(existing.repo, existing.commit, key);
@@ -100,13 +118,21 @@ export function ensureLayerPackage(db, projectId, key) {
   const staging = mkdtempSync(join(dirname(target), `.${key}-`));
   try {
     rmSync(staging, { recursive: true, force: true });
-    execFileSync('git', ['clone', '--quiet', '--no-hardlinks', '--local', pin.repo, staging], { stdio: 'pipe' });
+    execFileSync('git', ['clone', '--quiet', '--no-hardlinks', '--local', '--origin', 'template', pin.repo, staging], { stdio: 'pipe' });
     if (git(staging, 'rev-parse', '--verify', `${pin.commit}^{commit}`) !== pin.commit) throw new Error('Layer pin is absent from the template repository.');
-    execFileSync('git', ['-C', staging, 'checkout', '--quiet', '--detach', pin.commit], { stdio: 'pipe' });
-    const pkg = packageAt(staging, pin.commit, key);
+    execFileSync('git', ['-C', staging, 'checkout', '--quiet', '-B', 'main', pin.commit], { stdio: 'pipe' });
+    const manifest = JSON.parse(git(staging, 'show', `${pin.commit}:layer.json`));
+    const own = { ...manifest, key, name: name || manifest.name, path: path || (manifest.key === key ? manifest.path : `/${key.replace(/_/g, '-')}`) };
+    if (own.key !== manifest.key || own.name !== manifest.name || own.path !== manifest.path) {
+      writeFileSync(join(staging, 'layer.json'), JSON.stringify(own, null, 2) + '\n');
+      execFileSync('git', ['-C', staging, 'commit', '--quiet', '-am', `Install ${own.name} as ${key} from the ${pin.template} template`],
+        { stdio: 'pipe', env: { ...process.env, GIT_AUTHOR_NAME: 'Aludel', GIT_AUTHOR_EMAIL: 'aludel@aludel.invalid', GIT_COMMITTER_NAME: 'Aludel', GIT_COMMITTER_EMAIL: 'aludel@aludel.invalid' } });
+    }
+    const head = git(staging, 'rev-parse', 'HEAD');
+    const pkg = packageAt(staging, head, key);
     renameSync(staging, target);
-    db.prepare('INSERT INTO layer_package_bindings(project_id,layer_key,layer_instance_id,repository_path,accepted_commit,installed_at) VALUES (?,?,?,?,?,?)')
-      .run(projectId,key,id,target,pin.commit,new Date().toISOString());
+    db.prepare('INSERT INTO layer_package_bindings(project_id,layer_key,layer_instance_id,repository_path,accepted_commit,installed_at,template,template_commit) VALUES (?,?,?,?,?,?,?,?)')
+      .run(projectId,key,id,target,head,new Date().toISOString(),pin.template,pin.commit);
     return { ...pkg, repo: target };
   } catch (error) { rmSync(staging, { recursive: true, force: true }); throw error; }
 }

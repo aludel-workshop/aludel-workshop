@@ -532,7 +532,7 @@ test('Pages flow task includes exact installed layer method and repository Knowl
       'an existing flow can be staged without a Vision story');
     assert.ok(f.worker.current(f.scope, work.id));
     f.db.prepare("UPDATE layer_package_bindings SET accepted_commit = ? WHERE project_id = ? AND layer_key = 'pages'")
-      .run('aabcfff1f457f8fe4517ea4ec8aef23263e38371', f.projectId);
+      .run(execFileSync('git', ['-C', f.db.prepare("SELECT repository_path FROM layer_package_bindings WHERE project_id = ? AND layer_key = 'pages'").get(f.projectId).repository_path, 'rev-parse', 'HEAD~1'], { encoding: 'utf8' }).trim(), f.projectId);
     assert.equal(f.worker.current(f.scope, work.id), null, 'a Pages package repin withdraws the prior task context');
   } finally {
     f?.close();
@@ -606,7 +606,7 @@ test('revising a flow rejects changed source, foreign instance and stale page wi
       usedInputs:[{id:flow.id,revision:flow.revision},{id:page.id,revision:page.revision}]};
     const submitted=f.worker.submitProposal(f.scope,{attemptId:issue.native_ref.attempt_id,proposal});
     f.know.updateWork(f.owner,f.projectId,work.id,{verdict:{index:0,value:'accept'}});
-    const newPin=JSON.parse(readFileSync(new URL('../config/layer-template-pins.json', import.meta.url),'utf8')).pages.commit, oldPin='e88409c78e790e8d4fdccc2ef4db043b6d3c39d3';
+    const newPin=(({ templates, builtIn }) => templates[builtIn.pages].commit)(JSON.parse(readFileSync(new URL('../config/layer-templates.json', import.meta.url),'utf8'))), oldPin=execFileSync('git',['-C',f.db.prepare("SELECT repository_path FROM layer_package_bindings WHERE project_id=? AND layer_key='pages'").get(f.projectId).repository_path,'rev-parse','HEAD~1'],{encoding:'utf8'}).trim();
     f.db.prepare("UPDATE layer_package_bindings SET accepted_commit=? WHERE project_id=? AND layer_key='pages'").run(oldPin,f.projectId);
     assert.throws(()=>f.worker.acceptProposal(f.owner,f.projectId,work.id,submitted.proposalId),/installed source|source.*changed/);
     f.db.prepare("UPDATE layer_package_bindings SET accepted_commit=? WHERE project_id=? AND layer_key='pages'").run(newPin,f.projectId);
@@ -774,7 +774,7 @@ test('a staged draft is refused when a record it changes moved on, a reference i
   f.db.prepare("UPDATE knowledge_records SET kind = 'doc' WHERE id = ?").run(page.id);
   assert.throws(() => f.worker.acceptProposal(f.owner, f.projectId, work.id, submitted.proposalId), /linked page was not found/);
   f.db.prepare("UPDATE knowledge_records SET kind = 'page' WHERE id = ?").run(page.id);
-  f.db.prepare("UPDATE layer_package_bindings SET accepted_commit = ? WHERE project_id = ? AND layer_key = 'pages'").run('07e2c74ac626651a72ea7620a1bb286c4b7b7a59', f.projectId);
+  f.db.prepare("UPDATE layer_package_bindings SET accepted_commit = ? WHERE project_id = ? AND layer_key = 'pages'").run(execFileSync('git', ['-C', pinOf(f).repo, 'rev-parse', 'HEAD~1'], { encoding: 'utf8' }).trim(), f.projectId);
   assert.throws(() => f.worker.acceptProposal(f.owner, f.projectId, work.id, submitted.proposalId), /layer source changed/);
   assert.equal(f.know.get(f.projectId, created.staged.id), null);
   assert.equal(f.know.get(f.projectId, flow.id).revision, flow.revision);
@@ -879,7 +879,7 @@ test('a run edits its layer Knowledge as one staged commit; an elevated reviewer
   assert.equal(f.know.insert(f.projectId, 'page', { label: 'Still works', icon: 'article', pageType: 'list' }).origin, 'You');
 }));
 
-test('changing what the layer runs needs the project owner, records the reviewed handler, and cannot strand existing records', () => withPagesTemplate(async f => {
+test('an elevated reviewer accepts a change to what the layer runs, which records the reviewed handler and cannot strand existing records', () => withPagesTemplate(async f => {
   const member = addMember(f, 'designer@example.com');
   setLayerElevated(f.db, f.owner, f.projectId, { userId: member.id, layerKey: 'pages', enabled: true });
   f.know.insert(f.projectId, 'page', { label: 'Browse', icon: 'article', pageType: 'list' });
@@ -890,12 +890,13 @@ test('changing what the layer runs needs the project owner, records the reviewed
   const submitted = f.worker.submitProposal(f.scope, { attemptId: code.attemptId, proposal: { summary: 'Default the origin of new pages to Planner.', content: {} } });
   assert.equal(submitted.proposal.source.ownerReview, true);
   f.know.updateWork(f.owner, f.projectId, code.work.id, { verdict: { index: 0, value: 'accept' } });
-  assert.throws(() => f.worker.acceptProposal(member, f.projectId, code.work.id, submitted.proposalId), /project owner accepts it/);
+  const outsider = addMember(f, 'viewer@example.com');
+  assert.throws(() => f.worker.acceptProposal(outsider, f.projectId, code.work.id, submitted.proposalId), /Elevated access/);
   assert.equal(pinOf(f).commit, base);
   assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM layer_source_reviews').get().n, 0);
-  f.worker.acceptProposal(f.owner, f.projectId, code.work.id, submitted.proposalId);
+  f.worker.acceptProposal(member, f.projectId, code.work.id, submitted.proposalId);
   assert.equal(pinOf(f).commit, submitted.proposal.source.commit);
-  assert.equal(f.db.prepare("SELECT reviewed_by FROM layer_source_reviews WHERE path = 'server/pages-api.mjs'").get().reviewed_by, 'Owner');
+  assert.equal(f.db.prepare("SELECT reviewed_by FROM layer_source_reviews WHERE path = 'server/pages-api.mjs'").get().reviewed_by, 'designer');
   assert.equal(f.know.insert(f.projectId, 'page', { label: 'Detail', icon: 'article', pageType: 'detail' }).origin, 'Planner', 'the accepted handler now runs');
 
   const rule = sourceRun(f, 'Shorten page names');

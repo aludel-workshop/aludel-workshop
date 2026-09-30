@@ -7,9 +7,10 @@ import { fileURLToPath } from 'node:url';
 
 const portal = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const candidate = resolve(portal, '../..');
-const pin = JSON.parse(readFileSync(join(portal, 'config/layer-template-pins.json'), 'utf8')).pages;
-if (!pin || !/^[0-9a-f]{40}$/.test(pin.commit) || typeof pin.repo !== 'string') throw new Error('Pages needs a pinned local repository commit.');
-const repo = resolve(candidate, pin.repo);
+const catalog = JSON.parse(readFileSync(join(portal, 'config/layer-templates.json'), 'utf8'));
+const pin = catalog.templates[catalog.builtIn.pages];
+if (!pin || !/^[0-9a-f]{40}$/.test(pin.commit) || typeof catalog.repo !== 'string') throw new Error('Pages needs a pinned template commit.');
+const repo = resolve(candidate, catalog.repo);
 const git = (...args) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 }).trimEnd();
 if (git('rev-parse', '--verify', `${pin.commit}^{commit}`) !== pin.commit) throw new Error('Pages template commit is not available.');
 const file = path => {

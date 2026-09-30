@@ -1,8 +1,8 @@
 // LAYER-SOURCE-01: a layer-scoped run may edit its own layer instance's repository. Edits stage per run; submission writes
 // one Git commit on top of the pinned commit (kept at refs/aludel/candidates/<attempt>) without touching the checkout
 // or the pin; acceptance advances the pin. Docs are guidance an elevated reviewer can accept. Files that run on the host
-// or define the layer's authority need the project owner, whose acceptance records their exact bytes as reviewed, and the
-// new rules must still accept every existing record of the layer.
+// or define the layer's authority are marked for the reviewer; accepting records their exact bytes as reviewed, and the
+// new rules must still accept every existing record of the layer. Review is always an elevated person's (DEC-057).
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -18,8 +18,7 @@ const writable = [/^knowledge\/[a-z0-9][a-z0-9-]*\.md$/, /^docs\/[a-z0-9][a-z0-9
   /^api\/[a-z0-9][a-z0-9-]*\.json$/, /^server\/[a-z0-9][a-z0-9-]*\.mjs$/, /^ui\/[a-z0-9][a-z0-9-]*\.(?:ts|scss)$/, /^tests\/[a-z0-9][a-z0-9-]*\.test\.mjs$/, /^layer\.json$/];
 // Files that run on the host or define what the layer may do.
 export const authorityPath = path => /^(?:server|ui|api|tests)\//.test(path) || path === 'layer.json';
-export const writablePatterns = ['knowledge/*.md', 'docs/*.md', 'README.md', 'AGENTS.md', 'fixtures/*.md|json', 'api/*.json (owner review)', 'server/*.mjs (owner review)',
-  'ui/*.ts|scss (owner review)', 'tests/*.test.mjs (owner review)', 'layer.json (owner review)'];
+export const writablePatterns = ['knowledge/*.md', 'docs/*.md', 'README.md', 'AGENTS.md', 'fixtures/*.md|json', 'api/*.json', 'server/*.mjs', 'ui/*.ts|scss', 'tests/*.test.mjs', 'layer.json'];
 const git = (repo, args, options = {}) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024, ...options });
 
 export function initLayerSource(db) {
@@ -107,11 +106,10 @@ export function buildSourceCandidate(db, { projectId, key, attemptId, baseCommit
 
 // Inside the acceptance transaction: records owner review of changed host-run files, proves the new rules still accept
 // every existing record of the layer, then advances the pin. Throws (rolling back) on any failure.
-export function acceptSourceCandidate(db, { projectId, key, source, reviewer, owner, workId, catalogs, recordsOf }) {
+export function acceptSourceCandidate(db, { projectId, key, source, reviewer, workId, catalogs, recordsOf }) {
   const { repo, commit } = layerBinding(db, projectId, key);
   if (commit !== source.base) fail(`The ${key} layer source changed since this was reviewed. Send it back.`, 409);
   if (git(repo, ['rev-parse', '--verify', `refs/aludel/candidates/${source.attempt}^{commit}`]).trim() !== source.commit) fail('The reviewed layer commit is missing.', 409);
-  if (source.ownerReview && !owner) fail(`This run changes what the ${key} layer runs or may do. The project owner accepts it.`, 403);
   const pkg = packageAt(repo, source.commit, key);
   for (const file of source.files.filter(entry => entry.status !== 'deleted' && /^server\/.+\.mjs$/.test(entry.path)))
     db.prepare('INSERT OR IGNORE INTO layer_source_reviews VALUES (?, ?, ?, ?, ?, ?, ?)').run(projectId, key, file.path,

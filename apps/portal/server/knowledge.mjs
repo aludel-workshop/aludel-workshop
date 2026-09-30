@@ -12,7 +12,7 @@ import { join } from 'node:path';
 import { requireMember } from './accounts.mjs';
 import { actionGrant, recordNewWorkAction } from './lat08-migration.mjs';
 import { hasElevated, layerDefaultAssignee, layerWorkScope } from './layer-scope.mjs';
-import { layerApi, normalizeRecord } from './layer-api.mjs';
+import { kindOwners, layerApiForKind, normalizeRecord } from './layer-api.mjs';
 import { compiledLocalActions } from './lat07-actions.mjs';
 import { actionForProject, actionsForDefinition, projectLayerDefinition, projectLayerDefinitions } from './layer-registry.mjs';
 import { cleanBrandAsset, cleanComponent, cleanTokens, componentStatus, ensureDesign as seedDesign, syncTokensFromLook } from './design.mjs';
@@ -456,7 +456,7 @@ const references = {
   flow: clean => [...(clean.activity ? [[clean.activity, 'activity']] : []), ...(clean.persona ? [[clean.persona, 'persona']] : []),
     ...clean.steps.flatMap(step => [...(step.page ? [[step.page, 'page']] : []), ...(step.persona ? [[step.persona, 'persona']] : []), ...(step.story ? [[step.story, 'story']] : [])])]
 };
-const newId = kind => `${prefixes[kind]}-${randomBytes(4).toString('hex')}`;
+const newId = kind => `${prefixes[kind] || kind.replace(/[^a-z]/g, "").slice(0, 3)}-${randomBytes(4).toString("hex")}`;
 
 export function loadAgentDefaults(configDirectory) {
   const defaults = JSON.parse(readFileSync(join(configDirectory, 'agent-profiles.json'), 'utf8'));
@@ -494,9 +494,15 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
   const row = id => db.prepare('SELECT * FROM knowledge_records WHERE id = ?').get(id);
   const hydrate = record => record && { id: record.id, kind: record.kind, parentId: record.parent_id, position: record.position, revision: record.revision, updatedAt: record.updated_at, ...parse(record.data_json, {}) };
   const pagesKind = kind => ['page_map', 'page', 'flow'].includes(kind);
+  // LAYER-BASE-01: a record belongs to the layer instance that owns it. Pages kinds always carry their instance (DEC-056);
+  // any other kind carries one when the owning layer publishes an API. A named layer narrows a kind several layers own.
+  const instanceFor = (projectId, kind, layer = null) => pagesKind(kind) ? pagesInstanceId(db, projectId)
+    : layer ? kindOwners(db, projectId, kind).find(owner => owner.key === layer)?.instanceId || null : null;
   const scope = (projectId, kind) => pagesKind(kind) ? pagesInstanceId(db, projectId) : null;
-  const list = (projectId, kind) => {
-    const instanceId = scope(projectId, kind);
+  const inScope = (projectId, record) => record && record.project_id === projectId && (pagesKind(record.kind) ? record.layer_instance_id === pagesInstanceId(db, projectId)
+    : !record.layer_instance_id || kindOwners(db, projectId, record.kind).some(owner => owner.instanceId === record.layer_instance_id));
+  const list = (projectId, kind, { layer = null } = {}) => {
+    const instanceId = instanceFor(projectId, kind, layer);
     return (instanceId ? db.prepare('SELECT * FROM knowledge_records WHERE project_id = ? AND layer_instance_id = ? AND kind = ? ORDER BY position, created_at').all(projectId, instanceId, kind)
       : db.prepare('SELECT * FROM knowledge_records WHERE project_id = ? AND kind = ? ORDER BY position, created_at').all(projectId, kind)).map(hydrate);
   };
@@ -507,22 +513,23 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
   };
 
   // PAGES-API-01: an installed layer API owns its outputs' rules; `prepared` is a record its operation already normalized.
-  const layerRules = (projectId, kind, data, prepared) => {
-    if (!pagesKind(kind)) return null;
+  const layerRules = (projectId, kind, data, prepared, hint = {}) => {
     if (prepared) return prepared;
-    const api = layerApi(db, projectId, 'pages');
-    return api ? normalizeRecord(api, kind, data, catalogs) : null;
+    const owner = layerApiForKind(db, projectId, kind, hint);
+    return owner ? normalizeRecord(owner.api, kind, data, catalogs) : null;
   };
-  function insert(projectId, kind, data, { parentId = null, position, author = 'Aludel', rationale = null, workItemId = null, id: givenId = null, prepared = null } = {}) {
-    if (!kinds.includes(kind)) fail('Unknown record kind.');
-    const rules = layerRules(projectId, kind, data, prepared);
+  function insert(projectId, kind, data, { parentId = null, position, author = 'Aludel', rationale = null, workItemId = null, id: givenId = null, prepared = null, layer = null } = {}) {
+    if (!kinds.includes(kind) && !kindOwners(db, projectId, kind).length) fail('Unknown record kind.');
+    const owner = pagesKind(kind) ? null : layerApiForKind(db, projectId, kind, { layerKey: layer });
+    const rules = layerRules(projectId, kind, data, prepared, { layerKey: owner?.key || layer });
+    if (!rules && !validators[kind]) fail('Unknown record kind.');
     const clean = rules ? rules.data : validators[kind](data, catalogs);
     if (kind === 'routine') checkRoutineAction(projectId, clean);
     if (rules) checkReferenceList(projectId, rules.references); else checkReferences(projectId, kind, clean);
     checkDesign(projectId, kind, clean, { parentId });
     if (['story', 'spec', 'project'].includes(kind) && !clean.number) clean.number = counter(projectId, kind);
     if (kind === 'brief_claim') counter(projectId, 'brief');
-    const instanceId = scope(projectId, kind);
+    const instanceId = pagesKind(kind) ? scope(projectId, kind) : owner?.instanceId || null;
     if (parentId && !db.prepare('SELECT 1 FROM knowledge_records WHERE id = ? AND project_id = ? AND (layer_instance_id IS NULL OR layer_instance_id = ?)').get(parentId, projectId, instanceId)) fail('Parent record not found.', 404);
     const id = prepared && /^[a-z]+-[a-z0-9]{6,12}$/.test(String(givenId)) && !row(givenId) ? givenId : newId(kind);
     const created = now();
@@ -548,7 +555,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     for (const [id, expected] of list) {
       const target = row(id);
       const allowed = Array.isArray(expected) ? expected : [expected];
-      if (!target || target.project_id !== projectId || (pagesKind(target.kind) && target.layer_instance_id !== scope(projectId, target.kind)) || !allowed.includes(target.kind)) fail(`A linked ${Array.isArray(expected) ? 'record' : expected.replace('_', ' ')} was not found.`, 404);
+      if (!inScope(projectId, target) || !allowed.includes(target.kind)) fail(`A linked ${Array.isArray(expected) ? 'record' : expected.replace('_', ' ')} was not found.`, 404);
     }
   }
   // Design records (DESIGN-UX-01): uploads belong to the project, colour roles exist, one token set, one asset per brand key.
@@ -565,9 +572,10 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
 
   function update(projectId, id, changes, { expectedRevision, author = 'Aludel', rationale = null, workItemId = null, position, parentId, prepared = null } = {}) {
     const current = row(id);
-    if (!current || current.project_id !== projectId || (pagesKind(current.kind) && current.layer_instance_id !== scope(projectId, current.kind))) fail('Record not found.', 404);
+    if (!inScope(projectId, current)) fail('Record not found.', 404);
     if (expectedRevision !== undefined && Number(expectedRevision) !== current.revision) fail('This record changed since you opened it. Reload to see the latest; your edit is kept.', 409);
-    const rules = layerRules(projectId, current.kind, { ...parse(current.data_json, {}), ...changes }, prepared);
+    const rules = layerRules(projectId, current.kind, { ...parse(current.data_json, {}), ...changes }, prepared, { instanceId: current.layer_instance_id || null });
+    if (!rules && !validators[current.kind]) fail('This record changes only through its layer.', 409);
     const merged = rules ? rules.data : validators[current.kind]({ ...parse(current.data_json, {}), ...changes }, catalogs);
     if (current.kind === 'routine') checkRoutineAction(projectId, merged);
     if (rules) checkReferenceList(projectId, rules.references); else checkReferences(projectId, current.kind, merged);
@@ -590,7 +598,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
 
   function remove(projectId, id) {
     const current = row(id);
-    if (!current || current.project_id !== projectId || (pagesKind(current.kind) && current.layer_instance_id !== scope(projectId, current.kind))) fail('Record not found.', 404);
+    if (!inScope(projectId, current)) fail('Record not found.', 404);
     const children = db.prepare('SELECT id FROM knowledge_records WHERE parent_id = ?').all(id);
     for (const child of children) remove(projectId, child.id);
     db.prepare('INSERT OR IGNORE INTO knowledge_deletions(record_id,project_id,kind,parent_id,position,last_revision,data_json,deleted_at,layer_instance_id) VALUES (?,?,?,?,?,?,?,?,?)')
@@ -647,7 +655,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
   const revisionData = (id, revision) => parse(db.prepare('SELECT data_json FROM knowledge_revisions WHERE record_id = ? AND revision = ?').get(id, revision)?.data_json, null);
   // The record's revision at a moment in time, for links declared by a past commit.
   const revisionAt = (id, at) => db.prepare('SELECT MAX(revision) AS revision FROM knowledge_revisions WHERE record_id = ? AND created_at <= ?').get(id, at)?.revision || null;
-  const get = (projectId, id) => { const record = row(id); return record && record.project_id === projectId && (!pagesKind(record.kind) || record.layer_instance_id === scope(projectId, record.kind)) ? hydrate(record) : null; };
+  const get = (projectId, id) => { const record = row(id); return inScope(projectId, record) ? hydrate(record) : null; };
 
   // ---- Seeds ----
   function ensureProject(projectId, { pitch = '', seedRoutines = true } = {}) {
@@ -1108,9 +1116,9 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     if (!defaultProfile(projectId)) ensureAgents(projectId);
     const targets = (Array.isArray(input.targets) ? input.targets : []).map(target => {
       const record = row(target.id);
-      if (!record || record.project_id !== projectId || (pagesKind(record.kind) && record.layer_instance_id !== scope(projectId, record.kind))) fail('A work target was not found.', 404);
+      if (!inScope(projectId, record)) fail('A work target was not found.', 404);
       return { id: record.id, kind: record.kind, label: text(target.label, 160, 'Target') || record.kind,
-        ...(pagesKind(record.kind) && record.layer_instance_id ? { layerInstanceId: record.layer_instance_id } : {}) };
+        ...(record.layer_instance_id ? { layerInstanceId: record.layer_instance_id } : {}) };
     });
     const question = input.question ? { text: text(input.question.text, 400, 'Question', true), options: lines(input.question.options, 200, 'Option') } : null;
     // DEC-057: an item for a layer-scoped layer (or an agent follow-up) names only its layer; the layer's charter guides it.

@@ -79,10 +79,11 @@ test('reviewed Pages source runs on a disposable real flow and matches the host 
     const unreviewedCommit = execFileSync('git',['-C',pkg.repo,'rev-parse','HEAD'],{encoding:'utf8'}).trim();
     db.prepare("UPDATE layer_package_bindings SET accepted_commit=? WHERE project_id='one' AND layer_key='pages'").run(unreviewedCommit);
     assert.throws(()=>runPagesFlowCandidate(db,'one','propose',input),/has not passed host review/);
-    db.prepare("UPDATE layer_package_bindings SET accepted_commit=? WHERE project_id='one' AND layer_key='pages'")
-      .run('e88409c78e790e8d4fdccc2ef4db043b6d3c39d3');
+    // An earlier commit whose flow rule has the same reviewed bytes still runs.
+    const earlier = execFileSync('git',['-C',pkg.repo,'rev-parse','HEAD~2'],{encoding:'utf8'}).trim();
+    db.prepare("UPDATE layer_package_bindings SET accepted_commit=? WHERE project_id='one' AND layer_key='pages'").run(earlier);
     const legacy = runPagesFlowCandidate(db,'one','propose',{...input,sourceCommit:undefined});
-    assert.equal(legacy.sourceCommit,'e88409c78e790e8d4fdccc2ef4db043b6d3c39d3');
+    assert.equal(legacy.sourceCommit,earlier);
 
   } finally {
     db.close(); rmSync(data,{recursive:true,force:true});

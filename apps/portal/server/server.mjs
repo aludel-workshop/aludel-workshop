@@ -34,7 +34,7 @@ import { initPagesCodeObservations, codeRouteObservations, recordCodeRouteObserv
 import { initActionMigration, migrateActionProject, layerActionSettings, setActionAssignee, setProjectWorkStyle, setLayerActionGrant, setActionMethod } from './lat08-migration.mjs';
 import { readActionSource, readAttemptSource, checkPinnedActionEffect } from './code-action-gateway.mjs';
 import { decideFollowUp, hasElevated, initLayerScope, layerAccess, requireElevated, setLayerDefaultAssignee, setLayerElevated } from './layer-scope.mjs';
-import { applyOperation, layerApi } from './layer-api.mjs';
+import { applyOperation, layerApi, layerApiForKind, recordOperations } from './layer-api.mjs';
 import { initLayerContract, layerDescriptors, layerInstances, updateLayerInstance, layerCatalog, layerOutputRead, layerMigrationInventory } from './layer-contract.mjs';
 import { answerDecision, createProposal, ensureB02Fixture, getDecision, getProposal, listDecisions, listDownstreamRecords, listProposals, reassessRecord, reviseProposal } from './product-records.mjs';
 import { openSecretStore } from './secret-store.mjs';
@@ -72,8 +72,14 @@ initLayerContract(db);
 initMarkdownLayer(db);
 initActionMigration(db);
 initLayerScope(db);
-// The Pages API operation behind each generic record write the Pages UI makes.
-const pagesOperation = { page: { create: 'createPage', update: 'updatePage' }, flow: { create: 'createFlow', update: 'updateFlow' }, page_map: { create: 'setPageMap', update: 'setPageMap' } };
+// LAYER-BASE-01: a generic record write for a kind some layer's API owns becomes that layer's operation.
+function recordCall(db, projectId, kind, { layer = null, instanceId = null, mode }) {
+  const owner = layerApiForKind(db, projectId, kind, { layerKey: layer, instanceId });
+  if (!owner) return null;
+  const operation = recordOperations(owner.api, kind)[mode];
+  if (!operation) throw Object.assign(new Error(`The ${owner.key} layer has no operation to ${mode === 'remove' ? 'delete' : mode} ${kind.replace('_', ' ')} records.`), { status: 405 });
+  return { owner, operation };
+}
 initPagesLayerApp(db);
 initPagesReconciliation(db);
 initPagesCodeObservations(db);
@@ -1006,10 +1012,10 @@ async function api(request, response, url) {
       const input = await readJson(request);
       if (['role', 'work_action'].includes(input.kind)) return json(response, 409, { error: 'Historical role records are read-only. Configure actions in their layer.' });
       const work = know.openWorkItem(projectId, input.workItemId);
-      const pagesApi = Object.hasOwn(pagesOperation, String(input.kind)) && layerApi(db, projectId, 'pages');
-      // PAGES-API-01: Pages records change only through the Pages API.
-      if (pagesApi) return json(response, 201, applyOperation({ db, know, api: pagesApi, projectId, operationId: pagesOperation[input.kind].create,
-        body: input.kind === 'page_map' ? { places: input.data?.places || {} } : { [input.kind]: input.data || {} }, elevated: hasElevated(db, user.id, projectId, 'pages'),
+      // A kind a layer's API owns changes only through that API.
+      const call = recordCall(db, projectId, String(input.kind || ''), { layer: typeof input.layer === 'string' ? input.layer : null, mode: 'create' });
+      if (call) return json(response, 201, applyOperation({ db, know, api: call.owner.api, projectId, operationId: call.operation.operationId,
+        body: call.operation.singleton ? input.data || {} : { [call.operation.field]: input.data || {} }, elevated: hasElevated(db, user.id, projectId, call.owner.key),
         author: user.name, rationale: input.rationale || null, workItemId: work?.id || null }).record);
       return json(response, 201, know.insert(projectId, String(input.kind || ''), input.data || {}, { parentId: input.parentId || null, author: user.name, rationale: input.rationale || null, workItemId: work?.id || null }));
     }
@@ -1018,15 +1024,21 @@ async function api(request, response, url) {
       if (['role', 'work_action'].includes(know.get(projectId, item)?.kind)) return json(response, 409, { error: 'Historical role records are read-only. Configure actions in their layer.' });
       const work = know.openWorkItem(projectId, input.workItemId);
       const existing = know.get(projectId, item);
-      const pagesApi = Object.hasOwn(pagesOperation, String(existing?.kind)) && layerApi(db, projectId, 'pages');
-      if (pagesApi) return json(response, 200, applyOperation({ db, know, api: pagesApi, projectId, operationId: pagesOperation[existing.kind].update,
-        id: existing.kind === 'page_map' ? null : item, elevated: hasElevated(db, user.id, projectId, 'pages'),
-        body: existing.kind === 'page_map' ? { places: input.data?.places ?? existing.places, ...(input.expectedRevision !== undefined ? { expectedRevision: Number(input.expectedRevision) } : {}) }
-          : { changes: input.data || {}, ...(input.expectedRevision !== undefined ? { expectedRevision: Number(input.expectedRevision) } : {}) },
+      const call = existing && recordCall(db, projectId, existing.kind, { instanceId: db.prepare('SELECT layer_instance_id FROM knowledge_records WHERE id = ?').get(item)?.layer_instance_id || null, mode: 'update' });
+      const expected = input.expectedRevision !== undefined ? { expectedRevision: Number(input.expectedRevision) } : {};
+      if (call) return json(response, 200, applyOperation({ db, know, api: call.owner.api, projectId, operationId: call.operation.operationId,
+        id: call.operation.singleton ? null : item, elevated: hasElevated(db, user.id, projectId, call.owner.key),
+        body: call.operation.singleton ? { ...Object.fromEntries(Object.entries(existing).filter(([key]) => !['id', 'kind', 'parentId', 'position', 'revision', 'updatedAt'].includes(key))), ...(input.data || {}), ...expected }
+          : { changes: input.data || {}, ...expected },
         author: user.name, rationale: input.rationale || null, workItemId: work?.id || null }).record);
       return json(response, 200, know.update(projectId, item, input.data || {}, { expectedRevision: input.expectedRevision, author: user.name, rationale: input.rationale || null, position: input.position, parentId: input.parentId, workItemId: work?.id || null }));
     }
     if (section === 'records' && method === 'DELETE' && item) {
+      const existing = know.get(projectId, item);
+      const owner = existing && layerApiForKind(db, projectId, existing.kind, { instanceId: db.prepare('SELECT layer_instance_id FROM knowledge_records WHERE id = ?').get(item)?.layer_instance_id || null });
+      const remove = owner && recordOperations(owner.api, existing.kind).remove;
+      if (remove) { applyOperation({ db, know, api: owner.api, projectId, operationId: remove.operationId, id: item, body: {}, elevated: hasElevated(db, user.id, projectId, owner.key), author: user.name });
+        return json(response, 200, { deleted: item }); }
       const record = ['story', 'spec', 'doc', 'research', 'persona', 'activity', 'step', 'data_object', 'data_operation', 'access_rule', 'brief_claim', 'source', 'finding', 'insight', 'evidence_link', 'project', 'component', 'brand_asset', 'flow', 'page'].flatMap(kind => know.list(projectId, kind)).find(entry => entry.id === item);
       if (!record) return json(response, 409, { error: 'That record cannot be deleted here.' });
       // PAGES-UX-01: only page blanks go from the Map. Pages in the navigation change in the navigation editor; built pages change through a change request.

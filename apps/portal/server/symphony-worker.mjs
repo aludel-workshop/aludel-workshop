@@ -17,7 +17,7 @@ import { runPagesFlowCandidate } from './pages-flow-runner.mjs';
 import { activeLayerTopology, discoverySourceSnapshot } from './layer-discovery.mjs';
 import { applyDiscoveryProposal } from './layer-space.mjs';
 import { checkFollowUps, layerWorkScope, recordFollowUps, requireElevated } from './layer-scope.mjs';
-import { checkDraftCurrent, draftChanges, initLayerApi, initSourceReviews, layerApi, stageOperation } from './layer-api.mjs';
+import { applyWrites, checkDraftCurrent, draftChanges, initLayerApi, initSourceReviews, layerApi, stageOperation } from './layer-api.mjs';
 import { acceptSourceCandidate, buildSourceCandidate, hasSourceDraft, initLayerSource, settleSourceCheckout, sourceCall } from './layer-source.mjs';
 
 const hash = value => createHash('sha256').update(value).digest('hex');
@@ -681,16 +681,13 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     checkDraftCurrent(db, api, projectId, attemptId);
     const staged = draftChanges(db, projectId, attemptId);
     if (JSON.stringify(staged) !== JSON.stringify(submitted.changes)) fail('The staged changes differ from what was reviewed. Send this back.', 409);
-    // References were checked against current records and the draft above; created records go first so updates can point at them.
-    const ordered = [...submitted.changes].sort((a, b) => (a.op === 'create' ? 0 : 1) - (b.op === 'create' ? 0 : 1));
-    const applied = ordered.map(change => change.op === 'create'
-      ? know.insert(projectId, change.kind, change.after, { ...options, id: change.id, prepared: { data: change.after, references: [] } }).id
-      : know.update(projectId, change.id, change.after, { ...options, expectedRevision: change.baseRevision, prepared: { data: change.after, references: [] } }).id);
+    // References were checked against current records and the draft above.
+    const applied = [...applyWrites(know, projectId, submitted.changes.map(change => ({ op: change.op, kind: change.kind, id: change.id, baseRevision: change.baseRevision, data: change.after })), [],
+      { author: options.author, rationale: options.rationale, workItemId: options.workItemId }).map(record => record.id), ...submitted.changes.filter(change => change.op === 'delete').map(change => change.id)];
     // Data applies under the rules it was checked with; then the reviewed layer commit becomes the pin.
     const key = bundle.guidance.layerScope.key;
     const instance = db.prepare('SELECT instance_id FROM layer_instances WHERE project_id = ? AND layer_key = ?').get(projectId, key)?.instance_id;
     const source = submitted.source ? acceptSourceCandidate(db, { projectId, key, source: submitted.source, reviewer: user.name, workId: entry.id, catalogs: know.catalogs,
-      owner: Boolean(db.prepare("SELECT 1 FROM project_members WHERE project_id = ? AND user_id = ? AND role = 'owner'").get(projectId, user.id)),
       recordsOf: kind => db.prepare('SELECT id, data_json FROM knowledge_records WHERE project_id = ? AND kind = ? AND layer_instance_id = ?').all(projectId, kind, instance)
         .map(record => ({ id: record.id, data: JSON.parse(record.data_json) })) }) : null;
     return { applied, source };

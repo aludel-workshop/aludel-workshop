@@ -1,0 +1,16 @@
+{
+  "repo": "../layer-base",
+  "templates": {
+    "base": {
+      "branch": "main",
+      "commit": "493387c567ae6780b46e771acd1009a32f46bf74"
+    },
+    "pages": {
+      "branch": "pages",
+      "commit": "09f5f1e0f05917175991387bf3fdc4444d5df1b8"
+    }
+  },
+  "builtIn": {
+    "pages": "pages"
+  }
+}

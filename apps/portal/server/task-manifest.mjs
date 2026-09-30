@@ -34,7 +34,7 @@ function compileLayerTask(bundle) {
         `Change ${scope.key} data only by calling its API with aludel_layer_call (operation, id for a path id, body). The API document under layerApi defines every operation and schema. ` +
         'Your writes are staged for this run, reads include what you staged, and nothing applies until an elevated reviewer accepts the run. ' +
         `You may also edit this layer's own repository (its Knowledge, docs, API document and code) with aludel_layer_source (list, read, write, delete); edits are staged and submitted as one commit. ` +
-        'Changes to api/, server/, ui/, tests/ or layer.json change what the layer runs or may do: the project owner reviews them, and the new rules must still accept every existing record. ' +
+        'Changes to api/, server/, ui/, tests/ or layer.json change what the layer runs or may do: say so in your summary, and make sure the new rules still accept every existing record. ' +
         'If something outside this layer should change, or a separate task would help, propose it as a follow-up with a clear reason instead of doing it. ' +
         'Ask a question when a decision blocks the result. Do not change project records or repository files directly.' },
     layerSource: { key: layerPackage.key, instanceId: layerPackage.instanceId, commit: layerPackage.commit, charter: layerPackage.charter,

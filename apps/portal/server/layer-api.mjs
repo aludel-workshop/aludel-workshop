@@ -64,14 +64,19 @@ function compile(key, repo, commit, manifest) {
     if (output && (!manifest.outputs.includes(output) || op['x-aludel-staging'] !== 'record' || !['normal', 'elevated'].includes(op['x-aludel-access'])))
       fail(`Operation ${op.operationId} writes outside this layer or has no staging and access.`, 500);
     if (!output && !['list', 'get', 'singleton'].includes(op['x-aludel-read']?.mode)) fail(`Operation ${op.operationId} neither reads nor writes.`, 500);
+    const context = op['x-aludel-context'] || [];
+    if (!Array.isArray(context) || !context.every(kind => manifest.outputs.includes(kind))) fail(`Operation ${op.operationId} asks for context outside this layer.`, 500);
     const body = op.requestBody?.content?.['application/json']?.schema;
     operations.set(op.operationId, { operationId: op.operationId, method: method.toUpperCase(), path, summary: op.summary || '', description: op.description || '',
-      output, access: op['x-aludel-access'] || 'normal', singleton: Boolean(op['x-aludel-singleton']), read: op['x-aludel-read'] || null,
+      output, access: op['x-aludel-access'] || 'normal', singleton: Boolean(op['x-aludel-singleton']), read: op['x-aludel-read'] || null, context,
+      field: body?.required?.find(name => name !== 'expectedRevision') || null,
       needsId: Boolean(op.parameters?.some(parameter => parameter.in === 'path' && parameter.name === 'id')),
       validate: body ? ajv.getSchema(pointer(['paths', path, method, 'requestBody', 'content', 'application/json', 'schema'])) : null });
   }
   const records = new Map(Object.entries(spec['x-aludel-records'] || {}).map(([kind, ref]) => [kind, ajv.getSchema(`layer${ref}`)]));
-  const api = { key, commit, spec, source, digest: createHash('sha256').update(source).digest('hex'), handlerPath: manifest.api.handler, operations, records };
+  const catalogNames = spec['x-aludel-catalogs'] || [];
+  if (!Array.isArray(catalogNames) || !catalogNames.every(name => /^[a-zA-Z][a-zA-Z0-9]*$/.test(name))) fail('The layer API names invalid host catalogs.', 500);
+  const api = { key, commit, spec, source, digest: createHash('sha256').update(source).digest('hex'), handlerPath: manifest.api.handler, operations, records, catalogNames, outputs: manifest.outputs };
   cache.set(cacheKey, api);
   return api;
 }
@@ -97,6 +102,22 @@ export function layerApi(db, projectId, key) {
   if (!sourceReviewed(db, projectId, key, api.handlerPath, api.digest)) fail(`The ${key} API handler at this commit has not passed review.`, 409);
   return api;
 }
+// LAYER-BASE-01: which installed layers own a record kind. Several instances of one template can own the same kind;
+// their records are told apart by layer instance.
+export function kindOwners(db, projectId, kind) {
+  if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_definitions'").get()) return [];
+  return db.prepare(`SELECT d.layer_key AS key, i.instance_id AS instanceId, d.output_kinds_json AS outputs FROM layer_definitions d
+    JOIN layer_instances i ON i.project_id = d.project_id AND i.layer_key = d.layer_key WHERE d.project_id = ?`).all(projectId)
+    .filter(row => { try { return JSON.parse(row.outputs || '[]').includes(kind); } catch { return false; } }).map(({ key, instanceId }) => ({ key, instanceId }));
+}
+// The API that owns records of this kind here, narrowed by layer or instance when several layers own it; null when no owner publishes one.
+export function layerApiForKind(db, projectId, kind, { layerKey = null, instanceId = null } = {}) {
+  const owners = kindOwners(db, projectId, kind).filter(owner => (!layerKey || owner.key === layerKey) && (!instanceId || owner.instanceId === instanceId))
+    .map(owner => ({ ...owner, api: layerApi(db, projectId, owner.key) })).filter(owner => owner.api);
+  if (owners.length > 1) fail(`Several layers own ${kind.replace('_', ' ')} records here. Name the layer.`, 409);
+  return owners[0] || null;
+}
+
 // Compiles a layer API at any commit of its repository, for checking a candidate before it is accepted.
 export function layerApiAt(key, repo, commit, manifest) { return compile(key, repo, commit, manifest); }
 
@@ -111,7 +132,11 @@ function handle(api, call, args) {
   return response.value;
 }
 
-const handlerCatalogs = catalogs => ({ routeIcons: catalogs.routeIcons || [], pageTypes: Object.keys(catalogs.pageTypes || {}) });
+// Host catalogs a layer's rules may check against, as the API asks for them: a list, or the keys of a map.
+const handlerCatalogs = (api, catalogs) => Object.fromEntries(api.catalogNames.map(name => {
+  const value = catalogs?.[name];
+  return [name, Array.isArray(value) ? value.filter(entry => typeof entry === 'string') : value && typeof value === 'object' ? Object.keys(value) : []];
+}));
 function checkRecord(api, kind, data) {
   const validate = api.records.get(kind);
   if (!validate) fail(`The ${api.key} API has no schema for ${kind}.`, 500);
@@ -120,7 +145,7 @@ function checkRecord(api, kind, data) {
 
 // The layer's rules for one record, used by every host path that writes this layer's outputs.
 export function normalizeRecord(api, kind, data, catalogs) {
-  const result = handle(api, 'normalize', [kind, data, { catalogs: handlerCatalogs(catalogs) }]);
+  const result = handle(api, 'normalize', [kind, data, { catalogs: handlerCatalogs(api, catalogs) }]);
   checkRecord(api, kind, result.data);
   return result;
 }
@@ -137,32 +162,30 @@ function checkReferences(db, api, projectId, references, overlay) {
   const outputs = new Set(api.spec['x-aludel-records'] ? Object.keys(api.spec['x-aludel-records']) : []);
   for (const [id, kinds] of references) {
     const staged = overlay?.get(id);
-    const record = staged ? { kind: staged.kind, instanceId: instance } : stored(db, projectId, api.key, id);
+    const record = staged ? (staged.deleted ? null : { kind: staged.kind, instanceId: instance }) : stored(db, projectId, api.key, id);
     if (!record || !kinds.includes(record.kind) || outputs.has(record.kind) && record.instanceId !== instance)
       fail(`A linked ${kinds[0].replace('_', ' ')} was not found.`, 404);
   }
 }
 
-function currentFor(db, api, projectId, operation, id, overlay) {
+// This instance's records of one kind, as a run sees them: stored records with its staged changes applied.
+function recordsOf(db, api, projectId, kind, overlay) {
   const instance = instanceOf(db, projectId, api.key);
-  const scoped = record => record && record.kind === operation.output && record.instanceId === instance ? record : null;
-  if (operation.singleton) {
-    const staged = [...(overlay?.values() || [])].find(entry => entry.kind === operation.output);
-    if (staged) return staged;
-    const row = db.prepare('SELECT id FROM knowledge_records WHERE project_id = ? AND kind = ? AND layer_instance_id = ? ORDER BY created_at LIMIT 1').get(projectId, operation.output, instance);
-    return row ? scoped(stored(db, projectId, api.key, row.id)) : null;
-  }
+  const rows = db.prepare('SELECT id FROM knowledge_records WHERE project_id = ? AND kind = ? AND layer_instance_id = ? ORDER BY position, created_at').all(projectId, kind, instance)
+    .map(row => stored(db, projectId, api.key, row.id));
+  return [...rows.map(record => overlay?.get(record.id) || record), ...[...(overlay?.values() || [])].filter(entry => entry.kind === kind && entry.created)]
+    .filter(record => !record.deleted).map(({ id, kind: recordKind, revision, data }) => ({ id, kind: recordKind, revision, data }));
+}
+
+function currentFor(db, api, projectId, operation, id, overlay) {
+  if (operation.singleton) return recordsOf(db, api, projectId, operation.output, overlay)[0] || null;
   if (!operation.needsId) return null;
-  return overlay?.get(id) || scoped(stored(db, projectId, api.key, id)) || fail(`That ${operation.output.replace('_', ' ')} was not found.`, 404);
+  return recordsOf(db, api, projectId, operation.output, overlay).find(record => record.id === id) || fail(`That ${operation.output.replace('_', ' ')} was not found.`, 404);
 }
 
 function read(db, api, projectId, operation, id, overlay) {
-  const instance = instanceOf(db, projectId, api.key);
   const { kind, mode } = operation.read;
-  const rows = db.prepare('SELECT id FROM knowledge_records WHERE project_id = ? AND kind = ? AND layer_instance_id = ? ORDER BY position, created_at').all(projectId, kind, instance)
-    .map(row => stored(db, projectId, api.key, row.id));
-  const all = [...rows.map(record => overlay?.get(record.id) || record), ...[...(overlay?.values() || [])].filter(entry => entry.kind === kind && entry.created)]
-    .map(({ id: recordId, revision, data }) => ({ id: recordId, revision, data }));
+  const all = recordsOf(db, api, projectId, kind, overlay).map(({ id: recordId, revision, data }) => ({ id: recordId, revision, data }));
   if (mode === 'list') return all;
   if (mode === 'singleton') return all[0] || null;
   return all.find(record => record.id === id) || fail(`That ${kind.replace('_', ' ')} was not found.`, 404);
@@ -176,29 +199,62 @@ export function callOperation({ db, catalogs, api, projectId, operationId, id = 
   if (operation.access === 'elevated' && !elevated) fail(`Elevated access to ${api.key} is required for ${operationId}.`, 403);
   if (operation.validate && !operation.validate(body)) fail(message(operation.validate.errors));
   const current = currentFor(db, api, projectId, operation, id, overlay);
+  // An operation may ask for this instance's records of some of its kinds, for rules that span records (paths, moves).
+  const records = Object.fromEntries(operation.context.map(kind => [kind, recordsOf(db, api, projectId, kind, overlay)]));
   const { writes, references } = handle(api, 'run', [operationId, { id, body },
-    { current: current && { id: current.id, kind: current.kind, revision: current.revision, data: current.data }, catalogs: handlerCatalogs(catalogs) }]);
-  if (!Array.isArray(writes) || writes.length !== 1) fail('The layer API handler returned an invalid result.', 500);
+    { current: current && { id: current.id, kind: current.kind, revision: current.revision, data: current.data }, records, catalogs: handlerCatalogs(api, catalogs) }]);
+  if (!Array.isArray(writes) || !writes.length || writes.length > 200 || !Array.isArray(references)) fail('The layer API handler returned an invalid result.', 500);
+  // Updates and deletes may touch only records this call loaded; creates get fresh IDs.
+  const loaded = new Map([...(current ? [current] : []), ...Object.values(records).flat()].map(record => [record.id, record]));
+  const touched = new Set();
   for (const write of writes) {
-    if (write.kind !== operation.output || !['create', 'update'].includes(write.op) || typeof write.id !== 'string' || !/^[a-z]+-[a-z0-9]{6,12}$/.test(write.id))
+    if (!api.outputs.includes(write.kind) || !['create', 'update', 'delete'].includes(write.op) || typeof write.id !== 'string' || !/^[a-z]+-[a-z0-9]{6,12}$/.test(write.id) || touched.has(write.id))
       fail('The layer API handler wrote outside its operation.', 500);
-    if (write.op === 'update' && (write.id !== current?.id || write.baseRevision !== current.revision)) fail('The layer API handler changed a record it did not load.', 500);
-    if (write.op === 'create' && (current || stored(db, projectId, api.key, write.id) || overlay?.has(write.id))) fail('The layer API handler reused a record id.', 500);
-    checkRecord(api, write.kind, write.data);
+    touched.add(write.id);
+    if (write.op === 'create' && (loaded.has(write.id) || stored(db, projectId, api.key, write.id) || overlay?.has(write.id))) fail('The layer API handler reused a record id.', 500);
+    if (write.op !== 'create' && (loaded.get(write.id)?.kind !== write.kind || write.baseRevision !== loaded.get(write.id).revision)) fail('The layer API handler changed a record it did not load.', 500);
+    if (write.op !== 'delete') checkRecord(api, write.kind, write.data);
   }
-  checkReferences(db, api, projectId, references, overlay);
+  const next = new Map(overlay || []);
+  for (const write of writes) next.set(write.id, { id: write.id, kind: write.kind, data: write.data ?? null, deleted: write.op === 'delete', created: write.op === 'create' });
+  checkReferences(db, api, projectId, references, next);
   return { operation, writes, references };
+}
+
+// How the host's generic record writes (the UI's create, change and delete) map to a layer's operations.
+export function recordOperations(api, kind) {
+  const ops = [...api.operations.values()].filter(op => op.output === kind);
+  return { create: ops.find(op => op.singleton) || ops.find(op => op.method === 'POST' && !op.needsId) || null,
+    update: ops.find(op => op.singleton) || ops.find(op => ['PATCH', 'PUT'].includes(op.method) && op.needsId) || null,
+    remove: ops.find(op => op.method === 'DELETE' && op.needsId) || null };
 }
 
 // A person's call: runs the operation and applies its writes at once, through the same checks.
 export function applyOperation({ db, know, api, projectId, operationId, id = null, body = {}, elevated = false, author, rationale = null, workItemId = null }) {
   const called = callOperation({ db, catalogs: know.catalogs, api, projectId, operationId, id, body, elevated });
   if (called.result !== undefined) return called.result;
-  const [write] = called.writes;
-  const prepared = { data: write.data, references: called.references };
-  const record = write.op === 'create' ? know.insert(projectId, write.kind, write.data, { id: write.id, prepared, author, rationale, workItemId })
-    : know.update(projectId, write.id, write.data, { expectedRevision: write.baseRevision, prepared, author, rationale, workItemId });
-  return { id: record.id, revision: record.revision, data: write.data, record };
+  const own = !db.isTransaction;
+  if (own) db.exec('BEGIN IMMEDIATE');
+  try {
+    const records = applyWrites(know, projectId, called.writes, called.references, { author, rationale, workItemId });
+    if (own) db.exec('COMMIT');
+    const first = records[0];
+    return { id: first?.id || called.writes[0].id, revision: first?.revision ?? null, data: called.writes[0].data ?? null, record: first || null, records };
+  } catch (error) { if (own) db.exec('ROLLBACK'); throw error; }
+}
+
+// Writes checked changes through the host store: creates first so later writes can point at them, deletes last.
+export function applyWrites(know, projectId, writes, references, { author, rationale = null, workItemId = null, baseCheck = true } = {}) {
+  const order = { create: 0, update: 1, delete: 2 };
+  return [...writes].sort((a, b) => order[a.op] - order[b.op]).map(write => {
+    const prepared = { data: write.data, references: [] };
+    if (write.op === 'create') return know.insert(projectId, write.kind, write.data, { id: write.id, prepared, author, rationale, workItemId });
+    if (write.op === 'update') return know.update(projectId, write.id, write.data, { expectedRevision: baseCheck ? write.baseRevision : undefined, prepared, author, rationale, workItemId });
+    const current = know.get(projectId, write.id);
+    if (!current || baseCheck && current.revision !== write.baseRevision) fail('A record this change deletes was changed since. Reload and try again.', 409);
+    know.remove(projectId, write.id);
+    return null;
+  }).filter(Boolean).sort((a, b) => writes.findIndex(write => write.id === a.id) - writes.findIndex(write => write.id === b.id));
 }
 
 // ---- Staged runs: an agent's calls build a draft that review shows and acceptance commits ----
@@ -215,7 +271,10 @@ export function draftOverlay(db, projectId, attemptId) {
   for (const row of db.prepare('SELECT writes_json FROM layer_run_drafts WHERE attempt_id = ? AND project_id = ? ORDER BY seq').all(attemptId, projectId))
     for (const write of JSON.parse(row.writes_json)) {
       const previous = overlay.get(write.id);
-      overlay.set(write.id, { id: write.id, kind: write.kind, data: write.data, created: previous ? previous.created : write.op === 'create',
+      const created = previous ? previous.created : write.op === 'create';
+      // Deleting a record this draft created leaves nothing to apply.
+      if (write.op === 'delete' && created) { overlay.delete(write.id); continue; }
+      overlay.set(write.id, { id: write.id, kind: write.kind, data: write.op === 'delete' ? null : write.data, created, deleted: write.op === 'delete',
         revision: previous ? previous.revision : write.baseRevision ?? 0, baseRevision: previous ? previous.baseRevision : write.baseRevision ?? null });
     }
   return overlay;
@@ -229,14 +288,15 @@ export function stageOperation({ db, catalogs, api, projectId, attemptId, operat
   if (seq > 200) fail('This run has staged the most changes one review can hold.');
   db.prepare('INSERT INTO layer_run_drafts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(attemptId, seq, projectId, api.key, operationId,
     JSON.stringify({ id, body }), JSON.stringify(called.writes), JSON.stringify(called.references), now());
-  const write = called.writes[0];
-  return { operationId, staged: { id: write.id, kind: write.kind, op: write.op, data: write.data }, draft: draftChanges(db, projectId, attemptId).map(change => ({ id: change.id, kind: change.kind, op: change.op })) };
+  const [write] = called.writes;
+  return { operationId, staged: { id: write.id, kind: write.kind, op: write.op, data: write.data ?? null }, writes: called.writes.map(entry => ({ id: entry.id, kind: entry.kind, op: entry.op })),
+    draft: draftChanges(db, projectId, attemptId).map(change => ({ id: change.id, kind: change.kind, op: change.op })) };
 }
 
 // What review shows: each touched record before and after.
 export function draftChanges(db, projectId, attemptId) {
   const revision = (id, number) => JSON.parse(db.prepare('SELECT data_json FROM knowledge_revisions WHERE record_id = ? AND revision = ?').get(id, number)?.data_json || 'null');
-  return [...draftOverlay(db, projectId, attemptId).values()].map(entry => ({ id: entry.id, kind: entry.kind, op: entry.created ? 'create' : 'update',
+  return [...draftOverlay(db, projectId, attemptId).values()].map(entry => ({ id: entry.id, kind: entry.kind, op: entry.created ? 'create' : entry.deleted ? 'delete' : 'update',
     baseRevision: entry.baseRevision, before: entry.created ? null : revision(entry.id, entry.baseRevision), after: entry.data }));
 }
 
