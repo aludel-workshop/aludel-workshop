@@ -14,11 +14,6 @@ import { PagesPageComponent } from './pages-page';
   imports: [MatIconModule, PagesMapComponent, PagesPageComponent, PagesFlowsComponent],
   providers: [PagesState],
   template: `
-  <p class="lay-eyebrow">Pages · how the product works for people</p>
-  <h1 tabindex="-1">{{ ctx.setup()?.project?.name }}'s pages</h1>
-  <nav class="lay-tabs" aria-label="Pages sections">
-    @for (entry of tabs; track entry[0]) { <a [href]="ctx.link('pages', entry[0])" (click)="ctx.go(ctx.link('pages', entry[0]), $event)" [class.active]="tab() === entry[0]" [attr.aria-current]="tab() === entry[0] ? 'page' : null"><mat-icon aria-hidden="true">{{ entry[2] }}</mat-icon>{{ entry[1] }}</a> }
-  </nav>
   @if (!ctx.data()) { <p class="lay-muted">Loading the pages…</p> }
   @else {
     @switch (tab()) {

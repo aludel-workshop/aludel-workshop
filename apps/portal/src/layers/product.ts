@@ -30,11 +30,6 @@ export function markdownBlocks(body: string): Block[] {
   selector: 'aludel-product-layer', standalone: true,
   imports: [FormsModule, NgTemplateOutlet, MatIconModule, BuiltByComponent, EvidenceChipComponent, RefChipComponent],
   template: `
-  <p class="lay-eyebrow lay-layer"><mat-icon aria-hidden="true">lightbulb</mat-icon>Vision</p>
-  <h1 tabindex="-1">What we're building, and why</h1>
-  <nav class="lay-tabs" aria-label="Vision sections">
-    @for (entry of tabs; track entry[0]) { <a [href]="ctx.link('product', entry[0])" (click)="ctx.go(ctx.link('product', entry[0]), $event)" [class.active]="tab() === entry[0]" [attr.aria-current]="tab() === entry[0] ? 'page' : null"><mat-icon aria-hidden="true">{{ entry[2] }}</mat-icon>{{ entry[1] }}</a> }
-  </nav>
 
   @switch (tab()) {
     @case ('map') {

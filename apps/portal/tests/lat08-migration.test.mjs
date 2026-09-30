@@ -135,6 +135,11 @@ test('layer method edits are revisioned, owner-scoped and do not rewrite histori
   const before = layerActionSettings(db, { id: 'owner' }, 'p1', 'product').find(action => action.id === 'product.brief');
   assert.equal(before.method, 'Historical Vision method');
   assert.equal(before.methodRevision, 1);
+  // Tasks › Actions renders the declaration beside the method: what it reads and may change, its checks and runnability.
+  assert.ok(Array.isArray(before.checks) && before.checks.length, 'checks come from the declaration');
+  assert.ok(before.reads.every(read => typeof read.layer === 'string' && typeof read.kind === 'string'));
+  assert.equal(typeof before.humanRunnable, 'boolean'); assert.equal(typeof before.agentRunnable, 'boolean');
+  assert.ok(Array.isArray(before.effects) && Array.isArray(before.fileWrites));
   const changed = setActionMethod(db, { id: 'owner' }, 'p1', 'product.brief', 'Review the claim basis.', 1);
   assert.equal(changed.methodRevision, 2);
   assert.throws(() => setActionMethod(db, { id: 'owner' }, 'p1', 'product.brief', 'Stale edit', 1), { status: 409 });

@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { ProjectContext, LayerWorkAction, WorkItem, layerLabel, lines, priorityOrder } from './context';
@@ -7,14 +7,19 @@ import { ProjectContext, LayerWorkAction, WorkItem, layerLabel, lines, priorityO
 @Component({
   selector: 'aludel-work-create', standalone: true, imports: [FormsModule, MatIconModule],
   template: `
+  @if (layer(); as key) {
+    <a class="lay-back" [href]="ctx.link(key, 'tasks')" (click)="ctx.go(ctx.link(key, 'tasks'), $event)"><mat-icon aria-hidden="true">arrow_back</mat-icon>Board</a>
+    <h2 class="lay-tk-title">Create a {{ layerName(key) }} task</h2>
+  } @else {
   <div class="lay-section-head"><div><p class="lay-eyebrow lay-layer"><mat-icon aria-hidden="true">checklist</mat-icon>Work</p><h1>Create task</h1></div>
     <a class="lay-button ghost small" [href]="ctx.link('work', 'board')" (click)="ctx.go(ctx.link('work', 'board'), $event)">Back to Board</a></div>
+  }
   <p class="lay-lead">Choose an action, then describe this piece of work. The action sets what an agent may read and change; your brief sets the task.</p>
   <form class="lay-card lay-form" (ngSubmit)="create()">
     <div class="lay-row lay-wrap lay-fields">
-      <label>Layer<select name="role" [ngModel]="role()" (ngModelChange)="changeRole($event)" required>
+      @if (!layer()) { <label>Layer<select name="role" [ngModel]="role()" (ngModelChange)="changeRole($event)" required>
         @for (entry of layerKeys(); track entry) { <option [value]="entry">{{ layerName(entry) }}</option> }
-      </select></label>
+      </select></label> }
       <label>Action<select name="action" [ngModel]="selectedAction()?.id || ''" (ngModelChange)="changeAction($event)" required>
         @for (entry of actions(); track entry.id) { <option [value]="entry.id">{{ entry.name }}</option> }
       </select></label>
@@ -23,7 +28,7 @@ import { ProjectContext, LayerWorkAction, WorkItem, layerLabel, lines, priorityO
     @if (selectedAction(); as chosen) {
       <p class="lay-muted small">{{ chosen.description }} @if (chosen.elevated) { · A human lead reviews this action. }</p>
       @if (chosen.changes.length) { <p class="lay-muted small">Action scope: {{ chosen.changes.join('; ') }}</p> }
-    }
+    } @else if (layer(); as key) { <p class="lay-lock-note lay-lock-warn"><mat-icon aria-hidden="true">info</mat-icon>{{ layerName(key) }} has no runnable actions yet. Define or enable one in <a [href]="ctx.link(key, 'tasks', 'actions')" (click)="ctx.go(ctx.link(key, 'tasks', 'actions'), $event)">Actions</a>; a draft layer's actions start once it is active.</p> }
     <label>Task title<input name="title" [(ngModel)]="title" maxlength="160" required placeholder="What should be done?" /></label>
     <label>Task brief<textarea name="brief" [(ngModel)]="brief" maxlength="2000" rows="5" placeholder="The specific outcome, constraints, and relevant context"></textarea></label>
     <div class="lay-row lay-wrap lay-fields">
@@ -46,6 +51,9 @@ import { ProjectContext, LayerWorkAction, WorkItem, layerLabel, lines, priorityO
 })
 export class WorkCreateComponent {
   readonly ctx = inject(ProjectContext);
+  // Inside a layer's Tasks tab the layer is fixed, and an action row can preset its action.
+  readonly layer = input<string | null>(null);
+  readonly preset = input<string | null>(null);
   readonly priorities = priorityOrder;
   readonly role = signal('product');
   readonly action = signal('product.define');
@@ -66,8 +74,14 @@ export class WorkCreateComponent {
     ];
   });
   title = ''; brief = ''; target = ''; assignee = ''; state = 'ready'; priority = 'medium'; outputs = ''; checks = '';
+  constructor() {
+    effect(() => {
+      const layer = this.layer(), preset = this.preset(); this.actions();
+      if (layer) untracked(() => { if (this.role() !== layer) this.role.set(layer); const id = preset && this.actions().some(entry => entry.id === preset) ? preset : this.actions()[0]?.id || ''; if (id && id !== this.action()) this.changeAction(id); });
+    });
+  }
   changeRole(layer: string) { this.role.set(layer); this.changeAction(this.actions()[0]?.id || ''); }
-  layerName(layer: string) { return layerLabel[layer] || layer; }
+  layerName(layer: string) { return this.ctx.layerInstances().find(entry => entry.key === layer)?.name || layerLabel[layer] || layer; }
   changeAction(id: string) { this.action.set(id); this.checks = this.selectedAction()?.checks.join('\n') || ''; }
   assignedAgent() {
     if (this.assignee) return this.assignee.startsWith('agent:');

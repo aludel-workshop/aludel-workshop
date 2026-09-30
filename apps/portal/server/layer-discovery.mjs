@@ -13,10 +13,17 @@ export function initLayerDiscovery(db) {
   )`);
 }
 
+export function activeLayerTopology(db,projectId){
+  if(!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='layer_definitions'").get())
+    return db.prepare('SELECT layer_key AS key,descriptor_version AS version FROM layer_instances WHERE project_id=? AND enabled=1 ORDER BY layer_key').all(projectId);
+  return db.prepare(`SELECT i.layer_key AS key,i.descriptor_version AS version FROM layer_instances i
+    JOIN layer_definitions d ON d.project_id=i.project_id AND d.layer_key=i.layer_key
+    WHERE i.project_id=? AND i.enabled=1 AND d.lifecycle='active' ORDER BY i.layer_key`).all(projectId);
+}
+
 export function stageLayerDiscovery(db, know, projectId) {
   initLayerDiscovery(db);
-  const installed = db.prepare(`SELECT layer_key AS key, descriptor_version AS version FROM layer_instances
-    WHERE project_id = ? AND enabled = 1 ORDER BY layer_key`).all(projectId);
+  const installed = activeLayerTopology(db,projectId);
   if (installed.length < 2) return [];
   const digest = createHash('sha256').update(JSON.stringify(installed)).digest('hex');
   const created = [];
@@ -55,7 +62,7 @@ const projectionTables = { code_unit:'code_units', trace_link:'trace_links', cod
 // Identity/revision manifest for each source output. The fingerprint covers every
 // row, including records beyond the short task preview, so a changed source
 // withdraws the Go snapshot before submission or acceptance.
-export function discoverySourceSnapshot(db,projectId,sourceKeys) {
+export function discoverySourceSnapshot(db,projectId,sourceKeys,receivingKey=null) {
   return sourceKeys.map(key => {
     const declaration=projectLayerDefinition(db,projectId,key) || layerDeclarations.find(layer => layer.key===key);
     if (!declaration) throw Object.assign(new Error('Unknown source layer.'),{status:409});
@@ -69,6 +76,10 @@ export function discoverySourceSnapshot(db,projectId,sourceKeys) {
         summary:kind==='markdown_document' ? row.path : table ? '' : String((() => {try { const data=JSON.parse(row.data_json);return data.title||data.name||data.label||data.text||data.description||kind;}catch{return kind;}})()).slice(0,160) }));
       return { kind, count:records.length, records:records.slice(0,100).map((record,index)=>kind==='markdown_document' ? {...record,excerpt:String(rows[index].content||'').slice(0,2000),truncated:String(rows[index].content||'').length>2000} : record), fingerprint:createHash('sha256').update(JSON.stringify(records)).digest('hex') };
     });
-    return { key, kinds };
+    const pairPolicies=receivingKey&&db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='layer_connections'").get()
+      ? db.prepare(`SELECT receiving_key AS receivingKey,source_key AS sourceKey,status,mapping,instructions,reaction,question,answer,revision
+          FROM layer_connections WHERE project_id=? AND ((receiving_key=? AND source_key=?) OR (receiving_key=? AND source_key=?))
+          ORDER BY receiving_key,source_key`).all(projectId,key,receivingKey,receivingKey,key) : [];
+    return { key, identity:declaration.identity, identityRevision:declaration.identityRevision, pairPolicies, kinds };
   });
 }

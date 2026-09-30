@@ -83,7 +83,9 @@ export function pagesDocumentUpdate(db, userId, projectId, key, input) {
     .run(projectId, key, revision, content, userId, stamp);
   return pagesDocumentRead(db, userId, projectId, key);
 }
-const sourceState = (db, projectId, row) => ({ ...row, sourceAvailable: !!db.prepare('SELECT 1 FROM layer_instances WHERE project_id = ? AND layer_key = ? AND enabled = 1').get(projectId, row.sourceKey) });
+const sourceState = (db, projectId, row) => ({ ...row, sourceAvailable: !!(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='layer_definitions'").get()
+  ? db.prepare("SELECT 1 FROM layer_instances i JOIN layer_definitions d ON d.project_id=i.project_id AND d.layer_key=i.layer_key WHERE i.project_id=? AND i.layer_key=? AND i.enabled=1 AND d.lifecycle='active'").get(projectId,row.sourceKey)
+  : db.prepare('SELECT 1 FROM layer_instances WHERE project_id=? AND layer_key=? AND enabled=1').get(projectId,row.sourceKey)) });
 export function pagesConnections(db, userId, projectId) {
   allowed(db, userId, projectId);
   return db.prepare("SELECT id, source_key AS sourceKey, status, mapping, instructions, reaction, question, answer, revision, reviewed_by AS reviewedBy, reviewed_at AS reviewedAt, updated_at AS updatedAt FROM layer_connections WHERE project_id = ? AND receiving_key = 'pages' ORDER BY rowid").all(projectId)
@@ -91,7 +93,9 @@ export function pagesConnections(db, userId, projectId) {
 }
 export function pagesConnectionCreate(db, userId, projectId, sourceKey) {
   allowed(db, userId, projectId, true);
-  if (sourceKey === 'pages' || !db.prepare('SELECT 1 FROM layer_instances WHERE project_id = ? AND layer_key = ? AND enabled = 1').get(projectId, sourceKey)) fail('Choose an installed neighboring layer.', 400);
+  if (sourceKey === 'pages' || !(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='layer_definitions'").get()
+    ? db.prepare("SELECT 1 FROM layer_instances i JOIN layer_definitions d ON d.project_id=i.project_id AND d.layer_key=i.layer_key WHERE i.project_id = ? AND i.layer_key = ? AND i.enabled = 1 AND d.lifecycle = 'active'").get(projectId, sourceKey)
+    : db.prepare('SELECT 1 FROM layer_instances WHERE project_id=? AND layer_key=? AND enabled=1').get(projectId,sourceKey))) fail('Choose an installed neighboring layer.', 400);
   const existing = pagesConnections(db, userId, projectId).find(row => row.sourceKey === sourceKey);
   if (existing) return existing;
   const id = `lcn-${randomBytes(6).toString('hex')}`, stamp = now();

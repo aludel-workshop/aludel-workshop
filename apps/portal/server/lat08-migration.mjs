@@ -159,11 +159,14 @@ export function setProjectWorkStyle(db, actor, projectId, style) {
 export function layerActionSettings(db, actor, projectId, layerKey) {
   if (!actor?.id || !db.prepare('SELECT 1 FROM project_members WHERE project_id = ? AND user_id = ?').get(projectId, actor.id)) fail('Project not found.', 404);
   if (!db.prepare('SELECT 1 FROM layer_instances WHERE project_id = ? AND layer_key = ? AND enabled = 1').get(projectId, layerKey)) fail('Layer not found.', 404);
-  return layerActions(db, projectId, layerKey).map(action => {
+  return layerActions(db, projectId, layerKey).filter(action => !action.legacy).map(action => {
     const installed = db.prepare('SELECT * FROM layer_action_installations WHERE project_id = ? AND action_id = ?').get(projectId, action.id);
     return { id: action.id, revision: action.revision, title: action.title, purpose: action.purpose, elevated: action.permissions.elevated,
       available: action.humanRunnable || action.agentRunnable, assignee: installed?.assignee_id ? { kind: installed.assignee_kind, id: installed.assignee_id } : null,
-      installedStyle: installed?.installed_style || null, method: installed?.method_text || '', methodRevision: installed?.method_revision || 1, unavailableReason: combinedLegacyInventory[action.id]?.reason ||
+      installedStyle: installed?.installed_style || null, method: installed?.method_text || '', methodRevision: installed?.method_revision || 1,
+      // Read-only declaration facts, so Tasks › Actions can show what an action reads, changes and is checked against.
+      checks: action.checks || [], reads: action.permissions.reads || [], result: action.result || null, fileWrites: action.permissions.fileWrites || [],
+      effects: action.permissions.effects || [], reviewer: action.reviewer || null, humanRunnable: !!action.humanRunnable, agentRunnable: !!action.agentRunnable, unavailableReason: combinedLegacyInventory[action.id]?.reason ||
         (!action.humanRunnable && !action.agentRunnable ? 'No checked adapter is registered.' : null) };
   });
 }

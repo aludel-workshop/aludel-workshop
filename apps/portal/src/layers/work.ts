@@ -1,4 +1,4 @@
-import { Component, OnDestroy, computed, effect, inject, untracked } from '@angular/core';
+import { Component, computed, effect, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { ProjectContext, layerLabel, lines, workStatusLabel } from './context';
@@ -9,6 +9,7 @@ import { WorkItemComponent } from './work-item';
 import { WorkReviewComponent } from './work-review';
 import { WorkItemsComponent, WorkProjectsComponent } from './work-plan';
 import { WorkTeamComponent } from './work-team';
+import { pollLiveBatches } from './work-shared';
 
 // Work: the shared bench (DEC-036), redesigned in WORK-UX-01. Board (batches per assignee, then Queue, Backlog and Done),
 // the item page, Roles (who takes each action and how), Agents (who does agent work) and Routines.
@@ -53,7 +54,7 @@ import { WorkTeamComponent } from './work-team';
     }
   }`
 })
-export class WorkLayerComponent implements OnDestroy {
+export class WorkLayerComponent {
   readonly ctx = inject(ProjectContext);
   // ROADMAP-01 (DEC-043): Items and Projects follow Linear; Team holds people and the agent profiles; tabs carry their records' icons.
   readonly tabs: [string, string, string][] = [['board', 'Board', 'view_kanban'], ['items', 'Items', 'task_alt'], ['projects', 'Projects', 'deployed_code_history'], ['team', 'Team', 'group'], ['routines', 'Routines', 'event_repeat']];
@@ -70,25 +71,14 @@ export class WorkLayerComponent implements OnDestroy {
   // /work, /work/board, and the old /work/queue and /work/style addresses all land somewhere sensible.
   readonly tab = computed(() => { const segment = this.ctx.segments()[1] || 'board'; return segment === 'queue' ? 'board' : segment === 'style' || segment === 'roles' ? 'items' : segment; });
   readonly routines = computed(() => this.ctx.data()?.routines || []);
-  readonly live = computed(() => (this.ctx.data()?.batches || []).some(batch => ['queued', 'running', 'stopping'].includes(batch.state)));
   newRoutine = { title: '', layer: 'product', type: 'audit', cadence: 'weekly', documents: '' };
-  private poll: ReturnType<typeof setInterval> | null = null;
-  private clock: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
-    // While a batch waits or runs: refresh capacity, queue order and progress without a manual reload.
     effect(() => {
       if (['roles', 'style'].includes(this.ctx.segments()[1] || '')) { const path = this.ctx.link('work', 'items'); history.replaceState({}, '', path); this.ctx.path.set(path); }
     });
-    effect(() => {
-      const running = this.live();
-      untracked(() => {
-        if (running && !this.poll) { this.poll = setInterval(() => void this.ctx.reload().catch(() => undefined), 2000); this.clock = setInterval(() => this.ctx.now.set(Date.now()), 1000); }
-        if (!running && this.poll) { clearInterval(this.poll); clearInterval(this.clock!); this.poll = this.clock = null; }
-      });
-    });
+    pollLiveBatches(this.ctx);
   }
-  ngOnDestroy() { if (this.poll) clearInterval(this.poll); if (this.clock) clearInterval(this.clock); }
 
   actionFor(routine: { key: string | null; layer: string; type: string }) {
     const actions = this.ctx.data()?.layerActions || [];

@@ -115,8 +115,8 @@ export interface WorkRun { id: string; number: number; batchId: string | null; s
   proposalId: string | null; reportId: string | null; summary?: string | null;
   review: { verdicts: Record<string, { value: 'accept' | 'reject' | 'skip'; note: string }>; flags: Record<string, string>; outcome: WorkRunState | null; comment: string | null; signedBy: string | null; signedAt: string | null }; }
 export interface WorkChange { recordId: string; revision: number; author: string; rationale: string | null; createdAt: string; kind: string | null; exists: boolean; fields: FieldChange[]; }
-export interface Routine extends RecordBase { key: string | null; title: string; layer: string; type: string; cadence: string; documents: string[]; enabled: boolean; executor?: 'utility' | 'agent'; trigger?: 'manual' | 'schedule' | 'output-change'; instructionDoc?: string | null; allowedReads?: string[]; capabilities?: string[]; outputKinds?: string[]; nextRunAt: string | null; lastRunAt: string | null; lastWorkId: string | null; history: Revision[]; }
-export interface LayerInstance { key: string; name: string; path: string; category: string; icon: string; description: string; enabled: boolean; visible: boolean; dashboardVisible: boolean; outputProvider: string; editorAdapter: string; builtIn: boolean; }
+export interface Routine extends RecordBase { key: string | null; title: string; layer: string; type: string; cadence: string; documents: string[]; enabled: boolean; actionKey?: string | null; executor?: 'utility' | 'agent'; trigger?: 'manual' | 'schedule' | 'output-change'; instructionDoc?: string | null; allowedReads?: string[]; capabilities?: string[]; outputKinds?: string[]; nextRunAt: string | null; lastRunAt: string | null; lastWorkId: string | null; history: Revision[]; }
+export interface LayerInstance { key: string; name: string; path: string; category: string; icon: string; color: string | null; description: string; enabled: boolean; visible: boolean; dashboardVisible: boolean; outputProvider: string; editorAdapter: string; builtIn: boolean; lifecycle: 'draft' | 'active'; identityRevision: number; identity: Record<string,string> | null; domainActions: {key:string;title:string;purpose:string;method:string;checks:string[];revision:number}[]; }
 export interface Knowledge {
   vision: Record<string, VisionSection>; personas: Persona[]; phases: Phase[]; activities: Activity[]; stories: Story[]; specs: Spec[];
   research: Research[]; docs: Doc[]; pages: Page[]; work: WorkItem[]; selectedPacks: string[];
@@ -170,6 +170,14 @@ export const projectStatusIcon: Record<string, string> = { backlog: 'radio_butto
 export const healthLabel: Record<string, string> = { on: 'On track', risk: 'At risk', off: 'Off track' };
 export const sourceTypeIcon: Record<string, string> = { interview: 'record_voice_over', observation: 'visibility', survey: 'ballot', link: 'link', article: 'article', competitor: 'storefront', screenshot: 'image', analytics: 'query_stats', note: 'edit_note' };
 export const layerLabel: Record<string, string> = { product: 'Vision', library: 'Library', design: 'Design', pages: 'Pages', data: 'Data', platform: 'Code', deploy: 'Deploy', work: 'Work' };
+// Built-in layers are editable templates (CUSTOM-LAYER-01), so their names come from the project's definitions.
+// reload() refreshes this map before it sets the signals that make templates render.
+const defaultLayerLabels = { ...layerLabel };
+function applyLayerNames(layers: { key: string; name: string }[]) {
+  for (const key of Object.keys(layerLabel)) if (!(key in defaultLayerLabels)) delete layerLabel[key];
+  Object.assign(layerLabel, defaultLayerLabels);
+  for (const layer of layers) layerLabel[layer.key] = layer.name;
+}
 export const dataStatusLabel: Record<string, string> = { proposed: 'Proposed', contracted: 'Contracted', built: 'Built', shipped: 'Shipped' };
 export const unitStateLabel: Record<string, string> = { healthy: 'Healthy', suspect: 'Suspect', untraced: 'Untraced', dead: 'Unused' };
 
@@ -181,6 +189,8 @@ export class ProjectContext {
   readonly data = signal<Knowledge | null>(null);
   readonly catalog = signal<Catalog | null>(null);
   readonly layerInstances = signal<LayerInstance[]>([]);
+  // Output tabs with unsaved edits, keyed `layer/tab`. The shell's layer bar marks them; the layer component reports them.
+  readonly dirtyTabs = signal<Record<string, boolean>>({});
   readonly error = signal('');
   readonly notice = signal('');
   readonly path = signal(location.pathname);
@@ -271,7 +281,7 @@ export class ProjectContext {
     if (kind === 'agent_profile') return this.link('work', 'agents', id);
     if (kind === 'work_item') return this.link('work', 'item', id);
     if (kind === 'role' || kind === 'work_action') { const role = this.data()?.roles.find(entry => entry.id === id || entry.actions.some(action => action.recordId === id));
-      return role ? this.link(role.layer, 'operations') : this.link('work', 'items'); }
+      return role ? this.link(role.layer, 'tasks', 'actions') : this.link('work', 'items'); }
     if (kind === 'project_instructions') return this.link('work', 'agents');
     if (kind === 'doc') return this.link('library', 'docs', id);
     if (kind === 'component') return this.link('design', 'components', id);
@@ -390,13 +400,14 @@ export class ProjectContext {
   // Evidence and documents write through here too.
   comment(insightId: string, text: string) { return this.api(`/api/projects/${encodeURIComponent(this.projectId())}/comments/${encodeURIComponent(insightId)}`, 'POST', { text }); }
   generate(generator: string, id = '') { return this.api<Doc>(`/api/projects/${encodeURIComponent(this.projectId())}/docs${id ? '/' + encodeURIComponent(id) : ''}`, 'POST', { generator }); }
-  next(assignee: Assignee, count: number) { return this.api<{ added: string[] }>(`/api/projects/${encodeURIComponent(this.projectId())}/batches/next`, 'POST', { assignee, count }); }
+  next(assignee: Assignee, count: number, layer: string | null = null) { return this.api<{ added: string[] }>(`/api/projects/${encodeURIComponent(this.projectId())}/batches/next`, 'POST', { assignee, count, ...(layer ? { layer } : {}) }); }
 
   async reload() {
     const [value, instances] = await Promise.all([
       this.api<{ setup: ProjectSetup; knowledge: Knowledge; catalog: Catalog }>(`/api/projects/${encodeURIComponent(this.projectId())}/knowledge`),
       this.api<{ layers: LayerInstance[] }>(`/api/projects/${encodeURIComponent(this.projectId())}/layer-instances`)
     ]);
+    applyLayerNames(instances.layers);
     this.setup.set(value.setup); this.data.set(value.knowledge); this.catalog.set(value.catalog); this.layerInstances.set(instances.layers);
   }
 

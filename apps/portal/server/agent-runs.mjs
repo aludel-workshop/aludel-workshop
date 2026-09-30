@@ -137,13 +137,14 @@ export function agentRuns({ db, know, worker = null, symphonyDispatch = false })
 
   // ROADMAP-01 (DEC-043): Next N is a fixed rule, not a ranking. The assignee's queued, unblocked items in the current
   // milestone's projects, highest priority first, then oldest; agents take only what they can run. Stops when the batch is full.
-  function next(user, projectId, assignee, count) {
+  // A layer's Tasks board may pass its layer key so Next fills the batch only from that layer's queue.
+  function next(user, projectId, assignee, count, layer = null) {
     const limit = Number(count);
     if (!Number.isInteger(limit) || limit < 1 || limit > batchLimits.max) fail(`Choose between 1 and ${batchLimits.max} items.`);
     if (!assignee || !['person', 'agent'].includes(assignee.kind)) fail('Say whose batch to fill.');
     const milestone = know.list(projectId, 'phase').find(phase => phase.current)?.key || 'demo';
     const projects = new Map(know.list(projectId, 'project').map(project => [project.id, project]));
-    const candidates = know.workList(projectId).filter(entry => entry.status === 'queued' && !entry.blockedBy.length && entry.assignee?.kind === assignee.kind && entry.assignee?.id === assignee.id
+    const candidates = know.workList(projectId).filter(entry => entry.status === 'queued' && !entry.blockedBy.length && (!layer || entry.layer === layer) && entry.assignee?.kind === assignee.kind && entry.assignee?.id === assignee.id
       && projects.get(entry.project)?.milestone === milestone && (assignee.kind !== 'agent' || runnable(projectId,entry.action) && symphonyCompatible(projectId, assignee.id))).sort(byPriority);
     const added = [];
     for (const entry of candidates) {

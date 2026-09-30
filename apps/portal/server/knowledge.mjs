@@ -407,6 +407,7 @@ const validators = {
     if (!['manual', 'schedule', 'output-change'].includes(trigger)) fail('Choose a supported trigger.');
     return { key: data.key ? text(data.key, 40, 'Key') : null, title: text(data.title, 120, 'Routine', true), layer: data.layer, type: data.type, cadence: data.cadence,
       documents: lines(data.documents, 300, 'Document'), enabled: data.enabled !== false, executor, trigger,
+      actionKey: data.actionKey ? text(data.actionKey, 32, 'Routine action') : null,
       instructionDoc: data.instructionDoc ? text(data.instructionDoc, 80, 'Instruction document') : null,
       allowedReads: lines(data.allowedReads, 80, 'Allowed read').slice(0, 20), capabilities: lines(data.capabilities, 80, 'Capability').slice(0, 20),
       outputKinds: lines(data.outputKinds, 80, 'Allowed output').slice(0, 20) };
@@ -487,7 +488,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
   function insert(projectId, kind, data, { parentId = null, position, author = 'Aludel', rationale = null, workItemId = null } = {}) {
     if (!kinds.includes(kind)) fail('Unknown record kind.');
     const clean = validators[kind](data, catalogs);
-    if (kind === 'routine' && !layers.includes(clean.layer) && !projectLayerDefinition(db,projectId,clean.layer)) fail('Install the routine layer first.',409);
+    if (kind === 'routine') checkRoutineAction(projectId, clean);
     checkReferences(projectId, kind, clean);
     checkDesign(projectId, kind, clean, { parentId });
     if (['story', 'spec', 'project'].includes(kind) && !clean.number) clean.number = counter(projectId, kind);
@@ -501,6 +502,15 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     db.prepare('INSERT INTO knowledge_revisions(record_id, revision, data_json, author, rationale, work_item_id, created_at) VALUES (?, 1, ?, ?, ?, ?, ?)')
       .run(id, JSON.stringify(clean), author, rationale, workItemId, created);
     return hydrate(row(id));
+  }
+
+  function checkRoutineAction(projectId, routine) {
+    const definition = projectLayerDefinition(db, projectId, routine.layer);
+    if (!layers.includes(routine.layer) && !definition) fail('Install the routine layer first.', 409);
+    if (definition?.outputProvider !== 'markdown-files' || !routine.enabled) return;
+    if (definition.lifecycle !== 'active') fail('Activate this layer before enabling or running its routine.', 409);
+    const action = actionForProject(db, projectId, `${routine.layer}.${routine.actionKey || ''}`);
+    if (!action || action.legacy || !action.humanRunnable) fail('Choose a configured domain action before enabling this routine.', 409);
   }
 
   function checkReferences(projectId, kind, clean) {
@@ -527,7 +537,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     if (!current || current.project_id !== projectId) fail('Record not found.', 404);
     if (expectedRevision !== undefined && Number(expectedRevision) !== current.revision) fail('This record changed since you opened it. Reload to see the latest; your edit is kept.', 409);
     const merged = validators[current.kind]({ ...parse(current.data_json, {}), ...changes }, catalogs);
-    if (current.kind === 'routine' && !layers.includes(merged.layer) && !projectLayerDefinition(db,projectId,merged.layer)) fail('Install the routine layer first.',409);
+    if (current.kind === 'routine') checkRoutineAction(projectId, merged);
     checkReferences(projectId, current.kind, merged);
     checkDesign(projectId, current.kind, merged, { id, parentId: parentId ?? current.parent_id });
     if (current.kind === 'project') checkProjectDeps(projectId, id, merged.deps);
@@ -1491,7 +1501,8 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
       const open = workList(projectId).find(item => item.context?.routine === routine.id && item.state !== 'done');
       if (open) { if (routineId) fail(`${open.ref} from this routine is still open.`, 409); continue; }
       const custom = projectLayerDefinition(db,projectId,routine.layer)?.outputProvider === 'markdown-files';
-      const item = createWork(projectId, { action:custom ? `${routine.layer}.edit` : undefined, layer: routine.layer, type: routine.type, state: 'ready', title: `${routine.title} · ${at.slice(0, 10)}`, targets: [], documents: routine.documents,
+      if (custom) checkRoutineAction(projectId, {...routine, enabled:true});
+      const item = createWork(projectId, { action:custom ? `${routine.layer}.${routine.actionKey}` : undefined, layer: routine.layer, type: routine.type, state: 'ready', title: `${routine.title} · ${at.slice(0, 10)}`, targets: [], documents: routine.documents,
         context: { routine: routine.id }, routineKey: routine.key, logText: `Created by the “${routine.title}” routine (${trigger === 'schedule' ? routine.cadence : trigger})` });
       db.prepare('INSERT INTO routine_runs(routine_id, project_id, ran_at, trigger, work_item_id) VALUES (?, ?, ?, ?, ?)').run(routine.id, projectId, at, trigger, item.id);
       created.push(item);
@@ -1564,7 +1575,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
       projectInstructions: list(projectId, 'project_instructions')[0] || null,
       roles: roleView(projectId),
       layerActions: db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_action_installations'").get()
-        ? [...compiledLocalActions, ...projectLayerDefinitions(db,projectId).flatMap(actionsForDefinition)].filter(action => action.humanRunnable || action.agentRunnable).flatMap(action => {
+        ? [...compiledLocalActions, ...projectLayerDefinitions(db,projectId).flatMap(actionsForDefinition)].filter(action => (action.humanRunnable || action.agentRunnable) && !action.legacy && (projectLayerDefinition(db,projectId,action.layer)?.lifecycle === 'active' || !projectLayerDefinition(db,projectId,action.layer))).flatMap(action => {
           const installed = db.prepare('SELECT assignee_kind, assignee_id FROM layer_action_installations WHERE project_id = ? AND action_id = ?').get(projectId, action.id);
           const legacy = catalogs.roles.actions.get(action.id);
           return installed ? [{ id: action.id, layer: action.layer, name: action.title, description: action.purpose,

@@ -1,4 +1,4 @@
-import { Component, ElementRef, computed, inject, input, output, signal } from '@angular/core';
+import { Component, DestroyRef, ElementRef, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { DomSanitizer } from '@angular/platform-browser';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
@@ -26,6 +26,21 @@ export const elapsed = (from: string | undefined, to: number) => {
   const minutes = Math.floor(seconds / 60);
   return minutes >= 60 ? `${Math.floor(minutes / 60)}h ${minutes % 60}m` : minutes ? `${minutes}m ${String(seconds % 60).padStart(2, '0')}s` : `${seconds}s`;
 };
+// While a batch waits or runs: refresh capacity, queue order and progress without a manual reload. Call from a constructor
+// of any view that shows batches (Work, and each layer's Tasks board).
+export function pollLiveBatches(ctx: ProjectContext) {
+  let poll: ReturnType<typeof setInterval> | null = null, clock: ReturnType<typeof setInterval> | null = null;
+  const stop = () => { if (poll) clearInterval(poll); if (clock) clearInterval(clock); poll = clock = null; };
+  const live = computed(() => (ctx.data()?.batches || []).some(batch => ['queued', 'running', 'stopping'].includes(batch.state)));
+  effect(() => {
+    const running = live();
+    untracked(() => {
+      if (running && !poll) { poll = setInterval(() => void ctx.reload().catch(() => undefined), 2000); clock = setInterval(() => ctx.now.set(Date.now()), 1000); }
+      if (!running && poll) stop();
+    });
+  });
+  inject(DestroyRef).onDestroy(stop);
+}
 export const tokens = (count: number) => count >= 10000 ? `${Math.round(count / 1000)}k` : count >= 1000 ? `${(count / 1000).toFixed(1)}k` : String(count);
 
 @Component({
@@ -111,14 +126,15 @@ export class RefChipComponent {
   <mat-menu #menu="matMenu" class="lay-menu" xPosition="before">
     <p class="lay-menu-head">People</p>
     @for (member of ctx.data()?.members || []; track member.id) {
-      <button mat-menu-item type="button" (click)="changed.emit({ kind: 'person', id: member.id })"><aludel-avatar [who]="{ kind: 'person', id: member.id }" />
+      <button mat-menu-item type="button" [disabled]="!allowPeople()" (click)="changed.emit({ kind: 'person', id: member.id })"><aludel-avatar [who]="{ kind: 'person', id: member.id }" />
         <span>{{ member.id === ctx.me() ? 'You (' + member.name + ')' : member.name }}</span>@if (isCurrent('person', member.id)) { <mat-icon class="lay-menu-check" aria-label="current">check</mat-icon> }</button>
     }
     <p class="lay-menu-head">Agent profiles</p>
     @for (profile of activeProfiles(); track profile.id) {
-      <button mat-menu-item type="button" [disabled]="!ctx.data()?.symphonyProfiles?.includes(profile.id)" (click)="changed.emit({ kind: 'agent', id: profile.id })"><aludel-avatar [who]="{ kind: 'agent', id: profile.id }" />
+      <button mat-menu-item type="button" [disabled]="!allowAgents() || !ctx.data()?.symphonyProfiles?.includes(profile.id)" (click)="changed.emit({ kind: 'agent', id: profile.id })"><aludel-avatar [who]="{ kind: 'agent', id: profile.id }" />
         <span>{{ profile.name }}<small>{{ profile.model || 'Account default' }} · {{ profile.effort }} effort</small></span>@if (isCurrent('agent', profile.id)) { <mat-icon class="lay-menu-check" aria-label="current">check</mat-icon> }</button>
     }
+    @if (!allowPeople() || !allowAgents()) { <p class="lay-menu-note"><mat-icon aria-hidden="true">info</mat-icon>{{ allowPeople() ? 'No checked agent adapter for this action yet.' : 'No checked person adapter for this action yet.' }}</p> }
     @if (!ctx.data()?.symphonyProfiles?.length) { <p class="lay-menu-note"><mat-icon aria-hidden="true">power_off</mat-icon>Create a Codex agent profile to assign agent work. Other providers need a runtime adapter.</p> }
     <a mat-menu-item [href]="ctx.link('work', 'agents')" (click)="ctx.go(ctx.link('work', 'agents'), $event)"><mat-icon aria-hidden="true">tune</mat-icon><span>Manage agent profiles</span></a>
   </mat-menu>`
@@ -128,6 +144,9 @@ export class AssigneeComponent {
   readonly assignee = input<Assignee | null>(null);
   readonly locked = input<string | null>(null);
   readonly label = input('Assignee');
+  // An action without a checked person or agent adapter can't go to one (the server refuses it too).
+  readonly allowPeople = input(true);
+  readonly allowAgents = input(true);
   readonly changed = output<Assignee>();
   readonly activeProfiles = computed(() => (this.ctx.data()?.profiles || []).filter(profile => profile.active));
   readonly metal = computed(() => { const who = this.assignee(); return who?.kind === 'agent' ? this.ctx.profileById().get(who.id || '')?.avatar.color || null : null; });
@@ -151,16 +170,21 @@ export class PriorityComponent {
 // Layer action chip opens its owning Operations view.
 @Component({
   selector: 'aludel-role-chip', standalone: true, imports: [MatIconModule],
-  template: `<a [class]="'lay-rolechip lay-l-' + layer()" [href]="ctx.link(layer(), 'operations')" (click)="ctx.go(ctx.link(layer(), 'operations'), $event)" [attr.title]="title()">
-    <mat-icon aria-hidden="true">{{ layerIcon[layer()] }}</mat-icon><span>{{ layerLabel[layer()] }}</span>@if (actionName()) { <span class="lay-rolechip-act">· {{ actionName() }}</span> }</a>`
+  template: `<a [class]="'lay-rolechip lay-l-' + layer()" [style]="colour()" [href]="href()" (click)="ctx.go(href(), $event)" [attr.title]="title()">
+    <mat-icon aria-hidden="true">{{ icon() }}</mat-icon><span>{{ name() }}</span>@if (actionName()) { <span class="lay-rolechip-act">· {{ actionName() }}</span> }</a>`
 })
 export class RoleChipComponent {
   readonly ctx = inject(ProjectContext);
   readonly layer = input.required<string>();
   readonly action = input<string | null>(null);
   readonly actionName = computed(() => this.ctx.actionById().get(this.action() || '')?.name || '');
-  readonly title = computed(() => `${layerLabel[this.layer()]} action setup`);
-  readonly layerLabel = layerLabel;
+  // Built-in and custom layers both resolve through the project's layer instances; the chip opens that action in Tasks.
+  private readonly instance = computed(() => this.ctx.layerInstances().find(entry => entry.key === this.layer()) || null);
+  readonly name = computed(() => this.instance()?.name || layerLabel[this.layer()] || this.layer());
+  readonly icon = computed(() => this.instance()?.icon || this.layerIcon[this.layer()] || 'layers');
+  readonly colour = computed(() => this.instance() && !this.instance()!.builtIn ? { background: 'var(--machine-panel)', color: this.instance()!.color || '#475467' } : {});
+  readonly href = computed(() => this.action() ? this.ctx.link(this.layer(), 'tasks', 'actions', this.action()!) : this.ctx.link(this.layer(), 'tasks', 'actions'));
+  readonly title = computed(() => `${this.name()} action setup`);
   readonly layerIcon: Record<string, string> = { product: 'lightbulb', design: 'palette', pages: 'web', data: 'schema', platform: 'dns', work: 'checklist' };
 }
 

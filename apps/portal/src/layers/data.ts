@@ -15,12 +15,7 @@ const box = { width: 196, height: 128, gapX: 56, gapY: 44 };
   selector: 'aludel-data-layer', standalone: true,
   imports: [FormsModule, MatIconModule, BuiltByComponent],
   template: `
-  <p class="lay-eyebrow">Data · objects and contracts</p>
-  <h1 tabindex="-1">What {{ ctx.setup()?.project?.name }} knows, and how it's asked for</h1>
   <p class="lay-lead">Written so any stack could build it. Objects are JSON Schema; operations are OpenAPI 3.1. How they're built lives in Platform.</p>
-  <nav class="lay-tabs" aria-label="Data sections">
-    @for (entry of tabs; track entry[0]) { <a [href]="ctx.link('data', entry[0])" (click)="ctx.go(ctx.link('data', entry[0]), $event)" [class.active]="tab() === entry[0]" [attr.aria-current]="tab() === entry[0] ? 'page' : null">{{ entry[1] }}</a> }
-  </nav>
   @switch (tab()) {
     @case ('api') {
       <div class="lay-api-grid">

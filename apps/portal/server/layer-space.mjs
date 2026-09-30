@@ -4,7 +4,7 @@
 import { randomBytes } from 'node:crypto';
 import { layerDeclarations } from './layer-contract.mjs';
 import { compiledLocalActions } from './lat07-actions.mjs';
-import { actionsForDefinition, projectLayerDefinition } from './layer-registry.mjs';
+import { actionsForDefinition, projectLayerDefinition, saveLayerCharter, charterTemplate, charterFromFields } from './layer-registry.mjs';
 import { pagesDocumentList, pagesDocumentRead, pagesDocumentUpdate, pagesConnections, pagesConnectionCreate, pagesConnectionUpdate } from './pages-layer-app.mjs';
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
@@ -38,6 +38,20 @@ function defaults(db,projectId,layerKey) {
       `Check the source identity and revision, output authority, applicability, missing inputs, and the resulting ${definition.name} work. Review a proposed policy before activating it.`]
   ];
 }
+function identityDoc(db,projectId,layerKey,revision=null){
+  const definition=projectLayerDefinition(db,projectId,layerKey);
+  if(!definition)fail('Layer not found.',404);
+  let identity=definition.identity,selectedRevision=definition.identityRevision,updatedAt=null;
+  if(revision!==null){
+    if(!Number.isInteger(revision)||revision<1)fail('Choose a valid revision.');
+    const old=db.prepare('SELECT identity_json,created_at FROM layer_identity_revisions WHERE project_id=? AND layer_key=? AND revision=?').get(projectId,layerKey,revision);
+    if(!old)fail('Identity revision not found.',404);
+    identity=JSON.parse(old.identity_json);selectedRevision=revision;updatedAt=old.created_at;
+  }
+  // The charter is the layer's identity, editable like any Knowledge document; older identities written as fields read back as headings.
+  const content=identity?.markdown||(identity?charterFromFields(definition.name,identity):charterTemplate(definition.name));
+  return {key:'identity',groupName:'identity',title:'Charter',content,revision:selectedRevision,updatedAt};
+}
 function seed(db, projectId, layerKey) {
   const at = now();
   const insert = db.prepare(`INSERT INTO layer_documents(project_id,layer_key,doc_key,group_name,title,content,revision,updated_at)
@@ -50,13 +64,15 @@ function seed(db, projectId, layerKey) {
   }
 }
 export function layerDocumentList(db, userId, projectId, layerKey) {
-  if (layerKey === 'pages') return pagesDocumentList(db,userId,projectId);
   allowed(db,userId,projectId,layerKey);
+  const ownIdentity=projectLayerDefinition(db,projectId,layerKey);
+  if (layerKey === 'pages') return [...(ownIdentity?[identityDoc(db,projectId,layerKey)]:[]),...pagesDocumentList(db,userId,projectId)];
   seed(db,projectId,layerKey);
-  return db.prepare(`SELECT doc_key AS key, group_name AS groupName, title, revision, updated_at AS updatedAt FROM layer_documents
-    WHERE project_id = ? AND layer_key = ? ORDER BY CASE group_name WHEN 'outputs' THEN 0 WHEN 'methods' THEN 1 WHEN 'routines' THEN 2 WHEN 'connections' THEN 3 ELSE 4 END, rowid`).all(projectId,layerKey);
+  return [...(ownIdentity?[identityDoc(db,projectId,layerKey)]:[]),...db.prepare(`SELECT doc_key AS key, group_name AS groupName, title, revision, updated_at AS updatedAt FROM layer_documents
+    WHERE project_id = ? AND layer_key = ? ORDER BY CASE group_name WHEN 'outputs' THEN 0 WHEN 'methods' THEN 1 WHEN 'routines' THEN 2 WHEN 'connections' THEN 3 ELSE 4 END, rowid`).all(projectId,layerKey)];
 }
 export function layerDocumentRead(db, userId, projectId, layerKey, key, revision = null) {
+  if (key === 'identity') { allowed(db,userId,projectId,layerKey);return identityDoc(db,projectId,layerKey,revision); }
   if (layerKey === 'pages') return pagesDocumentRead(db,userId,projectId,key,revision);
   allowed(db,userId,projectId,layerKey);
   seed(db,projectId,layerKey);
@@ -71,6 +87,7 @@ export function layerDocumentRead(db, userId, projectId, layerKey, key, revision
   return {...row,...past,revision};
 }
 export function layerDocumentUpdate(db,userId,projectId,layerKey,key,input) {
+  if (key === 'identity') { saveLayerCharter(db,userId,projectId,layerKey,input); return identityDoc(db,projectId,layerKey); }
   if (layerKey === 'pages') return pagesDocumentUpdate(db,userId,projectId,key,input);
   allowed(db,userId,projectId,layerKey,true);
   const current = layerDocumentRead(db,userId,projectId,layerKey,key);
@@ -89,7 +106,8 @@ export function layerDocumentUpdate(db,userId,projectId,layerKey,key,input) {
   } catch(error) { db.exec('ROLLBACK'); throw error; }
   return layerDocumentRead(db,userId,projectId,layerKey,key);
 }
-const available = (db,projectId,key) => !!db.prepare('SELECT 1 FROM layer_instances WHERE project_id=? AND layer_key=? AND enabled=1').get(projectId,key);
+const available = (db,projectId,key) => !db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='layer_definitions'").get()
+  ? !!db.prepare('SELECT 1 FROM layer_instances WHERE project_id=? AND layer_key=? AND enabled=1').get(projectId,key) : !!db.prepare("SELECT 1 FROM layer_instances i JOIN layer_definitions d ON d.project_id=i.project_id AND d.layer_key=i.layer_key WHERE i.project_id=? AND i.layer_key=? AND i.enabled=1 AND d.lifecycle='active'").get(projectId,key);
 export function layerConnections(db,userId,projectId,receivingKey) {
   if (receivingKey === 'pages') return pagesConnections(db,userId,projectId);
   allowed(db,userId,projectId,receivingKey);

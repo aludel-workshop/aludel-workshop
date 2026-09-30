@@ -43,9 +43,10 @@ try {
 
   // ---- Tokens: tree and live preview ----
   await page.goto(`${portal}/p/tool-share/design`);
-  await page.getByRole('heading', { name: "Tool Share's design system", level: 1 }).waitFor();
-  const tabs = await page.getByRole('navigation', { name: 'Design sections' }).getByRole('link').allInnerTexts();
-  assert.deepEqual(tabs.map(text => text.replace(/^\S+\s*/, '').trim()), ['Tokens', 'Components', 'Brand', 'Docs']);
+  // CUSTOM-LAYER-01: the shell's layer bar carries the heading and the output tabs, then Tasks and Manage.
+  await page.getByRole('heading', { name: 'Design', level: 1 }).waitFor();
+  const tabs = await page.locator('.lay-layer-outputs a').allInnerTexts();
+  assert.deepEqual(tabs.map(text => text.trim()), ['Tokens', 'Components', 'Brand', 'Docs']);
   const tree = page.getByRole('complementary', { name: 'Token tree' });
   await tree.locator('.lay-ds-tier', { hasText: 'Raw values' }).waitFor();
   const treeText = await tree.textContent(); assert.ok(treeText.indexOf('Raw values') < treeText.indexOf('Roles') && treeText.indexOf('Roles') < treeText.indexOf('Rules'), 'raw values come first, then roles, then rules');
@@ -129,7 +130,7 @@ try {
   await page.getByRole('complementary', { name: 'Token history' }).getByLabel('Close').click();
 
   // ---- Components ----
-  await page.getByRole('navigation', { name: 'Design sections' }).getByRole('link', { name: 'Components' }).click();
+  await page.getByRole('navigation', { name: 'Design views' }).getByRole('link', { name: 'Components' }).click();
   await page.getByRole('complementary', { name: 'Components' }).getByRole('link', { name: /Nav list/ }).click();
   await page.locator('.lay-ds-ccanvas .lay-ds-navitem').first().waitFor();
   await page.locator('.lay-ds-ccanvas .lay-ds-inst').nth(2).click();
@@ -159,7 +160,7 @@ try {
   await page.locator('.lay-ds-chip-specified').waitFor();
 
   // ---- Brand ----
-  await page.getByRole('navigation', { name: 'Design sections' }).getByRole('link', { name: 'Brand' }).click();
+  await page.getByRole('navigation', { name: 'Design views' }).getByRole('link', { name: 'Brand' }).click();
   await page.locator('.lay-ds-asset').first().waitFor();
   assert.ok(await page.locator('.lay-ds-asset', { hasText: 'Tagline' }).count());
   await shot('14-brand');
@@ -176,7 +177,7 @@ try {
   await page.getByRole('complementary', { name: 'Logo mark' }).getByLabel('Close').click();
 
   // ---- Docs (Library documents shown in Design) ----
-  await page.getByRole('navigation', { name: 'Design sections' }).getByRole('link', { name: 'Docs' }).click();
+  await page.getByRole('navigation', { name: 'Design views' }).getByRole('link', { name: 'Docs' }).click();
   await page.getByRole('link', { name: /Design direction/ }).click();
   await page.getByText('Neighbourly and practical').waitFor();
   await page.getByRole('group', { name: 'Shows in' }).getByRole('button', { name: 'Pages' }).click();

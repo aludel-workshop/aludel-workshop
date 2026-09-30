@@ -26,7 +26,7 @@ import { importCorpus } from './importer.mjs';
 import { openDatabase } from './storage.mjs';
 import { initPagesLayerApp, pagesDocumentList, pagesDocumentRead, pagesDocumentUpdate, pagesConnections, pagesConnectionCreate, pagesConnectionUpdate } from './pages-layer-app.mjs';
 import { initLayerDiscovery, stageLayerDiscovery, layerDiscoveryStatus } from './layer-discovery.mjs';
-import { actionForProject, createMarkdownDefinition, projectLayerDefinitions } from './layer-registry.mjs';
+import { actionForProject, createMarkdownDefinition, projectLayerDefinitions, projectLayerDefinition, saveLayerIdentity, saveLayerPresentation, layerIdentityHistory, addDomainAction, activateLayerDefinition } from './layer-registry.mjs';
 import { initMarkdownLayer, markdownTree, markdownRead, markdownFolderCreate, markdownFolderMove, markdownFolderDelete, markdownFileCreate, markdownFileSave, markdownFileMove, markdownFileDelete } from './markdown-layer.mjs';
 import { layerDocumentList, layerDocumentRead, layerDocumentUpdate, layerConnections, layerConnectionCreate, layerConnectionUpdate, layerRoutineRuns } from './layer-space.mjs';
 import { initPagesReconciliation, pagesReconciliationView, pagesGapDecision, reconcilePagesFlow } from './pages-reconciliation.mjs';
@@ -588,9 +588,9 @@ async function api(request, response, url) {
   const pagesDocRoute = /^\/api\/projects\/([^/]+)\/layers\/pages\/documents(?:\/([^/]+))?$/.exec(url.pathname);
   if (pagesDocRoute) {
     const projectId = decodeURIComponent(pagesDocRoute[1]), key = pagesDocRoute[2] ? decodeURIComponent(pagesDocRoute[2]) : null;
-    if (request.method === 'GET' && !key) return json(response, 200, { documents: pagesDocumentList(db, user.id, projectId) }, { 'cache-control': 'no-store' });
-    if (request.method === 'GET' && key) return json(response, 200, pagesDocumentRead(db, user.id, projectId, key, url.searchParams.has('revision') ? Number(url.searchParams.get('revision')) : null), { 'cache-control': 'no-store' });
-    if (request.method === 'PUT' && key) return json(response, 200, pagesDocumentUpdate(db, user.id, projectId, key, await readJson(request)), { 'cache-control': 'no-store' });
+    if (request.method === 'GET' && !key) return json(response, 200, { documents: layerDocumentList(db, user.id, projectId, 'pages') }, { 'cache-control': 'no-store' });
+    if (request.method === 'GET' && key) return json(response, 200, layerDocumentRead(db, user.id, projectId, 'pages', key, url.searchParams.has('revision') ? Number(url.searchParams.get('revision')) : null), { 'cache-control': 'no-store' });
+    if (request.method === 'PUT' && key) { const doc = layerDocumentUpdate(db, user.id, projectId, 'pages', key, await readJson(request)); if (key === 'identity') stageLayerDiscovery(db, know, projectId); return json(response, 200, doc, { 'cache-control': 'no-store' }); }
     return json(response, 405, { error: 'Method not allowed.' });
   }
   const pagesConnectionRoute = /^\/api\/projects\/([^/]+)\/layers\/pages\/connections(?:\/([^/]+))?$/.exec(url.pathname);
@@ -611,9 +611,31 @@ async function api(request, response, url) {
     if(request.method==='GET'){requireMember(db,user,projectId);return json(response,200,{layers:projectLayerDefinitions(db,projectId)}, {'cache-control':'no-store'});}
     if(request.method==='POST'){
       const definition=createMarkdownDefinition(db,user.id,projectId,await readJson(request));
+      return json(response,201,definition,{'cache-control':'no-store'});
+    }
+    return json(response,405,{error:'Method not allowed.'});
+  }
+  const definitionDetailRoute = /^\/api\/projects\/([^/]+)\/layer-definitions\/([^/]+)(?:\/(identity|actions|activate|history|presentation))?$/.exec(url.pathname);
+  if(definitionDetailRoute){
+    const projectId=decodeURIComponent(definitionDetailRoute[1]),key=decodeURIComponent(definitionDetailRoute[2]),section=definitionDetailRoute[3]||'';
+    if(request.method==='GET'&&section==='history')return json(response,200,{revisions:layerIdentityHistory(db,user.id,projectId,key)},{'cache-control':'no-store'});
+    if(request.method==='GET'&&!section){requireMember(db,user,projectId);const definition=projectLayerDefinition(db,projectId,key);return definition?json(response,200,definition,{'cache-control':'no-store'}):json(response,404,{error:'Layer not found.'});}
+    if(request.method==='PUT'&&section==='presentation')return json(response,200,saveLayerPresentation(db,user.id,projectId,key,await readJson(request)),{'cache-control':'no-store'});
+    if(request.method==='PUT'&&section==='identity'){
+      const definition=saveLayerIdentity(db,user.id,projectId,key,await readJson(request));
+      if(definition.lifecycle==='active')stageLayerDiscovery(db,know,projectId);
+      return json(response,200,definition,{'cache-control':'no-store'});
+    }
+    if(request.method==='POST'&&section==='actions'){
+      const definition=addDomainAction(db,user.id,projectId,key,await readJson(request));
+      migrateActionProject(db,projectId);
+      return json(response,201,definition,{'cache-control':'no-store'});
+    }
+    if(request.method==='POST'&&section==='activate'){
+      const definition=activateLayerDefinition(db,user.id,projectId,key);
       migrateActionProject(db,projectId);
       stageLayerDiscovery(db,know,projectId);
-      return json(response,201,definition,{'cache-control':'no-store'});
+      return json(response,200,definition,{'cache-control':'no-store'});
     }
     return json(response,405,{error:'Method not allowed.'});
   }
@@ -645,7 +667,8 @@ async function api(request, response, url) {
       if (request.method === 'GET' && !id) return json(response, 200, { documents: layerDocumentList(db,user.id,projectId,layerKey) }, { 'cache-control': 'no-store' });
       if (request.method === 'GET' && id) return json(response, 200, layerDocumentRead(db,user.id,projectId,layerKey,id,
         url.searchParams.has('revision') ? Number(url.searchParams.get('revision')) : null), { 'cache-control': 'no-store' });
-      if (request.method === 'PUT' && id) return json(response, 200, layerDocumentUpdate(db,user.id,projectId,layerKey,id,await readJson(request)), { 'cache-control': 'no-store' });
+      // A changed charter of an active layer stages fresh neighbor discovery; drafts stay invisible until activated.
+      if (request.method === 'PUT' && id) { const doc = layerDocumentUpdate(db,user.id,projectId,layerKey,id,await readJson(request)); if (id === 'identity' && projectLayerDefinition(db,projectId,layerKey)?.lifecycle === 'active') stageLayerDiscovery(db,know,projectId); return json(response, 200, doc, { 'cache-control': 'no-store' }); }
     }
     if (section === 'connections') {
       if (request.method === 'GET' && !id) return json(response, 200, { connections: layerConnections(db,user.id,projectId,layerKey) }, { 'cache-control': 'no-store' });
@@ -961,7 +984,7 @@ async function api(request, response, url) {
         const selected = know.view(user, projectId).layerActions.find(action => action.id === input.action);
         if (!selected || input.layer && input.layer !== selected.layer || input.type && input.type !== selected.type) throw Object.assign(new Error('Choose an installed layer action.'), { status: 400 });
       }
-      return json(response, 201, know.createWork(projectId, { ...input, context: typeof input.suggestion === 'string' ? { suggestion: input.suggestion.slice(0, 2000) } : (actionForProject(db,projectId,input.action)?.key === 'edit' && typeof input.context?.markdownPath === 'string' ? { markdownPath: input.context.markdownPath.slice(0,240), markdownFileId: typeof input.context.markdownFileId === 'string' ? input.context.markdownFileId.slice(0,80) : null, markdownRevision: Number.isInteger(input.context.markdownRevision) ? input.context.markdownRevision : null } : null) }, user.name));
+      return json(response, 201, know.createWork(projectId, { ...input, context: typeof input.suggestion === 'string' ? { suggestion: input.suggestion.slice(0, 2000) } : (actionForProject(db,projectId,input.action)?.result?.kind === 'markdown_document' && typeof input.context?.markdownPath === 'string' ? { markdownPath: input.context.markdownPath.slice(0,240), markdownFileId: typeof input.context.markdownFileId === 'string' ? input.context.markdownFileId.slice(0,80) : null, markdownRevision: Number.isInteger(input.context.markdownRevision) ? input.context.markdownRevision : null } : null) }, user.name));
     }
     if (section === 'work' && method === 'PUT' && item) {
       const input = await readJson(request);
@@ -1017,7 +1040,7 @@ async function api(request, response, url) {
       const input = await readJson(request);
       if (item === 'start') { const { batch } = runs.start(user, projectId, String(input.batchId || ''), input.requestedSlots ?? 1); return json(response, 202, { batch }); }
       if (item === 'stop') return json(response, 200, { batch: runs.stop(user, projectId, String(input.batchId || '')) });
-      if (item === 'next') return json(response, 200, runs.next(user, projectId, input.assignee, input.count));
+      if (item === 'next') return json(response, 200, runs.next(user, projectId, input.assignee, input.count, typeof input.layer === 'string' && input.layer ? input.layer : null));
     }
     // ROADMAP-01: documents generated from the Brief, and comments on insights.
     if (section === 'docs' && method === 'POST') return json(response, item ? 200 : 201, know.generateDoc(user, projectId, { generator: String((await readJson(request)).generator || ''), id: item }));

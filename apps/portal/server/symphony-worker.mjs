@@ -11,7 +11,7 @@ import { briefSections } from './knowledge.mjs';
 import { compiledLocalActions } from './lat07-actions.mjs';
 import { actionForProject, projectLayerDefinition } from './layer-registry.mjs';
 import { layerDeclarations } from './layer-contract.mjs';
-import { discoverySourceSnapshot } from './layer-discovery.mjs';
+import { activeLayerTopology, discoverySourceSnapshot } from './layer-discovery.mjs';
 import { applyDiscoveryProposal } from './layer-space.mjs';
 
 const hash = value => createHash('sha256').update(value).digest('hex');
@@ -230,10 +230,10 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     }
     const discovery = entry.context?.discovery;
     if (discovery) {
-      const installed = db.prepare('SELECT layer_key AS key, descriptor_version AS version FROM layer_instances WHERE project_id = ? AND enabled = 1 ORDER BY layer_key').all(projectId);
+      const installed = activeLayerTopology(db,projectId);
       if (hash(JSON.stringify(installed)) !== discovery.topologyDigest) fail('Installed layers changed. Use the newer discovery task.', 409);
     }
-    const content = { controlPins, codeObservation, layerDiscovery: discovery ? { ...discovery, sources: discoverySourceSnapshot(db,projectId,discovery.sourceKeys) } : null, schemaVersion: 1, project: project(projectId), work: entry, batch: { id: batchId },
+    const content = { controlPins, codeObservation, layerDiscovery: discovery ? { ...discovery, receiver:projectLayerDefinition(db,projectId,entry.layer), sources: discoverySourceSnapshot(db,projectId,discovery.sourceKeys,entry.layer) } : null, schemaVersion: 1, project: project(projectId), work: entry, batch: { id: batchId },
       sources: [...targets, ...briefClaims, ...docs], briefRevision: entry.action === 'product.brief' ? know.briefRevision(projectId) : null, sharedDocs: know.list(projectId, 'doc').filter(doc => doc.agents).map(doc => ({ id: doc.id, revision: doc.revision })), instructionPins: know.instructionPins(projectId, workerProfile, entry.action), guidance: { principles: instructions.principles, project: instructions.instructions,
         role: role && { id: role.id, revision: role.revision, name: role.name, instructions: role.instructions },
         layerAction: layerAction && { id: layerAction.id, revision: layerAction.revision, adapter: layerAction.adapter, result: layerAction.result, permissions: layerAction.permissions,
@@ -278,7 +278,7 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     if (bundle.sources.some(source => know.get(projectId, source.id)?.revision !== source.revision)) return false;
     if (bundle.controlPins?.some(control => { const row = db.prepare('SELECT revision, status FROM layer_connections WHERE id = ? AND project_id = ?').get(control.id, projectId); return !row || row.revision !== control.revision || row.status !== 'active'; })) return false;
     if (bundle.codeObservation && !codeObservationCurrent(projectId, bundle.codeObservation)) return false;
-    if (bundle.layerDiscovery) { const installed = db.prepare('SELECT layer_key AS key, descriptor_version AS version FROM layer_instances WHERE project_id = ? AND enabled = 1 ORDER BY layer_key').all(projectId); if (hash(JSON.stringify(installed)) !== bundle.layerDiscovery.topologyDigest || JSON.stringify(discoverySourceSnapshot(db,projectId,bundle.layerDiscovery.sourceKeys)) !== JSON.stringify(bundle.layerDiscovery.sources)) return false; }
+    if (bundle.layerDiscovery) { const installed = activeLayerTopology(db,projectId); if (hash(JSON.stringify(installed)) !== bundle.layerDiscovery.topologyDigest || JSON.stringify(discoverySourceSnapshot(db,projectId,bundle.layerDiscovery.sourceKeys,bundle.work.layer)) !== JSON.stringify(bundle.layerDiscovery.sources)) return false; }
     const source = db.prepare('SELECT workspace_path FROM project_setup WHERE project_id = ?').get(projectId)?.workspace_path;
     try {
       if (execFileSync('git', ['rev-parse', 'HEAD'], { cwd: source, timeout: 2500, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim() !== bundle.repository.commit) return false;
@@ -353,7 +353,7 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     if (bundle.sources.some(source => know.get(scope.projectId, source.id)?.revision !== source.revision)) return null;
     if (bundle.controlPins?.some(control => { const row = db.prepare('SELECT revision, status FROM layer_connections WHERE id = ? AND project_id = ?').get(control.id, scope.projectId); return !row || row.revision !== control.revision || row.status !== 'active'; })) return null;
     if (bundle.codeObservation && !codeObservationCurrent(scope.projectId, bundle.codeObservation)) return null;
-    if (bundle.layerDiscovery) { const installed = db.prepare('SELECT layer_key AS key, descriptor_version AS version FROM layer_instances WHERE project_id = ? AND enabled = 1 ORDER BY layer_key').all(scope.projectId); if (hash(JSON.stringify(installed)) !== bundle.layerDiscovery.topologyDigest || !same(discoverySourceSnapshot(db,scope.projectId,bundle.layerDiscovery.sourceKeys),bundle.layerDiscovery.sources)) return null; }
+    if (bundle.layerDiscovery) { const installed = activeLayerTopology(db,scope.projectId); if (hash(JSON.stringify(installed)) !== bundle.layerDiscovery.topologyDigest || !same(discoverySourceSnapshot(db,scope.projectId,bundle.layerDiscovery.sourceKeys,bundle.work.layer),bundle.layerDiscovery.sources)) return null; }
     const source = db.prepare('SELECT workspace_path FROM project_setup WHERE project_id = ?').get(scope.projectId)?.workspace_path;
     try {
       if (execFileSync('git', ['rev-parse', 'HEAD'], { cwd: source, timeout: 2500, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim() !== bundle.repository.commit) return null;
@@ -696,8 +696,8 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
       let acceptedFlowId = null;
       const options = { author: user.name, rationale: `Accepted ${entry.ref} proposal`, workItemId: entry.id };
       if (row.action_id.endsWith('.discover')) {
-        const installed = db.prepare('SELECT layer_key AS key, descriptor_version AS version FROM layer_instances WHERE project_id = ? AND enabled = 1 ORDER BY layer_key').all(projectId);
-        if (hash(JSON.stringify(installed)) !== bundle.layerDiscovery?.topologyDigest || JSON.stringify(discoverySourceSnapshot(db,projectId,bundle.layerDiscovery.sourceKeys)) !== JSON.stringify(bundle.layerDiscovery.sources)) fail('Source outputs or installed layers changed. Reassess this proposal.', 409);
+        const installed = activeLayerTopology(db,projectId);
+        if (hash(JSON.stringify(installed)) !== bundle.layerDiscovery?.topologyDigest || JSON.stringify(discoverySourceSnapshot(db,projectId,bundle.layerDiscovery.sourceKeys,bundle.work.layer)) !== JSON.stringify(bundle.layerDiscovery.sources)) fail('Source outputs or installed layers changed. Reassess this proposal.', 409);
         applyDiscoveryProposal(db, projectId, entry.layer, content.connections, user.id);
       } else if (row.action_id === 'product.define') {
         const record = know.get(projectId, bundle.work.targets[0].id);

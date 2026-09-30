@@ -87,7 +87,7 @@ try {
   await check('map-flow');
 
   // ---- A built page: spec draft → change request → Engineer work ----
-  await page.getByRole('navigation', { name: 'Pages sections' }).getByRole('link', { name: 'Pages' }).click();
+  await page.getByRole('navigation', { name: 'Pages views' }).getByRole('link', { name: 'Pages' }).click();
   const tree = page.getByRole('navigation', { name: 'Page tree' });
   await tree.getByRole('link', { name: /^Messages/ }).click();
   await page.locator('.lay-pg-right h2', { hasText: 'Messages' }).waitFor();
@@ -148,7 +148,7 @@ try {
   await check('page-built');
 
   // ---- Flows: walk through and review ----
-  await page.getByRole('navigation', { name: 'Pages sections' }).getByRole('link', { name: 'Flows' }).click();
+  await page.getByRole('navigation', { name: 'Pages views' }).getByRole('link', { name: 'Flows' }).click();
   await page.locator('.lay-pg-fsi').first().waitFor();
   await page.getByRole('button', { name: 'Review this flow' }).click();
   await page.getByText('In review', { exact: true }).first().waitFor();
@@ -171,7 +171,7 @@ try {
 
   // Phone width: no horizontal page scroll.
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole('navigation', { name: 'Pages sections' }).getByRole('link', { name: 'Map' }).click();
+  await page.getByRole('navigation', { name: 'Pages views' }).getByRole('link', { name: 'Map' }).click();
   await node('Messages').waitFor();
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= 391), 'no horizontal scroll at 390px');
   await check('map-phone');

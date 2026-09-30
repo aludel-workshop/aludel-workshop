@@ -12,6 +12,9 @@ import { ensureProductWorkspace } from '../server/product-workspace.mjs';
 import { openSecretStore } from '../server/secret-store.mjs';
 import { openDatabase } from '../server/storage.mjs';
 import { initWorkflow } from '../server/workflow.mjs';
+import { initLayerContract } from '../server/layer-contract.mjs';
+import { createMarkdownDefinition, saveLayerIdentity, addDomainAction, activateLayerDefinition } from '../server/layer-registry.mjs';
+import { migrateActionProject } from '../server/lat08-migration.mjs';
 
 const catalogs = loadCatalogs(new URL('../config', import.meta.url).pathname);
 const day = 86400000;
@@ -178,4 +181,31 @@ test('LAY-04B (as revised by WORK-UX-01): reconcile items created by code links 
   assert.equal(reconcile.assignee.label, 'Default agent');
   assert.equal(reconcile.priority, 'high');
   assert.ok(reconcile.context.reconcile, 'the reconcile context is kept');
+});
+
+
+test('a custom routine stages its configured domain action only after layer activation', () => {
+  const { db, know, ada, id } = fixture();
+  initLayerContract(db);
+  createMarkdownDefinition(db, ada.id, id, { name: 'Research' });
+  const fields = { purpose:'Maintain research evidence for this project.', scope:'Sources, analyses and synthesized findings for the product.',
+    methodology:'Collect sources, check reliability, analyze patterns and synthesize insights.',
+    outputConventions:'Put cited sources under sources/ and syntheses under insights/.',
+    qualityBar:'Every finding cites provenance and states its limitations.',
+    projectRole:'Offer evidence and uncertainty to product and design decisions.',
+    collaboration:'Publish findings as candidate inputs to neighboring layers.' };
+  saveLayerIdentity(db, ada.id, id, 'research', {...fields, expectedRevision:0});
+  addDomainAction(db, ada.id, id, 'research', {key:'add_source', title:'Add source', purpose:'Capture evidence with provenance.',
+    method:'Read and summarize one source, then add its citation.', checks:['Provenance is recorded']});
+  const routine = know.insert(id, 'routine', {title:'Review new sources',layer:'research',type:'audit',cadence:'monthly',
+    trigger:'output-change',documents:[],enabled:false});
+  assert.throws(() => know.update(id,routine.id,{enabled:true,actionKey:'add_source'}), /Activate this layer/);
+  activateLayerDefinition(db, ada.id, id, 'research');
+  assert.throws(() => know.update(id,routine.id,{enabled:true}), /configured domain action/);
+  const enabled=know.update(id,routine.id,{enabled:true,actionKey:'add_source'});
+  assert.equal(enabled.actionKey,'add_source');
+  migrateActionProject(db,id);
+  const [work]=know.runRoutines(id,{trigger:'output-change',layerKey:'research'});
+  assert.equal(work.action,'research.add_source');
+  assert.equal(work.context.routine,routine.id);
 });

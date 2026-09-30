@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -6,14 +6,16 @@ import { Assignee, Batch, ProjectContext, WorkItem, priorityOrder } from './cont
 import { AvatarComponent, WorkCardComponent, agentRunnable, isRunning, tokens, elapsed } from './work-shared';
 
 const byPriority = (a: WorkItem, b: WorkItem) => priorityOrder.indexOf(a.priority) - priorityOrder.indexOf(b.priority) || a.number - b.number;
-interface Lane { key: string; who: Assignee; title: string; items: WorkItem[]; batch: Batch | null; }
+// items are what this board shows; batchItems are everything in the lane, which Go and Next act on.
+interface Lane { key: string; who: Assignee; title: string; items: WorkItem[]; batchItems: WorkItem[]; batch: Batch | null; }
 
 // Work › Board (WORK-UX-01): batches are what's being worked on now, one per assignee; agent results stay in their batch
 // until someone clears them. Everything else waits in Queue or Backlog, highest priority first; Done keeps the history.
+// A layer's Tasks tab renders this same board with [layer], showing only that layer's items (CUSTOM-LAYER-01).
 @Component({
   selector: 'aludel-work-board', standalone: true, imports: [FormsModule, MatIconModule, MatTooltipModule, AvatarComponent, WorkCardComponent],
   template: `
-  <div class="lay-section-head"><h2>Batches</h2><div class="lay-row lay-wrap"><span class="lay-muted small">Agent results stay in their batch until you clear them</span><a class="lay-button small" [href]="ctx.link('work', 'create')" (click)="ctx.go(ctx.link('work', 'create'), $event)"><mat-icon aria-hidden="true">add</mat-icon>Create task</a></div></div>
+  <div class="lay-section-head"><h2>Batches</h2><div class="lay-row lay-wrap"><span class="lay-muted small">Agent results stay in their batch until you clear them</span><a class="lay-button small" [href]="createLink()" (click)="ctx.go(createLink(), $event)"><mat-icon aria-hidden="true">add</mat-icon>Create task</a></div></div>
   <p class="lay-muted small">Symphony workers: {{ ctx.data()?.workerPool?.free || 0 }} free of {{ ctx.data()?.workerPool?.capacity || 0 }} online slots · {{ ctx.data()?.workerPool?.queued || 0 }} queued batches. Capacity and host health are in <a [href]="ctx.link('deploy', 'agents')" (click)="ctx.go(ctx.link('deploy', 'agents'), $event)">Deploy</a>.</p>
   <div class="lay-lanes">
     @for (lane of lanes(); track lane.key) {
@@ -41,9 +43,11 @@ interface Lane { key: string; who: Assignee; title: string; items: WorkItem[]; b
         </div>
         @if (running(lane)) { <p class="lay-lock-note"><mat-icon aria-hidden="true">lock</mat-icon>Locked in while it runs. Hover an item to skip or stop it.</p> }
         @if (lane.batch; as batch) { @if (batch.note && !running(lane)) { <p class="lay-lock-note lay-lock-warn"><mat-icon aria-hidden="true">info</mat-icon>{{ batch.ref }}: {{ batch.note }}</p> } }
+        @if (layer() && otherLayers(lane); as others) { <p class="lay-lock-note"><mat-icon aria-hidden="true">layers</mat-icon>This batch also holds {{ others }} item{{ others === 1 ? '' : 's' }} from other layers. Go runs the whole batch; <a [href]="ctx.link('work')" (click)="ctx.go(ctx.link('work'), $event)">see it in Work</a>.</p> }
         @if (lane.who.kind === 'agent' && !canGo(lane) && waiting(lane) && !running(lane) && lane.batch?.state !== 'queued') { <p class="lay-lock-note lay-lock-warn"><mat-icon aria-hidden="true">info</mat-icon>This task needs a supported profile and Symphony action adapter.</p> }
         @if (lane.items.length) { <ol class="lay-stack">@for (item of lane.items; track item.id) { <li><aludel-work-card [item]="item" /></li> }</ol> }
         @else { <p class="lay-lane-empty">Empty. Press Next, or stage items from the queue.</p> }
+        @if (lane.batchItems.length > lane.items.length && !lane.items.length) { <p class="lay-muted small">No {{ layerName() }} items; {{ lane.batchItems.length }} from other layers.</p> }
       </section>
     }
   </div>
@@ -76,11 +80,15 @@ interface Lane { key: string; who: Assignee; title: string; items: WorkItem[]; b
 })
 export class WorkBoardComponent {
   readonly ctx = inject(ProjectContext);
+  readonly layer = input<string | null>(null);
+  readonly layerName = computed(() => this.ctx.layerInstances().find(entry => entry.key === this.layer())?.name || this.layer() || '');
+  readonly createLink = computed(() => this.layer() ? this.ctx.link(this.layer()!, 'tasks', 'create') : this.ctx.link('work', 'create'));
   readonly tabs: [string, string][] = [['queue', 'Queue'], ['backlog', 'Backlog'], ['done', 'Done']];
   readonly sub = signal('queue');
   readonly hint: Record<string, string> = { queue: 'Staging puts an item in its assignee\'s batch: yours, or that agent\'s.', backlog: 'Gaps the layers found and work nobody has queued yet. Queue what you want done.', done: 'Cleared work. The records it changed keep the history.' };
   readonly empty: Record<string, string> = { queue: 'Nothing queued. Queue items from the backlog.', backlog: 'Nothing in the backlog.', done: 'Nothing done yet.' };
-  private readonly work = computed(() => this.ctx.data()?.work || []);
+  private readonly allWork = computed(() => this.ctx.data()?.work || []);
+  private readonly work = computed(() => { const layer = this.layer(); return layer ? this.allWork().filter(item => item.layer === layer) : this.allWork(); });
   private readonly filtered = computed(() => { const who = this.ctx.boardFilter(); return who ? this.work().filter(item => item.assignee?.id === who) : this.work(); });
   readonly counts = computed(() => ({ queue: this.filtered().filter(item => item.status === 'queued').length, backlog: this.filtered().filter(item => item.status === 'backlog').length, done: this.filtered().filter(item => item.status === 'done').length } as Record<string, number>));
   readonly list = computed(() => {
@@ -90,7 +98,8 @@ export class WorkBoardComponent {
   });
   readonly people = computed<Assignee[]>(() => [...(this.ctx.data()?.members || []).map(member => ({ kind: 'person' as const, id: member.id })),
     ...(this.ctx.data()?.profiles || []).filter(profile => profile.active).map(profile => ({ kind: 'agent' as const, id: profile.id }))]);
-  readonly finished = computed(() => (this.ctx.data()?.batches || []).filter(batch => batch.state === 'done' || batch.state === 'stopped'));
+  readonly finished = computed(() => { const ids = new Set(this.work().map(item => item.id));
+    return (this.ctx.data()?.batches || []).filter(batch => (batch.state === 'done' || batch.state === 'stopped') && (!this.layer() || batch.items.some(id => ids.has(id)))); });
   // One lane per assignee: you first, then other people with staged work, then each agent profile with a batch.
   readonly lanes = computed<Lane[]>(() => {
     const data = this.ctx.data(); if (!data) return [];
@@ -99,20 +108,24 @@ export class WorkBoardComponent {
     const lanes: Lane[] = [];
     const people = [me, ...data.members.map(member => member.id).filter(id => id !== me)];
     for (const id of people) {
-      const items = this.work().filter(item => item.assignee?.kind === 'person' && item.assignee.id === id && inLane(item)).sort(byPriority);
-      if (id === me || items.length) lanes.push({ key: id === me ? 'me' : id, who: { kind: 'person', id }, title: id === me ? 'Your batch' : `${this.ctx.whoName({ kind: 'person', id })}'s batch`, items, batch: null });
+      const batchItems = this.allWork().filter(item => item.assignee?.kind === 'person' && item.assignee.id === id && inLane(item)).sort(byPriority);
+      const items = this.shown(batchItems);
+      if (id === me || items.length) lanes.push({ key: id === me ? 'me' : id, who: { kind: 'person', id }, title: id === me ? 'Your batch' : `${this.ctx.whoName({ kind: 'person', id })}'s batch`, items, batchItems, batch: null });
     }
     for (const profile of data.profiles) {
-      const items = this.work().filter(item => item.assignee?.kind === 'agent' && item.assignee.id === profile.id && inLane(item)).sort(byPriority);
+      const batchItems = this.allWork().filter(item => item.assignee?.kind === 'agent' && item.assignee.id === profile.id && inLane(item)).sort(byPriority);
+      const items = this.shown(batchItems);
       // Every active agent has a lane, so Next can fill it (ROADMAP-01).
       if (!items.length && !profile.active) continue;
       const batches = data.batches.filter(batch => batch.profileId === profile.id);
-      const batch = batches.find(isRunningBatch) || batches.find(entry => entry.state === 'queued') || batches.find(entry => entry.state === 'draft') || batches.find(entry => items.some(item => item.context?.batch === entry.id)) || null;
-      lanes.push({ key: profile.id, who: { kind: 'agent', id: profile.id }, title: profile.name, items, batch });
+      const batch = batches.find(isRunningBatch) || batches.find(entry => entry.state === 'queued') || batches.find(entry => entry.state === 'draft') || batches.find(entry => batchItems.some(item => item.context?.batch === entry.id)) || null;
+      lanes.push({ key: profile.id, who: { kind: 'agent', id: profile.id }, title: profile.name, items, batchItems, batch });
     }
     const who = this.ctx.boardFilter();
     return who ? lanes.filter(lane => lane.who.id === who) : lanes;
   });
+  private shown(items: WorkItem[]) { const layer = this.layer(); return layer ? items.filter(item => item.layer === layer) : items; }
+  otherLayers(lane: Lane) { return lane.items.length ? lane.batchItems.length - lane.items.length : 0; }
 
   // Next (ROADMAP-01, DEC-043): a fixed rule on the server; the number is per lane and remembered while you stay.
   readonly editing = signal('');
@@ -127,11 +140,11 @@ export class WorkBoardComponent {
   editCount(lane: Lane) { this.editing.set(lane.key); setTimeout(() => (document.getElementById('n-' + lane.key) as HTMLInputElement | null)?.select()); }
   next(lane: Lane) {
     let added = 0;
-    void this.ctx.write(async () => { added = (await this.ctx.next(lane.who, this.count(lane))).added.length; })
+    void this.ctx.write(async () => { added = (await this.ctx.next(lane.who, this.count(lane), this.layer())).added.length; })
       .then(ok => { if (ok) this.ctx.notice.set(added ? `Added ${added} item${added === 1 ? '' : 's'} to ${lane.key === 'me' ? 'your batch' : lane.title}.` : `Nothing is ready for ${lane.key === 'me' ? 'you' : lane.title} in ${this.milestone()}.`); });
   }
   running(lane: Lane) { return isRunning(lane.batch); }
-  waiting(lane: Lane) { return lane.items.filter(item => item.state === 'ready' && item.context?.batch === lane.batch?.id).length; }
+  waiting(lane: Lane) { return lane.batchItems.filter(item => item.state === 'ready' && item.context?.batch === lane.batch?.id).length; }
   laneNote(lane: Lane) {
     if (lane.who.kind === 'person') return lane.key === 'me' ? 'Your work, highest priority first' : 'Their work, highest priority first';
     const batch = lane.batch;
@@ -151,7 +164,7 @@ export class WorkBoardComponent {
   elapsedFor(batch: Batch) { return elapsed(batch.startedAt || undefined, this.ctx.now()); }
   tokenText(batch: Batch) { return tokens(batch.usage.input + batch.usage.output); }
   canGo(lane: Lane) {
-    const items = lane.items.filter(item => item.state === 'ready' && item.context?.batch === lane.batch?.id);
+    const items = lane.batchItems.filter(item => item.state === 'ready' && item.context?.batch === lane.batch?.id);
     if (!items.length) return false;
     return Boolean(lane.batch && ['draft', 'stopped'].includes(lane.batch.state) && lane.who.id && this.ctx.data()?.symphonyProfiles?.includes(lane.who.id) && items.every(item => agentRunnable(item, this.ctx)));
   }

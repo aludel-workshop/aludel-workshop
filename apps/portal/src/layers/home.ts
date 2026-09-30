@@ -16,7 +16,7 @@ import { ProjectContext, layerLabel, statusLabel, statusOrder, workStatusLabel }
       <div class="lay-layer-controls">
         @for (layer of activeLayers(); track layer.key) {
           <div class="lay-layer-control">
-            <a [href]="ctx.link(layer.key)" (click)="ctx.go(ctx.link(layer.key), $event)"><strong>{{ layer.name }}</strong><small>{{ layer.description }}</small></a>
+            <a [href]="ctx.link(layer.key)" (click)="ctx.go(ctx.link(layer.key), $event)"><strong>{{ layer.name }}</strong>@if (layer.lifecycle === 'draft') { <small>Draft · setup needed</small> } @else { <small>{{ layer.description }}</small> }</a>
             <label><input type="checkbox" [checked]="layer.dashboardVisible" [disabled]="saving() === layer.key || !canManage()" (change)="setPreference(layer.key, 'dashboardVisible', $event)"> Show on Home</label>
             @if (canManage()) { <button type="button" class="lay-link-button" [disabled]="saving() === layer.key" (click)="setInstalled(layer.key, false)">Remove</button> }
           </div>
@@ -32,7 +32,7 @@ import { ProjectContext, layerLabel, statusLabel, statusOrder, workStatusLabel }
       }
     </div>
     @if (!availableLayers().length) { <p class="lay-muted">All available local layer apps are in this project.</p> }
-    @if (canManage()) { <form class="lay-md-create-layer" (submit)="createLayer($event)"><h3>Create a layer app</h3><p class="lay-muted small">Start with a Markdown file workspace. This project owns its definition and output.</p><label for="custom-layer-name">Layer name</label><div><input id="custom-layer-name" name="customLayerName" [value]="newLayerName()" (input)="newLayerName.set($any($event.target).value)" placeholder="Research"><button class="lay-button" type="submit" [disabled]="saving() === 'custom' || !newLayerName().trim()">Create layer</button></div></form> }
+    @if (canManage()) { <form class="lay-md-create-layer" (submit)="createLayer($event)"><h3>Create a layer app</h3><p class="lay-muted small">Create a draft Markdown layer, then define its purpose, methods and actions before connecting it to the project.</p><label for="custom-layer-name">Layer name</label><div><input id="custom-layer-name" name="customLayerName" [value]="newLayerName()" (input)="newLayerName.set($any($event.target).value)" placeholder="Research"><button class="lay-button" type="submit" [disabled]="saving() === 'custom' || !newLayerName().trim()">Create layer</button></div></form> }
     <p class="lay-muted small">Removing a layer keeps its records so you can add it back.</p>
   </section>
   @if (homeLayers().length) {
@@ -77,7 +77,7 @@ export class HomeLayerComponent {
     event.preventDefault(); const name=this.newLayerName().trim(); if(!name)return;
     this.saving.set('custom');
     try {const layer=await this.ctx.api<{key:string}>(`/api/projects/${encodeURIComponent(this.ctx.projectId())}/layer-definitions`,'POST',{name});
-      this.newLayerName.set('');await this.ctx.reload();this.ctx.go(this.ctx.link(layer.key));this.ctx.notice.set(`${name} added.`);}
+      this.newLayerName.set('');await this.ctx.reload();this.ctx.go(this.ctx.link(layer.key,'manage','activate'));this.ctx.notice.set(`${name} added.`);}
     catch(error){this.ctx.error.set(error instanceof Error?error.message:String(error));}
     finally{this.saving.set('');}
   }

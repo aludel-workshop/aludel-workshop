@@ -17,8 +17,14 @@ import { WorkLayerComponent } from './work';
 import { HomeLayerComponent } from './home';
 import { LibraryComponent } from './library';
 import { EvidencePanelComponent } from './evidence';
-import { SharedLayerSlotComponent } from './shared-layer-slot';
 import { MarkdownLayerComponent } from './markdown-layer';
+import { LayerTasksComponent } from './layer-tasks';
+import { LayerManageComponent } from './layer-manage';
+import { LayerKnowledgeComponent } from './layer-knowledge';
+import { activeOutputTab, layerColourStyle, layerOutputTabs, layerSpaces, legacyLayerPath, setupProgress } from './layer-nav';
+
+// The rail can shrink to icons (CUSTOM-LAYER-01) so a layer's own sidebars don't stack beside a wide one.
+function readRailPreference() { try { return localStorage.getItem('aludel.rail.min') === '1'; } catch { return false; } }
 
 // ROADMAP-01 (DEC-043): Product is shown as Vision (URLs /vision/…; the internal layer key stays `product`), and each layer has one colour.
 const localLayers = [{ id: 'product', icon: 'lightbulb', label: 'Vision' }, { id: 'design', icon: 'palette', label: 'Design' }, { id: 'pages', icon: 'web', label: 'Pages' }, { id: 'data', icon: 'schema', label: 'Data' }, { id: 'platform', icon: 'code', label: 'Code' }, { id: 'deploy', icon: 'rocket_launch', label: 'Deploy' }];
@@ -26,38 +32,42 @@ const localLayers = [{ id: 'product', icon: 'lightbulb', label: 'Vision' }, { id
 // LAY-02: every project's workspace at /p/<slug>/<layer>/<tab>/<id>. The layer comes first (DEC-036).
 @Component({
   selector: 'aludel-project-shell', standalone: true,
-  imports: [FormsModule, MatIconModule, AvatarEditorComponent, HomeLayerComponent, ProductLayerComponent, DesignLayerComponent, PagesLayerComponent, DataLayerComponent, CodeLayerComponent, DeployLayerComponent, WorkLayerComponent, LibraryComponent, EvidencePanelComponent, SharedLayerSlotComponent, MarkdownLayerComponent],
+  imports: [FormsModule, MatIconModule, AvatarEditorComponent, HomeLayerComponent, ProductLayerComponent, DesignLayerComponent, PagesLayerComponent, DataLayerComponent, CodeLayerComponent, DeployLayerComponent, WorkLayerComponent, LibraryComponent, EvidencePanelComponent, MarkdownLayerComponent, LayerTasksComponent, LayerKnowledgeComponent, LayerManageComponent],
   providers: [ProjectContext],
   template: `
   <a class="skip-link" href="#lay-main">Skip to content</a>
-  <div class="lay-shell">
+  <div class="lay-shell" [class.lay-rail-min]="railMin()">
     <aside class="lay-rail">
-      <a class="lay-brand" href="/projects"><mat-icon aria-hidden="true">deployed_code</mat-icon>Aludel</a>
+      <div class="lay-rail-top">
+        <a class="lay-brand" href="/projects" title="Aludel"><mat-icon aria-hidden="true">deployed_code</mat-icon><span class="lay-nav-label">Aludel</span></a>
+        <button type="button" class="lay-rail-toggle" (click)="toggleRail()" [attr.aria-label]="railMin() ? 'Expand sidebar' : 'Collapse sidebar'" [attr.aria-pressed]="railMin()" [title]="railMin() ? 'Expand sidebar' : 'Collapse sidebar'">
+          @if (railMin()) { <mat-icon aria-hidden="true">chevron_right</mat-icon> } @else { <mat-icon aria-hidden="true">chevron_left</mat-icon> }</button>
+      </div>
       @if (ctx.setup(); as setup) {
-        <a class="lay-project" [href]="ctx.link()" (click)="ctx.go(ctx.link(), $event)"><span class="lay-mark" [style.background]="markColor()" [style.color]="markText()" aria-hidden="true">{{ initials(setup.project.name) }}</span>
-          <span><strong>{{ setup.project.name }}</strong>@if (currentPhase()) { <small>{{ currentPhase() }} milestone</small> } @else { <small>{{ activeLayerCount() }} layer apps</small> }</span></a>
+        <a class="lay-project" [href]="ctx.link()" (click)="ctx.go(ctx.link(), $event)" [title]="setup.project.name"><span class="lay-mark" [style.background]="markColor()" [style.color]="markText()" aria-hidden="true">{{ initials(setup.project.name) }}</span>
+          <span class="lay-nav-label"><strong>{{ setup.project.name }}</strong>@if (currentPhase()) { <small>{{ currentPhase() }} milestone</small> } @else { <small>{{ activeLayerCount() }} layer apps</small> }</span></a>
       }
       <nav class="lay-nav" aria-label="Project navigation">
-        <a class="lay-lc-home" [href]="ctx.link()" (click)="ctx.go(ctx.link(), $event)" [class.active]="layer() === 'home'" [attr.aria-current]="layer() === 'home' ? 'page' : null"><span class="lay-tile"><mat-icon aria-hidden="true">home</mat-icon></span>Home</a>
+        <a class="lay-lc-home" [href]="ctx.link()" (click)="ctx.go(ctx.link(), $event)" [class.active]="layer() === 'home'" [attr.aria-current]="layer() === 'home' ? 'page' : null" title="Home"><span class="lay-tile"><mat-icon aria-hidden="true">home</mat-icon></span><span class="lay-nav-label">Home</span></a>
         <span class="lay-nav-divider" aria-hidden="true"></span>
         @for (item of visibleLayers(); track item.id) {
-          <a [class]="'lay-lc-' + item.id" [href]="ctx.link(item.id)" (click)="ctx.go(ctx.link(item.id), $event)" [class.active]="layer() === item.id" [attr.aria-current]="layer() === item.id ? 'page' : null">
-            <span class="lay-tile"><mat-icon aria-hidden="true">{{ item.icon }}</mat-icon></span>{{ item.label }}
+          <a [class]="'lay-lc-' + item.id" [style]="colourStyle(item.id)" [href]="ctx.link(item.id)" (click)="ctx.go(ctx.link(item.id), $event)" [class.active]="layer() === item.id" [attr.aria-current]="layer() === item.id ? 'page' : null" [title]="item.label">
+            <span class="lay-tile"><mat-icon aria-hidden="true">{{ item.icon }}</mat-icon></span><span class="lay-nav-label">{{ item.label }}</span>
           </a>
         }
         <span class="lay-nav-divider" aria-hidden="true"></span>
-        <a class="lay-lc-library" [href]="ctx.link('library')" (click)="ctx.go(ctx.link('library'), $event)" [class.active]="layer() === 'library'" [attr.aria-current]="layer() === 'library' ? 'page' : null"><span class="lay-tile"><mat-icon aria-hidden="true">local_library</mat-icon></span>Library</a>
-        <a class="lay-lc-work" [href]="ctx.link('work')" (click)="ctx.go(ctx.link('work'), $event)" [class.active]="layer() === 'work'" [attr.aria-current]="layer() === 'work' ? 'page' : null"><span class="lay-tile"><mat-icon aria-hidden="true">checklist</mat-icon></span>Work
+        <a class="lay-lc-library" [href]="ctx.link('library')" (click)="ctx.go(ctx.link('library'), $event)" [class.active]="layer() === 'library'" [attr.aria-current]="layer() === 'library' ? 'page' : null" title="Library"><span class="lay-tile"><mat-icon aria-hidden="true">local_library</mat-icon></span><span class="lay-nav-label">Library</span></a>
+        <a class="lay-lc-work" [href]="ctx.link('work')" (click)="ctx.go(ctx.link('work'), $event)" [class.active]="layer() === 'work'" [attr.aria-current]="layer() === 'work' ? 'page' : null" title="Work"><span class="lay-tile"><mat-icon aria-hidden="true">checklist</mat-icon></span><span class="lay-nav-label">Work</span>
           @if (needsYou().length) { <span class="lay-badge" [attr.aria-label]="needsYou().length + ' need you'">{{ needsYou().length }}</span> }
         </a>
       </nav>
       <div class="lay-spacer"></div>
       <nav class="lay-nav" aria-label="Utilities">
-        <a class="lay-settings lay-lc-settings" [href]="ctx.link('settings')" (click)="ctx.go(ctx.link('settings'), $event)" [class.active]="layer() === 'settings'" [attr.aria-current]="layer() === 'settings' ? 'page' : null"><span class="lay-tile"><mat-icon aria-hidden="true">settings</mat-icon></span>Settings</a>
+        <a class="lay-settings lay-lc-settings" [href]="ctx.link('settings')" (click)="ctx.go(ctx.link('settings'), $event)" [class.active]="layer() === 'settings'" [attr.aria-current]="layer() === 'settings' ? 'page' : null" title="Settings"><span class="lay-tile"><mat-icon aria-hidden="true">settings</mat-icon></span><span class="lay-nav-label">Settings</span></a>
       </nav>
       <div class="lay-account-wrap">
         <button type="button" class="lay-account" (click)="menu.set(!menu())" [attr.aria-expanded]="menu()" aria-controls="lay-account-menu" [attr.aria-label]="'Account menu, ' + (user()?.name || 'you')">
-          <img class="lay-av lay-av-md" [src]="myAvatar()" alt="" aria-hidden="true"><span><strong>{{ user()?.name }}</strong><small>{{ user()?.email || 'Owner access key' }}</small></span></button>
+          <img class="lay-av lay-av-md" [src]="myAvatar()" alt="" aria-hidden="true"><span class="lay-nav-label"><strong>{{ user()?.name }}</strong><small>{{ user()?.email || 'Owner access key' }}</small></span></button>
         @if (menu()) {
           <div class="lay-account-menu" id="lay-account-menu">
             <a [href]="ctx.link('account')" (click)="menu.set(false); ctx.go(ctx.link('account'), $event)"><mat-icon aria-hidden="true">person</mat-icon>Account</a>
@@ -83,7 +93,7 @@ const localLayers = [{ id: 'product', icon: 'lightbulb', label: 'Vision' }, { id
           }
         </div>
       </div>
-      <main [class]="'lay-main lay-lc-' + layerColour()" id="lay-main" tabindex="-1">
+      <main [class]="'lay-main lay-lc-' + layerColour()" [style]="colourStyle(layer())" id="lay-main" tabindex="-1">
         @if (ctx.workingOn(); as current) {
           <div class="lay-working" role="status"><mat-icon aria-hidden="true">assignment</mat-icon><span>Working on <strong>{{ current.ref }}</strong>: edits to its targets are saved as its output.</span>
             <a [href]="ctx.link('work', 'item', current.id)" (click)="ctx.go(ctx.link('work', 'item', current.id), $event)">Back to {{ current.ref }}</a><button type="button" class="lay-link-button" (click)="ctx.workingOn.set(null)">Stop</button></div>
@@ -94,14 +104,34 @@ const localLayers = [{ id: 'product', icon: 'lightbulb', label: 'Vision' }, { id
           <h1 tabindex="-1">Project not found</h1><p>You don't have access to this project, or it doesn't exist. <a href="/projects">Your apps</a></p>
         } @else if (ctx.data() && ctx.setup(); as ready) {
           @if (localLayer() && activeLocalLayer()) {
-            <nav class="lay-shared-tabs" [attr.aria-label]="localLayer()?.name + ' shared views'">
-              <a [href]="ctx.link(layer())" (click)="ctx.go(ctx.link(layer()), $event)" [class.active]="!sharedTab()" [attr.aria-current]="!sharedTab() ? 'page' : null">{{ localLayer()?.editorAdapter === 'markdown-editor' ? 'Editor' : 'Outputs' }}</a>
-              <a [href]="ctx.link(layer(), 'operations')" (click)="ctx.go(ctx.link(layer(), 'operations'), $event)" [class.active]="sharedTab() === 'operations'" [attr.aria-current]="sharedTab() === 'operations' ? 'page' : null">Operations</a>
-              <a [href]="ctx.link(layer(), 'knowledge')" (click)="ctx.go(ctx.link(layer(), 'knowledge'), $event)" [class.active]="sharedTab() === 'knowledge'" [attr.aria-current]="sharedTab() === 'knowledge' ? 'page' : null">Knowledge</a>
+            <!-- CUSTOM-LAYER-01: one bar per layer. Output tabs scroll on the left; Tasks and Manage stay put on the right. -->
+            <header class="lay-layer-head">
+              <span class="lay-tile" aria-hidden="true"><mat-icon>{{ localLayer()?.icon }}</mat-icon></span>
+              <div><h1 tabindex="-1">{{ localLayer()?.name }}@if (localLayer()?.lifecycle === 'draft') { <span class="lay-chip lay-plain lay-layer-draft">Draft</span> }</h1>
+                <p>{{ localLayer()?.description }}</p></div>
+            </header>
+            @if (setup(); as p) { @if (!(space() === 'manage' && (ctx.segments()[2] || 'activate') === 'activate')) {
+              <div class="lay-draft-banner" role="status"><mat-icon aria-hidden="true">flag</mat-icon>
+                <span><strong>{{ localLayer()?.name }} isn't active yet.</strong> Other layers can't see it until you finish setup: {{ p.done }} of {{ p.total }} steps done.</span>
+                <a [href]="ctx.link(layer(), 'manage', 'activate')" (click)="ctx.go(ctx.link(layer(), 'manage', 'activate'), $event)">Finish setup</a></div>
+            } }
+            <nav class="lay-layer-bar" [attr.aria-label]="localLayer()?.name + ' views'">
+              <div class="lay-layer-outputs">
+                @for (tab of outputTabs(); track tab[0]) {
+                  <a [href]="ctx.link(layer(), tab[0])" (click)="ctx.go(ctx.link(layer(), tab[0]), $event)" [class.active]="outputTab() === tab[0]" [attr.aria-current]="outputTab() === tab[0] ? 'page' : null">{{ tab[1] }}@if (ctx.dirtyTabs()[layer() + '/' + tab[0]]) { <span class="lay-layer-dirty" aria-label="unsaved changes"></span> }</a>
+                }
+              </div>
+              <div class="lay-layer-fixed">
+                <a [href]="ctx.link(layer(), 'tasks')" (click)="ctx.go(ctx.link(layer(), 'tasks'), $event)" [class.active]="space() === 'tasks'" [attr.aria-current]="space() === 'tasks' ? 'page' : null"><mat-icon aria-hidden="true">view_kanban</mat-icon>Tasks@if (layerNeedsYou()) { <span class="lay-layer-count" [attr.aria-label]="layerNeedsYou() + ' need you'">{{ layerNeedsYou() }}</span> }</a>
+                <a [href]="ctx.link(layer(), 'knowledge')" (click)="ctx.go(ctx.link(layer(), 'knowledge'), $event)" [class.active]="space() === 'knowledge'" [attr.aria-current]="space() === 'knowledge' ? 'page' : null"><mat-icon aria-hidden="true">menu_book</mat-icon>Knowledge</a>
+                <a [href]="ctx.link(layer(), 'manage')" (click)="ctx.go(ctx.link(layer(), 'manage'), $event)" [class.active]="space() === 'manage'" [attr.aria-current]="space() === 'manage' ? 'page' : null"><mat-icon aria-hidden="true">settings</mat-icon>Manage@if (setup(); as p) { <span class="lay-layer-count lay-layer-count-warn" [attr.aria-label]="p.remaining + ' setup steps left'">{{ p.remaining }}</span> }</a>
+              </div>
             </nav>
           }
           @if (localLayer() && !activeLocalLayer()) { <p class="lay-eyebrow">Layer app</p><h1 tabindex="-1">{{ localLayer()?.name }} is not in this project</h1><p>Add it from Home when you need it.</p><a [href]="ctx.link()" (click)="ctx.go(ctx.link(), $event)">Go to Home</a> }
-          @else if (sharedTab()) { <aludel-shared-layer-slot [layerKey]="layer()" [slot]="sharedTab()" /> }
+          @else if (space() === 'tasks') { <aludel-layer-tasks [layerKey]="layer()" /> }
+          @else if (space() === 'knowledge') { <aludel-layer-knowledge [layerKey]="layer()" /> }
+          @else if (space() === 'manage') { <aludel-layer-manage [layerKey]="layer()" /> }
           @else { @switch (layer()) {
             @case ('product') { <aludel-product-layer /> }
             @case ('design') { <aludel-design-layer /> }
@@ -141,7 +171,17 @@ export class ProjectShellComponent implements OnInit {
     .map(layer => ({ id: layer.key, icon: layer.icon, label: layer.name })));
   readonly localLayer = computed(() => this.ctx.layerInstances().find(item => item.key === this.layer()) || null);
   readonly activeLocalLayer = computed(() => this.ctx.layerInstances().some(item => item.key === this.layer() && item.enabled));
-  readonly sharedTab = computed(() => this.localLayer() && ['operations', 'knowledge'].includes(this.ctx.segments()[1]) ? this.ctx.segments()[1] : '');
+  // A draft custom layer opens on Manage › Settings until it is described and activated.
+  readonly space = computed(() => { const segment = this.ctx.segments()[1], layer = this.localLayer();
+    if (!layer) return ''; if (layerSpaces.includes(segment)) return segment;
+    return !segment && layer.lifecycle === 'draft' && !layer.builtIn ? 'manage' : ''; });
+  readonly outputTabs = computed(() => layerOutputTabs(this.localLayer()));
+  readonly outputTab = computed(() => this.space() ? '' : activeOutputTab(this.localLayer(), this.ctx.segments()[1]));
+  readonly setup = computed(() => setupProgress(this.localLayer()));
+  readonly layerNeedsYou = computed(() => this.needsYou().filter(item => item.layer === this.layer()).length);
+  readonly railMin = signal(readRailPreference());
+  toggleRail() { const next = !this.railMin(); this.railMin.set(next); try { localStorage.setItem('aludel.rail.min', next ? '1' : '0'); } catch { /* per-viewer convenience */ } }
+  colourStyle(key: string) { return layerColourStyle(this.ctx.layerInstances().find(item => item.key === key) || null); }
   readonly menu = signal(false);
   readonly missing = signal(false);
   readonly q = signal('');
@@ -186,6 +226,8 @@ export class ProjectShellComponent implements OnInit {
 
   constructor() {
     window.addEventListener('popstate', () => this.ctx.path.set(location.pathname));
+    // Operations, Knowledge and Setup links from before the layer bar open their new places.
+    effect(() => { const next = this.localLayer() ? legacyLayerPath(this.ctx.segments()) : null; if (next) { const path = this.ctx.link(...next); history.replaceState({}, '', path); this.ctx.path.set(path); } });
     effect(() => { if (this.ctx.segments()[0] === 'product') { const path = this.ctx.link(...this.ctx.segments()); history.replaceState({}, '', path); this.ctx.path.set(path); } });
     effect(() => { const layer = this.layer(); document.title = `${layer === 'home' ? 'Home' : layer === 'product' ? 'Vision' : layer.charAt(0).toUpperCase() + layer.slice(1)} · ${this.ctx.setup()?.project.name || 'Aludel'}`; });
   }

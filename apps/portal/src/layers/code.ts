@@ -54,11 +54,6 @@ export function markdownBlocks(text: string) {
   selector: 'aludel-code-layer', standalone: true,
   imports: [FormsModule, MatIconModule, RefChipComponent],
   template: `
-  <p class="lay-eyebrow">Code · how it's built and connected</p>
-  <h1 tabindex="-1">{{ titles[tab()] }}</h1>
-  <nav class="lay-tabs" aria-label="Code sections">
-    @for (entry of tabs; track entry[0]) { <a [href]="ctx.link('platform', entry[0])" (click)="ctx.go(ctx.link('platform', entry[0]), $event)" [class.active]="tab() === entry[0]" [attr.aria-current]="tab() === entry[0] ? 'page' : null">{{ entry[1] }}</a> }
-  </nav>
   @switch (tab()) {
     @case ('overview') {
       <div class="lay-row lay-wrap lay-block"><p class="lay-lead lay-flat">How the code fits together and connects to the other layers, read from the repository.</p><span class="lay-muted small lay-push">As of <code>main</code>{{ draft()?.head ? ' @ ' + draft()?.head : '' }}{{ latest() ? ' · latest release v' + latest()?.version : '' }}</span></div>
@@ -115,7 +110,7 @@ export function markdownBlocks(text: string) {
         }
         <ul class="lay-list">@for (observation of observations(); track observation.id) { <li class="lay-pa-history-row"><strong>{{ observation.route }}</strong> · <code>{{ observation.source_path }}</code> · commit <code>{{ observation.repository_commit.slice(0,8) }}</code> · blob <code>{{ observation.blob_sha.slice(0,8) }}</code></li> }
           @empty { <li class="lay-muted">No Code observations recorded.</li> }</ul>
-        <a [href]="ctx.link('pages','operations','connections')" (click)="ctx.go(ctx.link('pages','operations','connections'),$event)">Review Code relations in Pages</a>
+        <a [href]="ctx.link('pages','manage','connections')" (click)="ctx.go(ctx.link('pages','manage','connections'),$event)">Review Code relations in Pages</a>
       </section>
     }
     @case ('explorer') {
