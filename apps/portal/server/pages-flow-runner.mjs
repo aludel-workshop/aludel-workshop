@@ -5,8 +5,11 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { layerInstanceId } from './layer-contract.mjs';
 import { pagesPackageForProject } from './layer-package.mjs';
 
-// Host-reviewed exact source; a later repin needs its own source review.
-const reviewedDigest = '249643ad5110143af8193251bc8887f1f55c3c272ff553e199d2eeaf58b24728';
+// Each accepted source revision needs its own review. Existing installs retain their pin.
+const reviewedSources = new Map([
+  ['e88409c78e790e8d4fdccc2ef4db043b6d3c39d3', '249643ad5110143af8193251bc8887f1f55c3c272ff553e199d2eeaf58b24728'],
+  ['7b18537648f872f3309b6d1dd2d3fca65d38d8c1', '51524ef9a737bfcad29e7a3eb491630a333fdb03538982190aa337f11cb71dd1']
+]);
 const entry = 'server/flow-change.mjs';
 const child = `
 let raw = '';
@@ -39,7 +42,7 @@ export function runPagesFlowCandidate(db, projectId, operation, input) {
     if (input[key] != null && input[key] !== expected) throw new Error(`Pages flow ${key} does not match the installed package.`);
   const source = execFileSync('git', ['-C', pkg.repo, 'show', `${pkg.commit}:${entry}`],
     { encoding: 'utf8', maxBuffer: 65536 });
-  if (createHash('sha256').update(source).digest('hex') !== reviewedDigest)
+  if (createHash('sha256').update(source).digest('hex') !== reviewedSources.get(pkg.commit))
     throw new Error('Pages flow source has not passed host review.');
   const payload = JSON.stringify({ source, operation, input: { ...input, projectId, layerInstanceId: instanceId, sourceCommit: pkg.commit } });
   if (payload.length > 262144) throw new Error('Pages flow input is too large.');
