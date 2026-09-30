@@ -188,6 +188,7 @@ export function initKnowledge(db) {
     const columns = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(column => column.name));
     if (!columns.has('layer_instance_id')) db.exec(`ALTER TABLE ${table} ADD COLUMN layer_instance_id TEXT`);
   }
+  if (!workColumns.has('layer_instance_id')) db.exec('ALTER TABLE layer_work_items ADD COLUMN layer_instance_id TEXT');
   // Archived work leaves normal planning views without losing its task, runs, review or activity trail.
   for (const column of ['archived_at', 'archived_by']) if (!workColumns.has(column)) db.exec(`ALTER TABLE layer_work_items ADD COLUMN ${column} TEXT`);
 }
@@ -1045,18 +1046,22 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
   const workRow = item => {
     if (!item) return null;
     const context = parse(item.context_json, null);
+    const ownerInstance = item.layer === 'pages' ? pagesInstanceId(db, item.project_id) : null;
+    if (ownerInstance && item.layer_instance_id !== ownerInstance) return null;
+    const workTargets = parse(item.targets_json, []);
+    if (workTargets.some(target => target.layerInstanceId && ['page_map','page','flow'].includes(target.kind) && target.layerInstanceId !== pagesInstanceId(db, item.project_id))) return null;
     const migration = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_work_migration'").get()
       ? db.prepare('SELECT action_id AS actionId, action_revision AS actionRevision, disposition, reason FROM layer_work_migration WHERE project_id = ? AND work_id = ?').get(item.project_id, item.id) : null;
-    return { id: item.id, number: item.number, ref: `W-${item.number}`, layer: item.layer, type: item.type, action: item.action || null, title: item.title, state: item.state,
+    return { id: item.id, number: item.number, ref: `W-${item.number}`, layer: item.layer, layerInstanceId: item.layer_instance_id || null, type: item.type, action: item.action || null, title: item.title, state: item.state,
       status: migration?.disposition === 'blocked' && item.state !== 'done' ? 'blocked' : statusOf(item.state, context), migration, priority: priorities.includes(item.priority) ? item.priority : 'medium',
       assignee: item.assignee_kind ? { kind: item.assignee_kind, id: item.assignee_id || (item.assignee_kind === 'agent' ? item.profile_id : null), label: item.assignee_label } : null,
-      targets: parse(item.targets_json, []), question: parse(item.question_json, null), documents: parse(item.documents_json, []), log: parse(item.log_json, []),
+      targets: workTargets, question: parse(item.question_json, null), documents: parse(item.documents_json, []), log: parse(item.log_json, []),
       createdAt: item.created_at, updatedAt: item.updated_at, profileId: item.profile_id || null, instructions: parse(item.instructions_json, null), context,
       blocks: parse(item.blocks_json, []), checks: parse(item.checks_json, []), project: item.plan_project_id || null, checkpoint: item.checkpoint || null };
   };
   const workById = (projectId, id) => workRow(db.prepare('SELECT * FROM layer_work_items WHERE id = ? AND project_id = ? AND archived_at IS NULL').get(id, projectId));
   function workList(projectId) {
-    const rows = db.prepare('SELECT * FROM layer_work_items WHERE project_id = ? AND archived_at IS NULL ORDER BY number DESC').all(projectId).map(workRow);
+    const rows = db.prepare('SELECT * FROM layer_work_items WHERE project_id = ? AND archived_at IS NULL ORDER BY number DESC').all(projectId).map(workRow).filter(Boolean);
     // Jira's "is blocked by": the open items that list this one in their blocks.
     for (const item of rows) item.blockedBy = rows.filter(other => other.state !== 'done' && other.blocks.includes(item.id)).map(other => other.id);
     return rows;
@@ -1086,8 +1091,9 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     if (!defaultProfile(projectId)) ensureAgents(projectId);
     const targets = (Array.isArray(input.targets) ? input.targets : []).map(target => {
       const record = row(target.id);
-      if (!record || record.project_id !== projectId) fail('A work target was not found.', 404);
-      return { id: record.id, kind: record.kind, label: text(target.label, 160, 'Target') || record.kind };
+      if (!record || record.project_id !== projectId || (pagesKind(record.kind) && record.layer_instance_id !== scope(projectId, record.kind))) fail('A work target was not found.', 404);
+      return { id: record.id, kind: record.kind, label: text(target.label, 160, 'Target') || record.kind,
+        ...(pagesKind(record.kind) && record.layer_instance_id ? { layerInstanceId: record.layer_instance_id } : {}) };
     });
     const question = input.question ? { text: text(input.question.text, 400, 'Question', true), options: lines(input.question.options, 200, 'Option') } : null;
     const installedAction = compiledLocalActions.find(action => action.id === input.action) || actionForProject(db,projectId,input.action);
@@ -1095,6 +1101,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     const definition = catalogs.roles.actions.get(actionId) || (installedAction ? { layer: installedAction.layer, type: installedAction.key === 'edit' ? 'implement' : 'audit', checks: installedAction.checks } : null);
     if (!definition) fail('Action not found.', 404);
     const layer = input.layer ?? definition.layer;
+    const layerInstanceId = layer === 'pages' ? pagesInstanceId(db, projectId) : null;
     const type = input.type ?? definition.type;
     if (!projectLayerDefinition(db,projectId,layer) && !layers.includes(layer)) fail('Unknown layer.');
     if (!workTypes.includes(type)) fail('Unknown work type.');
@@ -1108,12 +1115,12 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     const projectRecord = input.project !== undefined ? (input.project ? get(projectId, input.project) : null) : projectFor(projectId, targets);
     if (input.project && projectRecord?.kind !== 'project') fail('Project not found.', 404);
     db.prepare(`INSERT INTO layer_work_items(id, project_id, number, layer, type, title, state, assignee_kind, assignee_label, targets_json, question_json, documents_json, log_json, created_at, updated_at,
-      context_json, action, assignee_id, profile_id, priority, blocks_json, checks_json, plan_project_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      context_json, action, assignee_id, profile_id, priority, blocks_json, checks_json, plan_project_id, layer_instance_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(id, projectId, number, layer, type, text(input.title, 160, 'Work title', true), input.state || 'ready',
         assignee?.kind || null, assignee?.label || null, JSON.stringify(targets), question ? JSON.stringify(question) : null,
         JSON.stringify(lines(input.documents, 300, 'Document')), JSON.stringify([{ at: created, text: input.logText || `Created by ${author}`, refs: targets.map(target => target.id) }]), created, created,
         input.context && typeof input.context === 'object' ? JSON.stringify(input.context) : null, actionId, assignee?.id || null, assignee?.kind === 'agent' ? assignee.id : null,
-        input.priority || priorityLevel(projectId, type, targets), '[]', JSON.stringify(checks), projectRecord?.id || null);
+        input.priority || priorityLevel(projectId, type, targets), '[]', JSON.stringify(checks), projectRecord?.id || null, layerInstanceId);
     recordNewWorkAction(db, projectId, id, actionId);
     return workById(projectId, id);
   }

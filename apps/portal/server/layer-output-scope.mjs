@@ -53,5 +53,50 @@ export function backfillPagesOutputScope(db) {
     revisions = db.prepare(`UPDATE knowledge_revisions SET layer_instance_id=${target}
       WHERE layer_instance_id IS NULL AND ${target} IS NOT NULL`).run().changes;
   }
-  return { records, revisions, deletions };
+  const work = backfillPagesWorkScope(db);
+  return { records, revisions, deletions, ...work };
+}
+
+function backfillPagesWorkScope(db) {
+  if (!hasTable(db, 'layer_work_items') || !hasColumn(db, 'layer_work_items', 'layer') || !hasColumn(db, 'layer_work_items', 'targets_json'))
+    return { workItems: 0, targets: 0, unresolvedTargets: 0 };
+  addScope(db, 'layer_work_items');
+  const rows = db.prepare('SELECT id,project_id,layer,layer_instance_id,targets_json FROM layer_work_items').all();
+  const record = db.prepare('SELECT kind,layer_instance_id FROM knowledge_records WHERE id=? AND project_id=?');
+  const deleted = hasTable(db, 'knowledge_deletions')
+    ? db.prepare('SELECT kind,layer_instance_id FROM knowledge_deletions WHERE record_id=? AND project_id=?') : null;
+  const update = db.prepare('UPDATE layer_work_items SET layer_instance_id=?, targets_json=? WHERE id=? AND project_id=?');
+  let workItems = 0, targets = 0, unresolvedTargets = 0;
+  for (const row of rows) {
+    const receivingId = row.layer === 'pages' ? pagesInstanceId(db, row.project_id) : null;
+    if (receivingId && row.layer_instance_id && row.layer_instance_id !== receivingId)
+      fail(`Pages Work item ${row.id} belongs to a different instance.`);
+    let parsed;
+    try { parsed = JSON.parse(row.targets_json); } catch { fail(`Work item ${row.id} has invalid targets.`); }
+    if (!Array.isArray(parsed)) fail(`Work item ${row.id} has invalid targets.`);
+    let changed = false;
+    const next = parsed.map(target => {
+      if (!target || typeof target.id !== 'string') return target;
+      const source = record.get(target.id,row.project_id) || deleted?.get(target.id,row.project_id);
+      if (!source || !['page_map','page','flow'].includes(source.kind)) {
+        if (['page_map','page','flow'].includes(target.kind)) {
+          const expected = pagesInstanceId(db, row.project_id);
+          if (target.layerInstanceId && target.layerInstanceId !== expected)
+            fail(`Pages Work target ${target.id} belongs to a different instance.`);
+          if (!target.layerInstanceId) unresolvedTargets++;
+        }
+        return target;
+      }
+      if (target.layerInstanceId && target.layerInstanceId !== source.layer_instance_id)
+        fail(`Pages Work target ${target.id} belongs to a different instance.`);
+      if (target.layerInstanceId === source.layer_instance_id) return target;
+      targets++; changed = true;
+      return { ...target, layerInstanceId: source.layer_instance_id };
+    });
+    if (receivingId && !row.layer_instance_id || changed) {
+      update.run(receivingId || row.layer_instance_id, JSON.stringify(next), row.id, row.project_id);
+      if (receivingId && !row.layer_instance_id) workItems++;
+    }
+  }
+  return { workItems, targets, unresolvedTargets };
 }

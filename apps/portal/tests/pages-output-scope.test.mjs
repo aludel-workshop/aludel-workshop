@@ -23,13 +23,20 @@ test('Pages legacy outputs and tombstones backfill exact instance scope, and cur
       VALUES ('pag-old',1,'{}','owner',?),('pag-old',2,'{}','owner',?),('flw-deleted',1,'{}','owner',?)`).run(stamp,stamp,stamp);
     db.prepare(`INSERT INTO knowledge_deletions(record_id,project_id,kind,parent_id,position,last_revision,data_json,deleted_at)
       VALUES ('flw-deleted','a','flow',NULL,0,1,'{}',?)`).run(stamp);
+    db.prepare(`INSERT INTO layer_work_items(id,project_id,number,layer,type,title,state,targets_json,documents_json,log_json,created_at,updated_at)
+      VALUES ('wrk-legacy','a',1,'pages','design','Review the old page','ready',?, '[]', '[]', ?, ?)`)
+      .run(JSON.stringify([{id:'pag-old',kind:'page',label:'Old page'},{id:'flw-deleted',kind:'flow',label:'Deleted flow'},{id:'sto-unknown',kind:'story',label:'Vision story'},{id:'pag-unknown',kind:'page',label:'Missing historical page'}]),stamp,stamp);
     initLayerContract(db);
     const a = layerInstanceId(db,'a','pages'), b = layerInstanceId(db,'b','pages');
     assert.notEqual(a,b);
     assert.equal(db.prepare("SELECT layer_instance_id FROM knowledge_records WHERE id='pag-old'").get().layer_instance_id,a);
     assert.deepEqual(db.prepare("SELECT DISTINCT layer_instance_id FROM knowledge_revisions WHERE record_id IN ('pag-old','flw-deleted')").all().map(row=>row.layer_instance_id),[a]);
     assert.equal(db.prepare("SELECT layer_instance_id FROM knowledge_deletions WHERE record_id='flw-deleted'").get().layer_instance_id,a);
+    const legacyWork = db.prepare("SELECT layer_instance_id,targets_json FROM layer_work_items WHERE id='wrk-legacy'").get();
+    assert.equal(legacyWork.layer_instance_id,a);
+    assert.deepEqual(JSON.parse(legacyWork.targets_json).map(target=>target.layerInstanceId || null),[a,a,null,null]);
     initLayerContract(db);
+    assert.equal(db.prepare("SELECT targets_json FROM layer_work_items WHERE id='wrk-legacy'").get().targets_json,legacyWork.targets_json);
     assert.equal(layerOutputRead(db,'owner','a','pages','page','pag-old').revision,2);
     assert.throws(()=>layerOutputRead(db,'other','b','pages','page','pag-old'),{status:404});
 
@@ -47,6 +54,16 @@ test('Pages legacy outputs and tombstones backfill exact instance scope, and cur
     assert.throws(()=>initLayerContract(db),/different instance/);
     db.prepare('UPDATE knowledge_records SET layer_instance_id=? WHERE id=?').run(a,page.id);
     know.remove('a',page.id);
+    db.prepare("UPDATE layer_work_items SET layer_instance_id=? WHERE id='wrk-legacy'").run(b);
+    assert.equal(know.workById('a','wrk-legacy'),null);
+    assert.throws(()=>initLayerContract(db),/Work item.*different instance/);
+    db.prepare("UPDATE layer_work_items SET layer_instance_id=? WHERE id='wrk-legacy'").run(a);
+    const foreignTargets = JSON.parse(legacyWork.targets_json);
+    foreignTargets[0].layerInstanceId = b;
+    db.prepare("UPDATE layer_work_items SET targets_json=? WHERE id='wrk-legacy'").run(JSON.stringify(foreignTargets));
+    assert.equal(know.workById('a','wrk-legacy'),null);
+    assert.throws(()=>initLayerContract(db),/Work target.*different instance/);
+    db.prepare("UPDATE layer_work_items SET targets_json=? WHERE id='wrk-legacy'").run(legacyWork.targets_json);
     assert.equal(db.prepare('SELECT layer_instance_id FROM knowledge_deletions WHERE record_id=?').get(page.id).layer_instance_id,a);
   } finally { db.close(); }
 });

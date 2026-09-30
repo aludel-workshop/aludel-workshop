@@ -111,6 +111,11 @@ test('the real Pages connection stages Work and a flow edit closes its untouched
     assert.ok(know.defaultProfile(project.id), 'Work initializes its profile when Pages emits the first task');
     assert.equal(know.workById(project.id, item.id).state, 'suggested');
     const page = know.insert(project.id, 'page', { label: 'Find', icon: 'article', pageType: 'detail', inNav: false, status: 'planned' });
+    const pagesId = db.prepare("SELECT instance_id FROM layer_instances WHERE project_id=? AND layer_key='pages'").get(project.id).instance_id;
+    assert.equal(item.layerInstanceId,pagesId);
+    const pageWork = know.createWork(project.id, { layer: 'pages', type: 'design', title: 'Review Find', targets: [{ id: page.id, label: 'Find page' }], documents: ['Pages review'] });
+    assert.equal(pageWork.layerInstanceId,pagesId);
+    assert.equal(pageWork.targets[0].layerInstanceId,pagesId);
     know.insert(project.id, 'flow', { title: 'Find route', steps: [{ page: page.id, story: story.id, name: 'Find' }] });
     const resolved = reconcilePagesFlow(db, know, project.id);
     assert.ok(resolved.closed.includes(item.id));
