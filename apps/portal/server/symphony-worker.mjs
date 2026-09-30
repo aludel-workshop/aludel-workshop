@@ -17,6 +17,7 @@ import { runPagesFlowCandidate } from './pages-flow-runner.mjs';
 import { activeLayerTopology, discoverySourceSnapshot } from './layer-discovery.mjs';
 import { applyDiscoveryProposal } from './layer-space.mjs';
 import { checkFollowUps, layerWorkScope, recordFollowUps, requireElevated } from './layer-scope.mjs';
+import { checkDraftCurrent, draftChanges, initLayerApi, layerApi, stageOperation } from './layer-api.mjs';
 
 const hash = value => createHash('sha256').update(value).digest('hex');
 const now = () => new Date().toISOString();
@@ -27,6 +28,7 @@ const validChecks = checks => Array.isArray(checks) && checks.length <= 30 && ch
   ['passed', 'failed', 'skipped'].includes(check.status) && (check.detail === undefined || typeof check.detail === 'string' && check.detail.length <= 500));
 
 export function initSymphonyWorker(db) {
+  initLayerApi(db);
   db.exec(`CREATE TABLE IF NOT EXISTS symphony_worker_tokens (
     token_hash TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id), profile_id TEXT NOT NULL,
     created_by TEXT NOT NULL REFERENCES users(id), created_at TEXT NOT NULL, expires_at TEXT NOT NULL, last_seen_at TEXT
@@ -245,7 +247,9 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     const instructions = know.agentExport(projectId);
     const followUpLayers = db.prepare(`SELECT i.layer_key AS key, COALESCE(d.name, i.layer_key) AS name FROM layer_instances i
       LEFT JOIN layer_definitions d ON d.project_id = i.project_id AND d.layer_key = i.layer_key WHERE i.project_id = ? AND i.enabled = 1 ORDER BY i.layer_key`).all(projectId);
-    return persist(projectId, profileId, entry.id, batchId, { layerPackage, flowInputs, controlPins, codeObservation: pinnedObservation(projectId, entry, commit), layerDiscovery: null,
+    const api = layerApi(db, projectId, entry.layer);
+    if (!api || api.commit !== scope.commit) fail('This layer publishes no reviewed API for agents.', 409);
+    return persist(projectId, profileId, entry.id, batchId, { layerPackage, layerApi: { commit: api.commit, spec: api.spec }, flowInputs, controlPins, codeObservation: pinnedObservation(projectId, entry, commit), layerDiscovery: null,
       schemaVersion: 1, project: project(projectId), work: entry, batch: { id: batchId },
       sources: [...targets, ...flowInputs.map(ref => know.get(projectId, ref.id)).filter(Boolean), ...docs], briefRevision: null,
       sharedDocs: know.list(projectId, 'doc').filter(doc => doc.agents).map(doc => ({ id: doc.id, revision: doc.revision })), instructionPins: know.instructionPins(projectId, workerProfile, null),
@@ -621,77 +625,55 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     });
     return { attemptId, reportId: id, report: submission };
   }
-  // ---- DEC-057 layer change sets: changes to the item's own layer, notes, and follow-ups for any installed layer ----
-  const flowStep = (projectId, step) => step && typeof step === 'object' && typeof step.page === 'string' && know.get(projectId, step.page)?.kind === 'page' &&
-    typeof step.name === 'string' && step.name.trim() && step.name.length <= 60 && (!step.trigger || typeof step.trigger === 'string' && step.trigger.length <= 80) &&
-    (step.story == null || typeof step.story === 'string' && know.get(projectId, step.story)?.kind === 'story') &&
-    (step.persona == null || typeof step.persona === 'string' && know.get(projectId, step.persona)?.kind === 'persona') &&
-    (step.why == null || typeof step.why === 'string' && step.why.length <= 300);
-  // Each change is checked by its owning adapter; a revision runs the layer's reviewed rule against current records.
-  function checkLayerChange(projectId, bundle, workId, change) {
-    const allowed = bundle.guidance.layerScope.changes[change?.kind];
-    if (!allowed?.includes(change?.op)) fail(`This task may change only ${Object.entries(bundle.guidance.layerScope.changes).map(([kind, ops]) => `${kind} (${ops.join('/')})`).join(', ')} in its own layer.`);
-    const next = { title: change.title, steps: change.steps };
-    if (typeof next.title !== 'string' || !next.title.trim() || next.title.length > 60 || !Array.isArray(next.steps) || next.steps.length > 40)
-      fail('A flow change needs a title and no more than forty steps.');
-    if (change.op === 'create') {
-      if (!next.steps.length || next.steps.length > 20 || !next.steps.every(step => flowStep(projectId, step)))
-        fail('A new flow needs one to twenty bounded steps through existing pages.');
-      const refs = next.steps.flatMap(step => [step.page, step.story, step.persona]).filter(Boolean).map(id => know.get(projectId, id))
-        .map(record => ({ id: record.id, kind: record.kind, revision: record.revision }));
-      return { kind: 'flow', op: 'create', title: next.title.trim(), steps: next.steps, requires: refs };
-    }
-    if (typeof change.id !== 'string' || know.get(projectId, change.id)?.kind !== 'flow') fail('A flow revision names an existing flow.');
-    const pinned = bundle.sources.find(source => source.id === change.id);
-    const snapshot = pagesFlowSnapshot(db, know, projectId, change.id, next);
-    if (pinned && pinned.revision !== snapshot.current.revision) fail('A flow pinned for this task changed. Authorize a fresh run.', 409);
-    const semanticChange = runPagesFlowCandidate(db, projectId, 'propose', { workId, ...snapshot, next });
-    const semanticReview = runPagesFlowCandidate(db, projectId, 'review', { change: semanticChange, ...snapshot });
-    return { kind: 'flow', op: 'revise', id: change.id, title: next.title.trim(), steps: next.steps, semanticChange, semanticReview, requires: semanticChange.usedInputs };
+  // ---- Layer-scoped runs (DEC-057, PAGES-API-01): the agent calls its layer's API; each write stages in this run's draft ----
+  function runLayerApi(scope, row, bundle) {
+    const api = layerApi(db, scope.projectId, bundle.guidance.layerScope.key);
+    if (!api || api.commit !== bundle.guidance.layerScope.commit) fail(`The ${bundle.guidance.layerScope.key} layer source changed. Authorize a fresh run.`, 409);
+    return api;
+  }
+  function callLayer(scope, { attemptId, operation, id = null, body = {} }) {
+    const row = attempt(scope, attemptId);
+    const bundle = saved(scope, row.bundle_digest);
+    const issue = current(scope, row.work_id);
+    if (!bundle.guidance.layerScope || !issue || issue.native_ref.attempt_id !== attemptId || row.state !== 'working' || row.runs_started < 1)
+      fail('This attempt cannot call its layer API now.', 409);
+    if (typeof operation !== 'string' || !body || typeof body !== 'object' || Array.isArray(body)) fail('Name an operation and pass its body.');
+    return stageOperation({ db, catalogs: know.catalogs, api: runLayerApi(scope, row, bundle), projectId: scope.projectId, attemptId, operationId: operation, id, body });
   }
   function submitLayerChanges(scope, row, bundle, proposal) {
     const content = proposal.content;
-    const layer = bundle.guidance.layerScope;
-    if (layerPackageForProject(db, scope.projectId, layer.key)?.commit !== layer.commit) fail(`The ${layer.key} layer source changed. Authorize a fresh run.`, 409);
-    if (!Array.isArray(content.changes || []) || (content.changes || []).length > 10) fail('Submit at most ten changes.');
+    if (content.changes !== undefined) fail('Make changes by calling the layer API (aludel_layer_call); the submission carries notes and follow-ups.');
     if (content.notes !== undefined && (typeof content.notes !== 'string' || content.notes.length > 4000)) fail('Notes must be text under 4000 characters.');
     const followUps = checkFollowUps(db, scope.projectId, proposal.followUps);
-    const changes = (content.changes || []).map(change => checkLayerChange(scope.projectId, bundle, row.work_id, change));
-    if (!changes.length && !content.notes?.trim() && !followUps.length) fail('Submit at least one change, a note, or a follow-up.');
-    const revised = changes.filter(change => change.op === 'revise').map(change => change.id);
-    if (new Set(revised).size !== revised.length) fail('Revise each flow at most once per submission.');
+    checkDraftCurrent(db, runLayerApi(scope, row, bundle), scope.projectId, row.id);
+    const changes = draftChanges(db, scope.projectId, row.id);
+    if (!changes.length && !content.notes?.trim() && !followUps.length) fail('Stage at least one change, or submit a note or a follow-up.');
     const usedInputs = proposal.usedInputs || [];
     if (!Array.isArray(usedInputs) || usedInputs.length > 200 || !usedInputs.every(ref => ref && typeof ref.id === 'string' && Number.isInteger(ref.revision) && ref.revision > 0))
       fail('Invalid used inputs.');
-    for (const change of changes) for (const ref of change.requires) if (!usedInputs.some(input => input.id === ref.id && input.revision === ref.revision))
-      fail('Include every record a change cites, at its current revision, in used inputs.', 409);
-    for (const target of bundle.work.targets || []) if (!usedInputs.some(ref => ref.id === target.id && ref.revision === bundle.sources.find(source => source.id === target.id)?.revision))
-      fail('Include each pinned target and its revision in used inputs.');
     for (const ref of usedInputs) if (knowledgeRead(scope, row.bundle_digest, ref.id, ref.revision).currentRevision !== ref.revision)
       fail('A used record changed; reassess before submitting.', 409);
-    return { changes: changes.map(({ requires, ...change }) => change), notes: content.notes?.trim() || '', followUps, usedInputs };
+    return { changes, notes: content.notes?.trim() || '', followUps, usedInputs };
   }
+  // Commits the reviewed draft as it was reviewed, only if nothing it read or changes moved on.
   function acceptLayerChanges(user, projectId, entry, submitted, bundle, options) {
-    const layer = bundle.guidance.layerScope;
-    if (layerPackageForProject(db, projectId, layer.key)?.commit !== layer.commit) fail(`The ${layer.key} layer source changed. Send this back.`, 409);
     if (bundle.codeObservation && !codeObservationCurrent(projectId, bundle.codeObservation)) fail('The reviewed Code relation changed. Send this back.', 409);
     for (const control of bundle.controlPins || []) {
       const policy = db.prepare('SELECT revision, status FROM layer_connections WHERE id = ? AND project_id = ?').get(control.id, projectId);
       if (!policy || policy.revision !== control.revision || policy.status !== 'active') fail('The originating layer policy changed. Send this back.', 409);
     }
     for (const ref of submitted.usedInputs || []) if (know.get(projectId, ref.id)?.revision !== ref.revision) fail('A used input changed. Send this back.', 409);
-    const applied = [];
-    for (const change of submitted.changes) {
-      if (change.op === 'create') {
-        applied.push(know.insert(projectId, 'flow', { title: change.title, steps: change.steps, review: { state: 'none', work: entry.ref } }, options).id);
-        continue;
-      }
-      const snapshot = pagesFlowSnapshot(db, know, projectId, change.id, { title: change.title, steps: change.steps });
-      const review = runPagesFlowCandidate(db, projectId, 'review', { change: change.semanticChange, ...snapshot });
-      if (change.semanticChange.workId !== entry.id || JSON.stringify(review) !== JSON.stringify(change.semanticReview)) fail('A reviewed flow result changed. Send this back.', 409);
-      applied.push(know.update(projectId, change.id, review.after, { ...options, expectedRevision: review.target.expectedRevision }).id);
-    }
-    return applied;
+    const api = layerApi(db, projectId, bundle.guidance.layerScope.key);
+    if (!api || api.commit !== bundle.guidance.layerScope.commit) fail(`The ${bundle.guidance.layerScope.key} layer source changed. Send this back.`, 409);
+    const attemptId = db.prepare('SELECT attempt_id FROM symphony_proposals WHERE id = ?').get(submitted.id).attempt_id;
+    checkDraftCurrent(db, api, projectId, attemptId);
+    const staged = draftChanges(db, projectId, attemptId);
+    if (JSON.stringify(staged) !== JSON.stringify(submitted.changes)) fail('The staged changes differ from what was reviewed. Send this back.', 409);
+    // References were checked against current records and the draft above; created records go first so updates can point at them.
+    const ordered = [...submitted.changes].sort((a, b) => (a.op === 'create' ? 0 : 1) - (b.op === 'create' ? 0 : 1));
+    return ordered.map(change => change.op === 'create'
+      ? know.insert(projectId, change.kind, change.after, { ...options, id: change.id, prepared: { data: change.after, references: [] } }).id
+      : know.update(projectId, change.id, change.after, { ...options, expectedRevision: change.baseRevision, prepared: { data: change.after, references: [] } }).id);
   }
   function readOnlyWorkspace(row, bundle) {
     let clean, head;
@@ -1014,5 +996,5 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     const page = ready.slice(0, limit);
     return { issues: page, nextCursor: ready.length > limit ? page.at(-1).id : null };
   }
-  return { ensurePool, poolStatus, configurePool, heartbeat, scopeForDigest, scopeForAttempt, pinnedCurrent, issueToken, revoke, status, hasConnection, authenticate, pin, saved, activeBundle, taskOpen, knowledgeMap, knowledgeSearch, knowledgeRead, current, issues, registerWorkspace, reserveRun, submitCandidate, submitAudit, submitProposal, acceptProposal, rejectProposal, askQuestion, commitCandidate, appendEvent, attemptStatus, attemptForWork, extendRuns };
+  return { ensurePool, poolStatus, configurePool, heartbeat, scopeForDigest, scopeForAttempt, pinnedCurrent, issueToken, revoke, status, hasConnection, authenticate, pin, saved, activeBundle, taskOpen, knowledgeMap, knowledgeSearch, knowledgeRead, current, issues, registerWorkspace, reserveRun, submitCandidate, submitAudit, submitProposal, acceptProposal, rejectProposal, callLayer, askQuestion, commitCandidate, appendEvent, attemptStatus, attemptForWork, extendRuns };
 }

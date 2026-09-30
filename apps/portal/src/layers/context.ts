@@ -100,8 +100,10 @@ export interface WorkItem { id: string; number: number; ref: string; layer: stri
 export interface FieldChange { field: string; before: unknown; after: unknown; }
 // WORK-ITEM-UX-01: one started run of a work item, with the task it was given, what it produced and how it was signed.
 export type WorkRunState = 'working' | 'needs' | 'review' | 'failed' | 'stopped' | 'accepted' | 'sent' | 'closed';
-export interface RunChange { id: string; kind: 'claim' | 'proposal' | 'flow' | 'flow-revision' | 'report' | 'file'; icon: string; name: string; op: 'created' | 'modified' | 'removed'; size: string;
-  before?: string | null; after?: string; note?: string; basis?: string; content?: Record<string, unknown>; findings?: { severity: string; title: string; affected: string; evidence: string; recommendation: string }[]; candidateId?: string; }
+export interface RunChange { id: string; kind: 'claim' | 'proposal' | 'flow' | 'flow-revision' | 'record' | 'report' | 'file'; icon: string; name: string; op: 'created' | 'modified' | 'removed'; size: string;
+  before?: string | null; after?: string; note?: string; basis?: string; content?: Record<string, unknown>; findings?: { severity: string; title: string; affected: string; evidence: string; recommendation: string }[]; candidateId?: string;
+  // PAGES-API-01: the fields a layer API change sets, before and after.
+  fields?: { name: string; before: string | null; after: string }[]; }
 export interface RunStep { seq: number; kind: 'plan' | 'progress' | 'note'; at: string; objectives?: string[]; index?: number; status?: 'active' | 'done' | 'stuck'; note?: string; text?: string; }
 // DEC-057: work an agent proposed for another (or its own) layer; the reviewer creates or dismisses each one.
 export interface RunFollowUp { id: string; position: number; layer: string; layerName: string; sourceLayer: string; title: string; brief: string; why: string;

@@ -12,6 +12,7 @@ import { join } from 'node:path';
 import { requireMember } from './accounts.mjs';
 import { actionGrant, recordNewWorkAction } from './lat08-migration.mjs';
 import { hasElevated, layerDefaultAssignee, layerWorkScope } from './layer-scope.mjs';
+import { layerApi, normalizeRecord } from './layer-api.mjs';
 import { compiledLocalActions } from './lat07-actions.mjs';
 import { actionForProject, actionsForDefinition, projectLayerDefinition, projectLayerDefinitions } from './layer-registry.mjs';
 import { cleanBrandAsset, cleanComponent, cleanTokens, componentStatus, ensureDesign as seedDesign, syncTokensFromLook } from './design.mjs';
@@ -505,17 +506,25 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     return current;
   };
 
-  function insert(projectId, kind, data, { parentId = null, position, author = 'Aludel', rationale = null, workItemId = null } = {}) {
+  // PAGES-API-01: an installed layer API owns its outputs' rules; `prepared` is a record its operation already normalized.
+  const layerRules = (projectId, kind, data, prepared) => {
+    if (!pagesKind(kind)) return null;
+    if (prepared) return prepared;
+    const api = layerApi(db, projectId, 'pages');
+    return api ? normalizeRecord(api, kind, data, catalogs) : null;
+  };
+  function insert(projectId, kind, data, { parentId = null, position, author = 'Aludel', rationale = null, workItemId = null, id: givenId = null, prepared = null } = {}) {
     if (!kinds.includes(kind)) fail('Unknown record kind.');
-    const clean = validators[kind](data, catalogs);
+    const rules = layerRules(projectId, kind, data, prepared);
+    const clean = rules ? rules.data : validators[kind](data, catalogs);
     if (kind === 'routine') checkRoutineAction(projectId, clean);
-    checkReferences(projectId, kind, clean);
+    if (rules) checkReferenceList(projectId, rules.references); else checkReferences(projectId, kind, clean);
     checkDesign(projectId, kind, clean, { parentId });
     if (['story', 'spec', 'project'].includes(kind) && !clean.number) clean.number = counter(projectId, kind);
     if (kind === 'brief_claim') counter(projectId, 'brief');
     const instanceId = scope(projectId, kind);
     if (parentId && !db.prepare('SELECT 1 FROM knowledge_records WHERE id = ? AND project_id = ? AND (layer_instance_id IS NULL OR layer_instance_id = ?)').get(parentId, projectId, instanceId)) fail('Parent record not found.', 404);
-    const id = newId(kind);
+    const id = prepared && /^[a-z]+-[a-z0-9]{6,12}$/.test(String(givenId)) && !row(givenId) ? givenId : newId(kind);
     const created = now();
     const place = position ?? ((db.prepare('SELECT MAX(position) AS max FROM knowledge_records WHERE project_id = ? AND kind = ? AND COALESCE(parent_id, \'\') = COALESCE(?, \'\')').get(projectId, kind, parentId)?.max ?? -1) + 1);
     db.prepare('INSERT INTO knowledge_records(id, project_id, kind, parent_id, position, data_json, revision, created_at, updated_at, layer_instance_id) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)')
@@ -534,8 +543,9 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     if (!action || action.legacy || !action.humanRunnable) fail('Choose a configured domain action before enabling this routine.', 409);
   }
 
-  function checkReferences(projectId, kind, clean) {
-    for (const [id, expected] of references[kind]?.(clean) || []) {
+  function checkReferences(projectId, kind, clean) { checkReferenceList(projectId, references[kind]?.(clean) || []); }
+  function checkReferenceList(projectId, list) {
+    for (const [id, expected] of list) {
       const target = row(id);
       const allowed = Array.isArray(expected) ? expected : [expected];
       if (!target || target.project_id !== projectId || (pagesKind(target.kind) && target.layer_instance_id !== scope(projectId, target.kind)) || !allowed.includes(target.kind)) fail(`A linked ${Array.isArray(expected) ? 'record' : expected.replace('_', ' ')} was not found.`, 404);
@@ -553,13 +563,14 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     }
   }
 
-  function update(projectId, id, changes, { expectedRevision, author = 'Aludel', rationale = null, workItemId = null, position, parentId } = {}) {
+  function update(projectId, id, changes, { expectedRevision, author = 'Aludel', rationale = null, workItemId = null, position, parentId, prepared = null } = {}) {
     const current = row(id);
     if (!current || current.project_id !== projectId || (pagesKind(current.kind) && current.layer_instance_id !== scope(projectId, current.kind))) fail('Record not found.', 404);
     if (expectedRevision !== undefined && Number(expectedRevision) !== current.revision) fail('This record changed since you opened it. Reload to see the latest; your edit is kept.', 409);
-    const merged = validators[current.kind]({ ...parse(current.data_json, {}), ...changes }, catalogs);
+    const rules = layerRules(projectId, current.kind, { ...parse(current.data_json, {}), ...changes }, prepared);
+    const merged = rules ? rules.data : validators[current.kind]({ ...parse(current.data_json, {}), ...changes }, catalogs);
     if (current.kind === 'routine') checkRoutineAction(projectId, merged);
-    checkReferences(projectId, current.kind, merged);
+    if (rules) checkReferenceList(projectId, rules.references); else checkReferences(projectId, current.kind, merged);
     checkDesign(projectId, current.kind, merged, { id, parentId: parentId ?? current.parent_id });
     if (current.kind === 'project') checkProjectDeps(projectId, id, merged.deps);
     const contentChanged = JSON.stringify(merged) !== current.data_json;
@@ -1729,7 +1740,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     }
   }
 
-  return { ensureFlows, requestPageChange, reviewFlow, ensureDesign, syncDesignFromLook, addBrandTemplate, ensureProject, ensureAgents, ensureRoles, ensurePackData, ensureBrief, ensurePlan, ensureLibrary, addComment, generateDoc, briefRevision, mayDo, projectFor, insert, update, remove, list, get, view, navRoutes, seedPages, saveNavRoutes, applyPacks, createWork, updateWork, appendLog,
+  return { catalogs, ensureFlows, requestPageChange, reviewFlow, ensureDesign, syncDesignFromLook, addBrandTemplate, ensureProject, ensureAgents, ensureRoles, ensurePackData, ensureBrief, ensurePlan, ensureLibrary, addComment, generateDoc, briefRevision, mayDo, projectFor, insert, update, remove, list, get, view, navRoutes, seedPages, saveNavRoutes, applyPacks, createWork, updateWork, appendLog,
     setWorkContext, workList, workById, blockersOf, workChanges, recordBuild, history, revisionData, revisionAt, kinds, openApi, referrers, openWorkItem, applyAnswer, suggestions, syncBacklog,
     migrateWork, ensureRoutines, runRoutines, instructionPins, actionRecord, actionIdFor, roleView, resolveAssignee, defaultProfile, members, agentExport,
     onRevision: listener => revisionListeners.push(listener), onWorkDone: listener => doneListeners.push(listener) };

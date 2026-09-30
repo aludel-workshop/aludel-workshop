@@ -9,7 +9,7 @@ function compileLayerTask(bundle) {
   const { project, work, guidance, sources, repository, instructionPins, layerPackage } = bundle;
   const scope = guidance.layerScope;
   if (!project?.id || !work?.id || !guidance?.profile?.revision || !/^[a-f0-9]{40}$/.test(repository?.commit || '') ||
-      !scope?.key || scope.key !== work.layer || !layerPackage || layerPackage.commit !== scope.commit) fail('The task is missing pinned inputs.');
+      !scope?.key || scope.key !== work.layer || !layerPackage || layerPackage.commit !== scope.commit || bundle.layerApi?.commit !== scope.commit) fail('The task is missing pinned inputs.');
   const pinned = (target, list) => {
     const source = sources.find(record => record.id === target.id && record.kind === target.kind);
     if (!source?.revision) fail('A task target has no pinned project revision.');
@@ -18,7 +18,9 @@ function compileLayerTask(bundle) {
   const inputs = [];
   for (const target of work.targets || []) pinned(target, inputs);
   for (const ref of bundle.flowInputs || []) pinned(ref, inputs);
-  const changes = Object.entries(scope.changes).map(([kind, operations]) => ({ kind, operations }));
+  const spec = bundle.layerApi.spec;
+  const operations = Object.entries(spec.paths).flatMap(([path, item]) => Object.entries(item).filter(([, op]) => op?.operationId).map(([method, op]) => ({
+    operationId: op.operationId, method: method.toUpperCase(), path, summary: op.summary || '', writes: op['x-aludel-output'] || null, reads: op['x-aludel-read']?.kind || null })));
   return {
     schemaVersion: 'aludel-task-open-v2',
     identity: { projectId: project.id, workId: work.id, workRef: work.ref, batchId: bundle.batch.id },
@@ -28,7 +30,8 @@ function compileLayerTask(bundle) {
       profile: { id: guidance.profile.id, revision: guidance.profile.revision, name: guidance.profile.name, provider: guidance.profile.provider || 'codex', model: guidance.profile.model || '', effort: guidance.profile.effort || 'medium' } },
     guidance: { project: guidance.project, profile: guidance.profile.instructions,
       method: `Do this task as the ${scope.key} layer. Its charter and Knowledge below are your method. Read whatever project records help (reads are project-wide). ` +
-        'Change only the output kinds listed under outputs, in this layer; every change is checked by its owning validator and waits for an elevated reviewer. ' +
+        `Change ${scope.key} data only by calling its API with aludel_layer_call (operation, id for a path id, body). The API document under layerApi defines every operation and schema. ` +
+        'Your writes are staged for this run, reads include what you staged, and nothing applies until an elevated reviewer accepts the run. ' +
         'If something outside this layer should change, or a separate task would help, propose it as a follow-up with a clear reason instead of doing it. ' +
         'Ask a question when a decision blocks the result. Do not change project records or repository files directly.' },
     layerSource: { key: layerPackage.key, instanceId: layerPackage.instanceId, commit: layerPackage.commit, charter: layerPackage.charter,
@@ -40,11 +43,11 @@ function compileLayerTask(bundle) {
     requiredInputs: inputs,
     contextSeeds: sources.filter(record => record.kind === 'doc' && !(work.targets || []).some(target => target.id === record.id))
       .slice(0, 12).map(record => ({ id: record.id, kind: record.kind, revision: record.revision, summary: summary(record) })),
-    outputs: [{ key: 'changes', kind: 'layer_change_set', operation: 'submit_for_review', reviewer: `elevated ${scope.key} reviewer`, changes,
-      shape: 'summary; content: { changes[0..10]: { kind, op: create|revise, id? (revise), title, steps[{page, name, trigger?, story?, persona?, why?}] }, notes? }; ' +
-        'followUps[0..5]: { layer, title, brief, why }; usedInputs: every record a change cites, at its current revision',
+    layerApi: spec,
+    outputs: [{ key: 'changes', kind: 'layer_api_draft', operation: 'submit_for_review', reviewer: `elevated ${scope.key} reviewer`, operations,
+      shape: 'Stage changes with aludel_layer_call, then aludel_submit_proposal { summary; content: { notes? }; followUps[0..5]: { layer, title, brief, why }; usedInputs? }',
       followUpLayers: guidance.followUpLayers || [], checks: (work.checks || []).map(check => check.text) }],
-    capabilities: { knowledge: ['map', 'search', 'read'], repository: 'read-only pinned commit', submit: 'layer_change_set' },
+    capabilities: { knowledge: ['map', 'search', 'read'], layerApi: scope.key, repository: 'read-only pinned commit', submit: 'layer_api_draft' },
     runtime: { authorization: 'Go-pinned attempt', repositoryCommit: repository.commit, instructionPins, staleInputs: 'withdraw this attempt when a pinned input changes' }
   };
 }

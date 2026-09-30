@@ -58,16 +58,22 @@ export function workRuns({ db, know, candidates = null }) {
       const vision = content.visionProposal || (proposal.action_id === 'product.brief'
         ? parse(db.prepare('SELECT content_json FROM vision_proposals WHERE id = ?').get(proposal.id)?.content_json, null) : null);
       if (content.scope === 'layer') {
-        // DEC-057: one row per change in the layer's change set; notes read as a report.
-        content.changes.forEach((change, index) => {
-          const name = `${layerName(projectId, content.layer)} › Flow › ${change.op === 'revise' ? change.semanticReview.before.title : change.title}`;
-          if (change.op === 'revise') changes.push({ id: `${proposal.id}:${index}`, kind: 'flow-revision', icon: 'route', name, op: 'modified',
-            size: `r${change.semanticReview.target.expectedRevision} → r${change.semanticReview.target.acceptedRevision}`,
-            before: JSON.stringify(change.semanticReview.before, null, 2), after: JSON.stringify(change.semanticReview.after, null, 2) });
-          else changes.push({ id: `${proposal.id}:${index}`, kind: 'flow', icon: 'route', name, op: 'created',
-            size: `${change.steps.length} ${change.steps.length === 1 ? 'step' : 'steps'}`, after: JSON.stringify({ title: change.title, steps: change.steps }, null, 2) });
-        });
-        if (content.notes) changes.push({ id: `${proposal.id}:notes`, kind: 'report', icon: 'notes', name: 'Notes', op: 'created', size: '', after: content.notes, findings: [] });
+        // PAGES-API-01: one row per record the run's API calls changed, with the fields that differ.
+        const kindName = { page: 'Page', flow: 'Flow', page_map: 'Map' };
+        // Record IDs read as their names, so a reviewer sees "Browse tools (pag-…)" rather than an ID.
+        const named = id => { const record = know.get(projectId, id); const label = record && (record.title || record.label || record.name || record.text); return label ? `${label} (${id})` : id; };
+        const show = value => typeof value === 'string' ? named(value) : JSON.stringify(value, (key, entry) => typeof entry === 'string' && /^[a-z]+-[a-z0-9]{6,12}$/.test(entry) ? named(entry) : entry, 2);
+        const empty = value => value === null || value === '' || Array.isArray(value) && !value.length || value && typeof value === 'object' && !Array.isArray(value) && !Object.keys(value).length;
+        for (const change of content.changes) {
+          const keys = [...new Set([...Object.keys(change.before || {}), ...Object.keys(change.after || {})])];
+          const fields = keys.filter(key => JSON.stringify(change.before?.[key]) !== JSON.stringify(change.after?.[key]) && !(change.op === 'create' && empty(change.after?.[key])))
+            .map(key => ({ name: key, before: change.before ? show(change.before[key] ?? '') : null, after: show(change.after?.[key] ?? '') }));
+          const label = change.after?.title || change.after?.label || (change.kind === 'page_map' ? 'Placement' : change.id);
+          changes.push({ id: `${proposal.id}:${change.id}`, kind: 'record', icon: change.kind === 'flow' ? 'route' : change.kind === 'page_map' ? 'map' : 'web',
+            name: `${layerName(projectId, content.layer)} › ${kindName[change.kind] || change.kind} › ${label}`, op: change.op === 'create' ? 'created' : 'modified',
+            size: change.op === 'create' ? '' : `${fields.length} ${fields.length === 1 ? 'field' : 'fields'} · r${change.baseRevision}`, fields });
+        }
+        if (content.notes) changes.push({ id: `${proposal.id}:notes`, kind: 'report', icon: 'notes', name: 'Notes', op: 'created', size: '', after: content.notes });
       } else if (vision) changes.push({ id: proposal.id, kind: 'claim', icon: 'lightbulb', name: `Vision › Brief › ${sectionName(vision.section)}`,
         op: vision.targetId ? 'modified' : 'created', size: '1 claim', before: vision.beforeText || null, after: vision.text, note: vision.note || '', basis: vision.basis || '' });
       else if (proposal.action_id === 'pages.flows' && content.semanticReview) {

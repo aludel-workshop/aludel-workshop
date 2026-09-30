@@ -671,6 +671,7 @@ test('an existing-flow agent task waits for a reviewed Pages package but still n
 
 // ---- DEC-057: layer-scoped Work, elevated access and agent follow-ups ----
 import { decideFollowUp, initLayerScope, layerAccess, setLayerDefaultAssignee, setLayerElevated } from '../server/layer-scope.mjs';
+import { applyOperation, layerApi } from '../server/layer-api.mjs';
 
 async function withPagesTemplate(run) {
   const data = mkdtempSync(join(tmpdir(), 'aludel-layer-scope-'));
@@ -694,39 +695,40 @@ const layerTask = (f, title, extra = {}) => {
   return f.know.workById(f.projectId, work.id);
 };
 
-test('a layer-scoped Pages task needs no action, writes only Pages flows, and signs follow-ups as the agent from Pages', () => withPagesTemplate(async f => {
+test('a layer-scoped Pages task changes Pages only through its API; review shows fields and follow-ups are signed as the agent from Pages', () => withPagesTemplate(async f => {
   const browse = f.know.insert(f.projectId, 'page', { label: 'Browse', icon: 'article', pageType: 'list', status: 'planned' });
   const detail = f.know.insert(f.projectId, 'page', { label: 'Detail', icon: 'article', pageType: 'detail', status: 'planned' });
   const flow = f.know.insert(f.projectId, 'flow', { title: 'Browse', steps: [{ page: browse.id, name: 'Browse' }] });
   const work = layerTask(f, 'Tighten the browse journey');
   assert.equal(work.action, null);
   assert.equal(work.scope, 'layer');
-  assert.match(work.checks[0].text, /Pages charter/);
   const { issue, card } = f.start(null, [], null, null, false, work);
-  assert.equal(card.schemaVersion, 'aludel-task-open-v2');
-  assert.equal(card.task.layer, 'pages');
-  assert.deepEqual(card.outputs[0].changes, [{ kind: 'flow', operations: ['create', 'revise'] }]);
-  assert.match(card.layerSource.charter, /Pages/);
+  assert.equal(card.layerApi.openapi, '3.1.0');
+  assert.ok(card.outputs[0].operations.some(op => op.operationId === 'updateFlow' && op.writes === 'flow'));
   assert.ok(card.outputs[0].followUpLayers.some(layer => layer.key === 'platform'));
-  const kinds = f.worker.knowledgeMap(f.scope, issue.native_ref.bundle_digest).kinds.map(entry => entry.kind);
-  assert.ok(kinds.includes('flow') && kinds.includes('story'), 'reads are project-wide');
   const attemptId = issue.native_ref.attempt_id;
-  const proposal = { summary: 'Add a detail journey and mark the missing decision step in browse.', content: { changes: [
-    { kind: 'flow', op: 'create', title: 'Inspect detail', steps: [{ page: detail.id, name: 'Read the detail' }] },
-    { kind: 'flow', op: 'revise', id: flow.id, title: 'Browse and decide', steps: [{ page: browse.id, name: 'Browse' }, { page: null, name: 'Decide', why: 'No decision page yet' }] }
-  ], notes: 'The decision step needs a page; Code has no detail route.' },
-  followUps: [{ layer: 'platform', title: 'Build the detail route', brief: 'Implement the Detail page route.', why: 'The new Inspect detail flow needs a built Detail page.' }],
-  usedInputs: [{ id: detail.id, revision: detail.revision }, { id: browse.id, revision: browse.revision }, { id: flow.id, revision: flow.revision }] };
-  assert.throws(() => f.worker.submitProposal(f.scope, { attemptId, proposal: { ...proposal, content: { changes: [{ kind: 'page', op: 'create', title: 'X', steps: [] }] } } }), /may change only flow/);
-  assert.throws(() => f.worker.submitProposal(f.scope, { attemptId, proposal: { ...proposal, followUps: [{ ...proposal.followUps[0], layer: 'nowhere' }] } }), /not installed/);
-  assert.throws(() => f.worker.submitProposal(f.scope, { attemptId, proposal: { ...proposal, usedInputs: proposal.usedInputs.slice(1) } }), /every record a change cites/);
-  const submitted = f.worker.submitProposal(f.scope, { attemptId, proposal });
+  const call = (operation, body = {}, id = null) => f.worker.callLayer(f.scope, { attemptId, operation, id, body });
+  assert.throws(() => call('createFlow', { flow: { title: 'x'.repeat(61) } }), /Flow name must be under 60 characters/);
+  assert.throws(() => call('createFlow', { flow: { title: 'Ghost', steps: [{ page: 'pag-00000000', name: 'Nowhere' }] } }), /linked page was not found/);
+  assert.throws(() => call('createFlow', { flow: { title: 'Extra', owner: 'me' } }), /Unknown field/);
+  assert.throws(() => call('updatePage', { changes: { label: 'x' } }, flow.id), /not found/);
+  assert.throws(() => call('deleteEverything'), /no operation/);
+  const created = call('createFlow', { flow: { title: 'Inspect detail', steps: [{ page: detail.id, name: 'Read the detail' }] } });
+  assert.equal(created.staged.op, 'create');
+  assert.ok(call('listFlows').result.some(entry => entry.id === created.staged.id), 'reads include staged changes');
+  call('updateFlow', { expectedRevision: flow.revision, changes: { title: 'Browse and decide', steps: [{ page: browse.id, name: 'Browse' }, { page: null, name: 'Decide', why: 'No decision page yet' }] } }, flow.id);
+  assert.equal(call('getFlow', {}, flow.id).result.data.title, 'Browse and decide');
   assert.equal(f.know.list(f.projectId, 'flow').length, 1, 'nothing is applied before review');
   assert.equal(f.know.get(f.projectId, flow.id).revision, flow.revision);
+  const proposal = { summary: 'Add a detail journey and mark the missing decision step in browse.', content: { notes: 'The decision step needs a page.' },
+    followUps: [{ layer: 'platform', title: 'Build the detail route', brief: 'Implement the Detail page route.', why: 'The new Inspect detail flow needs a built Detail page.' }] };
+  assert.throws(() => f.worker.submitProposal(f.scope, { attemptId, proposal: { ...proposal, content: { changes: [] } } }), /aludel_layer_call/);
+  const submitted = f.worker.submitProposal(f.scope, { attemptId, proposal });
+  assert.throws(() => call('createFlow', { flow: { title: 'Late' } }), /cannot call/);
 
   const run = workRuns({ db: f.db, know: f.know }).list(f.projectId, work.id)[0];
-  assert.deepEqual(run.changes.map(change => change.kind), ['flow', 'flow-revision', 'report']);
-  assert.equal(run.followUps.length, 1);
+  assert.deepEqual(run.changes.map(change => [change.kind, change.op]), [['record', 'created'], ['record', 'modified'], ['report', 'created']]);
+  assert.deepEqual(run.changes[1].fields.map(field => field.name), ['title', 'steps']);
   assert.equal(run.followUps[0].state, 'proposed');
 
   const member = addMember(f, 'designer@example.com');
@@ -736,46 +738,73 @@ test('a layer-scoped Pages task needs no action, writes only Pages flows, and si
   assert.throws(() => setLayerElevated(f.db, member, f.projectId, { userId: member.id, layerKey: 'pages', enabled: true }), /owner required/);
   setLayerElevated(f.db, f.owner, f.projectId, { userId: member.id, layerKey: 'pages', enabled: true });
   assert.ok(layerAccess(f.db, member, f.projectId, 'pages').people.find(person => person.id === member.id).elevated);
-
   const accepted = f.worker.acceptProposal(member, f.projectId, work.id, submitted.proposalId);
   assert.equal(accepted.applied.length, 2);
-  assert.equal(f.know.list(f.projectId, 'flow').length, 2);
+  assert.equal(f.know.get(f.projectId, created.staged.id).title, 'Inspect detail', 'the staged ID is the accepted ID');
   assert.equal(f.know.get(f.projectId, flow.id).revision, flow.revision + 1);
   assert.equal(f.know.get(f.projectId, flow.id).steps[1].page, null);
+  assert.equal(f.db.prepare('SELECT work_item_id FROM knowledge_revisions WHERE record_id = ? AND revision = ?').get(flow.id, flow.revision + 1).work_item_id, work.id);
   assert.equal(f.know.workById(f.projectId, work.id).state, 'done');
 
   const decided = decideFollowUp(f.db, f.know, member, f.projectId, work.id, run.followUps[0].id, 'create');
   assert.equal(decided.work.layer, 'platform');
   assert.equal(decided.work.state, 'suggested');
   assert.equal(decided.work.scope, 'layer');
-  assert.equal(decided.work.action, null);
   assert.deepEqual({ kind: decided.work.context.createdBy.kind, profileId: decided.work.context.createdBy.profileId, layer: decided.work.context.createdBy.layer, workRef: decided.work.context.createdBy.workRef },
     { kind: 'agent', profileId: f.profile.id, layer: 'pages', workRef: work.ref });
   assert.match(decided.work.log[0].text, /from the Pages layer as a follow-up to W-\d+; accepted by designer/);
   assert.equal(decideFollowUp(f.db, f.know, member, f.projectId, work.id, run.followUps[0].id, 'dismiss').followUp.state, 'created', 'a decided follow-up stays decided');
-  assert.equal(workRuns({ db: f.db, know: f.know }).list(f.projectId, work.id)[0].followUps[0].createdRef, decided.work.ref);
 }));
 
-test('a layer-scoped change set is withdrawn on stale input and changed layer source; follow-ups stay decidable after send-back', () => withPagesTemplate(async f => {
+test('a staged draft is refused when a record it changes moved on, a reference is gone, or the layer source changed', () => withPagesTemplate(async f => {
   const page = f.know.insert(f.projectId, 'page', { label: 'Browse', icon: 'article', pageType: 'list', status: 'planned' });
+  const flow = f.know.insert(f.projectId, 'flow', { title: 'Browse', steps: [{ page: page.id, name: 'Browse' }] });
   const work = layerTask(f, 'Map browse');
   const { issue } = f.start(null, [], null, null, false, work);
-  const submitted = f.worker.submitProposal(f.scope, { attemptId: issue.native_ref.attempt_id, proposal: { summary: 'Map the browse journey through the list page.',
-    content: { changes: [{ kind: 'flow', op: 'create', title: 'Browse', steps: [{ page: page.id, name: 'Browse' }] }] },
-    followUps: [{ layer: 'product', title: 'Write the browse story', brief: 'Capture why people browse.', why: 'The flow has no Vision story to cite.' }],
-    usedInputs: [{ id: page.id, revision: page.revision }] } });
+  const attemptId = issue.native_ref.attempt_id;
+  f.worker.callLayer(f.scope, { attemptId, operation: 'updateFlow', id: flow.id, body: { changes: { title: 'Browse again' } } });
+  const created = f.worker.callLayer(f.scope, { attemptId, operation: 'createFlow', body: { flow: { title: 'Browse copy', steps: [{ page: page.id, name: 'Browse' }] } } });
+  const submitted = f.worker.submitProposal(f.scope, { attemptId, proposal: { summary: 'Rename the browse flow and add a copy.', content: {},
+    followUps: [{ layer: 'product', title: 'Write the browse story', brief: 'Capture why people browse.', why: 'The flow has no Vision story to cite.' }] } });
   f.know.updateWork(f.owner, f.projectId, work.id, { verdict: { index: 0, value: 'accept' } });
-  f.know.update(f.projectId, page.id, { notes: 'Changed after submission' }, { expectedRevision: page.revision });
-  assert.throws(() => f.worker.acceptProposal(f.owner, f.projectId, work.id, submitted.proposalId), /used input changed/);
-  f.db.prepare("UPDATE layer_package_bindings SET accepted_commit = ? WHERE project_id = ? AND layer_key = 'pages'").run('ae93312c96299c3b855024911f33362ab5cfecb9', f.projectId);
+  const stale = f.know.update(f.projectId, flow.id, { title: 'Edited by a person' }, { expectedRevision: flow.revision });
+  assert.throws(() => f.worker.acceptProposal(f.owner, f.projectId, work.id, submitted.proposalId), /changed since/);
+  f.db.prepare('UPDATE knowledge_records SET revision = ?, data_json = (SELECT data_json FROM knowledge_revisions WHERE record_id = ? AND revision = ?) WHERE id = ?').run(flow.revision, flow.id, flow.revision, flow.id);
+  f.db.prepare('DELETE FROM knowledge_revisions WHERE record_id = ? AND revision = ?').run(flow.id, stale.revision);
+  f.db.prepare("UPDATE knowledge_records SET kind = 'doc' WHERE id = ?").run(page.id);
+  assert.throws(() => f.worker.acceptProposal(f.owner, f.projectId, work.id, submitted.proposalId), /linked page was not found/);
+  f.db.prepare("UPDATE knowledge_records SET kind = 'page' WHERE id = ?").run(page.id);
+  f.db.prepare("UPDATE layer_package_bindings SET accepted_commit = ? WHERE project_id = ? AND layer_key = 'pages'").run('07e2c74ac626651a72ea7620a1bb286c4b7b7a59', f.projectId);
   assert.throws(() => f.worker.acceptProposal(f.owner, f.projectId, work.id, submitted.proposalId), /layer source changed/);
-  assert.equal(f.know.list(f.projectId, 'flow').length, 0);
+  assert.equal(f.know.get(f.projectId, created.staged.id), null);
+  assert.equal(f.know.get(f.projectId, flow.id).revision, flow.revision);
   f.know.updateWork(f.owner, f.projectId, work.id, { verdict: { index: 0, value: 'reject', note: 'The page changed; map it again.' } });
   f.know.updateWork(f.owner, f.projectId, work.id, { sendBack: true });
   f.worker.rejectProposal(f.projectId, work.id, submitted.proposalId);
   const followUp = workRuns({ db: f.db, know: f.know }).list(f.projectId, work.id)[0].followUps[0];
   assert.equal(decideFollowUp(f.db, f.know, f.owner, f.projectId, work.id, followUp.id, 'dismiss').followUp.state, 'dismissed');
-  assert.equal(f.know.workList(f.projectId).filter(item => item.context?.createdBy).length, 0);
+}));
+
+test('every host write of a Pages record uses the Pages API rules and messages; people call the same operations', () => withPagesTemplate(async f => {
+  assert.throws(() => f.know.insert(f.projectId, 'page', { label: 'x'.repeat(31), icon: 'article', pageType: 'list' }), /Page name must be under 30 characters/);
+  assert.throws(() => f.know.insert(f.projectId, 'page', { label: 'Bad', icon: 'article', pageType: 'list', sections: [{ name: 'A', state: 'broken' }] }), /Unknown page state/);
+  assert.throws(() => f.know.insert(f.projectId, 'page', { label: 'Bad', icon: 'article', pageType: 'list', sections: [{ name: '' }] }), /Section name is required/);
+  assert.throws(() => f.know.insert(f.projectId, 'flow', { title: 'Notes', review: { notes: [{ type: 'rant', text: 'x' }] } }), /Unknown kind of review note/);
+  const api = layerApi(f.db, f.projectId, 'pages');
+  const target = f.know.insert(f.projectId, 'page', { label: 'Detail', icon: 'article', pageType: 'detail' });
+  const made = applyOperation({ db: f.db, know: f.know, api, projectId: f.projectId, operationId: 'createPage', author: f.owner.name,
+    body: { page: { label: 'Browse', icon: 'article', pageType: 'list', sections: [{ name: 'List', leadsTo: target.id, content: { action: 'Open' } }] } } });
+  assert.deepEqual(f.know.get(f.projectId, made.id).links, [{ to: target.id, label: 'Open' }], 'the layer derives Map links');
+  assert.throws(() => applyOperation({ db: f.db, know: f.know, api, projectId: f.projectId, operationId: 'updatePage', id: made.id, author: f.owner.name,
+    body: { expectedRevision: 99, changes: { label: 'Late' } } }), /changed since/);
+  const map = applyOperation({ db: f.db, know: f.know, api, projectId: f.projectId, operationId: 'setPageMap', author: f.owner.name, body: { places: { [made.id]: { col: 1, row: 2 } } } });
+  assert.deepEqual(f.know.get(f.projectId, map.id).places, { [made.id]: { col: 1, row: 2 } });
+  const foreign = f.db.prepare('SELECT layer_instance_id FROM knowledge_records WHERE id = ?').get(target.id).layer_instance_id;
+  f.db.prepare("UPDATE knowledge_records SET layer_instance_id = 'foreign-instance' WHERE id = ?").run(target.id);
+  assert.throws(() => applyOperation({ db: f.db, know: f.know, api, projectId: f.projectId, operationId: 'updatePage', id: made.id, author: f.owner.name,
+    body: { changes: { links: [{ to: target.id }] } } }), /linked page was not found/);
+  f.db.prepare('UPDATE knowledge_records SET layer_instance_id = ? WHERE id = ?').run(foreign, target.id);
+  assert.equal(api.operations.get('updatePage').output, 'page');
 }));
 
 test('layer access keeps elevated grants layer-wide, never widens action grants, and seeds the layer default assignee', () => withPagesTemplate(async f => {

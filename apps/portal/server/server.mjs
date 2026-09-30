@@ -33,7 +33,8 @@ import { initPagesReconciliation, pagesReconciliationView, pagesGapDecision, rec
 import { initPagesCodeObservations, codeRouteObservations, recordCodeRouteObservation, pagesObservationRelations, proposePagesObservationRelation, reviewPagesObservationRelation, stagePagesFlowFromObservation } from './pages-code-observations.mjs';
 import { initActionMigration, migrateActionProject, layerActionSettings, setActionAssignee, setProjectWorkStyle, setLayerActionGrant, setActionMethod } from './lat08-migration.mjs';
 import { readActionSource, readAttemptSource, checkPinnedActionEffect } from './code-action-gateway.mjs';
-import { decideFollowUp, initLayerScope, layerAccess, requireElevated, setLayerDefaultAssignee, setLayerElevated } from './layer-scope.mjs';
+import { decideFollowUp, hasElevated, initLayerScope, layerAccess, requireElevated, setLayerDefaultAssignee, setLayerElevated } from './layer-scope.mjs';
+import { applyOperation, layerApi } from './layer-api.mjs';
 import { initLayerContract, layerDescriptors, layerInstances, updateLayerInstance, layerCatalog, layerOutputRead, layerMigrationInventory } from './layer-contract.mjs';
 import { answerDecision, createProposal, ensureB02Fixture, getDecision, getProposal, listDecisions, listDownstreamRecords, listProposals, reassessRecord, reviseProposal } from './product-records.mjs';
 import { openSecretStore } from './secret-store.mjs';
@@ -71,6 +72,8 @@ initLayerContract(db);
 initMarkdownLayer(db);
 initActionMigration(db);
 initLayerScope(db);
+// The Pages API operation behind each generic record write the Pages UI makes.
+const pagesOperation = { page: { create: 'createPage', update: 'updatePage' }, flow: { create: 'createFlow', update: 'updateFlow' }, page_map: { create: 'setPageMap', update: 'setPageMap' } };
 initPagesLayerApp(db);
 initPagesReconciliation(db);
 initPagesCodeObservations(db);
@@ -453,7 +456,7 @@ async function api(request, response, url) {
   // Symphony host credentials have no browser/session authority. Pool requests resolve their pinned profile per attempt.
   if (url.pathname.startsWith('/api/worker/')) {
     const workerAuth = worker.authenticate(request.headers.authorization);
-    const attemptRoute = /^\/api\/worker\/attempts\/([^/]+)(?:\/(workspace|runs|events|candidate|commit|audit|proposal|question|plan|progress|source))?$/.exec(url.pathname);
+    const attemptRoute = /^\/api\/worker\/attempts\/([^/]+)(?:\/(workspace|runs|events|candidate|commit|audit|proposal|question|plan|progress|source|layer))?$/.exec(url.pathname);
     if (attemptRoute) {
       const [, attemptId, operation] = attemptRoute;
       const scope = worker.scopeForAttempt(workerAuth, attemptId);
@@ -461,6 +464,8 @@ async function api(request, response, url) {
       if (operation === 'source' && request.method === 'GET') return json(response, 200, readAttemptSource(db, scope, attemptId, url.searchParams.get('path')), { 'cache-control': 'no-store' });
       if (request.method === 'POST' && operation) {
         const input = await readJson(request, ['audit', 'proposal'].includes(operation) ? 128 * 1024 : 64 * 1024);
+        // PAGES-API-01: a layer-scoped run calls its layer's API; writes stage in the run's draft until review.
+        if (operation === 'layer') return json(response, 200, worker.callLayer(scope, { attemptId, operation: input.operation, id: input.id ?? null, body: input.body ?? {} }), { 'cache-control': 'no-store' });
         // WORK-ITEM-UX-01 WI-5: the agent's own plan and progress, shown as the run's objectives.
         if (operation === 'plan') return json(response, 200, runHistory.reportPlan(workerAuth.projectId, attemptId, input.objectives), { 'cache-control': 'no-store' });
         if (operation === 'progress') {
@@ -701,6 +706,22 @@ async function api(request, response, url) {
   if (layerGrantRoute && request.method === 'PUT') {
     const projectId = decodeURIComponent(layerGrantRoute[1]);
     return json(response, 200, setLayerActionGrant(db, user, projectId, await readJson(request)));
+  }
+  // PAGES-API-01: a layer's API. GET returns its OpenAPI document; POST calls one operation and applies it at once.
+  const layerApiRoute = /^\/api\/projects\/([^/]+)\/layers\/([^/]+)\/api(?:\/([A-Za-z][A-Za-z0-9]*))?$/.exec(url.pathname);
+  if (layerApiRoute) {
+    const [projectId, layerKey, operationId] = layerApiRoute.slice(1).map(value => value && decodeURIComponent(value));
+    requireMember(db, user, projectId);
+    const api = layerApi(db, projectId, layerKey);
+    if (!api) return json(response, 404, { error: 'This layer publishes no API.' });
+    if (request.method === 'GET' && !operationId) return json(response, 200, api.spec, { 'cache-control': 'no-store' });
+    if (request.method === 'POST' && operationId) {
+      const input = await readJson(request);
+      const work = know.openWorkItem(projectId, input.workItemId);
+      return json(response, 200, applyOperation({ db, know, api, projectId, operationId, id: input.id ?? null, body: input.body ?? {}, elevated: hasElevated(db, user.id, projectId, layerKey),
+        author: user.name, rationale: typeof input.rationale === 'string' ? input.rationale.slice(0, 300) : null, workItemId: work?.id || null }), { 'cache-control': 'no-store' });
+    }
+    return json(response, 405, { error: 'Method not allowed.' });
   }
   // DEC-057: per-layer elevated access and default assignee, shown in the layer's Manage › Access.
   const layerAccessRoute = /^\/api\/projects\/([^/]+)\/layer-access\/([^/]+)$/.exec(url.pathname);
@@ -984,12 +1005,24 @@ async function api(request, response, url) {
       const input = await readJson(request);
       if (['role', 'work_action'].includes(input.kind)) return json(response, 409, { error: 'Historical role records are read-only. Configure actions in their layer.' });
       const work = know.openWorkItem(projectId, input.workItemId);
+      const pagesApi = Object.hasOwn(pagesOperation, String(input.kind)) && layerApi(db, projectId, 'pages');
+      // PAGES-API-01: Pages records change only through the Pages API.
+      if (pagesApi) return json(response, 201, applyOperation({ db, know, api: pagesApi, projectId, operationId: pagesOperation[input.kind].create,
+        body: input.kind === 'page_map' ? { places: input.data?.places || {} } : { [input.kind]: input.data || {} }, elevated: hasElevated(db, user.id, projectId, 'pages'),
+        author: user.name, rationale: input.rationale || null, workItemId: work?.id || null }).record);
       return json(response, 201, know.insert(projectId, String(input.kind || ''), input.data || {}, { parentId: input.parentId || null, author: user.name, rationale: input.rationale || null, workItemId: work?.id || null }));
     }
     if (section === 'records' && method === 'PUT' && item) {
       const input = await readJson(request);
       if (['role', 'work_action'].includes(know.get(projectId, item)?.kind)) return json(response, 409, { error: 'Historical role records are read-only. Configure actions in their layer.' });
       const work = know.openWorkItem(projectId, input.workItemId);
+      const existing = know.get(projectId, item);
+      const pagesApi = Object.hasOwn(pagesOperation, String(existing?.kind)) && layerApi(db, projectId, 'pages');
+      if (pagesApi) return json(response, 200, applyOperation({ db, know, api: pagesApi, projectId, operationId: pagesOperation[existing.kind].update,
+        id: existing.kind === 'page_map' ? null : item, elevated: hasElevated(db, user.id, projectId, 'pages'),
+        body: existing.kind === 'page_map' ? { places: input.data?.places ?? existing.places, ...(input.expectedRevision !== undefined ? { expectedRevision: Number(input.expectedRevision) } : {}) }
+          : { changes: input.data || {}, ...(input.expectedRevision !== undefined ? { expectedRevision: Number(input.expectedRevision) } : {}) },
+        author: user.name, rationale: input.rationale || null, workItemId: work?.id || null }).record);
       return json(response, 200, know.update(projectId, item, input.data || {}, { expectedRevision: input.expectedRevision, author: user.name, rationale: input.rationale || null, position: input.position, parentId: input.parentId, workItemId: work?.id || null }));
     }
     if (section === 'records' && method === 'DELETE' && item) {

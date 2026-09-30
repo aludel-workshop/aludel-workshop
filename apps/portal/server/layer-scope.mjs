@@ -3,6 +3,7 @@
 // what a layer-scoped item may write, and elevated access per layer gates review, follow-up decisions
 // and layer configuration. Package text can opt a layer in, but it can never add a change kind.
 import { randomUUID } from 'node:crypto';
+import { layerApi } from './layer-api.mjs';
 import { layerPackageForProject } from './layer-package.mjs';
 
 const fail = (message, status = 409) => { throw Object.assign(new Error(message), { status }); };
@@ -10,8 +11,7 @@ const now = () => new Date().toISOString();
 const text = (value, max) => typeof value === 'string' ? value.trim().slice(0, max) : '';
 const hasTable = (db, name) => Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name));
 
-// Output kinds each layer can change through a checked host adapter, with their operations.
-export const layerChangeAdapters = Object.freeze({ pages: Object.freeze({ flow: Object.freeze(['create', 'revise']) }) });
+// Record changes through a layer's own API (PAGES-API-01) are the only agent write path this host stages.
 export const followUpLimit = 5;
 
 export function initLayerScope(db) {
@@ -36,18 +36,17 @@ const installed = (db, projectId, layerKey) => Boolean(db.prepare('SELECT 1 FROM
 const isOwner = (db, userId, projectId) => Boolean(db.prepare("SELECT 1 FROM project_members WHERE project_id = ? AND user_id = ? AND role = 'owner'").get(projectId, userId));
 const isMember = (db, userId, projectId) => Boolean(db.prepare('SELECT 1 FROM project_members WHERE project_id = ? AND user_id = ?').get(projectId, userId));
 
-// The layer's Work scope when its installed package opts in: the kinds it may change, limited to host adapters.
+// The layer's Work scope when its installed source opts in and publishes an API: the output kinds its write operations change.
 export function layerWorkScope(db, projectId, layerKey) {
-  const adapters = layerChangeAdapters[layerKey];
-  if (!adapters || !installed(db, projectId, layerKey)) return null;
-  let pkg;
-  try { pkg = layerPackageForProject(db, projectId, layerKey); } catch { return null; }
-  const declared = pkg?.manifest?.work;
-  if (declared?.scope !== 'layer' || !Array.isArray(declared.changes)) return null;
-  const changes = Object.fromEntries(declared.changes.filter(kind => Object.hasOwn(adapters, kind)).map(kind => [kind, [...adapters[kind]]]));
+  if (!installed(db, projectId, layerKey)) return null;
+  let pkg, api;
+  try { pkg = layerPackageForProject(db, projectId, layerKey); api = pkg?.manifest?.work?.scope === 'layer' ? layerApi(db, projectId, layerKey) : null; } catch { return null; }
+  if (!api) return null;
+  const changes = {};
+  for (const operation of api.operations.values()) if (operation.output) (changes[operation.output] ||= []).push(operation.operationId);
   if (!Object.keys(changes).length) return null;
   const instance = db.prepare('SELECT instance_id FROM layer_instances WHERE project_id = ? AND layer_key = ?').get(projectId, layerKey)?.instance_id;
-  return { key: layerKey, instanceId: instance, commit: pkg.commit, changes, unavailable: declared.changes.filter(kind => !Object.hasOwn(adapters, kind)) };
+  return { key: layerKey, instanceId: instance, commit: pkg.commit, changes, unavailable: [] };
 }
 
 export function hasElevated(db, userId, projectId, layerKey) {

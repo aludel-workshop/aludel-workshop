@@ -68,14 +68,14 @@ git(root, 'clone', workspace, clone); git(clone, 'checkout', '--detach', issue.n
 writeFileSync(join(clone, '.git', 'aludel-base'), issue.native_ref.repository_commit + '\n');
 worker.registerWorkspace(scope, { attemptId: issue.native_ref.attempt_id, path: clone });
 worker.reserveRun(scope, { attemptId: issue.native_ref.attempt_id });
-worker.submitProposal(scope, { attemptId: issue.native_ref.attempt_id, proposal: {
-  summary: 'Map finding a tool from the list to its detail page.',
-  content: { changes: [{ kind: 'flow', op: 'create', title: 'Find a tool', steps: [{ page: page1.id, name: 'Browse tools', trigger: 'Open Tools' }, { page: page2.id, name: 'Read the detail' }] }],
-    notes: 'Detail has no borrow action yet.' },
+const attempt = issue.native_ref.attempt_id;
+worker.callLayer(scope, { attemptId: attempt, operation: 'createFlow', body: { flow: { title: 'Find a tool', steps: [{ page: page1.id, name: 'Browse tools', trigger: 'Open Tools' }, { page: page2.id, name: 'Read the detail' }] } } });
+worker.callLayer(scope, { attemptId: attempt, operation: 'updatePage', id: page2.id, body: { changes: { description: 'Everything a neighbour needs before borrowing.' } } });
+worker.submitProposal(scope, { attemptId: attempt, proposal: {
+  summary: 'Map finding a tool from the list to its detail page.', content: { notes: 'Detail has no borrow action yet.' },
   followUps: [
     { layer: 'platform', title: 'Build the tool detail route', brief: 'Implement Tool detail with its borrow button.', why: 'The Find a tool flow ends on a page Code has not built.' },
-    { layer: 'product', title: 'Write the borrow story', brief: 'Capture who borrows and why.', why: 'No Vision story explains borrowing, so the flow cites none.' }],
-  usedInputs: [{ id: page1.id, revision: page1.revision }, { id: page2.id, revision: page2.revision }] } });
+    { layer: 'product', title: 'Write the borrow story', brief: 'Capture who borrows and why.', why: 'No Vision story explains borrowing, so the flow cites none.' }] } });
 db.close();
 
 const port = await new Promise(resolve => { const probe = createServer().listen(0, '127.0.0.1', () => { const { port: free } = probe.address(); probe.close(() => resolve(free)); }); });
@@ -95,6 +95,18 @@ try {
   const axe = () => page.evaluate(async () => (await window.axe.run(document.querySelector('main'), { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21aa'] } }))
     .violations.map(item => `${item.id}: ${item.nodes[0]?.target}`));
   const base = `${portal}/p/${project.slug}`;
+
+  // People change Pages through the same API: its document is served, and a record edit uses its rules and messages.
+  const spec = await (await context.request.get(`${portal}/api/projects/${projectId}/layers/pages/api`)).json();
+  assert.equal(spec.openapi, '3.1.0');
+  const tooLong = await context.request.put(`${portal}/api/projects/${projectId}/records/${page1.id}`, { data: { data: { label: 'x'.repeat(31) }, expectedRevision: page1.revision } });
+  assert.equal(tooLong.status(), 400);
+  assert.match((await tooLong.json()).error, /Page name must be under 30 characters/);
+  const renamed = await context.request.post(`${portal}/api/projects/${projectId}/layers/pages/api/updatePage`, { data: { id: page1.id, body: { expectedRevision: page1.revision, changes: { label: 'All tools' } } } });
+  assert.ok(renamed.ok(), await renamed.text());
+  await page.goto(`${base}/pages`);
+  await page.waitForFunction(() => [...document.querySelectorAll('main input, main textarea')].some(field => field.value === 'All tools'));
+  await shot('pages-after-rename');
 
   // Tasks: Access replaces Actions for the layer-scoped Pages layer.
   await page.goto(`${base}/pages/tasks/access`);
@@ -120,7 +132,11 @@ try {
   // Review: Changes show the new flow and notes; Follow-ups show each reason.
   await page.goto(`${base}/work/item/${task.id}/review/1`);
   await page.getByRole('heading', { name: /Review W-\d+ · Run 1/ }).waitFor();
-  await page.getByText('New flow').waitFor();
+  const fields = page.locator('table.wr-fields');
+  await fields.first().waitFor();
+  assert.equal(await fields.count(), 2, 'one field table per changed record');
+  await fields.nth(1).getByRole('rowheader', { name: 'description' }).waitFor();
+  await shot('changes');
   await page.getByRole('tab', { name: /Follow-ups/ }).click();
   await page.getByText('The Find a tool flow ends on a page Code has not built.').waitFor();
   assert.deepEqual(await axe(), [], 'Follow-ups axe');
@@ -145,6 +161,7 @@ try {
   await page.getByText(/Run 1 accepted and applied/).waitFor();
   const reopened = openDatabase(join(root, 'machine.sqlite'));
   assert.equal(reopened.prepare("SELECT COUNT(*) AS n FROM knowledge_records WHERE project_id = ? AND kind = 'flow'").get(projectId).n, 1);
+  assert.match(reopened.prepare('SELECT data_json FROM knowledge_records WHERE id = ?').get(page2.id).data_json, /before borrowing/);
   reopened.close();
 
   // Phone width: the review tabs and follow-ups stay within the page.

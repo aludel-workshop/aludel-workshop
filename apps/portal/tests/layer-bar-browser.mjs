@@ -71,7 +71,9 @@ try {
   await oneBar('Pages tasks', ['Map', 'Pages', 'Flows']);
   const tasksNav = page.getByRole('navigation', { name: 'Pages tasks' });
   const sectionNames = await tasksNav.locator('a').evaluateAll(links => links.map(a => [...a.childNodes].filter(node => node.nodeType === 3).map(node => node.textContent).join('').trim()));
-  assert.deepEqual(sectionNames, ['Board', 'Actions', 'Routines', 'All work']);
+  // DEC-057: a layer-scoped Pages (its template publishes an API) shows Access instead of an action list.
+  const scoped = Boolean((await request('GET', `/api/projects/${project.id}/layer-instances`)).layers.find(entry => entry.key === 'pages')?.workScope);
+  assert.deepEqual(sectionNames, ['Board', scoped ? 'Access' : 'Actions', 'Routines', 'All work']);
   await page.locator('aludel-layer-tasks aludel-work-board .lay-lanes').waitFor();
   await page.locator('.lay-lane', { hasText: 'Your batch' }).waitFor();
   await shot('02-pages-tasks');
@@ -83,26 +85,36 @@ try {
   await page.getByRole('heading', { name: 'Create a Pages task' }).waitFor();
   await oneBar('Pages create task', ['Map', 'Pages', 'Flows']);
   assert.equal(await page.locator('aludel-work-create select[name="role"]').count(), 0, 'the layer is fixed inside its own Tasks');
-  const actionId = await page.locator('aludel-work-create select[name="action"]').inputValue();
-  assert.match(actionId, /^pages\./);
+  const actionId = scoped ? null : await page.locator('aludel-work-create select[name="action"]').inputValue();
+  if (scoped) assert.equal(await page.locator('aludel-work-create select[name="action"]').count(), 0, 'a layer-scoped task names no action');
+  else assert.match(actionId, /^pages\./);
   await page.getByLabel('Task title').fill('Check the checkout flow');
   await page.getByRole('button', { name: 'Create task' }).click();
   await page.waitForURL(/\/work\/item\//);
   await page.goto(origin + base + '/pages/tasks');
   const card = page.locator('aludel-work-card', { hasText: 'Check the checkout flow' });
   await card.waitFor();
-  await card.locator('.lay-rolechip').click();
-  await page.waitForURL(new RegExp(`/pages/tasks/actions/${actionId.replace('.', '\\.')}$`));
-  await page.locator(`[id="setup-${actionId}"]`).waitFor();
-  step('Tasks: Work board and cards; create in the layer, open in Work, back as a card; card chip opens its action');
-
-  await oneBar('Pages actions', ['Map', 'Pages', 'Flows']);
-  const row = page.locator(`[id="action-${actionId}"]`);
-  await row.locator('aludel-assignee').waitFor();
-  await row.locator(`[id="setup-${actionId}"] h4`, { hasText: 'Done when' }).waitFor();
-  await row.locator(`[id="setup-${actionId}"] h4`, { hasText: 'Always reads' }).waitFor();
-  await shot('02b-pages-actions');
-  await audit('Pages actions');
+  if (scoped) {
+    await tasksNav.getByRole('link', { name: /^Access/ }).click();
+    await page.waitForURL(/\/pages\/tasks\/access$/);
+    await page.getByRole('heading', { name: 'Access', level: 2 }).waitFor();
+    await oneBar('Pages access', ['Map', 'Pages', 'Flows']);
+    await shot('02b-pages-access');
+    await audit('Pages access');
+    step('Tasks: Work board and cards; create in the layer, open in Work, back as a card; Access for a layer-scoped layer');
+  } else {
+    await card.locator('.lay-rolechip').click();
+    await page.waitForURL(new RegExp(`/pages/tasks/actions/${actionId.replace('.', '\\.')}$`));
+    await page.locator(`[id="setup-${actionId}"]`).waitFor();
+    step('Tasks: Work board and cards; create in the layer, open in Work, back as a card; card chip opens its action');
+    await oneBar('Pages actions', ['Map', 'Pages', 'Flows']);
+    const row = page.locator(`[id="action-${actionId}"]`);
+    await row.locator('aludel-assignee').waitFor();
+    await row.locator(`[id="setup-${actionId}"] h4`, { hasText: 'Done when' }).waitFor();
+    await row.locator(`[id="setup-${actionId}"] h4`, { hasText: 'Always reads' }).waitFor();
+    await shot('02b-pages-actions');
+    await audit('Pages actions');
+  }
   await tasksNav.getByRole('link', { name: /^Routines/ }).click();
   await page.waitForURL(/\/pages\/tasks\/routines$/);
   await page.getByRole('region', { name: 'Pages routines' }).waitFor();
@@ -266,7 +278,7 @@ try {
   step('rail collapses to an icon rail and remembers it');
 
   await page.setViewportSize({ width: 390, height: 844 });
-  for (const path of ['/pages/tasks', '/pages/tasks/actions', '/pages/tasks/routines', '/pages/manage', `/${layer.key}`]) {
+  for (const path of ['/pages/tasks', scoped ? '/pages/tasks/access' : '/pages/tasks/actions', '/pages/tasks/routines', '/pages/manage', `/${layer.key}`]) {
     await page.goto(origin + base + path);
     await page.locator('.lay-layer-bar').waitFor();
     await page.waitForTimeout(200);

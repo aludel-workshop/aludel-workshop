@@ -69,8 +69,11 @@ function packageAt(repo, commit, key) {
       || !tabs.every(tab => /^[a-z][a-z0-9-]*$/.test(tab.key) && typeof tab.label === 'string' && tab.label.trim().length > 0 && tab.label.length <= 40)
       || !manifest.knowledge || !Array.isArray(manifest.knowledge.documents)) throw new Error('Invalid layer package manifest.');
   // DEC-057: a package may opt into layer-scoped Work; the host adapter registry still bounds its change kinds.
-  if (manifest.work !== undefined && (manifest.work?.scope !== 'layer' || !Array.isArray(manifest.work.changes) || !manifest.work.changes.length ||
-      !manifest.work.changes.every(kind => manifest.outputs.includes(kind)))) throw new Error('Invalid layer Work scope.');
+  if (manifest.work !== undefined && (manifest.work?.scope !== 'layer' || manifest.work.changes !== undefined &&
+      (!Array.isArray(manifest.work.changes) || !manifest.work.changes.every(kind => manifest.outputs.includes(kind))))) throw new Error('Invalid layer Work scope.');
+  // PAGES-API-01: the layer's API document and handler module; the host loads and reviews them separately.
+  if (manifest.api !== undefined && !['spec', 'handler'].every(field => typeof manifest.api?.[field] === 'string' && /^(?:api|server)\/[a-z][a-z0-9-]*\.(?:json|mjs)$/.test(manifest.api[field])))
+    throw new Error('Invalid layer API declaration.');
   const charter = content(repo, commit, manifest.knowledge.charter);
   if (charter.length > 20000) throw new Error('Layer charter is too large.');
   // Pure server contracts are declared and pinned here, but never executed by package loading.
