@@ -7,6 +7,7 @@ import { existsSync, readFileSync, realpathSync, mkdirSync, writeFileSync, chmod
 import { basename, dirname } from 'node:path';
 import { symphonyIssue } from './symphony-readiness.mjs';
 import { compileTaskManifest } from './task-manifest.mjs';
+import { layerPackageTaskContext, layerPackageForProject } from './layer-package.mjs';
 import { briefSections } from './knowledge.mjs';
 import { compiledLocalActions } from './lat07-actions.mjs';
 import { actionForProject, projectLayerDefinition } from './layer-registry.mjs';
@@ -233,11 +234,16 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
       const installed = activeLayerTopology(db,projectId);
       if (hash(JSON.stringify(installed)) !== discovery.topologyDigest) fail('Installed layers changed. Use the newer discovery task.', 409);
     }
-    const content = { controlPins, codeObservation, layerDiscovery: discovery ? { ...discovery, receiver:projectLayerDefinition(db,projectId,entry.layer), sources: discoverySourceSnapshot(db,projectId,discovery.sourceKeys,entry.layer) } : null, schemaVersion: 1, project: project(projectId), work: entry, batch: { id: batchId },
+    const layerPackage = layerPackageTaskContext(db, projectId, layerAction?.layer || entry.layer);
+    const configuredMethod = method?.method_text || layerAction?.method || '';
+    const methodPath = layerPackage && configuredMethod.match(new RegExp(`^${layerPackage.key}/([a-z][a-z0-9-]*)$`));
+    const layerMethodText = methodPath ? layerPackage.documents.find(doc => doc.path === `knowledge/${methodPath[1]}.md`)?.markdown : configuredMethod;
+    if (methodPath && !layerMethodText) fail('The pinned layer action method is missing from its package.', 409);
+    const content = { layerPackage, controlPins, codeObservation, layerDiscovery: discovery ? { ...discovery, receiver:projectLayerDefinition(db,projectId,entry.layer), sources: discoverySourceSnapshot(db,projectId,discovery.sourceKeys,entry.layer) } : null, schemaVersion: 1, project: project(projectId), work: entry, batch: { id: batchId },
       sources: [...targets, ...briefClaims, ...docs], briefRevision: entry.action === 'product.brief' ? know.briefRevision(projectId) : null, sharedDocs: know.list(projectId, 'doc').filter(doc => doc.agents).map(doc => ({ id: doc.id, revision: doc.revision })), instructionPins: know.instructionPins(projectId, workerProfile, entry.action), guidance: { principles: instructions.principles, project: instructions.instructions,
         role: role && { id: role.id, revision: role.revision, name: role.name, instructions: role.instructions },
         layerAction: layerAction && { id: layerAction.id, revision: layerAction.revision, adapter: layerAction.adapter, result: layerAction.result, permissions: layerAction.permissions,
-          methodRevision: method?.method_revision || null, method: method?.method_text || layerAction.method || '' },
+          methodRevision: method?.method_revision || null, method: layerMethodText },
         action: { id: taskAction.id, revision: taskAction.revision, name: taskAction.name, instructions: method?.method_text ?? taskAction.instructions,
           reads: taskAction.reads, changes: taskAction.changes, tools: taskAction.tools, asks: taskAction.asks },
         profile: { id: workerProfile.id, revision: workerProfile.revision, name: workerProfile.name, instructions: workerProfile.instructions,
@@ -274,6 +280,7 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     if (!same(project(projectId), bundle.project)) return false;
     if (entry.action === 'product.brief' && know.briefRevision(projectId) !== bundle.briefRevision) return false;
     if (!same(know.instructionPins(projectId, profile(projectId, profileId), entry.action, { legacyRole: Boolean(bundle.instructionPins?.role) }), bundle.instructionPins)) return false;
+    if (bundle.layerPackage && layerPackageForProject(db, projectId, bundle.layerPackage.key)?.commit !== bundle.layerPackage.commit) return false;
     if (!same(know.list(projectId, 'doc').filter(doc => doc.agents).map(doc => ({ id: doc.id, revision: doc.revision })), bundle.sharedDocs)) return false;
     if (bundle.sources.some(source => know.get(projectId, source.id)?.revision !== source.revision)) return false;
     if (bundle.controlPins?.some(control => { const row = db.prepare('SELECT revision, status FROM layer_connections WHERE id = ? AND project_id = ?').get(control.id, projectId); return !row || row.revision !== control.revision || row.status !== 'active'; })) return false;
@@ -349,6 +356,7 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     if (!same(project(scope.projectId), bundle.project)) return null;
     if (bundle.work.action === 'product.brief' && know.briefRevision(scope.projectId) !== bundle.briefRevision) return null;
     if (!same(know.instructionPins(scope.projectId, profile(scope.projectId, scope.profileId), entry.action, { legacyRole: Boolean(bundle.instructionPins?.role) }), bundle.instructionPins)) return null;
+    if (bundle.layerPackage && layerPackageForProject(db, scope.projectId, bundle.layerPackage.key)?.commit !== bundle.layerPackage.commit) return null;
     if (!same(know.list(scope.projectId, 'doc').filter(doc => doc.agents).map(doc => ({ id: doc.id, revision: doc.revision })), bundle.sharedDocs)) return null;
     if (bundle.sources.some(source => know.get(scope.projectId, source.id)?.revision !== source.revision)) return null;
     if (bundle.controlPins?.some(control => { const row = db.prepare('SELECT revision, status FROM layer_connections WHERE id = ? AND project_id = ?').get(control.id, scope.projectId); return !row || row.revision !== control.revision || row.status !== 'active'; })) return null;

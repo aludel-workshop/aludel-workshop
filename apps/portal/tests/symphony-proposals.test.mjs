@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import test from 'node:test';
 import { createUser, initAccounts } from '../server/accounts.mjs';
 import { agentRuns, initAgentRuns } from '../server/agent-runs.mjs';
@@ -482,4 +483,58 @@ test('discovery knowledge gateway follows the installed layer graph', () => {
     assert.equal(kinds.includes('data_object'),false);
     assert.throws(()=>f.worker.knowledgeSearch(f.scope,issue.native_ref.bundle_digest,'object','data_object'),/Invalid knowledge search/);
   } finally {f.close();}
+});
+
+test('Pages flow task includes exact installed layer method and repository Knowledge alongside the same pinned targets', async () => {
+  const data = mkdtempSync(join(tmpdir(), 'aludel-pages-context-'));
+  const oldData = process.env.MACHINE_DATA_DIR;
+  const oldTemplates = process.env.MACHINE_PAGES_TEMPLATE_ENABLED;
+  process.env.MACHINE_DATA_DIR = data;
+  process.env.MACHINE_PAGES_TEMPLATE_ENABLED = '1';
+  let f;
+  try {
+    f = fixture();
+    const story = f.know.insert(f.projectId, 'story', { title: 'Find a useful page', phase: 'demo' });
+    const { work, card, issue } = f.start('pages.flows', [{ id: story.id, kind: 'story', label: story.title }]);
+    assert.equal(card.requiredInputs[0].id, story.id);
+    assert.equal(card.requiredInputs[0].revision, story.revision);
+    assert.equal(card.layerSource.key, 'pages');
+    assert.match(card.layerSource.commit, /^[0-9a-f]{40}$/);
+    assert.match(card.layerSource.charter, /start directly in Pages without Vision/);
+    assert.ok(card.layerSource.documents.some(doc => doc.path === 'knowledge/flow-method.md' && /exact revision/.test(doc.markdown)));
+    assert.equal(card.layerMethod.actionId, 'pages.flows');
+    assert.match(card.layerMethod.text, /For a new flow/);
+    const bundle = f.worker.saved(f.scope, issue.native_ref.bundle_digest);
+    assert.equal(bundle.layerPackage.commit, card.layerSource.commit);
+    assert.equal(bundle.guidance.layerAction.method, card.layerMethod.text);
+    const baselineSource = execFileSync('git', ['show', 'f6adc8e813aead602304080e1f0e18584e84d66d:apps/portal/server/task-manifest.mjs'],
+      { cwd: new URL('../../', import.meta.url).pathname, encoding: 'utf8' });
+    const oldCompilerPath = join(data, 'old-task-manifest.mjs');
+    writeFileSync(oldCompilerPath, baselineSource);
+    const { compileTaskManifest: compileBefore } = await import(pathToFileURL(oldCompilerPath).href);
+    const oldCard = compileBefore(bundle);
+    assert.deepEqual(card.requiredInputs, oldCard.requiredInputs);
+    assert.deepEqual(card.outputs, oldCard.outputs);
+    assert.deepEqual(card.controls, oldCard.controls);
+    assert.deepEqual(card.capabilities, oldCard.capabilities);
+    assert.equal(oldCard.layerSource, undefined);
+    assert.equal(oldCard.layerMethod, undefined);
+    const existingPage = f.know.insert(f.projectId, 'page', { label: 'Browse', icon: 'article', pageType: 'list', status: 'planned' });
+    const existingFlow = f.know.insert(f.projectId, 'flow', { title: 'Browse journey', steps: [{ page: existingPage.id, name: 'Browse' }] });
+    const modify = f.know.createWork(f.projectId, { action: 'pages.flows', title: 'Modify the existing flow',
+      assignee: { kind: 'agent', id: f.profile.id }, targets: [{ id: existingFlow.id, kind: 'flow', label: existingFlow.title }],
+      checks: ['Preserve the flow identity and explain the changed steps'] }, f.owner.name);
+    if (modify.state === 'suggested') f.know.updateWork(f.owner, f.projectId, modify.id, { state: 'ready' });
+    assert.throws(() => f.runs.stage(f.owner, f.projectId, modify.id), /at most one Vision story/,
+      'the current agent adapter cannot modify an existing flow');
+    assert.ok(f.worker.current(f.scope, work.id));
+    f.db.prepare("UPDATE layer_package_bindings SET accepted_commit = ? WHERE project_id = ? AND layer_key = 'pages'")
+      .run('aabcfff1f457f8fe4517ea4ec8aef23263e38371', f.projectId);
+    assert.equal(f.worker.current(f.scope, work.id), null, 'a Pages package repin withdraws the prior task context');
+  } finally {
+    f?.close();
+    rmSync(data, { recursive: true, force: true });
+    if (oldData === undefined) delete process.env.MACHINE_DATA_DIR; else process.env.MACHINE_DATA_DIR = oldData;
+    if (oldTemplates === undefined) delete process.env.MACHINE_PAGES_TEMPLATE_ENABLED; else process.env.MACHINE_PAGES_TEMPLATE_ENABLED = oldTemplates;
+  }
 });

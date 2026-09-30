@@ -1,0 +1,19 @@
+/* Host SDK v1 visual contract for installed layer editor chrome.
+   Native layer source may use these semantic tokens; Spec/Built previews use the project's Design theme. */
+aludel-project-shell {
+  --aludel-layer-surface: var(--mat-sys-surface);
+  --aludel-layer-surface-raised: var(--mat-sys-surface-container-low);
+  --aludel-layer-ink: var(--mat-sys-on-surface);
+  --aludel-layer-muted: var(--mat-sys-on-surface-variant);
+  --aludel-layer-line: var(--mat-sys-outline-variant);
+  --aludel-layer-selection: var(--mat-sys-primary);
+  --aludel-layer-strong: var(--mat-sys-on-surface);
+  --aludel-layer-warning: #e39b00;
+  --aludel-layer-warning-ink: var(--machine-waiting-ink);
+  --aludel-layer-warning-bg: var(--machine-waiting-bg);
+  --aludel-layer-muted-bg: var(--mat-sys-surface-container);
+  --aludel-layer-radius-control: var(--machine-radius);
+  --aludel-layer-radius-card: 14px;
+  --aludel-layer-radius-panel: 18px;
+  --aludel-layer-radius-pill: 999px;
+}

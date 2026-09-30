@@ -17,7 +17,7 @@ const file = path => {
   return execFileSync('git', ['-C', repo, 'show', `${pin.commit}:${path}`], { maxBuffer: 8 * 1024 * 1024 });
 };
 const manifest = JSON.parse(git('show', `${pin.commit}:layer.json`));
-if (manifest.schemaVersion !== 1 || manifest.key !== 'pages' || manifest.ui?.entry !== 'ui/pages.ts' || !Array.isArray(manifest.ui.files)) throw new Error('Invalid Pages template manifest.');
+if (manifest.schemaVersion !== 1 || manifest.hostSdkVersion !== 1 || manifest.key !== 'pages' || manifest.ui?.entry !== 'ui/pages.ts' || !Array.isArray(manifest.ui.files)) throw new Error('Invalid Pages template manifest.');
 const files = [...new Set(manifest.ui.files)];
 if (files.length !== manifest.ui.files.length || !files.includes(manifest.ui.entry) || !files.includes('ui/pages.scss')) throw new Error('Incomplete Pages UI manifest.');
 const target = join(portal, 'src/installed/pages');

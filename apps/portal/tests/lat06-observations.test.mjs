@@ -7,7 +7,7 @@ import { codeRouteObservations, initPagesCodeObservations, pagesObservationRelat
 
 const candidateRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
-test('a real pinned Pages screen slice supports useful and wrong relations without rewriting Code evidence', () => {
+test('a real pinned portal route supports useful and wrong Pages relations without rewriting Code evidence', () => {
   const db = new DatabaseSync(':memory:');
   try {
     db.exec(`CREATE TABLE projects(id TEXT PRIMARY KEY);
@@ -18,23 +18,23 @@ test('a real pinned Pages screen slice supports useful and wrong relations witho
       INSERT INTO layer_instances VALUES ('candidate','platform',1),('candidate','pages',1);`);
     initPagesCodeObservations(db);
     assert.throws(() => recordCodeRouteObservation(db, 'member', 'candidate', candidateRoot,
-      { path: 'apps/portal/src/layers/pages-flows.ts', marker: "selector: 'aludel-pages-flows'", route: 'Pages › Flows screen' }), { status: 403 });
+      { path: 'apps/portal/src/layers/shell.ts', marker: 'PagesLayerComponent', route: 'Portal › Pages route' }), { status: 403 });
     const observation = recordCodeRouteObservation(db, 'owner', 'candidate', candidateRoot,
-      { path: 'apps/portal/src/layers/pages-flows.ts', marker: "selector: 'aludel-pages-flows'", route: 'Pages › Flows screen' });
+      { path: 'apps/portal/src/layers/shell.ts', marker: 'PagesLayerComponent', route: 'Portal › Pages route' });
     assert.match(observation.commit, /^[a-f0-9]{40}$/);
     assert.match(observation.blob, /^[a-f0-9]{40}$/);
     assert.throws(() => recordCodeRouteObservation(db, 'owner', 'candidate', candidateRoot,
       { path: '../.env', marker: 'SECRET', route: 'Invalid' }), /unavailable|bounded tracked/);
     const useful = proposePagesObservationRelation(db, 'owner', 'candidate', observation.id,
-      'The screen exposes page steps and permits a story-free Pages flow review.');
+      'The portal route exposes the Pages app; the intended journey still needs separate review.');
     const wrong = proposePagesObservationRelation(db, 'owner', 'candidate', observation.id,
-      'The screen proves every visitor activity is complete.');
+      'The route proves every visitor activity is complete.');
     assert.throws(() => reviewPagesObservationRelation(db, 'member', 'candidate', wrong.id,
       { expectedRevision: 1, verdict: 'wrong', reason: 'Not shown' }), { status: 403 });
     const reviewedUseful = reviewPagesObservationRelation(db, 'owner', 'candidate', useful.id,
-      { expectedRevision: 1, verdict: 'useful', reason: 'Step controls are observed; intended journey still needs review.' });
+      { expectedRevision: 1, verdict: 'useful', reason: 'The route is observed; intended journey still needs review.' });
     const reviewedWrong = reviewPagesObservationRelation(db, 'owner', 'candidate', wrong.id,
-      { expectedRevision: 1, verdict: 'wrong', reason: 'A screen control cannot establish that all visitor activities are covered.' });
+      { expectedRevision: 1, verdict: 'wrong', reason: 'A route cannot establish that all visitor activities are covered.' });
     assert.equal(reviewedUseful.observation_id, reviewedWrong.observation_id);
     assert.equal(codeRouteObservations(db, 'member', 'candidate').length, 1);
     assert.deepEqual(pagesObservationRelations(db, 'member', 'candidate').map(row => row.status).sort(), ['useful', 'wrong']);

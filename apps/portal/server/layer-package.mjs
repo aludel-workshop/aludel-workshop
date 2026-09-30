@@ -40,7 +40,7 @@ function packageAt(repo, commit, key) {
   if (!/^[0-9a-f]{40}$/.test(commit) || git(repo, 'rev-parse', '--verify', `${commit}^{commit}`) !== commit) throw new Error('Layer package commit is unavailable.');
   const manifest = JSON.parse(git(repo, 'show', `${commit}:layer.json`));
   const tabs = manifest.tabs;
-  if (manifest.schemaVersion !== 1 || manifest.key !== key || typeof manifest.name !== 'string' || !manifest.name.trim()
+  if (manifest.schemaVersion !== 1 || manifest.hostSdkVersion !== 1 || manifest.key !== key || typeof manifest.name !== 'string' || !manifest.name.trim()
       || typeof manifest.path !== 'string' || !/^\/[a-z][a-z0-9-]*$/.test(manifest.path)
       || !['knowledge_records','code_projection','runtime_projection'].includes(manifest.authority)
       || typeof manifest.outputProvider !== 'string' || typeof manifest.editorAdapter !== 'string'
@@ -91,4 +91,16 @@ export function pagesPackageDocuments(db, projectId) {
     if (!title || markdown.length > 8000) throw new Error('Invalid Pages Knowledge document.');
     return [entry[0],entry[1],title,markdown];
   });
+}
+
+// Immutable, task-facing layer source. Keep content small and pinned; it cannot grant effects.
+export function layerPackageTaskContext(db, projectId, key) {
+  const pkg = layerPackageForProject(db, projectId, key);
+  if (!pkg) return null;
+  const documents = pkg.manifest.knowledge.documents.map(path => {
+    const markdown = content(pkg.repo, pkg.commit, path);
+    if (markdown.length > 8000) throw new Error('Layer task document is too large.');
+    return { path, markdown };
+  });
+  return { key, commit: pkg.commit, charter: pkg.charter, documents };
 }
