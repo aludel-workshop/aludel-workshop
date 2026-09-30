@@ -2,7 +2,7 @@
 
 ## Scope and revisions
 
-The owner directed Pages-specific data, code, shared design language, same-task agent packet and build-note migration work before moving to other templates, plus a GitHub publication investigation. This remains an isolated local candidate. The Pages source repository is pinned at `10604c43a615511cd579b8976d7d2e120033e742` (prior UX/doc/theme commits in its history). This candidate follows the earlier source extraction `f6adc8e813aead602304080e1f0e18584e84d66d`. No original project data, retained LAT-08 candidate, GitHub account or provider was changed.
+The owner directed Pages-specific data, code, shared design language, same-task agent packet and build-note migration work before moving to other templates, plus a GitHub publication investigation. This remains an isolated local candidate. The Pages source repository is pinned at `c57721311d44338d5be8361a5869e2c7d71af6b2` (prior UX/doc/theme commits in its history). This candidate follows the earlier source extraction `f6adc8e813aead602304080e1f0e18584e84d66d`. No original project data, retained LAT-08 candidate, GitHub account or provider was changed.
 
 The template now also has `docs/source-inventory.md`, a file-level account of remaining Pages-specific portal branches and the order for extracting them.
 
@@ -49,3 +49,7 @@ The real worker test passes using a disposable project and no provider turn. Thi
 ## Q-011 follow-up — 2026-09-29
 
 The owner challenged Git-file authority for complex Pages outputs. The template data document now treats the tested deterministic files as an export/restore primitive, while [the revised comparison](../../../../docs/design/layer-app-transition/pages-output-authority.md) proposes a structured output store and database-backed semantic change sets. This is a design correction, not a runtime cutover or a passed branch/merge test. Q-011 remains unconfirmed.
+
+## DEC-056 follow-up — 2026-09-29
+
+The owner confirmed one owner-controlled repo per installed instance, one target local SQLite database per project, strict immutable instance scoping and a shared Work review surface for Git source commits, semantic database changes or both. The template data document now reflects this decision. No database schema, physical placement, accepted output, provider repository or original project data changed in this follow-up. The current candidate still uses a shared portal SQLite file and lacks instance IDs on `knowledge_records`; these are explicit migration gates in the [authority contract](../../../../docs/design/layer-app-transition/pages-output-authority.md).
