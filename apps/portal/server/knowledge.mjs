@@ -1,3 +1,4 @@
+import { pagesInstanceId } from './layer-output-scope.mjs';
 // Project knowledge by layer (DEC-036/037). Record kinds and fields follow
 // docs/design/portal-layers/knowledge-structures.md. One table with a kind whitelist and an explicit
 // validator per kind: typed at the domain layer, not an open-ended entity store. New kinds need a
@@ -182,6 +183,11 @@ export function initKnowledge(db) {
   // ROADMAP-01: the plan project an item belongs to (not project_id, which is the Aludel project that owns the item),
   // and the project checkpoint it counts towards.
   for (const column of ['plan_project_id', 'checkpoint']) if (!workColumns.has(column)) db.exec(`ALTER TABLE layer_work_items ADD COLUMN ${column} TEXT`);
+  // DEC-056 bridge: current Pages records, revisions and tombstones carry instance identity.
+  for (const table of ['knowledge_records', 'knowledge_revisions', 'knowledge_deletions']) {
+    const columns = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(column => column.name));
+    if (!columns.has('layer_instance_id')) db.exec(`ALTER TABLE ${table} ADD COLUMN layer_instance_id TEXT`);
+  }
   // Archived work leaves normal planning views without losing its task, runs, review or activity trail.
   for (const column of ['archived_at', 'archived_by']) if (!workColumns.has(column)) db.exec(`ALTER TABLE layer_work_items ADD COLUMN ${column} TEXT`);
 }
@@ -482,7 +488,13 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
   const doneListeners = [];
   const row = id => db.prepare('SELECT * FROM knowledge_records WHERE id = ?').get(id);
   const hydrate = record => record && { id: record.id, kind: record.kind, parentId: record.parent_id, position: record.position, revision: record.revision, updatedAt: record.updated_at, ...parse(record.data_json, {}) };
-  const list = (projectId, kind) => db.prepare('SELECT * FROM knowledge_records WHERE project_id = ? AND kind = ? ORDER BY position, created_at').all(projectId, kind).map(hydrate);
+  const pagesKind = kind => ['page_map', 'page', 'flow'].includes(kind);
+  const scope = (projectId, kind) => pagesKind(kind) ? pagesInstanceId(db, projectId) : null;
+  const list = (projectId, kind) => {
+    const instanceId = scope(projectId, kind);
+    return (instanceId ? db.prepare('SELECT * FROM knowledge_records WHERE project_id = ? AND layer_instance_id = ? AND kind = ? ORDER BY position, created_at').all(projectId, instanceId, kind)
+      : db.prepare('SELECT * FROM knowledge_records WHERE project_id = ? AND kind = ? ORDER BY position, created_at').all(projectId, kind)).map(hydrate);
+  };
   const counter = (projectId, kind) => {
     const current = db.prepare('SELECT next FROM knowledge_counters WHERE project_id = ? AND kind = ?').get(projectId, kind)?.next || 1;
     db.prepare('INSERT INTO knowledge_counters(project_id, kind, next) VALUES (?, ?, ?) ON CONFLICT(project_id, kind) DO UPDATE SET next = excluded.next').run(projectId, kind, current + 1);
@@ -497,14 +509,15 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     checkDesign(projectId, kind, clean, { parentId });
     if (['story', 'spec', 'project'].includes(kind) && !clean.number) clean.number = counter(projectId, kind);
     if (kind === 'brief_claim') counter(projectId, 'brief');
-    if (parentId && !db.prepare('SELECT 1 FROM knowledge_records WHERE id = ? AND project_id = ?').get(parentId, projectId)) fail('Parent record not found.', 404);
+    const instanceId = scope(projectId, kind);
+    if (parentId && !db.prepare('SELECT 1 FROM knowledge_records WHERE id = ? AND project_id = ? AND (layer_instance_id IS NULL OR layer_instance_id = ?)').get(parentId, projectId, instanceId)) fail('Parent record not found.', 404);
     const id = newId(kind);
     const created = now();
     const place = position ?? ((db.prepare('SELECT MAX(position) AS max FROM knowledge_records WHERE project_id = ? AND kind = ? AND COALESCE(parent_id, \'\') = COALESCE(?, \'\')').get(projectId, kind, parentId)?.max ?? -1) + 1);
-    db.prepare('INSERT INTO knowledge_records(id, project_id, kind, parent_id, position, data_json, revision, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)')
-      .run(id, projectId, kind, parentId, place, JSON.stringify(clean), created, created);
-    db.prepare('INSERT INTO knowledge_revisions(record_id, revision, data_json, author, rationale, work_item_id, created_at) VALUES (?, 1, ?, ?, ?, ?, ?)')
-      .run(id, JSON.stringify(clean), author, rationale, workItemId, created);
+    db.prepare('INSERT INTO knowledge_records(id, project_id, kind, parent_id, position, data_json, revision, created_at, updated_at, layer_instance_id) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)')
+      .run(id, projectId, kind, parentId, place, JSON.stringify(clean), created, created, instanceId);
+    db.prepare('INSERT INTO knowledge_revisions(record_id, revision, data_json, author, rationale, work_item_id, created_at, layer_instance_id) VALUES (?, 1, ?, ?, ?, ?, ?, ?)')
+      .run(id, JSON.stringify(clean), author, rationale, workItemId, created, instanceId);
     return hydrate(row(id));
   }
 
@@ -521,7 +534,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     for (const [id, expected] of references[kind]?.(clean) || []) {
       const target = row(id);
       const allowed = Array.isArray(expected) ? expected : [expected];
-      if (!target || target.project_id !== projectId || !allowed.includes(target.kind)) fail(`A linked ${Array.isArray(expected) ? 'record' : expected.replace('_', ' ')} was not found.`, 404);
+      if (!target || target.project_id !== projectId || (pagesKind(target.kind) && target.layer_instance_id !== scope(projectId, target.kind)) || !allowed.includes(target.kind)) fail(`A linked ${Array.isArray(expected) ? 'record' : expected.replace('_', ' ')} was not found.`, 404);
     }
   }
   // Design records (DESIGN-UX-01): uploads belong to the project, colour roles exist, one token set, one asset per brand key.
@@ -538,7 +551,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
 
   function update(projectId, id, changes, { expectedRevision, author = 'Aludel', rationale = null, workItemId = null, position, parentId } = {}) {
     const current = row(id);
-    if (!current || current.project_id !== projectId) fail('Record not found.', 404);
+    if (!current || current.project_id !== projectId || (pagesKind(current.kind) && current.layer_instance_id !== scope(projectId, current.kind))) fail('Record not found.', 404);
     if (expectedRevision !== undefined && Number(expectedRevision) !== current.revision) fail('This record changed since you opened it. Reload to see the latest; your edit is kept.', 409);
     const merged = validators[current.kind]({ ...parse(current.data_json, {}), ...changes }, catalogs);
     if (current.kind === 'routine') checkRoutineAction(projectId, merged);
@@ -553,8 +566,8 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     const updated = now();
     db.prepare('UPDATE knowledge_records SET data_json = ?, revision = ?, updated_at = ?, position = COALESCE(?, position), parent_id = CASE WHEN ? THEN ? ELSE parent_id END WHERE id = ?')
       .run(JSON.stringify(merged), revision, updated, position ?? null, parentId !== undefined ? 1 : 0, parentId ?? null, id);
-    db.prepare('INSERT INTO knowledge_revisions(record_id, revision, data_json, author, rationale, work_item_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      .run(id, revision, JSON.stringify(merged), author, rationale, workItemId, updated);
+    db.prepare('INSERT INTO knowledge_revisions(record_id, revision, data_json, author, rationale, work_item_id, created_at, layer_instance_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(id, revision, JSON.stringify(merged), author, rationale, workItemId, updated, current.layer_instance_id);
     // Moving a record is not a change to what it says; only content changes reach code links (LAY-07D).
     if (contentChanged) for (const listener of revisionListeners) listener({ projectId, record: hydrate(row(id)), fromRevision: current.revision, toRevision: revision, author });
     return hydrate(row(id));
@@ -562,11 +575,11 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
 
   function remove(projectId, id) {
     const current = row(id);
-    if (!current || current.project_id !== projectId) fail('Record not found.', 404);
+    if (!current || current.project_id !== projectId || (pagesKind(current.kind) && current.layer_instance_id !== scope(projectId, current.kind))) fail('Record not found.', 404);
     const children = db.prepare('SELECT id FROM knowledge_records WHERE parent_id = ?').all(id);
     for (const child of children) remove(projectId, child.id);
-    db.prepare('INSERT OR IGNORE INTO knowledge_deletions(record_id,project_id,kind,parent_id,position,last_revision,data_json,deleted_at) VALUES (?,?,?,?,?,?,?,?)')
-      .run(current.id,current.project_id,current.kind,current.parent_id,current.position,current.revision,current.data_json,now());
+    db.prepare('INSERT OR IGNORE INTO knowledge_deletions(record_id,project_id,kind,parent_id,position,last_revision,data_json,deleted_at,layer_instance_id) VALUES (?,?,?,?,?,?,?,?,?)')
+      .run(current.id,current.project_id,current.kind,current.parent_id,current.position,current.revision,current.data_json,now(),current.layer_instance_id);
     db.prepare('DELETE FROM knowledge_records WHERE id = ?').run(id);
     // ROADMAP-01: evidence and plans that point at the record let go of it rather than dangle.
     const kind = current.kind;
@@ -619,7 +632,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
   const revisionData = (id, revision) => parse(db.prepare('SELECT data_json FROM knowledge_revisions WHERE record_id = ? AND revision = ?').get(id, revision)?.data_json, null);
   // The record's revision at a moment in time, for links declared by a past commit.
   const revisionAt = (id, at) => db.prepare('SELECT MAX(revision) AS revision FROM knowledge_revisions WHERE record_id = ? AND created_at <= ?').get(id, at)?.revision || null;
-  const get = (projectId, id) => { const record = row(id); return record && record.project_id === projectId ? hydrate(record) : null; };
+  const get = (projectId, id) => { const record = row(id); return record && record.project_id === projectId && (!pagesKind(record.kind) || record.layer_instance_id === scope(projectId, record.kind)) ? hydrate(record) : null; };
 
   // ---- Seeds ----
   function ensureProject(projectId, { pitch = '', seedRoutines = true } = {}) {

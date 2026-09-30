@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { knowledgeKinds } from './knowledge.mjs';
+import { backfillPagesOutputScope } from './layer-output-scope.mjs';
 import { compiledLocalActions, combinedLegacyInventory } from './lat07-actions.mjs';
 import { initLayerRegistry, seedBuiltInDefinitions, projectLayerDefinition, projectLayerDefinitions, actionsForDefinition } from './layer-registry.mjs';
 // LAT-02: built-in layer declarations describe existing authorities; they do not grant writes.
@@ -107,6 +108,7 @@ export function initLayerContract(db) {
   db.exec('BEGIN');
   try {
     for (const project of projects) inserted += createLayerInstances(db, project.id, created);
+    backfillPagesOutputScope(db);
     db.exec('COMMIT');
   } catch (error) { db.exec('ROLLBACK'); throw error; }
   return { projects: projects.length, inserted };
@@ -182,7 +184,9 @@ export function layerOutputRead(db, userId, projectId, key, kind, id) {
     // Projection reads return identity and revision only. Existing native endpoints own detailed views.
     return { id: row.id, kind, revision: createHash('sha256').update(JSON.stringify(row)).digest('hex'), authority: layer.authority };
   }
-  const row = db.prepare('SELECT id, kind, revision, data_json FROM knowledge_records WHERE project_id = ? AND kind = ? AND id = ?').get(projectId, kind, id);
+  const row = key === 'pages'
+    ? db.prepare('SELECT id, kind, revision, data_json FROM knowledge_records WHERE project_id = ? AND layer_instance_id = ? AND kind = ? AND id = ?').get(projectId, layer.instanceId, kind, id)
+    : db.prepare('SELECT id, kind, revision, data_json FROM knowledge_records WHERE project_id = ? AND kind = ? AND id = ?').get(projectId, kind, id);
   if (!row) fail('Output not found.', 404);
   return { id: row.id, kind: row.kind, revision: row.revision, data: JSON.parse(row.data_json), authority: layer.authority };
 }
