@@ -2,7 +2,7 @@
 
 ## Scope and revisions
 
-The owner directed Pages-specific data, code, shared design language, same-task agent packet and build-note migration work before moving to other templates, plus a GitHub publication investigation. This remains an isolated local candidate. The Pages source repository is pinned at `f45f3f758f239927e6b257141713c332fa5de917` (prior UX/doc/theme commits in its history). This candidate follows the earlier source extraction `f6adc8e813aead602304080e1f0e18584e84d66d`. No original project data, retained LAT-08 candidate, GitHub account or provider was changed.
+The owner directed Pages-specific data, code, shared design language, same-task agent packet and build-note migration work before moving to other templates, plus a GitHub publication investigation. This remains an isolated local candidate. The Pages source repository is pinned at `7a168a1f081a406ec095b893af9c5b21da3db5f2` (prior UX/doc/theme commits in its history). This candidate follows the earlier source extraction `f6adc8e813aead602304080e1f0e18584e84d66d`. No original project data, retained LAT-08 candidate, GitHub account or provider was changed.
 
 The template now also has `docs/source-inventory.md`, a file-level account of remaining Pages-specific portal branches and the order for extracting them.
 
