@@ -8,7 +8,7 @@ import { personAvatar } from '../avatars';
 import { AvatarEditorComponent } from './avatar-editor';
 import { PersonAvatar, ProjectContext, dataStatusLabel, phaseName, sectionTitle, statusLabel, unitStateLabel, workStatusLabel } from './context';
 import { DesignLayerComponent } from './design';
-import { PagesLayerComponent } from './pages';
+import { PagesLayerComponent } from '../installed/pages/pages';
 import { DataLayerComponent } from './data';
 import { CodeLayerComponent } from './code';
 import { DeployLayerComponent } from './deploy';

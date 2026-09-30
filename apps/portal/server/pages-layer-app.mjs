@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { pagesPackageDocuments } from './layer-package.mjs';
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const now = () => new Date().toISOString();
@@ -48,7 +49,9 @@ function seed(db, projectId) {
     VALUES (?, 'pages', ?, ?, ?, ?, 1, ?) ON CONFLICT DO NOTHING`);
   const history = db.prepare(`INSERT INTO layer_document_revisions(project_id,layer_key,doc_key,revision,content,author_id,created_at)
     VALUES (?, 'pages', ?, 1, ?, 'built-in', ?) ON CONFLICT DO NOTHING`);
-  for (const [group, key, title, content] of defaults) {
+  const packaged = pagesPackageDocuments(db,projectId);
+  const documents = packaged ? [...packaged,...defaults.filter(([,key])=>!packaged.some(([,packagedKey])=>packagedKey===key))] : defaults;
+  for (const [group, key, title, content] of documents) {
     insert.run(projectId, key, group, title, content, stamp);
     history.run(projectId, key, content, stamp);
   }

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { contrastRatio } from '../src/color.js';
+import { initLayerPackages, ensureLayerPackage } from './layer-package.mjs';
 // Project-scoped layer definitions share one lifecycle and output/action contract.
 // Built-ins seed richer adapters; a Markdown layer begins as a draft definition.
 const fail=(message,status=400)=>{throw Object.assign(new Error(message),{status});};
@@ -43,6 +44,9 @@ export function initLayerRegistry(db) {
   if(!columns.has('identity_revision'))db.exec('ALTER TABLE layer_definitions ADD COLUMN identity_revision INTEGER NOT NULL DEFAULT 0');
   // A chosen colour overrides the layer's seeded palette entry; null keeps the default.
   if(!columns.has('color'))db.exec('ALTER TABLE layer_definitions ADD COLUMN color TEXT');
+  if(!columns.has('output_tabs_json'))db.exec("ALTER TABLE layer_definitions ADD COLUMN output_tabs_json TEXT NOT NULL DEFAULT '[]'");
+  if(!columns.has('package_commit'))db.exec('ALTER TABLE layer_definitions ADD COLUMN package_commit TEXT');
+  initLayerPackages(db);
   // A layer created by the earlier editor-only candidate has no identity. Keep its files,
   // but withdraw it from neighbor discovery until the owner describes and activates it.
   db.exec("UPDATE layer_definitions SET lifecycle='draft' WHERE built_in=0 AND identity_revision=0 AND lifecycle='active'");
@@ -52,13 +56,22 @@ export function seedBuiltInDefinitions(db,projectId,declarations,presentation) {
   const insert=db.prepare(`INSERT INTO layer_definitions(project_id,layer_key,name,description,category,icon,path,authority,output_provider,editor_adapter,output_kinds_json,built_in,created_at,lifecycle,identity_json,identity_revision)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'active',?,1) ON CONFLICT(project_id,layer_key) DO NOTHING`);
   const at=now();
-  for(const layer of declarations){const [category,icon,description]=presentation[layer.key],identity=builtInIdentity[layer.key];
-    insert.run(projectId,layer.key,layer.name,description,category,icon,layer.path,layer.authority,
-      layer.authority,`native:${layer.key}`,JSON.stringify(layer.outputs),1,at,JSON.stringify(identity));
+  for(const layer of declarations){
+    const pkg=ensureLayerPackage(db,projectId,layer.key);
+    if(pkg && (pkg.manifest.authority!==layer.authority || JSON.stringify(pkg.manifest.outputs)!==JSON.stringify(layer.outputs))) throw new Error('Layer package output authority differs from the migration contract.');
+    const manifest=pkg?.manifest;
+    const [fallbackCategory,fallbackIcon,fallbackDescription]=presentation[layer.key];
+    const identity=pkg?{...parseCharter(pkg.charter),markdown:pkg.charter}:builtInIdentity[layer.key];
+    const category=manifest?.category||fallbackCategory,icon=manifest?.icon||fallbackIcon;
+    const description=manifest?.description||fallbackDescription;
+    insert.run(projectId,layer.key,manifest?.name||layer.name,description,category,icon,layer.path,layer.authority,
+      manifest?.outputProvider||layer.authority,manifest?.editorAdapter||`native:${layer.key}`,JSON.stringify(layer.outputs),1,at,JSON.stringify(identity));
     db.prepare("UPDATE layer_definitions SET identity_json=?,identity_revision=1 WHERE project_id=? AND layer_key=? AND built_in=1 AND identity_revision=0")
       .run(JSON.stringify(identity),projectId,layer.key);
+    if(pkg)db.prepare("UPDATE layer_definitions SET output_tabs_json=?,package_commit=? WHERE project_id=? AND layer_key=? AND built_in=1 AND package_commit IS NULL")
+      .run(JSON.stringify(manifest.tabs),pkg.commit,projectId,layer.key);
     db.prepare('INSERT OR IGNORE INTO layer_identity_revisions VALUES (?,?,?,?,?,?)')
-      .run(projectId,layer.key,1,JSON.stringify(identity),'built-in',at);
+      .run(projectId,layer.key,1,JSON.stringify(identity),pkg?'pages-template':'built-in',at);
   }
 }
 const actionRows=(db,projectId,key)=>db.prepare('SELECT * FROM layer_custom_actions WHERE project_id=? AND layer_key=? ORDER BY rowid').all(projectId,key)
@@ -66,6 +79,7 @@ const actionRows=(db,projectId,key)=>db.prepare('SELECT * FROM layer_custom_acti
 const decode=(db,row)=>row&&({key:row.layer_key,name:row.name,description:row.description,category:row.category,icon:row.icon,path:row.path,
   authority:row.authority,outputProvider:row.output_provider,editorAdapter:row.editor_adapter,outputs:parse(row.output_kinds_json,[]),
   color:row.color||null,builtIn:!!row.built_in,version:row.descriptor_version,lifecycle:row.lifecycle,identity:parse(row.identity_json,null),
+  outputTabs:parse(row.output_tabs_json,[]),packageCommit:row.package_commit||null,
   identityRevision:row.identity_revision,domainActions:actionRows(db,row.project_id,row.layer_key)});
 export function projectLayerDefinition(db,projectId,key) {
   if(!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='layer_definitions'").get())return null;

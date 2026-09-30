@@ -6,3 +6,6 @@ test-results/
 .angular/
 .vite/
 out-tsc/
+
+# Compiled source from pinned layer repositories
+src/installed/

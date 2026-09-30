@@ -141,7 +141,7 @@ export function recordNewWorkAction(db, projectId, workId, legacyActionId) {
   const entry = combinedLegacyInventory[legacyActionId];
   const action = entry?.disposition === 'recreated' ? projectAction(db, projectId, entry.action) : projectAction(db, projectId, legacyActionId);
   const installed = action && db.prepare('SELECT action_revision FROM layer_action_installations WHERE project_id = ? AND action_id = ?').get(projectId, action.id);
-  const disposition = installed?.action_revision === action?.revision && (action.humanRunnable || action.agentRunnable) ? 'mapped' : 'blocked';
+  const disposition = action && installed?.action_revision === action.revision && (action.humanRunnable || action.agentRunnable) ? 'mapped' : 'blocked';
   db.prepare(`INSERT OR IGNORE INTO layer_work_migration
     (project_id, work_id, legacy_action_id, action_id, action_revision, disposition, reason, recorded_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(projectId, workId, legacyActionId, action?.id || null, action?.revision || null, disposition,

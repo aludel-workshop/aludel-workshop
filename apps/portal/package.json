@@ -15,7 +15,11 @@
     "build": "vite build",
     "typecheck": "ngc -p tsconfig.app.json --noEmit",
     "storybook": "storybook dev -p 6006 --no-open --disable-telemetry",
-    "build-storybook": "storybook build --disable-telemetry"
+    "build-storybook": "storybook build --disable-telemetry",
+    "sync:layers": "node tools/sync-layer-template.mjs",
+    "prebuild": "npm run sync:layers",
+    "pretypecheck": "npm run sync:layers",
+    "predev": "npm run sync:layers"
   },
   "dependencies": {
     "@angular/animations": "22.1.7",

@@ -17,11 +17,12 @@ const outputTabs: Record<string, OutputTabs> = {
 export const layerSpaces = ['tasks', 'knowledge', 'manage'];
 
 export function layerOutputTabs(layer: LayerInstance | null): [string, string][] {
+  if (layer?.outputTabs?.length) return layer.outputTabs.map(tab => [tab.key,tab.label]);
   return layer ? outputTabs[layer.editorAdapter]?.tabs || [] : [];
 }
 // The output tab a URL segment opens: its own slug, an alias, or the layer's first tab.
 export function activeOutputTab(layer: LayerInstance | null, segment: string | undefined): string {
-  const entry = layer ? outputTabs[layer.editorAdapter] : undefined;
+  const entry = layer?.outputTabs?.length ? { tabs: layer.outputTabs.map(tab => [tab.key,tab.label] as [string,string]) } : layer ? outputTabs[layer.editorAdapter] : undefined;
   if (!entry || (segment && layerSpaces.includes(segment))) return '';
   if (segment && entry.tabs.some(([slug]) => slug === segment)) return segment;
   return (segment && entry.aliases?.[segment]) || entry.tabs[0]?.[0] || '';

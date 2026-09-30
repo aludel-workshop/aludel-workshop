@@ -1,1 +1,41 @@
-{"compilerOptions":{"target":"ES2022","module":"ESNext","moduleResolution":"bundler","lib":["ES2022","dom"],"experimentalDecorators":true,"useDefineForClassFields":false,"strict":true,"skipLibCheck":true,"isolatedModules":true,"resolveJsonModule":true,"types":[]},"angularCompilerOptions":{"strictTemplates":true}}
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": [
+      "ES2022",
+      "dom"
+    ],
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
+    "strict": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "types": [],
+    "paths": {
+      "@aludel/host/context": [
+        "./src/layers/context.ts"
+      ],
+      "@aludel/host/built-by": [
+        "./src/layers/built-by.ts"
+      ],
+      "@aludel/host/design-components": [
+        "./src/layers/design-components.ts"
+      ],
+      "@aludel/host/design-state": [
+        "./src/layers/design-state.ts"
+      ],
+      "@aludel/host/page-blocks": [
+        "./src/page-blocks.ts"
+      ],
+      "@aludel/host/design-tokens": [
+        "./src/design-tokens.d.ts"
+      ]
+    }
+  },
+  "angularCompilerOptions": {
+    "strictTemplates": true
+  }
+}

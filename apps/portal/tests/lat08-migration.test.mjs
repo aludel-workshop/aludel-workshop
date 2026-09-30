@@ -5,7 +5,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync, rmSync } from 'node
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { initActionMigration, migrateActionProject, actionGrant, workActionMigration, setProjectWorkStyle, setActionAssignee, setLayerActionGrant, setActionMethod, layerActionSettings } from '../server/lat08-migration.mjs';
+import { initActionMigration, migrateActionProject, actionGrant, workActionMigration, recordNewWorkAction, setProjectWorkStyle, setActionAssignee, setLayerActionGrant, setActionMethod, layerActionSettings } from '../server/lat08-migration.mjs';
 import { readActionSource, checkActionEffect } from '../server/code-action-gateway.mjs';
 
 function fixture(style = 'dreamer') {
@@ -41,6 +41,17 @@ test('migration is idempotent and keeps historical pins while blocking unsupport
   assert.throws(() => workActionMigration(db, 'p1', 'work2'), /adapter|unavailable|mapping/i);
   assert.equal(db.prepare("SELECT revision FROM knowledge_records WHERE id = 'legacy1'").get().revision, 4);
   assert.equal(db.prepare("SELECT state FROM layer_work_items WHERE id = 'work2'").get().state, 'ready');
+  db.close();
+});
+
+test('new Work items with no checked action are blocked without interrupting Pages review', () => {
+  const db = fixture();
+  migrateActionProject(db, 'p1');
+  recordNewWorkAction(db, 'p1', 'flow-review', 'pages.flow.review');
+  const row = db.prepare("SELECT disposition, action_id, reason FROM layer_work_migration WHERE project_id = 'p1' AND work_id = 'flow-review'").get();
+  assert.equal(row.disposition, 'blocked');
+  assert.equal(row.action_id, null);
+  assert.match(row.reason, /checked layer action/i);
   db.close();
 });
 
