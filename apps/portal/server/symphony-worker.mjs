@@ -18,7 +18,7 @@ import { activeLayerTopology, discoverySourceSnapshot } from './layer-discovery.
 import { applyDiscoveryProposal } from './layer-space.mjs';
 import { checkFollowUps, layerWorkScope, recordFollowUps, requireElevated } from './layer-scope.mjs';
 import { applyWrites, checkDraftCurrent, draftChanges, initLayerApi, initSourceReviews, layerApi, stageOperation } from './layer-api.mjs';
-import { acceptSourceCandidate, buildSourceCandidate, hasSourceDraft, initLayerSource, settleSourceCheckout, sourceCall } from './layer-source.mjs';
+import { commitLayerBranch, initLayerSource, layerBranch, layerBundle, mergeLayerBranch, settleLayerCheckout, undoLayerMerge, workBranchName } from './layer-source.mjs';
 
 const hash = value => createHash('sha256').update(value).digest('hex');
 const now = () => new Date().toISOString();
@@ -641,14 +641,40 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     if (typeof operation !== 'string' || !body || typeof body !== 'object' || Array.isArray(body)) fail('Name an operation and pass its body.');
     return stageOperation({ db, catalogs: know.catalogs, api: runLayerApi(scope, row, bundle), projectId: scope.projectId, attemptId, operationId: operation, id, body });
   }
-  // LAYER-SOURCE-01: the run's own layer repository, read and edited against the pinned commit plus this run's draft.
-  function callLayerSource(scope, { attemptId, action, path = null, content = null }) {
+  // LAYER-BASE-01 B5: the run's sandbox works on its layer instance's repository. The workspace hook clones it from a bundle
+  // at the run's base onto the run's work branch, with a copy of the layer's current outputs to test against.
+  function layerRun(scope, attemptId, { working = false } = {}) {
     const row = attempt(scope, attemptId);
     const bundle = saved(scope, row.bundle_digest);
+    if (!bundle.guidance.layerScope) return { row, bundle, layer: null };
     const issue = current(scope, row.work_id);
-    if (!bundle.guidance.layerScope || !issue || issue.native_ref.attempt_id !== attemptId || row.state !== 'working' || row.runs_started < 1)
-      fail('This attempt cannot edit its layer repository now.', 409);
-    return sourceCall(db, { projectId: scope.projectId, key: bundle.guidance.layerScope.key, attemptId, baseCommit: bundle.layerPackage.commit, action, path, content });
+    if (!issue || issue.native_ref.attempt_id !== attemptId || working && (row.state !== 'working' || row.runs_started < 1)) fail('This attempt cannot work on its layer now.', 409);
+    return { row, bundle, layer: bundle.guidance.layerScope };
+  }
+  function layerWorkspace(scope, attemptId) {
+    const { row, bundle, layer } = layerRun(scope, attemptId);
+    if (!layer) return { layer: null };
+    const instance = layer.instanceId;
+    const outputs = Object.fromEntries((bundle.layerApi ? Object.keys(bundle.layerApi.spec['x-aludel-records'] || {}) : []).map(kind => [kind,
+      db.prepare('SELECT id, revision, data_json FROM knowledge_records WHERE project_id = ? AND kind = ? AND layer_instance_id = ? ORDER BY position, created_at').all(scope.projectId, kind, instance)
+        .map(record => ({ id: record.id, revision: record.revision, data: JSON.parse(record.data_json) }))]));
+    const catalogs = Object.fromEntries((bundle.layerApi?.spec['x-aludel-catalogs'] || []).map(name => {
+      const value = know.catalogs?.[name];
+      return [name, Array.isArray(value) ? value : value && typeof value === 'object' ? Object.keys(value) : []];
+    }));
+    return { layer: layer.key, base: bundle.layerPackage.commit, branch: workBranchName(bundle.work.ref, row.id), outputs, catalogs };
+  }
+  function layerSourceBundle(scope, attemptId) {
+    const { row, bundle, layer } = layerRun(scope, attemptId);
+    if (!layer) fail('This attempt has no layer repository.', 404);
+    return layerBundle(db, { projectId: scope.projectId, key: layer.key, base: bundle.layerPackage.commit, attemptId: row.id });
+  }
+  function commitLayer(scope, { attemptId, message, tests = [] }) {
+    const { row, bundle, layer } = layerRun(scope, attemptId, { working: true });
+    if (!layer) fail('This attempt has no layer repository.', 404);
+    if (!row.workspace_path) fail('Register the run workspace first.', 409);
+    return commitLayerBranch(db, { projectId: scope.projectId, key: layer.key, attemptId: row.id, workspace: row.workspace_path, base: bundle.layerPackage.commit,
+      workRef: bundle.work.ref, message, tests });
   }
   function submitLayerChanges(scope, row, bundle, proposal) {
     const content = proposal.content;
@@ -657,8 +683,8 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     const followUps = checkFollowUps(db, scope.projectId, proposal.followUps);
     checkDraftCurrent(db, runLayerApi(scope, row, bundle), scope.projectId, row.id);
     const changes = draftChanges(db, scope.projectId, row.id);
-    const source = hasSourceDraft(db, row.id) ? { ...buildSourceCandidate(db, { projectId: scope.projectId, key: bundle.guidance.layerScope.key, attemptId: row.id,
-      baseCommit: bundle.layerPackage.commit, message: `${bundle.work.ref}: ${proposal.summary.trim()}` }), attempt: row.id } : null;
+    const source = layerBranch(db, row.id);
+    if (source && source.base !== layerPackageForProject(db, scope.projectId, bundle.guidance.layerScope.key)?.commit) fail('The layer repository moved since this run began. Authorize a fresh run.', 409);
     if (!changes.length && !source && !content.notes?.trim() && !followUps.length) fail('Stage at least one change, or submit a note or a follow-up.');
     const usedInputs = proposal.usedInputs || [];
     if (!Array.isArray(usedInputs) || usedInputs.length > 200 || !usedInputs.every(ref => ref && typeof ref.id === 'string' && Number.isInteger(ref.revision) && ref.revision > 0))
@@ -675,19 +701,21 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
       if (!policy || policy.revision !== control.revision || policy.status !== 'active') fail('The originating layer policy changed. Send this back.', 409);
     }
     for (const ref of submitted.usedInputs || []) if (know.get(projectId, ref.id)?.revision !== ref.revision) fail('A used input changed. Send this back.', 409);
+    // Staged data was checked under the layer's rules at the run's base, so it applies only while those rules are the pin.
+    // A run that changes only the repository merges onto a moved main instead.
     const api = layerApi(db, projectId, bundle.guidance.layerScope.key);
-    if (!api || api.commit !== bundle.guidance.layerScope.commit) fail(`The ${bundle.guidance.layerScope.key} layer source changed. Send this back.`, 409);
+    if (submitted.changes.length && (!api || api.commit !== bundle.guidance.layerScope.commit)) fail(`The ${bundle.guidance.layerScope.key} layer source changed. Send this back.`, 409);
     const attemptId = db.prepare('SELECT attempt_id FROM symphony_proposals WHERE id = ?').get(submitted.id).attempt_id;
-    checkDraftCurrent(db, api, projectId, attemptId);
+    if (submitted.changes.length) checkDraftCurrent(db, api, projectId, attemptId);
     const staged = draftChanges(db, projectId, attemptId);
     if (JSON.stringify(staged) !== JSON.stringify(submitted.changes)) fail('The staged changes differ from what was reviewed. Send this back.', 409);
     // References were checked against current records and the draft above.
     const applied = [...applyWrites(know, projectId, submitted.changes.map(change => ({ op: change.op, kind: change.kind, id: change.id, baseRevision: change.baseRevision, data: change.after })), [],
-      { author: options.author, rationale: options.rationale, workItemId: options.workItemId }).map(record => record.id), ...submitted.changes.filter(change => change.op === 'delete').map(change => change.id)];
+      { layer: bundle.guidance.layerScope.key, author: options.author, rationale: options.rationale, workItemId: options.workItemId }).map(record => record.id), ...submitted.changes.filter(change => change.op === 'delete').map(change => change.id)];
     // Data applies under the rules it was checked with; then the reviewed layer commit becomes the pin.
     const key = bundle.guidance.layerScope.key;
     const instance = db.prepare('SELECT instance_id FROM layer_instances WHERE project_id = ? AND layer_key = ?').get(projectId, key)?.instance_id;
-    const source = submitted.source ? acceptSourceCandidate(db, { projectId, key, source: submitted.source, reviewer: user.name, workId: entry.id, catalogs: know.catalogs,
+    const source = submitted.source ? mergeLayerBranch(db, { projectId, key, source: submitted.source, reviewer: user.name, workId: entry.id, workRef: entry.ref, catalogs: know.catalogs,
       recordsOf: kind => db.prepare('SELECT id, data_json FROM knowledge_records WHERE project_id = ? AND kind = ? AND layer_instance_id = ?').all(projectId, kind, instance)
         .map(record => ({ id: record.id, data: JSON.parse(record.data_json) })) }) : null;
     return { applied, source };
@@ -877,12 +905,12 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     }
     const submitted = JSON.parse(row.content_json);
     const content = submitted.content;
+    let accepted = null;
     db.exec('BEGIN IMMEDIATE');
     try {
       let acceptedFlowId = null;
       const options = { author: user.name, rationale: `Accepted ${entry.ref} proposal`, workItemId: entry.id };
       let appliedIds = [];
-      let accepted = null;
       if (layerScoped) { accepted = acceptLayerChanges(user, projectId, entry, submitted, bundle, options); appliedIds = accepted.applied; }
       else if (row.action_id.endsWith('.discover')) {
         const installed = activeLayerTopology(db,projectId);
@@ -936,9 +964,9 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
         refs: [...bundle.work.targets.map(target => target.id), ...(acceptedFlowId ? [acceptedFlowId] : []), ...appliedIds] });
       const work = know.updateWork(user, projectId, workId, { state: 'done', proposalId });
       db.exec('COMMIT');
-      if (accepted?.source) settleSourceCheckout(accepted.source.repo, accepted.source.commit);
+      settleLayerCheckout(accepted?.source);
       return { work, proposalId, ...(acceptedFlowId ? { flowId: acceptedFlowId } : {}), ...(layerScoped ? { applied: appliedIds, sourceCommit: accepted.source?.commit || null } : {}) };
-    } catch (error) { db.exec('ROLLBACK'); throw error; }
+    } catch (error) { if (db.isTransaction) { db.exec('ROLLBACK'); undoLayerMerge(accepted?.source); } throw error; }
   }
   function rejectProposal(projectId, workId, proposalId) {
     db.prepare("UPDATE symphony_proposals SET state = 'rejected' WHERE id = ? AND project_id = ? AND work_id = ? AND state = 'submitted'")
@@ -1015,5 +1043,5 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     const page = ready.slice(0, limit);
     return { issues: page, nextCursor: ready.length > limit ? page.at(-1).id : null };
   }
-  return { ensurePool, poolStatus, configurePool, heartbeat, scopeForDigest, scopeForAttempt, pinnedCurrent, issueToken, revoke, status, hasConnection, authenticate, pin, saved, activeBundle, taskOpen, knowledgeMap, knowledgeSearch, knowledgeRead, current, issues, registerWorkspace, reserveRun, submitCandidate, submitAudit, submitProposal, acceptProposal, rejectProposal, callLayer, callLayerSource, askQuestion, commitCandidate, appendEvent, attemptStatus, attemptForWork, extendRuns };
+  return { ensurePool, poolStatus, configurePool, heartbeat, scopeForDigest, scopeForAttempt, pinnedCurrent, issueToken, revoke, status, hasConnection, authenticate, pin, saved, activeBundle, taskOpen, knowledgeMap, knowledgeSearch, knowledgeRead, current, issues, registerWorkspace, reserveRun, submitCandidate, submitAudit, submitProposal, acceptProposal, rejectProposal, callLayer, layerWorkspace, layerSourceBundle, commitLayer, askQuestion, commitCandidate, appendEvent, attemptStatus, attemptForWork, extendRuns };
 }

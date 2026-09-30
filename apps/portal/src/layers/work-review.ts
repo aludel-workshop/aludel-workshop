@@ -87,7 +87,8 @@ const evidenceType: Record<Evidence['type'], [string, string]> = { change: ['dif
                   </div>
                 }
                 @case ('tests') {
-                  <ul class="wr-tests">@for (check of r.candidate?.checks || []; track $index) {
+                  @if (r.layerSource; as branch) { <p class="small lay-muted">Run by the agent in its sandbox on <code>{{ branch.branch }}</code> ({{ branch.commit.slice(0, 12) }}) against a copy of the layer's outputs.</p> }
+                  <ul class="wr-tests">@for (check of testsOf(r); track $index) {
                     <li [class.hl]="focus() === 'test:' + $index"><mat-icon aria-hidden="true" [class]="'wr-t-' + check.status">{{ check.status === 'passed' ? 'check_circle' : check.status === 'failed' ? 'cancel' : 'radio_button_unchecked' }}</mat-icon>
                       <span>{{ check.name }}<small>{{ check.source === 'agent-report' ? 'Reported by the agent; not re-run by Aludel' : 'Run by Aludel' }}@if (check.detail) { · {{ check.detail }} }</small></span></li> }</ul>
                 }
@@ -181,7 +182,7 @@ export class WorkReviewComponent {
     return [{ id: 'changes', label: 'Changes', icon: 'difference', count: r.changes.length },
       ...(r.followUps?.length ? [{ id: 'follow-ups', label: 'Follow-ups', icon: 'playlist_add', count: r.followUps.length }] : []),
       ...(r.candidate ? [{ id: 'preview', label: 'Preview', icon: 'web', count: 0 }] : []),
-      ...(r.candidate?.checks?.length ? [{ id: 'tests', label: 'Tests', icon: 'science', count: r.candidate.checks.length }] : [])]; });
+      ...(this.testsOf(r).length ? [{ id: 'tests', label: 'Tests', icon: 'science', count: this.testsOf(r).length }] : [])]; });
   // The evidence the run named for this criterion (WI-6). Runs that named none fall back to everything they produced.
   readonly named = computed(() => (this.run()?.evidence || []).length > 0);
   readonly evidence = computed<Evidence[]>(() => { const r = this.run(); if (!r) return [];
@@ -190,7 +191,7 @@ export class WorkReviewComponent {
       detail: !item.found ? 'Named by the performer, but not in the review packet' : item.type === 'test' ? (item.independent ? 'Run by Aludel' : 'Reported by the agent; not re-run') : item.type === 'try' ? item.ref : item.note,
       result: item.type === 'test' ? item.result || undefined : undefined, missing: !item.found }));
     return [...r.changes.map(change => ({ type: 'change' as const, label: change.name, detail: `${this.opLabel[change.op]}${change.size ? ' · ' + change.size : ''}`, look: `change:${change.id}` })),
-      ...(r.candidate?.checks || []).map((check, index) => ({ type: 'test' as const, label: check.name, detail: check.source === 'agent-report' ? 'Reported by the agent' : 'Run by Aludel', look: `test:${index}`, result: check.status }))]; });
+      ...this.testsOf(r).map((check, index) => ({ type: 'test' as const, label: check.name, detail: check.source === 'agent-report' ? 'Reported by the agent' : 'Run by Aludel', look: `test:${index}`, result: check.status }))]; });
   readonly flaggedChanges = computed(() => { const r = this.run(); return r ? r.changes.filter(change => r.review.flags[change.id] !== undefined) : []; });
   readonly flagCount = computed(() => { const r = this.run(); return r ? Object.values(r.review.verdicts).filter(value => value.value === 'reject').length + this.flaggedChanges().length : 0; });
   readonly unchecked = computed(() => { const r = this.run(); return r ? r.task.criteria.filter(c => !r.review.verdicts[c.index] || r.review.verdicts[c.index].value === 'skip').length : 0; });
@@ -244,6 +245,7 @@ export class WorkReviewComponent {
     void this.ctx.api<{ diff: string }>(`${this.base()}/candidates/${encodeURIComponent(r.candidate.id)}`).then(value => this.diffLines.set((value.diff || '').split('\n').slice(0, 2000)), () => this.diffLines.set([])); }
   buildPreview() { const r = this.run(); if (!r?.candidate) return;
     void this.ctx.write(async () => { const value = await this.ctx.api<{ preview: { status: string; error?: string | null }; url: string }>(`${this.base()}/candidates/${encodeURIComponent(r.candidate!.id)}/preview`, 'POST', {}); this.preview.set({ ...value.preview, url: value.url }); }); }
+  testsOf(run: WorkRun) { return run.candidate?.checks?.length ? run.candidate.checks : run.layerSource?.tests || []; }
   layerName(key: string) { return this.ctx.layerInstances().find(entry => entry.key === key)?.name || key; }
   decide(followUpId: string, decision: 'create' | 'dismiss') {
     void this.ctx.write(async () => {

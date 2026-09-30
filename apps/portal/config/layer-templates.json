@@ -8,6 +8,10 @@
     "pages": {
       "branch": "pages",
       "commit": "09f5f1e0f05917175991387bf3fdc4444d5df1b8"
+    },
+    "markdown": {
+      "branch": "markdown",
+      "commit": "837190c2333ffdef8fdb42f8322368979bef9eef"
     }
   },
   "builtIn": {

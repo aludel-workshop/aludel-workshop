@@ -88,7 +88,8 @@ export function initSourceReviews(db) {
     reviewed_by TEXT NOT NULL, reviewed_at TEXT NOT NULL, work_id TEXT, PRIMARY KEY(project_id, layer_key, path, digest))`);
 }
 export function sourceReviewed(db, projectId, key, path, digest) {
-  if (reviewedSources[key]?.[path]?.includes(digest)) return true;
+  // The host's own list is by file and exact bytes, whichever instance runs them; owner acceptance is per project and instance.
+  if (reviewedSources[path]?.includes(digest)) return true;
   return Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_source_reviews'").get() &&
     db.prepare('SELECT 1 FROM layer_source_reviews WHERE project_id = ? AND layer_key = ? AND path = ? AND digest = ?').get(projectId, key, path, digest));
 }
@@ -236,7 +237,7 @@ export function applyOperation({ db, know, api, projectId, operationId, id = nul
   const own = !db.isTransaction;
   if (own) db.exec('BEGIN IMMEDIATE');
   try {
-    const records = applyWrites(know, projectId, called.writes, called.references, { author, rationale, workItemId });
+    const records = applyWrites(know, projectId, called.writes, called.references, { layer: api.key, author, rationale, workItemId });
     if (own) db.exec('COMMIT');
     const first = records[0];
     return { id: first?.id || called.writes[0].id, revision: first?.revision ?? null, data: called.writes[0].data ?? null, record: first || null, records };
@@ -244,11 +245,11 @@ export function applyOperation({ db, know, api, projectId, operationId, id = nul
 }
 
 // Writes checked changes through the host store: creates first so later writes can point at them, deletes last.
-export function applyWrites(know, projectId, writes, references, { author, rationale = null, workItemId = null, baseCheck = true } = {}) {
+export function applyWrites(know, projectId, writes, references, { layer, author, rationale = null, workItemId = null, baseCheck = true } = {}) {
   const order = { create: 0, update: 1, delete: 2 };
   return [...writes].sort((a, b) => order[a.op] - order[b.op]).map(write => {
     const prepared = { data: write.data, references: [] };
-    if (write.op === 'create') return know.insert(projectId, write.kind, write.data, { id: write.id, prepared, author, rationale, workItemId });
+    if (write.op === 'create') return know.insert(projectId, write.kind, write.data, { id: write.id, prepared, author, rationale, workItemId, layer });
     if (write.op === 'update') return know.update(projectId, write.id, write.data, { expectedRevision: baseCheck ? write.baseRevision : undefined, prepared, author, rationale, workItemId });
     const current = know.get(projectId, write.id);
     if (!current || baseCheck && current.revision !== write.baseRevision) fail('A record this change deletes was changed since. Reload and try again.', 409);

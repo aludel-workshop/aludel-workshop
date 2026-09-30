@@ -27,7 +27,8 @@ import { openDatabase } from './storage.mjs';
 import { initPagesLayerApp, pagesDocumentList, pagesDocumentRead, pagesDocumentUpdate, pagesConnections, pagesConnectionCreate, pagesConnectionUpdate } from './pages-layer-app.mjs';
 import { initLayerDiscovery, stageLayerDiscovery, layerDiscoveryStatus } from './layer-discovery.mjs';
 import { actionForProject, createMarkdownDefinition, projectLayerDefinitions, projectLayerDefinition, saveLayerIdentity, saveLayerPresentation, layerIdentityHistory, addDomainAction, activateLayerDefinition } from './layer-registry.mjs';
-import { initMarkdownLayer, markdownTree, markdownRead, markdownFolderCreate, markdownFolderMove, markdownFolderDelete, markdownFileCreate, markdownFileSave, markdownFileMove, markdownFileDelete } from './markdown-layer.mjs';
+import { initMarkdownLayer } from './markdown-layer.mjs';
+import { adoptMarkdownLayer, markdownOutputs } from './markdown-outputs.mjs';
 import { layerDocumentList, layerDocumentRead, layerDocumentUpdate, layerConnections, layerConnectionCreate, layerConnectionUpdate, layerRoutineRuns } from './layer-space.mjs';
 import { initPagesReconciliation, pagesReconciliationView, pagesGapDecision, reconcilePagesFlow } from './pages-reconciliation.mjs';
 import { initPagesCodeObservations, codeRouteObservations, recordCodeRouteObservation, pagesObservationRelations, proposePagesObservationRelation, reviewPagesObservationRelation, stagePagesFlowFromObservation } from './pages-code-observations.mjs';
@@ -127,6 +128,10 @@ for (const projectId of layerProjects().filter(id => !db.prepare('SELECT layer_o
   know.ensureDesign(projectId);
 }
 for (const projectId of layerProjects()) migrateActionProject(db, projectId);
+// LAYER-BASE-01: custom Markdown layers from before layer repositories get their own repository and move their files into it.
+for (const projectId of layerProjects()) for (const layer of projectLayerDefinitions(db, projectId).filter(entry => !entry.builtIn && entry.outputProvider === 'markdown-files'))
+  try { adoptMarkdownLayer({ db, know, dataDirectory, projectId, key: layer.key }); } catch (error) { console.error(`Could not move the ${layer.key} layer into its repository: ${error.message}`); }
+const markdown = markdownOutputs({ db, know, dataDirectory });
 const links = codeLinks({ db, know });
 const ops = platformOps({ db, backupRoot: join(dataDirectory, 'backups') });
 const codeRelease = codeReleases({ db });
@@ -462,16 +467,23 @@ async function api(request, response, url) {
   // Symphony host credentials have no browser/session authority. Pool requests resolve their pinned profile per attempt.
   if (url.pathname.startsWith('/api/worker/')) {
     const workerAuth = worker.authenticate(request.headers.authorization);
-    const attemptRoute = /^\/api\/worker\/attempts\/([^/]+)(?:\/(workspace|runs|events|candidate|commit|audit|proposal|question|plan|progress|source|layer|layer-source))?$/.exec(url.pathname);
+    const attemptRoute = /^\/api\/worker\/attempts\/([^/]+)(?:\/(workspace|runs|events|candidate|commit|audit|proposal|question|plan|progress|source|layer|layer-commit|layer-workspace|layer-bundle))?$/.exec(url.pathname);
     if (attemptRoute) {
       const [, attemptId, operation] = attemptRoute;
       const scope = worker.scopeForAttempt(workerAuth, attemptId);
       if (!operation && request.method === 'GET') return json(response, 200, worker.attemptStatus(scope, attemptId), { 'cache-control': 'no-store' });
+      if (operation === 'layer-workspace' && request.method === 'GET') return json(response, 200, worker.layerWorkspace(scope, attemptId), { 'cache-control': 'no-store' });
+      if (operation === 'layer-bundle' && request.method === 'GET') {
+        const body = worker.layerSourceBundle(scope, attemptId);
+        response.writeHead(200, { 'content-type': 'application/octet-stream', 'content-length': body.length, 'cache-control': 'no-store' });
+        return response.end(body);
+      }
       if (operation === 'source' && request.method === 'GET') return json(response, 200, readAttemptSource(db, scope, attemptId, url.searchParams.get('path')), { 'cache-control': 'no-store' });
       if (request.method === 'POST' && operation) {
-        const input = await readJson(request, ['audit', 'proposal'].includes(operation) ? 128 * 1024 : operation === 'layer-source' ? 256 * 1024 : 64 * 1024);
+        const input = await readJson(request, ['audit', 'proposal'].includes(operation) ? 128 * 1024 : 64 * 1024);
         // PAGES-API-01: a layer-scoped run calls its layer's API; writes stage in the run's draft until review.
-        if (operation === 'layer-source') return json(response, 200, worker.callLayerSource(scope, { attemptId, action: input.action, path: input.path ?? null, content: input.content ?? null }), { 'cache-control': 'no-store' });
+        // LAYER-BASE-01 B5: the host commits the sandbox's layer checkout as the run's work branch, with the agent's test results.
+        if (operation === 'layer-commit') return json(response, 200, worker.commitLayer(scope, { attemptId, message: input.message, tests: input.tests ?? [] }), { 'cache-control': 'no-store' });
         if (operation === 'layer') return json(response, 200, worker.callLayer(scope, { attemptId, operation: input.operation, id: input.id ?? null, body: input.body ?? {} }), { 'cache-control': 'no-store' });
         // WORK-ITEM-UX-01 WI-5: the agent's own plan and progress, shown as the run's objectives.
         if (operation === 'plan') return json(response, 200, runHistory.reportPlan(workerAuth.projectId, attemptId, input.objectives), { 'cache-control': 'no-store' });
@@ -656,18 +668,18 @@ async function api(request, response, url) {
   const markdownRoute = /^\/api\/projects\/([^/]+)\/layers\/([^/]+)\/markdown\/(tree|folders|files)(?:\/([^/]+))?(?:\/(move))?$/.exec(url.pathname);
   if(markdownRoute){
     const projectId=decodeURIComponent(markdownRoute[1]),key=decodeURIComponent(markdownRoute[2]),section=markdownRoute[3],fileId=markdownRoute[4]?decodeURIComponent(markdownRoute[4]):null;
-    if(section==='tree'&&request.method==='GET')return json(response,200,markdownTree(db,dataDirectory,user.id,projectId,key),{'cache-control':'no-store'});
+    if(section==='tree'&&request.method==='GET')return json(response,200,markdown.tree(user.id,projectId,key),{'cache-control':'no-store'});
     if(section==='folders'){
-      if(request.method==='POST'&&!fileId){const created=markdownFolderCreate(db,dataDirectory,user.id,projectId,key,(await readJson(request)).path);know.runRoutines(projectId,{trigger:'output-change',layerKey:key});return json(response,201,created);}
-      if(request.method==='PUT'&&!fileId){const input=await readJson(request);const moved=markdownFolderMove(db,dataDirectory,user.id,projectId,key,input.from,input.to);know.runRoutines(projectId,{trigger:'output-change',layerKey:key});return json(response,200,moved);}
-      if(request.method==='DELETE'&&!fileId){const deleted=markdownFolderDelete(db,dataDirectory,user.id,projectId,key,url.searchParams.get('path'));know.runRoutines(projectId,{trigger:'output-change',layerKey:key});return json(response,200,deleted);}
+      if(request.method==='POST'&&!fileId){const created=markdown.folderCreate(user.id,projectId,key,(await readJson(request)).path);know.runRoutines(projectId,{trigger:'output-change',layerKey:key});return json(response,201,created);}
+      if(request.method==='PUT'&&!fileId){const input=await readJson(request);const moved=markdown.folderMove(user.id,projectId,key,input.from,input.to);know.runRoutines(projectId,{trigger:'output-change',layerKey:key});return json(response,200,moved);}
+      if(request.method==='DELETE'&&!fileId){const deleted=markdown.folderDelete(user.id,projectId,key,url.searchParams.get('path'));know.runRoutines(projectId,{trigger:'output-change',layerKey:key});return json(response,200,deleted);}
     }
     if(section==='files'){
-      if(request.method==='POST'&&!fileId){const input=await readJson(request);const created=markdownFileCreate(db,dataDirectory,user.id,projectId,key,input.path,input.content||'',input.workId||null);know.runRoutines(projectId,{trigger:'output-change',layerKey:key});return json(response,201,created);}
-      if(request.method==='GET'&&fileId&&!markdownRoute[5])return json(response,200,markdownRead(db,dataDirectory,user.id,projectId,key,fileId,url.searchParams.has('revision')?Number(url.searchParams.get('revision')):null),{'cache-control':'no-store'});
-      if(request.method==='PUT'&&fileId&&!markdownRoute[5]){const saved=markdownFileSave(db,dataDirectory,user.id,projectId,key,fileId,await readJson(request));know.runRoutines(projectId,{trigger:'output-change',layerKey:key});return json(response,200,saved);}
-      if(request.method==='POST'&&fileId&&markdownRoute[5]==='move'){const moved=markdownFileMove(db,dataDirectory,user.id,projectId,key,fileId,await readJson(request));know.runRoutines(projectId,{trigger:'output-change',layerKey:key});return json(response,200,moved);}
-      if(request.method==='DELETE'&&fileId&&!markdownRoute[5]){const deleted=markdownFileDelete(db,dataDirectory,user.id,projectId,key,fileId,Number(url.searchParams.get('expectedRevision')));know.runRoutines(projectId,{trigger:'output-change',layerKey:key});return json(response,200,deleted);}
+      if(request.method==='POST'&&!fileId){const input=await readJson(request);const created=markdown.fileCreate(user.id,projectId,key,input.path,input.content||'',input.workId||null);know.runRoutines(projectId,{trigger:'output-change',layerKey:key});return json(response,201,created);}
+      if(request.method==='GET'&&fileId&&!markdownRoute[5])return json(response,200,markdown.read(user.id,projectId,key,fileId,url.searchParams.has('revision')?Number(url.searchParams.get('revision')):null),{'cache-control':'no-store'});
+      if(request.method==='PUT'&&fileId&&!markdownRoute[5]){const saved=markdown.fileSave(user.id,projectId,key,fileId,await readJson(request));know.runRoutines(projectId,{trigger:'output-change',layerKey:key});return json(response,200,saved);}
+      if(request.method==='POST'&&fileId&&markdownRoute[5]==='move'){const moved=markdown.fileMove(user.id,projectId,key,fileId,await readJson(request));know.runRoutines(projectId,{trigger:'output-change',layerKey:key});return json(response,200,moved);}
+      if(request.method==='DELETE'&&fileId&&!markdownRoute[5]){const deleted=markdown.fileDelete(user.id,projectId,key,fileId,Number(url.searchParams.get('expectedRevision')));know.runRoutines(projectId,{trigger:'output-change',layerKey:key});return json(response,200,deleted);}
     }
     return json(response,405,{error:'Method not allowed.'});
   }

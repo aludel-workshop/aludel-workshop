@@ -4,7 +4,7 @@
 // Usage (build first): PLAYWRIGHT_MODULE=<…/playwright/index.mjs> node tests/layer-scope-browser.mjs
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -71,8 +71,17 @@ worker.reserveRun(scope, { attemptId: issue.native_ref.attempt_id });
 const attempt = issue.native_ref.attempt_id;
 worker.callLayer(scope, { attemptId: attempt, operation: 'createFlow', body: { flow: { title: 'Find a tool', steps: [{ page: page1.id, name: 'Browse tools', trigger: 'Open Tools' }, { page: page2.id, name: 'Read the detail' }] } } });
 worker.callLayer(scope, { attemptId: attempt, operation: 'updatePage', id: page2.id, body: { changes: { description: 'Everything a neighbour needs before borrowing.' } } });
-const method = worker.callLayerSource(scope, { attemptId: attempt, action: 'read', path: 'knowledge/flow-method.md' }).content;
-worker.callLayerSource(scope, { attemptId: attempt, action: 'write', path: 'knowledge/flow-method.md', content: `${method.trim()}\n\nName the goal before the first step.\n` });
+// The sandbox's layer checkout, as the workspace hook prepares it; the agent edits there and the host commits its branch.
+const layerInfo = worker.layerWorkspace(scope, attempt);
+const layerCheckout = join(clone, 'layer');
+writeFileSync(join(clone, '.git', 'aludel-layer.bundle'), worker.layerSourceBundle(scope, attempt));
+mkdirSync(layerCheckout); git(layerCheckout, 'init', '-q');
+git(layerCheckout, 'fetch', '-q', join(clone, '.git', 'aludel-layer.bundle'), `refs/aludel/base/${attempt}:refs/aludel/base`);
+git(layerCheckout, 'checkout', '-q', '-b', layerInfo.branch, layerInfo.base);
+writeFileSync(join(clone, '.git', 'info', 'exclude'), '/layer/\n', { flag: 'a' });
+const methodPath = join(layerCheckout, 'knowledge/flow-method.md');
+writeFileSync(methodPath, `${readFileSync(methodPath, 'utf8').trim()}\n\nName the goal before the first step.\n`);
+worker.commitLayer(scope, { attemptId: attempt, message: 'Name the goal first', tests: [{ name: 'node --test tests/', status: 'passed' }] });
 worker.submitProposal(scope, { attemptId: attempt, proposal: {
   summary: 'Map finding a tool from the list to its detail page.', content: { notes: 'Detail has no borrow action yet.' },
   followUps: [
@@ -139,7 +148,11 @@ try {
   assert.equal(await fields.count(), 2, 'one field table per changed record');
   const sourceDiff = page.locator('article.wr-change', { hasText: 'repository › knowledge/flow-method.md' }).locator('pre.wr-diff');
   await sourceDiff.getByText('+Name the goal before the first step.').waitFor();
-  assert.equal(await page.locator('.wr-owner').count(), 0, 'a Knowledge edit needs no owner review');
+  assert.equal(await page.locator('.wr-owner').count(), 0, 'a Knowledge edit is not marked as changing what the layer runs');
+  await page.getByRole('tab', { name: /Tests/ }).click();
+  await page.getByText(/Run by the agent in its sandbox on/).waitFor();
+  await shot('tests');
+  await page.getByRole('tab', { name: /Changes/ }).click();
   await fields.nth(1).getByRole('rowheader', { name: 'description' }).waitFor();
   await shot('changes');
   await page.getByRole('tab', { name: /Follow-ups/ }).click();

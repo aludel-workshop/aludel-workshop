@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { contrastRatio } from '../src/color.js';
-import { initLayerPackages, ensureLayerPackage } from './layer-package.mjs';
+import { initLayerPackages, ensureLayerPackage, layerTemplates } from './layer-package.mjs';
 // Project-scoped layer definitions share one lifecycle and output/action contract.
 // Built-ins seed richer adapters; a Markdown layer begins as a draft definition.
 const fail=(message,status=400)=>{throw Object.assign(new Error(message),{status});};
@@ -111,6 +111,16 @@ export function createMarkdownDefinition(db,userId,projectId,input) {
     db.prepare('INSERT INTO layer_instances(project_id,layer_key,instance_id,enabled,created_at) VALUES (?,?,?,1,?)').run(projectId,key,randomUUID(),at);
     db.exec('COMMIT');
   }catch(error){db.exec('ROLLBACK');throw error;}
+  // LAYER-BASE-01: the new layer's own repository, forked from the Markdown template (default) or the base layer.
+  const template=input.template===undefined?'markdown':input.template;
+  if(layerTemplates().length){
+    if(!['markdown','base'].includes(template)||!layerTemplates().includes(template))fail('Start from the base layer or the Markdown template.');
+    try{
+      const pkg=ensureLayerPackage(db,projectId,key,{template,name});
+      db.prepare('UPDATE layer_definitions SET output_kinds_json=?,output_tabs_json=?,package_commit=?,output_provider=?,editor_adapter=? WHERE project_id=? AND layer_key=?')
+        .run(JSON.stringify(pkg.manifest.outputs),JSON.stringify(pkg.manifest.tabs),pkg.commit,pkg.manifest.outputProvider,pkg.manifest.editorAdapter,projectId,key);
+    }catch(error){db.prepare('DELETE FROM layer_instances WHERE project_id=? AND layer_key=?').run(projectId,key);db.prepare('DELETE FROM layer_definitions WHERE project_id=? AND layer_key=?').run(projectId,key);throw error;}
+  }
   return projectLayerDefinition(db,projectId,key);
 }
 // Layer presentation (Manage › Settings). Every layer, built-in or custom, is fully editable: any icon the portal's font

@@ -2,7 +2,7 @@
 // Symphony runs this host-side from an issue workspace, before Codex starts.
 // A private project-pool credential never reaches the Codex child.
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 
 const fail = message => { throw new Error(message); };
@@ -61,6 +61,33 @@ const registration = await fetch(new URL(endpoint + `/attempts/${attemptId}/work
   body: JSON.stringify({ path: workspace, hostId }), signal: AbortSignal.timeout(10_000),
 });
 if (!registration.ok) fail(`Aludel workspace registration failed (${registration.status}).`);
+// LAYER-BASE-01: a layer-scoped run also works on its layer's repository: a checkout at the run's base on its work branch in
+// layer/, hidden from the project checkout, with a fresh copy of the layer's current outputs to test against.
+const layerInfo = await fetch(new URL(endpoint + `/attempts/${attemptId}/layer-workspace`), { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000) });
+const layer = layerInfo.ok ? await layerInfo.json() : null;
+if (layer?.layer) {
+  if (!/^[a-f0-9]{40}$/.test(layer.base || '') || !/^work\/[a-z0-9-]+$/.test(layer.branch || '')) fail('Aludel returned an invalid layer workspace.');
+  const checkout = join(workspace, 'layer');
+  if (!existsSync(join(checkout, '.git'))) {
+    const bundle = await fetch(new URL(endpoint + `/attempts/${attemptId}/layer-bundle`), { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(30_000) });
+    if (!bundle.ok) fail(`Aludel layer repository download failed (${bundle.status}).`);
+    const bundleFile = join(workspace, '.git', 'aludel-layer.bundle');
+    writeFileSync(bundleFile, Buffer.from(await bundle.arrayBuffer()), { mode: 0o600 });
+    mkdirSync(checkout);
+    git(checkout, 'init', '--quiet');
+    git(checkout, 'fetch', '--quiet', bundleFile, `refs/aludel/base/${attemptId}:refs/aludel/base`);
+    if (git(checkout, 'rev-parse', 'refs/aludel/base') !== layer.base) fail('The layer repository download does not match the run base.');
+    git(checkout, 'checkout', '--quiet', '-b', layer.branch, layer.base);
+    appendFileSync(join(workspace, '.git', 'info', 'exclude'), '/layer/\n');
+  } else {
+    try { git(checkout, 'merge-base', '--is-ancestor', layer.base, 'HEAD'); }
+    catch { fail('The layer checkout is not descended from the run base.'); }
+  }
+  const outputs = join(checkout, '.aludel', 'outputs');
+  mkdirSync(outputs, { recursive: true });
+  for (const [kind, records] of Object.entries(layer.outputs || {})) if (/^[a-z][a-z0-9_]*$/.test(kind)) writeFileSync(join(outputs, `${kind}.json`), JSON.stringify(records, null, 2));
+  writeFileSync(join(outputs, 'catalogs.json'), JSON.stringify(layer.catalogs || {}, null, 2));
+}
 if (phase === 'start-run') {
   const reservation = await fetch(new URL(endpoint + `/attempts/${attemptId}/runs`), {
     method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },

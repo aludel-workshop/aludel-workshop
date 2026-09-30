@@ -106,7 +106,7 @@ function readPackage(repo, commit, key) {
 }
 // Forks the layer's template into this instance's own repository. Its `main` starts at the template commit; an install
 // commit makes the manifest this instance's (key, name, path) when they differ. `main` is what the host builds and serves.
-export function ensureLayerPackage(db, projectId, key, { template = null, name = null, path = null } = {}) {
+export function ensureLayerPackage(db, projectId, key, { template = null, name = null, path = null, charter = null } = {}) {
   const pin = configured(key, template);
   if (!pin) return null;
   const existing = binding(db, projectId, key);
@@ -123,8 +123,11 @@ export function ensureLayerPackage(db, projectId, key, { template = null, name =
     execFileSync('git', ['-C', staging, 'checkout', '--quiet', '-B', 'main', pin.commit], { stdio: 'pipe' });
     const manifest = JSON.parse(git(staging, 'show', `${pin.commit}:layer.json`));
     const own = { ...manifest, key, name: name || manifest.name, path: path || (manifest.key === key ? manifest.path : `/${key.replace(/_/g, '-')}`) };
-    if (own.key !== manifest.key || own.name !== manifest.name || own.path !== manifest.path) {
+    // An existing layer brings its own charter into its new repository.
+    const ownCharter = typeof charter === 'string' && charter.trim() && charter !== git(staging, 'show', `${pin.commit}:${manifest.knowledge.charter}`) ? charter : null;
+    if (own.key !== manifest.key || own.name !== manifest.name || own.path !== manifest.path || ownCharter) {
       writeFileSync(join(staging, 'layer.json'), JSON.stringify(own, null, 2) + '\n');
+      if (ownCharter) writeFileSync(join(staging, manifest.knowledge.charter), ownCharter.endsWith('\n') ? ownCharter : ownCharter + '\n');
       execFileSync('git', ['-C', staging, 'commit', '--quiet', '-am', `Install ${own.name} as ${key} from the ${pin.template} template`],
         { stdio: 'pipe', env: { ...process.env, GIT_AUTHOR_NAME: 'Aludel', GIT_AUTHOR_EMAIL: 'aludel@aludel.invalid', GIT_COMMITTER_NAME: 'Aludel', GIT_COMMITTER_EMAIL: 'aludel@aludel.invalid' } });
     }

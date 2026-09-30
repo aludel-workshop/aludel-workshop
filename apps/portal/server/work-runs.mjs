@@ -100,7 +100,10 @@ export function workRuns({ db, know, candidates = null }) {
     }
     const candidate = row.candidate_id && candidates ? candidates.get(projectId, row.candidate_id) : null;
     if (candidate) for (const file of candidate.files || []) changes.push({ id: `${candidate.id}:${file}`, kind: 'file', icon: 'code', name: file, op: 'modified', size: '', candidateId: candidate.id });
-    return { changes, followUps: proposal ? followUpsForAttempt(db, row.id).map(entry => ({ ...entry, layerName: layerName(projectId, entry.layer),
+    // LAYER-BASE-01 B5: the run's work branch of the layer repository and the tests the agent ran on it in its sandbox.
+    const layerSource = proposal ? parse(proposal.content_json, {}).source || null : null;
+    return { changes, layerSource: layerSource && { branch: layerSource.branch, commit: layerSource.commit, base: layerSource.base,
+        tests: (layerSource.tests || []).map(test => ({ ...test, source: 'agent-report' })) }, followUps: proposal ? followUpsForAttempt(db, row.id).map(entry => ({ ...entry, layerName: layerName(projectId, entry.layer),
         createdRef: entry.createdWorkId ? know.workById(projectId, entry.createdWorkId)?.ref || null : null })) : [], summary: proposal ? parse(proposal.content_json, {}).summary || null : null,
       candidate: candidate ? { id: candidate.id, state: candidate.state, commit: candidate.commit, base: candidate.base, checks: candidate.checks } : null,
       proposalId: proposal?.id || null, reportId: report?.id || null };

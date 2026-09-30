@@ -14,7 +14,7 @@ function pathParts(value,folder=false){
   if(!folder&&!parts.at(-1).toLowerCase().endsWith('.md'))fail('Files must end in .md');
   return parts;
 }
-function access(db,userId,projectId,key,write=false){
+export function access(db,userId,projectId,key,write=false){
   const member=db.prepare('SELECT role FROM project_members WHERE project_id=? AND user_id=?').get(projectId,userId);
   if(!member)fail('Project not found.',404);
   if(write&&member.role!=='owner')fail('Project owner required.',403);
@@ -22,14 +22,14 @@ function access(db,userId,projectId,key,write=false){
   if(!definition||definition.outputProvider!=='markdown-files'||!db.prepare('SELECT 1 FROM layer_instances WHERE project_id=? AND layer_key=? AND enabled=1').get(projectId,key))fail('Markdown layer not found.',404);
   return definition;
 }
-function root(dataDirectory,projectId,key){
+export function root(dataDirectory,projectId,key){
   const projectFolder=sha(projectId).slice(0,24);
   const base=resolve(dataDirectory,'layer-outputs',projectFolder,key);
   mkdirSync(base,{recursive:true,mode:0o700});
   if(lstatSync(base).isSymbolicLink())fail('Layer output root is unsafe.',409);
   return base;
 }
-function physical(base,path){
+export function physical(base,path){
   const parts=pathParts(path,path?.endsWith('.md')?false:true);
   let current=base;
   for(const part of parts){ current=join(current,part);if(existsSync(current)&&lstatSync(current).isSymbolicLink())fail('Symbolic links are not allowed in layer outputs.',409); }
@@ -40,7 +40,7 @@ function physical(base,path){
 function parent(path){const at=path.lastIndexOf('/');return at<0?'':path.slice(0,at);}
 function folderExists(db,projectId,key,path){return !path||!!db.prepare('SELECT 1 FROM markdown_folders WHERE project_id=? AND layer_key=? AND path=?').get(projectId,key,path);}
 function fileRow(db,projectId,key,fileId){const row=db.prepare('SELECT * FROM markdown_files WHERE id=? AND project_id=? AND layer_key=? AND deleted=0').get(fileId,projectId,key);if(!row)fail('Markdown file not found.',404);return row;}
-function workLink(db,projectId,key,userId,workId){
+export function workLink(db,projectId,key,userId,workId){
   if(!workId)return null;
   const row=db.prepare('SELECT layer,state,assignee_kind,assignee_id,context_json FROM layer_work_items WHERE id=? AND project_id=?').get(workId,projectId);
   const context=row?.context_json?JSON.parse(row.context_json):{};

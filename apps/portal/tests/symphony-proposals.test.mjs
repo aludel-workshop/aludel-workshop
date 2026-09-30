@@ -837,83 +837,232 @@ test('without an opted-in layer package, an action-less request keeps the legacy
   } finally { f.close(); }
 });
 
-// ---- LAYER-SOURCE-01: a run edits its own layer repository as one reviewed commit ----
+// ---- LAYER-SOURCE-01 / LAYER-BASE-01 B5: a run works on its layer repository on a branch in its sandbox; accepting merges it ----
 const pinOf = f => f.db.prepare("SELECT repository_path AS repo, accepted_commit AS \"commit\" FROM layer_package_bindings WHERE project_id = ? AND layer_key = 'pages'").get(f.projectId);
+// What the workspace hook does: the layer repository at the run base on its work branch in layer/, plus a copy of current outputs.
+function sandboxLayer(f, issue, clone) {
+  const attemptId = issue.native_ref.attempt_id;
+  const info = f.worker.layerWorkspace(f.scope, attemptId);
+  const checkout = join(clone, 'layer');
+  const bundle = join(clone, '.git', 'aludel-layer.bundle');
+  writeFileSync(bundle, f.worker.layerSourceBundle(f.scope, attemptId));
+  mkdirSync(checkout); git(checkout, 'init', '-q');
+  git(checkout, 'fetch', '-q', bundle, `refs/aludel/base/${attemptId}:refs/aludel/base`);
+  git(checkout, 'checkout', '-q', '-b', info.branch, info.base);
+  writeFileSync(join(clone, '.git', 'info', 'exclude'), '/layer/\n', { flag: 'a' });
+  mkdirSync(join(checkout, '.aludel', 'outputs'), { recursive: true });
+  for (const [kind, records] of Object.entries(info.outputs)) writeFileSync(join(checkout, '.aludel', 'outputs', `${kind}.json`), JSON.stringify(records));
+  writeFileSync(join(checkout, '.aludel', 'outputs', 'catalogs.json'), JSON.stringify(info.catalogs));
+  return { info, checkout };
+}
 function sourceRun(f, title) {
   const work = layerTask(f, title);
-  const { issue } = f.start(null, [], null, null, false, work);
+  const { issue, clone } = f.start(null, [], null, null, false, work);
   const attemptId = issue.native_ref.attempt_id;
-  return { work, attemptId, source: (action, path = null, content = null) => f.worker.callLayerSource(f.scope, { attemptId, action, path, content }) };
+  const { info, checkout } = sandboxLayer(f, issue, clone);
+  const file = path => join(checkout, path);
+  const test = () => {
+    try { execFileSync(process.execPath, ['--test', 'tests/'], { cwd: checkout, stdio: 'pipe' }); return [{ name: 'node --test tests/', status: 'passed' }]; }
+    catch (error) { return [{ name: 'node --test tests/', status: 'failed', detail: String(error.stdout || '').slice(-500) }]; }
+  };
+  return { work, attemptId, info, checkout, file, test, commit: (message, tests) => f.worker.commitLayer(f.scope, { attemptId, message, tests }) };
 }
+const edit = (path, change) => writeFileSync(path, change(readFileSync(path, 'utf8')));
 
-test('a run edits its layer Knowledge as one staged commit; an elevated reviewer accepts it and the pin moves', () => withPagesTemplate(async f => {
+test('a run edits its layer on a work branch in its sandbox, tests it against the output copy, and accepting merges the branch', () => withPagesTemplate(async f => {
   const member = addMember(f, 'designer@example.com');
   setLayerElevated(f.db, f.owner, f.projectId, { userId: member.id, layerKey: 'pages', enabled: true });
+  f.know.insert(f.projectId, 'page', { label: 'Browse', icon: 'article', pageType: 'list' });
   const before = pinOf(f);
-  const { work, attemptId, source } = sourceRun(f, 'Sharpen the flow method');
-  const files = source('list').files;
-  assert.deepEqual(files.find(file => file.path === 'knowledge/flow-method.md'), { path: 'knowledge/flow-method.md', staged: false, writable: true, ownerReview: false });
-  assert.equal(files.find(file => file.path === 'layer.json').ownerReview, true);
-  const method = source('read', 'knowledge/flow-method.md').content;
-  for (const [path, pattern] of [['.git/config', /inside the layer/], ['../outside.md', /inside the layer/], ['notes.env', /may not change/], ['knowledge/Bad Name.md', /may not change/]])
-    assert.throws(() => source('write', path, 'x'), pattern);
-  assert.throws(() => source('write', 'knowledge/flow-method.md', 'x'.repeat(205 * 1024)), /under 200 KB/);
-  source('write', 'knowledge/flow-method.md', `${method.trim()}\n\nName the goal before the first step.\n`);
-  source('write', 'knowledge/review-method.md', '# Review method\n\nWalk each flow at phone width first.\n');
-  assert.match(source('read', 'knowledge/flow-method.md').content, /Name the goal/);
-  const submitted = f.worker.submitProposal(f.scope, { attemptId, proposal: { summary: 'Tighten the flow method and add a review method.', content: {} } });
-  assert.deepEqual(submitted.proposal.source.files.map(file => [file.path, file.status, file.ownerReview]), [['knowledge/flow-method.md', 'modified', false], ['knowledge/review-method.md', 'added', false]]);
-  assert.equal(pinOf(f).commit, before.commit, 'submission does not move the pin');
-  assert.equal(execFileSync('git', ['-C', before.repo, 'rev-parse', `refs/aludel/candidates/${attemptId}`], { encoding: 'utf8' }).trim(), submitted.proposal.source.commit);
-  assert.equal(execFileSync('git', ['-C', before.repo, 'rev-parse', `${submitted.proposal.source.commit}^`], { encoding: 'utf8' }).trim(), before.commit);
-  const run = workRuns({ db: f.db, know: f.know }).list(f.projectId, work.id)[0];
-  const changed = run.changes.filter(change => change.kind === 'source');
-  assert.equal(changed.length, 2);
-  assert.match(changed[0].diff, /^\+Name the goal before the first step\.$/m);
-  f.know.updateWork(f.owner, f.projectId, work.id, { verdict: { index: 0, value: 'accept' } });
-  const accepted = f.worker.acceptProposal(member, f.projectId, work.id, submitted.proposalId);
-  assert.equal(accepted.sourceCommit, submitted.proposal.source.commit);
-  assert.equal(pinOf(f).commit, accepted.sourceCommit);
-  assert.equal(execFileSync('git', ['-C', before.repo, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), accepted.sourceCommit, 'the instance checkout follows the pin');
-  assert.ok(layerApi(f.db, f.projectId, 'pages'), 'a docs-only commit keeps its reviewed API handler');
-  assert.equal(f.know.insert(f.projectId, 'page', { label: 'Still works', icon: 'article', pageType: 'list' }).origin, 'You');
+  const run = sourceRun(f, 'Sharpen the flow method');
+  assert.equal(git(run.checkout, 'rev-parse', '--abbrev-ref', 'HEAD'), run.info.branch);
+  assert.ok(run.info.outputs.page.some(record => record.data.label === 'Browse'), 'the sandbox gets a copy of current outputs');
+  assert.throws(() => run.commit('Nothing yet', []), /no changes/);
+  edit(run.file('knowledge/flow-method.md'), text => `${text.trim()}\n\nName the goal before the first step.\n`);
+  writeFileSync(run.file('knowledge/review-method.md'), '# Review method\n\nWalk each flow at phone width first.\n');
+  const tests = run.test();
+  assert.equal(tests[0].status, 'passed', tests[0].detail);
+  const branch = run.commit('Tighten the flow method and add a review method.', tests);
+  assert.equal(branch.branch, run.info.branch);
+  assert.deepEqual(branch.files.map(entry => [entry.path, entry.status]), [['knowledge/flow-method.md', 'modified'], ['knowledge/review-method.md', 'added']]);
+  assert.equal(execFileSync('git', ['-C', before.repo, 'rev-parse', `refs/heads/${branch.branch}`], { encoding: 'utf8' }).trim(), branch.commit, 'the branch is in the instance repository');
+  assert.equal(pinOf(f).commit, before.commit, 'submitting a branch does not move main');
+  const submitted = f.worker.submitProposal(f.scope, { attemptId: run.attemptId, proposal: { summary: 'Tighten the flow method and add a review method.', content: {} } });
+  const reviewed = workRuns({ db: f.db, know: f.know }).list(f.projectId, run.work.id)[0];
+  assert.equal(reviewed.layerSource.branch, branch.branch);
+  assert.deepEqual(reviewed.layerSource.tests.map(entry => entry.status), ['passed']);
+  assert.match(reviewed.changes.find(change => change.kind === 'source').diff, /^\+Name the goal before the first step\.$/m);
+  f.know.updateWork(f.owner, f.projectId, run.work.id, { verdict: { index: 0, value: 'accept' } });
+  const accepted = f.worker.acceptProposal(member, f.projectId, run.work.id, submitted.proposalId);
+  assert.equal(accepted.sourceCommit, branch.commit, 'a branch from the current main fast-forwards');
+  assert.equal(pinOf(f).commit, branch.commit);
+  assert.equal(execFileSync('git', ['-C', before.repo, 'rev-parse', 'main'], { encoding: 'utf8' }).trim(), branch.commit, 'main is the pin');
+  assert.ok(layerApi(f.db, f.projectId, 'pages'), 'a Knowledge-only merge keeps the reviewed API handler');
 }));
 
-test('an elevated reviewer accepts a change to what the layer runs, which records the reviewed handler and cannot strand existing records', () => withPagesTemplate(async f => {
+test('a run cannot commit files outside the layer contract, an invalid package, or an API that does not load', () => withPagesTemplate(async f => {
+  const run = sourceRun(f, 'Break things');
+  writeFileSync(run.file('secrets.env'), 'TOKEN=x\n');
+  assert.throws(() => run.commit('Add a secret', []), /may not change secrets\.env/);
+  rmSync(run.file('secrets.env'));
+  git(run.checkout, 'reset', '-q', '--hard', run.info.base);
+  writeFileSync(run.file('layer.json'), '{ not json');
+  assert.throws(() => run.commit('Break the manifest', []), /not a valid package/);
+  git(run.checkout, 'reset', '-q', '--hard', run.info.base);
+  writeFileSync(run.file('api/openapi.json'), JSON.stringify({ openapi: '3.0.0', paths: {} }));
+  assert.throws(() => run.commit('Wrong API version', []), /API does not load/);
+}));
+
+test('an elevated reviewer merges a change to what the layer runs; the merged rules must accept existing records, and a moved main merges only when clean', () => withPagesTemplate(async f => {
   const member = addMember(f, 'designer@example.com');
   setLayerElevated(f.db, f.owner, f.projectId, { userId: member.id, layerKey: 'pages', enabled: true });
   f.know.insert(f.projectId, 'page', { label: 'Browse', icon: 'article', pageType: 'list' });
   const base = pinOf(f).commit;
-
+  // Three runs from the same main, all submitted before any is accepted.
   const code = sourceRun(f, 'Default new pages to the planner');
-  code.source('write', 'server/pages-api.mjs', code.source('read', 'server/pages-api.mjs').content.replace("origin: str(data.origin || 'You')", "origin: str(data.origin || 'Planner')"));
-  const submitted = f.worker.submitProposal(f.scope, { attemptId: code.attemptId, proposal: { summary: 'Default the origin of new pages to Planner.', content: {} } });
-  assert.equal(submitted.proposal.source.ownerReview, true);
-  f.know.updateWork(f.owner, f.projectId, code.work.id, { verdict: { index: 0, value: 'accept' } });
+  edit(code.file('server/pages-api.mjs'), text => text.replace("origin: str(data.origin || 'You')", "origin: str(data.origin || 'Planner')"));
+  code.commit('Default the origin of new pages to Planner.', code.test());
+  const codeProposal = f.worker.submitProposal(f.scope, { attemptId: code.attemptId, proposal: { summary: 'Default the origin of new pages to Planner.', content: {} } });
+  const docs = sourceRun(f, 'Describe the Map');
+  edit(docs.file('knowledge/map-output.md'), text => `${text.trim()}\n\nPlaces are kept per page.\n`);
+  docs.commit('Describe Map placement.', docs.test());
+  const docsProposal = f.worker.submitProposal(f.scope, { attemptId: docs.attemptId, proposal: { summary: 'Describe how the Map keeps placements.', content: {} } });
+  const clash = sourceRun(f, 'Rewrite the pages API differently');
+  edit(clash.file('server/pages-api.mjs'), text => text.replace("origin: str(data.origin || 'You')", "origin: str(data.origin || 'Someone')"));
+  clash.commit('Default the origin of new pages to Someone.', []);
+  const clashProposal = f.worker.submitProposal(f.scope, { attemptId: clash.attemptId, proposal: { summary: 'Default the origin of new pages to Someone.', content: {} } });
+  for (const run of [code, docs, clash]) f.know.updateWork(f.owner, f.projectId, run.work.id, { verdict: { index: 0, value: 'accept' } });
+
   const outsider = addMember(f, 'viewer@example.com');
-  assert.throws(() => f.worker.acceptProposal(outsider, f.projectId, code.work.id, submitted.proposalId), /Elevated access/);
-  assert.equal(pinOf(f).commit, base);
-  assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM layer_source_reviews').get().n, 0);
-  f.worker.acceptProposal(member, f.projectId, code.work.id, submitted.proposalId);
-  assert.equal(pinOf(f).commit, submitted.proposal.source.commit);
+  assert.throws(() => f.worker.acceptProposal(outsider, f.projectId, code.work.id, codeProposal.proposalId), /Elevated access/);
+  f.worker.acceptProposal(member, f.projectId, code.work.id, codeProposal.proposalId);
   assert.equal(f.db.prepare("SELECT reviewed_by FROM layer_source_reviews WHERE path = 'server/pages-api.mjs'").get().reviewed_by, 'designer');
-  assert.equal(f.know.insert(f.projectId, 'page', { label: 'Detail', icon: 'article', pageType: 'detail' }).origin, 'Planner', 'the accepted handler now runs');
+  assert.equal(f.know.insert(f.projectId, 'page', { label: 'Detail', icon: 'article', pageType: 'detail' }).origin, 'Planner', 'the merged handler now runs');
+  const afterCode = pinOf(f).commit;
+  assert.notEqual(afterCode, base);
+
+  const merged = f.worker.acceptProposal(member, f.projectId, docs.work.id, docsProposal.proposalId);
+  const parents = execFileSync('git', ['-C', pinOf(f).repo, 'show', '-s', '--format=%P', merged.sourceCommit], { encoding: 'utf8' }).trim().split(' ');
+  assert.deepEqual(parents, [afterCode, f.db.prepare('SELECT commit_sha FROM layer_work_branches WHERE attempt_id = ?').get(docs.attemptId).commit_sha], 'a moved main gets a merge commit');
+  assert.match(execFileSync('git', ['-C', pinOf(f).repo, 'show', `${merged.sourceCommit}:knowledge/map-output.md`], { encoding: 'utf8' }), /Places are kept per page/);
+  assert.match(execFileSync('git', ['-C', pinOf(f).repo, 'show', `${merged.sourceCommit}:server/pages-api.mjs`], { encoding: 'utf8' }), /'Planner'/);
+
+  assert.throws(() => f.worker.acceptProposal(member, f.projectId, clash.work.id, clashProposal.proposalId), /no longer merges cleanly/);
+  assert.equal(pinOf(f).commit, merged.sourceCommit, 'a refused merge leaves main and the pin');
 
   const rule = sourceRun(f, 'Shorten page names');
-  const spec = JSON.parse(rule.source('read', 'api/openapi.json').content);
-  spec.components.schemas.Page.properties.label.maxLength = 3;
-  rule.source('write', 'api/openapi.json', JSON.stringify(spec, null, 2));
+  edit(rule.file('api/openapi.json'), text => { const spec = JSON.parse(text); spec.components.schemas.Page.properties.label.maxLength = 3; return JSON.stringify(spec, null, 2); });
+  const ruleTests = rule.test();
+  assert.equal(ruleTests[0].status, 'passed', 'the repository tests do not know the schema limit; the host checks it at merge');
+  rule.commit('Limit page names to three characters.', ruleTests);
   const tight = f.worker.submitProposal(f.scope, { attemptId: rule.attemptId, proposal: { summary: 'Limit page names to three characters.', content: {} } });
   f.know.updateWork(f.owner, f.projectId, rule.work.id, { verdict: { index: 0, value: 'accept' } });
-  assert.throws(() => f.worker.acceptProposal(f.owner, f.projectId, rule.work.id, tight.proposalId), /reject the existing page “[^”]+”: Page name must be under 3 characters/);
-  assert.equal(pinOf(f).commit, submitted.proposal.source.commit, 'a rejected rule change leaves the pin');
+  const pin = pinOf(f).commit;
+  assert.throws(() => f.worker.acceptProposal(member, f.projectId, rule.work.id, tight.proposalId), /reject the existing page “[^”]+”: Page name must be under 3 characters/);
+  assert.equal(pinOf(f).commit, pin);
+  assert.equal(execFileSync('git', ['-C', pinOf(f).repo, 'rev-parse', 'main'], { encoding: 'utf8' }).trim(), pin, 'main is put back when acceptance fails');
 }));
 
-test('a run cannot submit a layer commit that is not a valid package or whose API does not load', () => withPagesTemplate(async f => {
-  const broken = sourceRun(f, 'Break the manifest');
-  broken.source('write', 'layer.json', '{ not json');
-  assert.throws(() => f.worker.submitProposal(f.scope, { attemptId: broken.attemptId, proposal: { summary: 'This manifest does not parse at all.', content: {} } }), /not a valid package/);
-  broken.source('write', 'layer.json', broken.source('read', 'layer.json').content === '{ not json' ? execFileSync('git', ['-C', pinOf(f).repo, 'show', `${pinOf(f).commit}:layer.json`], { encoding: 'utf8' }) : '');
-  broken.source('write', 'api/openapi.json', JSON.stringify({ openapi: '3.0.0', paths: {} }));
-  assert.throws(() => f.worker.submitProposal(f.scope, { attemptId: broken.attemptId, proposal: { summary: 'This API document is the wrong version.', content: {} } }), /API does not load/);
+// ---- LAYER-BASE-01: every added layer is a fork of the base layer repository; Markdown proves it beside Pages ----
+import { createMarkdownDefinition } from '../server/layer-registry.mjs';
+import { adoptMarkdownLayer, markdownOutputs } from '../server/markdown-outputs.mjs';
+import { initMarkdownLayer, markdownFileCreate, markdownFolderCreate } from '../server/markdown-layer.mjs';
+const bindingOf = (f, key) => f.db.prepare('SELECT repository_path AS repo, accepted_commit AS "commit", template, template_commit AS templateCommit FROM layer_package_bindings WHERE project_id = ? AND layer_key = ?').get(f.projectId, key);
+const catalogPins = () => JSON.parse(readFileSync(new URL('../config/layer-templates.json', import.meta.url), 'utf8'));
+
+test('adding a layer forks its template from the base repository into the instance\'s own repository', () => withPagesTemplate(async f => {
+  const pins = catalogPins();
+  const notes = createMarkdownDefinition(f.db, f.owner.id, f.projectId, { name: 'Research notes' });
+  const decisions = createMarkdownDefinition(f.db, f.owner.id, f.projectId, { name: 'Decisions', template: 'base' });
+  assert.throws(() => createMarkdownDefinition(f.db, f.owner.id, f.projectId, { name: 'Second pages', template: 'pages' }), /base layer or the Markdown template/);
+  const repos = ['pages', notes.key, decisions.key].map(key => bindingOf(f, key));
+  assert.equal(new Set(repos.map(repo => repo.repo)).size, 3, 'each instance has its own repository');
+  assert.deepEqual(repos.map(repo => repo.template), ['pages', 'markdown', 'base']);
+  for (const [key, repo] of [[notes.key, repos[1]], [decisions.key, repos[2]]]) {
+    const manifest = JSON.parse(execFileSync('git', ['-C', repo.repo, 'show', `${repo.commit}:layer.json`], { encoding: 'utf8' }));
+    assert.equal(manifest.key, key);
+    assert.equal(execFileSync('git', ['-C', repo.repo, 'rev-parse', `${repo.commit}^`], { encoding: 'utf8' }).trim(), pins.templates[repo.template].commit, 'one install commit on the template');
+    assert.equal(execFileSync('git', ['-C', repo.repo, 'rev-parse', '--abbrev-ref', 'HEAD'], { encoding: 'utf8' }).trim(), 'main');
+  }
+  assert.equal(repos[0].commit, pins.templates.pages.commit, 'Pages keeps its key, so it needs no install commit');
+  assert.deepEqual(notes.outputs, ['markdown_document', 'markdown_folder']);
+  assert.deepEqual(decisions.outputs, [], 'the base layer starts with no outputs');
+  assert.equal(layerApi(f.db, f.projectId, decisions.key), null);
+}));
+
+test('a Markdown layer changes its files only through its own API and stays apart from another Markdown layer', () => withPagesTemplate(async f => {
+  const data = process.env.MACHINE_DATA_DIR;
+  const research = createMarkdownDefinition(f.db, f.owner.id, f.projectId, { name: 'Research' });
+  const journal = createMarkdownDefinition(f.db, f.owner.id, f.projectId, { name: 'Journal' });
+  const md = markdownOutputs({ db: f.db, know: f.know, dataDirectory: data });
+  md.folderCreate(f.owner.id, f.projectId, research.key, 'notes');
+  const file = md.fileCreate(f.owner.id, f.projectId, research.key, 'notes/a.md', '# A');
+  assert.match(file.id, /^mdd-[a-f0-9]{8}$/);
+  assert.deepEqual([file.path, file.revision, file.content], ['notes/a.md', 1, '# A']);
+  assert.throws(() => md.fileCreate(f.owner.id, f.projectId, research.key, '../escape.md', ''), /unsupported name/);
+  assert.throws(() => md.fileCreate(f.owner.id, f.projectId, journal.key, 'notes/a.md', ''), /parent folder/, 'another Markdown layer has its own folders');
+  assert.throws(() => md.fileSave(f.owner.id, f.projectId, research.key, file.id, { expectedRevision: 9, content: 'x' }), /changed/);
+  assert.equal(md.fileSave(f.owner.id, f.projectId, research.key, file.id, { expectedRevision: 1, content: '# A\n\nMore.' }).revision, 2);
+  md.fileMove(f.owner.id, f.projectId, research.key, file.id, { expectedRevision: 2, path: 'notes/b.md' });
+  md.folderCreate(f.owner.id, f.projectId, research.key, 'archive');
+  md.folderMove(f.owner.id, f.projectId, research.key, 'notes', 'archive/notes');
+  assert.deepEqual(md.tree(f.owner.id, f.projectId, research.key).files.map(entry => entry.path), ['archive/notes/b.md']);
+  assert.equal(md.read(f.owner.id, f.projectId, research.key, file.id, 2).content, '# A\n\nMore.', 'history is kept per revision');
+  assert.throws(() => md.folderDelete(f.owner.id, f.projectId, research.key, 'archive'), /Empty the folder/);
+  const instance = key => f.db.prepare('SELECT instance_id FROM layer_instances WHERE project_id = ? AND layer_key = ?').get(f.projectId, key).instance_id;
+  assert.equal(f.db.prepare('SELECT layer_instance_id FROM knowledge_records WHERE id = ?').get(file.id).layer_instance_id, instance(research.key));
+  assert.throws(() => f.know.insert(f.projectId, 'markdown_document', { path: 'x.md', content: '' }), /Several layers own/);
+  assert.equal(f.know.insert(f.projectId, 'markdown_document', { path: 'x.md', content: '' }, { layer: journal.key }).path, 'x.md');
+  md.fileDelete(f.owner.id, f.projectId, research.key, file.id, md.read(f.owner.id, f.projectId, research.key, file.id).revision);
+  assert.deepEqual(md.tree(f.owner.id, f.projectId, research.key).files, []);
+}));
+
+test('a Markdown layer from before layer repositories moves into its own repository with its files and charter', async () => {
+  const f = fixture();
+  const data = mkdtempSync(join(tmpdir(), 'aludel-adopt-'));
+  const oldData = process.env.MACHINE_DATA_DIR;
+  process.env.MACHINE_DATA_DIR = data;
+  try {
+    initMarkdownLayer(f.db); initLayerScope(f.db);
+    const legacy = createMarkdownDefinition(f.db, f.owner.id, f.projectId, { name: 'Field notes' });
+    f.db.prepare('UPDATE layer_definitions SET identity_json = ? WHERE project_id = ? AND layer_key = ?')
+      .run(JSON.stringify({ markdown: '# Field notes charter\n\n## Purpose\n\nNotes from customer visits.\n' }), f.projectId, legacy.key);
+    markdownFolderCreate(f.db, data, f.owner.id, f.projectId, legacy.key, 'visits');
+    markdownFileCreate(f.db, data, f.owner.id, f.projectId, legacy.key, 'visits/monday.md', '# Monday\n\nTwo visits.');
+    process.env.MACHINE_LAYER_TEMPLATES_ENABLED = '1';
+    const pkg = adoptMarkdownLayer({ db: f.db, know: f.know, dataDirectory: data, projectId: f.projectId, key: legacy.key });
+    assert.match(pkg.charter, /Notes from customer visits/, 'the layer keeps its own charter in its repository');
+    const md = markdownOutputs({ db: f.db, know: f.know, dataDirectory: data });
+    const [file] = md.tree(f.owner.id, f.projectId, legacy.key).files;
+    assert.equal(file.path, 'visits/monday.md');
+    assert.equal(md.read(f.owner.id, f.projectId, legacy.key, file.id).content, '# Monday\n\nTwo visits.');
+    assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM markdown_adoptions').get().n, 1);
+    assert.equal(adoptMarkdownLayer({ db: f.db, know: f.know, dataDirectory: data, projectId: f.projectId, key: legacy.key }).commit, pkg.commit, 'adoption runs once');
+    assert.equal(md.tree(f.owner.id, f.projectId, legacy.key).files.length, 1);
+  } finally {
+    f.close(); rmSync(data, { recursive: true, force: true });
+    delete process.env.MACHINE_LAYER_TEMPLATES_ENABLED;
+    if (oldData === undefined) delete process.env.MACHINE_DATA_DIR; else process.env.MACHINE_DATA_DIR = oldData;
+  }
+});
+
+test('an agent works on a Markdown layer through the same staged API, review and elevated acceptance as Pages', () => withPagesTemplate(async f => {
+  const research = createMarkdownDefinition(f.db, f.owner.id, f.projectId, { name: 'Research' });
+  f.db.prepare("UPDATE layer_definitions SET lifecycle = 'active' WHERE project_id = ? AND layer_key = ?").run(f.projectId, research.key);
+  const work = f.know.createWork(f.projectId, { layer: research.key, title: 'Summarize the interviews', assignee: { kind: 'agent', id: f.profile.id } }, f.owner.name);
+  assert.equal(work.scope, 'layer');
+  if (work.state === 'suggested') f.know.updateWork(f.owner, f.projectId, work.id, { state: 'ready' });
+  const { issue, card } = f.start(null, [], null, null, false, f.know.workById(f.projectId, work.id));
+  assert.equal(card.layerApi.info.title, 'Markdown layer');
+  const attemptId = issue.native_ref.attempt_id;
+  const call = (operation, body = {}, id = null) => f.worker.callLayer(f.scope, { attemptId, operation, id, body });
+  call('createFolder', { folder: { path: 'interviews' } });
+  const doc = call('createDocument', { document: { path: 'interviews/summary.md', content: '# Summary' } });
+  assert.throws(() => call('createDocument', { document: { path: 'interviews/summary.md', content: '' } }), /already exists/, 'staged records count');
+  const submitted = f.worker.submitProposal(f.scope, { attemptId, proposal: { summary: 'Add an interview summary under a new folder.', content: {} } });
+  assert.equal(f.db.prepare("SELECT COUNT(*) AS n FROM knowledge_records WHERE kind LIKE 'markdown_%'").get().n, 0);
+  f.know.updateWork(f.owner, f.projectId, work.id, { verdict: { index: 0, value: 'accept' } });
+  f.worker.acceptProposal(f.owner, f.projectId, work.id, submitted.proposalId);
+  const md = markdownOutputs({ db: f.db, know: f.know, dataDirectory: process.env.MACHINE_DATA_DIR });
+  assert.equal(md.read(f.owner.id, f.projectId, research.key, doc.staged.id).content, '# Summary');
 }));
