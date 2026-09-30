@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { followUpsForAttempt } from './layer-scope.mjs';
 
 // WORK-ITEM-UX-01: a work item's runs. A run is one Symphony attempt that a worker actually started. It is read from the
 // attempt, the task snapshot pinned in its Go bundle, and the outputs it submitted. Each run is reviewed and signed on its
@@ -41,6 +42,7 @@ export function workRuns({ db, know, candidates = null }) {
   const events = attemptId => db.prepare('SELECT kind, created_at AS at FROM symphony_attempt_events WHERE attempt_id = ? ORDER BY created_at').all(attemptId);
   const steps = attemptId => db.prepare('SELECT seq, kind, payload_json, created_at FROM work_run_steps WHERE attempt_id = ? ORDER BY seq').all(attemptId)
     .map(row => ({ seq: row.seq, kind: row.kind, at: row.created_at, ...parse(row.payload_json, {}) }));
+  const layerName = (projectId, key) => db.prepare('SELECT name FROM layer_definitions WHERE project_id = ? AND layer_key = ?').get(projectId, key)?.name || key;
   const sectionName = key => ({ problem: 'Problem', audience: 'Audience', value: 'Value', differentiators: 'Differentiators', scope: 'Scope', constraints: 'Constraints' })[key]
     || String(key || 'Brief').replace(/^./, first => first.toUpperCase());
 
@@ -55,7 +57,18 @@ export function workRuns({ db, know, candidates = null }) {
       const content = parse(proposal.content_json, {});
       const vision = content.visionProposal || (proposal.action_id === 'product.brief'
         ? parse(db.prepare('SELECT content_json FROM vision_proposals WHERE id = ?').get(proposal.id)?.content_json, null) : null);
-      if (vision) changes.push({ id: proposal.id, kind: 'claim', icon: 'lightbulb', name: `Vision › Brief › ${sectionName(vision.section)}`,
+      if (content.scope === 'layer') {
+        // DEC-057: one row per change in the layer's change set; notes read as a report.
+        content.changes.forEach((change, index) => {
+          const name = `${layerName(projectId, content.layer)} › Flow › ${change.op === 'revise' ? change.semanticReview.before.title : change.title}`;
+          if (change.op === 'revise') changes.push({ id: `${proposal.id}:${index}`, kind: 'flow-revision', icon: 'route', name, op: 'modified',
+            size: `r${change.semanticReview.target.expectedRevision} → r${change.semanticReview.target.acceptedRevision}`,
+            before: JSON.stringify(change.semanticReview.before, null, 2), after: JSON.stringify(change.semanticReview.after, null, 2) });
+          else changes.push({ id: `${proposal.id}:${index}`, kind: 'flow', icon: 'route', name, op: 'created',
+            size: `${change.steps.length} ${change.steps.length === 1 ? 'step' : 'steps'}`, after: JSON.stringify({ title: change.title, steps: change.steps }, null, 2) });
+        });
+        if (content.notes) changes.push({ id: `${proposal.id}:notes`, kind: 'report', icon: 'notes', name: 'Notes', op: 'created', size: '', after: content.notes, findings: [] });
+      } else if (vision) changes.push({ id: proposal.id, kind: 'claim', icon: 'lightbulb', name: `Vision › Brief › ${sectionName(vision.section)}`,
         op: vision.targetId ? 'modified' : 'created', size: '1 claim', before: vision.beforeText || null, after: vision.text, note: vision.note || '', basis: vision.basis || '' });
       else if (proposal.action_id === 'pages.flows' && content.semanticReview) {
         const review = content.semanticReview;
@@ -77,7 +90,9 @@ export function workRuns({ db, know, candidates = null }) {
     }
     const candidate = row.candidate_id && candidates ? candidates.get(projectId, row.candidate_id) : null;
     if (candidate) for (const file of candidate.files || []) changes.push({ id: `${candidate.id}:${file}`, kind: 'file', icon: 'code', name: file, op: 'modified', size: '', candidateId: candidate.id });
-    return { changes, candidate: candidate ? { id: candidate.id, state: candidate.state, commit: candidate.commit, base: candidate.base, checks: candidate.checks } : null,
+    return { changes, followUps: proposal ? followUpsForAttempt(db, row.id).map(entry => ({ ...entry, layerName: layerName(projectId, entry.layer),
+        createdRef: entry.createdWorkId ? know.workById(projectId, entry.createdWorkId)?.ref || null : null })) : [], summary: proposal ? parse(proposal.content_json, {}).summary || null : null,
+      candidate: candidate ? { id: candidate.id, state: candidate.state, commit: candidate.commit, base: candidate.base, checks: candidate.checks } : null,
       proposalId: proposal?.id || null, reportId: report?.id || null };
   }
 

@@ -45,6 +45,7 @@ const evidenceType: Record<Evidence['type'], [string, string]> = { change: ['dif
                       @switch (change.kind) {
                         @case ('claim') { <dl class="wr-text">@if (change.before) { <dt>Was</dt><dd class="wr-was">{{ change.before }}</dd> }<dt>{{ change.before ? 'Now' : 'New' }}</dt><dd class="wr-now">{{ change.after }}</dd>
                           @if (change.note) { <dt>Note</dt><dd class="small">{{ change.note }}</dd> }@if (change.basis) { <dt>Basis</dt><dd class="small">{{ change.basis }}</dd> }</dl> }
+                        @case ('flow') { <section class="wr-flow-new"><h3>New flow</h3><pre class="wr-diff">{{ change.after }}</pre></section> }
                         @case ('flow-revision') { <div class="wr-flow-revision"><section><h3>Previous</h3><pre class="wr-diff">{{ change.before }}</pre></section><section><h3>Proposed</h3><pre class="wr-diff">{{ change.after }}</pre></section></div> }
                         @case ('proposal') { <p class="lay-prose">{{ change.after }}</p><dl class="lay-fieldiff">@for (field of fields(change); track field[0]) { <dt>{{ field[0] }}</dt><dd>{{ field[1] }}</dd> }</dl> }
                         @case ('report') { <p class="lay-prose">{{ change.after }}</p>
@@ -56,6 +57,22 @@ const evidenceType: Record<Evidence['type'], [string, string]> = { change: ['dif
                     </article>
                   } @empty { <p class="lay-muted">Run {{ r.number }} submitted no changes.</p> }
                   @if (r.candidate && !diffLines().length) { <button type="button" class="lay-button ghost small" (click)="loadDiff()">Show the code diff</button> }
+                }
+                @case ('follow-ups') {
+                  <p class="lay-muted small wr-fu-lead">{{ r.performer.label }} proposes this work for a layer to pick up. A task you create is signed as created by {{ r.performer.label }} from {{ layerName(work.layer) }}, and starts in that layer's backlog.</p>
+                  @for (entry of r.followUps || []; track entry.id) {
+                    <article class="wr-change wr-fu">
+                      <header><mat-icon aria-hidden="true">playlist_add</mat-icon><strong>{{ entry.title }}</strong><span class="lay-chip">{{ entry.layerName }}</span>
+                        <span [class]="'wi-op wr-fu-' + entry.state">{{ followUpState[entry.state] }}</span></header>
+                      <dl class="wr-text"><dt>Why</dt><dd>{{ entry.why }}</dd>@if (entry.brief) { <dt>Brief</dt><dd class="small">{{ entry.brief }}</dd> }</dl>
+                      @if (entry.state === 'proposed') {
+                        @if (elevated()) { <div class="lay-row lay-wrap"><button type="button" class="lay-button small" (click)="decide(entry.id, 'create')"><mat-icon aria-hidden="true">add_task</mat-icon>Create task in {{ entry.layerName }}</button>
+                          <button type="button" class="lay-button ghost small" (click)="decide(entry.id, 'dismiss')">Dismiss</button></div> }
+                        @else { <p class="lay-muted small">Someone with elevated {{ layerName(work.layer) }} access decides follow-ups.</p> }
+                      } @else if (entry.createdWorkId) { <p class="small">Created <a [href]="ctx.link('work', 'item', entry.createdWorkId)" (click)="ctx.go(ctx.link('work', 'item', entry.createdWorkId), $event)">{{ entry.createdRef }}</a> · {{ entry.decidedBy }}</p> }
+                      @else { <p class="lay-muted small">Dismissed by {{ entry.decidedBy }}</p> }
+                    </article>
+                  }
                 }
                 @case ('preview') {
                   <div class="wr-preview">
@@ -119,6 +136,8 @@ const evidenceType: Record<Evidence['type'], [string, string]> = { change: ['dif
                     @if (verdict()?.value === 'reject') { <button type="button" class="wr-skip" (click)="saveNote(); goTo(step() + 1)">Next</button> }
                     @else { <button type="button" class="wr-skip" (click)="setVerdict('skip')">Skip</button> }</span>
                 } @else { <button type="button" class="lay-button" (click)="goTo(step() + 1)">Next<mat-icon aria-hidden="true">arrow_forward</mat-icon></button> }
+              } @else if (r.state === 'review' && !elevated()) {
+                <span class="lay-muted small">Elevated {{ layerName(work.layer) }} access is required to sign.</span>
               } @else if (r.state === 'review') {
                 <button type="button" [class]="'lay-button ' + (flagCount() ? 'danger' : 'lay-button-ok')" (click)="sign(flagCount() ? 'reject' : 'accept')"><mat-icon aria-hidden="true">draw</mat-icon>{{ flagCount() ? 'Sign and send back' : 'Sign and accept' }}</button>
               }
@@ -136,6 +155,9 @@ export class WorkReviewComponent {
   readonly runTitle = runTitle;
   readonly evidenceType = evidenceType;
   readonly opLabel = { created: 'Created', modified: 'Modified', removed: 'Removed' };
+  readonly followUpState = { proposed: 'Proposed', created: 'Created', dismissed: 'Dismissed' };
+  // DEC-057: signing a layer-scoped item's run and deciding its follow-ups need elevated access to its layer.
+  readonly elevated = computed(() => { const work = this.item(); return !work || work.scope !== 'layer' || Boolean(this.ctx.layerInstances().find(entry => entry.key === work.layer)?.elevated); });
   readonly item = computed(() => this.ctx.workById().get(this.id()) || null);
   readonly runs = signal<WorkRun[]>([]);
   readonly loaded = signal(false);
@@ -152,6 +174,7 @@ export class WorkReviewComponent {
   readonly verdict = computed(() => this.run()?.review.verdicts[this.step()] || null);
   readonly tabs = computed(() => { const r = this.run(); if (!r) return [];
     return [{ id: 'changes', label: 'Changes', icon: 'difference', count: r.changes.length },
+      ...(r.followUps?.length ? [{ id: 'follow-ups', label: 'Follow-ups', icon: 'playlist_add', count: r.followUps.length }] : []),
       ...(r.candidate ? [{ id: 'preview', label: 'Preview', icon: 'web', count: 0 }] : []),
       ...(r.candidate?.checks?.length ? [{ id: 'tests', label: 'Tests', icon: 'science', count: r.candidate.checks.length }] : [])]; });
   // The evidence the run named for this criterion (WI-6). Runs that named none fall back to everything they produced.
@@ -216,6 +239,13 @@ export class WorkReviewComponent {
     void this.ctx.api<{ diff: string }>(`${this.base()}/candidates/${encodeURIComponent(r.candidate.id)}`).then(value => this.diffLines.set((value.diff || '').split('\n').slice(0, 2000)), () => this.diffLines.set([])); }
   buildPreview() { const r = this.run(); if (!r?.candidate) return;
     void this.ctx.write(async () => { const value = await this.ctx.api<{ preview: { status: string; error?: string | null }; url: string }>(`${this.base()}/candidates/${encodeURIComponent(r.candidate!.id)}/preview`, 'POST', {}); this.preview.set({ ...value.preview, url: value.url }); }); }
+  layerName(key: string) { return this.ctx.layerInstances().find(entry => entry.key === key)?.name || key; }
+  decide(followUpId: string, decision: 'create' | 'dismiss') {
+    void this.ctx.write(async () => {
+      await this.ctx.api(`${this.base()}/work/${encodeURIComponent(this.id())}/follow-ups/${encodeURIComponent(followUpId)}`, 'POST', { decision });
+      this.load();
+    }, decision === 'create' ? 'Follow-up task created.' : 'Follow-up dismissed.');
+  }
   fields(change: RunChange): [string, string][] { return Object.entries(change.content || {}).map(([key, value]) => [key, typeof value === 'string' ? value : JSON.stringify(value)]); }
 
   @HostListener('document:keydown', ['$event'])

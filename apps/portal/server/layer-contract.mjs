@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { knowledgeKinds } from './knowledge.mjs';
 import { backfillPagesOutputScope } from './layer-output-scope.mjs';
 import { compiledLocalActions, combinedLegacyInventory } from './lat07-actions.mjs';
+import { hasElevated, layerWorkScope } from './layer-scope.mjs';
 import { initLayerRegistry, seedBuiltInDefinitions, projectLayerDefinition, projectLayerDefinitions, actionsForDefinition } from './layer-registry.mjs';
 // LAT-02: built-in layer declarations describe existing authorities; they do not grant writes.
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
@@ -140,8 +141,10 @@ export function layerInstances(db, userId, projectId) {
     .map(row => {
       const declaration = projectLayerDefinition(db,projectId,row.layer_key);
       if (!declaration) fail('Unknown layer instance.');
+      // DEC-057: which outputs layer-scoped Work may change, and whether this person holds elevated access.
       return { ...declaration, instanceId: row.instance_id,
-        enabled: !!row.enabled, visible: !!row.visible, dashboardVisible: !!row.dashboard_visible };
+        enabled: !!row.enabled, visible: !!row.visible, dashboardVisible: !!row.dashboard_visible,
+        workScope: row.enabled ? layerWorkScope(db, projectId, row.layer_key)?.changes || null : null, elevated: hasElevated(db, userId, projectId, row.layer_key) };
     });
 }
 export function updateLayerInstance(db, userId, projectId, key, settings) {

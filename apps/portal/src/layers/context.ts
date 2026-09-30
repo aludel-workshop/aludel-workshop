@@ -86,7 +86,7 @@ export interface LogEntry { at: string; text: string; refs?: string[]; by?: { ki
 export interface ExecutionBlock { code: string; reason: string; recovery: 'deploy' | 'agents' | 'retry'; }
 export interface RunState { phases?: string[]; phase?: number; activity?: string; startedAt?: string; finishedAt?: string; model?: string; provider?: string; batch?: string; profileId?: string;
   usage?: { input: number; output: number }; at?: string; done?: boolean; }
-export interface WorkItem { id: string; number: number; ref: string; layer: string; type: string; action: string | null; title: string; state: string; status: WorkStatus; priority: string;
+export interface WorkItem { id: string; number: number; ref: string; layer: string; type: string; action: string | null; scope?: 'layer' | 'action'; title: string; state: string; status: WorkStatus; priority: string;
   assignee: Assignee | null; targets: WorkTarget[]; blocks: string[]; blockedBy: string[]; checks: WorkCheck[];
   question: { text: string; options: string[]; answer?: string; rationale?: string; answeredBy?: string; applied?: string[]; recommendation?: string; reasoning?: string } | null; documents: string[]; log: LogEntry[]; createdAt: string; updatedAt: string;
   profileId: string | null; instructions: InstructionPins | null; migration?: { actionId: string | null; actionRevision: number | null; disposition: 'mapped' | 'blocked'; reason: string | null } | null; project: string | null; checkpoint: string | null;
@@ -100,9 +100,12 @@ export interface WorkItem { id: string; number: number; ref: string; layer: stri
 export interface FieldChange { field: string; before: unknown; after: unknown; }
 // WORK-ITEM-UX-01: one started run of a work item, with the task it was given, what it produced and how it was signed.
 export type WorkRunState = 'working' | 'needs' | 'review' | 'failed' | 'stopped' | 'accepted' | 'sent' | 'closed';
-export interface RunChange { id: string; kind: 'claim' | 'proposal' | 'flow-revision' | 'report' | 'file'; icon: string; name: string; op: 'created' | 'modified' | 'removed'; size: string;
+export interface RunChange { id: string; kind: 'claim' | 'proposal' | 'flow' | 'flow-revision' | 'report' | 'file'; icon: string; name: string; op: 'created' | 'modified' | 'removed'; size: string;
   before?: string | null; after?: string; note?: string; basis?: string; content?: Record<string, unknown>; findings?: { severity: string; title: string; affected: string; evidence: string; recommendation: string }[]; candidateId?: string; }
 export interface RunStep { seq: number; kind: 'plan' | 'progress' | 'note'; at: string; objectives?: string[]; index?: number; status?: 'active' | 'done' | 'stuck'; note?: string; text?: string; }
+// DEC-057: work an agent proposed for another (or its own) layer; the reviewer creates or dismisses each one.
+export interface RunFollowUp { id: string; position: number; layer: string; layerName: string; sourceLayer: string; title: string; brief: string; why: string;
+  state: 'proposed' | 'created' | 'dismissed'; createdWorkId: string | null; createdRef: string | null; decidedBy: string | null; decidedAt: string | null; }
 export interface WorkRun { id: string; number: number; batchId: string | null; state: WorkRunState;
   performer: { kind: 'agent' | 'person'; id: string; label: string; model: string | null; effort: string | null };
   startedAt: string; finishedAt: string | null; turns: { used: number; limit: number };
@@ -112,11 +115,11 @@ export interface WorkRun { id: string; number: number; batchId: string | null; s
   steps: RunStep[]; blockReason: string | null; changes: RunChange[];
   evidence: { criterion: number; type: 'change' | 'test' | 'try' | 'note'; ref: string; note: string; found: boolean; target: string | null; label: string; result?: string | null; independent?: boolean }[];
   candidate: { id: string; state: string; commit: string | null; base: string; checks: { name: string; status: string; detail: string; source?: string }[] } | null;
-  proposalId: string | null; reportId: string | null; summary?: string | null;
+  proposalId: string | null; reportId: string | null; summary?: string | null; followUps?: RunFollowUp[];
   review: { verdicts: Record<string, { value: 'accept' | 'reject' | 'skip'; note: string }>; flags: Record<string, string>; outcome: WorkRunState | null; comment: string | null; signedBy: string | null; signedAt: string | null }; }
 export interface WorkChange { recordId: string; revision: number; author: string; rationale: string | null; createdAt: string; kind: string | null; exists: boolean; fields: FieldChange[]; }
 export interface Routine extends RecordBase { key: string | null; title: string; layer: string; type: string; cadence: string; documents: string[]; enabled: boolean; actionKey?: string | null; executor?: 'utility' | 'agent'; trigger?: 'manual' | 'schedule' | 'output-change'; instructionDoc?: string | null; allowedReads?: string[]; capabilities?: string[]; outputKinds?: string[]; nextRunAt: string | null; lastRunAt: string | null; lastWorkId: string | null; history: Revision[]; }
-export interface LayerInstance { key: string; instanceId: string; name: string; path: string; category: string; icon: string; color: string | null; description: string; enabled: boolean; visible: boolean; dashboardVisible: boolean; outputProvider: string; editorAdapter: string; outputTabs?: {key:string;label:string}[]; packageCommit?: string | null; builtIn: boolean; lifecycle: 'draft' | 'active'; identityRevision: number; identity: Record<string,string> | null; domainActions: {key:string;title:string;purpose:string;method:string;checks:string[];revision:number}[]; }
+export interface LayerInstance { key: string; instanceId: string; name: string; path: string; category: string; icon: string; color: string | null; description: string; enabled: boolean; visible: boolean; dashboardVisible: boolean; outputProvider: string; editorAdapter: string; outputTabs?: {key:string;label:string}[]; packageCommit?: string | null; workScope?: Record<string, string[]> | null; elevated?: boolean; builtIn: boolean; lifecycle: 'draft' | 'active'; identityRevision: number; identity: Record<string,string> | null; domainActions: {key:string;title:string;purpose:string;method:string;checks:string[];revision:number}[]; }
 export interface Knowledge {
   vision: Record<string, VisionSection>; personas: Persona[]; phases: Phase[]; activities: Activity[]; stories: Story[]; specs: Spec[];
   research: Research[]; docs: Doc[]; pages: Page[]; work: WorkItem[]; selectedPacks: string[];

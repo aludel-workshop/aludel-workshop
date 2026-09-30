@@ -33,7 +33,7 @@ export function legacyLayerPath(segments: string[]): string[] | null {
   const [layer, space, section, id] = segments;
   if (space === 'operations') {
     if (section === 'connections') return [layer, 'manage', 'connections', ...(id ? [id] : [])];
-    if (section === 'routines' || section === 'actions') return [layer, 'tasks', section, ...(id ? [id] : [])];
+    if (section === 'routines' || section === 'actions' || section === 'access') return [layer, 'tasks', section, ...(id ? [id] : [])];
     return [layer, 'tasks'];
   }
   if (space === 'manage' && section === 'knowledge') return [layer, 'knowledge', ...(id ? [id] : [])];

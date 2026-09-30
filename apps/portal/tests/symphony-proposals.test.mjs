@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -606,7 +606,7 @@ test('revising a flow rejects changed source, foreign instance and stale page wi
       usedInputs:[{id:flow.id,revision:flow.revision},{id:page.id,revision:page.revision}]};
     const submitted=f.worker.submitProposal(f.scope,{attemptId:issue.native_ref.attempt_id,proposal});
     f.know.updateWork(f.owner,f.projectId,work.id,{verdict:{index:0,value:'accept'}});
-    const newPin='ae93312c96299c3b855024911f33362ab5cfecb9', oldPin='e88409c78e790e8d4fdccc2ef4db043b6d3c39d3';
+    const newPin=JSON.parse(readFileSync(new URL('../config/layer-template-pins.json', import.meta.url),'utf8')).pages.commit, oldPin='e88409c78e790e8d4fdccc2ef4db043b6d3c39d3';
     f.db.prepare("UPDATE layer_package_bindings SET accepted_commit=? WHERE project_id=? AND layer_key='pages'").run(oldPin,f.projectId);
     assert.throws(()=>f.worker.acceptProposal(f.owner,f.projectId,work.id,submitted.proposalId),/installed source|source.*changed/);
     f.db.prepare("UPDATE layer_package_bindings SET accepted_commit=? WHERE project_id=? AND layer_key='pages'").run(newPin,f.projectId);
@@ -666,5 +666,144 @@ test('an existing-flow agent task waits for a reviewed Pages package but still n
     if (work.state==='suggested') f.know.updateWork(f.owner,f.projectId,work.id,{state:'ready'});
     assert.throws(()=>f.runs.stage(f.owner,f.projectId,work.id),/Install a reviewed Pages package/);
     assert.equal(f.know.workById(f.projectId,work.id).state,'ready');
+  } finally { f.close(); }
+});
+
+// ---- DEC-057: layer-scoped Work, elevated access and agent follow-ups ----
+import { decideFollowUp, initLayerScope, layerAccess, setLayerDefaultAssignee, setLayerElevated } from '../server/layer-scope.mjs';
+
+async function withPagesTemplate(run) {
+  const data = mkdtempSync(join(tmpdir(), 'aludel-layer-scope-'));
+  const oldData = process.env.MACHINE_DATA_DIR, oldTemplates = process.env.MACHINE_PAGES_TEMPLATE_ENABLED;
+  process.env.MACHINE_DATA_DIR = data; process.env.MACHINE_PAGES_TEMPLATE_ENABLED = '1';
+  let f;
+  try { f = fixture(); initLayerScope(f.db); await run(f); } finally {
+    f?.close(); rmSync(data, { recursive: true, force: true });
+    if (oldData === undefined) delete process.env.MACHINE_DATA_DIR; else process.env.MACHINE_DATA_DIR = oldData;
+    if (oldTemplates === undefined) delete process.env.MACHINE_PAGES_TEMPLATE_ENABLED; else process.env.MACHINE_PAGES_TEMPLATE_ENABLED = oldTemplates;
+  }
+}
+const addMember = (f, email) => {
+  const user = createUser(f.db, { email, name: email.split('@')[0], password: 'correct-horse-battery' });
+  f.db.prepare("INSERT INTO project_members VALUES (?, ?, 'member', ?)").run(f.projectId, user.id, new Date().toISOString());
+  return user;
+};
+const layerTask = (f, title, extra = {}) => {
+  const work = f.know.createWork(f.projectId, { layer: 'pages', title, assignee: { kind: 'agent', id: f.profile.id }, ...extra }, f.owner.name);
+  if (work.state === 'suggested') f.know.updateWork(f.owner, f.projectId, work.id, { state: 'ready' });
+  return f.know.workById(f.projectId, work.id);
+};
+
+test('a layer-scoped Pages task needs no action, writes only Pages flows, and signs follow-ups as the agent from Pages', () => withPagesTemplate(async f => {
+  const browse = f.know.insert(f.projectId, 'page', { label: 'Browse', icon: 'article', pageType: 'list', status: 'planned' });
+  const detail = f.know.insert(f.projectId, 'page', { label: 'Detail', icon: 'article', pageType: 'detail', status: 'planned' });
+  const flow = f.know.insert(f.projectId, 'flow', { title: 'Browse', steps: [{ page: browse.id, name: 'Browse' }] });
+  const work = layerTask(f, 'Tighten the browse journey');
+  assert.equal(work.action, null);
+  assert.equal(work.scope, 'layer');
+  assert.match(work.checks[0].text, /Pages charter/);
+  const { issue, card } = f.start(null, [], null, null, false, work);
+  assert.equal(card.schemaVersion, 'aludel-task-open-v2');
+  assert.equal(card.task.layer, 'pages');
+  assert.deepEqual(card.outputs[0].changes, [{ kind: 'flow', operations: ['create', 'revise'] }]);
+  assert.match(card.layerSource.charter, /Pages/);
+  assert.ok(card.outputs[0].followUpLayers.some(layer => layer.key === 'platform'));
+  const kinds = f.worker.knowledgeMap(f.scope, issue.native_ref.bundle_digest).kinds.map(entry => entry.kind);
+  assert.ok(kinds.includes('flow') && kinds.includes('story'), 'reads are project-wide');
+  const attemptId = issue.native_ref.attempt_id;
+  const proposal = { summary: 'Add a detail journey and mark the missing decision step in browse.', content: { changes: [
+    { kind: 'flow', op: 'create', title: 'Inspect detail', steps: [{ page: detail.id, name: 'Read the detail' }] },
+    { kind: 'flow', op: 'revise', id: flow.id, title: 'Browse and decide', steps: [{ page: browse.id, name: 'Browse' }, { page: null, name: 'Decide', why: 'No decision page yet' }] }
+  ], notes: 'The decision step needs a page; Code has no detail route.' },
+  followUps: [{ layer: 'platform', title: 'Build the detail route', brief: 'Implement the Detail page route.', why: 'The new Inspect detail flow needs a built Detail page.' }],
+  usedInputs: [{ id: detail.id, revision: detail.revision }, { id: browse.id, revision: browse.revision }, { id: flow.id, revision: flow.revision }] };
+  assert.throws(() => f.worker.submitProposal(f.scope, { attemptId, proposal: { ...proposal, content: { changes: [{ kind: 'page', op: 'create', title: 'X', steps: [] }] } } }), /may change only flow/);
+  assert.throws(() => f.worker.submitProposal(f.scope, { attemptId, proposal: { ...proposal, followUps: [{ ...proposal.followUps[0], layer: 'nowhere' }] } }), /not installed/);
+  assert.throws(() => f.worker.submitProposal(f.scope, { attemptId, proposal: { ...proposal, usedInputs: proposal.usedInputs.slice(1) } }), /every record a change cites/);
+  const submitted = f.worker.submitProposal(f.scope, { attemptId, proposal });
+  assert.equal(f.know.list(f.projectId, 'flow').length, 1, 'nothing is applied before review');
+  assert.equal(f.know.get(f.projectId, flow.id).revision, flow.revision);
+
+  const run = workRuns({ db: f.db, know: f.know }).list(f.projectId, work.id)[0];
+  assert.deepEqual(run.changes.map(change => change.kind), ['flow', 'flow-revision', 'report']);
+  assert.equal(run.followUps.length, 1);
+  assert.equal(run.followUps[0].state, 'proposed');
+
+  const member = addMember(f, 'designer@example.com');
+  f.know.updateWork(f.owner, f.projectId, work.id, { verdict: { index: 0, value: 'accept' } });
+  assert.throws(() => f.worker.acceptProposal(member, f.projectId, work.id, submitted.proposalId), /Elevated access/);
+  assert.throws(() => decideFollowUp(f.db, f.know, member, f.projectId, work.id, run.followUps[0].id, 'create'), /Elevated access/);
+  assert.throws(() => setLayerElevated(f.db, member, f.projectId, { userId: member.id, layerKey: 'pages', enabled: true }), /owner required/);
+  setLayerElevated(f.db, f.owner, f.projectId, { userId: member.id, layerKey: 'pages', enabled: true });
+  assert.ok(layerAccess(f.db, member, f.projectId, 'pages').people.find(person => person.id === member.id).elevated);
+
+  const accepted = f.worker.acceptProposal(member, f.projectId, work.id, submitted.proposalId);
+  assert.equal(accepted.applied.length, 2);
+  assert.equal(f.know.list(f.projectId, 'flow').length, 2);
+  assert.equal(f.know.get(f.projectId, flow.id).revision, flow.revision + 1);
+  assert.equal(f.know.get(f.projectId, flow.id).steps[1].page, null);
+  assert.equal(f.know.workById(f.projectId, work.id).state, 'done');
+
+  const decided = decideFollowUp(f.db, f.know, member, f.projectId, work.id, run.followUps[0].id, 'create');
+  assert.equal(decided.work.layer, 'platform');
+  assert.equal(decided.work.state, 'suggested');
+  assert.equal(decided.work.scope, 'layer');
+  assert.equal(decided.work.action, null);
+  assert.deepEqual({ kind: decided.work.context.createdBy.kind, profileId: decided.work.context.createdBy.profileId, layer: decided.work.context.createdBy.layer, workRef: decided.work.context.createdBy.workRef },
+    { kind: 'agent', profileId: f.profile.id, layer: 'pages', workRef: work.ref });
+  assert.match(decided.work.log[0].text, /from the Pages layer as a follow-up to W-\d+; accepted by designer/);
+  assert.equal(decideFollowUp(f.db, f.know, member, f.projectId, work.id, run.followUps[0].id, 'dismiss').followUp.state, 'created', 'a decided follow-up stays decided');
+  assert.equal(workRuns({ db: f.db, know: f.know }).list(f.projectId, work.id)[0].followUps[0].createdRef, decided.work.ref);
+}));
+
+test('a layer-scoped change set is withdrawn on stale input and changed layer source; follow-ups stay decidable after send-back', () => withPagesTemplate(async f => {
+  const page = f.know.insert(f.projectId, 'page', { label: 'Browse', icon: 'article', pageType: 'list', status: 'planned' });
+  const work = layerTask(f, 'Map browse');
+  const { issue } = f.start(null, [], null, null, false, work);
+  const submitted = f.worker.submitProposal(f.scope, { attemptId: issue.native_ref.attempt_id, proposal: { summary: 'Map the browse journey through the list page.',
+    content: { changes: [{ kind: 'flow', op: 'create', title: 'Browse', steps: [{ page: page.id, name: 'Browse' }] }] },
+    followUps: [{ layer: 'product', title: 'Write the browse story', brief: 'Capture why people browse.', why: 'The flow has no Vision story to cite.' }],
+    usedInputs: [{ id: page.id, revision: page.revision }] } });
+  f.know.updateWork(f.owner, f.projectId, work.id, { verdict: { index: 0, value: 'accept' } });
+  f.know.update(f.projectId, page.id, { notes: 'Changed after submission' }, { expectedRevision: page.revision });
+  assert.throws(() => f.worker.acceptProposal(f.owner, f.projectId, work.id, submitted.proposalId), /used input changed/);
+  f.db.prepare("UPDATE layer_package_bindings SET accepted_commit = ? WHERE project_id = ? AND layer_key = 'pages'").run('ae93312c96299c3b855024911f33362ab5cfecb9', f.projectId);
+  assert.throws(() => f.worker.acceptProposal(f.owner, f.projectId, work.id, submitted.proposalId), /layer source changed/);
+  assert.equal(f.know.list(f.projectId, 'flow').length, 0);
+  f.know.updateWork(f.owner, f.projectId, work.id, { verdict: { index: 0, value: 'reject', note: 'The page changed; map it again.' } });
+  f.know.updateWork(f.owner, f.projectId, work.id, { sendBack: true });
+  f.worker.rejectProposal(f.projectId, work.id, submitted.proposalId);
+  const followUp = workRuns({ db: f.db, know: f.know }).list(f.projectId, work.id)[0].followUps[0];
+  assert.equal(decideFollowUp(f.db, f.know, f.owner, f.projectId, work.id, followUp.id, 'dismiss').followUp.state, 'dismissed');
+  assert.equal(f.know.workList(f.projectId).filter(item => item.context?.createdBy).length, 0);
+}));
+
+test('layer access keeps elevated grants layer-wide, never widens action grants, and seeds the layer default assignee', () => withPagesTemplate(async f => {
+  const member = addMember(f, 'reader@example.com'), lead = addMember(f, 'lead@example.com');
+  f.db.exec(`CREATE TABLE IF NOT EXISTS layer_action_grants (project_id TEXT NOT NULL, user_id TEXT NOT NULL, layer_key TEXT NOT NULL,
+    action_id TEXT NOT NULL DEFAULT '', level TEXT NOT NULL, source_role_id TEXT, created_at TEXT NOT NULL, PRIMARY KEY(project_id, user_id, layer_key, action_id, level))`);
+  const at = new Date().toISOString();
+  f.db.prepare("INSERT INTO layer_action_grants VALUES (?, ?, 'pages', '', 'elevated', NULL, ?)").run(f.projectId, lead.id, at);
+  f.db.prepare("INSERT INTO layer_action_grants VALUES (?, ?, 'pages', 'pages.flows', 'elevated', NULL, ?)").run(f.projectId, member.id, at);
+  initLayerScope(f.db);
+  const access = layerAccess(f.db, f.owner, f.projectId, 'pages');
+  assert.equal(access.layerScoped, true);
+  assert.equal(access.people.find(person => person.id === lead.id).elevated, true);
+  assert.equal(access.people.find(person => person.id === member.id).elevated, false, 'an action-specific grant is not widened');
+  assert.throws(() => setLayerDefaultAssignee(f.db, member, f.projectId, 'pages', { kind: 'person', id: member.id }), /Elevated access/);
+  setLayerDefaultAssignee(f.db, lead, f.projectId, 'pages', { kind: 'person', id: member.id });
+  const work = f.know.createWork(f.projectId, { layer: 'pages', title: 'Review the map' }, f.owner.name);
+  assert.equal(work.assignee.id, member.id);
+  f.know.migrateWork(f.projectId);
+  assert.equal(f.know.workById(f.projectId, work.id).action, null, 'a layer-scoped item is never back-filled with an action');
+}));
+
+test('without an opted-in layer package, an action-less request keeps the legacy action path', () => {
+  const f = fixture();
+  try {
+    initLayerScope(f.db);
+    const work = f.know.createWork(f.projectId, { layer: 'pages', type: 'design', title: 'Legacy request' }, f.owner.name);
+    assert.equal(work.scope, 'action');
+    assert.ok(work.action?.startsWith('pages.'));
   } finally { f.close(); }
 });

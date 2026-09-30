@@ -11,6 +11,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { requireMember } from './accounts.mjs';
 import { actionGrant, recordNewWorkAction } from './lat08-migration.mjs';
+import { hasElevated, layerDefaultAssignee, layerWorkScope } from './layer-scope.mjs';
 import { compiledLocalActions } from './lat07-actions.mjs';
 import { actionForProject, actionsForDefinition, projectLayerDefinition, projectLayerDefinitions } from './layer-registry.mjs';
 import { cleanBrandAsset, cleanComponent, cleanTokens, componentStatus, ensureDesign as seedDesign, syncTokensFromLook } from './design.mjs';
@@ -183,6 +184,8 @@ export function initKnowledge(db) {
   // ROADMAP-01: the plan project an item belongs to (not project_id, which is the Aludel project that owns the item),
   // and the project checkpoint it counts towards.
   for (const column of ['plan_project_id', 'checkpoint']) if (!workColumns.has(column)) db.exec(`ALTER TABLE layer_work_items ADD COLUMN ${column} TEXT`);
+  // DEC-057: 'layer' marks an item scoped to its layer rather than an action; it is never back-filled with one.
+  if (!workColumns.has('work_scope')) db.exec('ALTER TABLE layer_work_items ADD COLUMN work_scope TEXT');
   // DEC-056 bridge: current Pages records, revisions and tombstones carry instance identity.
   for (const table of ['knowledge_records', 'knowledge_revisions', 'knowledge_deletions']) {
     const columns = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(column => column.name));
@@ -834,6 +837,9 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     const role = list(projectId, 'role').find(entry => entry.layer === String(actionId || '').split('.')[0]);
     return Boolean(role?.members?.some(member => member.id === user.id && member.lead));
   }
+  function layerAssignee(projectId, layerKey) {
+    try { return resolveAssignee(projectId, layerDefaultAssignee(db, projectId, layerKey)); } catch { return null; }
+  }
   function defaultAssignee(projectId, actionId) {
     const installed = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_action_installations'").get()
       ? db.prepare('SELECT assignee_kind, assignee_id FROM layer_action_installations WHERE project_id = ? AND action_id = ?').get(projectId, actionId) : null;
@@ -1052,7 +1058,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     if (workTargets.some(target => target.layerInstanceId && ['page_map','page','flow'].includes(target.kind) && target.layerInstanceId !== pagesInstanceId(db, item.project_id))) return null;
     const migration = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_work_migration'").get()
       ? db.prepare('SELECT action_id AS actionId, action_revision AS actionRevision, disposition, reason FROM layer_work_migration WHERE project_id = ? AND work_id = ?').get(item.project_id, item.id) : null;
-    return { id: item.id, number: item.number, ref: `W-${item.number}`, layer: item.layer, layerInstanceId: item.layer_instance_id || null, type: item.type, action: item.action || null, title: item.title, state: item.state,
+    return { id: item.id, number: item.number, ref: `W-${item.number}`, layer: item.layer, layerInstanceId: item.layer_instance_id || null, type: item.type, action: item.action || null, scope: item.work_scope === 'layer' ? 'layer' : 'action', title: item.title, state: item.state,
       status: migration?.disposition === 'blocked' && item.state !== 'done' ? 'blocked' : statusOf(item.state, context), migration, priority: priorities.includes(item.priority) ? item.priority : 'medium',
       assignee: item.assignee_kind ? { kind: item.assignee_kind, id: item.assignee_id || (item.assignee_kind === 'agent' ? item.profile_id : null), label: item.assignee_label } : null,
       targets: workTargets, question: parse(item.question_json, null), documents: parse(item.documents_json, []), log: parse(item.log_json, []),
@@ -1096,9 +1102,12 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
         ...(pagesKind(record.kind) && record.layer_instance_id ? { layerInstanceId: record.layer_instance_id } : {}) };
     });
     const question = input.question ? { text: text(input.question.text, 400, 'Question', true), options: lines(input.question.options, 200, 'Option') } : null;
-    const installedAction = compiledLocalActions.find(action => action.id === input.action) || actionForProject(db,projectId,input.action);
-    const actionId = catalogs.roles.actions.has(input.action) || installedAction ? input.action : actionIdFor(input.layer, input.type, { question, routineKey: input.routineKey });
-    const definition = catalogs.roles.actions.get(actionId) || (installedAction ? { layer: installedAction.layer, type: installedAction.key === 'edit' ? 'implement' : 'audit', checks: installedAction.checks } : null);
+    // DEC-057: an item for a layer-scoped layer (or an agent follow-up) names only its layer; the layer's charter guides it.
+    const layerScoped = !input.action && typeof input.layer === 'string' && (input.layerScoped === true || Boolean(layerWorkScope(db, projectId, input.layer)));
+    const installedAction = layerScoped ? null : compiledLocalActions.find(action => action.id === input.action) || actionForProject(db,projectId,input.action);
+    const actionId = layerScoped ? null : catalogs.roles.actions.has(input.action) || installedAction ? input.action : actionIdFor(input.layer, input.type, { question, routineKey: input.routineKey });
+    const definition = layerScoped ? { layer: input.layer, type: 'design', checks: [`The change fits the ${projectLayerDefinition(db, projectId, input.layer)?.name || input.layer} charter and cites the exact inputs it used`] }
+      : catalogs.roles.actions.get(actionId) || (installedAction ? { layer: installedAction.layer, type: installedAction.key === 'edit' ? 'implement' : 'audit', checks: installedAction.checks } : null);
     if (!definition) fail('Action not found.', 404);
     const layer = input.layer ?? definition.layer;
     const layerInstanceId = layer === 'pages' ? pagesInstanceId(db, projectId) : null;
@@ -1110,18 +1119,18 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     const number = counter(projectId, 'work');
     const id = `wrk-${randomBytes(4).toString('hex')}`;
     const created = now();
-    const assignee = input.assignee ? resolveAssignee(projectId, input.assignee) : defaultAssignee(projectId, actionId);
-    const checks = checkList(input.checks?.length ? input.checks : actionRecord(projectId, actionId)?.checks || definition.checks, targets);
+    const assignee = input.assignee ? resolveAssignee(projectId, input.assignee) : layerScoped ? layerAssignee(projectId, layer) : defaultAssignee(projectId, actionId);
+    const checks = checkList(input.checks?.length ? input.checks : (!layerScoped && actionRecord(projectId, actionId)?.checks) || definition.checks, targets);
     const projectRecord = input.project !== undefined ? (input.project ? get(projectId, input.project) : null) : projectFor(projectId, targets);
     if (input.project && projectRecord?.kind !== 'project') fail('Project not found.', 404);
     db.prepare(`INSERT INTO layer_work_items(id, project_id, number, layer, type, title, state, assignee_kind, assignee_label, targets_json, question_json, documents_json, log_json, created_at, updated_at,
-      context_json, action, assignee_id, profile_id, priority, blocks_json, checks_json, plan_project_id, layer_instance_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      context_json, action, assignee_id, profile_id, priority, blocks_json, checks_json, plan_project_id, layer_instance_id, work_scope) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(id, projectId, number, layer, type, text(input.title, 160, 'Work title', true), input.state || 'ready',
         assignee?.kind || null, assignee?.label || null, JSON.stringify(targets), question ? JSON.stringify(question) : null,
         JSON.stringify(lines(input.documents, 300, 'Document')), JSON.stringify([{ at: created, text: input.logText || `Created by ${author}`, refs: targets.map(target => target.id) }]), created, created,
         input.context && typeof input.context === 'object' ? JSON.stringify(input.context) : null, actionId, assignee?.id || null, assignee?.kind === 'agent' ? assignee.id : null,
-        input.priority || priorityLevel(projectId, type, targets), '[]', JSON.stringify(checks), projectRecord?.id || null, layerInstanceId);
-    recordNewWorkAction(db, projectId, id, actionId);
+        input.priority || priorityLevel(projectId, type, targets), '[]', JSON.stringify(checks), projectRecord?.id || null, layerInstanceId, layerScoped ? 'layer' : null);
+    if (actionId) recordNewWorkAction(db, projectId, id, actionId);
     return workById(projectId, id);
   }
 
@@ -1332,7 +1341,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
           !db.prepare("SELECT 1 FROM code_candidates WHERE project_id = ? AND work_id = ? AND state = 'review' LIMIT 1").get(projectId, workId))
         fail('Build and check a code candidate before reviewing this work.', 409);
       if (state === 'done') {
-        if ((item.action?.endsWith('.discover') || ['product.define', 'product.clarify', 'data.contract', 'design.audit', 'pages.a11y', 'pages.flows', 'deploy.review', 'work.review'].includes(item.action)) && item.assignee?.kind === 'agent' &&
+        if ((item.scope === 'layer' || item.action?.endsWith('.discover') || ['product.define', 'product.clarify', 'data.contract', 'design.audit', 'pages.a11y', 'pages.flows', 'deploy.review', 'work.review'].includes(item.action)) && item.assignee?.kind === 'agent' &&
             (item.state !== 'review' || !input.proposalId || !db.prepare("SELECT 1 FROM symphony_proposals WHERE id = ? AND project_id = ? AND work_id = ? AND state = 'accepted'").get(input.proposalId, projectId, workId)))
           fail('Accept the exact Work proposal before closing this agent task.', 409);
         if (item.action === 'product.brief' && item.assignee?.kind === 'agent' && (item.state !== 'review' || !input.visionProposalId ||
@@ -1345,12 +1354,14 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
           fail('Accept an exact, independently checked code candidate before closing this work.', 409);
         if (!outputs.length && !checks.length) fail('Name what this work checks or documents before closing it (DEC-036: logs are not documentation).', 409);
         if (item.state === 'review' && checks.some(check => check.verdict !== 'accept')) fail('Accept every check before accepting the work, or send it back.', 409);
+        if (item.state === 'review' && item.scope === 'layer' && !hasElevated(db, user.id, projectId, item.layer))
+          fail(`Elevated access to this layer is required to accept ${item.ref}.`, 403);
         if (item.state === 'review' && item.action && !mayDo(user, projectId, item.action)) {
           const migrated = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_action_installations'").get();
           fail(migrated ? `A grant for ${item.action} is required to accept ${item.ref}.`
             : `Only a lead of the ${catalogs.roles.roles.find(role => role.layer === item.action.split('.')[0])?.name || 'role'} can accept ${item.ref}: its action is elevated.`, 403);
         }
-        if (verifiedTypes.includes(item.type) && item.assignee?.kind !== 'template' && !(item.action === 'pages.flows' && item.assignee?.kind === 'agent' && input.proposalId)) {
+        if (verifiedTypes.includes(item.type) && item.assignee?.kind !== 'template' && !((item.action === 'pages.flows' || item.scope === 'layer') && item.assignee?.kind === 'agent' && input.proposalId)) {
           const missing = item.targets.filter(target => !db.prepare('SELECT 1 FROM knowledge_revisions WHERE record_id = ? AND work_item_id = ?').get(target.id, item.id));
           if (missing.length) fail(`${missing.map(target => `“${target.label}”`).join(', ')} ${missing.length === 1 ? 'has' : 'have'} no change from ${item.ref} yet. Edit ${missing.length === 1 ? 'it' : 'them'} from this item (or apply the answer), then close it.`, 409);
         }
@@ -1493,7 +1504,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     const owner = ownerOf(projectId);
     const people = members(projectId);
     const routineKeys = new Map(list(projectId, 'routine').map(routine => [routine.id, routine.key]));
-    for (const item of workList(projectId).filter(entry => !entry.action)) {
+    for (const item of workList(projectId).filter(entry => !entry.action && entry.scope !== 'layer')) {
       const actionId = actionIdFor(item.layer, item.type, { question: item.question, routineKey: routineKeys.get(item.context?.routine) });
       const person = item.assignee?.kind === 'person' ? (people.find(member => member.name === item.assignee.label)?.id || owner) : null;
       const context = item.state === 'claimed' && item.assignee?.kind === 'person' ? { ...(item.context || {}), staged: true } : item.context;

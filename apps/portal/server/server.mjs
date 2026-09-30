@@ -33,6 +33,7 @@ import { initPagesReconciliation, pagesReconciliationView, pagesGapDecision, rec
 import { initPagesCodeObservations, codeRouteObservations, recordCodeRouteObservation, pagesObservationRelations, proposePagesObservationRelation, reviewPagesObservationRelation, stagePagesFlowFromObservation } from './pages-code-observations.mjs';
 import { initActionMigration, migrateActionProject, layerActionSettings, setActionAssignee, setProjectWorkStyle, setLayerActionGrant, setActionMethod } from './lat08-migration.mjs';
 import { readActionSource, readAttemptSource, checkPinnedActionEffect } from './code-action-gateway.mjs';
+import { decideFollowUp, initLayerScope, layerAccess, requireElevated, setLayerDefaultAssignee, setLayerElevated } from './layer-scope.mjs';
 import { initLayerContract, layerDescriptors, layerInstances, updateLayerInstance, layerCatalog, layerOutputRead, layerMigrationInventory } from './layer-contract.mjs';
 import { answerDecision, createProposal, ensureB02Fixture, getDecision, getProposal, listDecisions, listDownstreamRecords, listProposals, reassessRecord, reviseProposal } from './product-records.mjs';
 import { openSecretStore } from './secret-store.mjs';
@@ -69,6 +70,7 @@ initWorkRuns(db);
 initLayerContract(db);
 initMarkdownLayer(db);
 initActionMigration(db);
+initLayerScope(db);
 initPagesLayerApp(db);
 initPagesReconciliation(db);
 initPagesCodeObservations(db);
@@ -700,6 +702,27 @@ async function api(request, response, url) {
     const projectId = decodeURIComponent(layerGrantRoute[1]);
     return json(response, 200, setLayerActionGrant(db, user, projectId, await readJson(request)));
   }
+  // DEC-057: per-layer elevated access and default assignee, shown in the layer's Manage › Access.
+  const layerAccessRoute = /^\/api\/projects\/([^/]+)\/layer-access\/([^/]+)$/.exec(url.pathname);
+  if (layerAccessRoute) {
+    const projectId = decodeURIComponent(layerAccessRoute[1]), layerKey = decodeURIComponent(layerAccessRoute[2]);
+    if (request.method === 'GET') return json(response, 200, layerAccess(db, user, projectId, layerKey), { 'cache-control': 'no-store' });
+    if (request.method === 'PUT') {
+      const input = await readJson(request);
+      if (Object.hasOwn(input, 'elevated')) setLayerElevated(db, user, projectId, { userId: input.userId, layerKey, enabled: input.elevated });
+      else if (Object.hasOwn(input, 'defaultAssignee')) setLayerDefaultAssignee(db, user, projectId, layerKey, input.defaultAssignee);
+      else return json(response, 400, { error: 'Change elevated access or the default assignee.' });
+      return json(response, 200, layerAccess(db, user, projectId, layerKey), { 'cache-control': 'no-store' });
+    }
+    return json(response, 405, { error: 'Method not allowed.' });
+  }
+  // DEC-057: a reviewer creates or dismisses each follow-up an agent proposed.
+  const followUpRoute = /^\/api\/projects\/([^/]+)\/work\/([^/]+)\/follow-ups\/([^/]+)$/.exec(url.pathname);
+  if (followUpRoute && request.method === 'POST') {
+    const [projectId, workId, followUpId] = followUpRoute.slice(1).map(decodeURIComponent);
+    requireMember(db, user, projectId);
+    return json(response, 200, decideFollowUp(db, know, user, projectId, workId, followUpId, String((await readJson(request)).decision || '')), { 'cache-control': 'no-store' });
+  }
   const layerActionRoute = /^\/api\/projects\/([^/]+)\/layer-actions\/([^/]+)(?:\/([^/]+))?$/.exec(url.pathname);
   if (layerActionRoute) {
     const projectId = decodeURIComponent(layerActionRoute[1]);
@@ -759,6 +782,8 @@ async function api(request, response, url) {
     if (operation === 'review' && request.method === 'PUT') return json(response, 200, runHistory.saveReview(projectId, workId, attemptId, await readJson(request)), { 'cache-control': 'no-store' });
     if (operation === 'sign' && request.method === 'POST') {
       const input = await readJson(request);
+      const signing = know.workById(projectId, workId);
+      if (signing?.scope === 'layer') requireElevated(db, user, projectId, signing.layer, 'sign this review');
       const stamp = () => new Date().toISOString();
       const signed = await runHistory.sign(user, projectId, workId, attemptId, { outcome: String(input.outcome || ''), comment: typeof input.comment === 'string' ? input.comment : '' }, {
         accept: async run => {
@@ -980,6 +1005,7 @@ async function api(request, response, url) {
     if (section === 'work' && method === 'POST' && !item) {
       // People stage suggestions; reconcile and routine contexts are only ever written by the server.
       const input = await readJson(request);
+      delete input.layerScoped;
       if (input.action) {
         const selected = know.view(user, projectId).layerActions.find(action => action.id === input.action);
         if (!selected || input.layer && input.layer !== selected.layer || input.type && input.type !== selected.type) throw Object.assign(new Error('Choose an installed layer action.'), { status: 400 });
@@ -1007,6 +1033,7 @@ async function api(request, response, url) {
       if (input.stop === true) return json(response, 200, runs.stopItem(user, projectId, item));
       if (input.assignee !== undefined) return json(response, 200, runs.reassign(user, projectId, item, input.assignee));
       if (typeof input.note === 'string' && input.note.trim()) know.appendLog(item, input.note.trim().slice(0, 500), {}, { by: { kind: 'person', id: user.id } });
+      if (input.sendBack && know.workById(projectId, item)?.scope === 'layer') requireElevated(db, user, projectId, know.workById(projectId, item).layer, 'send this back');
       if (input.sendBack && know.workById(projectId, item)?.action === 'platform.implement') {
         const before = know.workById(projectId, item);
         const result = know.updateWork(user, projectId, item, input);
@@ -1030,7 +1057,7 @@ async function api(request, response, url) {
         worker.rejectProposal(projectId, item, before.context.visionProposal.id);
       }
       if (before?.context?.workProposal?.id && input.sendBack) worker.rejectProposal(projectId, item, before.context.workProposal.id);
-      if (['platform.security', 'product.define', 'product.clarify', 'product.brief', 'data.contract', 'design.audit', 'pages.a11y', 'pages.flows', 'deploy.review', 'work.review'].includes(before?.action) &&
+      if ((before?.scope === 'layer' || ['platform.security', 'product.define', 'product.clarify', 'product.brief', 'data.contract', 'design.audit', 'pages.a11y', 'pages.flows', 'deploy.review', 'work.review'].includes(before?.action)) &&
           (input.sendBack || input.state === 'done' || input.answer !== undefined)) settleSymphonyBatch(projectId, before.context?.batch);
       return json(response, 200, updated);
     }

@@ -55,7 +55,9 @@ export function migrateActionProject(db, projectId) {
      legacy_action_id, legacy_record_id, legacy_record_revision, method_text, method_revision, installed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`);
   const grants = db.prepare(`INSERT OR IGNORE INTO layer_action_grants
     (project_id, user_id, layer_key, action_id, level, source_role_id, created_at) VALUES (?, ?, ?, '', ?, ?, ?)`);
-  const workRows = db.prepare("SELECT id, action, state FROM layer_work_items WHERE project_id = ?").all(projectId);
+  // DEC-057: layer-scoped items have no action to map.
+  const scoped = db.prepare('PRAGMA table_info(layer_work_items)').all().some(column => column.name === 'work_scope');
+  const workRows = db.prepare(`SELECT id, action, state FROM layer_work_items WHERE project_id = ?${scoped ? " AND work_scope IS NOT 'layer'" : ''}`).all(projectId);
   const ledger = db.prepare(`INSERT OR IGNORE INTO layer_work_migration
     (project_id, work_id, legacy_action_id, legacy_record_id, legacy_record_revision,
      action_id, action_revision, disposition, reason, recorded_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
