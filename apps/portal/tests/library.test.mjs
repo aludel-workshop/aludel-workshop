@@ -97,4 +97,9 @@ test('T03-G1: layer frames may search and read the Library, and nothing else new
   assert.equal(allow('GET', '/library/entry'), true);
   assert.equal(allow('POST', '/library'), false);
   assert.equal(allow('GET', '/library/other'), false);
+  // T03-G2: a layer's own output files, but never another layer's.
+  assert.equal(allow('GET', '/layers/pages/files'), true);
+  assert.equal(allow('PUT', '/layers/pages/files'), true);
+  assert.equal(allow('PUT', '/layers/data/files'), false);
+  assert.equal(allow('DELETE', '/layers/pages/files'), false);
 });

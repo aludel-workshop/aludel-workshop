@@ -13,6 +13,7 @@ import { requireMember } from './accounts.mjs';
 import { actionGrant, recordNewWorkAction } from './lat08-migration.mjs';
 import { hasElevated, layerDefaultAssignee, layerWorkScope } from './layer-scope.mjs';
 import { kindOwners, layerApiForKind, normalizeRecord } from './layer-api.mjs';
+import { fileEntryExists } from './layer-files.mjs';
 import { compiledLocalActions } from './lat07-actions.mjs';
 import { actionForProject, actionsForDefinition, projectLayerDefinition, projectLayerDefinitions } from './layer-registry.mjs';
 import { cleanBrandAsset, cleanComponent, cleanTokens, componentStatus, ensureDesign as seedDesign, syncTokensFromLook } from './design.mjs';
@@ -555,6 +556,8 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     for (const [id, expected] of list) {
       const target = row(id);
       const allowed = Array.isArray(expected) ? expected : [expected];
+      // DEC-059: or an entry another layer keeps as repository files (T03-G2).
+      if (!target && fileEntryExists(db, projectId, id, allowed)) continue;
       if (!inScope(projectId, target) || !allowed.includes(target.kind)) fail(`A linked ${Array.isArray(expected) ? 'record' : expected.replace('_', ' ')} was not found.`, 404);
     }
   }

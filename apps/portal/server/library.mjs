@@ -4,6 +4,8 @@
 // agents and layer views search and read entries; a cross-layer reference pins an entry (ref + revision) and names the
 // instance that owns it. Nothing here writes: each layer still changes its outputs only through its own API.
 import { layerDocumentList, layerDocumentRead } from './layer-space.mjs';
+import { currentFileEntries, fileEntry } from './layer-files.mjs';
+import { layerPackageForProject } from './layer-package.mjs';
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const parse = value => { try { return JSON.parse(value); } catch { return null; } };
@@ -47,9 +49,18 @@ export function library({ db, know }) {
   const outputEntry = (layer, record, text) => ({ ref: record.id, source: 'output', layer: { key: layer.key, name: layer.name, instanceId: layer.instanceId },
     kind: record.kind, title: title(record) || record.id, revision: record.revision, updatedAt: record.updatedAt || null, text });
 
+  // Kinds a layer keeps as repository files (T03-G2), which the index reads from its pinned files instead of records.
+  const fileKinds = (projectId, key) => { try { return layerPackageForProject(db, projectId, key)?.manifest?.files?.kinds || []; } catch { return []; } };
   function outputs(projectId, installed) {
     const entries = [];
+    for (const layer of installed) {
+      if (!fileKinds(projectId, layer.key).length) continue;
+      for (const entry of currentFileEntries(db, projectId, layer.key))
+        entries.push({ ref: entry.id, source: 'output', layer: { key: layer.key, name: layer.name, instanceId: layer.instanceId }, kind: entry.kind, title: entry.title,
+          revision: entry.revision, updatedAt: entry.updatedAt, text: `${entry.title}\n${words(entry.data)}` });
+    }
     for (const layer of installed) for (const kind of layer.outputs) {
+      if (fileKinds(projectId, layer.key).includes(kind)) continue;
       // A kind several installed layers own is told apart by instance; untagged legacy rows go to its only owner.
       const sole = installed.filter(other => other.outputs.includes(kind)).length === 1;
       const rows = db.prepare(`SELECT id FROM knowledge_records WHERE project_id = ? AND kind = ? AND (layer_instance_id = ? OR (layer_instance_id IS NULL AND ?))
@@ -106,7 +117,14 @@ export function library({ db, know }) {
         revision: at.revision, currentRevision: current.revision, content: at.content };
     }
     const row = db.prepare('SELECT id, kind, project_id, layer_instance_id FROM knowledge_records WHERE id = ?').get(String(ref || ''));
-    if (!row || row.project_id !== projectId) fail('Library entry not found.', 404);
+    if (!row || row.project_id !== projectId) {
+      // A repository-mode output (T03-G2): an entry of an installed layer's pinned files.
+      const file = fileEntry(db, projectId, String(ref || ''), revision);
+      const layer = file && installed.find(entry => entry.instanceId === file.instanceId);
+      if (!file || !layer || file.currentRevision === null && revision === null) fail(revision === null ? 'Library entry not found.' : 'Revision not found.', 404);
+      return { ref: file.id, source: 'output', layer: { key: layer.key, name: layer.name, instanceId: layer.instanceId }, kind: file.kind, title: file.title,
+        revision: file.revision, currentRevision: file.currentRevision, data: file.data, commit: file.commit };
+    }
     const record = know.get(projectId, row.id) || fail('Library entry not found.', 404);
     const owner = libraryKinds.includes(row.kind) ? { key: 'library', name: 'Library', instanceId: null } : recordOwner(db, projectId, row);
     if (!owner) fail('Library entry not found.', 404);

@@ -7,6 +7,7 @@ import { hostTopology } from './hosts.mjs';
 import { initOnboarding, loadCatalogs, onboarding } from './onboarding.mjs';
 import { botColors, efforts, initKnowledge, knowledge } from './knowledge.mjs';
 import { library } from './library.mjs';
+import { commitOutputFile, initLayerFiles, readOutputFile } from './layer-files.mjs';
 import { previewManager, previewRuntime } from './previews.mjs';
 import { agentsGuide, copyMedia, initialFiles, loadScaffoldSources, sitePages, skeletonFiles, workflowPaths, writeBinaries, writeFiles } from './scaffold.mjs';
 import { brandUsage, componentStatus } from './design.mjs';
@@ -84,6 +85,7 @@ function recordCall(db, projectId, kind, { layer = null, instanceId = null, mode
   return { owner, operation };
 }
 initPagesLayerApp(db);
+initLayerFiles(db);
 initPagesReconciliation(db);
 initPagesCodeObservations(db);
 initLayerDiscovery(db);
@@ -755,6 +757,20 @@ async function api(request, response, url) {
     const [projectId, layerKey] = layerUiRoute.slice(1).map(decodeURIComponent);
     requireMember(db, user, projectId);
     return json(response, 200, views.status(db, projectId, layerKey), { 'cache-control': 'no-store' });
+  }
+  // T03-G2 (DEC-059): a layer's repository-mode output files. GET reads one at the pin; PUT commits a person's edit to main.
+  const layerFilesRoute = /^\/api\/projects\/([^/]+)\/layers\/([^/]+)\/files$/.exec(url.pathname);
+  if (layerFilesRoute) {
+    const [projectId, layerKey] = layerFilesRoute.slice(1).map(decodeURIComponent);
+    requireMember(db, user, projectId);
+    const path = url.searchParams.get('path') || '';
+    if (request.method === 'GET') return json(response, 200, readOutputFile(db, projectId, layerKey, path), { 'cache-control': 'no-store' });
+    if (request.method === 'PUT') {
+      const input = await readJson(request);
+      return json(response, 200, commitOutputFile(db, { projectId, key: layerKey, path, content: input.content, expectedCommit: input.expectedCommit, author: user.name,
+        message: typeof input.message === 'string' ? input.message : null }), { 'cache-control': 'no-store' });
+    }
+    return json(response, 405, { error: 'Method not allowed.' });
   }
   // PAGES-API-01: a layer's API. GET returns its OpenAPI document; POST calls one operation and applies it at once.
   const layerApiRoute = /^\/api\/projects\/([^/]+)\/layers\/([^/]+)\/api(?:\/([A-Za-z][A-Za-z0-9]*))?$/.exec(url.pathname);

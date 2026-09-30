@@ -362,7 +362,7 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
   // and research. Kinds no layer publishes (project docs) keep the older record path.
   const pool = library({ db, know });
   const libraryRef = id => typeof id === 'string' && id.startsWith('k:');
-  const currentRevision = (projectId, id) => libraryRef(id) ? pool.read(projectId, null, id).currentRevision : know.get(projectId, id)?.revision;
+  const currentRevision = (projectId, id) => libraryRef(id) || !know.get(projectId, id) ? pool.read(projectId, null, id).currentRevision : know.get(projectId, id)?.revision;
   const publishedKind = (projectId, kind) => !!kind && (libraryKinds.includes(kind) ||
     db.prepare('SELECT output_kinds_json AS outputs FROM layer_definitions d JOIN layer_instances i ON i.project_id = d.project_id AND i.layer_key = d.layer_key WHERE d.project_id = ? AND i.enabled = 1').all(projectId)
       .some(row => (JSON.parse(row.outputs || '[]')).includes(kind)));
@@ -399,7 +399,7 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
   }
   function knowledgeRead(scope, digest, id, revision = null) {
     const bundle=activeBundle(scope, digest);
-    if (bundle.guidance?.layerScope && (libraryRef(id) || publishedKind(scope.projectId, know.get(scope.projectId, id)?.kind))) {
+    if (bundle.guidance?.layerScope && (libraryRef(id) || !know.get(scope.projectId, id) || publishedKind(scope.projectId, know.get(scope.projectId, id)?.kind))) {
       const entry = pool.read(scope.projectId, null, id, revision);
       return { id, kind: entry.kind, revision: entry.revision, currentRevision: entry.currentRevision, layer: entry.layer.key, data: entry.data ?? { title: entry.title, content: entry.content } };
     }

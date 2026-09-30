@@ -85,10 +85,12 @@ export function frameAllows({ key, projectId, method, pathname }) {
   const project = `/api/projects/${encodeURIComponent(projectId)}`;
   if (!pathname.startsWith(project + '/')) return false;
   const rest = pathname.slice(project.length);
-  if (method === 'GET') return rest === '/knowledge' || rest === '/layer-instances' || rest === '/library' || rest === '/library/entry' || /^\/assets\/[^/]+$/.test(rest) || rest === `/layers/${key}/api`;
+  if (method === 'GET') return rest === '/knowledge' || rest === '/layer-instances' || rest === '/library' || rest === '/library/entry' || /^\/assets\/[^/]+$/.test(rest) || rest === `/layers/${key}/api` || rest === `/layers/${key}/files`;
   if (/^\/records(?:\/[^/]+)?$/.test(rest)) return ['POST', 'PUT', 'DELETE'].includes(method);
   if (method === 'POST' && new RegExp(`^/layers/${key}/api/[A-Za-z][A-Za-z0-9]*$`).test(rest)) return true;
   if (method === 'POST' && rest === '/work') return true;
+  // T03-G2: this layer's own output files, read and edited by the person using its views.
+  if (method === 'PUT' && rest === `/layers/${key}/files`) return true;
   if (key === 'pages' && method === 'POST' && ['/pages/change', '/pages/review', '/skeleton'].includes(rest)) return true;
   return false;
 }

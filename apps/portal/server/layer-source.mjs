@@ -11,15 +11,16 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { layerApiAt, normalizeRecord } from './layer-api.mjs';
 import { packageAt } from './layer-package.mjs';
+import { indexAt, syncFileEntries } from './layer-files.mjs';
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const now = () => new Date().toISOString();
 const maxFiles = 40, maxDiff = 60 * 1024;
 const writable = [/^knowledge\/[a-z0-9][a-z0-9-]*\.md$/, /^docs\/[a-z0-9][a-z0-9-]*\.md$/, /^(?:README|AGENTS)\.md$/, /^fixtures\/[a-z0-9][a-z0-9-]*\.(?:md|json)$/,
-  /^api\/[a-z0-9][a-z0-9-]*\.json$/, /^server\/[a-z0-9][a-z0-9-]*\.mjs$/, /^ui\/[a-z0-9][a-z0-9-]*\.(?:ts|scss)$/, /^tests\/[a-z0-9][a-z0-9-]*\.test\.mjs$/, /^layer\.json$/, /^\.gitignore$/];
+  /^api\/[a-z0-9][a-z0-9-]*\.json$/, /^outputs\/[a-z0-9][a-z0-9-]*(?:\/[a-z0-9][a-z0-9-]*)*\.(?:json|md|ya?ml)$/, /^server\/[a-z0-9][a-z0-9-]*\.mjs$/, /^ui\/[a-z0-9][a-z0-9-]*\.(?:ts|scss)$/, /^tests\/[a-z0-9][a-z0-9-]*\.test\.mjs$/, /^layer\.json$/, /^\.gitignore$/];
 // Files that run on the host or define what the layer may do; review marks them.
 export const authorityPath = path => /^(?:server|ui|api|tests)\//.test(path) || path === 'layer.json';
-export const writablePatterns = ['knowledge/*.md', 'docs/*.md', 'README.md', 'AGENTS.md', 'fixtures/*.md|json', 'api/*.json', 'server/*.mjs', 'ui/*.ts|scss', 'tests/*.test.mjs', 'layer.json', '.gitignore'];
+export const writablePatterns = ['knowledge/*.md', 'docs/*.md', 'README.md', 'AGENTS.md', 'fixtures/*.md|json', 'api/*.json', 'outputs/**/*.json|md|yaml', 'server/*.mjs', 'ui/*.ts|scss', 'tests/*.test.mjs', 'layer.json', '.gitignore'];
 const git = (repo, args, options = {}) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, ...options });
 const agentIdentity = { GIT_AUTHOR_NAME: 'Aludel agent', GIT_AUTHOR_EMAIL: 'agent@aludel.invalid', GIT_COMMITTER_NAME: 'Aludel', GIT_COMMITTER_EMAIL: 'aludel@aludel.invalid' };
 const validTests = tests => Array.isArray(tests) && tests.length <= 200 && tests.every(entry => entry && typeof entry.name === 'string' && entry.name.trim() && entry.name.length <= 200 &&
@@ -121,9 +122,13 @@ export function mergeLayerBranch(db, { projectId, key, source, reviewer, workId,
       catch (error) { fail(`The changed ${key} rules reject the existing ${kind.replace('_', ' ')} “${record.data.title || record.data.label || record.data.path || record.id}”: ${error.message}`, 409); }
     }
   }
+  // T03-G2: output files must still index under the merged indexer.
+  if (pkg.manifest.files) try { indexAt(db, projectId, key, repo, merged); }
+  catch (error) { fail(`The changed ${key} output files do not index: ${error.message}`, 409); }
   const clean = !git(repo, ['status', '--porcelain']).trim();
   git(repo, ['update-ref', 'refs/heads/main', merged, main]);
   db.prepare('UPDATE layer_package_bindings SET accepted_commit = ? WHERE project_id = ? AND layer_key = ?').run(merged, projectId, key);
+  if (pkg.manifest.files) syncFileEntries(db, projectId, key);
   return { commit: merged, repo, clean, main };
 }
 

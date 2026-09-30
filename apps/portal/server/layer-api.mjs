@@ -7,6 +7,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import Ajv2020 from 'ajv/dist/2020.js';
 import { layerPackageForProject } from './layer-package.mjs';
+import { fileEntryExists } from './layer-files.mjs';
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const now = () => new Date().toISOString();
@@ -74,6 +75,8 @@ function compile(key, repo, commit, manifest) {
       validate: body ? ajv.getSchema(pointer(['paths', path, method, 'requestBody', 'content', 'application/json', 'schema'])) : null });
   }
   const records = new Map(Object.entries(spec['x-aludel-records'] || {}).map(([kind, ref]) => [kind, ajv.getSchema(`layer${ref}`)]));
+  // T03-G2: a kind is kept either as records through this API or as repository files, never both.
+  if (manifest.files?.kinds?.some(kind => records.has(kind))) fail('A kind is either records or files, not both.', 500);
   const catalogNames = spec['x-aludel-catalogs'] || [];
   if (!Array.isArray(catalogNames) || !catalogNames.every(name => /^[a-zA-Z][a-zA-Z0-9]*$/.test(name))) fail('The layer API names invalid host catalogs.', 500);
   const api = { key, commit, spec, source, digest: createHash('sha256').update(source).digest('hex'), handlerPath: manifest.api.handler, operations, records, catalogNames, outputs: manifest.outputs };
@@ -122,8 +125,10 @@ export function layerApiForKind(db, projectId, kind, { layerKey = null, instance
 // Compiles a layer API at any commit of its repository, for checking a candidate before it is accepted.
 export function layerApiAt(key, repo, commit, manifest) { return compile(key, repo, commit, manifest); }
 
-function handle(api, call, args) {
-  const payload = JSON.stringify({ source: api.source, call, args });
+function handle(api, call, args) { return runPure(api.source, call, args); }
+// Runs one export of a pure, reviewed module in a limited child process: no filesystem, subprocess or network permission.
+export function runPure(source, call, args) {
+  const payload = JSON.stringify({ source, call, args });
   if (payload.length > 1048576) fail('The layer API input is too large.');
   const result = spawnSync(process.execPath, ['--permission', '--max-old-space-size=64', '-e', child],
     { input: payload, encoding: 'utf8', timeout: 3000, maxBuffer: 1048576, env: { PATH: process.env.PATH || '' } });
@@ -164,6 +169,8 @@ function checkReferences(db, api, projectId, references, overlay) {
   for (const [id, kinds] of references) {
     const staged = overlay?.get(id);
     const record = staged ? (staged.deleted ? null : { kind: staged.kind, instanceId: instance }) : stored(db, projectId, api.key, id);
+    // DEC-059: a reference may also name an entry another layer keeps as repository files (T03-G2).
+    if (!record && !staged && fileEntryExists(db, projectId, id, kinds)) continue;
     if (!record || !kinds.includes(record.kind) || outputs.has(record.kind) && record.instanceId !== instance)
       fail(`A linked ${kinds[0].replace('_', ' ')} was not found.`, 404);
   }

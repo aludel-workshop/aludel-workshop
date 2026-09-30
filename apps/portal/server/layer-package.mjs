@@ -64,6 +64,17 @@ function binding(db, projectId, key) {
   const row = db.prepare('SELECT repository_path AS repo, accepted_commit AS acceptedCommit FROM layer_package_bindings WHERE project_id=? AND layer_instance_id=? AND layer_key=?').get(projectId,rowId.instance_id,key);
   return row ? { repo: row.repo, commit: row.acceptedCommit } : null;
 }
+// T03-G2 (DEC-059): a manifest's repository-mode outputs: exact paths under outputs/, the kinds they hold and the pure
+// indexer that splits them into Library entries. Null when it declares none.
+export const outputPath = /^outputs\/[a-z0-9][a-z0-9-]*(?:\/[a-z0-9][a-z0-9-]*)*\.(?:json|md|ya?ml)$/;
+export function fileOutputs(manifest) {
+  const files = manifest?.files;
+  if (files === undefined) return null;
+  if (!files || !Array.isArray(files.paths) || !files.paths.length || files.paths.length > 20 || !files.paths.every(path => typeof path === 'string' && outputPath.test(path))
+      || new Set(files.paths).size !== files.paths.length || !Array.isArray(files.kinds) || !files.kinds.length || !files.kinds.every(kind => manifest.outputs.includes(kind))
+      || typeof files.indexer !== 'string' || !/^server\/[a-z][a-z0-9-]*\.mjs$/.test(files.indexer)) throw new Error('Invalid layer file outputs.');
+  return { paths: files.paths, kinds: files.kinds, indexer: files.indexer };
+}
 // Commits are immutable, so a validated package at one is kept.
 const packages = new Map();
 export function packageAt(repo, commit, key) {
@@ -90,6 +101,7 @@ function readPackage(repo, commit, key) {
   // PAGES-API-01: the layer's API document and handler module; the host loads and reviews them separately.
   if (manifest.api !== undefined && !['spec', 'handler'].every(field => typeof manifest.api?.[field] === 'string' && /^(?:api|server)\/[a-z][a-z0-9-]*\.(?:json|mjs)$/.test(manifest.api[field])))
     throw new Error('Invalid layer API declaration.');
+  fileOutputs(manifest);
   const charter = content(repo, commit, manifest.knowledge.charter);
   if (charter.length > 20000) throw new Error('Layer charter is too large.');
   // Pure server contracts are declared and pinned here, but never executed by package loading.
