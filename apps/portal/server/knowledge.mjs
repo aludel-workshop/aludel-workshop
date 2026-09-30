@@ -154,6 +154,10 @@ export function initKnowledge(db) {
       record_id TEXT NOT NULL, revision INTEGER NOT NULL, data_json TEXT NOT NULL, author TEXT NOT NULL,
       rationale TEXT, work_item_id TEXT, created_at TEXT NOT NULL, PRIMARY KEY(record_id, revision)
     );
+    CREATE TABLE IF NOT EXISTS knowledge_deletions (
+      record_id TEXT PRIMARY KEY, project_id TEXT NOT NULL, kind TEXT NOT NULL, parent_id TEXT,
+      position REAL NOT NULL, last_revision INTEGER NOT NULL, data_json TEXT NOT NULL, deleted_at TEXT NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS layer_work_items (
       id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id), number INTEGER NOT NULL,
       layer TEXT NOT NULL, type TEXT NOT NULL, title TEXT NOT NULL, state TEXT NOT NULL,
@@ -561,6 +565,8 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     if (!current || current.project_id !== projectId) fail('Record not found.', 404);
     const children = db.prepare('SELECT id FROM knowledge_records WHERE parent_id = ?').all(id);
     for (const child of children) remove(projectId, child.id);
+    db.prepare('INSERT OR IGNORE INTO knowledge_deletions(record_id,project_id,kind,parent_id,position,last_revision,data_json,deleted_at) VALUES (?,?,?,?,?,?,?,?)')
+      .run(current.id,current.project_id,current.kind,current.parent_id,current.position,current.revision,current.data_json,now());
     db.prepare('DELETE FROM knowledge_records WHERE id = ?').run(id);
     // ROADMAP-01: evidence and plans that point at the record let go of it rather than dangle.
     const kind = current.kind;

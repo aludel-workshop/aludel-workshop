@@ -2,7 +2,7 @@
 
 ## Scope and revisions
 
-The owner directed Pages-specific data, code, shared design language, same-task agent packet and build-note migration work before moving to other templates, plus a GitHub publication investigation. This remains an isolated local candidate. The Pages source repository is pinned at `618c6e669df64b381b41403847f122185dccd013` (prior UX/doc/theme commits in its history). This candidate follows the earlier source extraction `f6adc8e813aead602304080e1f0e18584e84d66d`. No original project data, retained LAT-08 candidate, GitHub account or provider was changed.
+The owner directed Pages-specific data, code, shared design language, same-task agent packet and build-note migration work before moving to other templates, plus a GitHub publication investigation. This remains an isolated local candidate. The Pages source repository is pinned at `f45f3f758f239927e6b257141713c332fa5de917` (prior UX/doc/theme commits in its history). This candidate follows the earlier source extraction `f6adc8e813aead602304080e1f0e18584e84d66d`. No original project data, retained LAT-08 candidate, GitHub account or provider was changed.
 
 The template now also has `docs/source-inventory.md`, a file-level account of remaining Pages-specific portal branches and the order for extracting them.
 
@@ -27,15 +27,15 @@ The real worker test passes using a disposable project and no provider turn. Thi
 
 - The Pages repository now holds organized `docs/` with purpose/UX, outputs/data, Work/connections, host SDK and a P/M decision ledger. It distinguishes owner-required behavior, agent-checked build evidence and target architecture. `AGENTS.md` is a short map.
 - The template declares `hostSdkVersion: 1`. Host theme variables for selection, status, surface and corners are supplied centrally; Pages' Map/editor CSS now uses them for common chrome and retains specialized canvas geometry. Typecheck/build and disposable Pages/layer-bar browser journeys passed. This is partial visual token adoption; remaining literal statuses and per-project UI bundle isolation need later checks.
-- An offline Pages module exports current `page_map`, `page` and `flow` records plus exact history into deterministic JSON and rebuilds ignored `.aludel/state.sqlite` in the layer repo. Its one disposable test passes repeat export, project isolation, revision/Work provenance, a new tombstone and hash rejection. It does **not** replace the portal's current SQLite writer. The old deletion path hard-deletes the current row; orphaned history lacks project/kind, so past deletions need a separate migration decision/ledger.
+- An offline Pages module exports current `page_map`, `page` and `flow` records plus exact history into deterministic JSON and rebuilds ignored `.aludel/state.sqlite` in the layer repo. Its one disposable test passes repeat export, project isolation, revision/Work provenance, an exported deleted-flow tombstone, a new candidate tombstone and hash rejection. The isolated portal candidate now records project/kind/revision metadata before hard-deleting a Knowledge record; the exporter includes these future deletions. It does **not** replace the portal's current SQLite writer. Historical orphaned revisions still lack project/kind, so original-data cutover needs a bounded exception or verified recovery.
 - The [GitHub provider plan](../../../../docs/design/layer-app-transition/github-publication.md) names six catalog template repos, project-owned generated repos, per-layer bindings, checked candidate/PR/repin and recovery work. No remote write was authorized or made.
 
 ## Checks
 
-- Final affected portal tests (Pages package, Symphony proposals, moved-source Code observation): **20/20** passed. The full server suite passed **168/168** after those changes; the final template pin changed only the offline migration helper, and the package installation test passed again against that pin.
+- Final affected portal tests (Pages package, Symphony proposals, moved-source Code observation): **20/20** passed. The full server suite passed **168/168** after the deletion-ledger change; the package installation and Pages behavior tests passed **7/7** against the final template pin.
 - `npm run typecheck` and `npm run build` passed with the new host tokens/SDK-versioned manifest. Existing Angular optional-chain and bundle-size warnings remain.
 - `MACHINE_PAGES_TEMPLATE_ENABLED=1 tools/browser-checks.sh pages layer-bar` passed on disposable projects after the CSS token change: Map, flow, page Spec/content/Built, change request, flow review, 390px Map, shared Tasks/Knowledge/Manage, axe and narrow layer bar.
-- Pages repository `node --test tests/portable-store.test.mjs`: **1/1** passed, including current-record round-trip and tamper rejection.
+- Pages repository `node --test tests/portable-store.test.mjs`: **1/1** passed, including current-record round-trip, deleted-flow export, project isolation and tamper rejection.
 - `git diff --check` passed on candidate and template source before checkpoint commit.
 
 ## Retrospective and handoff
@@ -44,4 +44,4 @@ The real worker test passes using a disposable project and no provider turn. Thi
 
 **Reusable change:** compare actual model-facing packets on identical saved bundles and preserve an executable negative fixture for an unsupported owner task. Sweep owner notes into template docs with a source/status ledger, and check extracted UI against a named host theme API. The packet/compiler and browser tests support these changes for Pages; they do not prove general layer SDK isolation, model usefulness, safe server adapters or migration of original data.
 
-**Roadmap effect:** implement a checked per-project UI/server extension boundary, a revise-flow adapter, a deletion ledger and same-fixture authority cutover before Pages is called self-contained. GitHub provider binding and template generation follow a reviewable local flow. LAT-08 owner review/original-data gates remain open; this continuation does not close LAT-T01 or LAT-T02.
+**Roadmap effect:** implement a checked per-project UI/server extension boundary, a revise-flow adapter, historical-deletion recovery and same-fixture authority cutover before Pages is called self-contained. GitHub provider binding and template generation follow a reviewable local flow. LAT-08 owner review/original-data gates remain open; this continuation does not close LAT-T01 or LAT-T02.

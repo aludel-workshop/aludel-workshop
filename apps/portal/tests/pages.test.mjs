@@ -39,7 +39,7 @@ const pageNamed = (know, id, label) => know.list(id, 'page').find(entry => entry
 const blank = { icon: 'article', pageType: 'detail', inNav: false, origin: 'You', status: 'planned' };
 
 test('a page spec holds sections from the design system; a section that leads somewhere is also a link', () => {
-  const { know, id } = fixture();
+  const { db, know, id } = fixture();
   const messages = pageNamed(know, id, 'Messages');
   const detail = know.insert(id, 'page', { ...blank, label: 'Tool detail', notes: 'Everything Sam needs to decide' });
   const list = component(know, id, 'List');
@@ -59,6 +59,11 @@ test('a page spec holds sections from the design system; a section that leads so
   const flow = know.list(id, 'flow')[0];
   know.update(id, flow.id, { steps: [...flow.steps, { page: detail.id, name: 'See details' }] });
   know.remove(id, detail.id);
+  const tombstone = db.prepare('SELECT project_id,kind,last_revision,data_json FROM knowledge_deletions WHERE record_id=?').get(detail.id);
+  assert.equal(tombstone.project_id, id);
+  assert.equal(tombstone.kind, 'page');
+  assert.equal(tombstone.last_revision, detail.revision);
+  assert.equal(JSON.parse(tombstone.data_json).label, detail.label);
   const after = know.get(id, messages.id);
   assert.deepEqual(after.links, []);
   assert.equal(after.sections[0].leadsTo, null);
