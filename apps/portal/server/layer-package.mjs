@@ -70,6 +70,16 @@ function packageAt(repo, commit, key) {
       || !manifest.knowledge || !Array.isArray(manifest.knowledge.documents)) throw new Error('Invalid layer package manifest.');
   const charter = content(repo, commit, manifest.knowledge.charter);
   if (charter.length > 20000) throw new Error('Layer charter is too large.');
+  // Pure server contracts are declared and pinned here, but never executed by package loading.
+  const changes = manifest.server?.semanticChanges || {};
+  if (Object.keys(changes).some(name => !/^[a-z][a-zA-Z0-9]*$/.test(name))) throw new Error('Invalid layer semantic change key.');
+  for (const declaration of Object.values(changes)) {
+    if (declaration?.schemaVersion !== 1 || declaration.mode !== 'pure-candidate' ||
+        typeof declaration.entry !== 'string' || !/^server\/[a-z][a-z0-9-]*\.mjs$/.test(declaration.entry))
+      throw new Error('Invalid layer semantic change source.');
+    const source = git(repo, 'show', `${commit}:${declaration.entry}`);
+    if (!source || source.length > 40000) throw new Error('Layer semantic change source is unavailable or too large.');
+  }
   return { manifest, charter, repo, commit };
 }
 export function ensureLayerPackage(db, projectId, key) {

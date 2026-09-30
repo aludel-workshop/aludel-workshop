@@ -30,6 +30,8 @@ test('Pages installs separate pinned local repository copies and reads their dec
     assert.equal(db.prepare('SELECT layer_instance_id FROM layer_package_bindings WHERE project_id=? AND layer_key=?')
       .get('one','pages').layer_instance_id, layerInstanceId(db, 'one', 'pages'));
     assert.equal(one.manifest.key, 'pages');
+    assert.equal(one.manifest.server.semanticChanges.flowRevision.entry, 'server/flow-change.mjs');
+    assert.equal(one.manifest.server.semanticChanges.flowRevision.schemaVersion, 1);
     const definition = layerInstances(db, 'owner', 'one').find(layer => layer.key === 'pages');
     assert.equal(definition.packageCommit, one.commit);
     assert.equal(definition.instanceId, layerInstanceId(db, 'one', 'pages'));
