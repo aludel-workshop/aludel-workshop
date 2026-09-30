@@ -255,7 +255,7 @@ defmodule SymphonyElixir.Aludel.Adapter do
       %{
         "name" => @proposal_tool,
         "description" =>
-          "Submit a bounded read-only action proposal to Aludel Work review. Product.brief content needs section, text, note, basis. Other supported actions use their task card output fields.",
+          "Submit this run to Aludel Work review. For a layer task: its staged layer API changes and committed layer branch go with it; give a summary, notes, follow-ups, and evidence for each criterion. For an action task: a bounded read-only proposal (product.brief content needs section, text, note, basis; other actions use their task card output fields).",
         "inputSchema" => %{
           "type" => "object",
           "additionalProperties" => false,

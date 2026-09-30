@@ -37,6 +37,7 @@ function compileLayerTask(bundle) {
         'layer/.aludel/outputs/ holds a copy of the current outputs: run `node --test tests/*.test.mjs` in layer/, then call aludel_layer_commit with a message and each test result. ' +
         'An elevated reviewer sees the diff and your results and accepting merges the branch into the layer. Changes to api/, server/, ui/, tests/ or layer.json change what the layer runs: say so in your summary. ' +
         'If something outside this layer should change, or a separate task would help, propose it as a follow-up with a clear reason instead of doing it. ' +
+        'When you submit, give evidence for every criterion (see outputs[0].evidence); the reviewer judges each criterion against it. ' +
         'Ask a question when a decision blocks the result. Do not change project records or repository files directly.' },
     layerSource: { key: layerPackage.key, instanceId: layerPackage.instanceId, commit: layerPackage.commit, charter: layerPackage.charter,
       documents: layerPackage.documents.map(doc => ({ path: doc.path, markdown: doc.markdown })) },
@@ -49,7 +50,8 @@ function compileLayerTask(bundle) {
       .slice(0, 12).map(record => ({ id: record.id, kind: record.kind, revision: record.revision, summary: summary(record) })),
     layerApi: spec,
     outputs: [{ key: 'changes', kind: 'layer_api_draft', operation: 'submit_for_review', reviewer: `elevated ${scope.key} reviewer`, operations,
-      shape: 'Stage changes with aludel_layer_call, then aludel_submit_proposal { summary; content: { notes? }; followUps[0..5]: { layer, title, brief, why }; usedInputs? }',
+      shape: 'Stage changes with aludel_layer_call, then aludel_submit_proposal { proposal: { summary; content: { notes? }; followUps[0..5]: { layer, title, brief, why }; usedInputs? }; evidence[]: { criterion, type: change|test, ref, note } }',
+      evidence: 'For each criterion (by index from 0), name what shows it is met: type change with ref = a record ID or title you staged, or a repository file path you committed; type test with ref = a test name exactly as reported to aludel_layer_commit. note says what the reviewer should check. Review shows each criterion with this evidence.',
       followUpLayers: guidance.followUpLayers || [], checks: (work.checks || []).map(check => check.text) }],
     capabilities: { knowledge: ['map', 'search', 'read'], layerApi: scope.key, layerRepository: { checkout: 'layer/', base: layerPackage.commit, commitTool: 'aludel_layer_commit', writable: writablePatterns },
       repository: 'read-only pinned commit', submit: 'layer_api_draft' },

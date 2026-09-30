@@ -19,7 +19,7 @@ import { ensureProductWorkspace } from '../server/product-workspace.mjs';
 import { openSecretStore } from '../server/secret-store.mjs';
 import { openDatabase } from '../server/storage.mjs';
 import { initSymphonyWorker, symphonyWorker } from '../server/symphony-worker.mjs';
-import { initWorkRuns } from '../server/work-runs.mjs';
+import { initWorkRuns, workRuns } from '../server/work-runs.mjs';
 import { initWorkflow } from '../server/workflow.mjs';
 import { chromium } from './browser-support.mjs';
 
@@ -58,7 +58,8 @@ const runs = agentRuns({ db, know, secrets: openSecretStore(root), providers: ca
 
 const page1 = know.insert(projectId, 'page', { label: 'Browse tools', icon: 'article', pageType: 'list', status: 'planned' });
 const page2 = know.insert(projectId, 'page', { label: 'Tool detail', icon: 'article', pageType: 'detail', status: 'planned' });
-const task = know.createWork(projectId, { layer: 'pages', title: 'Map how people find a tool', assignee: { kind: 'agent', id: profile.id } }, owner.name);
+const task = know.createWork(projectId, { layer: 'pages', title: 'Map how people find a tool', assignee: { kind: 'agent', id: profile.id },
+  checks: ['A flow goes from Browse tools to Tool detail', 'The flow method names the goal first'] }, owner.name);
 if (task.state === 'suggested') know.updateWork(owner, projectId, task.id, { state: 'ready' });
 runs.stage(owner, projectId, task.id);
 runs.start(owner, projectId, runs.view(projectId).find(value => value.state === 'draft').id);
@@ -87,6 +88,13 @@ worker.submitProposal(scope, { attemptId: attempt, proposal: {
   followUps: [
     { layer: 'platform', title: 'Build the tool detail route', brief: 'Implement Tool detail with its borrow button.', why: 'The Find a tool flow ends on a page Code has not built.' },
     { layer: 'product', title: 'Write the borrow story', brief: 'Capture who borrows and why.', why: 'No Vision story explains borrowing, so the flow cites none.' }] } });
+// LAYER-TOOLS-02: the submission names evidence per criterion, as the agent does through aludel_submit_proposal.
+const history = workRuns({ db, know });
+history.recordEvidence(attempt, history.checkEvidence(projectId, attempt, [
+  { criterion: 0, type: 'change', ref: 'Find a tool', note: 'Two steps, Browse tools then Tool detail.' },
+  { criterion: 1, type: 'change', ref: 'knowledge/flow-method.md', note: 'The last paragraph is the new rule.' },
+  { criterion: 1, type: 'test', ref: 'node --test tests/', note: 'Layer tests on the branch.' },
+  { criterion: 1, type: 'test', ref: 'phone walkthrough', note: 'Not reported, so shown as missing.' }]));
 db.close();
 
 const port = await new Promise(resolve => { const probe = createServer().listen(0, '127.0.0.1', () => { const { port: free } = probe.address(); probe.close(() => resolve(free)); }); });
@@ -151,6 +159,16 @@ try {
   // Review: Changes show the new flow and notes; Follow-ups show each reason.
   await page.goto(`${base}/work/item/${task.id}/review/1`);
   await page.getByRole('heading', { name: /Review W-\d+ · Run 1/ }).waitFor();
+  // Each criterion shows the evidence the run named for it; a reference to nothing it produced is marked, not hidden.
+  await page.getByRole('button', { name: 'Criterion 1', exact: true }).click();
+  await page.locator('.wr-ev', { hasText: 'Find a tool' }).waitFor();
+  await page.getByRole('button', { name: 'Criterion 2', exact: true }).click();
+  await page.locator('.wr-ev', { hasText: 'knowledge/flow-method.md' }).waitFor();
+  assert.match(await page.locator('.wr-ev-test', { hasText: 'node --test tests/' }).innerText(), /passed/);
+  await page.locator('.wr-ev.missing', { hasText: 'phone walkthrough' }).waitFor();
+  assert.deepEqual(await axe(), [], 'Evidence axe');
+  await shot('evidence');
+  await page.getByRole('button', { name: 'Criterion 1', exact: true }).click();
   const fields = page.locator('table.wr-fields');
   await fields.first().waitFor();
   assert.equal(await fields.count(), 2, 'one field table per changed record');

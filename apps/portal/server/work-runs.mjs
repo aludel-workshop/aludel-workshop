@@ -160,7 +160,7 @@ export function workRuns({ db, know, candidates = null }) {
         },
         live: live ? { phases: live.phases || [], phase: live.phase ?? null, activity: live.activity || '', model: live.model || null, usage: live.usage || null } : null,
         steps: planned.filter(step => step.kind !== 'evidence'),
-        evidence: resolveEvidence(planned, outputs.changes, outputs.candidate),
+        evidence: resolveEvidence(planned, outputs.changes, outputs.candidate, outputs.layerSource),
         blockReason: state === 'failed' ? item.context?.executionBlock?.reason || progress.find(step => step.status === 'stuck')?.note
           || item.log.filter(entry => /^Blocked: /.test(entry.text)).pop()?.text.slice(9) || null : null,
         ...outputs,
@@ -401,16 +401,19 @@ export function workRuns({ db, know, candidates = null }) {
     });
   }
   function recordEvidence(attemptId, evidence) { if (evidence.length) addStep(attemptId, 'evidence', { items: evidence }); }
-  function resolveEvidence(steps, changes, candidate) {
+  // A layer run's evidence names a record by its ID or title, a repository file by its path, and a test by the name it
+  // reported to aludel_layer_commit; tests are the candidate's checks, or else the layer branch's reported tests.
+  function resolveEvidence(steps, changes, candidate, layerSource = null) {
     const items = [...steps].reverse().find(step => step.kind === 'evidence')?.items || [];
+    const tests = candidate?.checks?.length ? candidate.checks : layerSource?.tests || [];
     return items.map(item => {
       if (item.type === 'change') {
-        const change = changes.find(entry => entry.id === item.ref || entry.name === item.ref || entry.kind === item.ref || entry.name.endsWith(item.ref));
+        const change = changes.find(entry => entry.id === item.ref || entry.id.endsWith(`:${item.ref}`) || entry.name === item.ref || entry.kind === item.ref || entry.name.endsWith(item.ref));
         return { ...item, found: Boolean(change), target: change ? `change:${change.id}` : null, label: change?.name || item.ref };
       }
       if (item.type === 'test') {
-        const index = (candidate?.checks || []).findIndex(check => check.name === item.ref);
-        const check = candidate?.checks?.[index];
+        const index = tests.findIndex(check => check.name === item.ref);
+        const check = tests[index];
         return { ...item, found: Boolean(check), target: check ? `test:${index}` : null, label: item.ref, result: check?.status || null, independent: check ? check.source !== 'agent-report' : false };
       }
       return { ...item, found: Boolean(candidate), target: candidate ? 'preview' : null, label: item.ref };

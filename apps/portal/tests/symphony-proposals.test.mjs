@@ -706,6 +706,7 @@ test('a layer-scoped Pages task changes Pages only through its API; review shows
   assert.equal(card.layerApi.openapi, '3.1.0');
   assert.ok(card.outputs[0].operations.some(op => op.operationId === 'updateFlow' && op.writes === 'flow'));
   assert.ok(card.outputs[0].followUpLayers.some(layer => layer.key === 'platform'));
+  assert.match(card.outputs[0].evidence, /For each criterion/, "a layer card asks for evidence per criterion");
   const attemptId = issue.native_ref.attempt_id;
   const call = (operation, body = {}, id = null) => f.worker.callLayer(f.scope, { attemptId, operation, id, body });
   assert.throws(() => call('createFlow', { flow: { title: 'x'.repeat(61) } }), /Flow name must be under 60 characters/);
@@ -888,7 +889,15 @@ test('a run edits its layer on a work branch in its sandbox, tests it against th
   assert.equal(execFileSync('git', ['-C', before.repo, 'rev-parse', `refs/heads/${branch.branch}`], { encoding: 'utf8' }).trim(), branch.commit, 'the branch is in the instance repository');
   assert.equal(pinOf(f).commit, before.commit, 'submitting a branch does not move main');
   const submitted = f.worker.submitProposal(f.scope, { attemptId: run.attemptId, proposal: { summary: 'Tighten the flow method and add a review method.', content: {} } });
-  const reviewed = workRuns({ db: f.db, know: f.know }).list(f.projectId, run.work.id)[0];
+  // LAYER-TOOLS-02: the submission's evidence names a committed file and a reported test; review shows each against its criterion.
+  const history = workRuns({ db: f.db, know: f.know });
+  history.recordEvidence(run.attemptId, history.checkEvidence(f.projectId, run.attemptId, [
+    { criterion: 0, type: 'change', ref: 'knowledge/flow-method.md', note: 'The goal rule is the last paragraph.' },
+    { criterion: 0, type: 'test', ref: tests[0].name, note: 'Layer tests on the branch.' },
+    { criterion: 0, type: 'test', ref: 'a test never reported', note: 'Shown as missing.' }]));
+  const reviewed = history.list(f.projectId, run.work.id)[0];
+  assert.deepEqual(reviewed.evidence.map(item => [item.type, item.found, item.target?.split(':')[0] || null]), [['change', true, 'change'], ['test', true, 'test'], ['test', false, null]]);
+  assert.equal(reviewed.evidence[1].result, 'passed');
   assert.equal(reviewed.layerSource.branch, branch.branch);
   assert.deepEqual(reviewed.layerSource.tests.map(entry => entry.status), ['passed']);
   assert.match(reviewed.changes.find(change => change.kind === 'source').diff, /^\+Name the goal before the first step\.$/m);
