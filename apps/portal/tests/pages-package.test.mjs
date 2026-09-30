@@ -4,7 +4,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { initLayerContract, layerInstances } from '../server/layer-contract.mjs';
+import { initLayerContract, layerInstances, layerInstanceId } from '../server/layer-contract.mjs';
 import { pagesPackageForProject } from '../server/layer-package.mjs';
 import { initPagesLayerApp, pagesDocumentRead } from '../server/pages-layer-app.mjs';
 
@@ -26,9 +26,13 @@ test('Pages installs separate pinned local repository copies and reads their dec
     assert.ok(one && two);
     assert.notEqual(one.repo, two.repo);
     assert.equal(one.commit, two.commit);
+    assert.notEqual(layerInstanceId(db, 'one', 'pages'), layerInstanceId(db, 'two', 'pages'));
+    assert.equal(db.prepare('SELECT layer_instance_id FROM layer_package_bindings WHERE project_id=? AND layer_key=?')
+      .get('one','pages').layer_instance_id, layerInstanceId(db, 'one', 'pages'));
     assert.equal(one.manifest.key, 'pages');
     const definition = layerInstances(db, 'owner', 'one').find(layer => layer.key === 'pages');
     assert.equal(definition.packageCommit, one.commit);
+    assert.equal(definition.instanceId, layerInstanceId(db, 'one', 'pages'));
     assert.equal(definition.editorAdapter, 'pages-native');
     assert.deepEqual(definition.outputTabs.map(tab => tab.label), ['Map', 'Pages', 'Flows']);
     assert.match(definition.identity.markdown, /A project may start directly in Pages without Vision/);

@@ -33,7 +33,7 @@ export function compileTaskManifest(bundle) {
         action.id.endsWith('.discover') ? 'Read this layer’s identity and every neighbor’s identity, outputs and reciprocal connection view. Propose a separate receiving policy for each source. State missing evidence and response to source changes. Do not activate a policy or edit project records.' :
         assessment ? 'Inspect the task scope and relevant project knowledge. Submit a findings report for lead review. Do not change project records or repository files.' :
         'Read the task and relevant project knowledge. Submit a bounded proposal for Work review. Do not change project records or repository files. Ask if a decision blocks the result.' },
-    layerSource: bundle.layerPackage ? { key: bundle.layerPackage.key, commit: bundle.layerPackage.commit,
+    layerSource: bundle.layerPackage ? { key: bundle.layerPackage.key, instanceId: bundle.layerPackage.instanceId, commit: bundle.layerPackage.commit,
       charter: bundle.layerPackage.charter,
       documents: bundle.layerPackage.documents.map(doc => ({ path: doc.path, markdown: doc.markdown })) } : null,
     layerMethod: guidance.layerAction?.id === action.id ? { actionId: guidance.layerAction.id,

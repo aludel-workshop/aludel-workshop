@@ -19,21 +19,41 @@ const configured = key => {
   return { commit: pin.commit, repo: resolve(candidate, pin.repo) };
 };
 const git = (repo, ...args) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8', maxBuffer: 1024 * 1024 }).trimEnd();
-const projectRoot = (projectId,key) => join(resolve(process.env.MACHINE_DATA_DIR || join(portal, '.data')), 'layer-repos', createHash('sha256').update(projectId).digest('hex').slice(0, 20), key);
+const projectRoot = (projectId,instanceId) => join(resolve(process.env.MACHINE_DATA_DIR || join(portal, '.data')), 'layer-repos', createHash('sha256').update(projectId).digest('hex').slice(0, 20), instanceId);
 const content = (repo, commit, path) => {
   if (typeof path !== 'string' || !/^(?:knowledge|ui)\/[a-z][a-z0-9-]*\.(?:md|ts|scss)$/.test(path)) throw new Error(`Invalid layer package path: ${path}`);
   return execFileSync('git', ['-C', repo, 'show', `${commit}:${path}`], { encoding: 'utf8', maxBuffer: 1024 * 1024 });
 };
 export function initLayerPackages(db) {
   db.exec(`CREATE TABLE IF NOT EXISTS layer_package_bindings (
-    project_id TEXT NOT NULL REFERENCES projects(id), layer_key TEXT NOT NULL,
+    project_id TEXT NOT NULL REFERENCES projects(id), layer_key TEXT NOT NULL, layer_instance_id TEXT,
     repository_path TEXT NOT NULL, accepted_commit TEXT NOT NULL, installed_at TEXT NOT NULL,
     PRIMARY KEY(project_id,layer_key)
   )`);
+  const columns = new Set(db.prepare('PRAGMA table_info(layer_package_bindings)').all().map(row => row.name));
+  if (!columns.has('layer_instance_id')) db.exec('ALTER TABLE layer_package_bindings ADD COLUMN layer_instance_id TEXT');
+  if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='layer_instances'").get()) return;
+  db.exec(`UPDATE layer_package_bindings SET layer_instance_id = (
+    SELECT instance_id FROM layer_instances WHERE layer_instances.project_id = layer_package_bindings.project_id
+      AND layer_instances.layer_key = layer_package_bindings.layer_key
+  ) WHERE layer_instance_id IS NULL`);
+  const invalid = db.prepare(`SELECT 1 FROM layer_package_bindings b LEFT JOIN layer_instances i
+    ON i.project_id=b.project_id AND i.instance_id=b.layer_instance_id AND i.layer_key=b.layer_key
+    WHERE i.instance_id IS NULL LIMIT 1`).get();
+  if (invalid) throw new Error('Layer package binding has no matching instance; reconcile before startup.');
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_layer_package_instance ON layer_package_bindings(project_id,layer_instance_id)');
+}
+function instanceId(db, projectId, key) {
+  const row = db.prepare('SELECT instance_id FROM layer_instances WHERE project_id=? AND layer_key=?').get(projectId,key);
+  if (!row?.instance_id) throw new Error('Layer package requires an installed instance.');
+  return row.instance_id;
 }
 function binding(db, projectId, key) {
   initLayerPackages(db);
-  const row = db.prepare('SELECT repository_path AS repo, accepted_commit AS acceptedCommit FROM layer_package_bindings WHERE project_id=? AND layer_key=?').get(projectId,key);
+  if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='layer_instances'").get()) return null;
+  const rowId = db.prepare('SELECT instance_id FROM layer_instances WHERE project_id=? AND layer_key=?').get(projectId,key);
+  if (!rowId) return null;
+  const row = db.prepare('SELECT repository_path AS repo, accepted_commit AS acceptedCommit FROM layer_package_bindings WHERE project_id=? AND layer_instance_id=? AND layer_key=?').get(projectId,rowId.instance_id,key);
   return row ? { repo: row.repo, commit: row.acceptedCommit } : null;
 }
 function packageAt(repo, commit, key) {
@@ -57,7 +77,8 @@ export function ensureLayerPackage(db, projectId, key) {
   if (!pin) return null;
   const existing = binding(db, projectId, key);
   if (existing) return packageAt(existing.repo, existing.commit, key);
-  const target = projectRoot(projectId,key);
+  const id = instanceId(db, projectId, key);
+  const target = projectRoot(projectId,id);
   if (existsSync(target)) throw new Error('Unbound layer repository exists; reconcile it before installing.');
   mkdirSync(dirname(target), { recursive: true });
   const staging = mkdtempSync(join(dirname(target), `.${key}-`));
@@ -68,8 +89,8 @@ export function ensureLayerPackage(db, projectId, key) {
     execFileSync('git', ['-C', staging, 'checkout', '--quiet', '--detach', pin.commit], { stdio: 'pipe' });
     const pkg = packageAt(staging, pin.commit, key);
     renameSync(staging, target);
-    db.prepare('INSERT INTO layer_package_bindings(project_id,layer_key,repository_path,accepted_commit,installed_at) VALUES (?,?,?,?,?)')
-      .run(projectId,key,target,pin.commit,new Date().toISOString());
+    db.prepare('INSERT INTO layer_package_bindings(project_id,layer_key,layer_instance_id,repository_path,accepted_commit,installed_at) VALUES (?,?,?,?,?,?)')
+      .run(projectId,key,id,target,pin.commit,new Date().toISOString());
     return { ...pkg, repo: target };
   } catch (error) { rmSync(staging, { recursive: true, force: true }); throw error; }
 }
@@ -102,5 +123,5 @@ export function layerPackageTaskContext(db, projectId, key) {
     if (markdown.length > 8000) throw new Error('Layer task document is too large.');
     return { path, markdown };
   });
-  return { key, commit: pkg.commit, charter: pkg.charter, documents };
+  return { key, instanceId: instanceId(db, projectId, key), commit: pkg.commit, charter: pkg.charter, documents };
 }

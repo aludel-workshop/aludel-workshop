@@ -11,7 +11,7 @@ import { layerPackageTaskContext, layerPackageForProject } from './layer-package
 import { briefSections } from './knowledge.mjs';
 import { compiledLocalActions } from './lat07-actions.mjs';
 import { actionForProject, projectLayerDefinition } from './layer-registry.mjs';
-import { layerDeclarations } from './layer-contract.mjs';
+import { layerDeclarations, layerInstanceId } from './layer-contract.mjs';
 import { activeLayerTopology, discoverySourceSnapshot } from './layer-discovery.mjs';
 import { applyDiscoveryProposal } from './layer-space.mjs';
 
@@ -280,7 +280,8 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     if (!same(project(projectId), bundle.project)) return false;
     if (entry.action === 'product.brief' && know.briefRevision(projectId) !== bundle.briefRevision) return false;
     if (!same(know.instructionPins(projectId, profile(projectId, profileId), entry.action, { legacyRole: Boolean(bundle.instructionPins?.role) }), bundle.instructionPins)) return false;
-    if (bundle.layerPackage && layerPackageForProject(db, projectId, bundle.layerPackage.key)?.commit !== bundle.layerPackage.commit) return false;
+    if (bundle.layerPackage && (layerPackageForProject(db, projectId, bundle.layerPackage.key)?.commit !== bundle.layerPackage.commit ||
+      bundle.layerPackage.instanceId && layerInstanceId(db, projectId, bundle.layerPackage.key) !== bundle.layerPackage.instanceId)) return false;
     if (!same(know.list(projectId, 'doc').filter(doc => doc.agents).map(doc => ({ id: doc.id, revision: doc.revision })), bundle.sharedDocs)) return false;
     if (bundle.sources.some(source => know.get(projectId, source.id)?.revision !== source.revision)) return false;
     if (bundle.controlPins?.some(control => { const row = db.prepare('SELECT revision, status FROM layer_connections WHERE id = ? AND project_id = ?').get(control.id, projectId); return !row || row.revision !== control.revision || row.status !== 'active'; })) return false;
@@ -356,7 +357,8 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     if (!same(project(scope.projectId), bundle.project)) return null;
     if (bundle.work.action === 'product.brief' && know.briefRevision(scope.projectId) !== bundle.briefRevision) return null;
     if (!same(know.instructionPins(scope.projectId, profile(scope.projectId, scope.profileId), entry.action, { legacyRole: Boolean(bundle.instructionPins?.role) }), bundle.instructionPins)) return null;
-    if (bundle.layerPackage && layerPackageForProject(db, scope.projectId, bundle.layerPackage.key)?.commit !== bundle.layerPackage.commit) return null;
+    if (bundle.layerPackage && (layerPackageForProject(db, scope.projectId, bundle.layerPackage.key)?.commit !== bundle.layerPackage.commit ||
+      bundle.layerPackage.instanceId && layerInstanceId(db, scope.projectId, bundle.layerPackage.key) !== bundle.layerPackage.instanceId)) return null;
     if (!same(know.list(scope.projectId, 'doc').filter(doc => doc.agents).map(doc => ({ id: doc.id, revision: doc.revision })), bundle.sharedDocs)) return null;
     if (bundle.sources.some(source => know.get(scope.projectId, source.id)?.revision !== source.revision)) return null;
     if (bundle.controlPins?.some(control => { const row = db.prepare('SELECT revision, status FROM layer_connections WHERE id = ? AND project_id = ?').get(control.id, scope.projectId); return !row || row.revision !== control.revision || row.status !== 'active'; })) return null;

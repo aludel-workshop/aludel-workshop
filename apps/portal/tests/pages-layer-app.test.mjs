@@ -7,10 +7,10 @@ const db = new DatabaseSync(':memory:');
 test.after(() => db.close());
 db.exec(`CREATE TABLE projects(id TEXT PRIMARY KEY);
 CREATE TABLE project_members(project_id TEXT,user_id TEXT,role TEXT);
-CREATE TABLE layer_instances(project_id TEXT,layer_key TEXT,enabled INTEGER);
+CREATE TABLE layer_instances(project_id TEXT,layer_key TEXT,instance_id TEXT,enabled INTEGER);
 INSERT INTO projects VALUES('a'),('b');
 INSERT INTO project_members VALUES('a','owner','owner'),('a','viewer','viewer'),('b','other','owner');
-INSERT INTO layer_instances VALUES('a','pages',1),('a','product',1),('a','design',0),('b','pages',1);`);
+INSERT INTO layer_instances VALUES('a','pages','pages-a',1),('a','product','product-a',1),('a','design','design-a',0),('b','pages','pages-b',1);`);
 initPagesLayerApp(db);
 
 test('Pages documents seed once, retain exact revisions and owner scope', () => {

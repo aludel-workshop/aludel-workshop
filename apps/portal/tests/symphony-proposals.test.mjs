@@ -499,6 +499,7 @@ test('Pages flow task includes exact installed layer method and repository Knowl
     assert.equal(card.requiredInputs[0].id, story.id);
     assert.equal(card.requiredInputs[0].revision, story.revision);
     assert.equal(card.layerSource.key, 'pages');
+    assert.match(card.layerSource.instanceId, /^[0-9a-f-]{36}$/);
     assert.match(card.layerSource.commit, /^[0-9a-f]{40}$/);
     assert.match(card.layerSource.charter, /start directly in Pages without Vision/);
     assert.ok(card.layerSource.documents.some(doc => doc.path === 'knowledge/flow-method.md' && /exact revision/.test(doc.markdown)));
@@ -506,6 +507,7 @@ test('Pages flow task includes exact installed layer method and repository Knowl
     assert.match(card.layerMethod.text, /For a new flow/);
     const bundle = f.worker.saved(f.scope, issue.native_ref.bundle_digest);
     assert.equal(bundle.layerPackage.commit, card.layerSource.commit);
+    assert.equal(bundle.layerPackage.instanceId, card.layerSource.instanceId);
     assert.equal(bundle.guidance.layerAction.method, card.layerMethod.text);
     const baselineSource = execFileSync('git', ['show', 'f6adc8e813aead602304080e1f0e18584e84d66d:apps/portal/server/task-manifest.mjs'],
       { cwd: new URL('../../', import.meta.url).pathname, encoding: 'utf8' });

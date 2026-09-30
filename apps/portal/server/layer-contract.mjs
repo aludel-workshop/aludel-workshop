@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { knowledgeKinds } from './knowledge.mjs';
 import { compiledLocalActions, combinedLegacyInventory } from './lat07-actions.mjs';
 import { initLayerRegistry, seedBuiltInDefinitions, projectLayerDefinition, projectLayerDefinitions, actionsForDefinition } from './layer-registry.mjs';
@@ -55,7 +55,7 @@ export const layerCatalog = Object.freeze(layerDeclarations.map(layer => Object.
 
 function ensureLayerTable(db) {
   db.exec(`CREATE TABLE IF NOT EXISTS layer_instances (
-    project_id TEXT NOT NULL REFERENCES projects(id), layer_key TEXT NOT NULL,
+    project_id TEXT NOT NULL REFERENCES projects(id), layer_key TEXT NOT NULL, instance_id TEXT NOT NULL,
     enabled INTEGER NOT NULL DEFAULT 1 CHECK(enabled IN (0, 1)),
     descriptor_version INTEGER NOT NULL DEFAULT 1 CHECK(descriptor_version > 0),
     visible INTEGER NOT NULL DEFAULT 1 CHECK(visible IN (0, 1)),
@@ -65,15 +65,34 @@ function ensureLayerTable(db) {
   const columns = new Set(db.prepare('PRAGMA table_info(layer_instances)').all().map(column => column.name));
   if (!columns.has('visible')) db.exec('ALTER TABLE layer_instances ADD COLUMN visible INTEGER NOT NULL DEFAULT 1 CHECK(visible IN (0, 1))');
   if (!columns.has('dashboard_visible')) db.exec('ALTER TABLE layer_instances ADD COLUMN dashboard_visible INTEGER NOT NULL DEFAULT 1 CHECK(dashboard_visible IN (0, 1))');
+  if (!columns.has('instance_id')) db.exec('ALTER TABLE layer_instances ADD COLUMN instance_id TEXT');
+  const missing = db.prepare("SELECT project_id, layer_key FROM layer_instances WHERE instance_id IS NULL OR instance_id = ''").all();
+  const backfill = db.prepare("UPDATE layer_instances SET instance_id = ? WHERE project_id = ? AND layer_key = ? AND (instance_id IS NULL OR instance_id = '')");
+  for (const row of missing) backfill.run(randomUUID(), row.project_id, row.layer_key);
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_layer_instance_id ON layer_instances(instance_id);
+    CREATE TRIGGER IF NOT EXISTS layer_instance_id_required BEFORE INSERT ON layer_instances
+      WHEN NEW.instance_id IS NULL OR NEW.instance_id = ''
+      BEGIN SELECT RAISE(ABORT, 'Layer instance ID required'); END;
+    CREATE TRIGGER IF NOT EXISTS layer_instance_id_immutable BEFORE UPDATE OF instance_id ON layer_instances
+      WHEN NEW.instance_id IS NOT OLD.instance_id
+      BEGIN SELECT RAISE(ABORT, 'Layer instance ID is immutable'); END;`);
+}
+
+// Stable identity for a particular installed app. Template keys remain a temporary legacy route.
+export function layerInstanceId(db, projectId, key) {
+  const row = db.prepare('SELECT instance_id FROM layer_instances WHERE project_id = ? AND layer_key = ?').get(projectId, key);
+  if (!row?.instance_id) fail('Layer instance not found.', 404);
+  return row.instance_id;
 }
 export function createLayerInstances(db, projectId, created = new Date().toISOString(), selected = null) {
   ensureLayerTable(db);
-  seedBuiltInDefinitions(db, projectId, declarations, layerPresentation);
   const chosen = selected === null ? new Set(layerDeclarations.map(layer => layer.key)) : new Set(selected);
   if ([...chosen].some(key => !layerDeclarations.some(layer => layer.key === key))) fail('Choose layers from the available catalog.');
-  const insert = db.prepare(`INSERT INTO layer_instances(project_id, layer_key, enabled, created_at)
-    VALUES (?, ?, ?, ?) ON CONFLICT(project_id, layer_key) DO NOTHING`);
-  return layerDeclarations.reduce((count, layer) => count + insert.run(projectId, layer.key, Number(chosen.has(layer.key)), created).changes, 0);
+  const insert = db.prepare(`INSERT INTO layer_instances(project_id, layer_key, instance_id, enabled, created_at)
+    VALUES (?, ?, ?, ?, ?) ON CONFLICT(project_id, layer_key) DO NOTHING`);
+  const inserted = layerDeclarations.reduce((count, layer) => count + insert.run(projectId, layer.key, randomUUID(), Number(chosen.has(layer.key)), created).changes, 0);
+  seedBuiltInDefinitions(db, projectId, declarations, layerPresentation);
+  return inserted;
 }
 
 export function initLayerContract(db) {
@@ -100,9 +119,9 @@ function member(db, userId, projectId) {
 function instance(db, projectId, key) {
   const layer = projectLayerDefinition(db,projectId,key);
   if (!layer) fail('Layer not found.', 404);
-  const row = db.prepare('SELECT enabled, descriptor_version FROM layer_instances WHERE project_id = ? AND layer_key = ?').get(projectId, key);
+  const row = db.prepare('SELECT instance_id, enabled, descriptor_version FROM layer_instances WHERE project_id = ? AND layer_key = ?').get(projectId, key);
   if (!row || !row.enabled) fail('Layer not found.', 404);
-  return { ...layer, version: row.descriptor_version };
+  return { ...layer, instanceId: row.instance_id, version: row.descriptor_version };
 }
 function outputCount(db, projectId, kind) {
   if (own(projections, kind)) {
@@ -115,11 +134,11 @@ function outputCount(db, projectId, kind) {
 export function layerInstances(db, userId, projectId) {
   member(db, userId, projectId);
   ensureLayerTable(db);
-  return db.prepare('SELECT layer_key, enabled, visible, dashboard_visible FROM layer_instances WHERE project_id = ? ORDER BY rowid').all(projectId)
+  return db.prepare('SELECT layer_key, instance_id, enabled, visible, dashboard_visible FROM layer_instances WHERE project_id = ? ORDER BY rowid').all(projectId)
     .map(row => {
       const declaration = projectLayerDefinition(db,projectId,row.layer_key);
       if (!declaration) fail('Unknown layer instance.');
-      return { ...declaration,
+      return { ...declaration, instanceId: row.instance_id,
         enabled: !!row.enabled, visible: !!row.visible, dashboardVisible: !!row.dashboard_visible };
     });
 }
@@ -143,7 +162,7 @@ export function layerDescriptors(db, userId, projectId) {
   member(db, userId, projectId);
   return db.prepare('SELECT layer_key FROM layer_instances WHERE project_id = ? AND enabled = 1 ORDER BY rowid').all(projectId)
     .map(row => instance(db, projectId, row.layer_key))
-    .map(layer => ({ key: layer.key, name: layer.name, path: layer.path, authority: layer.authority, outputProvider:layer.outputProvider, editorAdapter:layer.editorAdapter, version: layer.version,
+    .map(layer => ({ key: layer.key, instanceId: layer.instanceId, name: layer.name, path: layer.path, authority: layer.authority, outputProvider:layer.outputProvider, editorAdapter:layer.editorAdapter, version: layer.version,
       outputs: layer.outputs.map(kind => ({ kind, count: kind === 'markdown_document' ? (db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='markdown_files'").get() ? db.prepare('SELECT COUNT(*) AS n FROM markdown_files WHERE project_id=? AND layer_key=? AND deleted=0').get(projectId,layer.key).n : 0) : outputCount(db, projectId, kind), revision: kind === 'markdown_document' ? 'revision' : projections[kind] ? 'content-hash' : 'revision' })),
       actions: [...compiledLocalActions.filter(action => action.layer === layer.key), ...actionsForDefinition(layer)].filter(action=>!action.legacy).map(action => ({ id: action.id, revision: action.revision, title: action.title, purpose: action.purpose,
         result: action.result, permissions: action.permissions, checks: action.checks, elevated: action.permissions.elevated, agentAvailable: action.agentRunnable, humanAvailable: action.humanRunnable,

@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { contrastRatio } from '../src/color.js';
 import { initLayerPackages, ensureLayerPackage } from './layer-package.mjs';
 // Project-scoped layer definitions share one lifecycle and output/action contract.
@@ -107,7 +108,7 @@ export function createMarkdownDefinition(db,userId,projectId,input) {
     db.prepare(`INSERT INTO layer_definitions(project_id,layer_key,name,description,category,icon,path,authority,output_provider,editor_adapter,output_kinds_json,built_in,created_at,lifecycle)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'draft')`).run(projectId,key,name,'Define this layer before connecting it to the project.','Custom','description',`/${key}`,
       'layer_files','markdown-files','markdown-editor',JSON.stringify(['markdown_document']),0,at);
-    db.prepare('INSERT INTO layer_instances(project_id,layer_key,enabled,created_at) VALUES (?,?,1,?)').run(projectId,key,at);
+    db.prepare('INSERT INTO layer_instances(project_id,layer_key,instance_id,enabled,created_at) VALUES (?,?,?,1,?)').run(projectId,key,randomUUID(),at);
     db.exec('COMMIT');
   }catch(error){db.exec('ROLLBACK');throw error;}
   return projectLayerDefinition(db,projectId,key);

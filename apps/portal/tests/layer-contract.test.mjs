@@ -4,7 +4,7 @@ import { DatabaseSync, backup } from 'node:sqlite';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { initLayerContract, createLayerInstances, layerDescriptors, layerInstances, updateLayerInstance, layerOutputRead, layerMigrationInventory, validateLayerDeclarations } from '../server/layer-contract.mjs';
+import { initLayerContract, createLayerInstances, layerDescriptors, layerInstances, updateLayerInstance, layerOutputRead, layerMigrationInventory, validateLayerDeclarations, layerInstanceId } from '../server/layer-contract.mjs';
 
 const directory = mkdtempSync(join(tmpdir(), 'lat02-'));
 const sourcePath = join(directory, 'source.sqlite');
@@ -92,4 +92,36 @@ test('optional layer apps are owner-scoped and preserve native outputs across re
   assert.throws(() => updateLayerInstance(db, 'other', 'a', 'pages', { enabled: false }), { status: 404 });
   assert.throws(() => updateLayerInstance(db, 'owner', 'a', 'library', { enabled: false }), { status: 404 });
   assert.throws(() => updateLayerInstance(db, 'owner', 'a', 'pages', { visible: false }), { status: 400 });
+});
+
+
+test('legacy layer rows gain stable, immutable instance IDs on restart', () => {
+  const legacy = new DatabaseSync(':memory:');
+  try {
+    legacy.exec(`CREATE TABLE projects(id TEXT PRIMARY KEY);
+      INSERT INTO projects VALUES ('legacy');
+      CREATE TABLE layer_instances (project_id TEXT NOT NULL, layer_key TEXT NOT NULL,
+        enabled INTEGER NOT NULL, descriptor_version INTEGER NOT NULL DEFAULT 1,
+        visible INTEGER NOT NULL DEFAULT 1, dashboard_visible INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL, PRIMARY KEY(project_id,layer_key));
+      INSERT INTO layer_instances(project_id,layer_key,enabled,created_at) VALUES ('legacy','pages',1,'2026-09-29');
+      CREATE TABLE layer_package_bindings (project_id TEXT NOT NULL, layer_key TEXT NOT NULL,
+        repository_path TEXT NOT NULL, accepted_commit TEXT NOT NULL, installed_at TEXT NOT NULL,
+        PRIMARY KEY(project_id,layer_key));
+      INSERT INTO layer_package_bindings VALUES ('legacy','pages','/tmp/old-pages',
+        '0000000000000000000000000000000000000000','2026-09-29');`);
+    initLayerContract(legacy);
+    const id = layerInstanceId(legacy, 'legacy', 'pages');
+    assert.match(id, /^[0-9a-f-]{36}$/);
+    assert.equal(legacy.prepare('SELECT layer_instance_id FROM layer_package_bindings WHERE project_id=? AND layer_key=?')
+      .get('legacy','pages').layer_instance_id, id);
+    initLayerContract(legacy);
+    assert.equal(layerInstanceId(legacy, 'legacy', 'pages'), id);
+    assert.throws(() => legacy.prepare('UPDATE layer_instances SET instance_id=? WHERE project_id=? AND layer_key=?')
+      .run('changed','legacy','pages'), /immutable/);
+    assert.throws(() => layerInstanceId(legacy, 'other', 'pages'), { status: 404 });
+    legacy.prepare('UPDATE layer_package_bindings SET layer_instance_id=? WHERE project_id=? AND layer_key=?')
+      .run(layerInstanceId(legacy,'legacy','product'),'legacy','pages');
+    assert.throws(() => initLayerContract(legacy), /no matching instance/);
+  } finally { legacy.close(); }
 });
