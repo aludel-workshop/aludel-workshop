@@ -14,6 +14,8 @@ interface Status {
   events: { seq: number; kind: string; entry: string | null; target: string | null; detail: Record<string, unknown>; workItemId: string | null; createdAt: string }[];
   work: { id: string; state: string; kind: string; entry: string }[];
   wiring: { participant: string; hub: string; adapter: string | null }[];
+  // Changes to the binding proposed as Work and waiting on the owner (R2).
+  changes: { id: string; state: string; change: { kind: string; lifecycle?: string; participant?: { facet: string; layer?: { key: string }; role: string }; change?: { to: string }; changes?: Record<string, unknown> }; blockedBy: string[] }[];
 }
 const done = new Set(['done']);
 
@@ -60,6 +62,15 @@ const done = new Set(['done']);
           <button type="button" class="lay-button small ghost" (click)="decide(s.binding, w.id, 'rectify')">Rectify</button>
         </div>
       }
+      @if (proposals(s).length) {
+        <h3>Proposed changes</h3>
+        <ul class="lay-binding-list">@for (c of proposals(s); track c.id) {
+          <li class="lay-row lay-wrap"><a [href]="ctx.link('work', 'item', c.id)" (click)="ctx.go(ctx.link('work', 'item', c.id), $event)">{{ changeText(s, c.change) }}</a>
+            @if (c.blockedBy.length) { <small class="lay-muted">waits on other Work</small> }
+            @else { <button type="button" class="lay-button small" (click)="decideChange(c.id, 'accept')">Accept</button>
+              <button type="button" class="lay-button small ghost" (click)="decideChange(c.id, 'dismiss')">Dismiss</button> }</li>
+        }</ul>
+      }
       @if (openWork(s).length) {
         <h3>Waiting on</h3>
         <ul class="lay-binding-list">@for (w of openWork(s); track w.id) { <li><a [href]="ctx.link('work', 'item', w.id)" (click)="ctx.go(ctx.link('work', 'item', w.id), $event)">{{ kindLabel[w.kind] || w.kind }} · {{ entryName(w.entry) }}</a></li> }</ul>
@@ -105,11 +116,24 @@ export class LibraryBindingsComponent {
   entryName(key: string) { return this.ctx.refInfo(key)?.title || key; }
   decisions(s: Status) { return s.work.filter(w => w.kind === 'assess' && !done.has(w.state)); }
   openWork(s: Status) { return s.work.filter(w => w.kind !== 'assess' && !done.has(w.state)); }
-  changes(s: Status) { return s.events.filter(e => ['applied', 'activated', 'proposed'].includes(e.kind) || (e.kind === 'settled' && e.detail['decision'])).slice(0, 8); }
+  changes(s: Status) { return s.events.filter(e => ['applied', 'activated', 'proposed', 'refaceted'].includes(e.kind) || (e.kind === 'settled' && e.detail['decision'])).slice(0, 8); }
+  // Pending changes other than the proposal itself, which the Accept and Dismiss buttons above decide.
+  proposals(s: Status) { return (s.changes || []).filter(c => !(s.binding.lifecycle === 'proposed' && c.change.kind === 'lifecycle' && c.change.lifecycle === 'reconciling')); }
+  changeText(s: Status, change: Status['changes'][number]['change']) {
+    if (change.kind === 'lifecycle') return ({ reconciling: 'Accept', paused: 'Pause', active: 'Resume', retired: 'Retire' } as Record<string, string>)[change.lifecycle || ''] + ' this binding';
+    if (change.kind === 'join' && change.participant) return `${this.layerName(change.participant.layer?.key || '')}'s ${change.participant.facet} joins as ${this.roleLabel[change.participant.role] || change.participant.role}`;
+    if (change.kind === 'transfer') return `Move authority to ${this.participantName(s, change.change?.to || '')}`;
+    return `Change ${Object.keys(change.changes || {}).join(', ')}`;
+  }
+  decideChange(workItemId: string, decision: 'accept' | 'dismiss') {
+    const path = `/api/projects/${encodeURIComponent(this.ctx.projectId())}/binding-changes/${encodeURIComponent(workItemId)}/decide`;
+    return this.ctx.write(() => this.ctx.api(path, 'POST', { decision })).then(() => this.refresh());
+  }
   eventText(s: Status, e: Status['events'][number]) {
     if (e.kind === 'applied') return `${({ added: 'Added', changed: 'Updated', removed: 'Removed' } as Record<string, string>)[String(e.detail['event'])] || 'Imported'} ${this.entryName(e.entry || '')} in ${this.participantName(s, e.target || '')}`;
     if (e.kind === 'activated') return 'First reconcile complete; the binding is active';
     if (e.kind === 'proposed') return 'Proposed by Discover';
+    if (e.kind === 'refaceted') return `${this.layerName(String(e.detail['layer']))} was refaceted; its moved entries are held until every participant lets go`;
     return `Drift in ${this.entryName(e.entry || '')}: decided to ${e.detail['decision']}`;
   }
   move(binding: Binding, lifecycle: string, rationale: string) {

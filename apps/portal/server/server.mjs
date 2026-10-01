@@ -9,6 +9,7 @@ import { botColors, efforts, initKnowledge, knowledge } from './knowledge.mjs';
 import { library } from './library.mjs';
 import { bindingRecords, initBindings } from './binding-records.mjs';
 import { bindingRoutines } from './binding-routines.mjs';
+import { refacets } from './refacets.mjs';
 import { commitOutputFile, initLayerFiles, readOutputFile } from './layer-files.mjs';
 import { previewManager, previewRuntime } from './previews.mjs';
 import { agentsGuide, copyMedia, initialFiles, loadScaffoldSources, sitePages, skeletonFiles, workflowPaths, writeBinaries, writeFiles } from './scaffold.mjs';
@@ -126,6 +127,7 @@ const know = knowledge({ db, catalogs, packs: catalogs.packs });
 const pool = library({ db, know });
 const bindingStore = bindingRecords({ db });
 const bindings = bindingRoutines({ db, know, pool, store: bindingStore });
+const refacetWork = refacets({ db, know, pool, store: bindingStore, routines: bindings });
 // LAYER-BINDINGS-01: Discover proposes bindings where one layer reads another's facet; Watch keeps reconciling and active
 // bindings current. Both run after any successful change to a project, at start-up and with the routine tick.
 function runBindings(projectId) {
@@ -753,25 +755,46 @@ async function api(request, response, url) {
     return json(response, 405, { error: 'Method not allowed.' });
   }
   // LAYER-BINDINGS-01: one binding per shared concept, kept by Work with exact revisions and shown in Library › Bindings.
-  const bindingRoute = /^\/api\/projects\/([^/]+)\/bindings(?:\/([^/]+)(?:\/(history|status|decide|join|transfer|lifecycle))?)?$/.exec(url.pathname);
+  const bindingRoute = /^\/api\/projects\/([^/]+)\/bindings(?:\/([^/]+)(?:\/(history|status|decide|join|transfer|lifecycle|changes))?)?$/.exec(url.pathname);
   if (bindingRoute) {
     const projectId = decodeURIComponent(bindingRoute[1]), id = bindingRoute[2] ? decodeURIComponent(bindingRoute[2]) : null, action = bindingRoute[3] || null;
     const noStore = { 'cache-control': 'no-store' };
     if (request.method === 'GET' && !id) return json(response, 200, { bindings: bindingStore.list(projectId, user.id) }, noStore);
-    if (request.method === 'POST' && !id) return json(response, 201, bindingStore.create(projectId, user.id, await readJson(request)), noStore);
+    // A new binding starts as a proposal with its accept item, as Discover's do.
+    if (request.method === 'POST' && !id) {
+      const created = bindingStore.create(projectId, user.id, await readJson(request));
+      bindings.changes.propose(projectId, { bindingId: created.id, change: { kind: 'lifecycle', lifecycle: 'reconciling' }, by: { kind: 'person', id: user.id } });
+      return json(response, 201, created, noStore);
+    }
     if (request.method === 'GET' && id && !action) return json(response, 200, bindingStore.read(projectId, user.id, id,
       url.searchParams.has('revision') ? Number(url.searchParams.get('revision')) : null), noStore);
     if (request.method === 'GET' && action === 'history') return json(response, 200, { revisions: bindingStore.history(projectId, user.id, id) }, noStore);
     if (request.method === 'GET' && action === 'status') return json(response, 200, bindings.status(projectId, user.id, id), noStore);
     if (request.method === 'POST' && action === 'decide') { const input = await readJson(request); return json(response, 200, bindings.decideAssessment(projectId, user.id, id, String(input.workItemId || ''), input.decision), noStore); }
     if (request.method === 'PATCH' && id && !action) return json(response, 200, bindingStore.update(projectId, user.id, id, await readJson(request)), noStore);
-    // A binding change takes effect at once: Watch runs before the answer, so the page shows the imports it caused.
-    if (request.method === 'POST' && ['join', 'transfer', 'lifecycle'].includes(action)) {
-      bindingStore[action](projectId, user.id, id, await readJson(request));
-      bindings.watch(projectId, id);
+    // Every binding change is Work (R2). The owner's change is decided at once, closing the item that proposed it (Discover's,
+    // for an accept); anyone else's waits for the owner. Watch runs before the answer, so the page shows the imports it caused.
+    if (request.method === 'POST' && ['join', 'transfer', 'lifecycle', 'changes'].includes(action)) {
+      const input = await readJson(request);
+      const change = action === 'changes' ? input.change : action === 'lifecycle' ? { kind: 'lifecycle', lifecycle: input.lifecycle }
+        : action === 'join' ? { kind: 'join', participant: input.participant, policy: input.policy, adapters: input.adapters } : { kind: 'transfer', change: input.change };
+      const result = action === 'changes' ? { proposed: bindings.changes.propose(projectId, { bindingId: id, change, rationale: input.rationale || null, by: { kind: 'person', id: user.id } }) }
+        : bindings.changes.request(projectId, user.id, id, change, input.rationale || null);
+      if (result.proposed) return json(response, 202, { proposed: result.proposed }, noStore);
       return json(response, 200, bindingStore.read(projectId, user.id, id), noStore);
     }
     return json(response, 405, { error: 'Method not allowed.' });
+  }
+  // LAYER-BINDINGS-01 step 3: refacets are reviewed Work in the layer they change; binding changes and refacets are decided
+  // by the owner; an overlap chain raises the refacets and the binding proposal that waits on them.
+  const refacetRoute = /^\/api\/projects\/([^/]+)\/(?:layers\/([^/]+)\/refacets|refacets\/([^/]+)\/decide|binding-changes\/([^/]+)\/decide|overlaps)$/.exec(url.pathname);
+  if (refacetRoute && request.method === 'POST') {
+    const [projectId, layerKey, refacetId, changeId] = refacetRoute.slice(1).map(value => value ? decodeURIComponent(value) : value);
+    const input = await readJson(request), noStore = { 'cache-control': 'no-store' };
+    if (layerKey) return json(response, 201, refacetWork.propose(projectId, user.id, layerKey, input), noStore);
+    if (refacetId) return json(response, 200, refacetWork.decide(projectId, user.id, refacetId, input.decision, input.reason || null), noStore);
+    if (changeId) return json(response, 200, bindings.changes.decide(projectId, user.id, changeId, input.decision, input.reason || null), noStore);
+    return json(response, 201, refacetWork.chain(projectId, user.id, input), noStore);
   }
   const layerRoute = /^\/api\/projects\/([^/]+)\/layers(?:\/([^/]+)\/outputs\/([^/]+)\/([^/]+))?$/.exec(url.pathname);
   if (layerRoute && request.method === 'GET') {

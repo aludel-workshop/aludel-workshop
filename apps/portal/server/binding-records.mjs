@@ -12,7 +12,7 @@ const now = () => new Date().toISOString();
 const editable = ['concept', 'policy', 'adapters'];
 // What the routines keep current (which entries correspond, and the last agreed sync) is sync state, not the contract: it is
 // stored beside the binding, unrevisioned, and every automatic change is logged as an event instead.
-const syncFields = ['correspondence', 'baseline'];
+const syncFields = ['correspondence', 'baseline', 'detached'];
 
 export function initBindings(db) {
   db.exec(`CREATE TABLE IF NOT EXISTS layer_bindings (
@@ -29,6 +29,9 @@ export function initBindings(db) {
     seq INTEGER PRIMARY KEY AUTOINCREMENT, binding_id TEXT NOT NULL REFERENCES layer_bindings(id), action_id TEXT, kind TEXT NOT NULL,
     entry TEXT, target TEXT, detail_json TEXT NOT NULL, work_item_id TEXT, created_at TEXT NOT NULL);
     CREATE INDEX IF NOT EXISTS layer_binding_events_binding ON layer_binding_events(binding_id, seq);`);
+  // Step 3: entries a refacet took out of a participant's facet, held until no participant still publishes them.
+  if (!db.prepare('PRAGMA table_info(layer_binding_sync)').all().some(column => column.name === 'detached_json'))
+    db.exec("ALTER TABLE layer_binding_sync ADD COLUMN detached_json TEXT NOT NULL DEFAULT '[]'");
 }
 
 // The facets an installed layer declares in its accepted manifest; null when the layer is not installed and enabled.
@@ -43,8 +46,14 @@ export function bindingRecords({ db, facetsFor = (projectId, key) => installedFa
     if (!row) fail('Project not found.', 404);
     if (owner && row.role !== 'owner') fail('Project owner required.', 403);
   };
-  // Every participant is a declared facet of an installed layer, in a role it supports.
+  // Every participant is a declared facet of an installed layer, in a role it supports, and takes part in no other live
+  // binding: a facet that would straddle two is refaceted, so each part has one.
   const checkParticipants = (projectId, binding) => {
+    if (binding.lifecycle !== 'retired') for (const participant of binding.participants) {
+      const other = db.prepare("SELECT id, state_json FROM layer_bindings WHERE project_id = ? AND id <> ? AND lifecycle <> 'retired'").all(projectId, binding.id)
+        .find(row => JSON.parse(row.state_json).participants.some(p => p.layer.key === participant.layer.key && p.facet === participant.facet));
+      if (other) fail(`${participant.layer.key}'s ${participant.facet} already takes part in ${other.id}. Refacet it so each part has one binding.`, 409);
+    }
     return { ...binding, participants: binding.participants.map(participant => {
       const facets = facetsFor(projectId, participant.layer.key);
       if (!facets) fail(`${participant.layer.key} is not installed in this project.`, 409);
@@ -57,9 +66,10 @@ export function bindingRecords({ db, facetsFor = (projectId, key) => installedFa
     }) };
   };
   const row = (projectId, id) => db.prepare('SELECT * FROM layer_bindings WHERE project_id = ? AND id = ?').get(projectId, id) || fail('Binding not found.', 404);
-  const sync = id => db.prepare('SELECT correspondence_json, baseline_json FROM layer_binding_sync WHERE id = ?').get(id);
+  const sync = id => db.prepare('SELECT correspondence_json, baseline_json, detached_json FROM layer_binding_sync WHERE id = ?').get(id);
   const view = record => { const state = sync(record.id);
     return { ...JSON.parse(record.state_json), correspondence: state ? JSON.parse(state.correspondence_json) : [], baseline: state ? JSON.parse(state.baseline_json) : {},
+      detached: state ? JSON.parse(state.detached_json) : [],
       id: record.id, lifecycle: record.lifecycle, revision: record.revision, updatedAt: record.updated_at }; };
   const text = (value, max, name) => {
     if (value === undefined || value === null) return null;
@@ -132,8 +142,18 @@ export function bindingRecords({ db, facetsFor = (projectId, key) => installedFa
     // The routines' view of every binding, without a person's membership check.
     all(projectId) { return db.prepare('SELECT * FROM layer_bindings WHERE project_id = ? ORDER BY created_at, id').all(projectId).map(view); },
     // Watch keeps the sync state current; it never changes the contract.
-    saveSync(id, { correspondence, baseline }) {
-      db.prepare('UPDATE layer_binding_sync SET correspondence_json = ?, baseline_json = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(correspondence), JSON.stringify(baseline), now(), id);
+    saveSync(id, { correspondence, baseline, detached = [] }) {
+      db.prepare('UPDATE layer_binding_sync SET correspondence_json = ?, baseline_json = ?, detached_json = ?, updated_at = ? WHERE id = ?')
+        .run(JSON.stringify(correspondence), JSON.stringify(baseline), JSON.stringify(detached), now(), id);
+    },
+    // An accepted refacet's follow-through, applied as part of its Work: moved entries detach (sync state), and a split-off
+    // facet that joins this binding is a new revision of the contract.
+    applyRefacet(projectId, userId, next, rationale) {
+      const record = row(projectId, next.id), binding = view(record);
+      const joined = next.participants.filter(p => !binding.participants.some(q => q.id === p.id));
+      if (joined.length) save(projectId, userId, next.id, { ...binding, participants: next.participants }, { revision: record.revision, rationale });
+      this.saveSync(next.id, next);
+      return view(row(projectId, next.id));
     },
     logEvent(id, { actionId = null, kind, entry = null, target = null, detail = {}, workItemId = null }) {
       db.prepare('INSERT INTO layer_binding_events(binding_id,action_id,kind,entry,target,detail_json,work_item_id,created_at) VALUES (?,?,?,?,?,?,?,?)')

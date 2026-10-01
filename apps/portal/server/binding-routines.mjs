@@ -4,6 +4,7 @@
 // (checked and applied as Aludel), raises everything else as Work in the layer that should change, settles Work that has
 // closed, and logs each automatic change on the binding. Layers know nothing of this; they publish facets and accept Work.
 import { createHash } from 'node:crypto';
+import { bindingChanges } from './binding-changes.mjs';
 import { decide, evaluate, facetOf, settle, validateAdapters, validateFacets } from './bindings.mjs';
 import { adaptLayer, layerApi } from './layer-api.mjs';
 import { layerPackageForProject } from './layer-package.mjs';
@@ -65,10 +66,9 @@ export function bindingRoutines({ db, know, pool, store }) {
         authority: authorityId,
         adapters: [{ id: adapter.id, participant: replicaId, reads: adapter.reads, mechanical: adapter.mechanical, soft: adapter.soft }]
       }, `${receiver.name} declares the ${adapter.id} adapter for ${facet.shape}, which ${source.name}'s ${facet.title} publishes. ${source.name}'s facet supports authority and ${receiver.name}'s supports replica, so ${source.name} is proposed as the authority.`);
-      const work = know.createWork(projectId, { layer: 'work', layerScoped: true, type: 'review', state: 'suggested',
-        title: `Review the proposed binding: ${source.name}'s ${facet.title.toLowerCase()} → ${receiver.name}'s ${own.title.toLowerCase()}`,
-        documents: ['Library › Bindings'], context: { binding: binding.id, routine: 'binding-discover' },
-        logText: `Proposed by Discover: ${receiver.name}'s ${adapter.id} adapter reads what ${source.name} publishes` });
+      // The proposal is a binding change for the owner to decide: accepting it starts the first reconcile.
+      const work = changes.propose(projectId, { bindingId: binding.id, change: { kind: 'lifecycle', lifecycle: 'reconciling' }, state: 'suggested', routine: 'binding-discover',
+        rationale: `Discover: ${receiver.name}'s ${adapter.id} adapter reads what ${source.name} publishes` });
       store.logEvent(binding.id, { kind: 'proposed', detail: { by: 'discover', adapter: adapter.id }, workItemId: work.id });
       proposed.push(binding);
     }
@@ -138,7 +138,7 @@ export function bindingRoutines({ db, know, pool, store }) {
     }
 
     const evaluated = evaluate(binding, snapshots);
-    binding = { ...binding, correspondence: evaluated.correspondence };
+    binding = { ...binding, correspondence: evaluated.correspondence, detached: evaluated.detached };
     // Mechanical imports, grouped by receiving participant and adapter: one adapt call each, applied as Aludel.
     const applies = evaluated.actions.filter(action => action.kind === 'apply');
     const groups = new Map();
@@ -171,7 +171,7 @@ export function bindingRoutines({ db, know, pool, store }) {
     }
     // Settle what was applied or recorded automatically, against what the participants now publish.
     ({ snapshots } = snapshot(projectId, binding));
-    binding = { ...binding, correspondence: evaluate(binding, snapshots).correspondence };
+    { const again = evaluate(binding, snapshots); binding = { ...binding, correspondence: again.correspondence, detached: again.detached }; }
     const autoSettles = evaluated.actions.filter(action => action.auto).flatMap(action => action.settles);
     for (const action of evaluated.actions.filter(item => item.kind === 'ignored')) store.logEvent(bindingId, { actionId: action.id, kind: 'recorded', entry: action.entry, target: action.target, detail: { reason: action.reason } });
     if (autoSettles.length) binding = settle(binding, autoSettles, snapshots);
@@ -196,7 +196,8 @@ export function bindingRoutines({ db, know, pool, store }) {
     const evaluated = evaluate(binding, snapshots);
     return { binding, degraded: missing, status: missing.length ? [] : evaluated.status, pending: evaluated.actions.filter(action => action.work).map(action => ({ kind: action.kind, entry: action.entry, target: action.target })),
       wiring: evaluated.wiring, events: store.events(projectId, userId, bindingId, 30),
-      work: bindingWork(projectId, bindingId).map(item => ({ id: item.id, state: item.state, kind: item.context.action.kind, entry: item.context.action.entry })) };
+      work: bindingWork(projectId, bindingId).map(item => ({ id: item.id, state: item.state, kind: item.context.action.kind, entry: item.context.action.entry })),
+      changes: changes.pending(projectId, bindingId) };
   }
   // An owner decides an assessment of drift: adopt it into the authority, or rectify the drifted participant. The assessment
   // closes with the decision, and the next pass raises the Work it decides on.
@@ -211,5 +212,8 @@ export function bindingRoutines({ db, know, pool, store }) {
       { state: 'done', context: { ...item.context, decision } }, { by: { kind: 'person', id: userId } });
     return watch(projectId, bindingId);
   }
-  return { discover, watch, watchProject, snapshot, status, decideAssessment };
+  const routines = { discover, watch, watchProject, snapshot, status, decideAssessment };
+  // Every change to a binding is Work (R2); the routines raise and run them through the same items.
+  const changes = bindingChanges({ db, know, store, routines });
+  return Object.assign(routines, { changes });
 }

@@ -59,8 +59,21 @@ try {
   assert.match(await card.textContent(), /Design kit\s*authority/);
   assert.match(await card.textContent(), /Pages kit\s*follows the authority\s*through its aludel-kit adapter/);
   await axe('Library › Bindings (proposed)');
+  // R2: the proposal is a Work item, and Accept decides it rather than leaving Discover's review open.
+  const [{ id: bindingId }] = (await request('GET', `/api/projects/${project.id}/bindings`)).bindings;
+  const pendingChanges = async () => (await request('GET', `/api/projects/${project.id}/bindings/${bindingId}/status`)).changes;
+  assert.deepEqual((await pendingChanges()).map(c => c.change), [{ kind: 'lifecycle', lifecycle: 'reconciling' }], 'Discover\'s proposal waits as Work');
   await card.getByRole('button', { name: 'Accept' }).click();
   await until(() => card.locator('.lay-chip').first().textContent(), text => /Active/.test(text), 'the first reconcile completes and the binding is active');
+  assert.deepEqual(await pendingChanges(), [], 'accepting closed Discover\'s review item');
+  // The R2 routes: a proposed binding change and a refacet are Work items the owner decides; dismissing applies nothing.
+  const { proposed: pause } = await request('POST', `/api/projects/${project.id}/bindings/${bindingId}/changes`, { change: { kind: 'lifecycle', lifecycle: 'paused' }, rationale: 'Route check.' });
+  assert.deepEqual((await pendingChanges()).map(c => c.id), [pause.id]);
+  await request('POST', `/api/projects/${project.id}/binding-changes/${pause.id}/decide`, { decision: 'dismiss' });
+  assert.deepEqual(await pendingChanges(), []);
+  const refacet = await request('POST', `/api/projects/${project.id}/layers/design/refacets`, { change: { op: 'split', facet: 'kit', into: { key: 'brand', title: 'Brand', take: [{ kind: 'brand_asset' }] } } });
+  assert.ok(refacet.preflight.records.length > 0 && refacet.item.layer === 'design', 'the refacet is Work in Design, with its preflight');
+  assert.equal((await request('POST', `/api/projects/${project.id}/refacets/${refacet.item.id}/decide`, { decision: 'dismiss', reason: 'Route check.' })).merged, null);
   const counts = await card.locator('.lay-binding-counts').textContent();
   assert.match(counts, /^\s*\d+ matched\s*$/, `every entry matched, nothing waiting: ${counts}`);
   assert.match(await card.textContent(), /Recent changes[\s\S]*Added [\s\S]* in Pages's kit/, 'the imports are listed as automatic changes');
