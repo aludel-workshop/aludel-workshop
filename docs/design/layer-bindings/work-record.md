@@ -1,7 +1,7 @@
 ---
 id: LAYER-BINDINGS-01
 kind: design-work-record
-status: step-3-r3
+status: step-3-r4
 updated: 2026-10-01
 depends_on: [DEC-055, DEC-057, DEC-059, LAYER-FRAMEWORK-01, T03-ADAPT]
 ---
@@ -134,7 +134,7 @@ Layers stay simple. They publish facets to the Library, accept Work, own their a
    - A token change auto-applies and is recorded.
    - Library › Bindings shows the binding.
    - Browser journey.
-3. **Refaceting** — *R1 (pure contract) built and owner-accepted 2026-10-01 ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r1.md)); R2 (Work as the vehicle) built and agent-checked ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r2.md))* (owner 2026-10-01; replaces "roles in views" and a rejected areas-inside-facets plan): a layer's facets can be split, merged or renamed as reviewed Work, so a binding always contracts on exactly the matching part. A partial overlap with a new, unrelated layer is a chain of Work: assess overlap → refacet each side → propose binding → accept. Planned in [refaceting.md](refaceting.md).
+3. **Refaceting** — *R1 (pure contract) built and owner-accepted 2026-10-01 ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r1.md)); R2 (Work as the vehicle) built and committed ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r2.md)); R3 (roles in the host) built and agent-checked ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r3.md))* (owner 2026-10-01; replaces "roles in views" and a rejected areas-inside-facets plan): a layer's facets can be split, merged or renamed as reviewed Work, so a binding always contracts on exactly the matching part. A partial overlap with a new, unrelated layer is a chain of Work: assess overlap → refacet each side → propose binding → accept. Planned in [refaceting.md](refaceting.md).
 4. **Code ⇄ Pages** after T03-CODE publishes observations, replacing the hard-coded reconciliation.
 
 ## Owner decisions (2026-10-01)
@@ -204,11 +204,18 @@ Commit `layer-base` `main` before forking the Design and Pages branches from it.
   - `detached` is persisted, and a facet takes part in one live binding;
   - an overlap chain is a binding proposal blocked by its refacets.
 
-**Next: R3, the host.**
-  - `roleOf` in Library entries and layer API reads;
-  - the write guard;
-  - kinds per instance (audit project-wide reads);
-  - a reference index, so the preflight's `references` and `repoint` have data. Existing projects are out of scope (owner: only disposable tests exist).
+**R3 is built and committed** ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r3.md)):
+  - roles in Library and API reads;
+  - the write guard on every API write;
+  - kinds per instance;
+  - a data-scan reference index in the refacet preflight.
+
+**Next: R4, the views.**
+  - `@aludel/host/roles` (read-only state with "Propose a change", ceded pointer, full editing);
+  - the base contract's requirement and test;
+  - Vision and Design adopt it.
+
+R4 changes templates, so it needs `layer-base` commits and re-pins, which pins require. Existing projects are out of scope (owner: only disposable tests exist).
 
 T03-CODE can start after the owner's step-2 review. Its observations need stable concept keys (journeys, not file paths) and a stored copy for any replica.
 
@@ -223,6 +230,7 @@ Lessons from the T03 runs:
 - `npm run typecheck` syncs the pinned Pages views into `src/installed/pages`.
 - Assert what a view reads from other layers, not only that it renders.
 - (Step 1) Write walkthroughs as exact expected outcomes before trusting a prose contract. Four model gaps surfaced only that way. Mutation-check the fixtures.
+- (Step 3 R3) A test that spawns the server with output discarded hides a startup crash as a hang. The suite scripts now carry `--test-timeout=300000`. Compare against HEAD by swapping files in the real checkout, since a scratch worktree can't reach `../layer-base`.
 - (Step 3 R1) Mutate each guard alone. Where two guards cover one case, write a test that needs each alone. In R1, two detached-entry guards masked each other, and the test written to separate them exposed a real flaw.
 
 **Watch for:**
@@ -264,3 +272,16 @@ Lessons from the T03 runs:
     - a reference index, so a refacet's preflight `references` and `repoint` have runtime data;
     - server tests.
   - Same exclusions: no `layer-base` commits or re-pins unless a check requires them; no GitHub, provider, deployment, spending or live owner data.
+- **2026-10-01, R3 complete (agent-checked).** Roles in reads, the write guard, kinds per instance, and the reference index are built. Checks:
+  - 6 new tests, and 11 of 11 mutations caught;
+  - suites at 257 pass, 13 skipped (templates off) and 263 pass, 7 skipped (templates on), none cancelled;
+  - typecheck, build, per-pin checks and step 2's nine browser journeys pass.
+
+  A first full run hung for about 25 minutes on a startup crash that a test had hidden; it was fixed, and the suites now time out per test. Uncommitted. [Evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r3.md).
+- **2026-10-01, R3 committed; R4 started (Claude Code session).** Owner chat: "go for it", in reply to "Should I commit R3 and start R4?". R3 was committed in the candidate.
+  - Scope of R4:
+    - a host SDK roles module (`@aludel/host/roles`) that views use to show an entry's role: read-only with "Propose a change" for a replica, a pointer with read-only history for ceded, full editing for the authority;
+    - the base layer contract's requirement and contract test;
+    - Vision and Design adopting it.
+  - That needs local commits on `layer-base` (`main`, then `design` and `vision` rebased or merged as their history requires) and re-pins in the candidate, then the per-pin checks, both suites and journeys.
+  - No push, GitHub, provider, deployment, spending or live owner data.
