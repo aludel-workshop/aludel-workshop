@@ -1,7 +1,7 @@
 ---
 id: LAYER-BINDINGS-01
 kind: design-work-record
-status: step-3-r4
+status: step-3-r5
 updated: 2026-10-01
 depends_on: [DEC-055, DEC-057, DEC-059, LAYER-FRAMEWORK-01, T03-ADAPT]
 ---
@@ -134,7 +134,7 @@ Layers stay simple. They publish facets to the Library, accept Work, own their a
    - A token change auto-applies and is recorded.
    - Library › Bindings shows the binding.
    - Browser journey.
-3. **Refaceting** — *R1 (pure contract) built and owner-accepted 2026-10-01 ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r1.md)); R2 (Work as the vehicle) built and committed ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r2.md)); R3 (roles in the host) built and agent-checked ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r3.md))* (owner 2026-10-01; replaces "roles in views" and a rejected areas-inside-facets plan): a layer's facets can be split, merged or renamed as reviewed Work, so a binding always contracts on exactly the matching part. A partial overlap with a new, unrelated layer is a chain of Work: assess overlap → refacet each side → propose binding → accept. Planned in [refaceting.md](refaceting.md).
+3. **Refaceting** — *R1 (pure contract) built and owner-accepted 2026-10-01 ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r1.md)); R2 (Work as the vehicle) built and committed ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r2.md)); R3 (roles in the host) built and committed ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r3.md)); R4 (roles in the views) built and agent-checked ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r4.md))* (owner 2026-10-01; replaces "roles in views" and a rejected areas-inside-facets plan): a layer's facets can be split, merged or renamed as reviewed Work, so a binding always contracts on exactly the matching part. A partial overlap with a new, unrelated layer is a chain of Work: assess overlap → refacet each side → propose binding → accept. Planned in [refaceting.md](refaceting.md).
 4. **Code ⇄ Pages** after T03-CODE publishes observations, replacing the hard-coded reconciliation.
 
 ## Owner decisions (2026-10-01)
@@ -162,6 +162,24 @@ Layers stay simple. They publish facets to the Library, accept Work, own their a
 2. **Where bindings are seen:** a **Bindings tab in the Library**, because they're knowledge. Routines still run through Work.
 3. **Multi-party:** yes. One binding per shared concept with any number of participants, so three or four layers don't need a contract for every pair.
 4. **Authority:** there is no code-first default. It's chosen per project when the binding is created, from the participants' own documentation, and the owner may decide either way. Usual preference where Pages and Code both exist: the designer's flows drive the code, even when Pages was first drafted from it.
+
+## Follow-ups (kept here so they aren't lost)
+
+Work found during step 3 that is outside its slices. Each names where it came from and where it should land. Strike an item through only when the receiving packet has taken it.
+
+| # | Follow-up | Found in | Lands in |
+|---|---|---|---|
+| F1 | **Host SDK modules that take a layer key are not layer-relative.** For example, `<aludel-docs layer="design">` in Design's view breaks for a fork installed under another key. Audit every `@aludel/host/*` input that names a layer and make it relative, as `@aludel/host/roles` is. | R4 | T03-CODE prelude, or a small packet before the first fork |
+| F2 | **The base contract should say that views run in a sandboxed frame without dialogs.** `prompt()`, `confirm()` and `alert()` return immediately, and views must never name their own layer. A template using dialogs fails silently. | R4 | R5 (the next `layer-base` `main` commit) |
+| F3 | **Items with their own decision routes can't be decided from the general Work board.** These are binding changes, refacets and drift assessments. Closing one there applies nothing. | R2 | LAT-08A (layer-owned review) |
+| F4 | **Unnamed project-wide kind reads** (`doc`, `story`, `persona`, `routine`, …) now refuse rather than mix when two instances own the kind. Name the instance at each call site once such a project exists. Design's reads are already named. | R3 | When a second instance of any template ships |
+| F5 | **Content that overlaps part of a record can't be a facet.** Facets select whole entries, so section-level overlap (a Content layer and page sections) needs those parts to be entries. Open owner question. | R1 | LAYER-FRAMEWORK-01 or a later Pages template change |
+| F6 | **Existing forked instances keep their old pins** until updated. This is the general template-update question (unchanged since step 2). | Step 2, R4 | Template-update packet (not yet named) |
+| F7 | **A schema note for the candidate** (tables and key columns): two guessed column names cost runs in R2. This is a hypothesis that it saves time. | R2 | Candidate `docs/` with the next schema-touching packet |
+| F8 | **The contract test checks that views import the roles module, not that they behave.** A behavioural check per template (render each role) would be stronger; today only the `roles` journey does this, for Design and Vision. | R4 | R5 journeys, then each template's own tests |
+| F9 | **Pages can't be an authority** until it publishes its kit and has write operations for it (walkthrough 1). | Step 1 | Pages template work after T03-CODE |
+| F10 | **Step 4: Code ⇄ Pages**, including migrating `layer_connections` and the hard-coded Pages reconciliation into bindings, keeping their data. | Step 1 plan | Step 4, after T03-CODE |
+| F11 | **Already in R5:** Discover raising Assess overlap; Watch raising re-point Work (which needs layers to declare which kinds their references can name); UI to propose refacets and overlap chains; Personas, Branding and merge-back journeys. | R2, R3 | R5 |
 
 ## Readiness
 
@@ -210,12 +228,15 @@ Commit `layer-base` `main` before forking the Design and Pages branches from it.
   - kinds per instance;
   - a data-scan reference index in the refacet preflight.
 
-**Next: R4, the views.**
-  - `@aludel/host/roles` (read-only state with "Propose a change", ceded pointer, full editing);
+**R4 is built and committed** ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r4.md)); the `layer-base` commits are local (`main` `b8994b7`, `design` `a924ed2`, `vision` `15eac6f`).
+  - `@aludel/host/roles` (layer-relative: views never name their own layer);
   - the base contract's requirement and test;
-  - Vision and Design adopt it.
+  - Design and Vision show each facet's role.
 
-R4 changes templates, so it needs `layer-base` commits and re-pins, which pins require. Existing projects are out of scope (owner: only disposable tests exist).
+**Follow-ups F1–F11 are listed in [Follow-ups](#follow-ups-kept-here-so-they-arent-lost).** **Next: R5, overlap and journeys.**
+  - Discover raises Assess overlap for a new layer.
+  - Watch raises re-point Work, which needs layers to declare which kinds their references can name.
+  - Journeys: the Personas cede, Branding from scratch, and the merge back. Each needs a new layer installable from a template (Personas, Branding), or base-template fixtures. Existing projects are out of scope (owner: only disposable tests exist).
 
 T03-CODE can start after the owner's step-2 review. Its observations need stable concept keys (journeys, not file paths) and a stored copy for any replica.
 
@@ -230,6 +251,7 @@ Lessons from the T03 runs:
 - `npm run typecheck` syncs the pinned Pages views into `src/installed/pages`.
 - Assert what a view reads from other layers, not only that it renders.
 - (Step 1) Write walkthroughs as exact expected outcomes before trusting a prose contract. Four model gaps surfaced only that way. Mutation-check the fixtures.
+- (Step 3 R4) Layer views run in a sandboxed frame without dialogs (`prompt()` returns null) and must never name their own layer (Vision's key is `product`; forks have their own). Host SDK modules should be layer-relative.
 - (Step 3 R3) A test that spawns the server with output discarded hides a startup crash as a hang. The suite scripts now carry `--test-timeout=300000`. Compare against HEAD by swapping files in the real checkout, since a scratch worktree can't reach `../layer-base`.
 - (Step 3 R1) Mutate each guard alone. Where two guards cover one case, write a test that needs each alone. In R1, two detached-entry guards masked each other, and the test written to separate them exposed a real flaw.
 
@@ -285,3 +307,18 @@ Lessons from the T03 runs:
     - Vision and Design adopting it.
   - That needs local commits on `layer-base` (`main`, then `design` and `vision` rebased or merged as their history requires) and re-pins in the candidate, then the per-pin checks, both suites and journeys.
   - No push, GitHub, provider, deployment, spending or live owner data.
+- **2026-10-01, R4 complete (agent-checked).** The roles module, the base contract, and Design and Vision adopting it are built; `layer-base` is committed and re-pinned. Checks:
+  - the new `roles` journey passes, and 5 of 5 mutations are caught, plus the contract test's own;
+  - suites at 257 pass (templates off) and 264 pass (templates on), none failing or cancelled;
+  - typecheck, build, per-pin checks and all 10 journeys pass.
+
+  Uncommitted in the candidate. [Evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r4.md).
+- **2026-10-01, R4 committed; follow-ups recorded; R5 started (Claude Code session).** Owner chat: "yep, just make sure you're noting any of that follow up work somewhere it wont get lost". The follow-ups are in [Follow-ups](#follow-ups-kept-here-so-they-arent-lost) (F1–F11), with pointers from status (T03-CODE takes F1, LAT-08A takes F3).
+  - Scope of R5, in the candidate and `layer-base`:
+    - F2 in the base contract;
+    - layers declaring which kinds their references can name, so Watch raises re-point or adapter Work after a cede;
+    - Discover raising soft Assess overlap Work when a newly installed layer's facets share hints or shapes with an existing one;
+    - a UI path to propose a refacet and decide it;
+    - browser journeys for the Personas cede, Branding from scratch, and a merge back, using layers installed from the base template where no template exists;
+    - axe and 390px.
+  - Same exclusions: no push, GitHub, provider, deployment, spending or live owner data.
