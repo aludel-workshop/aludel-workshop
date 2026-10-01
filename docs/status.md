@@ -2,36 +2,69 @@
 id: status-001
 kind: project-status
 status: active
-updated: 2026-09-27
+updated: 2026-10-01
 current_phase: M1
 phase_state: in-progress
-next_action: WORK-AGENTS-01
+next_action: LAYER-BINDINGS-01
 ---
 
 # Current project status
 
 ## Objective
 
-Turn the running local portal foundation into the first complete request → deliberate authorization → real agent-built preview → owner review loop, while moving mutable product records out of hand-edited Markdown.
+Finish the remaining Code layer-template conversion while preserving the running portal and its existing Work loop. Deploy stays deferred.
 
 ## Next action
 
-**WORK-AGENTS-01: action-neutral agent work across layers**, selected by the owner on 2026-09-25 ahead of LAY-05 browser review. [Work record](design/work-agents/work-record.md). Manual task creation and explicit Symphony adapters now cover representative actions in every layer, including review-only Vision Brief proposals. The old connected-key path no longer receives Go work. Full action coverage, person-paired manifest parity, host profile controls and general parallel Symphony work remain. [Audit-slice evidence](evidence/work-agents-01-audit-slice.md). LAY-05 was selected earlier and its coding proof is preserved. [Authorization and readiness](design/lay-05/work-record.md). Live candidate retention, structured checks, bounded runs, owner reauthorization and process-interruption recovery now pass on disposable work. The owner deferred browser review until Work supports representative action-based tasks; that review remains open before normal production use; the owner requested local Symphony testing with an explicit Go. The Work item displays reserved turns and exhaustion; the pinned overlay compiles and the exact-commit review path has live evidence. The PP-01R bridge remains built; live pairing and PP-01C are deferred, and the blank-project feature trial remains shelved. Owner correction on 2026-09-26: workers are shared capacity, profiles include provider/model/effort, Work must not expose token pairing, and Deploy owns runtime capacity/status. [Worker-pool contract](design/work-agents/worker-pool-contract.md). The manual project/profile binding has been replaced by a private project worker pool and automatic credential provisioning. Local Docker hosts now poll both configured project pools; Deploy reports one slot and per-task Codex profile capability for each. The local portal now starts with Symphony Work dispatch enabled from its ignored env file, so active Codex profiles are assignable in Work. No batch has run. [Host activation and readiness evidence](evidence/work-agents-01-host-online.md).
+**LAYER-BINDINGS-01: how layers share what they know (contract agreed, implement in a new session).** The owner made this higher priority than T03-CODE (chat, 2026-10-01). [The proposal](design/layer-bindings/work-record.md) covers:
+- facets: what a layer maintains, including former internal state;
+- roles: authority, replica or ceded;
+- one project-level binding per shared concept, with many participants, shown in Library › Bindings and run by Work routines: a baseline for two-way and external change, per-event policy, and consumer-owned import adapters through the authority;
+- authority transfer.
+
+The owner agreed the contract on 2026-10-01: auto-apply mechanical changes, bindings shown in a Library tab, one multi-party binding per shared concept, and authority chosen per project with no code-first default. **Steps 1 and 2 are built and agent-checked** ([evidence](../pages-template-candidate/docs/evidence/layer-bindings-01/README.md)). The owner replaced the step-1 `peer` role with authority direction plus drift handling: adopt, rectify, or assess. The design-system binding now runs end to end: Discover proposes it, it is accepted in Library › Bindings, Pages keeps its own replica of the kit through its declared adapter, changes auto-apply, and drift is assessed. **The owner accepted step 2 in a browser review (2026-10-01). Next: step 3** (roles in views, Branding stand-in), from the record's handoff. Candidate changes are uncommitted; `layer-base` has local commits for the new pins.
+
+**After that, T03-CODE: the app repository as the Code layer.** Design is now a repository-owned layer in records mode, and Pages reads its kit from the Library ([T03-DESIGN evidence and retrospective](../pages-template-candidate/docs/evidence/t03-design/README.md)). Start T03-CODE by writing its brief in the same form as [the T03-DESIGN brief](design/layer-app-transition/t03-design-brief.md), then get the owner's approval of the plan before changing code. Its scope comes from that brief's "After Design" section:
+- The app repository *is* the Code layer repository (DEC-059), and connecting an existing repository is supported.
+- Code units, releases and route observations are derived from the repository at a commit.
+- Trace links become a file in the repository.
+- The writable set is the codebase, not `outputs/`.
+- Code gets its own kit adapter, as Pages has (`pages-kit-adapter.ts`), instead of reading the project store. It adds no hard-coded reads of other layers, and its starters go in its template's `seed`.
+
+Deploy stays deferred. No owner-data cutover, provider turn, GitHub write or promotion is authorized.
+
+## Prior transition evidence
+
+LAT-01–07 and the LAT-08 prototype established the isolated candidate, layer shell and early migration behavior. Their dated [implementation evidence](../lat08-candidate/docs/evidence/lat-08/README.md) remains historical input. DEC-057/059/060 replaced LAT-08's action setup and handoff; the repository-backed Pages and Data checkpoints are linked from the [conversion plan](design/layer-app-transition/layer-template-conversion.md).
 
 ## Ready queue
 
-1. **WORK-AGENTS-01**: action-neutral agent contract and Work execution/review across layers; manual task creation and explicit Symphony output adapters across all seven layers built; remaining actions, person-paired card, host profile controls and worker claim fencing remain.
-2. **LAY-05**: coding proof preserved; candidate boundary, direct tracker, live retention, bounded runs and live interruption recovery pass; owner browser review follows the general Work flow.
-3. **PLATFORM-PIPELINE-01**: PP-01C onboarding → PP-01D environments → PP-01E guards ([work record](design/platform-pipeline/work-record.md)).
-4. **ICONS-FONTS-01**: icon and font libraries in Design (unblocked in principle by PP-01A; waits behind PLATFORM-PIPELINE-01).
-5. **PAGES-UX-01**: built and agent-checked (DEC-048; [evidence](evidence/pages-ux-01-pages-layer.md)). Next: owner review of the built layer.
-6. **PLATFORM-UX-01**: **built and agent-checked** (DEC-049; [evidence](evidence/platform-ux-01-code-deploy.md)). Next: owner review of the built Code and Deploy layers ([work record](design/platform-layer/work-record.md), [prototype](design/platform-layer/v1/index.html)). It supplies PP-01D's Environments UX and absorbs the Platform half of DATA-PLATFORM-UX-01.
-7. **DATA-PLATFORM-UX-01**: the rest of Data (owner: "perhaps").
-8. **LAY-06**: Aludel's own knowledge into its layers; retire the hash workspace.
+1. **LAYER-BINDINGS-01**: steps 1–2 built; step 2 owner-accepted 2026-10-01. Next: step 3 (roles in views). Start from the record's handoff.
+2. **T03-CODE**: connect the app repository as the Code layer and support an existing repository. Brief and owner plan approval first.
+3. **LAT-08A**: build native-tab, layer-owned Work review on the template contract after LAT-T01–T03.
+4. **LAY-05**: coding proof preserved; candidate boundary, direct tracker, live retention, bounded runs and live interruption recovery pass; owner browser review follows the general Work flow.
+5. **PLATFORM-PIPELINE-01**: PP-01C onboarding → PP-01D environments → PP-01E guards ([work record](design/platform-pipeline/work-record.md)).
+6. **ICONS-FONTS-01**: icon and font libraries in Design (unblocked in principle by PP-01A; waits behind PLATFORM-PIPELINE-01).
+7. **PAGES-UX-01**: built and agent-checked (DEC-048; [evidence](evidence/pages-ux-01-pages-layer.md)). Next: owner review of the built layer.
+8. **PLATFORM-UX-01**: **built and agent-checked** (DEC-049; [evidence](evidence/platform-ux-01-code-deploy.md)). Next: owner review of the built Code and Deploy layers ([work record](design/platform-layer/work-record.md), [prototype](design/platform-layer/v1/index.html)). It supplies PP-01D's Environments UX and absorbs the Platform half of DATA-PLATFORM-UX-01.
+9. **DATA-PLATFORM-UX-01**: the rest of Data (owner: "perhaps").
+10. **LAY-06**: Aludel's own knowledge into its layers; retire the hash workspace.
+
+**Proposed cross-layer plan:** [EXISTING-PROJECTS-01](design/existing-projects/work-record.md) covers connecting existing repositories, reconstructing layer drafts from pinned evidence, and reconciling later external commits. The 2026-09-27 owner request authorized this plan and read-only inspection only. EX-01 research is the first proposed slice; knowledge authority, Work action coverage and app-defined environments remain dependencies. It does not replace T03-CODE as the current handoff.
+
+**Proposed layer framework:** [LAYER-FRAMEWORK-01](design/layer-framework/work-record.md) defines adaptive layer apps with output authority, discovery, versioned relation/coverage policy, quality audits and Work suggestions across optional project graphs, including read-only external projections. Vision-story and code-first Pages walkthroughs are conceptual checks; runtime and Figma-account trials remain open. The 2026-09-27 chat requests authorized local conceptual design only. It does not change T03-CODE as the current handoff.
+
+**Layer repository research:** [LAYER-REPOSITORIES-01](design/layer-repositories/work-record.md) records the earlier optional-repo scout. DEC-055 supersedes that target: every installed layer has an owner-owned template-derived repository. Local template repositories are in use; GitHub writes remain separately authorized. T03-CODE is the current handoff.
+
+**Pages-first layer-app trial:** [LAYER-APP-TRIAL-01](design/layer-app-trial/work-record.md) is an isolated, agent-checked local prototype for a UX designer starting with Pages, Library and Work only. Its [v3 preview](design/layer-app-trial/v3/index.html) separates Map/Pages/Flows from shared Operations and Knowledge tabs, moves layer management and optional dashboard cards to Home, and uses a card stack for layer work. The earlier [v2 preview](design/layer-app-trial/v2/index.html) remains as comparison evidence. A browser trial passed the local discovery → sync task → flow → automatic closure path; agent results are local stand-ins. Owner trial and production architecture remain open; T03-CODE is the current handoff.
+
+**Active layer-app transition:** [LAYER-APP-TRANSITION-01](design/layer-app-transition/implementation-plan.md) has an isolated candidate. LAT-01–04 passed their local gates; LAT-05 now combines its utility/reconciliation evidence with the later authorized Pages Work proposal path ([closeout](../aludel-layer-model/docs/evidence/lat-05/README.md#2026-09-29-packet-closeout-after-work-handoff)). LAT-06 passed its revised local gate under DEC-053; LAT-07 passed its local inventory/view gate at candidate `3e1e848`. DEC-060 retires LAT-08 as a current handoff. LAT-T03 now continues with Code under DEC-055/059; the catalog, Vision, Data and Design have local evidence. [LAT-08A](design/layer-app-transition/layer-owned-review.md) will reuse affected layer tabs for candidate review under DEC-054. External/Figma layers and promotion remain deferred.
 
 One packet at a time. B-03's worker/artifact/recovery work remains required and must not be displaced by later workspace expansion. [Proposed dependency order](design/project-workspace/v1/delivery-plan.md).
 
 ## Active blockers
+
+- **Template transition:** Code conversion remains; the G3 catalog, Vision, Data and Design have local agent evidence. Owner browser comparison is LAT-09; original-data cutover and recovery are LAT-10 gates. The old LAT-08 action-review gate is superseded by DEC-060. No new provider turn or promotion is authorized.
 
 - **LAY-05 activation:** ADR-008 selects Aludel as Symphony's tracker. Agent submission, isolated preview, terminal-workspace retention, structured checks and live process-interruption recovery pass on disposable projects. Owner browser review still blocks real-work dispatch.
 - **Operational records:** PW-01A is complete and exposes unavailable states rather than synthetic telemetry. Connected milestone records and live agent/server/spend telemetry still depend on later domain and B-03 work. [Implementation evidence](evidence/pw-01a-work-implementation.md) · [passed design QA](../apps/portal/design-qa.md).
@@ -42,6 +75,35 @@ One packet at a time. B-03's worker/artifact/recovery work remains required and 
 - **M3 generality:** Q-003 needs a representative second-product brief.
 
 ## Current facts and evidence
+
+- 2026-10-01: **LAYER-BINDINGS-01 step 2 built locally.**
+  - Pages keeps a replica of the app kit (`kit_item`) through its declared `aludel-kit` adapter, instead of reading Design live.
+  - Design declares its kit facet.
+  - Discover, Watch (auto-apply, drift assessment, a hold while a layer is off) and Library › Bindings are built.
+  - Pins: `layer-base` `main` `20bdd95`, `design` `cd96d4c`, `pages` `331908f`.
+  - Server suites: templates off 241 pass, 2 skipped; on 236 pass, 7 skipped.
+  - The new `bindings` journey and eight other journeys pass. The `design-layer` and `pages` journeys were updated to accept the binding.
+
+  [Evidence](../pages-template-candidate/docs/evidence/layer-bindings-01/README.md#step-2-the-design-system-binding-end-to-end).
+
+- 2026-10-01: **LAYER-BINDINGS-01 step 1 built locally (uncommitted).** It adds:
+  - facets in the base layer contract and host manifest check;
+  - the pure binding module (`bindings.mjs`), with per-spoke baselines and adapters chosen by source shape;
+  - the binding record and API (`/api/projects/:id/bindings`).
+
+  All six walkthroughs pass as data fixtures, and their outcomes are unchanged when every input list is reversed. A mutation check confirms the fixtures detect four separate logic breaks. Server suite 240/240; templates suite 233 pass, 7 skipped, 0 fail; pins are unchanged. No binding can be created until templates declare facets (step 2). [Evidence and retrospective](../pages-template-candidate/docs/evidence/layer-bindings-01/README.md).
+
+- 2026-09-29: **LAT-07 completed locally at candidate `3e1e848`.** All 17 remaining legacy layer actions have explicit dispositions; four built-in layers expose typed actions, unavailable reasons, Operations/Knowledge views and exact output revision reads. Candidate server suite 145/145, typecheck/build passed. Browser validation could not run because local Playwright/browser tooling is absent. Existing role-backed Work stays active until LAT-08 migration. [Evidence and retrospective](../aludel-layer-model/docs/evidence/lat-07/README.md). `LAT-08` is next.
+
+- 2026-09-29: **LAT-06 completed locally at candidate `cbe7601` under DEC-053.** Layer-owned action declarations, exact Go pins, story-free Pages Work and useful/wrong Code observation relation review passed; full candidate server suite 143/143. Earlier wide/390px browser evidence passed; a final rerun could not start because its temporary Playwright module had been removed. Runtime grants, assignment installation and role migration are LAT-08 gates. [Evidence and retrospective](../aludel-layer-model/docs/evidence/lat-06/README.md). `LAT-07` is next.
+
+- 2026-09-28: **WORK-AGENTS-01 LAT adapter checkpoint, packet partial.** The isolated candidate through `5ff5433` now admits a Pages-origin `pages.flows` item through Go into a read-only flow proposal and exact Work acceptance. Reviewed policy and source origin are pinned; changed policy blocks acceptance. Candidate focused tests passed 16/16 and full server 133/133 before final link tightening; affected tests passed again, and typecheck/build passed. [Evidence and retrospective](../aludel-layer-model/docs/evidence/work-agents-01-lat-adapter.md). Later live retry reached Review; owner validation and DEC-051 action migration remain open. Normal candidate dispatch stays disabled.
+
+- 2026-09-28: **LAT-05 utility checkpoint, packet partial.** The isolated candidate has durable exact-input receipts, a reviewed Vision → Pages flow-coverage utility, one Work suggestion per story gap, safe closure for untouched items, retained exceptions/rejections and degraded coverage on source removal. Focused 4/4, full server 130/130 before final run-link tightening, typecheck/build, and a disposable wide/390px browser journey with axe pass. [Evidence and retrospective](../aludel-layer-model/docs/evidence/lat-05/README.md). The later authorized Pages Go submitted a proposal into Work Review, closing this bounded agent handoff gate; DEC-051 layer-owned actions are LAT-06/07 work. Normal candidate dispatch remains off.
+
+- 2026-09-28: **LAT-04 completed locally on the isolated candidate at `02d0670`.** Explicit catalog selection permits zero or one layer; Home can add/remove apps while retaining records; Pages now has versioned Knowledge, Operations board, routines and reviewed connection documents. Full server tests passed 128/128; typecheck/build and wide/390px browser journeys with axe passed. [Evidence and retrospective](../aludel-layer-model/docs/evidence/lat-04/README.md). Owner usefulness review and promotion remain open. Next: WORK-AGENTS-01 dependency before LAT-05 agent execution.
+
+- 2026-09-28: **LAT-03 completed on the isolated candidate at `46bc1cf`.** Persisted instance preferences drive the rail and Home layer cards; shared Operations/Knowledge slots preserve native output tabs. Focused tests passed 3/3; typecheck/build and authenticated wide/390px browser checks passed, including axe, search and two-record history. [Evidence and retrospective](../aludel-layer-model/docs/evidence/lat-03/README.md). Next: LAT-04; owner comparison and promotion remain later gates.
 
 - PW-02 adds revisioned Direction, outcome Roadmap and Features records, then migrates primary navigation to Overview / Product / Work with utility destinations. Its primary-source reference study changed the implemented composition; product edits retain provenance, stale only exact dependents and never authorize Work. Node 24 typecheck/build, six server/domain suites, Product wide/narrow axe/browser checks and the existing Work lifecycle regression pass. [Evidence/retrospective](evidence/pw-02-product-workspace.md) · [research and references](design/project-workspace/pw-02/research.md).
 
@@ -81,6 +143,12 @@ One packet at a time. B-03's worker/artifact/recovery work remains required and 
 
 ## Completed packets
 
+2026-09-29: **CUSTOM-LAYER-01 closed on owner acceptance.** The owner accepted the browser-reviewed custom Markdown layer candidate in chat ("all looks good"). It has one project-scoped definition reader, draft/active charter activation, one layer bar, and Tasks built from Work's components. Server tests 165/165; `layer-bar`, `markdown-editor`, `product`, `design` and `workflow` browser checks pass. The evidence is pinned at `6d43ed8` on `feature/custom-markdown-layer`, with the first checkpoint at `97fb422`. Agent discovery and browser person-run review remain unproved and are carried forward. [Closeout and retrospective](design/layer-app-transition/custom-markdown-layer.md#packet-closeout--owner-acceptance-2026-09-29).
+
+2026-09-29: **LAT-07 local gate passed at candidate `3e1e848`.** Design, Data, Code and Deploy inventories, unavailable states, shared layer views and exact output revision reads are agent-checked; full server suite 145/145. [Evidence and retrospective](../aludel-layer-model/docs/evidence/lat-07/README.md). Runtime migration and browser/owner comparison remain later gates.
+
+2026-09-29: **LAT-06 local gate passed at candidate `cbe7601` under DEC-053.** Pages/Vision inventory, Code observation relation review and direct story-free Work path are agent-checked. [Evidence and retrospective](../aludel-layer-model/docs/evidence/lat-06/README.md). Runtime permissions remain LAT-08 work.
+
 2026-09-27: **WORK-ITEM-UX-01 live-run correction.** Browser Buddy W-3 proved that a blocking `stuck` objective could still submit a report and appear complete. `stuck` is now terminal; failed runs retain diagnosis but cannot be accepted; the UI centers diagnostic review and exposes the pinned action. W-3 now reads as failed with its original namespace error. Focused tests pass 9/9; typecheck/build and the restarted live read model pass. The trace also proved its generic security plan came from choosing `platform.security` for a hello-world task, not missing task context. A bounded context-usage procedure was added after the diagnosis itself consumed excessive model usage. [Evidence and retrospective](evidence/work-item-ux-01-build.md).
 
 2026-09-27: **Symphony command-sandbox repair.** Docker's default seccomp profile blocked Bubblewrap inside both local workers. Hosts now use `seccomp=unconfined` with `no-new-privileges`, no privileged mode or added capabilities, and must pass a Bubblewrap smoke test before reporting started. Both workers and heartbeats pass; Browser Buddy read W-3's exact pinned commit through the repaired sandbox. No model run was started, so a new owner Go remains required for security assurance. [Evidence and retrospective](evidence/work-item-ux-01-build.md).
@@ -89,6 +157,14 @@ One packet at a time. B-03's worker/artifact/recovery work remains required and 
 
 | Packet | Result | Evidence |
 |---|---|---|
+| T03-DESIGN-SEED / T03-ADAPT | Design's starter kit and Look & feel sync come from its template's `seed`. Pages reads the kit through its own adapter and names no layer. Design reads no later layer. Final pins `design` `64e916f`, `pages` `96194a1` | [Evidence and retrospective](../pages-template-candidate/docs/evidence/t03-design-seed-adapt/README.md) |
+| T03-DESIGN | Design repository (`design` `bc36f24`) owns its views, Knowledge, rules and 9-operation API in records mode; shared rendering moved to the host app-kit SDK; Pages (`e693c19`) reads the kit from the Library; templates on 215/0 (7 explained skips), off 222/222; `design-layer` journey 5/5 | [Evidence and retrospective](../pages-template-candidate/docs/evidence/t03-design/README.md) |
+| T03-G3 / T03-VISION | Reviewed pins drive converted declarations/catalog; Vision repository owns its native view, Knowledge, and (since `ab021b0`) its record rules and 38-operation API; template-mode suite added and green | [Catalog and view](../pages-template-candidate/docs/evidence/t03-vision/README.md) · [Rules, template-mode suite, host features](../pages-template-candidate/docs/evidence/t03-vision-rules/README.md) |
+| T03-DATA | Local template conversion checked; original-owner-data cutover remains a later gate | [Evidence and retrospective](../pages-template-candidate/docs/evidence/t03-data/README.md) |
+| WORK-AGENTS-01 | Bounded layer-origin → shared Work Go → proposal foundation and DEC-051 action contract accepted under DEC-052; disposable proposal itself remains in Review | [Trial](../aludel-layer-model/docs/evidence/work-agents-01-lat-adapter.md), [action groundwork](../aludel-layer-model/docs/evidence/work-agents-01-layer-actions-groundwork.md), [owner closeout](design/work-agents/work-record.md#2026-09-29-owner-closeout-and-lat-handoff) |
+| LAT-05 | Exact-input Pages reconciliation utility plus one authorized agent Work handoff; no self-Go or flow before acceptance | [Evidence and retrospective](../aludel-layer-model/docs/evidence/lat-05/README.md#2026-09-29-packet-closeout-after-work-handoff) |
+| LAT-02 | Six built-in layer descriptors, membership-scoped reads and idempotent instance migration; candidate commit `ca2e771` | [Evidence/retrospective](../aludel-layer-model/docs/evidence/lat-02/README.md) |
+| LAT-01 | Isolated sibling candidate, local launcher and deterministic fixture; concurrent portal, database, cookie and preview separation checked; candidate commit `a799756` | [Evidence/retrospective](design/layer-app-transition/work-record.md) |
 | PP-01R | Project-scoped read-only Codex bridge: Work → Team pairing, assigned tasks and live knowledge, saved context bundles, local MCP adapter; agent-checked on a disposable portal; owner live pairing pending | [Evidence/retrospective](evidence/pp-01r-editor-bridge.md), [guide](guides/co-work-with-codex.md) |
 | PLATFORM-UX-01 | Platform split into **Code** and **Deploy**.
 
@@ -134,129 +210,79 @@ New Operator role. Agent-checked: server 88/89 (1 pre-existing), all browser sui
 
 ## Latest handoff
 
-2026-09-27: **WORK-ITEM-UX-01 continuation is built, restarted and agent-checked.** Owner answers may amend next-run criteria without changing the active run snapshot. Person work now has first-class start → review packet → review/signature runs with no fabricated agent telemetry. Roles no longer exposes configured Run phases. The expanded disposable browser proof passes person review, keyboard/axe/narrow checks, and real code preview/tests/patch/exact-commit acceptance; it found and fixed a candidate API that returned only a diff stat. Server 116/118 (the same two pre-existing failures), focused runs 7/7, candidate tests 6/6, typecheck and build pass. `./launch-machine` rebuilt the portal, restarted both one-slot hosts and loaded the new server at `http://aludel.localhost:4310`; no batch or live model turn was started. [Evidence and retrospective](evidence/work-item-ux-01-build.md) · [work record](design/work-item/work-record.md). Next: owner-review the built flow, then use the next deliberate Go to observe plan/progress/evidence tool quality.
+2026-10-01: **LAYER-BINDINGS-01 step 2 built; owner review, then step 3.**
+- Owner decision: no `peer`. Bindings have a clear authority direction, and changes made outside the binding are drift, which the binding adopts, rectifies or has assessed.
+- Building step 2 showed that the contract's "replica" needs a stored copy. Pages now keeps one. Without it, a live read can't apply changes, drift, or work without Design.
+- The browser journey caught a switched-off Design being read as deleting everything. Bindings now hold while a participant is off.
+- Open for the owner:
+  - review Library › Bindings and Pages' new behaviour (no kit until the binding is accepted; it keeps the kit with Design off);
+  - whether existing projects move to the new Pages template.
 
-2026-09-27: **WORK-ITEM-UX-01 is built and agent-checked (DEC-050).** A work item is its task plus its runs. Each started run has a tab with its own task snapshot, its agent-reported objectives, its changes, and its verdicts, flags and signature. Review is a full-page stepper with evidence the run names for each criterion. Rejecting or closing reopens an editable Next run carrying the notes. Symphony gained `aludel_task_plan`, `aludel_task_progress` and submit `evidence`. The hosts are rebuilt; the owner's running portal needs a `./launch-machine` restart to load it. [Evidence and retrospective](evidence/work-item-ux-01-build.md) · [work record](design/work-item/work-record.md). Next: owner review of the built page and a live Go that exercises the new tools.
+[Record and handoff](design/layer-bindings/work-record.md#handoff-for-the-next-session).
 
-2026-09-25: **LAY-05 direct agent submission passed; terminal cleanup exposed a review defect.** A real Codex turn called `aludel_commit_candidate`, submitted an exact commit, and produced a healthy isolated Docker preview without moving the shared project. Symphony then deleted its terminal workspace, leaving the candidate detail route at 409; loosely shaped agent checks were stored as unnamed skipped claims. Aludel now snapshots the exact commit before acknowledging submission and requires structured check fields. Focused tests cover clone deletion, portal restart, preview and acceptance from the retained snapshot; the updated adapter compiles. These fixes still need live proof, as do owner browser review, interruption recovery and a durable turn budget. The authorized turn is spent and dispatch stays off. [Evidence and retrospective](evidence/lay-05-agent-submission-snapshot.md).
+2026-10-01: **LAYER-BINDINGS-01 step 1 built; step 2 next.** Writing the walkthroughs as exact fixtures exposed four gaps the prose contract left open:
+- an undefined `peer` role, now defined (owner to confirm);
+- the need for a baseline per spoke;
+- content a replica stops keeping must move to the new authority;
+- how a sent-back change is represented.
 
-2026-09-25: **LAY-05 real Codex turn reached code and tests; host commit correction is locally checked.** Codex passed four disposable blog API tests, but its sandbox made `.git` read only. An alternate clone commit was correctly rejected. A new trusted `aludel_commit_candidate` path validates and commits in the registered workspace; focused tests, pinned adapter compilation/mock POST, and operator-assisted submission of the actual agent files to a Docker preview passed. The preview passed API probes and isolated portal sessions; the shared project did not move. Agent-initiated submission, owner browser review, and interruption recovery remain open. The one authorized additional turn is spent; dispatch stays off. [Evidence and retrospective](evidence/lay-05-live-turn-host-commit.md).
+Open for step 2:
+- Pages-as-authority needs Pages to publish its kit;
+- comparable digests come from each receiver's adapter.
 
-2026-09-25: **LAY-05 supervised trial stopped before candidate submission.** Pinned Symphony polled a disposable Go-authorized blog item; the host hook cloned and registered the exact workspace. One Codex App Server process started, but Symphony failed before a turn event or candidate. The workspace stayed clean and all trial processes stopped. an isolated newer CLI passes a no-turn handshake, but writable retained logs and a coding turn still need proof; another live coding turn requires new owner authorization. Dispatch stays off. [Trial evidence and retrospective](evidence/lay-05-live-trial-checkpoint.md).
+Commit `layer-base` `main` before forking Design and Pages from it. [Record and handoff](design/layer-bindings/work-record.md#handoff-for-the-next-session).
 
-2026-09-25: **LAY-05 local result and review cycle checked; packet remains partial.** Symphony-owned workspace registration, durable attempts/events, exact-commit submission, isolated Docker preview, Work review and owner acceptance were exercised through a disposable HTTP cycle. The submitted candidate did not move the shared repository; acceptance did. Full server suite 103/104, with only the pre-existing executable-bit failure. The pinned Elixir overlay compiles and its tools pass a local HTTP mock, but a real Symphony/Codex cycle, browser review and live interruption recovery remain unproved; keep dispatch off. [Evidence and retrospective](evidence/lay-05-result-preview-review.md).
+2026-10-01: **LAYER-BINDINGS-01 contract agreed; implementation handed to a new session.** The owner's model:
+- layers start with no inputs and import what they discover;
+- contracts are per facet pairing, at project level;
+- authority can move between layers;
+- a layer's copy of a concept is the authority, a replica its own work needs, or ceded.
 
-2026-09-25: **LAY-05 direct tracker integration remains partial.** The owner accepted Aludel as Symphony's tracker. The scoped worker API, guarded coding Go path, tested workspace hook and pinned Elixir overlay are built; the disposable HTTP/restart test passes. Keep `MACHINE_SYMPHONY_DISPATCH` off until upstream adapter conformance, workspace attachment, result/event intake, candidate preview and exact-commit review are proved. [Evidence and retrospective](evidence/lay-05-symphony-worker.md). PP-01C and the feature trial remain deferred.
+The owner agreed the contract: one binding per shared concept with many participants, mechanical changes auto-apply, bindings shown in a Library tab, and authority chosen per project. [Record and handoff](design/layer-bindings/work-record.md). T03-CODE follows step 2.
 
-2026-09-25: **LAY-05 Symphony correction.** The owner reaffirmed Symphony as the orchestrator. ADR-008 already selected it; a custom coding-agent tool loop was not built. Aludel now has a tested, side-effect-free projection from a Go-snapshotted item and pinned bundle to a Symphony issue (1/1 focused test). [Work record](design/lay-05/work-record.md) · [alignment evidence](evidence/lay-05-symphony-alignment.md). The owner accepted direct Aludel polling with optional Linear/Jira sync; ADR-008 is amended. A scoped worker API and pinned Symphony adapter overlay have focused local tests; live Symphony conformance remains open. Keep coding dispatch gated until scoped context, events, preview and review are proved.
+2026-10-01: **T03-DESIGN-SEED and T03-ADAPT completed locally; T03-CODE next.**
+- Owner direction, 2026-09-30:
+  - layer-scoped Work, with no actions, for every layer;
+  - Design's starter belongs in its template;
+  - sources keep their own shape and each consumer owns an adapter; build only that boundary for now.
+- Layer seeds are part of the contract: `api.seeds` and `seed(event, context)`, checked like operations.
+  - Design seeds its kit and follows the Look & feel itself.
+  - Start-up on unseeded projects went from 5.4 s to 3.3 s.
+- Pages reads the kit through `ui/pages-kit-adapter.ts`, with links to the source layer and Library entries. The host app kit only renders.
+- Next steps for the connection idea: wire connection records to adapter sources, and let routines propose adapter changes.
+- [Evidence and retrospective](../pages-template-candidate/docs/evidence/t03-design-seed-adapt/README.md).
 
-2026-09-25: **LAY-05 active, candidate foundation agent-checked.** The owner selected it ahead of PP-01C. Detached worktrees now preserve the shared repository until review, enforce a pinned clean base and action path permissions, and store commit/check evidence; the project API reads candidates. [Evidence/retrospective](evidence/lay-05-candidate-foundation.md). Focused tests 3/3, typecheck/build pass; full server tests 98/99 with the existing executable-mode failure. Next: container-bound coding executor, candidate preview and independent checks, then Work review/acceptance. Agent batch execution for `platform.implement` remains gated. PP-01C and the feature trial remain deferred.
+2026-09-30: **T03-DESIGN completed locally; T03-CODE next.**
+- Candidate `f2fb8be` pins `design` `bc36f24`, `pages` `e693c19` and base `61565cf`.
+- Design keeps its kit (tokens, components, brand) as records through its own API:
+  - its rules are ported unchanged;
+  - parity holds for all 28 seeded records;
+  - cross-record rules run in the handler through `x-aludel-context`.
+- The main design question went to the default. Shared rendering is now the host SDK `@aludel/host/app-kit`, which takes kit data and knows no layer.
+- Pages reads the kit from the Library (`data=1`) and gets an empty kit when Design is off.
+- New named host features: `uploads`, `brandTemplates` and `libraryRecords`.
+- Process change: `tools/typecheck-layer-ui.mjs`. The frame build exits 0 with type errors in it.
+- Results:
+  - templates on: 215 pass, 0 fail, 7 explained skips;
+  - templates off: 222/222;
+  - the `design-layer` journey passed 5/5, and seven other journeys pass.
+- Owner answers, 2026-09-30: layer-scoped Work is accepted for every layer, with no per-action catalogs. Design's starter seeding belongs in its template (done: T03-DESIGN-SEED).
+- Limit: each handler call is one sandboxed child process (about 22 ms), so first-time seeding costs about 0.9 s per project.
+- [Evidence and retrospective](../pages-template-candidate/docs/evidence/t03-design/README.md).
 
-2026-09-24: **PLATFORM-UX-01 built and agent-checked** (DEC-049; [evidence](evidence/platform-ux-01-code-deploy.md)).
-- Platform is now **Code** (`/code`) and **Deploy** (`/deploy`); old `/platform` links still work.
-- **Restart the portal** to get the Operator role and the new layers for existing projects.
-- Not built: publishing releases to GitHub (needs your OK for that write), CI test results, and Production hosting.
-- The Docs checks flag the scaffold's 277-line `AGENTS.md`; harness engineering suggests about 100.
-- **Round 3:**
-  - Releases publish to each project's own GitHub (tag and Release; the app's release workflow builds the image into GitHub Packages).
-  - Code › Tests reads the app's CI results.
-  - `AGENTS.md` is a short map and the guide is `docs/agents.md`.
-- **Owner step:** add **Workflows: read and write** and **Actions: read** to the GitHub App, and accept them on each installation. Until then, workflow files are held back and Tests says why.
-- Next: owner review. PLATFORM-PIPELINE-01 remains `next_action`.
+2026-09-30: **T03-VISION completed with its rules in the layer; T03-DESIGN next.**
+- Candidate `ab021b0` pins `vision` `eac6132`:
+  - `server/vision-api.mjs` and a 38-operation API replace the portal's Vision validators.
+  - Parity holds for every stored Vision record.
+  - Records that sit under another name their parent (`x-aludel-parent`).
+  - Existing records join their instance.
+- Frames request named host features (`hostCalls`) instead of matching layer keys.
+- Views write in order, which fixed a lost-note race in the Pages Map (journey 2/4 → 4/4).
+- New `npm run test:server:templates` runs the target mode. It found and closed two Data-as-files gaps (Work targets and the close check).
+- Results: templates off 217/217; templates on 210 pass and 7 explained skips; seven template browser journeys pass. The `layers` journey is stale (fails identically on `7ceebd7`).
+- Owner questions:
+  - Is DEC-057 layer scoping for Vision Work acceptable? It removes the `product.*` actions and per-style presets.
+  - Should other Map and Flow edits get the latest-revision treatment?
+- [Evidence and retrospective](../pages-template-candidate/docs/evidence/t03-vision-rules/README.md).
 
-2026-09-24: **PLATFORM-UX-01 v2 ready for owner review** ([v2](design/platform-layer/v2/index.html), [work record §8](design/platform-layer/work-record.md)).
-- Code is now a reference layer: Overview (compact structure with stack, "as of"), Explorer (files → chunks, story lens), Tests (scenario → test → green), Docs (AGENTS.md as a map, a sidecar for provenance, findings from any layer) and Releases (explicit; GitHub Releases and Packages).
-- Deploy is Environments, Variables, Integrations and Data.
-- Agent-checked: 28 screenshots with no errors, and no horizontal scroll at 390 px. Static only.
-
-2026-09-24: **PLATFORM-UX-01 prototype v1 ready for owner review** ([work record](design/platform-layer/work-record.md), [prototype](design/platform-layer/v1/index.html), [screenshots](design/platform-layer/v1/shots/)).
-- The owner asked to split Platform into Code (architecture, code, repository, releases) and Deploy (environments, database, domains), bridged by releases. They asked for a tree to browse code "in smaller chunks" (not an IDE), and for the existing worldview to be captured without designing integrations.
-- **v1:**
-  - Code has Overview (generated summary, C4 structure, stack read from manifests, ADRs, constraints), Explorer (a Structure or Files tree; read-only source with a gutter showing which piece each line belongs to; request a change), Dependencies, Changes and Releases.
-  - Deploy has Pipeline (Heroku-style columns, health and "in step", promote), Environment (variables from `.env.example`, services, history with rollback, logs, hosting and leaving Aludel), Database (migrations per environment), Domains and Monitoring.
-- **Agent-checked:** a 25-step Chromium walkthrough with no errors, and no horizontal scroll at 390 px. No axe audit.
-- **Process:** new [tools/capture-refs.mjs](../tools/capture-refs.mjs) records every reference capture and its failures (31 of 35 usable).
-- **Open questions (§7):** Releases in Code; Structure-first Explorer; a new Operator role; ADRs in the app repository; where the app lists its environments.
-- Static only: no portal code changed. PLATFORM-PIPELINE-01 remains `next_action`.
-
-2026-09-24: **PLATFORM-PIPELINE-01 brief written** for a fresh session ([work record](design/platform-pipeline/work-record.md)). It has the owner's ask ledger (P1–P11), verified facts about repos, previews and knowledge today, the decisions those force, a research plan and three questions for the owner. It flags a conflict: full ownership and multi-instance sync probably mean product knowledge moves into each project's repository, which revises the knowledge strategy. The owner committed and pushed DESIGN-UX-01 as `36dcb0c`.
-
-2026-09-24: **DESIGN-UX-01 accepted** ("looks good", DEC-046). Icons and fonts are shelved as ICONS-FONTS-01: they need per-project dependencies. Next: PLATFORM-PIPELINE-01.
-
-2026-09-24: **PAGES-UX-01 built and agent-checked** (DEC-048; [evidence](evidence/pages-ux-01-pages-layer.md)).
-- Pages is now Map · Pages · Flows:
-  - a planning canvas with page blanks, drawn links and flows edited on the canvas;
-  - page specs from Design components, with Spec and Built views (a bridge in generated apps);
-  - content edited in place, and change requests that become `platform.implement` work;
-  - flow reviews as `pages.review` work.
-- Checks: server 84/85 (the pre-existing executable-bit failure on `tools/delete-project.mjs`); the pages, layers, design, onboarding, product, brand, workflow and github browser suites pass; `browser` fails as on the baseline.
-- **Restart the portal**, then use Pages › Built › "Update preview" once per app so its preview has the bridge.
-- Earlier: **PAGES-UX-01 prototype v2 ready for owner review** ([v2](design/pages-layer/v2/index.html)). Map is now a planning canvas: pan and zoom, grid snapping, page blanks, drawn links, and a Flows sidebar that edits flows on the canvas. The Flows tab puts the preview first. Earlier: **v1** ([work record](design/pages-layer/work-record.md), [prototype](design/pages-layer/v1/index.html)). It has Map, a page workspace (Spec and Built, hover inspection, content-only editing) and Flows (Experience designer review). Layout or behaviour changes become Engineer · implement work items. It is static only; no portal code changed. PLATFORM-PIPELINE-01 remains `next_action`.
-
-2026-09-24: **DESIGN-UX-01 built and agent-checked** (DEC-045; [evidence](evidence/design-ux-01-design-layer.md)). Design is now Tokens · Components · Brand · Docs. The preview renders real Angular Material components in the project's theme, and saved design changes reach the generated app (checked end to end). Library gains Documents and image sources with region findings. Server 75/75; the design, layers, onboarding, product, brand, github and workflow browser suites pass. `browser` fails as on the baseline. **Restart the portal** to seed Design for existing projects. Next: owner review of the built Design layer, then PAGES-UX-01.
-
-2026-09-24: **DESIGN-UX-01 prototype v1 ready for owner review** ([work record](design/design-layer/work-record.md), [prototype](design/design-layer/v1/index.html), [screenshots](design/design-layer/v1/shots/)). Tabs become Tokens · Components · Brand · Docs. Sources and Guidelines move into the Library: references can point straight at sources and findings, and documents get a "shows in" setting. Tokens are a two-pane tree and live preview in three tiers (raw values, roles, rules). Components get a tree, a preview and a properties panel, with slots and placeholders for components that are needed. Brand assets are starter examples, not required fields. Agent-checked: no console errors, edits propagate, keyboard and mouse drag and drop, nested selection, 390px. Next: owner review ask by ask (D1–D22).
-
-2026-09-24: **ROADMAP-01 accepted** ("alright, i like it. mark done"; DEC-044). Next: UX passes, starting with Design (DESIGN-UX-01), then Pages, then perhaps Data and Platform.
-
-2026-09-24: **ROADMAP-01 built** after the owner accepted v3 (DEC-043). Details are in [the evidence](evidence/roadmap-01-product-and-plan.md). Three things matter for the next session:
-- **Restart the portal to migrate.** The migration was run against a copy of real data: repeatable, and no item changed its project.
-- **Caught before any real data was touched:** a column-name clash that would have moved work items between projects. Now `plan_project_id`.
-- **A pre-existing crash is fixed:** "Mariachi Madness" could not load, because of old stories without `services`.
-
-Next: owner review (ROADMAP-01R), then LAY-05.
-
-2026-09-23: **ROADMAP-01P v3 built** after the owner's v2 review ("v2, nice"). Studied Linear's timeline, peek and project images and borrowed from them. Agents act in the role of their assigned action, and elevated results still wait for a human lead. Agent-checked: 18 routes, both themes, 1400px and 390px, axe clean, 14 interactions scripted. Next: owner review of v3.
-
-2026-09-23: **ROADMAP-01P v2 built** after the owner's v1 review. Recommendations recorded (work record §10):
-- documents come back, with an anchor and a consumer;
-- the opportunity tree is dropped;
-- people have member or lead access per role action, and agents are members only;
-- a Linear and Jira mapping;
-- Next N;
-- Product becomes Vision.
-
-Process: the purpose test now asks about overlap, and prototypes mark each composition as borrowed or invented. Agent-checked: 16 routes in both themes at 1400px and 390px, axe clean, 11 interactions scripted. Next: owner review of v2.
-
-2026-09-23: **DEC-042 recorded and ROADMAP-01P prototype v1 built.** The owner answered: optional target dates, keep "batch", phase → milestone, spec → project brief, the business model optional (a future layer), and the Library in the rail. [Prototype](design/product-and-plan/v1/index.html). Agent-checked: 11 routes in light and dark at 1400px and 390px, axe clean, three interactions scripted. Next: owner review.
-
-2026-09-23: **ROADMAP-01 research and proposal** ([work record](design/product-and-plan/work-record.md)). Primary sources: Lean Canvas, Rumelt, Mehta, OST, impact mapping, atomic research, Productboard, Jira Product Discovery, Dovetail, Linear, Shape Up, Now-Next-Later. No code changed. Process: the purpose test was added to [operating procedure §2](design/process/operating-procedure.md#2-inventory-evidence-for-the-proposed-scope) and applied to the Product tabs; it is unproven. Next: the owner's answers to four questions, then the prototype.
-
-2026-09-23: **WORK-UX-01 built and agent-checked (DEC-041)** after the owner accepted prototype v2.
-- Work now has Board (batches per assignee; Queue, Backlog and Done), Roles, Agents and Routines. Items carry priority, blocking links and a review checklist.
-- Server tests pass 63/63. The layers and onboarding browser scripts pass. The migration was checked on a copy of the real database and three gaps were fixed.
-- Restart the portal to pick it up: existing projects migrate at start-up.
-- Limits: agents still run only acceptance, clarification options and contracts; there is no live token ticker; the agent reviewer's pre-check isn't built. [Evidence](evidence/work-ux-01-work-redesign.md).
-- Next: ROADMAP-01.
-
-2026-09-23: **WORK-UX-01 v2 for owner review.** The owner reviewed v1. Feedback is recorded as B1–B13 in the [work record](design/work-redesign/work-record.md#owner-review-of-v1-2026-09-23): per-action instructions and toolkit, one card everywhere, live agent runs, a review checklist, robot avatars per profile, priority and blocking. [v2](design/work-redesign/v2/index.html). Earlier the same day: **WORK-UX-01 prototype for owner review.** The owner asked in chat for a Work layer UI pass: items, per-assignee batches, Roles by layer, and flexible agent profiles. A preview comes first, before any code. [Work record and brief ledger](design/work-redesign/work-record.md) · [prototype v1](design/work-redesign/v1/index.html). No portal code has changed. Trial process change: multi-part chat briefs are itemised in a ledger ([operating procedure §1](design/process/operating-procedure.md#1-establish-the-task-and-improve-the-process)). ROADMAP-01 remains `next_action`.
-
-2026-09-23: **Bug found and fixed at closeout:** creating or building a project committed Aludel's own repository (four mislabeled commits, three already pushed; no GitHub push of Aludel to a project happened). Workspaces must now be their own repository. [Details](evidence/lay-04-work-automation.md#found-at-closeout-project-creation-committed-aludels-own-repository-fixed-2026-09-23).
-
-2026-09-23: **Closed out LAY-07 and LAY-04.** The owner ran two real batches on OpenAI: one contract done (903 tokens) and one acceptance draft waiting in review (1,413 tokens). [Evidence](evidence/lay-04-work-automation.md#owner-use-2026-09-23). Next: ROADMAP-01 (design first).
-
-2026-09-23: **Agents run in batches you start (DEC-040).** Working style now marks work as available for agents instead of opening items; your untouched items go back to the pool on restart. In Work › Queue, fill a batch (by hand or "the next 10") and press Go. The runner drafts acceptance, clarification options and data contracts on the project's key (OpenAI `gpt-6-astra` by default), and drafts come back for review. Server tests pass 60/60; all browser scripts pass except the known step. No real provider was called by us. Next: ROADMAP-01 design.
-
-2026-09-23: **Agent accounts connect by pasted key (DEC-039).** The owner cares about hosting and declined a third-party broker. The guided Anthropic and OpenAI key panel checks each key for free, stores it encrypted, and links a [user guide](guides/connect-an-agent.md). "Codex on this machine" is retired. Server tests pass 54/54; all browser scripts pass except the known step. Next: the owner's OK for the Product agent to spend on runs.
-
-2026-09-23: **LAY-04A–C built and agent-checked** after the owner accepted v3.
-- Closing record-changing work now needs a revision made from it, and answers are applied to their records. Working style stages and routes suggestions (a Planner's plans go to the Architect, page designs to the Design lead for review). Four default routines run weekly, monthly or before each release.
-- Server tests pass 51/51. All browser scripts pass except the known `browser.mjs` step.
-- Next: the owner's decision on how the Product agent may run (LAY-04D). [Evidence](evidence/lay-04-work-automation.md).
-
-2026-09-22: **LAY-07 built and agent-checked** on the owner's instruction ("can you handle lay-07 for me?"), without the separate v3 review.
-- Server tests pass 44/44, including 12 new ones. Typecheck and build pass. `tests/layers-browser.mjs` drives every new tab, with axe clean on 23 views and 390px clean on 10 paths.
-- `tools/browser-checks.sh` now runs every browser script against a fresh portal each. All pass except the known `tests/browser.mjs` step.
-- Deviation: backups live in `<data>/backups/<project>/`, not in the workspace, because the workspace is the git repository.
-- Process: the browser runner and a `*.localhost` resolver in the test support.
-- Next: owner walkthrough (V3-REVIEW), then LAY-04, which reuses the code links' revision anchoring. [Evidence](evidence/lay-07-data-platform-agents.md).
-
-2026-09-22: **LAY-REVIEW done.** Owner: "a decent direction … a solid enough base to work with"; each layer gets a later refinement pass. New owner input: a stack-neutral **data and API** layer (objects, OpenAPI-backed exploration) above Platform, plus Platform operations (database health, backups, querying, servers, CI/CD, domains, provider handoffs). Owner approved the name **Data**, the Platform direction, integrations where they are used, Work › Agents with profiles, and code links (Platform › Code, no inline tags): DEC-038. Documented in [data-platform-research](design/portal-layers/data-platform-research.md) and [knowledge-structures](design/portal-layers/knowledge-structures.md); prototype v3 built for review.
-
-2026-09-22: the layers are real (LAY-02/03). A new session should read [the layers implementation plan](design/portal-layers/implementation-plan.md) first; its "Current state" section names the next concrete steps and entry points. Server 32/32; onboarding and layers browser tests pass.
-
-2026-09-22: new-project onboarding built locally (DEC-032–035). The end-to-end browser script takes a new user from the marketing page to a running generated app on its own subdomain. Fixed on the way: non-executable git askpass (GitHub pushes would have failed), 19 missing workspace icons, the stale Playwright path. `tests/browser.mjs` fails on the baseline too (pre-existing). [Evidence](evidence/onb-01-05-onboarding.md).
-
-2026-09-21: PW-02 is complete. The Product area now provides revisioned Direction, horizon Roadmap and feature comparison/detail over one product record set; route and authority boundaries survived desktop/narrow browser checks and the existing Work lifecycle regression. [Evidence](evidence/pw-02-product-workspace.md). B-03B is again the single next planning pointer and needs separate authorization.
-
-2026-09-21: the first live GitHub organization setup succeeded through the portal. Persisted binding, installation permissions, local baseline, tracked-file count and authenticated GitHub `main` were cross-checked; no real credential file or client secret is tracked. [Evidence](design/process/enterprise-github-app-work-record.md).
+2026-09-30: **T03-G3 and T03-VISION local checkpoints; T03-DESIGN next.** Pin-derived catalog/declarations preserve compiled Design, Code and Deploy choices and templates-off compatibility. Candidate `7ceebd7` pins Vision repository `ac96e2f`, which owns its manifest, Knowledge and native frame; disposable new/existing project, Library, stable-record and browser journeys passed. [Evidence and retrospective](../pages-template-candidate/docs/evidence/t03-vision/README.md). Owner comparison and original-data cutover remain LAT-09/10 gates.
