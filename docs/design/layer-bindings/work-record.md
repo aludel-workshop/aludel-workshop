@@ -1,7 +1,7 @@
 ---
 id: LAYER-BINDINGS-01
 kind: design-work-record
-status: step-3-r2
+status: step-3-r3
 updated: 2026-10-01
 depends_on: [DEC-055, DEC-057, DEC-059, LAYER-FRAMEWORK-01, T03-ADAPT]
 ---
@@ -134,7 +134,7 @@ Layers stay simple. They publish facets to the Library, accept Work, own their a
    - A token change auto-applies and is recorded.
    - Library › Bindings shows the binding.
    - Browser journey.
-3. **Refaceting** — *R1 (pure contract) built 2026-10-01, agent-checked ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r1.md)); defaults and deviations await owner confirmation* (owner 2026-10-01; replaces "roles in views" and a rejected areas-inside-facets plan): a layer's facets can be split, merged or renamed as reviewed Work, so a binding always contracts on exactly the matching part. A partial overlap with a new, unrelated layer is a chain of Work: assess overlap → refacet each side → propose binding → accept. Planned in [refaceting.md](refaceting.md).
+3. **Refaceting** — *R1 (pure contract) built and owner-accepted 2026-10-01 ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r1.md)); R2 (Work as the vehicle) built and agent-checked ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r2.md))* (owner 2026-10-01; replaces "roles in views" and a rejected areas-inside-facets plan): a layer's facets can be split, merged or renamed as reviewed Work, so a binding always contracts on exactly the matching part. A partial overlap with a new, unrelated layer is a chain of Work: assess overlap → refacet each side → propose binding → accept. Planned in [refaceting.md](refaceting.md).
 4. **Code ⇄ Pages** after T03-CODE publishes observations, replacing the hard-coded reconciliation.
 
 ## Owner decisions (2026-10-01)
@@ -197,7 +197,18 @@ Commit `layer-base` `main` before forking the Design and Pages branches from it.
 
 **Step 2 is built** (same evidence). The candidate's step-2 changes are uncommitted; the `layer-base` commits above exist because pins require them, and nothing was pushed.
 
-**Step 3, refaceting: R1 is built** ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r1.md)). It is uncommitted in the candidate. The owner accepted its defaults and behaviour changes (decision 7). **Next: R2**: Work as the vehicle; persist `detached` with the sync state; enforce one live binding per facet on propose and join; apply a refacet as a reviewed branch of the layer's `layer.json`. R2's server tests can drive `tests/fixtures/refacet-cases.json`. Existing projects are out of scope (owner: only disposable tests exist).
+**Step 3, refaceting: R1 is built** ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r1.md)). It is uncommitted in the candidate. The owner accepted its defaults and behaviour changes (decision 7). **R2 is built and committed** ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r2.md)):
+  - every binding change and refacet is a Work item the owner decides;
+  - Library › Bindings decides them;
+  - a refacet is a reviewed `layer.json` branch merged through `mergeLayerBranch`;
+  - `detached` is persisted, and a facet takes part in one live binding;
+  - an overlap chain is a binding proposal blocked by its refacets.
+
+**Next: R3, the host.**
+  - `roleOf` in Library entries and layer API reads;
+  - the write guard;
+  - kinds per instance (audit project-wide reads);
+  - a reference index, so the preflight's `references` and `repoint` have data. Existing projects are out of scope (owner: only disposable tests exist).
 
 T03-CODE can start after the owner's step-2 review. Its observations need stable concept keys (journeys, not file paths) and a stored copy for any replica.
 
@@ -238,3 +249,18 @@ Lessons from the T03 runs:
     - `blocks` linking an overlap chain;
     - server tests.
   - Same exclusions as before: no `layer-base` template commits or re-pins unless a check requires them; no GitHub, provider, deployment, spending or live owner data.
+- **2026-10-01, R2 complete (agent-checked).** Binding changes and refacets are Work, with an overlap chain, persisted `detached`, and one live binding per facet. Checks:
+  - 7 new server tests, and 13 of 13 mutations caught (three test gaps fixed, one of them an owner-only dismissal hole);
+  - suites at 256 pass, 9 skipped (templates off) and 258 pass, 7 skipped (templates on), none failing;
+  - typecheck, build and per-pin checks pass;
+  - step 2's nine browser journeys pass, `bindings` now also checking that Accept closes Discover's item and that the new routes answer.
+
+  Uncommitted. [Evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r2.md).
+- **2026-10-01, R2 committed; R3 started (Claude Code session).** Owner chat: "go", in reply to "commit R2 and go on to R3?". R2 was committed in the candidate.
+  - Scope of R3, in `pages-template-candidate` only:
+    - each entry's role (facet, role, binding, authority) in Library entries and in the layer API's reads;
+    - a host write guard: people and agents can't write entries in a replica or ceded facet, creates included; only binding imports write there;
+    - kinds per instance, auditing and fixing project-wide reads by kind that would mix two instances with the same kind;
+    - a reference index, so a refacet's preflight `references` and `repoint` have runtime data;
+    - server tests.
+  - Same exclusions: no `layer-base` commits or re-pins unless a check requires them; no GitHub, provider, deployment, spending or live owner data.

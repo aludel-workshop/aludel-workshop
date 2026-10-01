@@ -1,7 +1,7 @@
 ---
 id: LAYER-BINDINGS-01-REFACET
 kind: design-plan
-status: r1-accepted
+status: r2-built
 updated: 2026-10-01
 depends_on: [LAYER-BINDINGS-01]
 supersedes: "facet-splitting plan of 2026-10-01 (areas inside facets), rejected by the owner"
@@ -153,4 +153,4 @@ Unrelated layers may still choose the same kind names (two layers with `persona`
 
 ## Readiness
 
-R1 is built, and its defaults and deviations are owner-accepted. R2 (Work as the vehicle, persisting detached entries, one live binding per facet in records) is in progress. Nothing depends on existing projects.
+R1 is built and owner-accepted. R2 (Work as the vehicle) is built and agent-checked ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r2.md)). R3 (host: roles in reads, the write guard, kinds per instance, a reference index) is next. Nothing depends on existing projects.
