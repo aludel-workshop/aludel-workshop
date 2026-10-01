@@ -43,16 +43,15 @@ export function bindingRecords({ db, facetsFor = (projectId, key) => installedFa
     if (!row) fail('Project not found.', 404);
     if (owner && row.role !== 'owner') fail('Project owner required.', 403);
   };
-  // Every participant is a declared facet of an installed layer, in a role it supports, including authority where it holds an area.
+  // Every participant is a declared facet of an installed layer, in a role it supports.
   const checkParticipants = (projectId, binding) => {
-    const holders = new Set(typeof binding.authority === 'string' ? [binding.authority] : Object.values(binding.authority));
     return { ...binding, participants: binding.participants.map(participant => {
       const facets = facetsFor(projectId, participant.layer.key);
       if (!facets) fail(`${participant.layer.key} is not installed in this project.`, 409);
       const facet = facets.find(item => item.key === participant.facet);
       if (!facet) fail(`${participant.layer.key} does not declare a ${participant.facet} facet.`, 409);
-      for (const role of new Set([participant.role, ...(holders.has(participant.id) ? ['authority'] : [])]))
-        if (!facet.roles.includes(role)) fail(`${participant.layer.key}'s ${facet.title} cannot be ${role === 'authority' ? 'an authority' : role === 'ceded' ? 'ceded' : 'a replica'}.`, 409);
+      if (!facet.roles.includes(participant.role)) fail(`${participant.layer.key}'s ${facet.title} cannot be ${participant.role === 'authority' ? 'an authority' : participant.role === 'ceded' ? 'ceded' : 'a replica'}.`, 409);
+      if (facet.readOnly) participant = { ...participant, readOnly: true };
       const instanceId = db.prepare('SELECT instance_id FROM layer_instances WHERE project_id = ? AND layer_key = ?').get(projectId, participant.layer.key)?.instance_id || null;
       return { ...participant, layer: { key: participant.layer.key, instanceId } };
     }) };

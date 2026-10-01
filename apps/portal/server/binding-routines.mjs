@@ -4,7 +4,7 @@
 // (checked and applied as Aludel), raises everything else as Work in the layer that should change, settles Work that has
 // closed, and logs each automatic change on the binding. Layers know nothing of this; they publish facets and accept Work.
 import { createHash } from 'node:crypto';
-import { decide, evaluate, settle, validateAdapters, validateFacets } from './bindings.mjs';
+import { decide, evaluate, facetOf, settle, validateAdapters, validateFacets } from './bindings.mjs';
 import { adaptLayer, layerApi } from './layer-api.mjs';
 import { layerPackageForProject } from './layer-package.mjs';
 
@@ -35,7 +35,8 @@ export function bindingRoutines({ db, know, pool, store }) {
       const layer = layers.get(participant.layer.key);
       const facet = layer?.facets.find(item => item.key === participant.facet);
       if (!facet && participant.role !== 'ceded') missing.push(participant.id);
-      library[participant.id] = facet ? outputs.filter(entry => entry.layer.key === layer.key && facet.kinds.includes(entry.kind)) : [];
+      // An entry is in the facet its layer's select clauses put it in, which may narrow a kind by one field.
+      library[participant.id] = facet ? outputs.filter(entry => entry.layer.key === layer.key && facetOf(layer.facets, entry) === facet.key) : [];
       snapshots[participant.id] = library[participant.id].map(entry => ({ ref: entry.ref, revision: entry.revision,
         key: typeof entry.data?.sourceRef === 'string' ? entry.data.sourceRef : entry.ref,
         digest: typeof entry.data?.sourceDigest === 'string' ? entry.data.sourceDigest : entryDigest(entry.data) }));

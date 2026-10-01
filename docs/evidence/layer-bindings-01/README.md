@@ -1,5 +1,7 @@
 # LAYER-BINDINGS-01 steps 1 and 2: the binding contract and the design-system binding — 2026-10-01
 
+> Step 3 (refaceting) evidence: [R1, the pure contract](refaceting-r1.md). It replaces area authority and `keeps` described below, and changes what a ceded participant does on its first reconcile.
+
 ## Scope and authorization
 
 On 2026-10-01 the owner said in chat to "pick it up and get started" on the binding system. The work was within the authorization in [the work record's handoff](../../../../docs/design/layer-bindings/work-record.md#handoff-for-the-next-session), and its run is recorded in the [run log](../../../../docs/design/layer-bindings/work-record.md#run-log). This run covers **step 1 only**: the contract, the pure module and the fixtures. Changes are local and uncommitted, in `pages-template-candidate` (branch `feature/pages-layer-template`, base `f3b6ecb`) and `layer-base` `main`. There were no GitHub or provider writes, provider turns, deployment, spending or live owner data. No template pin changed.

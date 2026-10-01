@@ -7,7 +7,7 @@ import { authorityFor, decide, evaluate, join, settle, transfer, transition, val
 const { scenarios } = JSON.parse(readFileSync(new URL('./fixtures/binding-walkthroughs.json', import.meta.url), 'utf8'));
 const show = action => action.kind === 'adapter' ? `adapter ${action.entries.join(',')} @${action.target}`
   : `${action.kind} ${action.entry} @${action.target}${['adopt', 'assess', 'combine', 'conflict'].includes(action.kind) ? ` <${action.from.join(',')}` : ''}`;
-const showWiring = binding => wiring(binding).map(row => `${row.participant} ${row.area} ${row.hub} ${row.adapter}`);
+const showWiring = binding => wiring(binding).map(row => `${row.participant} ${row.hub} ${row.adapter}`);
 
 // Plays a scenario as the binding's routines and the people doing its Work would: automatic actions are applied and
 // settled, Work is resolved as each step says. `reverse` feeds every list in reverse order to show the outcome is stable.
@@ -24,7 +24,7 @@ function play(scenario, { reverse = false } = {}) {
     const ref = binding.correspondence.find(item => item.key === key)?.refs[id];
     return ref ? (snapshots[id] || []).find(item => item.ref === ref) || null : null;
   };
-  const hubEntry = key => entry(authorityFor(binding, binding.correspondence.find(item => item.key === key).area ?? null), key);
+  const hubEntry = key => entry(authorityFor(binding), key);
   // A participant's layer writes the entry for `key` as `source` has it, or removes it.
   const write = (id, key, source) => {
     snapshots[id] ||= [];
@@ -33,7 +33,7 @@ function play(scenario, { reverse = false } = {}) {
     if (!source) { if (existing) snapshots[id] = snapshots[id].filter(item => item !== existing); return; }
     if (existing) { existing.revision += 1; existing.digest = source.digest; return; }
     const ref = concept.refs[id] || `${id}:${key}`;
-    snapshots[id].push({ ref, key, ...(concept.area ? { area: concept.area } : {}), revision: 1, digest: source.digest });
+    snapshots[id].push({ ref, key, revision: 1, digest: source.digest });
     concept.refs[id] = ref;
   };
   const settleAll = settlements => { if (settlements.length) binding = settle(binding, settlements, snapshots); };
@@ -153,16 +153,21 @@ test('facets name the layer\'s own outputs, one facet per kind, and the roles ea
     { key: 'Kit', title: 'Kit', kinds: ['component'], roles: ['authority'] }
   ]) assert.throws(() => validateFacets({ ...manifest, facets: [facet] }), /facet|roles|view/i, JSON.stringify(facet));
   assert.throws(() => validateFacets({ ...manifest, facets: [
-    { key: 'a', title: 'A', kinds: ['component'], roles: ['authority'] }, { key: 'b', title: 'B', kinds: ['component'], roles: ['authority'] }] }), /each in one facet/);
+    { key: 'a', title: 'A', kinds: ['component'], roles: ['authority'] }, { key: 'b', title: 'B', kinds: ['component'], roles: ['authority'] }] }), /each entry belongs to one facet/);
 });
 
-test('a binding is checked: a real authority per area, roles that hold, policies and adapters for its participants', () => {
+test('a binding is checked: one authority, whole facets, roles that hold, policies and adapters for its participants', () => {
   assert.doesNotThrow(() => validateBinding(base()));
   const cases = [
     [{ authority: 'nobody' }, /not a participant/],
-    [{ participants: base().participants.map(p => p.id === 'pages-kit' ? { ...p, role: 'ceded' } : p) }, /ceded facet cannot be an authority/],
-    [{ participants: base().participants.map(p => p.id === 'code-ds' ? { ...p, role: 'authority' } : p) }, /holds no area/],
-    [{ participants: base().participants.map(p => p.id === 'code-ds' ? { ...p, keeps: ['radius'], role: 'ceded' } : p) }, /Only a replica keeps/],
+    [{ participants: base().participants.map(p => p.id === 'pages-kit' ? { ...p, role: 'ceded' } : p) }, /its role is authority/],
+    [{ participants: base().participants.map(p => p.id === 'code-ds' ? { ...p, role: 'authority' } : p) }, /pages-kit holds it/],
+    [{ authority: { '*': 'pages-kit', admin: 'code-ds' } }, /one authority\. Contract on part of a facet by refaceting/],
+    [{ participants: base().participants.map(p => p.id === 'code-ds' ? { ...p, keeps: ['radius'] } : p) }, /whole facet/],
+    [{ participants: base().participants.map(p => p.id === 'code-ds' ? { ...p, areas: ['admin'] } : p) }, /whole facet/],
+    [{ correspondence: [{ key: 'radius', area: 'admin', refs: {} }] }, /names an area/],
+    [{ participants: base().participants.map(p => p.id === 'code-ds' ? { ...p, readOnly: true } : p) }, /read-only, so it cannot be a replica/],
+    [{ participants: [...base().participants, { ...base().participants[1], id: 'code-again' }] }, /takes part once/],
     [{ participants: base().participants.map(p => p.id === 'code-ds' ? { ...p, role: 'peer' } : p) }, /unknown role/],
     [{ policy: { 'code-ds': { drift: { changed: 'merge' } } } }, /Invalid drift policy/],
     [{ policy: { ghost: { changed: 'flag' } } }, /unknown participant/],
@@ -183,6 +188,9 @@ test('authority moves only by transfer, and the previous authority is given a ro
   assert.equal(moved.lifecycle, 'reconciling', 'an active binding reconciles after a transfer');
   assert.deepEqual(moved.participants.map(p => [p.id, p.role]), [['pages-kit', 'replica'], ['code-ds', 'replica'], ['design-kit', 'authority']]);
   assert.throws(() => transfer(moved, { to: 'design-kit', roles: {} }), /already holds/);
+  assert.throws(() => transfer(joined, { to: 'design-kit', area: 'tokens', roles: { 'pages-kit': 'replica' } }), /whole binding/);
+  const ceded = transfer(moved, { to: 'pages-kit', roles: { 'design-kit': 'ceded' } });
+  assert.equal(transfer(ceded, { to: 'design-kit', roles: { 'pages-kit': 'replica' } }).authority, 'design-kit', 'a ceded facet can take authority back (a merge reversing a cede)');
 });
 
 test('lifecycle: proposed → reconciling → active → paused | retired', () => {

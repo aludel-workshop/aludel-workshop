@@ -39,7 +39,7 @@
         { "do": "evaluate", "note": "applied and recorded: nothing left", "expect": [] },
         { "do": "join", "participant": { "id": "design-kit", "layer": { "key": "design" }, "facet": "kit", "role": "replica", "shape": "design.kit" } },
         { "do": "transfer", "change": { "to": "design-kit", "roles": { "pages-kit": "replica" } },
-          "expectWiring": ["code-ds * design-kit code-from-design-kit", "pages-kit * design-kit pages-aludel-kit"] },
+          "expectWiring": ["code-ds design-kit code-from-design-kit", "pages-kit design-kit pages-aludel-kit"] },
         { "do": "evaluate", "note": "the first reconcile asks Design to take in Pages' choices, one Work item per entry, offered by both spokes",
           "expect": ["adopt color-primary @design-kit <code-ds,pages-kit", "adopt radius @design-kit <code-ds,pages-kit"] },
         { "do": "resolve", "kind": "adopt", "decision": "accept" },
@@ -101,9 +101,9 @@
           "expect": ["apply legacy-shadow @code-ds", "apply legacy-shadow @pages-kit"] },
         { "do": "join", "participant": { "id": "figma", "layer": { "key": "figma_import" }, "facet": "variables", "role": "replica", "shape": "figma.variables" } },
         { "do": "transfer", "change": { "to": "figma", "roles": { "design-kit": "ceded" } },
-          "expectWiring": ["code-ds * figma code-from-figma", "pages-kit * figma null"] },
-        { "do": "evaluate", "note": "equal content needs no Work; Pages has no adapter for Figma's own shape yet, so it gets Work to write one; the ceded Design facet takes no part",
-          "expect": ["ignored color-primary @code-ds", "ignored color-primary @pages-kit", "adopt legacy-shadow @figma <code-ds,pages-kit", "apply spacing-base @code-ds", "adapter spacing-base @pages-kit"] },
+          "expectWiring": ["code-ds figma code-from-figma", "pages-kit figma null"] },
+        { "do": "evaluate", "note": "equal content needs no Work; Pages has no adapter for Figma's own shape yet, so it gets Work to write one; the ceded Design facet offers its content once, then takes no part",
+          "expect": ["ignored color-primary @code-ds", "ignored color-primary @design-kit", "ignored color-primary @pages-kit", "adopt legacy-shadow @figma <code-ds,design-kit,pages-kit", "apply spacing-base @code-ds", "adapter spacing-base @pages-kit"] },
         { "do": "resolve", "kind": "adopt", "decision": "reject" },
         { "do": "evaluate", "note": "Figma keeps what it has; the replicas drop the token only Design had",
           "expect": ["apply legacy-shadow @code-ds", "adapter legacy-shadow,spacing-base @pages-kit"] },
@@ -213,14 +213,14 @@
       ]
     },
     {
-      "name": "Both developed: the first reconcile is the merge, with authority split by area",
+      "name": "Both developed: the first reconcile is the merge",
       "binding": {
         "id": "bnd-user-journeys", "concept": { "name": "The app's user journeys" }, "lifecycle": "reconciling",
         "participants": [
           { "id": "pages-flows", "layer": { "key": "pages" }, "facet": "flows", "role": "authority", "shape": "pages.flows" },
           { "id": "code-routes", "layer": { "key": "platform" }, "facet": "routes", "role": "replica", "shape": "code.routes" }
         ],
-        "authority": { "*": "pages-flows", "admin": "code-routes" },
+        "authority": "pages-flows",
         "adapters": [
           { "id": "code-flow-tests", "participant": "code-routes", "reads": "pages.flows", "mechanical": true, "soft": true },
           { "id": "pages-flows-from-routes", "participant": "pages-flows", "reads": "code.routes", "mechanical": false, "soft": true }
@@ -235,18 +235,27 @@
         "code-routes": [
           { "ref": "app/login/page.tsx", "key": "sign-in", "revision": 5, "digest": "sign-in:/login" },
           { "ref": "app/borrow/page.tsx", "key": "borrow-a-tool", "revision": 2, "digest": "borrow:/borrow" },
-          { "ref": "app/lend/page.tsx", "key": "lend-a-tool", "revision": 1, "digest": "lend:/lend" },
-          { "ref": "app/admin/users/page.tsx", "key": "admin-users", "area": "admin", "revision": 1, "digest": "admin:/admin/users" }
+          { "ref": "app/lend/page.tsx", "key": "lend-a-tool", "revision": 1, "digest": "lend:/lend" }
         ]
       },
       "steps": [
-        { "do": "evaluate", "note": "matched, only on one side and diverged entries become combine, trim or add Work; admin screens follow Code",
-          "expect": ["import admin-users @pages-flows", "combine borrow-a-tool @pages-flows <code-routes", "adopt lend-a-tool @pages-flows <code-routes",
-                     "apply return-a-tool @code-routes", "import return-a-tool @code-routes", "ignored sign-in @code-routes"] },
+        {
+          "do": "evaluate", "note": "matched, only on one side and diverged entries become combine, trim or add Work",
+          "expect": [
+            "combine borrow-a-tool @pages-flows <code-routes",
+            "adopt lend-a-tool @pages-flows <code-routes",
+            "apply return-a-tool @code-routes",
+            "import return-a-tool @code-routes",
+            "ignored sign-in @code-routes"
+          ]
+        },
         { "do": "resolve", "kind": "combine", "choose": "pages-flows" },
         { "do": "resolve", "kind": "adopt", "decision": "accept" },
         { "do": "resolve", "kind": "import", "decision": "accept" },
-        { "do": "evaluate", "note": "the designer's version of borrowing goes to Code", "expect": ["apply borrow-a-tool @code-routes", "import borrow-a-tool @code-routes"] },
+        {
+          "do": "evaluate", "note": "the designer's version of borrowing goes to Code",
+          "expect": ["apply borrow-a-tool @code-routes", "import borrow-a-tool @code-routes"]
+        },
         { "do": "resolve", "kind": "import", "decision": "accept" },
         { "do": "evaluate", "expect": [] },
         { "do": "edit", "participant": "pages-flows", "key": "lend-a-tool", "digest": "lend:/lend,/lend/photos" },
@@ -255,65 +264,72 @@
       ]
     },
     {
-      "name": "A Branding layer takes over branding: Design keeps name and mark as a replica, the rest is ceded",
+      "name": "A Branding layer takes over branding: after refaceting, Design keeps name and mark as a replica, cedes the rest, and Pages' brand kit follows",
+      "about": "Design was refaceted (kit → kit + identity + brand, within brand_asset by key) and Pages too (kit → kit + kit-brand); the design-system binding keeps both kits untouched. The split-off facets were unbound, so this is a new binding with Branding as its authority from the start.",
       "binding": {
-        "id": "bnd-design-system", "concept": { "name": "The app's design system" }, "lifecycle": "active",
+        "id": "bnd-branding", "concept": { "name": "The app's branding" }, "lifecycle": "reconciling",
         "participants": [
-          { "id": "design-tokens", "layer": { "key": "design" }, "facet": "tokens", "role": "authority", "areas": ["tokens"], "shape": "design.kit" },
-          { "id": "design-brand", "layer": { "key": "design" }, "facet": "branding", "role": "authority", "areas": ["branding"], "shape": "design.kit" },
-          { "id": "pages-kit", "layer": { "key": "pages" }, "facet": "kit", "role": "replica", "shape": "pages.kit" }
+          { "id": "branding", "layer": { "key": "branding" }, "facet": "brand", "role": "authority", "shape": "branding.brand" },
+          { "id": "design-identity", "layer": { "key": "design" }, "facet": "identity", "role": "replica", "shape": "design.identity" },
+          { "id": "design-brand", "layer": { "key": "design" }, "facet": "brand", "role": "ceded", "shape": "design.brand" },
+          { "id": "pages-kit-brand", "layer": { "key": "pages" }, "facet": "kit-brand", "role": "replica", "shape": "pages.kit-brand" }
         ],
-        "authority": { "tokens": "design-tokens", "branding": "design-brand" },
-        "correspondence": [
-          { "key": "color-primary", "area": "tokens", "refs": { "design-tokens": "tok-primary", "pages-kit": "kit-primary" } },
-          { "key": "app-name", "area": "branding", "refs": { "design-brand": "brd-name", "pages-kit": "kit-name" } },
-          { "key": "mark", "area": "branding", "refs": { "design-brand": "brd-mark", "pages-kit": "kit-mark" } }
-        ],
-        "baseline": {
-          "color-primary": { "pages-kit": { "hub": "design-tokens", "hubRevision": 1, "self": 1 } },
-          "app-name": { "pages-kit": { "hub": "design-brand", "hubRevision": 1, "self": 1 } },
-          "mark": { "pages-kit": { "hub": "design-brand", "hubRevision": 1, "self": 1 } }
-        },
+        "authority": "branding",
+        "policy": { "design-identity": { "added": "ignore" } },
         "adapters": [
-          { "id": "pages-aludel-kit", "participant": "pages-kit", "reads": "design.kit", "mechanical": true, "soft": false },
-          { "id": "design-brand-from-branding", "participant": "design-brand", "reads": "branding.brand", "mechanical": true, "soft": false }
+          { "id": "design-identity-from-branding", "participant": "design-identity", "reads": "branding.brand", "mechanical": true, "soft": false },
+          { "id": "pages-aludel-kit", "participant": "pages-kit-brand", "reads": "design.kit", "mechanical": true, "soft": false }
         ]
       },
       "snapshots": {
-        "design-tokens": [{ "ref": "tok-primary", "key": "color-primary", "area": "tokens", "revision": 1, "digest": "#335599" }],
-        "design-brand": [
-          { "ref": "brd-name", "key": "app-name", "area": "branding", "revision": 1, "digest": "Tool Share" },
-          { "ref": "brd-mark", "key": "mark", "area": "branding", "revision": 1, "digest": "mark-v1" },
-          { "ref": "brd-voice", "key": "voice", "area": "branding", "revision": 1, "digest": "friendly" },
-          { "ref": "brd-story", "key": "palette-story", "area": "branding", "revision": 1, "digest": "warm" }
-        ],
-        "pages-kit": [
-          { "ref": "kit-primary", "key": "color-primary", "area": "tokens", "revision": 1, "digest": "#335599" },
-          { "ref": "kit-name", "key": "app-name", "area": "branding", "revision": 1, "digest": "Tool Share" },
-          { "ref": "kit-mark", "key": "mark", "area": "branding", "revision": 1, "digest": "mark-v1" }
-        ],
+        "design-identity": [{ "ref": "brd-name", "key": "app-name", "revision": 1, "digest": "Tool Share" }, { "ref": "brd-mark", "key": "mark", "revision": 1, "digest": "mark-v1" }],
+        "design-brand": [{ "ref": "brd-voice", "key": "voice", "revision": 1, "digest": "friendly" }, { "ref": "brd-story", "key": "palette-story", "revision": 1, "digest": "warm" }],
+        "pages-kit-brand": [{ "ref": "kit-name", "key": "app-name", "revision": 1, "digest": "Tool Share" }, { "ref": "kit-mark", "key": "mark", "revision": 1, "digest": "mark-v1" }],
         "branding": [
-          { "ref": "name", "key": "app-name", "area": "branding", "revision": 1, "digest": "Tool Share" },
-          { "ref": "mark", "key": "mark", "area": "branding", "revision": 1, "digest": "mark-v2" },
-          { "ref": "tagline", "key": "tagline", "area": "branding", "revision": 1, "digest": "Borrow, don't buy" }
+          { "ref": "name", "key": "app-name", "revision": 1, "digest": "Tool Share" },
+          { "ref": "mark", "key": "mark", "revision": 1, "digest": "mark-v2" },
+          { "ref": "tagline", "key": "tagline", "revision": 1, "digest": "Borrow, don't buy" }
         ]
       },
       "steps": [
-        { "do": "join", "participant": { "id": "branding", "layer": { "key": "branding" }, "facet": "brand", "role": "replica", "areas": ["branding"], "shape": "branding.brand" } },
-        { "do": "transfer", "change": { "to": "branding", "area": "branding", "roles": { "design-brand": "replica" }, "keeps": { "design-brand": ["app-name", "mark"] } },
-          "expectWiring": ["design-brand branding branding design-brand-from-branding", "pages-kit branding branding null", "pages-kit tokens design-tokens pages-aludel-kit"] },
-        { "do": "evaluate", "note": "Design's voice and palette story move to Branding before they become history; the two marks differ, so a person combines them; Pages needs an adapter for Branding's shape",
-          "expect": ["ignored app-name @design-brand", "ignored app-name @pages-kit", "combine mark @branding <design-brand,pages-kit",
-                     "adopt palette-story @branding <design-brand", "adapter tagline @pages-kit", "adopt voice @branding <design-brand"] },
+        {
+          "do": "evaluate",
+          "note": "Design's ceded voice and palette story are offered to Branding once; the two marks differ, so a person combines them; Design's identity ignores what it never keeps; Pages needs an adapter for Branding's shape",
+          "expect": [
+            "ignored app-name @design-identity",
+            "ignored app-name @pages-kit-brand",
+            "combine mark @branding <design-identity,pages-kit-brand",
+            "adopt palette-story @branding <design-brand",
+            "adapter tagline @pages-kit-brand",
+            "ignored tagline @design-identity",
+            "adopt voice @branding <design-brand"
+          ],
+          "expectFirst": true
+        },
         { "do": "resolve", "kind": "combine", "choose": "branding" },
         { "do": "resolve", "kind": "adopt", "decision": "accept" },
-        { "do": "evaluate", "note": "Design's replica takes the new mark; nothing flows into what Design no longer keeps",
-          "expect": ["apply mark @design-brand", "adapter mark,palette-story,tagline,voice @pages-kit"] },
-        { "do": "addAdapter", "adapter": { "id": "pages-from-branding", "participant": "pages-kit", "reads": "branding.brand", "mechanical": true, "soft": false } },
-        { "do": "evaluate", "expect": ["apply mark @pages-kit", "apply palette-story @pages-kit", "apply tagline @pages-kit", "apply voice @pages-kit"] },
-        { "do": "evaluate", "expect": [], "expectStatus": { "app-name": "matched", "mark": "matched", "voice": "matched", "color-primary": "matched" } },
+        {
+          "do": "evaluate", "note": "Design's identity takes the new mark; nothing flows into what Design ceded",
+          "expect": [
+            "apply mark @design-identity",
+            "adapter mark,palette-story,tagline,voice @pages-kit-brand",
+            "ignored palette-story @design-identity",
+            "ignored voice @design-identity"
+          ]
+        },
+        { "do": "addAdapter", "adapter": { "id": "pages-from-branding", "participant": "pages-kit-brand", "reads": "branding.brand", "mechanical": true, "soft": false } },
+        {
+          "do": "evaluate",
+          "expect": ["apply mark @pages-kit-brand", "apply palette-story @pages-kit-brand", "apply tagline @pages-kit-brand", "apply voice @pages-kit-brand"]
+        },
+        { "do": "evaluate", "expect": [], "expectStatus": { "app-name": "matched", "mark": "matched", "voice": "matched", "tagline": "matched" } },
         { "do": "edit", "participant": "branding", "key": "voice", "digest": "plain" },
-        { "do": "evaluate", "note": "Design's ceded voice is history: only Pages takes the change", "expect": ["apply voice @pages-kit"] }
+        {
+          "do": "evaluate", "note": "Design's ceded voice is history: only Pages takes the change",
+          "expect": ["apply voice @pages-kit-brand", "ignored voice @design-identity"]
+        },
+        { "do": "edit", "participant": "design-brand", "key": "voice", "digest": "edited anyway" },
+        { "do": "evaluate", "note": "a ceded participant's later edit (one the write guard should have refused) is not drift: it is history", "expect": [] }
       ]
     }
   ]

@@ -7,13 +7,13 @@ import { ProjectContext } from './context';
 // what it is waiting on. Bindings are knowledge about the project, so they live here; Work's routines run them.
 interface Participant { id: string; layer: { key: string; instanceId: string | null }; facet: string; role: 'authority' | 'replica' | 'ceded'; shape: string }
 interface Binding { id: string; concept: { name: string; description?: string }; lifecycle: string; revision: number; participants: Participant[];
-  authority: string | Record<string, string>; adapters: { id: string; participant: string; reads: string; mechanical: boolean; soft: boolean }[] }
+  authority: string; adapters: { id: string; participant: string; reads: string; mechanical: boolean; soft: boolean }[] }
 interface Status {
   binding: Binding; degraded: string[];
   status: { key: string; state: 'matched' | 'missing' | 'diverged' | 'absent'; missingIn: string[] }[];
   events: { seq: number; kind: string; entry: string | null; target: string | null; detail: Record<string, unknown>; workItemId: string | null; createdAt: string }[];
   work: { id: string; state: string; kind: string; entry: string }[];
-  wiring: { participant: string; area: string; hub: string; adapter: string | null }[];
+  wiring: { participant: string; hub: string; adapter: string | null }[];
 }
 const done = new Set(['done']);
 

@@ -1,0 +1,378 @@
+{
+  "about": "LAYER-BINDINGS-01 step 3 (refaceting) as data. Each case starts from installed layers (their outputs, declared facets and current entries), live bindings and cross-layer references, then runs steps. A participant's snapshot is its layer's entries that fall in its facet, so refaceting changes what a binding sees exactly as the host will. refacet checks the preflight its Work item shows (records that move, bindings that keep them detached, other participants that should follow, references into the moving part, each facet's entries and bindings). evaluate, resolve, transfer and edit work as in binding-walkthroughs.json. repoint checks the Work that re-points references into a ceded facet. role checks what an entry is: its facet, that facet's role, and its binding.",
+  "cases": [
+    {
+      "name": "Vision cedes its personas to a new Personas layer: refacet by kind, cede, adopt through Personas' adapter, then re-point Pages' references",
+      "layers": {
+        "vision": {
+          "outputs": ["vision_section", "brief_claim", "story", "persona"],
+          "facets": [{ "key": "intent", "title": "Product intent", "kinds": ["vision_section", "brief_claim", "story", "persona"], "roles": ["authority", "replica", "ceded"] }],
+          "entries": [
+            { "ref": "sec-problem", "kind": "vision_section", "revision": 2, "digest": "problem" },
+            { "ref": "per-maker", "kind": "persona", "key": "maker", "revision": 1, "digest": "Maker: builds things" },
+            { "ref": "per-borrower", "kind": "persona", "key": "borrower", "revision": 1, "digest": "Borrower: needs a tool once" }
+          ]
+        },
+        "personas": {
+          "outputs": ["person"],
+          "facets": [{ "key": "people", "title": "People", "select": [{ "kind": "person" }], "roles": ["authority"] }],
+          "entries": []
+        },
+        "pages": {
+          "outputs": ["page", "flow"],
+          "facets": [{ "key": "pages", "title": "Pages", "kinds": ["page", "flow"], "roles": ["authority"] }],
+          "entries": [{ "ref": "pg-home", "kind": "page", "revision": 1, "digest": "home" }, { "ref": "flw-borrow", "kind": "flow", "revision": 1, "digest": "borrow" }]
+        }
+      },
+      "bindings": [],
+      "references": [{ "layer": "pages", "entry": "pg-home", "to": "per-maker" }, { "layer": "pages", "entry": "flw-borrow", "to": "per-borrower" }],
+      "steps": [
+        { "do": "refacet", "layer": "vision", "change": { "op": "split", "facet": "intent", "into": { "key": "personas", "title": "Personas", "take": [{ "kind": "persona" }] } },
+          "expectPreflight": { "records": ["per-borrower", "per-maker"], "follow": [], "bindings": [],
+            "references": ["pages/flw-borrow>per-borrower", "pages/pg-home>per-maker"], "facets": ["intent:1:", "personas:2:"] } },
+        { "do": "facets", "layer": "vision", "expect": { "intent": ["sec-problem"], "personas": ["per-borrower", "per-maker"] } },
+        { "do": "role", "layer": "vision", "ref": "per-maker", "expect": { "facet": "personas", "role": null, "binding": null } },
+        { "do": "propose", "binding": {
+          "id": "bnd-personas", "concept": { "name": "The app's personas" }, "lifecycle": "reconciling",
+          "participants": [
+            { "id": "personas-people", "layer": { "key": "personas" }, "facet": "people", "role": "authority", "shape": "personas.people" },
+            { "id": "vision-personas", "layer": { "key": "vision" }, "facet": "personas", "role": "ceded", "shape": "vision.personas" }
+          ],
+          "authority": "personas-people",
+          "adapters": [{ "id": "people-from-vision", "participant": "personas-people", "reads": "vision.personas", "mechanical": false, "soft": true }] } },
+        { "do": "evaluate", "binding": "bnd-personas", "note": "Vision's personas are offered once, in Vision's own shape, through the adapter Personas owns",
+          "expect": ["adopt borrower @personas-people <vision-personas", "adopt maker @personas-people <vision-personas"], "expectAdapter": "people-from-vision" },
+        { "do": "resolve", "binding": "bnd-personas", "kind": "adopt", "decision": "accept" },
+        { "do": "evaluate", "binding": "bnd-personas", "expect": [], "expectStatus": { "maker": "matched", "borrower": "matched" } },
+        { "do": "role", "layer": "vision", "ref": "per-maker", "expect": { "facet": "personas", "role": "ceded", "binding": "bnd-personas", "authority": { "participant": "personas-people", "layer": "personas", "facet": "people" } } },
+        { "do": "role", "layer": "vision", "ref": "sec-problem", "expect": { "facet": "intent", "role": null, "binding": null } },
+        { "do": "role", "layer": "personas", "ref": "personas:maker", "expect": { "facet": "people", "role": "authority", "binding": "bnd-personas", "authority": { "participant": "personas-people", "layer": "personas", "facet": "people" } } },
+        { "do": "repoint", "binding": "bnd-personas", "from": "vision-personas", "accepts": { "pages": ["persona"] },
+          "note": "Pages checks audiences against the persona kind, and Personas keeps people: adapter Work, not a silent rewrite",
+          "expect": ["adapter @pages flw-borrow:per-borrower>personas:borrower,pg-home:per-maker>personas:maker"] },
+        { "do": "repoint", "binding": "bnd-personas", "from": "vision-personas", "accepts": { "pages": "*" },
+          "note": "once Pages references by Library pin, the same references are re-pointed",
+          "expect": ["repoint @pages flw-borrow:per-borrower>personas:borrower,pg-home:per-maker>personas:maker"] },
+        { "do": "edit", "binding": "bnd-personas", "participant": "personas-people", "key": "maker", "digest": "Maker: builds and lends" },
+        { "do": "evaluate", "binding": "bnd-personas", "note": "a ceded facet takes nothing from its authority", "expect": [] }
+      ]
+    },
+    {
+      "name": "Design's branding goes to a Branding layer built from scratch: refacet within a kind, Pages' kit refaceted too, the design-system binding untouched",
+      "layers": {
+        "design": {
+          "outputs": ["design_tokens", "component", "brand_asset"],
+          "facets": [{ "key": "kit", "title": "Design system", "kinds": ["design_tokens", "component", "brand_asset"], "roles": ["authority", "replica", "ceded"], "shape": "design.kit" }],
+          "entries": [
+            { "ref": "tok-primary", "kind": "design_tokens", "key": "color-primary", "revision": 1, "digest": "#335599" },
+            { "ref": "brd-name", "kind": "brand_asset", "key": "app-name", "data": { "key": "name" }, "revision": 1, "digest": "Tool Share" },
+            { "ref": "brd-mark", "kind": "brand_asset", "key": "mark", "data": { "key": "mark" }, "revision": 1, "digest": "mark-v1" },
+            { "ref": "brd-voice", "kind": "brand_asset", "key": "voice", "data": { "key": "voice" }, "revision": 1, "digest": "friendly" }
+          ]
+        },
+        "pages": {
+          "outputs": ["kit_item", "page"],
+          "facets": [{ "key": "kit", "title": "App kit", "kinds": ["kit_item"], "roles": ["replica"], "shape": "pages.kit" }],
+          "entries": [
+            { "ref": "kit-primary", "kind": "kit_item", "key": "color-primary", "data": { "group": "tokens" }, "revision": 1, "digest": "#335599" },
+            { "ref": "kit-name", "kind": "kit_item", "key": "app-name", "data": { "group": "brand" }, "revision": 1, "digest": "Tool Share" },
+            { "ref": "kit-mark", "kind": "kit_item", "key": "mark", "data": { "group": "brand" }, "revision": 1, "digest": "mark-v1" },
+            { "ref": "kit-voice", "kind": "kit_item", "key": "voice", "data": { "group": "brand" }, "revision": 1, "digest": "friendly" }
+          ]
+        },
+        "branding": {
+          "outputs": ["brand_item"],
+          "facets": [{ "key": "brand", "title": "Brand", "select": [{ "kind": "brand_item" }], "roles": ["authority"], "shape": "branding.brand" }],
+          "entries": [
+            { "ref": "name", "kind": "brand_item", "key": "app-name", "revision": 1, "digest": "Tool Share" },
+            { "ref": "mark", "kind": "brand_item", "key": "mark", "revision": 1, "digest": "mark-v2" },
+            { "ref": "tagline", "kind": "brand_item", "key": "tagline", "revision": 1, "digest": "Borrow, don't buy" }
+          ]
+        }
+      },
+      "bindings": [{
+        "id": "bnd-design-system", "concept": { "name": "The app's design system" }, "lifecycle": "active",
+        "participants": [
+          { "id": "design-kit", "layer": { "key": "design" }, "facet": "kit", "role": "authority", "shape": "design.kit" },
+          { "id": "pages-kit", "layer": { "key": "pages" }, "facet": "kit", "role": "replica", "shape": "pages.kit" }
+        ],
+        "authority": "design-kit",
+        "correspondence": [
+          { "key": "app-name", "refs": { "design-kit": "brd-name", "pages-kit": "kit-name" } },
+          { "key": "color-primary", "refs": { "design-kit": "tok-primary", "pages-kit": "kit-primary" } },
+          { "key": "mark", "refs": { "design-kit": "brd-mark", "pages-kit": "kit-mark" } },
+          { "key": "voice", "refs": { "design-kit": "brd-voice", "pages-kit": "kit-voice" } }
+        ],
+        "baseline": {
+          "app-name": { "pages-kit": { "hub": "design-kit", "hubRevision": 1, "self": 1 } },
+          "color-primary": { "pages-kit": { "hub": "design-kit", "hubRevision": 1, "self": 1 } },
+          "mark": { "pages-kit": { "hub": "design-kit", "hubRevision": 1, "self": 1 } },
+          "voice": { "pages-kit": { "hub": "design-kit", "hubRevision": 1, "self": 1 } }
+        },
+        "adapters": [{ "id": "pages-aludel-kit", "participant": "pages-kit", "reads": "design.kit", "mechanical": true, "soft": false }]
+      }],
+      "references": [],
+      "steps": [
+        { "do": "evaluate", "binding": "bnd-design-system", "expect": [] },
+        { "do": "refacet", "layer": "design", "change": { "op": "split", "facet": "kit", "into": { "key": "identity", "title": "Name and mark", "take": [{ "kind": "brand_asset", "where": { "field": "key", "in": ["name", "mark"] } }] } },
+          "note": "the name and mark leave the design-system binding there, and Pages, which still holds them, should follow",
+          "expectPreflight": { "records": ["brd-mark", "brd-name"], "bindings": ["bnd-design-system:app-name,mark"],
+            "follow": ["bnd-design-system pages-kit pages/kit replica kit-mark,kit-name"], "references": [], "facets": ["kit:2:bnd-design-system", "identity:2:"] } },
+        { "do": "refacet", "layer": "design", "change": { "op": "split", "facet": "kit", "into": { "key": "brand", "title": "Brand", "take": [{ "kind": "brand_asset" }] } },
+          "note": "taking a kind as the facet now holds it: every brand asset but the name and mark",
+          "expectPreflight": { "records": ["brd-voice"], "bindings": ["bnd-design-system:app-name,mark,voice"],
+            "follow": ["bnd-design-system pages-kit pages/kit replica kit-voice"], "facets": ["kit:1:bnd-design-system", "brand:1:", "identity:2:"] } },
+        { "do": "select", "layer": "design", "expect": {
+          "kit": [{ "kind": "design_tokens" }, { "kind": "component" }],
+          "identity": [{ "kind": "brand_asset", "where": { "field": "key", "in": ["mark", "name"] } }],
+          "brand": [{ "kind": "brand_asset", "where": { "field": "key", "notIn": ["mark", "name"] } }] } },
+        { "do": "evaluate", "binding": "bnd-design-system", "note": "Pages still holds the brand entries, which are detached: not a removal on Design's side, not drift on Pages'",
+          "expect": [], "expectStatus": { "color-primary": "matched", "app-name": "detached", "mark": "detached", "voice": "detached" }, "expectDetached": ["app-name:pages-kit", "mark:pages-kit", "voice:pages-kit"] },
+        { "do": "refacet", "layer": "pages", "change": { "op": "split", "facet": "kit", "into": { "key": "kit-brand", "title": "Brand kit", "take": [{ "kind": "kit_item", "where": { "field": "group", "equals": "brand" } }] } },
+          "note": "Pages' kit would straddle two authorities, so it is refaceted too; its brand entries were already detached",
+          "expectPreflight": { "records": ["kit-mark", "kit-name", "kit-voice"], "bindings": [], "follow": [], "facets": ["kit:1:bnd-design-system", "kit-brand:3:"] } },
+        { "do": "evaluate", "binding": "bnd-design-system", "note": "nobody holds the detached entries any more", "expect": [], "expectDetached": [] },
+        { "do": "propose", "binding": {
+          "id": "bnd-branding", "concept": { "name": "The app's branding" }, "lifecycle": "reconciling",
+          "participants": [
+            { "id": "branding", "layer": { "key": "branding" }, "facet": "brand", "role": "authority", "shape": "branding.brand" },
+            { "id": "design-identity", "layer": { "key": "design" }, "facet": "identity", "role": "replica", "shape": "design.identity" },
+            { "id": "design-brand", "layer": { "key": "design" }, "facet": "brand", "role": "ceded", "shape": "design.brand" },
+            { "id": "pages-kit-brand", "layer": { "key": "pages" }, "facet": "kit-brand", "role": "replica", "shape": "pages.kit-brand" }
+          ],
+          "authority": "branding",
+          "policy": { "design-identity": { "added": "ignore" } },
+          "adapters": [
+            { "id": "identity-from-branding", "participant": "design-identity", "reads": "branding.brand", "mechanical": true, "soft": false },
+            { "id": "kit-from-branding", "participant": "pages-kit-brand", "reads": "branding.brand", "mechanical": true, "soft": false }
+          ] } },
+        { "do": "evaluate", "binding": "bnd-branding", "note": "the marks differ, so a person combines them; Design's ceded voice and Pages' copy of it go to Branding; Design's identity ignores what it never keeps",
+          "expect": ["ignored app-name @design-identity", "ignored app-name @pages-kit-brand", "combine mark @branding <design-identity,pages-kit-brand",
+            "apply tagline @pages-kit-brand", "ignored tagline @design-identity", "adopt voice @branding <design-brand,pages-kit-brand"] },
+        { "do": "resolve", "binding": "bnd-branding", "kind": "combine", "choose": "branding" },
+        { "do": "resolve", "binding": "bnd-branding", "kind": "adopt", "decision": "accept" },
+        { "do": "evaluate", "binding": "bnd-branding", "expect": ["apply mark @design-identity", "apply mark @pages-kit-brand", "ignored voice @design-identity"] },
+        { "do": "evaluate", "binding": "bnd-branding", "expect": [], "expectStatus": { "app-name": "matched", "mark": "matched", "tagline": "matched", "voice": "matched" } },
+        { "do": "evaluate", "binding": "bnd-design-system", "expect": [] },
+        { "do": "facets", "layer": "pages", "expect": { "kit": ["kit-primary"], "kit-brand": ["kit-mark", "kit-name", "kit-voice", "pages:tagline"] } },
+        { "do": "role", "layer": "design", "ref": "brd-voice", "expect": { "facet": "brand", "role": "ceded", "binding": "bnd-branding", "authority": { "participant": "branding", "layer": "branding", "facet": "brand" } } },
+        { "do": "role", "layer": "design", "ref": "tok-primary", "expect": { "facet": "kit", "role": "authority", "binding": "bnd-design-system", "authority": { "participant": "design-kit", "layer": "design", "facet": "kit" } } },
+        { "do": "role", "layer": "pages", "ref": "kit-name", "expect": { "facet": "kit-brand", "role": "replica", "binding": "bnd-branding", "authority": { "participant": "branding", "layer": "branding", "facet": "brand" } } }
+      ]
+    },
+    {
+      "name": "Design's branding goes to an imported, read-only source: it takes no Work, so replicas are rectified and ceded content stays as history",
+      "layers": {
+        "figma_brand": {
+          "outputs": ["figma_style"],
+          "facets": [{ "key": "styles", "title": "Brand styles", "select": [{ "kind": "figma_style" }], "roles": ["authority"], "readOnly": true, "shape": "figma.styles" }],
+          "entries": [
+            { "ref": "S:1", "kind": "figma_style", "key": "app-name", "revision": 4, "digest": "Tool Share" },
+            { "ref": "S:2", "kind": "figma_style", "key": "mark", "revision": 9, "digest": "mark-v3" }
+          ]
+        },
+        "design": {
+          "outputs": ["design_tokens", "brand_asset"],
+          "facets": [
+            { "key": "kit", "title": "Design system", "select": [{ "kind": "design_tokens" }], "roles": ["authority"] },
+            { "key": "identity", "title": "Name and mark", "select": [{ "kind": "brand_asset", "where": { "field": "key", "in": ["name", "mark"] } }], "roles": ["authority", "replica", "ceded"] },
+            { "key": "brand", "title": "Brand", "select": [{ "kind": "brand_asset", "where": { "field": "key", "notIn": ["name", "mark"] } }], "roles": ["authority", "replica", "ceded"] }
+          ],
+          "entries": [
+            { "ref": "brd-name", "kind": "brand_asset", "key": "app-name", "data": { "key": "name" }, "revision": 1, "digest": "Tool Share" },
+            { "ref": "brd-mark", "kind": "brand_asset", "key": "mark", "data": { "key": "mark" }, "revision": 1, "digest": "mark-v1" },
+            { "ref": "brd-voice", "kind": "brand_asset", "key": "voice", "data": { "key": "voice" }, "revision": 1, "digest": "friendly" }
+          ]
+        },
+        "pages": {
+          "outputs": ["kit_item"],
+          "facets": [{ "key": "kit-brand", "title": "Brand kit", "select": [{ "kind": "kit_item" }], "roles": ["replica"] }],
+          "entries": [{ "ref": "kit-mark", "kind": "kit_item", "key": "mark", "revision": 1, "digest": "mark-v1" }]
+        }
+      },
+      "bindings": [{
+        "id": "bnd-figma-brand", "concept": { "name": "The app's branding" }, "lifecycle": "reconciling",
+        "participants": [
+          { "id": "figma", "layer": { "key": "figma_brand" }, "facet": "styles", "role": "authority", "shape": "figma.styles", "readOnly": true },
+          { "id": "design-identity", "layer": { "key": "design" }, "facet": "identity", "role": "replica", "shape": "design.identity" },
+          { "id": "design-brand", "layer": { "key": "design" }, "facet": "brand", "role": "ceded", "shape": "design.brand" },
+          { "id": "pages-kit-brand", "layer": { "key": "pages" }, "facet": "kit-brand", "role": "replica", "shape": "pages.kit-brand" }
+        ],
+        "authority": "figma",
+        "policy": { "design-identity": { "drift": { "changed": "adopt" } } },
+        "adapters": [
+          { "id": "identity-from-figma", "participant": "design-identity", "reads": "figma.styles", "mechanical": true, "soft": false },
+          { "id": "kit-from-figma", "participant": "pages-kit-brand", "reads": "figma.styles", "mechanical": true, "soft": false }
+        ]
+      }],
+      "references": [],
+      "steps": [
+        { "do": "evaluate", "binding": "bnd-figma-brand", "note": "where a combine would ask the authority to take a side, Figma's side wins; Design's ceded voice cannot be adopted and stays as history",
+          "expect": ["apply app-name @pages-kit-brand", "ignored app-name @design-identity", "rectify mark @design-identity", "rectify mark @pages-kit-brand", "ignored voice @design-brand"] },
+        { "do": "resolve", "binding": "bnd-figma-brand", "kind": "rectify" },
+        { "do": "evaluate", "binding": "bnd-figma-brand", "expect": [] },
+        { "do": "edit", "binding": "bnd-figma-brand", "participant": "design-identity", "key": "mark", "digest": "mark-local" },
+        { "do": "evaluate", "binding": "bnd-figma-brand", "note": "Design's drift policy says adopt, but a read-only authority cannot adopt: Design is rectified", "expect": ["rectify mark @design-identity"] },
+        { "do": "transfer", "binding": "bnd-figma-brand", "change": { "to": "design-identity", "roles": { "figma": "replica" } }, "expectError": "read-only, so it cannot be a replica" }
+      ]
+    },
+    {
+      "name": "Design's branding goes to a heavily modified fork of Design: the same kind and facet names in two instances never mix",
+      "layers": {
+        "design": {
+          "outputs": ["design_tokens", "brand_asset"],
+          "facets": [
+            { "key": "kit", "title": "Design system", "select": [{ "kind": "design_tokens" }], "roles": ["authority"] },
+            { "key": "identity", "title": "Name and mark", "select": [{ "kind": "brand_asset" }], "roles": ["authority", "replica", "ceded"] }
+          ],
+          "entries": [
+            { "ref": "brd-name", "kind": "brand_asset", "key": "app-name", "revision": 1, "digest": "Tool Share" },
+            { "ref": "brd-mark", "kind": "brand_asset", "key": "mark", "revision": 1, "digest": "mark-v1" }
+          ]
+        },
+        "design_fork": {
+          "outputs": ["design_tokens", "brand_asset", "motion"],
+          "facets": [
+            { "key": "kit", "title": "Design system", "select": [{ "kind": "design_tokens" }, { "kind": "motion" }], "roles": ["authority"] },
+            { "key": "identity", "title": "Identity", "select": [{ "kind": "brand_asset" }], "roles": ["authority"] }
+          ],
+          "entries": [
+            { "ref": "frk-name", "kind": "brand_asset", "key": "app-name", "revision": 2, "digest": "Tool Share" },
+            { "ref": "frk-mark", "kind": "brand_asset", "key": "mark", "revision": 3, "digest": "mark-v2" },
+            { "ref": "frk-tok", "kind": "design_tokens", "key": "color-primary", "revision": 1, "digest": "#000000" }
+          ]
+        }
+      },
+      "bindings": [{
+        "id": "bnd-identity", "concept": { "name": "The app's name and mark" }, "lifecycle": "reconciling",
+        "participants": [
+          { "id": "fork-identity", "layer": { "key": "design_fork" }, "facet": "identity", "role": "authority", "shape": "design_fork.identity" },
+          { "id": "design-identity", "layer": { "key": "design" }, "facet": "identity", "role": "replica", "shape": "design.identity" }
+        ],
+        "authority": "fork-identity",
+        "adapters": [{ "id": "identity-from-fork", "participant": "design-identity", "reads": "design_fork.identity", "mechanical": true, "soft": false }]
+      }],
+      "references": [],
+      "steps": [
+        { "do": "evaluate", "binding": "bnd-identity", "expect": ["ignored app-name @design-identity", "combine mark @fork-identity <design-identity"] },
+        { "do": "resolve", "binding": "bnd-identity", "kind": "combine", "choose": "fork-identity" },
+        { "do": "evaluate", "binding": "bnd-identity", "expect": ["apply mark @design-identity"] },
+        { "do": "evaluate", "binding": "bnd-identity", "expect": [] },
+        { "do": "role", "layer": "design", "ref": "brd-mark", "expect": { "facet": "identity", "role": "replica", "binding": "bnd-identity", "authority": { "participant": "fork-identity", "layer": "design_fork", "facet": "identity" } } },
+        { "do": "role", "layer": "design_fork", "ref": "frk-mark", "expect": { "facet": "identity", "role": "authority", "binding": "bnd-identity", "authority": { "participant": "fork-identity", "layer": "design_fork", "facet": "identity" } } },
+        { "do": "role", "layer": "design_fork", "ref": "frk-tok", "expect": { "facet": "kit", "role": null, "binding": null } }
+      ]
+    },
+    {
+      "name": "A new Content layer overlaps part of Pages: both sides are refaceted, and one binding contracts on the overlap",
+      "layers": {
+        "content": {
+          "outputs": ["copy"],
+          "facets": [{ "key": "copy", "title": "Copy", "kinds": ["copy"], "roles": ["authority", "replica", "ceded"] }],
+          "entries": [
+            { "ref": "cp-hero", "kind": "copy", "key": "home-hero", "data": { "channel": "web" }, "revision": 2, "digest": "Borrow tools from your neighbours" },
+            { "ref": "cp-faq", "kind": "copy", "key": "faq", "data": { "channel": "web" }, "revision": 1, "digest": "faq-v1" },
+            { "ref": "cp-welcome", "kind": "copy", "key": "welcome-email", "data": { "channel": "email" }, "revision": 1, "digest": "Welcome" }
+          ]
+        },
+        "pages": {
+          "outputs": ["page", "flow"],
+          "facets": [{ "key": "pages", "title": "Pages", "kinds": ["page", "flow"], "roles": ["authority", "replica", "ceded"] }],
+          "entries": [
+            { "ref": "pg-home", "kind": "page", "key": "home-hero", "data": { "template": "marketing" }, "revision": 3, "digest": "Borrow tools" },
+            { "ref": "pg-faq", "kind": "page", "key": "faq", "data": { "template": "marketing" }, "revision": 1, "digest": "faq-v1" },
+            { "ref": "pg-borrow", "kind": "page", "key": "borrow", "data": { "template": "app" }, "revision": 1, "digest": "borrow" },
+            { "ref": "flw-borrow", "kind": "flow", "key": "borrow-flow", "revision": 1, "digest": "borrow-flow" }
+          ]
+        }
+      },
+      "bindings": [],
+      "references": [],
+      "steps": [
+        { "do": "refacet", "layer": "content", "change": { "op": "split", "facet": "copy", "into": { "key": "web-copy", "title": "Web copy", "take": [{ "kind": "copy", "where": { "field": "channel", "equals": "web" } }] } },
+          "expectPreflight": { "records": ["cp-faq", "cp-hero"], "bindings": [], "follow": [], "facets": ["copy:1:", "web-copy:2:"] } },
+        { "do": "refacet", "layer": "pages", "change": { "op": "split", "facet": "pages", "into": { "key": "marketing", "title": "Marketing pages", "take": [{ "kind": "page", "where": { "field": "template", "equals": "marketing" } }] } },
+          "expectPreflight": { "records": ["pg-faq", "pg-home"], "bindings": [], "follow": [], "facets": ["pages:2:", "marketing:2:"] } },
+        { "do": "propose", "binding": {
+          "id": "bnd-marketing-copy", "concept": { "name": "Marketing copy" }, "lifecycle": "reconciling",
+          "participants": [
+            { "id": "content-web", "layer": { "key": "content" }, "facet": "web-copy", "role": "authority", "shape": "content.web-copy" },
+            { "id": "pages-marketing", "layer": { "key": "pages" }, "facet": "marketing", "role": "replica", "shape": "pages.marketing" }
+          ],
+          "authority": "content-web",
+          "adapters": [{ "id": "sections-from-copy", "participant": "pages-marketing", "reads": "content.web-copy", "mechanical": false, "soft": true }] } },
+        { "do": "evaluate", "binding": "bnd-marketing-copy", "note": "the email copy and the app's own pages and flows are no part of it",
+          "expect": ["ignored faq @pages-marketing", "combine home-hero @content-web <pages-marketing"] },
+        { "do": "resolve", "binding": "bnd-marketing-copy", "kind": "combine", "choose": "content-web" },
+        { "do": "evaluate", "binding": "bnd-marketing-copy", "note": "copy into page sections is soft: Work in Pages", "expect": ["import home-hero @pages-marketing"] },
+        { "do": "resolve", "binding": "bnd-marketing-copy", "kind": "import", "decision": "accept" },
+        { "do": "evaluate", "binding": "bnd-marketing-copy", "expect": [] },
+        { "do": "facets", "layer": "pages", "expect": { "pages": ["flw-borrow", "pg-borrow"], "marketing": ["pg-faq", "pg-home"] } },
+        { "do": "facets", "layer": "content", "expect": { "copy": ["cp-welcome"], "web-copy": ["cp-faq", "cp-hero"] } }
+      ]
+    },
+    {
+      "name": "Personas merges back into Vision: transfer authority back to the ceded facet, reconcile, retire the binding, merge the facets",
+      "layers": {
+        "vision": {
+          "outputs": ["vision_section", "persona"],
+          "facets": [
+            { "key": "intent", "title": "Product intent", "select": [{ "kind": "vision_section" }], "roles": ["authority", "replica", "ceded"] },
+            { "key": "personas", "title": "Personas", "select": [{ "kind": "persona" }], "roles": ["authority", "replica", "ceded"] }
+          ],
+          "entries": [
+            { "ref": "sec-problem", "kind": "vision_section", "revision": 2, "digest": "problem" },
+            { "ref": "per-maker", "kind": "persona", "key": "maker", "revision": 1, "digest": "Maker: builds things" },
+            { "ref": "per-borrower", "kind": "persona", "key": "borrower", "revision": 1, "digest": "Borrower: needs a tool once" }
+          ]
+        },
+        "personas": {
+          "outputs": ["person"],
+          "facets": [{ "key": "people", "title": "People", "select": [{ "kind": "person" }], "roles": ["authority", "ceded"] }],
+          "entries": [
+            { "ref": "personas:maker", "kind": "person", "key": "maker", "revision": 2, "digest": "Maker: builds and lends" },
+            { "ref": "personas:borrower", "kind": "person", "key": "borrower", "revision": 1, "digest": "Borrower: needs a tool once" },
+            { "ref": "personas:lender", "kind": "person", "key": "lender", "revision": 1, "digest": "Lender: has a full shed" }
+          ]
+        }
+      },
+      "bindings": [{
+        "id": "bnd-personas", "concept": { "name": "The app's personas" }, "lifecycle": "active",
+        "participants": [
+          { "id": "personas-people", "layer": { "key": "personas" }, "facet": "people", "role": "authority", "shape": "personas.people" },
+          { "id": "vision-personas", "layer": { "key": "vision" }, "facet": "personas", "role": "ceded", "shape": "vision.personas" }
+        ],
+        "authority": "personas-people",
+        "correspondence": [
+          { "key": "borrower", "refs": { "personas-people": "personas:borrower", "vision-personas": "per-borrower" } },
+          { "key": "maker", "refs": { "personas-people": "personas:maker", "vision-personas": "per-maker" } }
+        ],
+        "baseline": {
+          "borrower": { "vision-personas": { "hub": "personas-people", "hubRevision": 1, "self": 1 } },
+          "maker": { "vision-personas": { "hub": "personas-people", "hubRevision": 1, "self": 1 } }
+        },
+        "adapters": [
+          { "id": "people-from-vision", "participant": "personas-people", "reads": "vision.personas", "mechanical": false, "soft": true },
+          { "id": "personas-from-people", "participant": "vision-personas", "reads": "personas.people", "mechanical": false, "soft": true }
+        ]
+      }],
+      "references": [],
+      "steps": [
+        { "do": "evaluate", "binding": "bnd-personas", "note": "Vision's ceded personas take nothing while Personas holds authority", "expect": [] },
+        { "do": "refacet", "layer": "vision", "change": { "op": "merge", "facet": "intent", "from": "personas" }, "expectError": "takes part in bnd-personas" },
+        { "do": "transfer", "binding": "bnd-personas", "change": { "to": "vision-personas", "roles": { "personas-people": "ceded" } } },
+        { "do": "evaluate", "binding": "bnd-personas", "note": "Personas offers what it holds once: its newer maker conflicts with Vision's history, the lender is new",
+          "expect": ["ignored borrower @personas-people", "adopt lender @vision-personas <personas-people", "combine maker @vision-personas <personas-people"], "expectAdapter": "personas-from-people" },
+        { "do": "resolve", "binding": "bnd-personas", "kind": "combine", "choose": "personas-people" },
+        { "do": "resolve", "binding": "bnd-personas", "kind": "adopt", "decision": "accept" },
+        { "do": "evaluate", "binding": "bnd-personas", "expect": [] },
+        { "do": "retire", "binding": "bnd-personas" },
+        { "do": "refacet", "layer": "vision", "change": { "op": "merge", "facet": "intent", "from": "personas" },
+          "expectPreflight": { "records": ["per-borrower", "per-maker", "vision:lender"], "bindings": [], "follow": [], "facets": ["intent:4:"] } },
+        { "do": "select", "layer": "vision", "expect": { "intent": [{ "kind": "vision_section" }, { "kind": "persona" }] } },
+        { "do": "facets", "layer": "vision", "expect": { "intent": ["per-borrower", "per-maker", "sec-problem", "vision:lender"] } },
+        { "do": "role", "layer": "vision", "ref": "per-maker", "expect": { "facet": "intent", "role": null, "binding": null } }
+      ]
+    }
+  ]
+}
