@@ -134,7 +134,7 @@ Layers stay simple. They publish facets to the Library, accept Work, own their a
    - A token change auto-applies and is recorded.
    - Library › Bindings shows the binding.
    - Browser journey.
-3. **Roles in views:** Design's Brand tab as a replica or ceded, tested with a stand-in "branding" layer built from `layer-base`.
+3. **General facet splitting** (replaces "roles in views", owner 2026-10-01): any part of a facet can be split to another layer or merged back, as one reviewed binding change. Planned in [facet-splitting.md](facet-splitting.md); the Branding example becomes one of its test cases.
 4. **Code ⇄ Pages** after T03-CODE publishes observations, replacing the hard-coded reconciliation.
 
 ## Owner decisions (2026-10-01)
@@ -184,13 +184,7 @@ Commit `layer-base` `main` before forking the Design and Pages branches from it.
 
 **Step 2 is built** (same evidence). The candidate's step-2 changes are uncommitted; the `layer-base` commits above exist because pins require them, and nothing was pushed.
 
-**Next: owner review of step 2, then step 3** (roles in views):
-1. ~~Owner review of step 2~~ (accepted 2026-10-01).
-2. Split Design's facet: give branding its own facet, and let Design's views show replica and ceded states (the Brand tab as "managed in …"). Then declare `replica` and `ceded` on those facets.
-3. Build a stand-in Branding layer from `layer-base` that publishes `branding.brand`, and run the branding walkthrough on real pins: join, transfer, kept subset, and ceded history.
-4. Give Pages kit write operations if Pages is to be an authority (walkthrough 1); otherwise record why not.
-
-Open for the owner: whether existing projects should be moved to the new Pages template (which brings the replica and the binding proposal), or keep live-reading until a general template-update path exists.
+**Next: step 3, general facet splitting.** The plan is in [facet-splitting.md](facet-splitting.md) and awaits owner review of its proposed defaults. Then S3.1, the pure contract with fixtures, comes first. Existing projects are out of scope (owner: only disposable tests exist).
 
 T03-CODE can start after the owner's step-2 review. Its observations need stable concept keys (journeys, not file paths) and a stored copy for any replica.
 
@@ -217,3 +211,4 @@ Lessons from the T03 runs:
 - **2026-10-01, drift model and step 2 started (Claude Code session).** The owner replaced `peer` with authority direction plus drift handling (decision 5) and said to "go ahead and start step 2". Scope: rework the step-1 module and fixtures for drift; then step 2 (Design and Pages facets; local commits on `layer-base` `main`, `design` and `pages` and re-pins, which pins require; no push; snapshot reader; Discover; Watch; Library › Bindings; browser journey). Same exclusions as above.
 - **2026-10-01, step 2 complete (agent-checked).** Drift replaced `peer` in the pure module, fixtures and base contract. Pages keeps a replica of the app kit (`kit_item`), filled by its declared `aludel-kit` adapter, run by the handler's `adapt`. Design declares its kit facet. Commits on `layer-base`: `main` `20bdd95`, `design` `cd96d4c`, `pages` `331908f`, pinned in the candidate. Discover, Watch, the hold while a participant is off, and Library › Bindings are built. Results: the server suites pass with templates off (241, 2 skipped) and on (236, 7 skipped); the new `bindings` journey and eight other journeys pass. Owner review of Library › Bindings and Pages' replica behaviour is pending. [Evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/README.md#step-2-the-design-system-binding-end-to-end).
 - **2026-10-01, step 2 accepted by the owner.** The owner reviewed it in a browser on a disposable templates-on portal (port 4330, seeded Tool Share project): "finished. looks good. like the way that bindings came out." Step 2 is owner-accepted. Not exercised in that review: Adopt/Rectify (there is no UI path to cause drift); the existing-projects question stays open.
+- **2026-10-01, step 3 replanned (owner).** The owner asked for a general process to split any part of a layer (for example part of Vision into its own layer) instead of a one-off Branding split, and said existing projects don't matter (disposable tests only). Work so far is committed: candidate `cd86e29`, workshop `9e8ad8f`. The plan is in [facet-splitting.md](facet-splitting.md); nothing is built yet.
