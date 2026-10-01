@@ -45,10 +45,12 @@ test('the charter is a seeded, editable Knowledge document that drives activatio
   layerDocumentUpdate(db, 'owner', 'one', 'research', 'identity', { content: `# Research charter\n\n${complete}`, expectedRevision: 1 });
   assert.equal(activateLayerDefinition(db, 'owner', 'one', 'research').lifecycle, 'active');
 
-  // Built-in layers are editable templates: their seeded identity reads back as a charter and can be revised.
+  // Built-in layers are editable templates: their seeded identity reads back as a charter and can be revised. With templates
+  // on, Design's charter is its template's (T03-DESIGN); off, it is the host's built-in identity.
+  const purpose = process.env.MACHINE_LAYER_TEMPLATES_ENABLED === '1' ? 'Own the app kit' : 'Maintain the design system';
   const design = layerDocumentRead(db, 'owner', 'one', 'design', 'identity');
-  assert.match(design.content, /^## Purpose\n\nMaintain the design system/m);
-  const revised = layerDocumentUpdate(db, 'owner', 'one', 'design', 'identity', { content: design.content.replace('Maintain the design system', 'Maintain the Tailwind-based design system'), expectedRevision: design.revision });
+  assert.match(design.content, new RegExp(`^## Purpose\\n+${purpose}`, 'm'));
+  const revised = layerDocumentUpdate(db, 'owner', 'one', 'design', 'identity', { content: design.content.replace(purpose, `${purpose} (Tailwind-based)`), expectedRevision: design.revision });
   assert.equal(revised.revision, design.revision + 1);
-  assert.match(projectLayerDefinition(db, 'one', 'design').identity.purpose, /^Maintain the Tailwind-based design system/);
+  assert.match(projectLayerDefinition(db, 'one', 'design').identity.purpose, new RegExp(`^${purpose} \\(Tailwind-based\\)`));
 });

@@ -11,7 +11,8 @@ import { layerPackageForProject } from './layer-package.mjs';
 
 const portal = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const sdkFiles = ['src/frame/frame-context.ts', 'src/frame/frame-main.ts', 'src/frame/index.html', 'src/layers/context.ts', 'src/layers/built-by.ts', 'src/layers/design-components.ts',
-  'src/layers/design-state.ts', 'src/layers/evidence.ts', 'src/layers/work-shared.ts', 'src/avatars.ts', 'src/page-blocks.ts', 'src/design-tokens.js', 'src/styles.scss', 'src/layers/host-theme.scss', 'tools/build-layer-ui.mjs'];
+  'src/layers/design-state.ts', 'src/layers/evidence.ts', 'src/layers/work-shared.ts', 'src/avatars.ts', 'src/page-blocks.ts', 'src/design-tokens.js', 'src/color.js', 'src/app-kit/index.ts', 'src/app-kit/kit.ts',
+  'src/app-kit/kit-render.ts', 'src/app-kit/theme-scope.ts', 'src/layers/doc-view.ts', 'src/layers/markdown.ts', 'src/styles.scss', 'src/layers/host-theme.scss', 'tools/build-layer-ui.mjs'];
 const sdkDigest = createHash('sha256').update(sdkFiles.map(path => readFileSync(join(portal, path))).join('\0')).digest('hex').slice(0, 16);
 const building = new Map(), failed = new Map();
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json',
@@ -83,8 +84,15 @@ export function layerUi({ dataDirectory, layerOrigin, portalOrigin, appOriginFor
 export const hostFeatures = Object.freeze({
   pageChanges: [['POST', /^\/pages\/change$/], ['POST', /^\/pages\/review$/]],
   skeleton: [['POST', /^\/skeleton$/]],
-  documents: [['POST', /^\/docs(?:\/[^/]+)?$/]]
+  documents: [['POST', /^\/docs(?:\/[^/]+)?$/]],
+  // T03-DESIGN: uploading an image the layer's records point at, and adding a brand template's stock assets.
+  uploads: [['POST', /^\/assets$/]],
+  brandTemplates: [['POST', /^\/brand-templates\/[a-z][a-z0-9-]{0,39}$/]],
+  // The Library's own records a layer's views may write through the generic record routes: shared documents and the links
+  // that reference a source or finding from a record. The kinds are fixed here; a layer can only ask for the feature.
+  libraryRecords: []
 });
+export const hostRecordFeatures = Object.freeze({ libraryRecords: Object.freeze(['doc', 'evidence_link']) });
 // What the portal page may do for a layer's frame, checked on the server for every call it carries. Reads of the project
 // the person can already see, including the Library (DEC-059); this layer's own API, records and output files; creating
 // Work; and the host features this layer's manifest requests. Everything else is refused.

@@ -47,7 +47,7 @@ export function library({ db, know }) {
   const member = (projectId, userId) => { if (userId && !db.prepare('SELECT 1 FROM project_members WHERE project_id = ? AND user_id = ?').get(projectId, userId)) fail('Project not found.', 404); };
 
   const outputEntry = (layer, record, text) => ({ ref: record.id, source: 'output', layer: { key: layer.key, name: layer.name, instanceId: layer.instanceId },
-    kind: record.kind, title: title(record) || record.id, revision: record.revision, updatedAt: record.updatedAt || null, text });
+    kind: record.kind, title: title(record) || record.id, revision: record.revision, updatedAt: record.updatedAt || null, text, data: record });
 
   // Kinds a layer keeps as repository files (T03-G2), which the index reads from its pinned files instead of records.
   const fileKinds = (projectId, key) => { try { return layerPackageForProject(db, projectId, key)?.manifest?.files?.kinds || []; } catch { return []; } };
@@ -57,7 +57,7 @@ export function library({ db, know }) {
       if (!fileKinds(projectId, layer.key).length) continue;
       for (const entry of currentFileEntries(db, projectId, layer.key))
         entries.push({ ref: entry.id, source: 'output', layer: { key: layer.key, name: layer.name, instanceId: layer.instanceId }, kind: entry.kind, title: entry.title,
-          revision: entry.revision, updatedAt: entry.updatedAt, text: `${entry.title}\n${words(entry.data)}` });
+          revision: entry.revision, updatedAt: entry.updatedAt, text: `${entry.title}\n${words(entry.data)}`, data: entry.data });
     }
     for (const layer of installed) for (const kind of layer.outputs) {
       if (fileKinds(projectId, layer.key).includes(kind)) continue;
@@ -82,7 +82,7 @@ export function library({ db, know }) {
     });
   }
   const own = projectId => libraryKinds.flatMap(kind => know.list(projectId, kind)).map(record => ({ ref: record.id, source: 'library',
-    layer: { key: 'library', name: 'Library', instanceId: null }, kind: record.kind, title: title(record) || record.id, revision: record.revision, updatedAt: record.updatedAt || null, text: words(record) }));
+    layer: { key: 'library', name: 'Library', instanceId: null }, kind: record.kind, title: title(record) || record.id, revision: record.revision, updatedAt: record.updatedAt || null, text: words(record), data: record }));
 
   function entries(projectId, userId = null) {
     member(projectId, userId);
@@ -91,14 +91,16 @@ export function library({ db, know }) {
   }
 
   // Search the pool. Every filter is optional; a query of two or more characters matches titles first, then content.
-  function search(projectId, userId, { q = '', layer = null, kind = null, source = null, cursor = 0, limit = 50 } = {}) {
+  // `withData` returns each output or Library entry's current content too, so a reader can take a whole kind in one call
+  // (Pages reads the app kit this way, T03-DESIGN); Knowledge documents are still read one at a time.
+  function search(projectId, userId, { q = '', layer = null, kind = null, source = null, cursor = 0, limit = 50, withData = false } = {}) {
     const needle = String(q || '').trim().toLowerCase();
     if (needle.length === 1 || needle.length > 100 || !Number.isInteger(cursor) || cursor < 0 || !Number.isInteger(limit) || limit < 1 || limit > 100) fail('Invalid Library search.');
     if (source && !['output', 'knowledge', 'library'].includes(source)) fail('Choose outputs, knowledge or the Library\'s own content.');
     const matches = entries(projectId, userId).filter(entry => (!layer || entry.layer.key === layer) && (!kind || entry.kind === kind) && (!source || entry.source === source))
       .map(entry => ({ entry, rank: !needle ? 0 : entry.title.toLowerCase().includes(needle) ? 1 : entry.text.toLowerCase().includes(needle) ? 2 : 3 }))
       .filter(match => match.rank < 3).sort((a, b) => a.rank - b.rank);
-    return { results: matches.slice(cursor, cursor + limit).map(({ entry }) => ({ ...entry, text: undefined, excerpt: excerpt(entry.text, needle) })),
+    return { results: matches.slice(cursor, cursor + limit).map(({ entry }) => ({ ...entry, text: undefined, data: withData ? entry.data : undefined, excerpt: excerpt(entry.text, needle) })),
       total: matches.length, nextCursor: matches.length > cursor + limit ? cursor + limit : null };
   }
 

@@ -14,5 +14,8 @@
   ],
   "server/vision-api.mjs": [
     "ab411fd7c9404bc3a8bd139d46a404a7fe20bc6d3f13763766248b24bc2b3a83"
+  ],
+  "server/design-api.mjs": [
+    "29389220f727471f9aa2431b7fb2f17f77eda67696233f41a6ca57b76ec94d7c"
   ]
 }

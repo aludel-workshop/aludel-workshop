@@ -3,7 +3,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { Doc, ProjectContext, layerLabel } from './context';
-import { markdownBlocks } from './product';
+import { markdownBlocks } from './markdown';
 import { RefChipComponent } from './work-shared';
 
 const docLayers = ['product', 'design', 'pages', 'data', 'platform', 'deploy', 'work'];

@@ -30,6 +30,12 @@
       "@aludel/host/page-blocks": [
         "./src/page-blocks.ts"
       ],
+      "@aludel/host/docs": [
+        "./src/layers/doc-view.ts"
+      ],
+      "@aludel/host/app-kit": [
+        "./src/app-kit/index.ts"
+      ],
       "@aludel/host/design-tokens": [
         "./src/design-tokens.d.ts"
       ],

@@ -38,7 +38,7 @@ import { initActionMigration, migrateActionProject, layerActionSettings, setActi
 import { readActionSource, readAttemptSource, checkPinnedActionEffect } from './code-action-gateway.mjs';
 import { decideFollowUp, hasElevated, initLayerScope, layerAccess, requireElevated, setLayerDefaultAssignee, setLayerElevated } from './layer-scope.mjs';
 import { applyOperation, kindOwners, layerApi, layerApiForKind, recordOperations } from './layer-api.mjs';
-import { frameAllows, frameLabel, layerUi } from './layer-ui.mjs';
+import { frameAllows, frameLabel, hostRecordFeatures, layerUi } from './layer-ui.mjs';
 import { layerHostCalls } from './layer-package.mjs';
 import { initLayerContract, layerDescriptors, layerInstances, updateLayerInstance, layerCatalog, layerOutputRead, layerMigrationInventory } from './layer-contract.mjs';
 import { answerDecision, createProposal, ensureB02Fixture, getDecision, getProposal, listDecisions, listDownstreamRecords, listProposals, reassessRecord, reviseProposal } from './product-records.mjs';
@@ -964,7 +964,7 @@ async function api(request, response, url) {
     if (section === 'library' && !item && method === 'GET') {
       const param = name => url.searchParams.get(name) || null;
       return json(response, 200, pool.search(projectId, user.id, { q: param('q') || '', layer: param('layer'), kind: param('kind'), source: param('source'),
-        cursor: Number(param('cursor') || 0), limit: Number(param('limit') || 50) }), { 'cache-control': 'no-store' });
+        cursor: Number(param('cursor') || 0), limit: Number(param('limit') || 50), withData: param('data') === '1' }), { 'cache-control': 'no-store' });
     }
     if (section === 'library' && item === 'entry' && method === 'GET') {
       const revision = url.searchParams.get('revision');
@@ -1080,8 +1080,9 @@ async function api(request, response, url) {
       writeFiles(setup.workspacePath, { 'docs/agents.md': agentsGuide(setup, catalogs) });
       return json(response, 200, { written: 'docs/agents.md', committed: false });
     }
-    // A layer frame changes only records its own layer owns.
-    const frameOwns = kind => request.headers['x-aludel-layer-frame'] === undefined || kindOwners(db, projectId, kind).some(owner => owner.key === request.headers['x-aludel-layer-frame']);
+    // A layer frame changes only records its own layer owns, and Library records when it asks for that host feature.
+    const frameOwns = kind => frameLayer === undefined || kindOwners(db, projectId, kind).some(owner => owner.key === frameLayer)
+      || layerHostCalls(db, projectId, String(frameLayer)).some(name => hostRecordFeatures[name]?.includes(kind));
     if (section === 'records' && method === 'POST' && !item) {
       const input = await readJson(request);
       if (!frameOwns(String(input.kind || ''))) return json(response, 403, { error: 'A layer view changes only its own records.' });

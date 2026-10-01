@@ -4,7 +4,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { Finding, Insight, LibraryEntry, LibraryRead, ProjectContext, Region, Source, layerLabel, sourceTypeIcon } from './context';
 import { DocsComponent } from './doc-view';
 import { FindingComponent } from './evidence';
-import { markdownBlocks } from './product';
+import { markdownBlocks } from './markdown';
 import { RefChipComponent } from './work-shared';
 
 type Segment = { text: string; finding?: Finding };
