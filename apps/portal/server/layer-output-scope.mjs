@@ -100,3 +100,20 @@ function backfillPagesWorkScope(db) {
   }
   return { workItems, targets, unresolvedTargets };
 }
+
+// T03-VISION (DEC-059): when a layer instance starts publishing an API, its existing untagged records join that instance,
+// so the layer API's own-instance checks hold for records written before. Only untagged rows of the layer's record kinds
+// in this project move; a row tagged with another instance is left with it. Revisions and deletion markers follow.
+export function backfillLayerOutputScope(db, projectId, instanceId, kinds) {
+  if (!kinds.length || !hasTable(db, 'knowledge_records')) return { records: 0, revisions: 0, deletions: 0 };
+  for (const table of ['knowledge_records', 'knowledge_revisions', 'knowledge_deletions']) addScope(db, table);
+  const marks = kinds.map(() => '?').join(',');
+  const records = db.prepare(`UPDATE knowledge_records SET layer_instance_id = ? WHERE project_id = ? AND kind IN (${marks}) AND layer_instance_id IS NULL`)
+    .run(instanceId, projectId, ...kinds).changes;
+  const deletions = hasTable(db, 'knowledge_deletions') ? db.prepare(`UPDATE knowledge_deletions SET layer_instance_id = ? WHERE project_id = ? AND kind IN (${marks}) AND layer_instance_id IS NULL`)
+    .run(instanceId, projectId, ...kinds).changes : 0;
+  const revisions = hasTable(db, 'knowledge_revisions') ? db.prepare(`UPDATE knowledge_revisions SET layer_instance_id = ? WHERE layer_instance_id IS NULL AND record_id IN (
+      SELECT id FROM knowledge_records WHERE project_id = ? AND layer_instance_id = ? UNION SELECT record_id FROM knowledge_deletions WHERE project_id = ? AND layer_instance_id = ?)`)
+    .run(instanceId, projectId, instanceId, projectId, instanceId).changes : 0;
+  return { records, revisions, deletions };
+}

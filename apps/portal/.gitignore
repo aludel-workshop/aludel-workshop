@@ -9,3 +9,4 @@ out-tsc/
 
 # Compiled source from pinned layer repositories
 src/installed/
+.layer-ui-src-*/

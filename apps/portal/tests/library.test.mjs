@@ -85,9 +85,9 @@ test('T03-G1: reads pin revisions, stay inside the project and installed layers,
   assert.throws(() => pool.read(id, ada.id, 'k:nothing:identity'), { status: 404 });
 
   // A disabled layer publishes nothing.
+  const object = know.list(id, 'data_object')[0];
   updateLayerInstance(db, ada.id, id, 'data', { enabled: false });
   assert.equal(pool.search(id, ada.id, { layer: 'data' }).total, 0);
-  const object = know.list(id, 'data_object')[0];
   assert.throws(() => pool.read(id, ada.id, object.id), { status: 404 });
 });
 

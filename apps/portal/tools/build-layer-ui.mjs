@@ -2,7 +2,7 @@
 // in a sandboxed frame. Repository content is input data: its files are compiled, never executed here, and only files
 // the manifest lists under ui/ are taken. Usage: node tools/build-layer-ui.mjs <repo> <commit> <key> <outDir>
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
@@ -14,6 +14,9 @@ const portal = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const git = (...args) => execFileSync('git', ['-C', repo, ...args], { maxBuffer: 16 * 1024 * 1024 });
 const manifest = JSON.parse(git('show', `${commit}:layer.json`).toString());
 if (manifest.key !== key || !manifest.ui?.entry || !Array.isArray(manifest.ui.files) || !manifest.ui.files.includes(manifest.ui.entry)) throw new Error('This layer declares no views.');
+// A build stopped partway (the portal shut down mid-build) leaves its staging folder; clear any older than ten minutes.
+for (const name of readdirSync(portal).filter(name => name.startsWith('.layer-ui-src-')))
+  try { if (Date.now() - statSync(join(portal, name)).mtimeMs > 10 * 60 * 1000) rmSync(join(portal, name), { recursive: true, force: true }); } catch { /* another build's, or already gone */ }
 const scratch = mkdtempSync(join(portal, '.layer-ui-src-'));
 try {
   const ui = join(scratch, 'ui');

@@ -437,10 +437,17 @@ export class ProjectContext {
   }
 
   // Every write goes through here: errors surface in the shell, success reloads the whole snapshot.
-  async write(action: () => Promise<unknown>, success = '') {
-    this.error.set(''); this.notice.set('');
-    try { await action(); await this.reload(); if (success) this.notice.set(success); return true; }
-    catch (error) { this.error.set(error instanceof Error ? error.message : String(error)); return false; }
+  // Writes from a view run one at a time, each after the previous write and its reload, so an edit made right after
+  // another (a blank's title, then its note) runs against the record's latest revision instead of racing it.
+  private writes: Promise<unknown> = Promise.resolve();
+  write(action: () => Promise<unknown>, success = ''): Promise<boolean> {
+    const run = this.writes.then(async () => {
+      this.error.set(''); this.notice.set('');
+      try { await action(); await this.reload(); if (success) this.notice.set(success); return true; }
+      catch (error) { this.error.set(error instanceof Error ? error.message : String(error)); return false; }
+    });
+    this.writes = run;
+    return run;
   }
 
   record(kind: string, data: unknown, parentId: string | null = null, rationale = '') {

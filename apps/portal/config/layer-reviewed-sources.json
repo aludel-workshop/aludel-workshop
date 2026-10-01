@@ -11,5 +11,8 @@
   ],
   "server/data-contract.mjs": [
     "b98c13b6799fc855e95505c6d42f93d1c3672f931ec91752d2d8e61ce0ef0c8f"
+  ],
+  "server/vision-api.mjs": [
+    "ab411fd7c9404bc3a8bd139d46a404a7fe20bc6d3f13763766248b24bc2b3a83"
   ]
 }

@@ -102,6 +102,8 @@ function readPackage(repo, commit, key) {
   if (manifest.api !== undefined && !['spec', 'handler'].every(field => typeof manifest.api?.[field] === 'string' && /^(?:api|server)\/[a-z][a-z0-9-]*\.(?:json|mjs)$/.test(manifest.api[field])))
     throw new Error('Invalid layer API declaration.');
   fileOutputs(manifest);
+  if (manifest.hostCalls !== undefined && (!Array.isArray(manifest.hostCalls) || manifest.hostCalls.length > 20 || !manifest.hostCalls.every(name => typeof name === 'string' && /^[a-z][A-Za-z0-9]{1,40}$/.test(name))))
+    throw new Error('Invalid layer host calls.');
   const charter = content(repo, commit, manifest.knowledge.charter);
   if (charter.length > 20000) throw new Error('Layer charter is too large.');
   // Pure server contracts are declared and pinned here, but never executed by package loading.
@@ -161,6 +163,17 @@ export function ensureLayerPackage(db, projectId, key, { template = null, name =
       .run(projectId,key,id,target,head,new Date().toISOString(),pin.template,pin.commit);
     return { ...pkg, repo: target };
   } catch (error) { rmSync(staging, { recursive: true, force: true }); throw error; }
+}
+// The host features an installed layer's views may use. Forks pinned before templates declared `hostCalls` keep what their
+// template's views already relied on, keyed by the template they were forked from, until a template update reaches them.
+const hostCallsBefore = { pages: ['pageChanges', 'skeleton'], vision: ['documents'] };
+export function layerHostCalls(db, projectId, key) {
+  let pkg;
+  try { pkg = layerPackageForProject(db, projectId, key); } catch { return []; }
+  if (!pkg) return [];
+  if (Array.isArray(pkg.manifest.hostCalls)) return pkg.manifest.hostCalls;
+  const template = db.prepare('SELECT template FROM layer_package_bindings WHERE project_id = ? AND layer_key = ?').get(projectId, key)?.template;
+  return hostCallsBefore[template] || [];
 }
 export function layerPackageForProject(db, projectId, key) {
   const installed = binding(db, projectId, key);

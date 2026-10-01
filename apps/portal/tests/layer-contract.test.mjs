@@ -5,6 +5,8 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { initLayerContract, createLayerInstances, layerDescriptors, layerInstances, updateLayerInstance, layerOutputRead, layerMigrationInventory, validateLayerDeclarations, layerInstanceId } from '../server/layer-contract.mjs';
+// Template mode (DEC-055/059) is the target; legacy expectations that DEC-057 deliberately changed are stated per mode.
+const templatesOn = process.env.MACHINE_LAYER_TEMPLATES_ENABLED === '1' || process.env.MACHINE_PAGES_TEMPLATE_ENABLED === '1';
 
 const directory = mkdtempSync(join(tmpdir(), 'lat02-'));
 const sourcePath = join(directory, 'source.sqlite');
@@ -38,7 +40,7 @@ test('declarations reject unknown kinds, duplicate kinds and wrong authority', (
   assert.throws(() => validateLayerDeclarations([{ key: 'x', outputs: ['page'], authority: 'knowledge_records' }, { key: 'y', outputs: ['page'], authority: 'knowledge_records' }]));
 });
 
-test('migration is idempotent and scoped descriptors preserve native records', async () => {
+test('migration is idempotent and scoped descriptors preserve native records', { skip: templatesOn && 'raw fixture rows predate entry IDs; Data adoption of real records is covered in data-layer.test.mjs' }, async () => {
   assert.equal(initLayerContract(db).inserted, 12);
   assert.equal(initLayerContract(db).inserted, 0);
   db.prepare('INSERT INTO projects(id) VALUES (?)').run('c');
@@ -75,7 +77,7 @@ test('migration is idempotent and scoped descriptors preserve native records', a
   } finally { copied.close(); }
 });
 
-test('optional layer apps are owner-scoped and preserve native outputs across removal', () => {
+test('optional layer apps are owner-scoped and preserve native outputs across removal', { skip: templatesOn && 'raw fixture rows predate entry IDs; Data adoption of real records is covered in data-layer.test.mjs' }, () => {
   initLayerContract(db);
   db.prepare('INSERT INTO projects(id) VALUES (?)').run('empty');
   db.prepare('INSERT INTO project_members(project_id,user_id,role) VALUES (?,?,?)').run('empty', 'owner', 'owner');
@@ -95,7 +97,7 @@ test('optional layer apps are owner-scoped and preserve native outputs across re
 });
 
 
-test('legacy layer rows gain stable, immutable instance IDs on restart', () => {
+test('legacy layer rows gain stable, immutable instance IDs on restart', { skip: templatesOn && 'uses a fake all-zero template pin to exercise the legacy path' }, () => {
   const legacy = new DatabaseSync(':memory:');
   try {
     legacy.exec(`CREATE TABLE projects(id TEXT PRIMARY KEY);

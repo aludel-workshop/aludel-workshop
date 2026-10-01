@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { contrastRatio } from '../src/color.js';
 import { initLayerPackages, ensureLayerPackage, layerTemplates } from './layer-package.mjs';
 import { adoptRecordsIntoFiles } from './layer-files.mjs';
+import { backfillLayerOutputScope } from './layer-output-scope.mjs';
 // Project-scoped layer definitions share one lifecycle and output/action contract.
 // Built-ins seed richer adapters; a Markdown layer begins as a draft definition.
 const fail=(message,status=400)=>{throw Object.assign(new Error(message),{status});};
@@ -74,6 +75,9 @@ export function seedBuiltInDefinitions(db,projectId,declarations,presentation) {
       .run(JSON.stringify(manifest.tabs),pkg.commit,projectId,layer.key);
     // DEC-059: a layer that now keeps its outputs as files takes over the records it kept before, IDs and revisions intact.
     if(manifest?.files)adoptRecordsIntoFiles(db,projectId,layer.key);
+    // T03-VISION: records kept through the layer's own API belong to its instance, including ones written before it had one.
+    if(manifest?.api)backfillLayerOutputScope(db,projectId,db.prepare('SELECT instance_id FROM layer_instances WHERE project_id=? AND layer_key=?').get(projectId,layer.key).instance_id,
+      manifest.outputs.filter(kind=>!manifest.files?.kinds?.includes(kind)));
     db.prepare('INSERT OR IGNORE INTO layer_identity_revisions VALUES (?,?,?,?,?,?)')
       .run(projectId,layer.key,1,JSON.stringify(identity),pkg?'pages-template':'built-in',at);
   }

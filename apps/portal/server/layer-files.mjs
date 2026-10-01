@@ -25,6 +25,7 @@ export function initLayerFiles(db) {
   const columns = new Set(db.prepare('PRAGMA table_info(layer_file_entries)').all().map(column => column.name));
   if (!columns.has('author')) db.exec('ALTER TABLE layer_file_entries ADD COLUMN author TEXT');
   if (!columns.has('rationale')) db.exec('ALTER TABLE layer_file_entries ADD COLUMN rationale TEXT');
+  if (!columns.has('work_item_id')) db.exec('ALTER TABLE layer_file_entries ADD COLUMN work_item_id TEXT');
 }
 
 const read = (repo, commit, path) => {
@@ -65,25 +66,25 @@ const binding = (db, projectId, key) => db.prepare(`SELECT b.repository_path AS 
 const latest = (db, projectId, id) => db.prepare('SELECT * FROM layer_file_entries WHERE project_id = ? AND entry_id = ? ORDER BY revision DESC LIMIT 1').get(projectId, id);
 
 // Brings the index up to the layer's pin: a changed entry gets its next revision, a removed one a tombstone revision.
-export function syncFileEntries(db, projectId, key, { author = null, rationale = null } = {}) {
+export function syncFileEntries(db, projectId, key, { author = null, rationale = null, workItemId = null } = {}) {
   initLayerFiles(db);
   const bound = binding(db, projectId, key);
   if (!bound) return [];
   const index = indexAt(db, projectId, key, bound.repo, bound.commit);
   if (!index) return [];
-  const insert = db.prepare(`INSERT INTO layer_file_entries(project_id, entry_id, revision, layer_key, layer_instance_id, kind, content_hash, commit_sha, title, created_at, author, rationale)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  const insert = db.prepare(`INSERT INTO layer_file_entries(project_id, entry_id, revision, layer_key, layer_instance_id, kind, content_hash, commit_sha, title, created_at, author, rationale, work_item_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
   const at = now(), present = new Set();
   for (const entry of index.entries) {
     present.add(entry.id);
     const last = latest(db, projectId, entry.id);
     if (last && last.layer_instance_id !== bound.instanceId && last.content_hash !== null) fail(`Entry ${entry.id} already belongs to another layer.`, 409);
     if (last?.content_hash === entry.hash) continue;
-    insert.run(projectId, entry.id, (last?.revision || 0) + 1, key, bound.instanceId, entry.kind, entry.hash, bound.commit, entry.title, at, author, rationale);
+    insert.run(projectId, entry.id, (last?.revision || 0) + 1, key, bound.instanceId, entry.kind, entry.hash, bound.commit, entry.title, at, author, rationale, workItemId);
   }
   for (const row of db.prepare(`SELECT e.* FROM layer_file_entries e WHERE e.project_id = ? AND e.layer_instance_id = ? AND e.revision = (
       SELECT MAX(revision) FROM layer_file_entries x WHERE x.project_id = e.project_id AND x.entry_id = e.entry_id) AND e.content_hash IS NOT NULL`).all(projectId, bound.instanceId))
-    if (!present.has(row.entry_id)) insert.run(projectId, row.entry_id, row.revision + 1, key, bound.instanceId, row.kind, null, bound.commit, row.title, at, author, rationale);
+    if (!present.has(row.entry_id)) insert.run(projectId, row.entry_id, row.revision + 1, key, bound.instanceId, row.kind, null, bound.commit, row.title, at, author, rationale, workItemId);
   db.prepare('INSERT INTO layer_file_syncs VALUES (?, ?, ?) ON CONFLICT(project_id, layer_instance_id) DO UPDATE SET commit_sha = excluded.commit_sha').run(projectId, bound.instanceId, bound.commit);
   return currentFileEntries(db, projectId, key);
 }
@@ -134,7 +135,7 @@ export function readOutputFile(db, projectId, key, path) {
 export function commitOutputFile(db, { projectId, key, path, content, expectedCommit, author, message = null }) {
   return commitOutputFiles(db, { projectId, key, files: { [path]: content }, expectedCommit, author, message });
 }
-export function commitOutputFiles(db, { projectId, key, files, expectedCommit, author, message = null, rationale = null }) {
+export function commitOutputFiles(db, { projectId, key, files, expectedCommit, author, message = null, rationale = null, workItemId = null }) {
   const bound = binding(db, projectId, key) || fail('This layer has no installed repository.', 409);
   if (expectedCommit !== bound.commit) fail('This layer changed since you opened it. Reload and try again.', 409);
   const declared = fileOutputs(packageAt(bound.repo, bound.commit, key).manifest) || fail('This layer keeps no output files.', 404);
@@ -165,7 +166,7 @@ export function commitOutputFiles(db, { projectId, key, files, expectedCommit, a
   try {
     git(repo, ['update-ref', 'refs/heads/main', next, main]);
     db.prepare('UPDATE layer_package_bindings SET accepted_commit = ? WHERE project_id = ? AND layer_key = ?').run(next, projectId, key);
-    const entries = syncFileEntries(db, projectId, key, { author: author || null, rationale: rationale || message || null });
+    const entries = syncFileEntries(db, projectId, key, { author: author || null, rationale: rationale || message || null, workItemId });
     if (own) db.exec('COMMIT');
     try { if (!git(repo, ['status', '--porcelain']).trim()) git(repo, ['reset', '--quiet', '--hard', 'main']); } catch { /* the pin is authoritative */ }
     return { commit: next, entries };
@@ -194,7 +195,7 @@ export function fileLayerFor(db, projectId, kind) {
 // files by the layer's `fromEntries`, and the result is one commit as the person. `checkReferences` resolves references
 // outside the batch (the Library); references to entries in the batch resolve here.
 // ops: { op: create | update | delete, kind?, id, data?, expectedRevision? }
-export function writeFileEntries(db, { projectId, key, ops, author = 'Aludel', rationale = null, checkReferences = () => {} }) {
+export function writeFileEntries(db, { projectId, key, ops, author = 'Aludel', rationale = null, workItemId = null, checkReferences = () => {} }) {
   const bound = binding(db, projectId, key) || fail('This layer has no installed repository.', 409);
   const declared = fileOutputs(packageAt(bound.repo, bound.commit, key).manifest) || fail('This layer keeps no output files.', 404);
   const source = read(bound.repo, bound.commit, declared.indexer);
@@ -238,7 +239,7 @@ export function writeFileEntries(db, { projectId, key, ops, author = 'Aludel', r
   let files;
   try { files = runPure(source, 'fromEntries', [list, { files: previous }]); } catch (error) { if (/no fromEntries/.test(error.message)) fail(`The ${key} layer's files change only in its repository.`, 409); throw error; }
   if (!files || typeof files !== 'object') fail(`The ${key} layer returned no files.`, 500);
-  return commitOutputFiles(db, { projectId, key, files, expectedCommit: bound.commit, author, rationale });
+  return commitOutputFiles(db, { projectId, key, files, expectedCommit: bound.commit, author, rationale, workItemId });
 }
 
 // Adopts records a layer kept before it kept files: one commit writes them into its files with their IDs, each entry
@@ -296,6 +297,8 @@ export function adoptRecordsIntoFiles(db, projectId, key) {
 // Who changed an entry and why, newest first, as record history reads.
 export function fileEntryHistory(db, projectId, id) {
   if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_file_entries'").get()) return [];
-  return db.prepare(`SELECT revision, COALESCE(author, 'Aludel') AS author, COALESCE(rationale, 'Edited') AS rationale, NULL AS workItemId, created_at AS createdAt FROM layer_file_entries
-    WHERE (? IS NULL OR project_id = ?) AND entry_id = ? AND content_hash IS NOT NULL ORDER BY revision DESC`).all(projectId, projectId, id);
+  // Without a project (PROJECT-DB-01), the entry ID alone finds it in whichever project holds it.
+  const columns = `SELECT revision, COALESCE(author, 'Aludel') AS author, COALESCE(rationale, 'Edited') AS rationale, work_item_id AS workItemId, created_at AS createdAt FROM layer_file_entries`;
+  return projectId ? db.prepare(`${columns} WHERE project_id = ? AND entry_id = ? AND content_hash IS NOT NULL ORDER BY revision DESC`).all(projectId, id)
+    : db.prepare(`${columns} WHERE entry_id = ? AND content_hash IS NOT NULL ORDER BY revision DESC`).all(id);
 }

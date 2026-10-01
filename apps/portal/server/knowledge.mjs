@@ -527,7 +527,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     const fileKey = fileLayerFor(db, projectId, kind);
     if (fileKey) {
       const id = /^[a-z]+-[a-z0-9]{6,12}$/.test(String(givenId)) && !row(givenId) && !fileEntry(db, projectId, givenId) ? givenId : newId(kind);
-      writeFileEntries(db, { projectId, key: fileKey, ops: [{ op: 'create', kind, id, data }], author, rationale, checkReferences: list => checkReferenceList(projectId, list) });
+      writeFileEntries(db, { projectId, key: fileKey, ops: [{ op: 'create', kind, id, data }], author, rationale, workItemId, checkReferences: list => checkReferenceList(projectId, list) });
       return get(projectId, id);
     }
     if (!kinds.includes(kind) && !kindOwners(db, projectId, kind).length) fail('Unknown record kind.');
@@ -585,7 +585,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
 
   function update(projectId, id, changes, { expectedRevision, author = 'Aludel', rationale = null, workItemId = null, position, parentId, prepared = null } = {}) {
     const current = row(id);
-    if (!current && fileEntry(db, projectId, id)?.currentRevision) return updateFileEntry(projectId, id, changes, { expectedRevision, author, rationale });
+    if (!current && fileEntry(db, projectId, id)?.currentRevision) return updateFileEntry(projectId, id, changes, { expectedRevision, author, rationale, workItemId });
     if (!inScope(projectId, current)) fail('Record not found.', 404);
     if (expectedRevision !== undefined && Number(expectedRevision) !== current.revision) fail('This record changed since you opened it. Reload to see the latest; your edit is kept.', 409);
     const rules = layerRules(projectId, current.kind, { ...parse(current.data_json, {}), ...changes }, prepared, { instanceId: current.layer_instance_id || null });
@@ -610,10 +610,10 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     return hydrate(row(id));
   }
 
-  function updateFileEntry(projectId, id, changes, { expectedRevision, author, rationale }) {
+  function updateFileEntry(projectId, id, changes, { expectedRevision, author, rationale, workItemId = null }) {
     const before = get(projectId, id);
     const key = fileLayerFor(db, projectId, before.kind) || fail('This record changes only through its layer.', 409);
-    writeFileEntries(db, { projectId, key, ops: [{ op: 'update', id, data: changes, expectedRevision }], author, rationale, checkReferences: list => checkReferenceList(projectId, list) });
+    writeFileEntries(db, { projectId, key, ops: [{ op: 'update', id, data: changes, expectedRevision }], author, rationale, workItemId, checkReferences: list => checkReferenceList(projectId, list) });
     const after = get(projectId, id);
     if (after.revision !== before.revision) for (const listener of revisionListeners) listener({ projectId, record: after, fromRevision: before.revision, toRevision: after.revision, author });
     return after;
@@ -701,7 +701,9 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     return entry ? entry.data : parse(db.prepare('SELECT data_json FROM knowledge_revisions WHERE record_id = ? AND revision = ?').get(id, revision)?.data_json, null);
   };
   // The record's revision at a moment in time, for links declared by a past commit.
-  const revisionAt = (id, at) => db.prepare('SELECT MAX(revision) AS revision FROM knowledge_revisions WHERE record_id = ? AND created_at <= ?').get(id, at)?.revision || null;
+  const revisionAt = (id, at) => Math.max(db.prepare('SELECT MAX(revision) AS revision FROM knowledge_revisions WHERE record_id = ? AND created_at <= ?').get(id, at)?.revision || 0,
+    db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_file_entries'").get()
+      ? db.prepare('SELECT revision FROM layer_file_entries WHERE entry_id = ? AND created_at <= ? AND content_hash IS NOT NULL ORDER BY revision DESC LIMIT 1').get(id, at)?.revision || 0 : 0) || null;
   const get = (projectId, id) => {
     const record = row(id);
     if (record) return inScope(projectId, record) ? hydrate(record) : null;
@@ -1186,6 +1188,9 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     if (!defaultProfile(projectId)) ensureAgents(projectId);
     const targets = (Array.isArray(input.targets) ? input.targets : []).map(target => {
       const record = row(target.id);
+      // DEC-059: a target may be an entry a layer keeps as files.
+      const file = !record && fileEntry(db, projectId, target.id);
+      if (file?.currentRevision) return { id: file.id, kind: file.kind, label: text(target.label, 160, 'Target') || file.kind, layerInstanceId: file.instanceId };
       if (!inScope(projectId, record)) fail('A work target was not found.', 404);
       return { id: record.id, kind: record.kind, label: text(target.label, 160, 'Target') || record.kind,
         ...(record.layer_instance_id ? { layerInstanceId: record.layer_instance_id } : {}) };
@@ -1451,7 +1456,9 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
             : `Only a lead of the ${catalogs.roles.roles.find(role => role.layer === item.action.split('.')[0])?.name || 'role'} can accept ${item.ref}: its action is elevated.`, 403);
         }
         if (verifiedTypes.includes(item.type) && item.assignee?.kind !== 'template' && !((item.action === 'pages.flows' || item.scope === 'layer') && item.assignee?.kind === 'agent' && input.proposalId)) {
-          const missing = item.targets.filter(target => !db.prepare('SELECT 1 FROM knowledge_revisions WHERE record_id = ? AND work_item_id = ?').get(target.id, item.id));
+          const fileEntries = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_file_entries'").get();
+          const missing = item.targets.filter(target => !db.prepare('SELECT 1 FROM knowledge_revisions WHERE record_id = ? AND work_item_id = ?').get(target.id, item.id)
+            && !(fileEntries && db.prepare('SELECT 1 FROM layer_file_entries WHERE entry_id = ? AND work_item_id = ?').get(target.id, item.id)));
           if (missing.length) fail(`${missing.map(target => `“${target.label}”`).join(', ')} ${missing.length === 1 ? 'has' : 'have'} no change from ${item.ref} yet. Edit ${missing.length === 1 ? 'it' : 'them'} from this item (or apply the answer), then close it.`, 409);
         }
       }
@@ -1507,7 +1514,18 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
           FROM markdown_file_revisions r JOIN markdown_files f ON f.id=r.file_id WHERE r.work_id=? AND f.project_id=? ORDER BY r.created_at`).all(workId,projectId).map(entry => ({
             recordId:entry.recordId,revision:entry.revision,author:entry.author,rationale:entry.operation,createdAt:entry.createdAt,
             kind:'markdown_document',exists:!entry.deleted,fields:[{field:'path',before:null,after:entry.path},{field:'operation',before:null,after:entry.operation}]})) : [];
-    return [...knowledgeChanges,...fileChanges].sort((a,b)=>a.createdAt.localeCompare(b.createdAt));
+    // DEC-059: entries a layer keeps as files, changed under this item.
+    const entryChanges = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='layer_file_entries'").get()
+      ? db.prepare('SELECT entry_id AS recordId, revision, kind, content_hash, author, rationale, created_at AS createdAt FROM layer_file_entries WHERE project_id = ? AND work_item_id = ? ORDER BY created_at')
+        .all(projectId, workId).map(entry => {
+          const after = entry.content_hash ? revisionData(entry.recordId, entry.revision) || {} : {};
+          const before = entry.revision > 1 ? revisionData(entry.recordId, entry.revision - 1) || {} : {};
+          const fields = [...new Set([...Object.keys(before), ...Object.keys(after)])].filter(key => JSON.stringify(before[key]) !== JSON.stringify(after[key]))
+            .map(field => ({ field, before: before[field] ?? null, after: after[field] ?? null }));
+          return { recordId: entry.recordId, revision: entry.revision, author: entry.author || 'Aludel', rationale: entry.rationale, createdAt: entry.createdAt, kind: entry.kind,
+            exists: Boolean(entry.content_hash && get(projectId, entry.recordId)), fields };
+        }) : [];
+    return [...knowledgeChanges,...fileChanges,...entryChanges].sort((a,b)=>a.createdAt.localeCompare(b.createdAt));
   }
 
   // An edit made "from" a work item carries its id, so closing the item can verify the change happened (LAY-04A).

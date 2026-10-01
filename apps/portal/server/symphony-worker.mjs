@@ -731,7 +731,7 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     const staged = draftChanges(db, projectId, attemptId);
     if (JSON.stringify(staged) !== JSON.stringify(submitted.changes)) fail('The staged changes differ from what was reviewed. Send this back.', 409);
     // References were checked against current records and the draft above.
-    const applied = [...applyWrites(know, projectId, submitted.changes.map(change => ({ op: change.op, kind: change.kind, id: change.id, baseRevision: change.baseRevision, data: change.after })), [],
+    const applied = [...applyWrites(know, projectId, submitted.changes.map(change => ({ op: change.op, kind: change.kind, id: change.id, baseRevision: change.baseRevision, data: change.after, ...(change.parentId ? { parentId: change.parentId } : {}) })), [],
       { layer: bundle.guidance.layerScope.key, author: options.author, rationale: options.rationale, workItemId: options.workItemId }).map(record => record.id), ...submitted.changes.filter(change => change.op === 'delete').map(change => change.id)];
     // Data applies under the rules it was checked with; then the reviewed layer commit becomes the pin.
     const key = bundle.guidance.layerScope.key;

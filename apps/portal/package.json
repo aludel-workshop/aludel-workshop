@@ -19,7 +19,8 @@
     "sync:layers": "node tools/sync-layer-template.mjs",
     "prebuild": "npm run sync:layers",
     "pretypecheck": "npm run sync:layers",
-    "predev": "npm run sync:layers"
+    "predev": "npm run sync:layers",
+    "test:server:templates": "MACHINE_LAYER_TEMPLATES_ENABLED=1 node --test tests/*.test.mjs"
   },
   "dependencies": {
     "@angular/animations": "22.1.7",

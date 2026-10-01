@@ -12,6 +12,8 @@ import { initialFiles, loadScaffoldSources, skeletonFiles } from '../server/scaf
 import { openSecretStore } from '../server/secret-store.mjs';
 import { openDatabase } from '../server/storage.mjs';
 import { initWorkflow } from '../server/workflow.mjs';
+// Template mode (DEC-055/059) is the target; legacy expectations that DEC-057 deliberately changed are stated per mode.
+const templatesOn = process.env.MACHINE_LAYER_TEMPLATES_ENABLED === '1' || process.env.MACHINE_PAGES_TEMPLATE_ENABLED === '1';
 
 const configDirectory = new URL('../config', import.meta.url).pathname;
 const catalogs = loadCatalogs(configDirectory);
@@ -166,7 +168,7 @@ test('story status is derived from connected work, and work cannot close without
   assert.throws(() => know.update(id, story.id, { title: 'stale' }, { expectedRevision: 1 }), error => error.status === 409);
   const design = know.createWork(id, { layer: 'pages', type: 'design', title: 'Design the request page', targets: [{ id: story.id }] });
   // Every item carries its action's checks; a record-changing item still can't close until its target changed from it.
-  assert.ok(design.checks.length && design.action === 'pages.design');
+  assert.ok(design.checks.length && (templatesOn ? design.scope === 'layer' : design.action === 'pages.design'));
   assert.throws(() => know.updateWork(ada, id, design.id, { state: 'done' }), /has no change from W-1/);
   const agent = know.defaultProfile(id);
   const implement = know.createWork(id, { layer: 'product', type: 'implement', title: 'Build the request', targets: [{ id: story.id }], documents: ['Product › story built'], question: { text: 'Dates or ASAP?', options: ['Dates', 'ASAP'] }, state: 'needs-input', assignee: { kind: 'agent', id: agent.id } });

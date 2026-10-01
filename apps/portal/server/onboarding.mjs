@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { aludelProjectId, requireMember } from './accounts.mjs';
 import { reservedSlugs, slugify } from './hosts.mjs';
 import { getProductWorkspace, saveProductRecord } from './product-workspace.mjs';
-import { loadAgentDefaults, loadRoles, loadStoryPacks } from './knowledge.mjs';
+import { loadAgentDefaults, loadRoles, loadStoryPacks, phaseKeys } from './knowledge.mjs';
 import { loadBrandTemplates } from './design.mjs';
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
@@ -45,7 +45,7 @@ export function loadCatalogs(configDirectory) {
     if (!values.length || values.some(value => !['you', 'agent', 'agent-review'].includes(rule.modes?.[value]))) throw new Error(`Automation for ${type} needs a mode for every ${rule.preference} value.`);
   }
   return { preferences: profiles.preferences, profiles: profiles.profiles, feels: starter.feels, features: starter.features, packs: loadStoryPacks(configDirectory), stacks,
-    pageTypes: pages.types, routeIcons, defaultRoute: starter.defaultRoute, services: read('story-packs.json').services || {}, agentDefaults: loadAgentDefaults(configDirectory),
+    pageTypes: pages.types, routeIcons, defaultRoute: starter.defaultRoute, services: read('story-packs.json').services || {}, phases: [...phaseKeys], agentDefaults: loadAgentDefaults(configDirectory),
     automation: profiles.automation, routines: read('routines.json').routines, playbooks: read('playbooks.json'), agentProviders: loadAgentProviders(configDirectory),
     roles: loadRoles(configDirectory, { routines: read('routines.json').routines, styles: Object.keys(profiles.profiles) }), brandTemplates: loadBrandTemplates(configDirectory) };
 }

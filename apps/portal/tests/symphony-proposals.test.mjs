@@ -21,6 +21,8 @@ import { initActionMigration, migrateActionProject } from '../server/lat08-migra
 import { stageLayerDiscovery } from '../server/layer-discovery.mjs';
 import { initWorkflow } from '../server/workflow.mjs';
 import { initWorkRuns, workRuns } from '../server/work-runs.mjs';
+// Template mode (DEC-055/059) is the target; legacy expectations that DEC-057 deliberately changed are stated per mode.
+const templatesOn = process.env.MACHINE_LAYER_TEMPLATES_ENABLED === '1' || process.env.MACHINE_PAGES_TEMPLATE_ENABLED === '1';
 
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, stdio: 'pipe' }).toString().trim();
 function fixture() {
@@ -656,7 +658,7 @@ test('a cited persona revision is mandatory and stale persona denies flow accept
   }
 });
 
-test('an existing-flow agent task waits for a reviewed Pages package but still needs no story', () => {
+test('an existing-flow agent task waits for a reviewed Pages package but still needs no story', { skip: templatesOn && 'checks the path before a reviewed Pages package exists' }, () => {
   const f=fixture();
   try {
     const page=f.know.insert(f.projectId,'page',{label:'Browse',icon:'article',pageType:'list',status:'planned'});
@@ -856,7 +858,7 @@ test('layer access keeps elevated grants layer-wide, never widens action grants,
   assert.equal(f.know.workById(f.projectId, work.id).action, null, 'a layer-scoped item is never back-filled with an action');
 }));
 
-test('without an opted-in layer package, an action-less request keeps the legacy action path', () => {
+test('without an opted-in layer package, an action-less request keeps the legacy action path', { skip: templatesOn && 'checks the path without any layer package' }, () => {
   const f = fixture();
   try {
     initLayerScope(f.db);
@@ -1054,7 +1056,7 @@ test('a Markdown layer changes its files only through its own API and stays apar
   assert.deepEqual(md.tree(f.owner.id, f.projectId, research.key).files, []);
 }));
 
-test('a Markdown layer from before layer repositories moves into its own repository with its files and charter', async () => {
+test('a Markdown layer from before layer repositories moves into its own repository with its files and charter', { skip: templatesOn && 'switches templates on midway to adopt a pre-repository layer' }, async () => {
   const f = fixture();
   const data = mkdtempSync(join(tmpdir(), 'aludel-adopt-'));
   const oldData = process.env.MACHINE_DATA_DIR;

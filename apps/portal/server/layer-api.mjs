@@ -68,9 +68,12 @@ function compile(key, repo, commit, manifest) {
     const context = op['x-aludel-context'] || [];
     if (!Array.isArray(context) || !context.every(kind => manifest.outputs.includes(kind))) fail(`Operation ${op.operationId} asks for context outside this layer.`, 500);
     const body = op.requestBody?.content?.['application/json']?.schema;
+    // A record that sits under another (a story under a step) names the request field that carries its parent.
+    const parentField = op['x-aludel-parent'] || null;
+    if (parentField !== null && (typeof parentField !== 'string' || !body?.properties?.[parentField])) fail(`Operation ${op.operationId} names a parent field it does not take.`, 500);
     operations.set(op.operationId, { operationId: op.operationId, method: method.toUpperCase(), path, summary: op.summary || '', description: op.description || '',
       output, access: op['x-aludel-access'] || 'normal', singleton: Boolean(op['x-aludel-singleton']), read: op['x-aludel-read'] || null, context,
-      field: body?.required?.find(name => name !== 'expectedRevision') || null,
+      field: body?.required?.find(name => name !== 'expectedRevision' && name !== parentField) || null, parentField,
       needsId: Boolean(op.parameters?.some(parameter => parameter.in === 'path' && parameter.name === 'id')),
       validate: body ? ajv.getSchema(pointer(['paths', path, method, 'requestBody', 'content', 'application/json', 'schema'])) : null });
   }
@@ -222,9 +225,13 @@ export function callOperation({ db, catalogs, api, projectId, operationId, id = 
     if (write.op === 'create' && (loaded.has(write.id) || stored(db, projectId, api.key, write.id) || overlay?.has(write.id))) fail('The layer API handler reused a record id.', 500);
     if (write.op !== 'create' && (loaded.get(write.id)?.kind !== write.kind || write.baseRevision !== loaded.get(write.id).revision)) fail('The layer API handler changed a record it did not load.', 500);
     if (write.op !== 'delete') checkRecord(api, write.kind, write.data);
+    // A record that sits under another names its parent, which must be one of the references checked below (its kind, and
+    // this instance for this layer's own kinds).
+    if (write.parentId !== undefined && (write.op === 'delete' || typeof write.parentId !== 'string' || !references.some(([id]) => id === write.parentId)))
+      fail('The layer API handler named a parent it did not reference.', 500);
   }
   const next = new Map(overlay || []);
-  for (const write of writes) next.set(write.id, { id: write.id, kind: write.kind, data: write.data ?? null, deleted: write.op === 'delete', created: write.op === 'create' });
+  for (const write of writes) next.set(write.id, { id: write.id, kind: write.kind, data: write.data ?? null, deleted: write.op === 'delete', created: write.op === 'create', ...(write.parentId ? { parentId: write.parentId } : {}) });
   checkReferences(db, api, projectId, references, next);
   return { operation, writes, references };
 }
@@ -238,13 +245,14 @@ export function recordOperations(api, kind) {
 }
 
 // A person's call: runs the operation and applies its writes at once, through the same checks.
-export function applyOperation({ db, know, api, projectId, operationId, id = null, body = {}, elevated = false, author, rationale = null, workItemId = null }) {
+// `position` is where a person placed the record among its siblings: ordering is the host's, not a change to what it says.
+export function applyOperation({ db, know, api, projectId, operationId, id = null, body = {}, elevated = false, author, rationale = null, workItemId = null, position = undefined }) {
   const called = callOperation({ db, catalogs: know.catalogs, api, projectId, operationId, id, body, elevated });
   if (called.result !== undefined) return called.result;
   const own = !db.isTransaction;
   if (own) db.exec('BEGIN IMMEDIATE');
   try {
-    const records = applyWrites(know, projectId, called.writes, called.references, { layer: api.key, author, rationale, workItemId });
+    const records = applyWrites(know, projectId, called.writes, called.references, { layer: api.key, author, rationale, workItemId, position });
     if (own) db.exec('COMMIT');
     const first = records[0];
     return { id: first?.id || called.writes[0].id, revision: first?.revision ?? null, data: called.writes[0].data ?? null, record: first || null, records };
@@ -252,12 +260,13 @@ export function applyOperation({ db, know, api, projectId, operationId, id = nul
 }
 
 // Writes checked changes through the host store: creates first so later writes can point at them, deletes last.
-export function applyWrites(know, projectId, writes, references, { layer, author, rationale = null, workItemId = null, baseCheck = true } = {}) {
+export function applyWrites(know, projectId, writes, references, { layer, author, rationale = null, workItemId = null, position = undefined, baseCheck = true } = {}) {
   const order = { create: 0, update: 1, delete: 2 };
   return [...writes].sort((a, b) => order[a.op] - order[b.op]).map(write => {
     const prepared = { data: write.data, references: [] };
-    if (write.op === 'create') return know.insert(projectId, write.kind, write.data, { id: write.id, prepared, author, rationale, workItemId, layer });
-    if (write.op === 'update') return know.update(projectId, write.id, write.data, { expectedRevision: baseCheck ? write.baseRevision : undefined, prepared, author, rationale, workItemId });
+    const placed = position !== undefined && write === writes[0] ? { position } : {};
+    if (write.op === 'create') return know.insert(projectId, write.kind, write.data, { id: write.id, prepared, author, rationale, workItemId, layer, parentId: write.parentId ?? null, ...placed });
+    if (write.op === 'update') return know.update(projectId, write.id, write.data, { expectedRevision: baseCheck ? write.baseRevision : undefined, prepared, author, rationale, workItemId, ...(write.parentId ? { parentId: write.parentId } : {}), ...placed });
     const current = know.get(projectId, write.id);
     if (!current || baseCheck && current.revision !== write.baseRevision) fail('A record this change deletes was changed since. Reload and try again.', 409);
     know.remove(projectId, write.id);
@@ -283,7 +292,8 @@ export function draftOverlay(db, projectId, attemptId) {
       // Deleting a record this draft created leaves nothing to apply.
       if (write.op === 'delete' && created) { overlay.delete(write.id); continue; }
       overlay.set(write.id, { id: write.id, kind: write.kind, data: write.op === 'delete' ? null : write.data, created, deleted: write.op === 'delete',
-        revision: previous ? previous.revision : write.baseRevision ?? 0, baseRevision: previous ? previous.baseRevision : write.baseRevision ?? null });
+        revision: previous ? previous.revision : write.baseRevision ?? 0, baseRevision: previous ? previous.baseRevision : write.baseRevision ?? null,
+        ...(write.parentId || previous?.parentId ? { parentId: write.parentId || previous.parentId } : {}) });
     }
   return overlay;
 }
@@ -305,7 +315,7 @@ export function stageOperation({ db, catalogs, api, projectId, attemptId, operat
 export function draftChanges(db, projectId, attemptId) {
   const revision = (id, number) => JSON.parse(db.prepare('SELECT data_json FROM knowledge_revisions WHERE record_id = ? AND revision = ?').get(id, number)?.data_json || 'null');
   return [...draftOverlay(db, projectId, attemptId).values()].map(entry => ({ id: entry.id, kind: entry.kind, op: entry.created ? 'create' : entry.deleted ? 'delete' : 'update',
-    baseRevision: entry.baseRevision, before: entry.created ? null : revision(entry.id, entry.baseRevision), after: entry.data }));
+    baseRevision: entry.baseRevision, before: entry.created ? null : revision(entry.id, entry.baseRevision), after: entry.data, ...(entry.parentId ? { parentId: entry.parentId } : {}) }));
 }
 
 // Stale if any record the draft changes moved on, or a reference it relies on is gone.

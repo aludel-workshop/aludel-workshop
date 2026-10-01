@@ -68,3 +68,46 @@ test('Vision template owns its pinned view and Knowledge; Library preserves stor
 test('existing Vision instance adopts a repository without changing story identity or revision', () => fixture(({ db, id }) => {
   assert.ok(layerPackageForProject(db, id, 'product'));
 }, true));
+
+// T03-VISION, rules in the layer: Vision publishes its own API; every write, from the portal's views or an agent, runs its rules.
+import { applyOperation, callOperation, layerApi } from '../server/layer-api.mjs';
+
+test('Vision changes go through its own API rules, and the story map keeps its hierarchy through that API', () => fixture(({ db, know, owner, id }) => {
+  const api = layerApi(db, id, 'product');
+  assert.ok(api, 'Vision publishes an API');
+  assert.equal(api.operations.get('createStory').output, 'story');
+  assert.deepEqual([api.operations.get('createStory').field, api.operations.get('createStory').parentField], ['story', 'stepId'], 'the portal\'s record calls know where the parent goes');
+  const instance = layerInstanceId(db, id, 'product');
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM knowledge_records WHERE project_id = ? AND kind = 'story' AND layer_instance_id IS NOT ?").get(id, instance).n, 0,
+    'every story belongs to the Vision instance');
+
+  const call = (operationId, body, recordId = null) => applyOperation({ db, know, api, projectId: id, operationId, id: recordId, body, author: owner.name });
+  const activity = call('createActivity', { activity: { title: 'Borrow a tool' } });
+  const step = call('createStep', { step: { title: 'Find one nearby' }, activityId: activity.id });
+  const story = call('createStory', { story: { title: 'Someone can see tools within a mile', phase: 'demo' }, stepId: step.id });
+  assert.equal(db.prepare('SELECT parent_id FROM knowledge_records WHERE id = ?').get(step.id).parent_id, activity.id);
+  assert.equal(db.prepare('SELECT parent_id FROM knowledge_records WHERE id = ?').get(story.id).parent_id, step.id);
+  assert.ok(know.get(id, story.id).number > 0, 'the host still numbers stories');
+  assert.throws(() => call('createStory', { story: { title: 'Wrong parent', phase: 'demo' }, stepId: activity.id }), /linked step was not found/);
+  assert.throws(() => call('createStory', { story: { title: 'Someday', phase: 'never' }, stepId: step.id }), /Choose a phase/);
+  const other = call('createStep', { step: { title: 'Ask to borrow' }, activityId: activity.id });
+  call('updateStory', { changes: { why: 'Distance decides whether people bother.' }, stepId: other.id, expectedRevision: 1 }, story.id);
+  assert.equal(db.prepare('SELECT parent_id FROM knowledge_records WHERE id = ?').get(story.id).parent_id, other.id, 'a story moves to another step');
+
+  // The portal's own views write through the same rules: a person's generic record write is checked by Vision's handler.
+  assert.throws(() => know.insert(id, 'brief_claim', { section: 'mood', text: 'x' }), /Choose a Brief section/);
+  const claim = know.insert(id, 'brief_claim', { section: 'problem', text: 'Tools sit unused in sheds.' });
+  assert.equal(db.prepare('SELECT layer_instance_id FROM knowledge_records WHERE id = ?').get(claim.id).layer_instance_id, instance);
+
+  // An agent's staged story keeps its parent through review and acceptance.
+  const staged = callOperation({ db, catalogs: know.catalogs, api, projectId: id, operationId: 'createStory', body: { story: { title: 'Staged story', phase: 'mvp' }, stepId: step.id } });
+  assert.equal(staged.writes[0].parentId, step.id);
+}));
+
+test('an existing project\'s Vision records join its instance when Vision starts publishing its API', () => fixture(({ db, id }) => {
+  const instance = layerInstanceId(db, id, 'product');
+  for (const kind of ['story', 'step', 'activity', 'phase', 'brief_claim'])
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM knowledge_records WHERE project_id = ? AND kind = ? AND layer_instance_id IS NOT ?').get(id, kind, instance).n, 0, `${kind} is tagged`);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM knowledge_revisions v JOIN knowledge_records r ON r.id = v.record_id WHERE r.project_id = ? AND r.kind = 'story' AND v.layer_instance_id IS NULL").get(id).n, 0,
+    'revisions follow their records');
+}, true));

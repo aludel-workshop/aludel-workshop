@@ -78,10 +78,17 @@ export function layerUi({ dataDirectory, layerOrigin, portalOrigin, appOriginFor
   return { status, settle, serve, buildKey };
 }
 
+// Host features a layer's views may ask for by name (`hostCalls` in layer.json), each fixed to its routes here. A layer
+// cannot add a route: it can only request a feature the host defines, and the manifest change is reviewed like any other.
+export const hostFeatures = Object.freeze({
+  pageChanges: [['POST', /^\/pages\/change$/], ['POST', /^\/pages\/review$/]],
+  skeleton: [['POST', /^\/skeleton$/]],
+  documents: [['POST', /^\/docs(?:\/[^/]+)?$/]]
+});
 // What the portal page may do for a layer's frame, checked on the server for every call it carries. Reads of the project
-// the person can already see, including the Library (DEC-059); this layer's own API and records; creating Work; and, for Pages, the Pages host features it
-// still relies on. Everything else is refused.
-export function frameAllows({ key, projectId, method, pathname }) {
+// the person can already see, including the Library (DEC-059); this layer's own API, records and output files; creating
+// Work; and the host features this layer's manifest requests. Everything else is refused.
+export function frameAllows({ key, projectId, method, pathname, features = [] }) {
   const project = `/api/projects/${encodeURIComponent(projectId)}`;
   if (!pathname.startsWith(project + '/')) return false;
   const rest = pathname.slice(project.length);
@@ -89,9 +96,8 @@ export function frameAllows({ key, projectId, method, pathname }) {
   if (/^\/records(?:\/[^/]+)?$/.test(rest)) return ['POST', 'PUT', 'DELETE'].includes(method);
   if (method === 'POST' && new RegExp(`^/layers/${key}/api/[A-Za-z][A-Za-z0-9]*$`).test(rest)) return true;
   if (method === 'POST' && rest === '/work') return true;
-  if (key === 'product' && method === 'POST' && /^\/docs(?:\/[^/]+)?$/.test(rest)) return true;
   // T03-G2: this layer's own output files, read and edited by the person using its views.
   if (method === 'PUT' && rest === `/layers/${key}/files`) return true;
-  if (key === 'pages' && method === 'POST' && ['/pages/change', '/pages/review', '/skeleton'].includes(rest)) return true;
+  for (const name of features) for (const [allowed, pattern] of hostFeatures[name] || []) if (method === allowed && pattern.test(rest)) return true;
   return false;
 }

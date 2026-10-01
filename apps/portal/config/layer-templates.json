@@ -3,23 +3,23 @@
   "templates": {
     "base": {
       "branch": "main",
-      "commit": "493387c567ae6780b46e771acd1009a32f46bf74"
+      "commit": "4fa64e258a627cf655fd473b98996d3966fd0176"
     },
     "pages": {
       "branch": "pages",
-      "commit": "09f5f1e0f05917175991387bf3fdc4444d5df1b8"
+      "commit": "b8fd73ca0a859d1ae4ebbc3c714ea26eb63bbb41"
     },
     "markdown": {
       "branch": "markdown",
-      "commit": "837190c2333ffdef8fdb42f8322368979bef9eef"
+      "commit": "b9a81228deecf8d33a274729e79f4e382cec4692"
     },
     "data": {
       "branch": "data",
-      "commit": "12d08ebe941d1effdea6b1a32adb4483b9dbc8de"
+      "commit": "53d15736a8a0bfd9e97d9afa31ed7be8069220bd"
     },
     "vision": {
       "branch": "vision",
-      "commit": "ac96e2f8317e665cf051e2c7dbbc33155481402b"
+      "commit": "eac6132cb548388e7d6d427366b0337b935dee41"
     }
   },
   "builtIn": {

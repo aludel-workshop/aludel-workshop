@@ -11,8 +11,9 @@ import { hostTopology, reservedSlugs } from '../server/hosts.mjs';
 import { frameAllows, frameLabel, layerUi } from '../server/layer-ui.mjs';
 import { initLayerContract } from '../server/layer-contract.mjs';
 
-test('a layer frame may read the project, use its own layer, create Work and (Pages only) its host features; nothing else', () => {
-  const allows = (key, method, rest) => frameAllows({ key, projectId: 'p1', method, pathname: `/api/projects/p1${rest}` });
+test('a layer frame may read the project, use its own layer, create Work and the host features its manifest requests; nothing else', () => {
+  const features = { pages: ['pageChanges', 'skeleton'], product: ['documents'] };
+  const allows = (key, method, rest) => frameAllows({ key, projectId: 'p1', method, pathname: `/api/projects/p1${rest}`, features: features[key] || [] });
   for (const [method, rest] of [['GET', '/knowledge'], ['GET', '/layer-instances'], ['GET', '/assets/as-1'], ['GET', '/layers/research/api'],
     ['POST', '/records'], ['PUT', '/records/rec-1'], ['DELETE', '/records/rec-1'], ['POST', '/layers/research/api/createDocument'], ['POST', '/work']])
     assert.equal(allows('research', method, rest), true, `${method} ${rest}`);
@@ -23,6 +24,9 @@ test('a layer frame may read the project, use its own layer, create Work and (Pa
   assert.equal(allows('product', 'POST', '/docs'), true);
   assert.equal(allows('product', 'POST', '/docs/doc-1'), true);
   assert.equal(allows('pages', 'POST', '/docs'), false);
+  // Features are by name, not by layer key: another layer that requests one gets exactly its routes, and an unknown name grants nothing.
+  assert.equal(frameAllows({ key: 'research', projectId: 'p1', method: 'POST', pathname: '/api/projects/p1/docs', features: ['documents'] }), true);
+  assert.equal(frameAllows({ key: 'pages', projectId: 'p1', method: 'POST', pathname: '/api/projects/p1/pages/change', features: ['everything'] }), false);
   assert.equal(frameAllows({ key: 'research', projectId: 'p1', method: 'GET', pathname: '/api/projects/p2/knowledge' }), false, 'another project');
   assert.equal(frameAllows({ key: 'research', projectId: 'p1', method: 'GET', pathname: '/api/session' }), false);
 });

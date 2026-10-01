@@ -39,6 +39,7 @@ import { readActionSource, readAttemptSource, checkPinnedActionEffect } from './
 import { decideFollowUp, hasElevated, initLayerScope, layerAccess, requireElevated, setLayerDefaultAssignee, setLayerElevated } from './layer-scope.mjs';
 import { applyOperation, kindOwners, layerApi, layerApiForKind, recordOperations } from './layer-api.mjs';
 import { frameAllows, frameLabel, layerUi } from './layer-ui.mjs';
+import { layerHostCalls } from './layer-package.mjs';
 import { initLayerContract, layerDescriptors, layerInstances, updateLayerInstance, layerCatalog, layerOutputRead, layerMigrationInventory } from './layer-contract.mjs';
 import { answerDecision, createProposal, ensureB02Fixture, getDecision, getProposal, listDecisions, listDownstreamRecords, listProposals, reassessRecord, reviseProposal } from './product-records.mjs';
 import { openSecretStore } from './secret-store.mjs';
@@ -378,7 +379,8 @@ async function api(request, response, url) {
   const frameLayer = request.headers['x-aludel-layer-frame'];
   if (frameLayer !== undefined) {
     const project = /^\/api\/projects\/([^/]+)\//.exec(url.pathname);
-    if (!project || !/^[a-z][a-z0-9_]{2,31}$/.test(String(frameLayer)) || !frameAllows({ key: String(frameLayer), projectId: decodeURIComponent(project[1]), method: request.method, pathname: url.pathname }))
+    if (!project || !/^[a-z][a-z0-9_]{2,31}$/.test(String(frameLayer)) || !frameAllows({ key: String(frameLayer), projectId: decodeURIComponent(project[1]), method: request.method, pathname: url.pathname,
+      features: layerHostCalls(db, decodeURIComponent(project[1]), String(frameLayer)) }))
       return json(response, 403, { error: 'A layer view cannot do that.' });
   }
   if (url.pathname === '/api/session' && request.method === 'GET') return json(response, 200, {
@@ -1088,7 +1090,8 @@ async function api(request, response, url) {
       // A kind a layer's API owns changes only through that API.
       const call = recordCall(db, projectId, String(input.kind || ''), { layer: typeof input.layer === 'string' ? input.layer : null, mode: 'create' });
       if (call) return json(response, 201, applyOperation({ db, know, api: call.owner.api, projectId, operationId: call.operation.operationId,
-        body: call.operation.singleton ? input.data || {} : { [call.operation.field]: input.data || {} }, elevated: hasElevated(db, user.id, projectId, call.owner.key),
+        body: call.operation.singleton ? input.data || {} : { [call.operation.field]: input.data || {}, ...(call.operation.parentField && input.parentId ? { [call.operation.parentField]: input.parentId } : {}) },
+        elevated: hasElevated(db, user.id, projectId, call.owner.key),
         author: user.name, rationale: input.rationale || null, workItemId: work?.id || null }).record);
       return json(response, 201, know.insert(projectId, String(input.kind || ''), input.data || {}, { parentId: input.parentId || null, author: user.name, rationale: input.rationale || null, workItemId: work?.id || null }));
     }
@@ -1103,8 +1106,8 @@ async function api(request, response, url) {
       if (call) return json(response, 200, applyOperation({ db, know, api: call.owner.api, projectId, operationId: call.operation.operationId,
         id: call.operation.singleton ? null : item, elevated: hasElevated(db, user.id, projectId, call.owner.key),
         body: call.operation.singleton ? { ...Object.fromEntries(Object.entries(existing).filter(([key]) => !['id', 'kind', 'parentId', 'position', 'revision', 'updatedAt'].includes(key))), ...(input.data || {}), ...expected }
-          : { changes: input.data || {}, ...expected },
-        author: user.name, rationale: input.rationale || null, workItemId: work?.id || null }).record);
+          : { changes: input.data || {}, ...expected, ...(call.operation.parentField && input.parentId ? { [call.operation.parentField]: input.parentId } : {}) },
+        author: user.name, rationale: input.rationale || null, workItemId: work?.id || null, ...(input.position !== undefined ? { position: input.position } : {}) }).record);
       return json(response, 200, know.update(projectId, item, input.data || {}, { expectedRevision: input.expectedRevision, author: user.name, rationale: input.rationale || null, position: input.position, parentId: input.parentId, workItemId: work?.id || null }));
     }
     if (section === 'records' && method === 'DELETE' && item) {

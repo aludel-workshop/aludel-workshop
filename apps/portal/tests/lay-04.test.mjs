@@ -15,6 +15,8 @@ import { initWorkflow } from '../server/workflow.mjs';
 import { initLayerContract } from '../server/layer-contract.mjs';
 import { createMarkdownDefinition, saveLayerIdentity, addDomainAction, activateLayerDefinition } from '../server/layer-registry.mjs';
 import { migrateActionProject } from '../server/lat08-migration.mjs';
+// Template mode (DEC-055/059) is the target; legacy expectations that DEC-057 deliberately changed are stated per mode.
+const templatesOn = process.env.MACHINE_LAYER_TEMPLATES_ENABLED === '1' || process.env.MACHINE_PAGES_TEMPLATE_ENABLED === '1';
 
 const catalogs = loadCatalogs(new URL('../config', import.meta.url).pathname);
 const day = 86400000;
@@ -56,7 +58,8 @@ test('LAY-04A (as revised by WORK-UX-01): an answer lands in the record it chang
   const story = storyTitled(know, id, 'Someone can start a conversation');
   const question = story.clarifications[0];
   const work = know.createWork(id, { layer: 'product', type: 'define', title: `Clarify: ${question}`, targets: [{ id: story.id, label: story.title }], question: { text: question, options: [] }, documents: ['Product › story (clarified)'] });
-  assert.equal(work.action, 'product.clarify', 'a question makes it the clarify action');
+  // DEC-057: in template mode Vision is layer-scoped, so the item names its layer; the answer still lands below.
+  if (templatesOn) assert.deepEqual([work.action, work.scope], [null, 'layer']); else assert.equal(work.action, 'product.clarify', 'a question makes it the clarify action');
   assert.deepEqual(work.question, { text: question, options: [] }, 'a free-text question is kept, not dropped');
   assert.throws(() => know.applyAnswer(ada, id, work.id, story.id), /Answer the question/);
   const answered = know.updateWork(ada, id, work.id, { answer: 'A tool listing', rationale: 'Tools are what people talk about' });
@@ -98,7 +101,7 @@ test('WORK-UX-01 (DEC-041): each layer\'s gaps become backlog items, assigned by
   assert.ok(['high', 'medium', 'low'].includes(demo.priority));
 });
 
-test('WORK-UX-01: roles by layer; the onboarding style only presets who takes each action', () => {
+test('WORK-UX-01: roles by layer; the onboarding style only presets who takes each action', { skip: templatesOn && 'DEC-057 replaces per-style action presets with a layer default assignee for layer-scoped layers (layer-scope tests)' }, () => {
   const planner = fixture({ profile: 'planner' });
   const roles = planner.know.roleView(planner.id);
   assert.deepEqual(roles.map(role => role.layer), ['product', 'design', 'pages', 'data', 'platform', 'deploy', 'work']);
@@ -148,8 +151,11 @@ test('LAY-04C: routines run when due, before releases or by hand, never twice wh
   assert.deepEqual(know.runRoutines(id, { at: at(6) }), [], 'nothing is due in the first week');
   const weekly = know.runRoutines(id, { at: at(8) });
   assert.deepEqual(weekly.map(item => item.title.split(' · ')[0]).sort(), ['Accessibility sweep', 'Milestone check', 'Product drift check']);
-  assert.deepEqual(weekly.map(item => item.action).sort(), ['pages.a11y', 'product.drift', 'work.milestone'], 'each routine has its action');
-  assert.ok(weekly.every(item => item.assignee?.label === 'Default agent'), 'a Planner hands audits to the default agent');
+  if (templatesOn) assert.deepEqual(weekly.map(item => item.action || item.layer).sort(), ['pages', 'product', 'work.milestone'], 'layer-scoped routines name their layer (DEC-057)');
+  else {
+    assert.deepEqual(weekly.map(item => item.action).sort(), ['pages.a11y', 'product.drift', 'work.milestone'], 'each routine has its action');
+    assert.ok(weekly.every(item => item.assignee?.label === 'Default agent'), 'a Planner hands audits to the default agent');
+  }
   assert.deepEqual(know.runRoutines(id, { at: at(16) }), [], 'the previous items are still open');
   const drift = weekly.find(item => item.title.startsWith('Product drift'));
   know.updateWork(ada, id, drift.id, { assignee: { kind: 'person', id: ada.id } });
