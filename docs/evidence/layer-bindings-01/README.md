@@ -1,6 +1,6 @@
 # LAYER-BINDINGS-01 steps 1 and 2: the binding contract and the design-system binding — 2026-10-01
 
-> Step 3 (refaceting) evidence: [R1, the pure contract](refaceting-r1.md); [R2, Work as the vehicle](refaceting-r2.md). It replaces area authority and `keeps` described below, and changes what a ceded participant does on its first reconcile.
+> Step 3 (refaceting) evidence: [R1, the pure contract](refaceting-r1.md); [R2, Work as the vehicle](refaceting-r2.md); [R3, roles in the host](refaceting-r3.md). It replaces area authority and `keeps` described below, and changes what a ceded participant does on its first reconcile.
 
 ## Scope and authorization
 

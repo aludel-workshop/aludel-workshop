@@ -495,6 +495,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
   const row = id => db.prepare('SELECT * FROM knowledge_records WHERE id = ?').get(id);
   const hydrate = record => record && { id: record.id, kind: record.kind, parentId: record.parent_id, position: record.position, revision: record.revision, updatedAt: record.updated_at, ...parse(record.data_json, {}) };
   const pagesKind = kind => ['page_map', 'page', 'flow'].includes(kind);
+  const design = { layer: 'design' };
   // LAYER-BASE-01: a record belongs to the layer instance that owns it. Pages kinds always carry their instance (DEC-056);
   // any other kind carries one when the owning layer publishes an API. A named layer narrows a kind several layers own.
   const instanceFor = (projectId, kind, layer = null) => pagesKind(kind) ? pagesInstanceId(db, projectId)
@@ -504,9 +505,17 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     : !record.layer_instance_id || kindOwners(db, projectId, record.kind).some(owner => owner.instanceId === record.layer_instance_id));
   // DEC-059 / T03-G2: a kind an installed layer keeps as files reads from its pinned files, shaped like records.
   const fromFile = (entry, position = 0) => entry && { id: entry.id, kind: entry.kind, parentId: null, position, revision: entry.revision, updatedAt: entry.updatedAt || null, ...entry.data };
+  // LAYER-BINDINGS-01 R3: kinds are per instance. Two installed layers may own the same kind; a read that names no layer
+  // then has to say which, instead of mixing both. A kind one layer owns reads that instance (and untagged legacy rows).
   const list = (projectId, kind, { layer = null } = {}) => {
     const fileKey = fileLayerFor(db, projectId, kind);
     if (fileKey) return currentFileEntries(db, projectId, fileKey).filter(entry => entry.kind === kind).map(fromFile);
+    const owners = pagesKind(kind) ? [] : kindOwners(db, projectId, kind);
+    if (!layer && owners.length > 1) fail(`Several layers own ${kind.replaceAll('_', ' ')} records here. Name the layer.`, 409);
+    // Untagged legacy rows belong to a kind's only owner, as in the Library.
+    const sole = owners.length === 1 && (!layer || owners[0].key === layer) ? owners[0] : null;
+    if (sole) return db.prepare('SELECT * FROM knowledge_records WHERE project_id = ? AND kind = ? AND (layer_instance_id = ? OR layer_instance_id IS NULL) ORDER BY position, created_at')
+      .all(projectId, kind, sole.instanceId).map(hydrate);
     const instanceId = instanceFor(projectId, kind, layer);
     return (instanceId ? db.prepare('SELECT * FROM knowledge_records WHERE project_id = ? AND layer_instance_id = ? AND kind = ? ORDER BY position, created_at').all(projectId, instanceId, kind)
       : db.prepare('SELECT * FROM knowledge_records WHERE project_id = ? AND kind = ? ORDER BY position, created_at').all(projectId, kind)).map(hydrate);
@@ -537,7 +546,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     const clean = rules ? rules.data : validators[kind](data, catalogs);
     if (kind === 'routine') checkRoutineAction(projectId, clean);
     if (rules) checkReferenceList(projectId, rules.references); else checkReferences(projectId, kind, clean);
-    checkDesign(projectId, kind, clean, { parentId });
+    checkDesign(projectId, kind, clean, { parentId, layer: owner?.key || layer || null });
     if (['story', 'spec', 'project'].includes(kind) && !clean.number) clean.number = counter(projectId, kind);
     if (kind === 'brief_claim') counter(projectId, 'brief');
     const instanceId = pagesKind(kind) ? scope(projectId, kind) : owner?.instanceId || null;
@@ -572,14 +581,16 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     }
   }
   // Design records (DESIGN-UX-01): uploads belong to the project, colour roles exist, one token set, one asset per brand key.
-  function checkDesign(projectId, kind, clean, { id = null, parentId = null } = {}) {
+  // The rules hold per layer instance (R3): a second Design-like layer keeps its own token set and brand keys.
+  function checkDesign(projectId, kind, clean, { id = null, parentId = null, layer = null } = {}) {
     if (clean.assetId && !db.prepare('SELECT 1 FROM project_assets WHERE id = ? AND project_id = ?').get(clean.assetId, projectId)) fail('That upload was not found.', 404);
-    if (kind === 'design_tokens' && !id && list(projectId, 'design_tokens').length) fail('The project already has a token set. Change it instead.', 409);
+    const named = { layer };
+    if (kind === 'design_tokens' && !id && list(projectId, 'design_tokens', named).length) fail('The project already has a token set. Change it instead.', 409);
     if (kind === 'component' && parentId && row(parentId)?.kind !== 'component') fail('A component nests inside another component.');
     if (kind === 'brand_asset') {
-      const tokens = list(projectId, 'design_tokens')[0];
+      const tokens = list(projectId, 'design_tokens', named)[0];
       if (tokens) cleanBrandAsset(clean, new Set(tokens.roles.map(role => role.id)));
-      if (clean.key && list(projectId, 'brand_asset').some(asset => asset.key === clean.key && asset.id !== id)) fail(`Another asset is already the app's ${clean.key}. Change that one, or clear its key first.`, 409);
+      if (clean.key && list(projectId, 'brand_asset', named).some(asset => asset.key === clean.key && asset.id !== id)) fail(`Another asset is already the app's ${clean.key}. Change that one, or clear its key first.`, 409);
     }
   }
 
@@ -593,7 +604,8 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     const merged = rules ? rules.data : validators[current.kind]({ ...parse(current.data_json, {}), ...changes }, catalogs);
     if (current.kind === 'routine') checkRoutineAction(projectId, merged);
     if (rules) checkReferenceList(projectId, rules.references); else checkReferences(projectId, current.kind, merged);
-    checkDesign(projectId, current.kind, merged, { id, parentId: parentId ?? current.parent_id });
+    checkDesign(projectId, current.kind, merged, { id, parentId: parentId ?? current.parent_id,
+      layer: current.layer_instance_id ? kindOwners(db, projectId, current.kind).find(owner => owner.instanceId === current.layer_instance_id)?.key || null : null });
     if (current.kind === 'project') checkProjectDeps(projectId, id, merged.deps);
     const contentChanged = JSON.stringify(merged) !== current.data_json;
     const same = !contentChanged && position === undefined && parentId === undefined;
@@ -646,7 +658,8 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
   function afterRemove(projectId, id, kind) {
     // ROADMAP-01: evidence and plans that point at the record let go of it rather than dangle.
     for (const link of list(projectId, 'evidence_link').filter(entry => entry.recordId === id || entry.insightId === id || entry.sourceRef === id)) db.prepare('DELETE FROM knowledge_records WHERE id = ?').run(link.id);
-    if (kind === 'component') for (const other of list(projectId, 'component').filter(entry => entry.slots.some(slot => slot.accepts.includes(id)))) {
+    // IDs are unique, so the components that accepted it are found by ID in whichever instance they are.
+    if (kind === 'component') for (const other of db.prepare("SELECT * FROM knowledge_records WHERE project_id = ? AND kind = 'component'").all(projectId).map(hydrate).filter(entry => entry.slots.some(slot => slot.accepts.includes(id)))) {
       update(projectId, other.id, { slots: other.slots.map(slot => ({ ...slot, accepts: slot.accepts.filter(entry => entry !== id) })) }, { rationale: 'A component it accepted was deleted' });
     }
     if (kind === 'source') for (const finding of list(projectId, 'finding').filter(entry => entry.sourceId === id)) remove(projectId, finding.id);
@@ -1734,9 +1747,10 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
       specs: list(projectId, 'spec').map(spec => ({ ...spec, ref: `SPEC-${String(spec.number).padStart(2, '0')}` })),
       research: list(projectId, 'research'), docs: list(projectId, 'doc').map(doc => ({ ...doc, showsIn: doc.showsIn || ['product'] })),
       // DESIGN-UX-01: Design's records, each with its revisions.
-      tokens: (() => { const record = list(projectId, 'design_tokens')[0]; return record ? { ...record, history: history(record.id) } : null; })(),
-      components: list(projectId, 'component').map(component => ({ ...component, status: componentStatus(component), history: history(component.id) })),
-      brand: list(projectId, 'brand_asset').map(asset => ({ ...asset, history: history(asset.id) })),
+      // The built-in Design layer's own view (R3: named, since another layer may own the same kinds).
+      tokens: (() => { const record = list(projectId, 'design_tokens', design)[0]; return record ? { ...record, history: history(record.id) } : null; })(),
+      components: list(projectId, 'component', design).map(component => ({ ...component, status: componentStatus(component), history: history(component.id) })),
+      brand: list(projectId, 'brand_asset', design).map(asset => ({ ...asset, history: history(asset.id) })),
       pages: pages.map(page => ({ ...page, sections: page.sections || [], links: page.links || [], states: page.states || {}, history: history(page.id) })), work,
       pageMap: list(projectId, 'page_map')[0] || null,
       flows: list(projectId, 'flow').map(flow => ({ ...flow, history: history(flow.id) })),

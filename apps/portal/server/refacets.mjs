@@ -11,6 +11,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { refacet } from './bindings.mjs';
+import { referencesTo } from './entry-roles.mjs';
 import { packageAt } from './layer-package.mjs';
 import { layerBinding, mergeLayerBranch, settleLayerCheckout, undoLayerMerge } from './layer-source.mjs';
 
@@ -43,11 +44,14 @@ export function refacets({ db, know, pool, store, routines }) {
   function current(projectId, key) {
     const { repo, commit } = layerBinding(db, projectId, key);
     const { manifest } = packageAt(repo, commit, key);
-    const entries = pool.outputEntries(projectId).filter(entry => entry.layer.key === key).map(entry => ({ ref: entry.ref, kind: entry.kind, data: entry.data || {} }));
-    return { repo, commit, manifest, entries, bindings: store.all(projectId) };
+    const all = pool.outputEntries(projectId);
+    const entries = all.filter(entry => entry.layer.key === key).map(entry => ({ ref: entry.ref, kind: entry.kind, data: entry.data || {} }));
+    // Other layers' references into this layer's entries, for the preflight (R3's reference index).
+    const references = referencesTo(all, entries.map(entry => entry.ref), { exceptLayer: key });
+    return { repo, commit, manifest, entries, references, bindings: store.all(projectId) };
   }
   const compute = (state, key, change) => refacet({ key, outputs: state.manifest.outputs || [], tabs: state.manifest.tabs || [], facets: state.manifest.facets || [] },
-    change, { entries: state.entries, bindings: state.bindings });
+    change, { entries: state.entries, bindings: state.bindings, references: state.references });
   const describe = (change, preflight) => {
     const what = change.op === 'split' ? `split ${change.facet} into ${change.facet} and ${change.into?.key}` : change.op === 'merge' ? `merge ${change.from} into ${change.facet}` : `rename ${change.facet}`;
     const kinds = Object.entries(preflight.byKind).map(([kind, count]) => `${count} ${kind.replaceAll('_', ' ')}`).join(', ');

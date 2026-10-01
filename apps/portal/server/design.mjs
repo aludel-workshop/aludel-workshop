@@ -251,9 +251,9 @@ export function ensureDesign({ projectId, list, insert, update, once, db, catalo
   const setup = db.prepare(`SELECT p.name, p.description, p.accent_color, s.feel, s.design_notes FROM projects p JOIN project_setup s ON s.project_id = p.id WHERE p.id = ?`).get(projectId);
   if (!setup) return;
   const feel = catalogs.feels?.[setup.feel || 'sleek-saas'] || Object.values(catalogs.feels || {})[0] || {};
-  if (seedKit && !list(projectId, 'design_tokens').length) insert(projectId, 'design_tokens', { ...defaultTokens({ accent: setup.accent_color || feel.accent, font: feel.font, radius: feel.radius }), fromLook: true },
+  if (seedKit && !list(projectId, 'design_tokens', { layer: 'design' }).length) insert(projectId, 'design_tokens', { ...defaultTokens({ accent: setup.accent_color || feel.accent, font: feel.font, radius: feel.radius }), fromLook: true },
     { rationale: `Material 3 starting set from the Look & feel (${feel.label || 'default'})` });
-  if (seedKit && once(projectId, 'design-components-seeded') && !list(projectId, 'component').length) {
+  if (seedKit && once(projectId, 'design-components-seeded') && !list(projectId, 'component', { layer: 'design' }).length) {
     seedComponents((kind, data, parentId) => insert(projectId, kind, data, { parentId, author: 'Aludel template', rationale: 'Provided by aludel-web-v1' }),
       (id, changes) => update(projectId, id, changes, { author: 'Aludel template', rationale: 'Slots accept the template components' }));
   }
@@ -285,7 +285,7 @@ export function ensureDesign({ projectId, list, insert, update, once, db, catalo
 
 // While the token set still comes straight from the Look & feel, changing the Look & feel regenerates it.
 export function syncTokensFromLook({ projectId, list, update, db, catalogs }) {
-  const current = list(projectId, 'design_tokens')[0];
+  const current = list(projectId, 'design_tokens', { layer: 'design' })[0];
   if (!current?.fromLook) return;
   const setup = db.prepare('SELECT p.accent_color, s.feel FROM projects p JOIN project_setup s ON s.project_id = p.id WHERE p.id = ?').get(projectId);
   const feel = catalogs.feels?.[setup?.feel || 'sleek-saas'] || {};

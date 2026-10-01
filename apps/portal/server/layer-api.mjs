@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 import Ajv2020 from 'ajv/dist/2020.js';
 import { layerPackageForProject } from './layer-package.mjs';
 import { fileEntryExists } from './layer-files.mjs';
+import { entryRoles } from './entry-roles.mjs';
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const now = () => new Date().toISOString();
@@ -207,7 +208,8 @@ function read(db, api, projectId, operation, id, overlay) {
 export function callOperation({ db, catalogs, api, projectId, operationId, id = null, body = {}, overlay = null, elevated = false }) {
   const operation = api.operations.get(operationId) || fail(`The ${api.key} API has no operation ${operationId}.`, 404);
   if (operation.needsId && (typeof id !== 'string' || !/^[a-z]+-[a-z0-9]{6,12}$/.test(id))) fail('This operation needs a record id.');
-  if (operation.read) return { operation, result: read(db, api, projectId, operation, id, overlay) };
+  // LAYER-BINDINGS-01 R3: each record read carries its role, when its facet takes part in a binding in force.
+  if (operation.read) return { operation, result: withRoles(db, projectId, api.key, operation.read.kind, read(db, api, projectId, operation, id, overlay)) };
   if (operation.access === 'elevated' && !elevated) fail(`Elevated access to ${api.key} is required for ${operationId}.`, 403);
   if (operation.validate && !operation.validate(body)) fail(message(operation.validate.errors));
   const current = currentFor(db, api, projectId, operation, id, overlay);
@@ -216,8 +218,18 @@ export function callOperation({ db, catalogs, api, projectId, operationId, id = 
   const { writes, references } = handle(api, 'run', [operationId, { id, body },
     { current: current && { id: current.id, kind: current.kind, revision: current.revision, data: current.data }, records, catalogs: handlerCatalogs(api, catalogs) }]);
   if (!Array.isArray(writes) || !writes.length || writes.length > 200 || !Array.isArray(references)) fail('The layer API handler returned an invalid result.', 500);
-  checkWrites(db, api, projectId, writes, references, [...(current ? [current] : []), ...Object.values(records).flat()], overlay);
+  const loaded = [...(current ? [current] : []), ...Object.values(records).flat()];
+  checkWrites(db, api, projectId, writes, references, loaded, overlay);
+  // A person's or agent's call never writes an entry in a replica or ceded facet; only the binding's imports do.
+  entryRoles(db).guard(projectId, api.key, writes, new Map(loaded.map(record => [record.id, record])));
   return { operation, writes, references };
+}
+function withRoles(db, projectId, key, kind, result) {
+  if (!result) return result;
+  const roles = entryRoles(db).resolver(projectId);
+  if (!roles.live.length) return result;
+  const attach = record => { const role = roles.of(key, { kind, data: record.data }); return role?.role ? { ...record, role } : record; };
+  return Array.isArray(result) ? result.map(attach) : attach(result);
 }
 
 // Checks a handler's writes: this layer's outputs only; updates and deletes only of records the call loaded, at the

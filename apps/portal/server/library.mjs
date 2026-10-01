@@ -6,6 +6,7 @@
 import { layerDocumentList, layerDocumentRead } from './layer-space.mjs';
 import { currentFileEntries, fileEntry } from './layer-files.mjs';
 import { layerPackageForProject } from './layer-package.mjs';
+import { entryRoles } from './entry-roles.mjs';
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const parse = value => { try { return JSON.parse(value); } catch { return null; } };
@@ -67,7 +68,14 @@ export function library({ db, know }) {
         ORDER BY position, created_at`).all(projectId, kind, layer.instanceId, sole ? 1 : 0);
       for (const { id } of rows) { const record = know.get(projectId, id); if (record) entries.push(outputEntry(layer, record, words(record))); }
     }
-    return entries;
+    return withRoles(projectId, entries);
+  }
+  // LAYER-BINDINGS-01 R3: an entry whose facet takes part in a binding in force says what it is there, and where its
+  // authority is, so a reader knows where a change belongs.
+  function withRoles(projectId, entries) {
+    const roles = entryRoles(db).resolver(projectId);
+    if (!roles.live.length) return entries;
+    return entries.map(entry => { const role = roles.of(entry.layer.key, { kind: entry.kind, data: entry.data }); return role?.role ? { ...entry, role } : entry; });
   }
   function knowledge(projectId, userId, installed) {
     const as = reader(projectId, userId);
@@ -132,8 +140,9 @@ export function library({ db, know }) {
     if (!owner) fail('Library entry not found.', 404);
     const data = revision === null ? record : know.revisionData(row.id, revision);
     if (!data || revision !== null && revision > record.revision) fail('Revision not found.', 404);
-    return { ref: row.id, source: owner.key === 'library' ? 'library' : 'output', layer: { key: owner.key, name: owner.name, instanceId: owner.instanceId },
-      kind: row.kind, title: title(data) || row.id, revision: revision ?? record.revision, currentRevision: record.revision, data };
+    const [entry] = withRoles(projectId, [{ ref: row.id, source: owner.key === 'library' ? 'library' : 'output', layer: { key: owner.key, name: owner.name, instanceId: owner.instanceId },
+      kind: row.kind, title: title(data) || row.id, revision: revision ?? record.revision, currentRevision: record.revision, data }]);
+    return entry;
   }
 
   // A pin for a cross-layer reference: which instance owns the entry, at which revision.

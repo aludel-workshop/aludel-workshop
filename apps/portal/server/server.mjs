@@ -322,8 +322,8 @@ function scaffoldSetup(user, projectId) {
   know.ensureDesign(projectId);
   // DESIGN-UX-01: the Design layer's tokens, contracts and brand drive the generated styles, token files and brand.
   const brandUploads = new Map(flows.projectAssets(projectId, 'brand').map(asset => [asset.id, asset]));
-  const designSystem = { tokens: know.list(projectId, 'design_tokens')[0] || null,
-    components: know.list(projectId, 'component').map(component => ({ ...component, status: componentStatus(component) })), brand: know.list(projectId, 'brand_asset').map(asset => ({ ...asset, upload: asset.assetId ? brandUploads.get(asset.assetId) || null : null })) };
+  const designSystem = { tokens: know.list(projectId, 'design_tokens', { layer: 'design' })[0] || null,
+    components: know.list(projectId, 'component', { layer: 'design' }).map(component => ({ ...component, status: componentStatus(component) })), brand: know.list(projectId, 'brand_asset', { layer: 'design' }).map(asset => ({ ...asset, upload: asset.assetId ? brandUploads.get(asset.assetId) || null : null })) };
   return { ...setup, data: { objects: know.list(projectId, 'data_object'), operations: know.list(projectId, 'data_operation') }, agents: know.agentExport(projectId), designSystem,
     pageRecords: know.list(projectId, 'page') };
 }
@@ -1093,7 +1093,7 @@ async function api(request, response, url) {
         if (!inspectGitRepository(workspace).committed) return json(response, 409, { error: 'The repository does not exist yet. Finish setup first.' });
         const setup = flows.projectSetup(user, projectId);
         return json(response, 200, starterDocs(workspace, { project: setup.project, stories: storyRefs(projectId), personas: know.list(projectId, 'persona'), objects: know.list(projectId, 'data_object'),
-          operations: know.list(projectId, 'data_operation'), tokens: know.list(projectId, 'design_tokens')[0] || null, components: know.list(projectId, 'component'), stack: readStack(workspace) }));
+          operations: know.list(projectId, 'data_operation'), tokens: know.list(projectId, 'design_tokens', { layer: 'design' })[0] || null, components: know.list(projectId, 'component', { layer: 'design' }), stack: readStack(workspace) }));
       }
       if (item === 'docs-refresh' && method === 'POST') {
         const input = await readJson(request);
