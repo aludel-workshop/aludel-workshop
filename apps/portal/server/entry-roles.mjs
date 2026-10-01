@@ -35,7 +35,16 @@ export function entryRoles(db) {
       if (role?.authority) role.authority = { ...role.authority, name: layer(role.authority.layer).name };
       return role;
     };
-    return { of, layer, live };
+    // Every facet of a layer with its role, for the layer's own views: { key, title, kinds, role, binding, authority }.
+    const facets = key => layer(key).facets.map(facet => {
+      const binding = live.find(item => item.participants.some(p => p.layer.key === key && p.facet === facet.key));
+      if (!binding) return { key: facet.key, title: facet.title, kinds: facet.kinds, role: null, binding: null, authority: null };
+      const self = binding.participants.find(p => p.layer.key === key && p.facet === facet.key);
+      const hub = binding.participants.find(p => p.id === binding.authority);
+      return { key: facet.key, title: facet.title, kinds: facet.kinds, role: self.role, binding: binding.id,
+        authority: { participant: hub.id, layer: hub.layer.key, facet: hub.facet, name: layer(hub.layer.key).name } };
+    });
+    return { of, layer, live, facets };
   }
 
   // A person's or agent's writes to a layer, before they apply: none may touch an entry in a replica or ceded facet,

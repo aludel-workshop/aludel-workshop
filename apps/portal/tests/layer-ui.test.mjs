@@ -28,6 +28,11 @@ test('a layer frame may read the project, use its own layer, create Work and the
   assert.equal(frameAllows({ key: 'research', projectId: 'p1', method: 'POST', pathname: '/api/projects/p1/docs', features: ['documents'] }), true);
   assert.equal(frameAllows({ key: 'pages', projectId: 'p1', method: 'POST', pathname: '/api/projects/p1/pages/change', features: ['everything'] }), false);
   assert.equal(frameAllows({ key: 'research', projectId: 'p1', method: 'GET', pathname: '/api/projects/p2/knowledge' }), false, 'another project');
+  // LAYER-BINDINGS-01 R4: a frame reads its own layer's roles (the server takes the layer from the frame) and proposes changes.
+  assert.equal(allows('research', 'GET', '/roles'), true);
+  assert.equal(allows('research', 'POST', '/roles/propose'), true);
+  assert.equal(allows('research', 'PUT', '/roles'), false);
+  assert.equal(allows('research', 'GET', '/roles/propose'), false);
   assert.equal(frameAllows({ key: 'research', projectId: 'p1', method: 'GET', pathname: '/api/session' }), false);
 });
 

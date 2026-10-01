@@ -33,7 +33,7 @@ try {
   const host = path => join(portal, 'src', path);
   await build({ configFile: false, root: join(portal, 'src/frame'), base: './', logLevel: 'warn',
     resolve: { alias: { '@aludel/host/context': host('layers/context.ts'), '@aludel/host/built-by': host('layers/built-by.ts'), '@aludel/host/evidence': host('layers/evidence.ts'),
-      '@aludel/host/work-shared': host('layers/work-shared.ts'),
+      '@aludel/host/work-shared': host('layers/work-shared.ts'), '@aludel/host/roles': host('layers/roles.ts'),
       '@aludel/host/design-components': host('layers/design-components.ts'), '@aludel/host/design-state': host('layers/design-state.ts'),
       '@aludel/host/page-blocks': host('page-blocks.ts'), '@aludel/host/design-tokens': host('design-tokens.js'), '@aludel/host/app-kit': host('app-kit/index.ts'), '@aludel/host/docs': host('layers/doc-view.ts'),
       '@aludel/layer/entry': join(scratch, manifest.ui.entry), '@aludel/layer/styles': join(scratch, 'styles.scss') } },

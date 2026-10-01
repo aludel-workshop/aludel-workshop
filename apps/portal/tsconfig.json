@@ -44,6 +44,9 @@
       ],
       "@aludel/host/work-shared": [
         "./src/layers/work-shared.ts"
+      ],
+      "@aludel/host/roles": [
+        "./src/layers/roles.ts"
       ]
     }
   },

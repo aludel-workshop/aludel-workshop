@@ -5,6 +5,7 @@ const host = (path: string) => fileURLToPath(new URL('./src/' + path, import.met
 const layerSdk = {
   '@aludel/host/context': host('layers/context.ts'),
   '@aludel/host/built-by': host('layers/built-by.ts'),
+  '@aludel/host/roles': host('layers/roles.ts'),
   '@aludel/host/design-components': host('layers/design-components.ts'),
   '@aludel/host/design-state': host('layers/design-state.ts'),
   '@aludel/host/page-blocks': host('page-blocks.ts'),

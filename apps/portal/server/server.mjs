@@ -10,6 +10,8 @@ import { library } from './library.mjs';
 import { bindingRecords, initBindings } from './binding-records.mjs';
 import { bindingRoutines } from './binding-routines.mjs';
 import { refacets } from './refacets.mjs';
+import { entryRoles } from './entry-roles.mjs';
+import { facetOf } from './bindings.mjs';
 import { commitOutputFile, initLayerFiles, readOutputFile } from './layer-files.mjs';
 import { previewManager, previewRuntime } from './previews.mjs';
 import { agentsGuide, copyMedia, initialFiles, loadScaffoldSources, sitePages, skeletonFiles, workflowPaths, writeBinaries, writeFiles } from './scaffold.mjs';
@@ -787,6 +789,35 @@ async function api(request, response, url) {
   }
   // LAYER-BINDINGS-01 step 3: refacets are reviewed Work in the layer they change; binding changes and refacets are decided
   // by the owner; an overlap chain raises the refacets and the binding proposal that waits on them.
+  // LAYER-BINDINGS-01 R4: a layer's facets with their roles, and which facet each of its entries is in, for its own views
+  // (@aludel/host/roles). A view never names its own layer (a template can be installed under any key): the layer is the
+  // frame asking (x-aludel-layer-frame), or `?layer=` outside a frame. A replica's or ceded facet's "Propose a change"
+  // raises Work in the authority's layer.
+  const rolesRoute = /^\/api\/projects\/([^/]+)\/roles(\/propose)?$/.exec(url.pathname);
+  if (rolesRoute) {
+    const projectId = decodeURIComponent(rolesRoute[1]);
+    const layerKey = String(frameLayer ?? url.searchParams.get('layer') ?? '');
+    requireMember(db, user, projectId);
+    if (!/^[a-z][a-z0-9_]{2,31}$/.test(layerKey)) return json(response, 400, { error: 'Name the layer.' });
+    const roles = entryRoles(db).resolver(projectId), facets = roles.facets(layerKey), declared = roles.layer(layerKey).facets;
+    const entries = Object.fromEntries(pool.outputEntries(projectId).filter(entry => entry.layer.key === layerKey)
+      .map(entry => [entry.ref, facetOf(declared, entry)]).filter(([, facet]) => facet));
+    if (request.method === 'GET' && !rolesRoute[2]) return json(response, 200, { facets, entries }, { 'cache-control': 'no-store' });
+    if (request.method === 'POST' && rolesRoute[2]) {
+      const input = await readJson(request);
+      const ref = typeof input.ref === 'string' ? input.ref : null;
+      const facet = facets.find(item => item.key === (ref ? entries[ref] : input.facet));
+      if (!facet || !['replica', 'ceded'].includes(facet.role)) return json(response, 409, { error: 'Changes to this are made here.' });
+      const note = typeof input.note === 'string' ? input.note.trim().slice(0, 1000) : '';
+      const title = ref ? pool.read(projectId, user.id, ref).title : facet.title;
+      const item = know.createWork(projectId, { layer: facet.authority.layer, layerScoped: true, type: 'review', state: 'suggested',
+        title: `Change proposed from ${roles.layer(layerKey).name}: ${title}`.slice(0, 160), documents: ['Library › Bindings'],
+        context: { routine: 'role-proposal', binding: facet.binding, from: { layer: layerKey, facet: facet.key, ref }, note },
+        logText: note ? `Proposed: ${note}` : 'Proposed' }, user.name);
+      return json(response, 201, { item }, { 'cache-control': 'no-store' });
+    }
+    return json(response, 405, { error: 'Method not allowed.' });
+  }
   const refacetRoute = /^\/api\/projects\/([^/]+)\/(?:layers\/([^/]+)\/refacets|refacets\/([^/]+)\/decide|binding-changes\/([^/]+)\/decide|overlaps)$/.exec(url.pathname);
   if (refacetRoute && request.method === 'POST') {
     const [projectId, layerKey, refacetId, changeId] = refacetRoute.slice(1).map(value => value ? decodeURIComponent(value) : value);

@@ -99,7 +99,10 @@ export function frameAllows({ key, projectId, method, pathname, features = [] })
   const project = `/api/projects/${encodeURIComponent(projectId)}`;
   if (!pathname.startsWith(project + '/')) return false;
   const rest = pathname.slice(project.length);
-  if (method === 'GET') return rest === '/knowledge' || rest === '/layer-instances' || rest === '/library' || rest === '/library/entry' || /^\/assets\/[^/]+$/.test(rest) || rest === `/layers/${key}/api` || rest === `/layers/${key}/files`;
+  // LAYER-BINDINGS-01 R4: the roles of this layer's own facets (the server reads the layer from the frame), and proposing
+  // a change to a replica or ceded entry, which becomes Work in the authority's layer.
+  if (method === 'POST' && rest === '/roles/propose') return true;
+  if (method === 'GET') return rest === '/roles' || rest === '/knowledge' || rest === '/layer-instances' || rest === '/library' || rest === '/library/entry' || /^\/assets\/[^/]+$/.test(rest) || rest === `/layers/${key}/api` || rest === `/layers/${key}/files`;
   if (/^\/records(?:\/[^/]+)?$/.test(rest)) return ['POST', 'PUT', 'DELETE'].includes(method);
   if (method === 'POST' && new RegExp(`^/layers/${key}/api/[A-Za-z][A-Za-z0-9]*$`).test(rest)) return true;
   if (method === 'POST' && rest === '/work') return true;
