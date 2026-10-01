@@ -1,7 +1,7 @@
 ---
 id: LAYER-BINDINGS-01-REFACET
 kind: design-plan
-status: proposed
+status: r1-accepted
 updated: 2026-10-01
 depends_on: [LAYER-BINDINGS-01]
 supersedes: "facet-splitting plan of 2026-10-01 (areas inside facets), rejected by the owner"
@@ -17,7 +17,7 @@ supersedes: "facet-splitting plan of 2026-10-01 (areas inside facets), rejected 
 
 Earlier the same day the owner said existing projects don't matter (only disposable tests exist), and asked for the general case rather than the Branding example.
 
-This document is the plan only; nothing in it is built. It is step 3 of [the work record](work-record.md).
+This document is the plan. It is step 3 of [the work record](work-record.md). **R1 (the pure contract) was built and agent-checked on 2026-10-01** ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r1.md)); R2–R5 aren't built. The owner accepted the defaults and R1's behaviour on 2026-10-01 (work record, decision 7). R1 settled some details differently from this text, and the evidence lists them: `notIn` in `where`; one field per kind; ceded participants offering their content once; a ceded facet taking authority back; narrow replicas using `added: ignore`.
 
 ## The idea in one paragraph
 
@@ -138,7 +138,7 @@ Unrelated layers may still choose the same kind names (two layers with `persona`
 | **R4 Views** | `@aludel/host/roles`; base contract requirement and test; Vision and Design adopt it (two different layers, to show generality) | Per-pin UI typecheck; each view renders all three roles |
 | **R5 Overlap and journeys** | Discover raises Assess overlap for a new layer; journeys for the Personas cede, Branding from scratch, and a merge back, with axe and 390px | Browser journeys with templates on |
 
-## Proposed defaults
+## Defaults (accepted by the owner 2026-10-01)
 
 1. **Area-split authority and `keeps` are removed from bindings**; refaceting replaces them (section 2).
 2. **The facet keeping the original key keeps its bindings**; split-off facets start unbound unless the refacet names a role.
@@ -153,4 +153,4 @@ Unrelated layers may still choose the same kind names (two layers with `persona`
 
 ## Readiness
 
-Ready for owner review. R1 can start once the defaults are accepted or changed. Nothing depends on existing projects.
+R1 is built, and its defaults and deviations are owner-accepted. R2 (Work as the vehicle, persisting detached entries, one live binding per facet in records) is in progress. Nothing depends on existing projects.
