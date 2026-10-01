@@ -7,7 +7,7 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { runPure, sourceReviewed } from './layer-api.mjs';
-import { fileOutputs, outputPath, packageAt } from './layer-package.mjs';
+import { fileOutputs, layerPackageForProject, outputPath, packageAt } from './layer-package.mjs';
 
 export { fileOutputs, outputPath };
 
@@ -22,6 +22,9 @@ export function initLayerFiles(db) {
     layer_key TEXT NOT NULL, layer_instance_id TEXT NOT NULL, kind TEXT NOT NULL, content_hash TEXT, commit_sha TEXT NOT NULL, title TEXT NOT NULL, created_at TEXT NOT NULL,
     PRIMARY KEY(project_id, entry_id, revision));
     CREATE TABLE IF NOT EXISTS layer_file_syncs (project_id TEXT NOT NULL, layer_instance_id TEXT NOT NULL, commit_sha TEXT NOT NULL, PRIMARY KEY(project_id, layer_instance_id))`);
+  const columns = new Set(db.prepare('PRAGMA table_info(layer_file_entries)').all().map(column => column.name));
+  if (!columns.has('author')) db.exec('ALTER TABLE layer_file_entries ADD COLUMN author TEXT');
+  if (!columns.has('rationale')) db.exec('ALTER TABLE layer_file_entries ADD COLUMN rationale TEXT');
 }
 
 const read = (repo, commit, path) => {
@@ -62,24 +65,25 @@ const binding = (db, projectId, key) => db.prepare(`SELECT b.repository_path AS 
 const latest = (db, projectId, id) => db.prepare('SELECT * FROM layer_file_entries WHERE project_id = ? AND entry_id = ? ORDER BY revision DESC LIMIT 1').get(projectId, id);
 
 // Brings the index up to the layer's pin: a changed entry gets its next revision, a removed one a tombstone revision.
-export function syncFileEntries(db, projectId, key) {
+export function syncFileEntries(db, projectId, key, { author = null, rationale = null } = {}) {
   initLayerFiles(db);
   const bound = binding(db, projectId, key);
   if (!bound) return [];
   const index = indexAt(db, projectId, key, bound.repo, bound.commit);
   if (!index) return [];
-  const insert = db.prepare('INSERT INTO layer_file_entries VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+  const insert = db.prepare(`INSERT INTO layer_file_entries(project_id, entry_id, revision, layer_key, layer_instance_id, kind, content_hash, commit_sha, title, created_at, author, rationale)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
   const at = now(), present = new Set();
   for (const entry of index.entries) {
     present.add(entry.id);
     const last = latest(db, projectId, entry.id);
     if (last && last.layer_instance_id !== bound.instanceId && last.content_hash !== null) fail(`Entry ${entry.id} already belongs to another layer.`, 409);
     if (last?.content_hash === entry.hash) continue;
-    insert.run(projectId, entry.id, (last?.revision || 0) + 1, key, bound.instanceId, entry.kind, entry.hash, bound.commit, entry.title, at);
+    insert.run(projectId, entry.id, (last?.revision || 0) + 1, key, bound.instanceId, entry.kind, entry.hash, bound.commit, entry.title, at, author, rationale);
   }
   for (const row of db.prepare(`SELECT e.* FROM layer_file_entries e WHERE e.project_id = ? AND e.layer_instance_id = ? AND e.revision = (
       SELECT MAX(revision) FROM layer_file_entries x WHERE x.project_id = e.project_id AND x.entry_id = e.entry_id) AND e.content_hash IS NOT NULL`).all(projectId, bound.instanceId))
-    if (!present.has(row.entry_id)) insert.run(projectId, row.entry_id, row.revision + 1, key, bound.instanceId, row.kind, null, bound.commit, row.title, at);
+    if (!present.has(row.entry_id)) insert.run(projectId, row.entry_id, row.revision + 1, key, bound.instanceId, row.kind, null, bound.commit, row.title, at, author, rationale);
   db.prepare('INSERT INTO layer_file_syncs VALUES (?, ?, ?) ON CONFLICT(project_id, layer_instance_id) DO UPDATE SET commit_sha = excluded.commit_sha').run(projectId, bound.instanceId, bound.commit);
   return currentFileEntries(db, projectId, key);
 }
@@ -128,24 +132,32 @@ export function readOutputFile(db, projectId, key, path) {
 // A person's edit to an output file: one commit on `main`, applied at once when the files still index. `expectedCommit`
 // guards against writing over a newer `main`.
 export function commitOutputFile(db, { projectId, key, path, content, expectedCommit, author, message = null }) {
-  if (typeof content !== 'string' || Buffer.byteLength(content) > maxFileBytes) fail(`An output file must be text under ${maxFileBytes / 1024} KB.`);
+  return commitOutputFiles(db, { projectId, key, files: { [path]: content }, expectedCommit, author, message });
+}
+export function commitOutputFiles(db, { projectId, key, files, expectedCommit, author, message = null, rationale = null }) {
   const bound = binding(db, projectId, key) || fail('This layer has no installed repository.', 409);
   if (expectedCommit !== bound.commit) fail('This layer changed since you opened it. Reload and try again.', 409);
   const declared = fileOutputs(packageAt(bound.repo, bound.commit, key).manifest) || fail('This layer keeps no output files.', 404);
-  if (!declared.paths.includes(path)) fail('That is not one of this layer\'s output files.', 404);
+  for (const [path, content] of Object.entries(files)) {
+    if (!declared.paths.includes(path)) fail('That is not one of this layer\'s output files.', 404);
+    if (typeof content !== 'string' || Buffer.byteLength(content) > maxFileBytes) fail(`An output file must be text under ${maxFileBytes / 1024} KB.`);
+  }
   const { repo, commit: main } = bound;
   if (git(repo, ['rev-parse', 'refs/heads/main']).trim() !== main) fail('The layer repository\'s main branch is not at its pin; reconcile it first.', 409);
-  if (read(repo, main, path) === content) return { commit: main, entries: currentFileEntries(db, projectId, key), unchanged: true };
+  const changed = Object.entries(files).filter(([path, content]) => read(repo, main, path) !== content);
+  if (!changed.length) return { commit: main, entries: currentFileEntries(db, projectId, key), unchanged: true };
   const index = `${repo}/.git/aludel-index-${process.pid}-${Date.now()}`;
   const env = { ...process.env, GIT_INDEX_FILE: index, GIT_AUTHOR_NAME: String(author || 'Aludel').slice(0, 80), GIT_AUTHOR_EMAIL: 'person@aludel.invalid',
     GIT_COMMITTER_NAME: 'Aludel', GIT_COMMITTER_EMAIL: 'aludel@aludel.invalid' };
   let next;
   try {
-    const blob = git(repo, ['hash-object', '-w', '--stdin'], { input: content }).trim();
     git(repo, ['read-tree', main], { env });
-    git(repo, ['update-index', '--add', '--cacheinfo', `100644,${blob},${path}`], { env });
+    for (const [path, content] of changed) {
+      const blob = git(repo, ['hash-object', '-w', '--stdin'], { input: content }).trim();
+      git(repo, ['update-index', '--add', '--cacheinfo', `100644,${blob},${path}`], { env });
+    }
     const tree = git(repo, ['write-tree'], { env }).trim();
-    next = git(repo, ['commit-tree', tree, '-p', main, '-m', String(message || `Edit ${path}`).slice(0, 300)], { env }).trim();
+    next = git(repo, ['commit-tree', tree, '-p', main, '-m', String(message || rationale || `Edit ${changed.map(([path]) => path).join(', ')}`).slice(0, 300)], { env }).trim();
   } finally { try { execFileSync('rm', ['-f', index]); } catch { /* none */ } }
   try { indexAt(db, projectId, key, repo, next); } catch (error) { fail(`The edited file does not index: ${error.message}`, error.status === 500 ? 400 : error.status); }
   const own = !db.isTransaction;
@@ -153,7 +165,7 @@ export function commitOutputFile(db, { projectId, key, path, content, expectedCo
   try {
     git(repo, ['update-ref', 'refs/heads/main', next, main]);
     db.prepare('UPDATE layer_package_bindings SET accepted_commit = ? WHERE project_id = ? AND layer_key = ?').run(next, projectId, key);
-    const entries = syncFileEntries(db, projectId, key);
+    const entries = syncFileEntries(db, projectId, key, { author: author || null, rationale: rationale || message || null });
     if (own) db.exec('COMMIT');
     try { if (!git(repo, ['status', '--porcelain']).trim()) git(repo, ['reset', '--quiet', '--hard', 'main']); } catch { /* the pin is authoritative */ }
     return { commit: next, entries };
@@ -162,4 +174,128 @@ export function commitOutputFile(db, { projectId, key, path, content, expectedCo
     try { git(repo, ['update-ref', 'refs/heads/main', main, next]); } catch { /* main was not moved */ }
     throw error;
   }
+}
+
+// ---- The host's record calls on file outputs ----
+
+// The installed, enabled layer that keeps this kind as files here, or null.
+export function fileLayerFor(db, projectId, kind) {
+  if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_package_bindings'").get()) return null;
+  for (const row of db.prepare(`SELECT b.layer_key AS key FROM layer_package_bindings b JOIN layer_instances i ON i.project_id = b.project_id AND i.instance_id = b.layer_instance_id
+      AND i.layer_key = b.layer_key WHERE b.project_id = ? AND i.enabled = 1`).all(projectId)) {
+    let manifest;
+    try { manifest = layerPackageForProject(db, projectId, row.key)?.manifest; } catch { continue; }
+    if (manifest?.files?.kinds?.includes(kind)) return row.key;
+  }
+  return null;
+}
+
+// Record-shaped writes to a file layer: each op is normalized by the layer's own rules, the entries are written back to its
+// files by the layer's `fromEntries`, and the result is one commit as the person. `checkReferences` resolves references
+// outside the batch (the Library); references to entries in the batch resolve here.
+// ops: { op: create | update | delete, kind?, id, data?, expectedRevision? }
+export function writeFileEntries(db, { projectId, key, ops, author = 'Aludel', rationale = null, checkReferences = () => {} }) {
+  const bound = binding(db, projectId, key) || fail('This layer has no installed repository.', 409);
+  const declared = fileOutputs(packageAt(bound.repo, bound.commit, key).manifest) || fail('This layer keeps no output files.', 404);
+  const source = read(bound.repo, bound.commit, declared.indexer);
+  if (!sourceReviewed(db, projectId, key, declared.indexer, createHash('sha256').update(source).digest('hex'))) fail(`The ${key} indexer at this commit has not passed review.`, 409);
+  const revisions = new Map(currentFileEntries(db, projectId, key).map(entry => [entry.id, entry.revision]));
+  let list = indexAt(db, projectId, key, bound.repo, bound.commit).entries.map(({ id, kind, title, data }) => ({ id, kind, title, data }));
+  const outside = [];
+  const normalize = (kind, data) => {
+    let result;
+    try { result = runPure(source, 'normalize', [kind, data]); } catch (error) { if (/no normalize/.test(error.message)) fail(`The ${key} layer's files change only in its repository.`, 409); throw error; }
+    if (!result?.data || !Array.isArray(result.references)) fail(`The ${key} layer returned an invalid entry.`, 500);
+    return result;
+  };
+  for (const change of ops) {
+    const at = list.findIndex(entry => entry.id === change.id);
+    if (change.op === 'create') {
+      if (!declared.kinds.includes(change.kind)) fail(`The ${key} layer keeps no ${change.kind}.`);
+      if (!entryId.test(String(change.id)) || at >= 0 || fileEntry(db, projectId, change.id)) fail('The new entry needs a fresh id.', 500);
+      const result = normalize(change.kind, change.data);
+      list.push({ id: change.id, kind: change.kind, title: '', data: result.data });
+      outside.push(...result.references);
+    } else if (change.op === 'update') {
+      if (at < 0) fail('Record not found.', 404);
+      if (change.expectedRevision !== undefined && Number(change.expectedRevision) !== revisions.get(change.id)) fail('This record changed since you opened it. Reload to see the latest; your edit is kept.', 409);
+      const result = normalize(list[at].kind, { ...list[at].data, ...change.data });
+      list[at] = { ...list[at], data: result.data };
+      outside.push(...result.references);
+    } else if (change.op === 'delete') {
+      if (at < 0) fail('Record not found.', 404);
+      list = list.filter(entry => entry.id !== change.id);
+    } else fail('Unknown change.', 500);
+  }
+  // References to this layer's own entries must be in the new list; the rest go to the Library.
+  const own = new Map(list.map(entry => [entry.id, entry.kind]));
+  checkReferences(outside.filter(([id, kinds]) => {
+    if (own.has(id)) { if (!kinds.includes(own.get(id))) fail(`A linked ${kinds[0].replace('_', ' ')} was not found.`, 404); return false; }
+    if (declared.kinds.some(kind => kinds.includes(kind)) && kinds.every(kind => declared.kinds.includes(kind))) fail(`A linked ${kinds[0].replace('_', ' ')} was not found.`, 404);
+    return true;
+  }));
+  const previous = Object.fromEntries(declared.paths.map(path => [path, read(bound.repo, bound.commit, path)]).filter(([, text]) => text !== null));
+  let files;
+  try { files = runPure(source, 'fromEntries', [list, { files: previous }]); } catch (error) { if (/no fromEntries/.test(error.message)) fail(`The ${key} layer's files change only in its repository.`, 409); throw error; }
+  if (!files || typeof files !== 'object') fail(`The ${key} layer returned no files.`, 500);
+  return commitOutputFiles(db, { projectId, key, files, expectedCommit: bound.commit, author, rationale });
+}
+
+// Adopts records a layer kept before it kept files: one commit writes them into its files with their IDs, each entry
+// continues its record's revision number, and the rows move to a read-only archive. Their revision history stays.
+export function adoptRecordsIntoFiles(db, projectId, key) {
+  initLayerFiles(db);
+  const bound = binding(db, projectId, key);
+  const declared = bound && fileOutputs(packageAt(bound.repo, bound.commit, key).manifest);
+  if (!declared) return null;
+  const marks = declared.kinds.map(() => '?').join(',');
+  if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'knowledge_records'").get()) return null;
+  const tagged = db.prepare('PRAGMA table_info(knowledge_records)').all().some(column => column.name === 'layer_instance_id');
+  const scope = `project_id = ? AND kind IN (${marks})${tagged ? ' AND (layer_instance_id IS NULL OR layer_instance_id = ?)' : ''}`;
+  const scopeArgs = [projectId, ...declared.kinds, ...(tagged ? [bound.instanceId] : [])];
+  const rows = db.prepare(`SELECT * FROM knowledge_records WHERE ${scope} ORDER BY rowid`).all(...scopeArgs);
+  if (!rows.length) return null;
+  const source = read(bound.repo, bound.commit, declared.indexer);
+  if (!sourceReviewed(db, projectId, key, declared.indexer, createHash('sha256').update(source).digest('hex'))) fail(`The ${key} indexer at this commit has not passed review.`, 409);
+  const existing = indexAt(db, projectId, key, bound.repo, bound.commit).entries;
+  if (existing.some(entry => rows.some(row => row.id === entry.id))) fail(`The ${key} files already hold some of these records; reconcile before adopting.`, 409);
+  const list = [...existing.map(({ id, kind, title, data }) => ({ id, kind, title, data })), ...rows.map(row => ({ id: row.id, kind: row.kind, title: '', data: runPure(source, 'normalize', [row.kind, JSON.parse(row.data_json)]).data }))];
+  const previous = Object.fromEntries(declared.paths.map(path => [path, read(bound.repo, bound.commit, path)]).filter(([, text]) => text !== null));
+  const files = runPure(source, 'fromEntries', [list, { files: previous }]);
+  db.exec(`CREATE TABLE IF NOT EXISTS knowledge_records_archive AS SELECT * FROM knowledge_records WHERE 0`);
+  const own = !db.isTransaction;
+  if (own) db.exec('BEGIN IMMEDIATE');
+  let result;
+  try {
+    // Seed each entry at its record's revision, so pins made against the records stay current.
+    const at = now();
+    const seed = db.prepare(`INSERT OR IGNORE INTO layer_file_entries(project_id, entry_id, revision, layer_key, layer_instance_id, kind, content_hash, commit_sha, title, created_at, author, rationale)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Aludel', 'Adopted from records')`);
+    result = commitOutputFiles(db, { projectId, key, files, expectedCommit: bound.commit, author: 'Aludel', rationale: `Adopt ${rows.length} existing records into ${declared.paths.join(', ')}` });
+    const index = indexAt(db, projectId, key, bound.repo, result.commit);
+    for (const row of rows) {
+      const entry = index.entries.find(item => item.id === row.id);
+      if (!entry) fail(`Record ${row.id} did not survive adoption.`, 500);
+      db.prepare('DELETE FROM layer_file_entries WHERE project_id = ? AND entry_id = ?').run(projectId, row.id);
+      seed.run(projectId, row.id, row.revision, key, bound.instanceId, row.kind, entry.hash, result.commit, entry.title, at);
+    }
+    db.prepare(`INSERT INTO knowledge_records_archive SELECT * FROM knowledge_records WHERE ${scope}`).run(...scopeArgs);
+    db.prepare(`DELETE FROM knowledge_records WHERE ${scope}`).run(...scopeArgs);
+    if (own) db.exec('COMMIT');
+    return { commit: result.commit, adopted: rows.length };
+  } catch (error) {
+    if (own) db.exec('ROLLBACK');
+    // Git is outside SQLite's transaction. If archiving fails after the commit, return main to the accepted pin too.
+    if (result && !result.unchanged) {
+      try { git(bound.repo, ['update-ref', 'refs/heads/main', bound.commit, result.commit]); } catch { /* a changed ref needs explicit reconciliation */ }
+    }
+    throw error;
+  }
+}
+
+// Who changed an entry and why, newest first, as record history reads.
+export function fileEntryHistory(db, projectId, id) {
+  if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_file_entries'").get()) return [];
+  return db.prepare(`SELECT revision, COALESCE(author, 'Aludel') AS author, COALESCE(rationale, 'Edited') AS rationale, NULL AS workItemId, created_at AS createdAt FROM layer_file_entries
+    WHERE (? IS NULL OR project_id = ?) AND entry_id = ? AND content_hash IS NOT NULL ORDER BY revision DESC`).all(projectId, projectId, id);
 }

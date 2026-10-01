@@ -13,7 +13,7 @@ import { requireMember } from './accounts.mjs';
 import { actionGrant, recordNewWorkAction } from './lat08-migration.mjs';
 import { hasElevated, layerDefaultAssignee, layerWorkScope } from './layer-scope.mjs';
 import { kindOwners, layerApiForKind, normalizeRecord } from './layer-api.mjs';
-import { fileEntryExists } from './layer-files.mjs';
+import { currentFileEntries, fileEntry, fileEntryExists, fileEntryHistory, fileLayerFor, writeFileEntries } from './layer-files.mjs';
 import { compiledLocalActions } from './lat07-actions.mjs';
 import { actionForProject, actionsForDefinition, projectLayerDefinition, projectLayerDefinitions } from './layer-registry.mjs';
 import { cleanBrandAsset, cleanComponent, cleanTokens, componentStatus, ensureDesign as seedDesign, syncTokensFromLook } from './design.mjs';
@@ -502,7 +502,11 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
   const scope = (projectId, kind) => pagesKind(kind) ? pagesInstanceId(db, projectId) : null;
   const inScope = (projectId, record) => record && record.project_id === projectId && (pagesKind(record.kind) ? record.layer_instance_id === pagesInstanceId(db, projectId)
     : !record.layer_instance_id || kindOwners(db, projectId, record.kind).some(owner => owner.instanceId === record.layer_instance_id));
+  // DEC-059 / T03-G2: a kind an installed layer keeps as files reads from its pinned files, shaped like records.
+  const fromFile = (entry, position = 0) => entry && { id: entry.id, kind: entry.kind, parentId: null, position, revision: entry.revision, updatedAt: entry.updatedAt || null, ...entry.data };
   const list = (projectId, kind, { layer = null } = {}) => {
+    const fileKey = fileLayerFor(db, projectId, kind);
+    if (fileKey) return currentFileEntries(db, projectId, fileKey).filter(entry => entry.kind === kind).map(fromFile);
     const instanceId = instanceFor(projectId, kind, layer);
     return (instanceId ? db.prepare('SELECT * FROM knowledge_records WHERE project_id = ? AND layer_instance_id = ? AND kind = ? ORDER BY position, created_at').all(projectId, instanceId, kind)
       : db.prepare('SELECT * FROM knowledge_records WHERE project_id = ? AND kind = ? ORDER BY position, created_at').all(projectId, kind)).map(hydrate);
@@ -520,6 +524,12 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     return owner ? normalizeRecord(owner.api, kind, data, catalogs) : null;
   };
   function insert(projectId, kind, data, { parentId = null, position, author = 'Aludel', rationale = null, workItemId = null, id: givenId = null, prepared = null, layer = null } = {}) {
+    const fileKey = fileLayerFor(db, projectId, kind);
+    if (fileKey) {
+      const id = /^[a-z]+-[a-z0-9]{6,12}$/.test(String(givenId)) && !row(givenId) && !fileEntry(db, projectId, givenId) ? givenId : newId(kind);
+      writeFileEntries(db, { projectId, key: fileKey, ops: [{ op: 'create', kind, id, data }], author, rationale, checkReferences: list => checkReferenceList(projectId, list) });
+      return get(projectId, id);
+    }
     if (!kinds.includes(kind) && !kindOwners(db, projectId, kind).length) fail('Unknown record kind.');
     const owner = pagesKind(kind) ? null : layerApiForKind(db, projectId, kind, { layerKey: layer });
     const rules = layerRules(projectId, kind, data, prepared, { layerKey: owner?.key || layer });
@@ -575,6 +585,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
 
   function update(projectId, id, changes, { expectedRevision, author = 'Aludel', rationale = null, workItemId = null, position, parentId, prepared = null } = {}) {
     const current = row(id);
+    if (!current && fileEntry(db, projectId, id)?.currentRevision) return updateFileEntry(projectId, id, changes, { expectedRevision, author, rationale });
     if (!inScope(projectId, current)) fail('Record not found.', 404);
     if (expectedRevision !== undefined && Number(expectedRevision) !== current.revision) fail('This record changed since you opened it. Reload to see the latest; your edit is kept.', 409);
     const rules = layerRules(projectId, current.kind, { ...parse(current.data_json, {}), ...changes }, prepared, { instanceId: current.layer_instance_id || null });
@@ -599,16 +610,41 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     return hydrate(row(id));
   }
 
+  function updateFileEntry(projectId, id, changes, { expectedRevision, author, rationale }) {
+    const before = get(projectId, id);
+    const key = fileLayerFor(db, projectId, before.kind) || fail('This record changes only through its layer.', 409);
+    writeFileEntries(db, { projectId, key, ops: [{ op: 'update', id, data: changes, expectedRevision }], author, rationale, checkReferences: list => checkReferenceList(projectId, list) });
+    const after = get(projectId, id);
+    if (after.revision !== before.revision) for (const listener of revisionListeners) listener({ projectId, record: after, fromRevision: before.revision, toRevision: after.revision, author });
+    return after;
+  }
+  // Several file entries of one layer go in one commit; the usual clean-up then runs for each.
+  function removeMany(projectId, ids) {
+    const entries = ids.map(id => row(id) ? null : get(projectId, id)).filter(Boolean);
+    const key = entries.length && fileLayerFor(db, projectId, entries[0].kind);
+    if (!key || entries.length !== ids.length) { for (const id of ids) remove(projectId, id); return; }
+    writeFileEntries(db, { projectId, key, ops: entries.map(entry => ({ op: 'delete', id: entry.id })), author: 'Aludel', rationale: 'Removed with its story pack' });
+    for (const entry of entries) afterRemove(projectId, entry.id, entry.kind);
+  }
   function remove(projectId, id) {
     const current = row(id);
+    if (!current) {
+      const entry = get(projectId, id);
+      const key = entry && fileLayerFor(db, projectId, entry.kind);
+      if (!key) fail('Record not found.', 404);
+      writeFileEntries(db, { projectId, key, ops: [{ op: 'delete', id }], author: 'Aludel', rationale: null });
+      return afterRemove(projectId, id, entry.kind);
+    }
     if (!inScope(projectId, current)) fail('Record not found.', 404);
     const children = db.prepare('SELECT id FROM knowledge_records WHERE parent_id = ?').all(id);
     for (const child of children) remove(projectId, child.id);
     db.prepare('INSERT OR IGNORE INTO knowledge_deletions(record_id,project_id,kind,parent_id,position,last_revision,data_json,deleted_at,layer_instance_id) VALUES (?,?,?,?,?,?,?,?,?)')
       .run(current.id,current.project_id,current.kind,current.parent_id,current.position,current.revision,current.data_json,now(),current.layer_instance_id);
     db.prepare('DELETE FROM knowledge_records WHERE id = ?').run(id);
+    afterRemove(projectId, id, current.kind);
+  }
+  function afterRemove(projectId, id, kind) {
     // ROADMAP-01: evidence and plans that point at the record let go of it rather than dangle.
-    const kind = current.kind;
     for (const link of list(projectId, 'evidence_link').filter(entry => entry.recordId === id || entry.insightId === id || entry.sourceRef === id)) db.prepare('DELETE FROM knowledge_records WHERE id = ?').run(link.id);
     if (kind === 'component') for (const other of list(projectId, 'component').filter(entry => entry.slots.some(slot => slot.accepts.includes(id)))) {
       update(projectId, other.id, { slots: other.slots.map(slot => ({ ...slot, accepts: slot.accepts.filter(entry => entry !== id) })) }, { rationale: 'A component it accepted was deleted' });
@@ -654,11 +690,24 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
   }
   const briefRevision = projectId => (db.prepare('SELECT next FROM knowledge_counters WHERE project_id = ? AND kind = ?').get(projectId, 'brief')?.next || 1) - 1;
 
-  const history = id => db.prepare('SELECT revision, author, rationale, work_item_id AS workItemId, created_at AS createdAt FROM knowledge_revisions WHERE record_id = ? AND rationale IS NOT NULL ORDER BY revision DESC').all(id);
-  const revisionData = (id, revision) => parse(db.prepare('SELECT data_json FROM knowledge_revisions WHERE record_id = ? AND revision = ?').get(id, revision)?.data_json, null);
+  // A file entry's history continues its record's (DEC-059): file revisions first, then the archived record's.
+  const history = id => [...fileEntryHistory(db, null, id).filter(entry => entry.rationale !== 'Adopted from records'),
+    ...db.prepare('SELECT revision, author, rationale, work_item_id AS workItemId, created_at AS createdAt FROM knowledge_revisions WHERE record_id = ? AND rationale IS NOT NULL ORDER BY revision DESC').all(id)]
+    .filter((entry, index, all) => all.findIndex(other => other.revision === entry.revision) === index);
+  const revisionData = (id, revision) => {
+    const project = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_file_entries'").get()
+      && db.prepare('SELECT project_id FROM layer_file_entries WHERE entry_id = ? LIMIT 1').get(id)?.project_id;
+    const entry = project && fileEntry(db, project, id, revision);
+    return entry ? entry.data : parse(db.prepare('SELECT data_json FROM knowledge_revisions WHERE record_id = ? AND revision = ?').get(id, revision)?.data_json, null);
+  };
   // The record's revision at a moment in time, for links declared by a past commit.
   const revisionAt = (id, at) => db.prepare('SELECT MAX(revision) AS revision FROM knowledge_revisions WHERE record_id = ? AND created_at <= ?').get(id, at)?.revision || null;
-  const get = (projectId, id) => { const record = row(id); return inScope(projectId, record) ? hydrate(record) : null; };
+  const get = (projectId, id) => {
+    const record = row(id);
+    if (record) return inScope(projectId, record) ? hydrate(record) : null;
+    const entry = fileEntry(db, projectId, id);
+    return entry?.currentRevision ? fromFile({ ...entry, revision: entry.currentRevision }) : null;
+  };
 
   // ---- Seeds ----
   function ensureProject(projectId, { pitch = '', seedRoutines = true } = {}) {
@@ -986,7 +1035,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
           else if (page.stories.some(story => storyIds.has(story))) update(projectId, page.id, { stories: page.stories.filter(story => !storyIds.has(story)) });
         }
         remove(projectId, activity.id);
-        for (const kind of ['access_rule', 'data_operation', 'data_object']) for (const record of list(projectId, kind)) if (record.pack === packs[id].label && record.revision === 1) remove(projectId, record.id);
+        removeMany(projectId, ['access_rule', 'data_operation', 'data_object'].flatMap(kind => list(projectId, kind)).filter(record => record.pack === packs[id].label && record.revision === 1).map(record => record.id));
       }
     }
     for (const id of selected.filter(id => !previous.includes(id))) seedPack(projectId, id);
@@ -1040,6 +1089,24 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     const byName = new Map(list(projectId, 'data_object').map(object => [object.name, object.id]));
     const refs = node => node && JSON.parse(JSON.stringify(node), (key, value) => key === '$ref' ? (byName.get(value) || fail(`Pack ${packId} refers to an unknown object ${value}.`)) : value);
     const created = [];
+    // DEC-059: when Data keeps its contract as a file, the pack arrives as one commit, its IDs chosen up front so
+    // relations and $refs resolve in the same write.
+    const fileKey = fileLayerFor(db, projectId, 'data_object');
+    if (fileKey) {
+      const fresh = (pack.objects || []).filter(object => !byName.has(object.name));
+      for (const object of fresh) byName.set(object.name, newId('data_object'));
+      const packTemplate = Boolean(pack.objects?.some(object => object.template));
+      const ops = [
+        ...fresh.map(object => ({ op: 'create', kind: 'data_object', id: byName.get(object.name), data: { name: object.name, description: object.description, schema: refs(object.schema),
+          relations: (object.relations || []).filter(relation => byName.has(relation.target)).map(relation => ({ ...relation, target: byName.get(relation.target) })), states: object.states || [],
+          stories: pick(object.stories), contract: object.template ? 'accepted' : 'proposed', origin: `${pack.label} pack`, pack: pack.label, template: Boolean(object.template) } })),
+        ...(pack.operations || []).map(operation => { const template = operation.template ?? packTemplate; return { op: 'create', kind: 'data_operation', id: newId('data_operation'),
+          data: { ...operation, objectId: operation.object ? byName.get(operation.object) : null, request: refs(operation.request), response: refs(operation.response),
+            stories: pick(operation.stories), contract: template ? 'accepted' : 'proposed', pack: pack.label, template } }; }),
+        ...(pack.access || []).map(rule => ({ op: 'create', kind: 'access_rule', id: newId('access_rule'), data: { ...rule, objectId: byName.get(rule.object), pack: pack.label } }))];
+      if (ops.length) writeFileEntries(db, { projectId, key: fileKey, ops, author: 'Aludel', rationale, checkReferences: list => checkReferenceList(projectId, list) });
+      return;
+    }
     for (const object of pack.objects || []) {
       if (byName.has(object.name)) continue;
       const record = insert(projectId, 'data_object', { name: object.name, description: object.description, schema: object.schema, relations: [], states: object.states || [], stories: pick(object.stories),

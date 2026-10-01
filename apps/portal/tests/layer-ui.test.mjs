@@ -47,7 +47,7 @@ test('built views are served sandboxed, may embed only their project\'s app, and
     const page = respond(`/${'b'.repeat(32)}/index.html`);
     assert.equal(page.status, 200);
     const csp = page.headers['content-security-policy'];
-    assert.match(csp, /^sandbox allow-scripts allow-forms allow-same-origin;/);
+    assert.match(csp, /^sandbox allow-scripts allow-forms allow-same-origin allow-downloads;/);
     assert.match(csp, /connect-src 'none'/); assert.match(csp, /form-action 'none'/);
     assert.match(csp, /frame-src http:\/\/tool-share\.localhost:4310;/);
     assert.match(csp, /frame-ancestors http:\/\/aludel\.localhost:4310$/);

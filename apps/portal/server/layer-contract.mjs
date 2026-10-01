@@ -4,6 +4,7 @@ import { backfillPagesOutputScope } from './layer-output-scope.mjs';
 import { compiledLocalActions, combinedLegacyInventory } from './lat07-actions.mjs';
 import { hasElevated, layerWorkScope } from './layer-scope.mjs';
 import { layerPackageForProject } from './layer-package.mjs';
+import { currentFileEntries, fileLayerFor } from './layer-files.mjs';
 import { initLayerRegistry, seedBuiltInDefinitions, projectLayerDefinition, projectLayerDefinitions, actionsForDefinition } from './layer-registry.mjs';
 // LAT-02: built-in layer declarations describe existing authorities; they do not grant writes.
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
@@ -128,6 +129,8 @@ function instance(db, projectId, key) {
   return { ...layer, instanceId: row.instance_id, version: row.descriptor_version };
 }
 function outputCount(db, projectId, kind) {
+  const fileKey = fileLayerFor(db, projectId, kind);
+  if (fileKey) return currentFileEntries(db, projectId, fileKey).filter(entry => entry.kind === kind).length;
   if (own(projections, kind)) {
     const { table } = projections[kind];
     if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table)) return 0;

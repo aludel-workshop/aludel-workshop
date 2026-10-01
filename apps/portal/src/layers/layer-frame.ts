@@ -12,7 +12,7 @@ type Frame = { status: 'ready' | 'building' | 'failed' | 'none'; url?: string; e
   selector: 'aludel-layer-frame', standalone: true,
   template: `
   @switch (frame()?.status) {
-    @case ('ready') { <iframe #view class="lay-frame-view" [src]="src()" sandbox="allow-scripts allow-forms allow-same-origin" [title]="title()" [style.height.px]="height()"></iframe> }
+    @case ('ready') { <iframe #view class="lay-frame-view" [src]="src()" sandbox="allow-scripts allow-forms allow-same-origin allow-downloads" [title]="title()" [style.height.px]="height()"></iframe> }
     @case ('failed') { <p class="lay-banner-warn" role="alert">{{ title() }} could not be built from its repository: {{ frame()?.error }}</p> }
     @default { <p class="lay-muted" role="status">Preparing {{ title() }}…</p> }
   }`,

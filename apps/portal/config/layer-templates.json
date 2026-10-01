@@ -12,9 +12,14 @@
     "markdown": {
       "branch": "markdown",
       "commit": "837190c2333ffdef8fdb42f8322368979bef9eef"
+    },
+    "data": {
+      "branch": "data",
+      "commit": "12d08ebe941d1effdea6b1a32adb4483b9dbc8de"
     }
   },
   "builtIn": {
-    "pages": "pages"
+    "pages": "pages",
+    "data": "data"
   }
 }

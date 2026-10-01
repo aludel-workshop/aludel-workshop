@@ -8,5 +8,8 @@
   ],
   "server/markdown-api.mjs": [
     "b3088dbbf059c10855a59cfd75ed1bddd70334564407cc758d2b9a3cbab44ced"
+  ],
+  "server/data-contract.mjs": [
+    "b98c13b6799fc855e95505c6d42f93d1c3672f931ec91752d2d8e61ce0ef0c8f"
   ]
 }

@@ -70,7 +70,7 @@ export function layerUi({ dataDirectory, layerOrigin, portalOrigin, appOriginFor
       'access-control-allow-origin': '*', 'cross-origin-resource-policy': 'cross-origin', 'cache-control': ext === '.html' ? 'no-cache' : 'public, max-age=31536000, immutable' };
     // Sandboxed even when opened directly; no network, forms or top navigation; may embed only its own project's app.
     const app = appOriginFor(label);
-    if (ext === '.html') headers['content-security-policy'] = `sandbox allow-scripts allow-forms allow-same-origin; default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; ` +
+    if (ext === '.html') headers['content-security-policy'] = `sandbox allow-scripts allow-forms allow-same-origin allow-downloads; default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; ` +
       `font-src 'self'; img-src blob: data:; connect-src 'none'; form-action 'none'; base-uri 'none'; frame-src ${app || "'none'"}; frame-ancestors ${portalOrigin}`;
     response.writeHead(200, headers);
     response.end(body);

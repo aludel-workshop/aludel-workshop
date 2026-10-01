@@ -125,7 +125,18 @@ export function ensureLayerPackage(db, projectId, key, { template = null, name =
   if (existing) return packageAt(existing.repo, existing.commit, key);
   const id = instanceId(db, projectId, key);
   const target = projectRoot(projectId,id);
-  if (existsSync(target)) throw new Error('Unbound layer repository exists; reconcile it before installing.');
+  if (existsSync(target)) {
+    // A failed outer SQLite transaction can leave the exact clean template clone while rolling back its binding.
+    // Rebind only that known source/pin; any changed or unknown repository still needs explicit reconciliation.
+    let recoverable = false;
+    try { recoverable = git(target, 'rev-parse', 'refs/heads/main') === pin.commit &&
+      git(target, 'config', '--get', 'remote.template.url') === pin.repo && !git(target, 'status', '--porcelain'); } catch { /* unknown repository */ }
+    if (!recoverable) throw new Error('Unbound layer repository exists; reconcile it before installing.');
+    const pkg = packageAt(target, pin.commit, key);
+    db.prepare('INSERT INTO layer_package_bindings(project_id,layer_key,layer_instance_id,repository_path,accepted_commit,installed_at,template,template_commit) VALUES (?,?,?,?,?,?,?,?)')
+      .run(projectId,key,id,target,pin.commit,new Date().toISOString(),pin.template,pin.commit);
+    return { ...pkg, repo: target };
+  }
   mkdirSync(dirname(target), { recursive: true });
   const staging = mkdtempSync(join(dirname(target), `.${key}-`));
   try {
