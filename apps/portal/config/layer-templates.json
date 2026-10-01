@@ -16,9 +16,14 @@
     "data": {
       "branch": "data",
       "commit": "12d08ebe941d1effdea6b1a32adb4483b9dbc8de"
+    },
+    "vision": {
+      "branch": "vision",
+      "commit": "ac96e2f8317e665cf051e2c7dbbc33155481402b"
     }
   },
   "builtIn": {
+    "product": "vision",
     "pages": "pages",
     "data": "data"
   }

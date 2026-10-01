@@ -29,7 +29,8 @@ try {
     files: [join(portal, 'src/frame/frame-main.ts')], include: [join(portal, 'src/**/*.ts'), join(ui, '**/*.ts')], exclude: [join(portal, 'src/**/*.stories.ts')] }, null, 2));
   const host = path => join(portal, 'src', path);
   await build({ configFile: false, root: join(portal, 'src/frame'), base: './', logLevel: 'warn',
-    resolve: { alias: { '@aludel/host/context': host('layers/context.ts'), '@aludel/host/built-by': host('layers/built-by.ts'),
+    resolve: { alias: { '@aludel/host/context': host('layers/context.ts'), '@aludel/host/built-by': host('layers/built-by.ts'), '@aludel/host/evidence': host('layers/evidence.ts'),
+      '@aludel/host/work-shared': host('layers/work-shared.ts'),
       '@aludel/host/design-components': host('layers/design-components.ts'), '@aludel/host/design-state': host('layers/design-state.ts'),
       '@aludel/host/page-blocks': host('page-blocks.ts'), '@aludel/host/design-tokens': host('design-tokens.js'),
       '@aludel/layer/entry': join(scratch, manifest.ui.entry), '@aludel/layer/styles': join(scratch, 'styles.scss') } },

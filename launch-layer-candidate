@@ -30,4 +30,4 @@ if [[ ! -x node_modules/.bin/vite ]]; then
 fi
 npm run build
 mkdir -p "$candidate_data"
-exec env -i PATH="$PATH" HOME="$candidate_data"   MACHINE_HOST=127.0.0.1   MACHINE_PORT=4311   MACHINE_PUBLIC_PORT=4311   MACHINE_BASE_DOMAIN=layers.localhost   MACHINE_PUBLIC_SCHEME=http   MACHINE_PUBLIC_BASE_URL=http://aludel.layers.localhost:4311   MACHINE_DATA_DIR="$candidate_data"   MACHINE_PREVIEW_RUNTIME=process   MACHINE_SYMPHONY_DISPATCH=0   node server/server.mjs
+exec env -i PATH="$PATH" HOME="$candidate_data"   MACHINE_HOST=127.0.0.1   MACHINE_PORT=4311   MACHINE_PUBLIC_PORT=4311   MACHINE_BASE_DOMAIN=layers.localhost   MACHINE_PUBLIC_SCHEME=http   MACHINE_PUBLIC_BASE_URL=http://aludel.layers.localhost:4311   MACHINE_DATA_DIR="$candidate_data"   MACHINE_PREVIEW_RUNTIME=process   MACHINE_SYMPHONY_DISPATCH=0   MACHINE_LAYER_TEMPLATES_ENABLED=1   node server/server.mjs

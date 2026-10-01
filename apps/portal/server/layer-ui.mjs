@@ -11,7 +11,7 @@ import { layerPackageForProject } from './layer-package.mjs';
 
 const portal = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const sdkFiles = ['src/frame/frame-context.ts', 'src/frame/frame-main.ts', 'src/frame/index.html', 'src/layers/context.ts', 'src/layers/built-by.ts', 'src/layers/design-components.ts',
-  'src/layers/design-state.ts', 'src/page-blocks.ts', 'src/design-tokens.js', 'src/styles.scss', 'src/layers/host-theme.scss', 'tools/build-layer-ui.mjs'];
+  'src/layers/design-state.ts', 'src/layers/evidence.ts', 'src/layers/work-shared.ts', 'src/avatars.ts', 'src/page-blocks.ts', 'src/design-tokens.js', 'src/styles.scss', 'src/layers/host-theme.scss', 'tools/build-layer-ui.mjs'];
 const sdkDigest = createHash('sha256').update(sdkFiles.map(path => readFileSync(join(portal, path))).join('\0')).digest('hex').slice(0, 16);
 const building = new Map(), failed = new Map();
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json',
@@ -89,6 +89,7 @@ export function frameAllows({ key, projectId, method, pathname }) {
   if (/^\/records(?:\/[^/]+)?$/.test(rest)) return ['POST', 'PUT', 'DELETE'].includes(method);
   if (method === 'POST' && new RegExp(`^/layers/${key}/api/[A-Za-z][A-Za-z0-9]*$`).test(rest)) return true;
   if (method === 'POST' && rest === '/work') return true;
+  if (key === 'product' && method === 'POST' && /^\/docs(?:\/[^/]+)?$/.test(rest)) return true;
   // T03-G2: this layer's own output files, read and edited by the person using its views.
   if (method === 'PUT' && rest === `/layers/${key}/files`) return true;
   if (key === 'pages' && method === 'POST' && ['/pages/change', '/pages/review', '/skeleton'].includes(rest)) return true;

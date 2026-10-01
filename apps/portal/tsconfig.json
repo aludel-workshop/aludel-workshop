@@ -32,6 +32,12 @@
       ],
       "@aludel/host/design-tokens": [
         "./src/design-tokens.d.ts"
+      ],
+      "@aludel/host/evidence": [
+        "./src/layers/evidence.ts"
+      ],
+      "@aludel/host/work-shared": [
+        "./src/layers/work-shared.ts"
       ]
     }
   },

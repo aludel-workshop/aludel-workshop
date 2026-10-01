@@ -1,15 +1,18 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { resolve, dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { knowledgeKinds } from './knowledge.mjs';
 import { backfillPagesOutputScope } from './layer-output-scope.mjs';
 import { compiledLocalActions, combinedLegacyInventory } from './lat07-actions.mjs';
 import { hasElevated, layerWorkScope } from './layer-scope.mjs';
-import { layerPackageForProject } from './layer-package.mjs';
+import { layerPackageForProject, packageAt } from './layer-package.mjs';
 import { currentFileEntries, fileLayerFor } from './layer-files.mjs';
 import { initLayerRegistry, seedBuiltInDefinitions, projectLayerDefinition, projectLayerDefinitions, actionsForDefinition } from './layer-registry.mjs';
 // LAT-02: built-in layer declarations describe existing authorities; they do not grant writes.
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const own = Object.hasOwn;
-const declarations = [
+const legacyDeclarations = [
   { key: 'product', name: 'Vision', outputs: ['vision_section', 'brief_claim', 'persona', 'phase', 'activity', 'step', 'story', 'spec', 'research', 'project'], authority: 'knowledge_records', path: '/vision' },
   { key: 'design', name: 'Design', outputs: ['design_tokens', 'component', 'brand_asset'], authority: 'knowledge_records', path: '/design' },
   { key: 'pages', name: 'Pages', outputs: ['page_map', 'page', 'flow'], authority: 'knowledge_records', path: '/pages' },
@@ -26,6 +29,25 @@ const projections = {
 };
 const sharedKinds = ['source', 'finding', 'insight', 'evidence_link', 'doc', 'agent_profile', 'role', 'work_action', 'project_instructions', 'routine'];
 const allowedKinds = new Set([...knowledgeKinds.filter(kind => !sharedKinds.includes(kind)), ...Object.keys(projections)]);
+const templatesEnabled = process.env.MACHINE_LAYER_TEMPLATES_ENABLED === '1' || process.env.MACHINE_PAGES_TEMPLATE_ENABLED === '1';
+const portal = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const templateConfig = templatesEnabled ? JSON.parse(readFileSync(join(portal, 'config/layer-templates.json'), 'utf8')) : null;
+const pinnedManifests = new Map();
+if (templateConfig) {
+  if (typeof templateConfig.repo !== 'string' || !templateConfig.builtIn || !templateConfig.templates) fail('Invalid layer template catalog.');
+  for (const [key, template] of Object.entries(templateConfig.builtIn)) {
+    const pin = templateConfig.templates[template];
+    if (!pin || !/^[0-9a-f]{40}$/.test(pin.commit)) fail(`Missing reviewed template pin for ${key}.`);
+    pinnedManifests.set(key, packageAt(resolve(portal, '../..', templateConfig.repo), pin.commit, key).manifest);
+  }
+}
+// Converted built-ins use the accepted repository manifest as their declaration. Historical
+// compiled declarations remain only for keys whose template is not yet converted.
+const declarations = legacyDeclarations.map(layer => {
+  const manifest = pinnedManifests.get(layer.key);
+  return manifest ? { key: manifest.key, name: manifest.name, outputs: manifest.outputs,
+    authority: manifest.authority, path: manifest.path } : layer;
+});
 
 export function validateLayerDeclarations(input = declarations) {
   const keys = new Set(), kinds = new Set();
@@ -54,8 +76,31 @@ const layerPresentation = {
   platform: ['Build', 'code', 'Observe code, tests and repository docs.'],
   deploy: ['Run', 'rocket_launch', 'Inspect environments and releases.']
 };
-export const layerCatalog = Object.freeze(layerDeclarations.map(layer => Object.freeze({ key: layer.key, name: layer.name, path: layer.path,
-  category: layerPresentation[layer.key][0], icon: layerPresentation[layer.key][1], description: layerPresentation[layer.key][2] })));
+// T03-G3: with templates enabled, the installable catalog is the reviewed pin set. The old
+// declarations remain a migration ledger for historical keys and the templates-off fallback.
+export function catalogFromPins(config, baseDirectory) {
+  const entries = [];
+  if (!config || typeof config.repo !== 'string' || !config.builtIn || !config.templates) fail('Invalid layer template catalog.');
+  for (const [key, template] of Object.entries(config.builtIn)) {
+    const pin = config.templates[template];
+    if (!pin || !/^[0-9a-f]{40}$/.test(pin.commit)) fail(`Missing reviewed template pin for ${key}.`);
+    const manifest = packageAt(resolve(baseDirectory, config.repo), pin.commit, key).manifest;
+    if (manifest.key !== key || !manifest.outputs?.length || !manifest.category || !manifest.icon || !manifest.description)
+      fail(`Invalid installable template: ${key}.`);
+    entries.push(manifest);
+  }
+  validateLayerDeclarations(entries);
+  return Object.freeze(entries.map(({ key, name, path, category, icon, description }) =>
+    Object.freeze({ key, name, path, category, icon, description })));
+}
+const compiledCatalog = layerDeclarations.map(layer => Object.freeze({ key: layer.key, name: layer.name, path: layer.path,
+  category: layerPresentation[layer.key][0], icon: layerPresentation[layer.key][1], description: layerPresentation[layer.key][2] }));
+const pinnedCatalog = templatesEnabled
+  ? catalogFromPins(JSON.parse(readFileSync(join(portal, 'config/layer-templates.json'), 'utf8')), resolve(portal, '../..')) : [];
+// Until Design, Code and Deploy move, keep their compiled setup choices available. Converted
+// entries come from the exact reviewed manifest, never a copied presentation declaration.
+export const layerCatalog = Object.freeze([...compiledCatalog.map(layer => pinnedCatalog.find(pin => pin.key === layer.key) || layer),
+  ...pinnedCatalog.filter(pin => !compiledCatalog.some(layer => layer.key === pin.key))]);
 
 function ensureLayerTable(db) {
   db.exec(`CREATE TABLE IF NOT EXISTS layer_instances (
@@ -90,8 +135,8 @@ export function layerInstanceId(db, projectId, key) {
 }
 export function createLayerInstances(db, projectId, created = new Date().toISOString(), selected = null) {
   ensureLayerTable(db);
-  const chosen = selected === null ? new Set(layerDeclarations.map(layer => layer.key)) : new Set(selected);
-  if ([...chosen].some(key => !layerDeclarations.some(layer => layer.key === key))) fail('Choose layers from the available catalog.');
+  const chosen = selected === null ? new Set(layerCatalog.map(layer => layer.key)) : new Set(selected);
+  if ([...chosen].some(key => !layerCatalog.some(layer => layer.key === key))) fail('Choose layers from the available catalog.');
   const insert = db.prepare(`INSERT INTO layer_instances(project_id, layer_key, instance_id, enabled, created_at)
     VALUES (?, ?, ?, ?, ?) ON CONFLICT(project_id, layer_key) DO NOTHING`);
   const inserted = layerDeclarations.reduce((count, layer) => count + insert.run(projectId, layer.key, randomUUID(), Number(chosen.has(layer.key)), created).changes, 0);

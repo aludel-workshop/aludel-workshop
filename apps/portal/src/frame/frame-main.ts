@@ -5,6 +5,7 @@ import { NgComponentOutlet } from '@angular/common';
 import { MatIconRegistry } from '@angular/material/icon';
 import { bootstrapApplication } from '@angular/platform-browser';
 import { ProjectContext } from '../layers/context';
+import { EvidencePanelComponent } from '../layers/evidence';
 import { FrameProjectContext } from './frame-context';
 import * as entry from '@aludel/layer/entry';
 import '../styles.scss';
@@ -16,8 +17,8 @@ const layerComponent = Object.values(entry).find(value => typeof value === 'func
 // The frame gives the layer the same surroundings it has in the portal: the project shell's theme tokens and the main
 // column's typography, without the main column's padding, which the portal already applies around the frame.
 @Component({
-  selector: 'aludel-project-shell', standalone: true, imports: [NgComponentOutlet],
-  template: `<div class="lay-main lay-frame-main">@if (ctx.ready()) { <ng-container *ngComponentOutlet="layer" /> } @else { <p class="lay-muted">Loading…</p> }</div>`
+  selector: 'aludel-project-shell', standalone: true, imports: [NgComponentOutlet, EvidencePanelComponent],
+  template: `<div class="lay-main lay-frame-main">@if (ctx.ready()) { <ng-container *ngComponentOutlet="layer" /><aludel-evidence-panel /> } @else { <p class="lay-muted">Loading…</p> }</div>`
 })
 class LayerFrameRoot {
   readonly ctx = inject(FrameProjectContext);

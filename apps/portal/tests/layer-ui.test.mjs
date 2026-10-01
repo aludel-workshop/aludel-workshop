@@ -20,6 +20,9 @@ test('a layer frame may read the project, use its own layer, create Work and (Pa
     ['POST', '/work/w-1/runs/a/sign'], ['PUT', '/layer-access/research'], ['GET', '/members'], ['POST', '/repository'], ['GET', '/preview']])
     assert.equal(allows('research', method, rest), false, `${method} ${rest}`);
   assert.equal(allows('pages', 'POST', '/pages/change'), true);
+  assert.equal(allows('product', 'POST', '/docs'), true);
+  assert.equal(allows('product', 'POST', '/docs/doc-1'), true);
+  assert.equal(allows('pages', 'POST', '/docs'), false);
   assert.equal(frameAllows({ key: 'research', projectId: 'p1', method: 'GET', pathname: '/api/projects/p2/knowledge' }), false, 'another project');
   assert.equal(frameAllows({ key: 'research', projectId: 'p1', method: 'GET', pathname: '/api/session' }), false);
 });
@@ -69,7 +72,9 @@ test('an instance\'s views are built from its own repository commit, and instanc
       INSERT INTO projects VALUES ('one'),('two'); INSERT INTO project_members VALUES ('one','owner','owner'),('two','owner','owner');`);
     initLayerContract(db);
     const ui = layerUi({ dataDirectory: data, layerOrigin: label => `http://${label}.layers.localhost`, portalOrigin: 'http://aludel.localhost' });
-    assert.equal(ui.status(db, 'one', 'product').status, 'none', 'a layer without its own views keeps the portal\'s');
+    assert.equal(ui.status(db, 'one', 'product').status, 'building');
+    await ui.settle(db, 'one', 'product');
+    assert.equal(ui.status(db, 'one', 'product').status, 'ready', 'Vision builds from its pinned repository');
     assert.equal(ui.status(db, 'one', 'pages').status, 'building');
     await ui.settle(db, 'one', 'pages');
     const one = ui.status(db, 'one', 'pages'), two = ui.status(db, 'two', 'pages');
