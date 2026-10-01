@@ -7,6 +7,8 @@ import { hostTopology } from './hosts.mjs';
 import { initOnboarding, loadCatalogs, onboarding } from './onboarding.mjs';
 import { botColors, efforts, initKnowledge, knowledge } from './knowledge.mjs';
 import { library } from './library.mjs';
+import { bindingRecords, initBindings } from './binding-records.mjs';
+import { bindingRoutines } from './binding-routines.mjs';
 import { commitOutputFile, initLayerFiles, readOutputFile } from './layer-files.mjs';
 import { previewManager, previewRuntime } from './previews.mjs';
 import { agentsGuide, copyMedia, initialFiles, loadScaffoldSources, sitePages, skeletonFiles, workflowPaths, writeBinaries, writeFiles } from './scaffold.mjs';
@@ -88,6 +90,7 @@ function recordCall(db, projectId, kind, { layer = null, instanceId = null, mode
 initPagesLayerApp(db);
 initLayerFiles(db);
 initPagesReconciliation(db);
+initBindings(db);
 initPagesCodeObservations(db);
 initLayerDiscovery(db);
 const secrets = openSecretStore(dataDirectory);
@@ -121,6 +124,13 @@ function createWorkspace(setup, user) {
 }
 const know = knowledge({ db, catalogs, packs: catalogs.packs });
 const pool = library({ db, know });
+const bindingStore = bindingRecords({ db });
+const bindings = bindingRoutines({ db, know, pool, store: bindingStore });
+// LAYER-BINDINGS-01: Discover proposes bindings where one layer reads another's facet; Watch keeps reconciling and active
+// bindings current. Both run after any successful change to a project, at start-up and with the routine tick.
+function runBindings(projectId) {
+  try { bindings.discover(projectId); bindings.watchProject(projectId); } catch (error) { console.error(`Bindings for ${projectId}: ${error.message}`); }
+}
 const flows = onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot: join(dataDirectory, 'project-assets'), createWorkspace, know });
 // One-time: projects created before the layers (LAY-03) get phases, a vision and page records from their onboarding data.
 for (const project of db.prepare(`SELECT p.id, p.description, s.feel FROM projects p JOIN project_setup s ON s.project_id = p.id
@@ -234,6 +244,7 @@ const editor = editorBridge({ db, know, projectSetup: (user, id) => flows.projec
 function tickRoutines() {
   for (const projectId of layerProjects()) {
     try { know.runRoutines(projectId); know.syncBacklog(projectId); reconcilePagesFlow(db, know, projectId); } catch (error) { console.error(`Routines for ${projectId}: ${error.message}`); }
+    runBindings(projectId);
   }
 }
 tickRoutines();
@@ -374,6 +385,11 @@ function overview() {
 }
 
 async function api(request, response, url) {
+  const changedProject = request.method !== 'GET' && /^\/api\/projects\/([^/]+)\//.exec(url.pathname);
+  if (changedProject) {
+    const projectId = decodeURIComponent(changedProject[1]);
+    response.once('finish', () => { if (response.statusCode < 400 && projectId !== aludelProjectId) setImmediate(() => runBindings(projectId)); });
+  }
   const user = currentUser(request);
   // LAYER-BASE-01 B6: a call the portal page carries for a layer's sandboxed frame may do only what frames are allowed.
   const frameLayer = request.headers['x-aludel-layer-frame'];
@@ -734,6 +750,27 @@ async function api(request, response, url) {
     }
     if (section === 'routines' && id && layerSpaceRoute[5] === 'runs' && request.method === 'GET')
       return json(response, 200, { runs: layerRoutineRuns(db,user.id,projectId,layerKey,id) }, { 'cache-control': 'no-store' });
+    return json(response, 405, { error: 'Method not allowed.' });
+  }
+  // LAYER-BINDINGS-01: one binding per shared concept, kept by Work with exact revisions and shown in Library › Bindings.
+  const bindingRoute = /^\/api\/projects\/([^/]+)\/bindings(?:\/([^/]+)(?:\/(history|status|decide|join|transfer|lifecycle))?)?$/.exec(url.pathname);
+  if (bindingRoute) {
+    const projectId = decodeURIComponent(bindingRoute[1]), id = bindingRoute[2] ? decodeURIComponent(bindingRoute[2]) : null, action = bindingRoute[3] || null;
+    const noStore = { 'cache-control': 'no-store' };
+    if (request.method === 'GET' && !id) return json(response, 200, { bindings: bindingStore.list(projectId, user.id) }, noStore);
+    if (request.method === 'POST' && !id) return json(response, 201, bindingStore.create(projectId, user.id, await readJson(request)), noStore);
+    if (request.method === 'GET' && id && !action) return json(response, 200, bindingStore.read(projectId, user.id, id,
+      url.searchParams.has('revision') ? Number(url.searchParams.get('revision')) : null), noStore);
+    if (request.method === 'GET' && action === 'history') return json(response, 200, { revisions: bindingStore.history(projectId, user.id, id) }, noStore);
+    if (request.method === 'GET' && action === 'status') return json(response, 200, bindings.status(projectId, user.id, id), noStore);
+    if (request.method === 'POST' && action === 'decide') { const input = await readJson(request); return json(response, 200, bindings.decideAssessment(projectId, user.id, id, String(input.workItemId || ''), input.decision), noStore); }
+    if (request.method === 'PATCH' && id && !action) return json(response, 200, bindingStore.update(projectId, user.id, id, await readJson(request)), noStore);
+    // A binding change takes effect at once: Watch runs before the answer, so the page shows the imports it caused.
+    if (request.method === 'POST' && ['join', 'transfer', 'lifecycle'].includes(action)) {
+      bindingStore[action](projectId, user.id, id, await readJson(request));
+      bindings.watch(projectId, id);
+      return json(response, 200, bindingStore.read(projectId, user.id, id), noStore);
+    }
     return json(response, 405, { error: 'Method not allowed.' });
   }
   const layerRoute = /^\/api\/projects\/([^/]+)\/layers(?:\/([^/]+)\/outputs\/([^/]+)\/([^/]+))?$/.exec(url.pathname);

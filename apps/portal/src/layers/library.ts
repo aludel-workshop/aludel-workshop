@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { Finding, Insight, LibraryEntry, LibraryRead, ProjectContext, Region, Source, layerLabel, sourceTypeIcon } from './context';
 import { DocsComponent } from './doc-view';
+import { LibraryBindingsComponent } from './library-bindings';
 import { FindingComponent } from './evidence';
 import { markdownBlocks } from './markdown';
 import { RefChipComponent } from './work-shared';
@@ -15,7 +16,7 @@ const layerOf: Record<string, string> = { brief_claim: 'product', persona: 'prod
 // evidence to records in every layer. A utility beside Settings, not a layer.
 // DEC-059: it is also where layers read each other. Layers pools every installed layer's outputs and Knowledge.
 @Component({
-  selector: 'aludel-library', standalone: true, imports: [FormsModule, MatIconModule, RefChipComponent, FindingComponent, DocsComponent],
+  selector: 'aludel-library', standalone: true, imports: [FormsModule, MatIconModule, RefChipComponent, FindingComponent, DocsComponent, LibraryBindingsComponent],
   template: `
   @switch (view()) {
     @case ('insight') {
@@ -142,8 +143,10 @@ const layerOf: Record<string, string> = { brief_claim: 'product', persona: 'prod
         <a [href]="ctx.link('library', 'sources')" (click)="ctx.go(ctx.link('library', 'sources'), $event)" [class.active]="view() === 'sources'" [attr.aria-current]="view() === 'sources' ? 'page' : null"><mat-icon aria-hidden="true">article</mat-icon>Sources</a>
         <a [href]="ctx.link('library', 'docs')" (click)="ctx.go(ctx.link('library', 'docs'), $event)" [class.active]="view() === 'docs'" [attr.aria-current]="view() === 'docs' ? 'page' : null"><mat-icon aria-hidden="true">description</mat-icon>Documents</a>
         <a [href]="ctx.link('library', 'layers')" (click)="ctx.go(ctx.link('library', 'layers'), $event)" [class.active]="view() === 'layers'" [attr.aria-current]="view() === 'layers' ? 'page' : null"><mat-icon aria-hidden="true">layers</mat-icon>Layers</a>
+        <a [href]="ctx.link('library', 'bindings')" (click)="ctx.go(ctx.link('library', 'bindings'), $event)" [class.active]="view() === 'bindings'" [attr.aria-current]="view() === 'bindings' ? 'page' : null"><mat-icon aria-hidden="true">link</mat-icon>Bindings</a>
       </nav>
       @if (view() === 'docs') { <aludel-docs layer="library" [base]="['library', 'docs']" /> }
+      @else if (view() === 'bindings') { <aludel-library-bindings /> }
       @else if (view() === 'layers') {
         <p class="lay-muted">Everything every layer has published: its outputs and its Knowledge (charter, methods, policies), with the Library's own research and documents. Layers and agents read each other here.</p>
         <div class="lay-toolbar">
@@ -208,7 +211,7 @@ export class LibraryComponent {
   readonly types = Object.keys(sourceTypeIcon);
   readonly strengths = ['weak', 'moderate', 'strong'];
   readonly layers = ['product', 'design', 'pages', 'data', 'work'];
-  readonly view = computed(() => { const segment = this.ctx.segments()[1] || 'insights'; return ['insight', 'source', 'sources', 'docs', 'layers', 'entry'].includes(segment) ? segment : 'insights'; });
+  readonly view = computed(() => { const segment = this.ctx.segments()[1] || 'insights'; return ['insight', 'source', 'sources', 'docs', 'layers', 'bindings', 'entry'].includes(segment) ? segment : 'insights'; });
   // Layers: the pooled index, searched on the server as filters change.
   readonly sourceLabel: Record<string, string> = { output: 'Output', knowledge: 'Knowledge', library: 'Library' };
   readonly installed = computed(() => this.ctx.layerInstances().filter(layer => layer.enabled));

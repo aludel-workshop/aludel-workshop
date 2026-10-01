@@ -67,8 +67,13 @@ try {
   assert.equal(tokens[0].revision, 2, 'one new revision of the token set');
   assert.equal(tokens[0].data.fromLook, false, 'a person\'s edit stops following the Look & feel');
 
-  // ---- Pages draws its spec preview in the saved theme, read from the Library; with Design off its kit is empty ----
+  // ---- Pages draws its spec preview from its own copy of the kit, which the accepted design-system binding fills
+  // (LAYER-BINDINGS-01); with Design off it keeps that copy ----
   await request('PUT', `/api/projects/${project.id}/layer-instances/pages`, { enabled: true });
+  let binding;
+  for (let i = 0; i < 40 && !(binding = (await request('GET', `/api/projects/${project.id}/bindings`)).bindings.find(entry => entry.lifecycle === 'proposed')); i++) await page.waitForTimeout(250);
+  assert.ok(binding, 'Discover proposes the design-system binding');
+  await request('POST', `/api/projects/${project.id}/bindings/${binding.id}/lifecycle`, { expectedRevision: binding.revision, lifecycle: 'reconciling', rationale: 'Accepted by the journey.' });
   // The kit arrives from the Library after the preview first draws, so read the theme until it settles.
   const pollTheme = async expected => {
     await page.goto(origin + base + '/pages/page');
@@ -80,7 +85,7 @@ try {
   };
   assert.equal(await pollTheme(draft), draft, 'Pages previews with the saved token set');
   await request('PUT', `/api/projects/${project.id}/layer-instances/design`, { enabled: false });
-  assert.equal(await pollTheme(''), '', 'without Design, Pages gets an empty kit and a plain preview');
+  assert.equal(await pollTheme(draft), draft, 'without Design, Pages keeps drawing with its copy of the kit');
   await request('PUT', `/api/projects/${project.id}/layer-instances/design`, { enabled: true });
   await page.goto(origin + base + '/design/components');
 
@@ -132,5 +137,5 @@ try {
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), 'no sideways scroll at 390px');
   await axe(frame(), 'Design frame (brand, 390px)');
   assert.deepEqual(errors, []);
-  console.log('PASS Design frame: token draft live across tabs and saved, component, reference, brand template and image, Pages theme and empty kit, Library, axe and 390px');
+  console.log('PASS Design frame: token draft live across tabs and saved, component, reference, brand template and image, Pages theme through the binding and kept without Design, Library, axe and 390px');
 } finally { await browser.close(); }

@@ -250,6 +250,20 @@ export function seedLayer({ db, know, api, projectId, event, project }) {
   const records = Object.fromEntries([...api.records.keys()].map(kind => [kind, recordsOf(db, api, projectId, kind, null)]));
   const { writes, references } = handle(api, 'seed', [event, { project, records, catalogs: {} }]);
   if (!Array.isArray(writes) || writes.length > 200 || !Array.isArray(references)) fail('The layer seed returned an invalid result.', 500);
+  return applyAsAludel(db, know, api, projectId, writes, references, records, write => typeof write.note === 'string' ? write.note.slice(0, 300) : null);
+}
+
+// LAYER-BINDINGS-01: an active binding imports another layer's entries into this layer's facet through the adapter this
+// layer declares (`adapters`) and implements as the handler's `adapt`. The host checks the writes like an operation's and
+// applies them as Aludel; the rationale names the binding.
+export function adaptLayer({ db, know, api, projectId, adapterId, entries = [], removed = [], rationale }) {
+  const records = Object.fromEntries([...api.records.keys()].map(kind => [kind, recordsOf(db, api, projectId, kind, null)]));
+  const { writes, references } = handle(api, 'adapt', [adapterId, { entries, removed }, { records }]);
+  if (!Array.isArray(writes) || writes.length > 500 || !Array.isArray(references)) fail('The layer adapter returned an invalid result.', 500);
+  return applyAsAludel(db, know, api, projectId, writes, references, records, () => rationale);
+}
+
+function applyAsAludel(db, know, api, projectId, writes, references, records, rationaleOf) {
   if (!writes.length) return [];
   checkWrites(db, api, projectId, writes, references, Object.values(records).flat());
   const own = !db.isTransaction;
@@ -257,7 +271,7 @@ export function seedLayer({ db, know, api, projectId, event, project }) {
   try {
     const order = { create: 0, update: 1, delete: 2 };
     const applied = [...writes].sort((a, b) => order[a.op] - order[b.op]).map(write => {
-      const options = { prepared: { data: write.data, references: [] }, author: 'Aludel', rationale: typeof write.note === 'string' ? write.note.slice(0, 300) : null };
+      const options = { prepared: { data: write.data, references: [] }, author: 'Aludel', rationale: rationaleOf(write) };
       if (write.op === 'create') return know.insert(projectId, write.kind, write.data, { ...options, id: write.id, layer: api.key, parentId: write.parentId ?? null });
       if (write.op === 'update') return know.update(projectId, write.id, write.data, { ...options, expectedRevision: write.baseRevision });
       know.remove(projectId, write.id);

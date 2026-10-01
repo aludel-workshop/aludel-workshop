@@ -138,5 +138,8 @@ export function library({ db, know }) {
 
   // A pin for a cross-layer reference: which instance owns the entry, at which revision.
   const pin = (projectId, ref) => { const entry = read(projectId, null, ref); return { ref: entry.ref, kind: entry.kind, layerInstanceId: entry.layer.instanceId, revision: entry.currentRevision }; };
-  return { entries, search, read, pin };
+  // Every installed layer's published outputs only, with content: what binding routines compare (LAYER-BINDINGS-01).
+  // Cheaper than a search, which also reads every layer's Knowledge.
+  const outputEntries = projectId => outputs(projectId, layers(db, projectId));
+  return { entries, search, read, pin, outputEntries };
 }

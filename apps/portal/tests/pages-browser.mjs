@@ -30,6 +30,16 @@ try {
   const running = async () => (await json('GET', `/api/projects/${project.id}/preview`)).preview.status === 'running';
   for (let i = 0; i < 120 && !(await running()); i++) await new Promise(resolve => setTimeout(resolve, 1000));
   const knowledge = async () => (await json('GET', `/api/projects/${project.id}/knowledge`)).knowledge;
+  // LAYER-BINDINGS-01: Pages draws with its own copy of the kit, which the design-system binding fills once accepted. With
+  // templates off there is no binding and Pages reads the compiled kit as before.
+  let binding = null;
+  for (let i = 0; i < 40; i++) {
+    const listed = await api.fetch(`${portal}/api/projects/${project.id}/bindings`);
+    binding = listed.ok() ? (await listed.json()).bindings.find(entry => entry.lifecycle === 'proposed') : null;
+    if (binding || process.env.MACHINE_LAYER_TEMPLATES_ENABLED !== '1') break;
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+  if (binding) await json('POST', `/api/projects/${project.id}/bindings/${binding.id}/lifecycle`, { expectedRevision: binding.revision, lifecycle: 'reconciling', rationale: 'Accepted by the Pages journey.' });
 
   const page = await context.newPage();
   page.on('pageerror', error => errors.push(error.message));
