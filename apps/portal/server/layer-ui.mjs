@@ -85,9 +85,8 @@ export const hostFeatures = Object.freeze({
   pageChanges: [['POST', /^\/pages\/change$/], ['POST', /^\/pages\/review$/]],
   skeleton: [['POST', /^\/skeleton$/]],
   documents: [['POST', /^\/docs(?:\/[^/]+)?$/]],
-  // T03-DESIGN: uploading an image the layer's records point at, and adding a brand template's stock assets.
+  // T03-DESIGN: uploading an image the layer's records point at.
   uploads: [['POST', /^\/assets$/]],
-  brandTemplates: [['POST', /^\/brand-templates\/[a-z][a-z0-9-]{0,39}$/]],
   // The Library's own records a layer's views may write through the generic record routes: shared documents and the links
   // that reference a source or finding from a record. The kinds are fixed here; a layer can only ask for the feature.
   libraryRecords: []

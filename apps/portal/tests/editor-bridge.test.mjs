@@ -78,9 +78,7 @@ test('editor connection scopes a versioned task bundle and live knowledge to its
     env: { ...process.env, MACHINE_DATA_DIR: root, MACHINE_PORT: String(port), MACHINE_PREVIEW_RUNTIME: 'process' }, stdio: 'ignore'
   });
   const origin = 'http://127.0.0.1:' + port;
-  // Start-up seeds these unseeded projects; with templates on, each seeded record runs its layer's handler in a sandboxed
-  // child process (~20 ms a call, T03-DESIGN), so under the parallel suite this can take well over the old 8 seconds.
-  const deadline = Date.now() + 20000;
+  const deadline = Date.now() + 20000; // a portal start under the parallel suite can exceed 8 seconds
   try {
     let ready = false;
     while (!ready && Date.now() < deadline) {

@@ -46,7 +46,7 @@ function fixture(run, adopt = false) {
         'the kit keeps its IDs, revisions and content');
     }
     know.ensureDesign(project.id);
-    run({ db, know, owner, id: project.id });
+    run({ db, know, owner, flow, id: project.id });
     db.close();
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -59,7 +59,7 @@ test('Design comes from its template: views, Knowledge, API and host calls', () 
   const pkg = layerPackageForProject(db, id, 'design');
   assert.equal(pkg.manifest.ui.entry, 'ui/design.ts');
   assert.deepEqual(pkg.manifest.tabs.map(tab => tab.key), ['tokens', 'components', 'brand', 'docs']);
-  assert.deepEqual(layerHostCalls(db, id, 'design').sort(), ['brandTemplates', 'libraryRecords', 'uploads']);
+  assert.deepEqual(layerHostCalls(db, id, 'design').sort(), ['libraryRecords', 'uploads']);
   const api = layerApi(db, id, 'design');
   assert.ok(api, 'Design publishes an API at a reviewed digest');
   assert.deepEqual([...api.operations.values()].filter(op => op.output).map(op => op.operationId).sort(),
@@ -119,19 +119,42 @@ test('the Library is the kit\'s read path: every kit kind with its data, and an 
   assert.ok(know.list(id, 'design_tokens').length, 'switching Design off keeps its records');
 }));
 
-test('an existing project\'s Design records join its instance when Design starts publishing its API', () => fixture(({ db, id }) => {
+test('an existing project\'s Design records join its instance when Design starts publishing its API', () => fixture(({ db, know, id }) => {
   const instance = layerInstanceId(db, id, 'design');
+  assert.equal(know.list(id, 'brand_asset').length, 5, 'adopting gains no second set of starters');
+  assert.equal(know.list(id, 'design_tokens').length, 1);
   for (const kind of kitKinds)
     assert.equal(db.prepare('SELECT COUNT(*) AS n FROM knowledge_records WHERE project_id = ? AND kind = ? AND layer_instance_id IS NOT ?').get(id, kind, instance).n, 0, `${kind} is tagged`);
 }, true));
 
-test('a frame may upload, add brand templates and write Library records only when it asks for those features', () => {
+test('a frame may upload and write Library records only when it asks for those features', () => {
   const projectId = 'prj-1';
   const allows = (method, path, features) => frameAllows({ key: 'design', projectId, method, pathname: `/api/projects/${projectId}${path}`, features });
   assert.equal(allows('POST', '/assets', []), false);
   assert.equal(allows('POST', '/assets', ['uploads']), true);
-  assert.equal(allows('POST', '/brand-templates/social', ['brandTemplates']), true);
-  assert.equal(allows('POST', '/brand-templates/social', ['uploads']), false);
+  assert.equal(allows('POST', '/brand-templates/social', ['uploads']), false, 'brand templates are Design\'s own, added through its API');
   assert.equal(allows('DELETE', '/assets/asset-1', ['uploads']), false, 'uploading is not deleting');
   assert.deepEqual([...hostRecordFeatures.libraryRecords].sort(), ['doc', 'evidence_link']);
 });
+
+// T03-DESIGN-SEED: the starter kit and the Look & feel sync come from Design's own handler.
+test('a new project\'s kit is seeded by the Design template, and a Look & feel change follows an untouched token set', () => fixture(({ db, know, owner, flow, id }) => {
+  const seeded = db.prepare("SELECT kind FROM knowledge_counters WHERE project_id = ? AND (kind LIKE 'layer-seed:%' OR kind IN ('design-components-seeded', 'design-brand-seeded'))").all(id).map(row => row.kind);
+  assert.deepEqual(seeded, [`layer-seed:${layerInstanceId(db, id, 'design')}`], 'the template seeded the kit, not the host');
+  const revision = id_ => db.prepare('SELECT author, rationale FROM knowledge_revisions WHERE record_id = ? AND revision = 1').get(id_);
+  const tokens = know.list(id, 'design_tokens')[0];
+  assert.match(revision(tokens.id).rationale, /^Material 3 starting set from the Look & feel/);
+  assert.equal(know.list(id, 'component').length, 15);
+  assert.equal(know.list(id, 'component').find(component => component.name === 'List item').parentId, know.list(id, 'component').find(component => component.name === 'List').id);
+  assert.deepEqual(know.list(id, 'brand_asset').map(asset => asset.name), ['Product name', 'Tagline', 'Short description', 'Logo mark', 'Social card']);
+  assert.equal(revision(know.list(id, 'brand_asset')[0].id).author, 'Aludel');
+  know.ensureDesign(id);
+  assert.equal(know.list(id, 'component').length, 15, 'install runs once per instance');
+  flow.saveDesign(owner, id, { feel: 'sleek-saas', theme: 'light', accent: '#b3261e' });
+  const followed = know.list(id, 'design_tokens')[0];
+  assert.equal(followed.palettes[0].seed, '#b3261e');
+  assert.equal(revision(followed.id).author, 'Aludel');
+  applyOperation({ db, know, api: layerApi(db, id, 'design'), projectId: id, operationId: 'setTokens', body: { fromLook: false }, author: owner.name });
+  flow.saveDesign(owner, id, { feel: 'sleek-saas', theme: 'light', accent: '#2e7d5b' });
+  assert.equal(know.list(id, 'design_tokens')[0].palettes[0].seed, '#b3261e', 'an edited token set stays as edited');
+}));

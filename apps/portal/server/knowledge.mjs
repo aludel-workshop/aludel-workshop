@@ -12,7 +12,7 @@ import { join } from 'node:path';
 import { requireMember } from './accounts.mjs';
 import { actionGrant, recordNewWorkAction } from './lat08-migration.mjs';
 import { hasElevated, layerDefaultAssignee, layerWorkScope } from './layer-scope.mjs';
-import { kindOwners, layerApiForKind, normalizeRecord } from './layer-api.mjs';
+import { kindOwners, layerApi, layerApiForKind, normalizeRecord, seedLayer } from './layer-api.mjs';
 import { currentFileEntries, fileEntry, fileEntryExists, fileEntryHistory, fileLayerFor, writeFileEntries } from './layer-files.mjs';
 import { compiledLocalActions } from './lat07-actions.mjs';
 import { actionForProject, actionsForDefinition, projectLayerDefinition, projectLayerDefinitions } from './layer-registry.mjs';
@@ -761,7 +761,9 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
   }
 
   // ---- Design (DESIGN-UX-01): the token set, component contracts, starter brand assets and documents ----
-  function ensureDesign(projectId) { seedDesign({ projectId, list, insert, update, once, db, catalogs }); }
+  // The compiled kit seeding runs only for kinds no installed template seeds itself (T03-DESIGN-SEED); the Library documents
+  // and reference media from onboarding stay with the host.
+  function ensureDesign(projectId) { seedDesign({ projectId, list, insert, update, once, db, catalogs, seedKit: !seedLayers(projectId, 'install').has('design_tokens') }); }
   function addBrandTemplate(user, projectId, templateId) {
     const template = catalogs.brandTemplates?.[templateId];
     if (!template) fail('Unknown brand template.', 404);
@@ -769,7 +771,35 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     return template.assets.map(asset => insert(projectId, 'brand_asset', { ...asset, banner: asset.banner ? { ...asset.banner, headline: asset.banner.headline || name } : undefined, template: templateId },
       { author: user.name, rationale: `From the ${template.label} template` }).id);
   }
-  function syncDesignFromLook(projectId) { syncTokensFromLook({ projectId, list, update, db, catalogs }); }
+  function syncDesignFromLook(projectId) { if (!seedLayers(projectId, 'look').has('design_tokens')) syncTokensFromLook({ projectId, list, update, db, catalogs }); }
+
+  // ---- Layer seeds (T03-DESIGN-SEED): a template's handler supplies its own starter content and answers host events ----
+  // The project facts any layer's seed may use. Missing values stay undefined so a layer's own defaults apply.
+  function projectFacts(projectId) {
+    const setup = db.prepare('SELECT p.name, p.description, p.accent_color, s.feel FROM projects p JOIN project_setup s ON s.project_id = p.id WHERE p.id = ?').get(projectId);
+    if (!setup) return null;
+    const key = setup.feel || 'sleek-saas';
+    const feel = catalogs.feels?.[key] || Object.values(catalogs.feels || {})[0] || {};
+    return { name: setup.name, description: setup.description || '', look: { feel: key, label: feel.label, accent: setup.accent_color || feel.accent, font: feel.font, radius: feel.radius } };
+  }
+  // Runs `event` for every installed layer whose handler declares it, and returns the output kinds those layers own, which
+  // the host then leaves to them. `install` runs once per instance, after it succeeds.
+  function seedLayers(projectId, event) {
+    const kinds = new Set();
+    const facts = projectFacts(projectId);
+    if (!facts || !db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_instances'").get()) return kinds;
+    for (const { key, instanceId } of db.prepare('SELECT layer_key AS key, instance_id AS instanceId FROM layer_instances WHERE project_id = ? ORDER BY rowid').all(projectId)) {
+      let api;
+      try { api = layerApi(db, projectId, key); } catch { api = null; }
+      if (!api?.seeds.includes(event)) continue;
+      for (const kind of api.outputs) kinds.add(kind);
+      const flag = `layer-seed:${instanceId}`;
+      if (event === 'install' && db.prepare('SELECT 1 FROM knowledge_counters WHERE project_id = ? AND kind = ?').get(projectId, flag)) continue;
+      seedLayer({ db, know: { insert, update, remove, get }, api, projectId, event, project: facts });
+      if (event === 'install') counter(projectId, flag);
+    }
+    return kinds;
+  }
 
   // ---- Vision › Documents (ROADMAP-01): generated from the Brief's claims, and out of date when the Brief changes ----
   function composeDoc(projectId, generator) {

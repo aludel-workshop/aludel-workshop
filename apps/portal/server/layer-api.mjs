@@ -82,7 +82,8 @@ function compile(key, repo, commit, manifest) {
   if (manifest.files?.kinds?.some(kind => records.has(kind))) fail('A kind is either records or files, not both.', 500);
   const catalogNames = spec['x-aludel-catalogs'] || [];
   if (!Array.isArray(catalogNames) || !catalogNames.every(name => /^[a-zA-Z][a-zA-Z0-9]*$/.test(name))) fail('The layer API names invalid host catalogs.', 500);
-  const api = { key, commit, spec, source, digest: createHash('sha256').update(source).digest('hex'), handlerPath: manifest.api.handler, operations, records, catalogNames, outputs: manifest.outputs };
+  const api = { key, commit, spec, source, digest: createHash('sha256').update(source).digest('hex'), handlerPath: manifest.api.handler, operations, records, catalogNames, outputs: manifest.outputs,
+    seeds: manifest.api.seeds || [] };
   cache.set(cacheKey, api);
   return api;
 }
@@ -215,8 +216,14 @@ export function callOperation({ db, catalogs, api, projectId, operationId, id = 
   const { writes, references } = handle(api, 'run', [operationId, { id, body },
     { current: current && { id: current.id, kind: current.kind, revision: current.revision, data: current.data }, records, catalogs: handlerCatalogs(api, catalogs) }]);
   if (!Array.isArray(writes) || !writes.length || writes.length > 200 || !Array.isArray(references)) fail('The layer API handler returned an invalid result.', 500);
-  // Updates and deletes may touch only records this call loaded; creates get fresh IDs.
-  const loaded = new Map([...(current ? [current] : []), ...Object.values(records).flat()].map(record => [record.id, record]));
+  checkWrites(db, api, projectId, writes, references, [...(current ? [current] : []), ...Object.values(records).flat()], overlay);
+  return { operation, writes, references };
+}
+
+// Checks a handler's writes: this layer's outputs only; updates and deletes only of records the call loaded, at the
+// revision loaded; creates with fresh IDs; every record valid against its schema; parents and references resolvable.
+function checkWrites(db, api, projectId, writes, references, loadedRecords, overlay = null) {
+  const loaded = new Map(loadedRecords.map(record => [record.id, record]));
   const touched = new Set();
   for (const write of writes) {
     if (!api.outputs.includes(write.kind) || !['create', 'update', 'delete'].includes(write.op) || typeof write.id !== 'string' || !/^[a-z]+-[a-z0-9]{6,12}$/.test(write.id) || touched.has(write.id))
@@ -233,7 +240,32 @@ export function callOperation({ db, catalogs, api, projectId, operationId, id = 
   const next = new Map(overlay || []);
   for (const write of writes) next.set(write.id, { id: write.id, kind: write.kind, data: write.data ?? null, deleted: write.op === 'delete', created: write.op === 'create', ...(write.parentId ? { parentId: write.parentId } : {}) });
   checkReferences(db, api, projectId, references, next);
-  return { operation, writes, references };
+}
+
+// T03-DESIGN-SEED: a layer's starter content and its answers to host events (`api.seeds`), from its own handler. The host
+// passes the project facts every layer may use and this instance's records of every output kind, checks the writes as it
+// checks an operation's, and applies them as Aludel. Each write's `note` becomes its rationale.
+export function seedLayer({ db, know, api, projectId, event, project }) {
+  if (!api.seeds.includes(event)) return [];
+  const records = Object.fromEntries([...api.records.keys()].map(kind => [kind, recordsOf(db, api, projectId, kind, null)]));
+  const { writes, references } = handle(api, 'seed', [event, { project, records, catalogs: {} }]);
+  if (!Array.isArray(writes) || writes.length > 200 || !Array.isArray(references)) fail('The layer seed returned an invalid result.', 500);
+  if (!writes.length) return [];
+  checkWrites(db, api, projectId, writes, references, Object.values(records).flat());
+  const own = !db.isTransaction;
+  if (own) db.exec('BEGIN IMMEDIATE');
+  try {
+    const order = { create: 0, update: 1, delete: 2 };
+    const applied = [...writes].sort((a, b) => order[a.op] - order[b.op]).map(write => {
+      const options = { prepared: { data: write.data, references: [] }, author: 'Aludel', rationale: typeof write.note === 'string' ? write.note.slice(0, 300) : null };
+      if (write.op === 'create') return know.insert(projectId, write.kind, write.data, { ...options, id: write.id, layer: api.key, parentId: write.parentId ?? null });
+      if (write.op === 'update') return know.update(projectId, write.id, write.data, { ...options, expectedRevision: write.baseRevision });
+      know.remove(projectId, write.id);
+      return null;
+    }).filter(Boolean);
+    if (own) db.exec('COMMIT');
+    return applied;
+  } catch (error) { if (own) db.exec('ROLLBACK'); throw error; }
 }
 
 // How the host's generic record writes (the UI's create, change and delete) map to a layer's operations.

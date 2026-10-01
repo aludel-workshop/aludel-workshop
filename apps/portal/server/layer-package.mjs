@@ -101,6 +101,9 @@ function readPackage(repo, commit, key) {
   // PAGES-API-01: the layer's API document and handler module; the host loads and reviews them separately.
   if (manifest.api !== undefined && !['spec', 'handler'].every(field => typeof manifest.api?.[field] === 'string' && /^(?:api|server)\/[a-z][a-z0-9-]*\.(?:json|mjs)$/.test(manifest.api[field])))
     throw new Error('Invalid layer API declaration.');
+  // T03-DESIGN-SEED: host events the handler's seed(event, context) answers.
+  if (manifest.api?.seeds !== undefined && (!Array.isArray(manifest.api.seeds) || !manifest.api.seeds.every(event => ['install', 'look'].includes(event))))
+    throw new Error('Invalid layer seed events.');
   fileOutputs(manifest);
   if (manifest.hostCalls !== undefined && (!Array.isArray(manifest.hostCalls) || manifest.hostCalls.length > 20 || !manifest.hostCalls.every(name => typeof name === 'string' && /^[a-z][A-Za-z0-9]{1,40}$/.test(name))))
     throw new Error('Invalid layer host calls.');

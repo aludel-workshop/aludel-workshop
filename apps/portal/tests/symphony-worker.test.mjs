@@ -94,7 +94,7 @@ test('worker token scopes pinned coding work; ID refresh withdraws skipped and s
   const origin = `http://127.0.0.1:${port}`;
   try {
     let ready = false;
-    const deadline = Date.now() + 8000;
+    const deadline = Date.now() + 20000; // a portal start under the parallel suite can exceed 8 seconds
     while (!ready && Date.now() < deadline) {
       try { ready = (await fetch(origin + '/api/session')).ok; }
       catch { await new Promise(resolve => setTimeout(resolve, 50)); }
@@ -154,7 +154,7 @@ test('worker token scopes pinned coding work; ID refresh withdraws skipped and s
   });
   try {
     let ready = false;
-    const deadline = Date.now() + 8000;
+    const deadline = Date.now() + 20000; // a portal start under the parallel suite can exceed 8 seconds
     while (!ready && Date.now() < deadline) {
       try { ready = (await fetch(`http://127.0.0.1:${port}/api/session`)).ok; }
       catch { await new Promise(resolve => setTimeout(resolve, 50)); }
@@ -186,7 +186,7 @@ test('worker token scopes pinned coding work; ID refresh withdraws skipped and s
   });
   try {
     let ready = false;
-    const deadline = Date.now() + 8000;
+    const deadline = Date.now() + 20000; // a portal start under the parallel suite can exceed 8 seconds
     while (!ready && Date.now() < deadline) {
       try { ready = (await fetch(`http://127.0.0.1:${port}/api/session`)).ok; }
       catch { await new Promise(resolve => setTimeout(resolve, 50)); }
@@ -234,7 +234,7 @@ test('worker token scopes pinned coding work; ID refresh withdraws skipped and s
   try {
     const origin = `http://127.0.0.1:${port}`;
     let ready = false;
-    const deadline = Date.now() + 8000;
+    const deadline = Date.now() + 20000; // a portal start under the parallel suite can exceed 8 seconds
     while (!ready && Date.now() < deadline) {
       try { ready = (await fetch(origin + '/api/session')).ok; }
       catch { await new Promise(resolve => setTimeout(resolve, 50)); }
