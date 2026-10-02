@@ -57,18 +57,18 @@ try {
 
   // Built-in layer: heading above one bar.
   await page.goto(origin + base + '/pages');
-  await oneBar('Pages map', ['Map', 'Pages', 'Flows']);
+  await oneBar('Pages map', ['Map', 'Pages', 'Flows', 'Kit']);
   assert.equal(await page.locator('main h1').innerText(), 'Pages');
   await shot('01-pages-map');
   await page.locator('.lay-layer-outputs a', { hasText: 'Flows' }).click();
   await page.waitForURL(/\/pages\/flows$/);
-  await oneBar('Pages flows', ['Map', 'Pages', 'Flows']);
+  await oneBar('Pages flows', ['Map', 'Pages', 'Flows', 'Kit']);
   step('built-in layer: heading, one bar, output tabs switch');
 
   // Tasks: Work's own board, the Roles-style Actions and a Routines list, picked from a sidebar (no second tab row).
   await page.locator('.lay-layer-fixed a', { hasText: 'Tasks' }).click();
   await page.waitForURL(/\/pages\/tasks$/);
-  await oneBar('Pages tasks', ['Map', 'Pages', 'Flows']);
+  await oneBar('Pages tasks', ['Map', 'Pages', 'Flows', 'Kit']);
   const tasksNav = page.getByRole('navigation', { name: 'Pages tasks' });
   const sectionNames = await tasksNav.locator('a').evaluateAll(links => links.map(a => [...a.childNodes].filter(node => node.nodeType === 3).map(node => node.textContent).join('').trim()));
   // DEC-057: a layer-scoped Pages (its template publishes an API) shows Access instead of an action list.
@@ -83,7 +83,7 @@ try {
   await page.locator('aludel-work-board').getByRole('link', { name: 'Create task' }).click();
   await page.waitForURL(/\/pages\/tasks\/create$/);
   await page.getByRole('heading', { name: 'Create a Pages task' }).waitFor();
-  await oneBar('Pages create task', ['Map', 'Pages', 'Flows']);
+  await oneBar('Pages create task', ['Map', 'Pages', 'Flows', 'Kit']);
   assert.equal(await page.locator('aludel-work-create select[name="role"]').count(), 0, 'the layer is fixed inside its own Tasks');
   const actionId = scoped ? null : await page.locator('aludel-work-create select[name="action"]').inputValue();
   if (scoped) assert.equal(await page.locator('aludel-work-create select[name="action"]').count(), 0, 'a layer-scoped task names no action');
@@ -98,7 +98,7 @@ try {
     await tasksNav.getByRole('link', { name: /^Access/ }).click();
     await page.waitForURL(/\/pages\/tasks\/access$/);
     await page.getByRole('heading', { name: 'Access', level: 2 }).waitFor();
-    await oneBar('Pages access', ['Map', 'Pages', 'Flows']);
+    await oneBar('Pages access', ['Map', 'Pages', 'Flows', 'Kit']);
     await shot('02b-pages-access');
     await audit('Pages access');
     step('Tasks: Work board and cards; create in the layer, open in Work, back as a card; Access for a layer-scoped layer');
@@ -107,7 +107,7 @@ try {
     await page.waitForURL(new RegExp(`/pages/tasks/actions/${actionId.replace('.', '\\.')}$`));
     await page.locator(`[id="setup-${actionId}"]`).waitFor();
     step('Tasks: Work board and cards; create in the layer, open in Work, back as a card; card chip opens its action');
-    await oneBar('Pages actions', ['Map', 'Pages', 'Flows']);
+    await oneBar('Pages actions', ['Map', 'Pages', 'Flows', 'Kit']);
     const row = page.locator(`[id="action-${actionId}"]`);
     await row.locator('aludel-assignee').waitFor();
     await row.locator(`[id="setup-${actionId}"] h4`, { hasText: 'Done when' }).waitFor();
@@ -125,7 +125,7 @@ try {
   await page.getByRole('button', { name: 'New routine' }).click();
   await page.waitForURL(/\/pages\/tasks\/routines\/[^/]+$/);
   await page.locator('#rt-title').waitFor();
-  await oneBar('Pages routine', ['Map', 'Pages', 'Flows']);
+  await oneBar('Pages routine', ['Map', 'Pages', 'Flows', 'Kit']);
   await page.locator('#rt-title').fill('Weekly flow audit');
   await page.getByLabel('Trigger').selectOption('schedule');
   await page.getByLabel('Cadence').selectOption('weekly');
@@ -139,11 +139,11 @@ try {
   assert.equal(await tasksNav.locator('a', { hasText: 'Weekly flow audit' }).count(), 0, 'routines are listed on their page, not in the sidebar');
   step('Tasks: Roles-style actions; routine list, detail with a way back, and a saved schedule');
 
-  // Manage: sidebar with Settings, Connections and Knowledge documents.
+  // Manage: settings only (LAYER-KNOWLEDGE-01: Connections gave way to bindings, proposed from Knowledge).
   await page.locator('.lay-layer-fixed a', { hasText: 'Manage' }).click();
   await page.waitForURL(/\/pages\/manage$/);
   await page.locator('aludel-layer-manage').waitFor();
-  await oneBar('Pages manage', ['Map', 'Pages', 'Flows']);
+  await oneBar('Pages manage', ['Map', 'Pages', 'Flows', 'Kit']);
   await page.getByLabel('Name', { exact: true }).fill('Screens');
   await page.getByLabel('Search icons').fill('rou');
   await page.locator('.lay-mg-icons label[title="route"]').click();
@@ -164,24 +164,26 @@ try {
   await audit('Pages manage settings');
   assert.equal(await page.locator('.lay-mg-side .lay-mg-doc').count(), 0, 'Manage lists no Knowledge documents');
   assert.equal(await page.locator('.lay-mg-side a', { hasText: 'Activate' }).count(), 0, 'an active layer has no Activate step');
-  await page.locator('.lay-mg-side a', { hasText: 'Connections' }).click();
-  await page.waitForURL(/\/pages\/manage\/connections$/);
+  assert.equal(await page.locator('.lay-mg-side a', { hasText: /Connections|Facets/ }).count(), 0, 'no Connections or Facets in Manage');
 
-  // Knowledge is its own tab and opens on the charter; built-in charters are editable like any document.
+  // Knowledge is its own tab, a docs site: the overview, then the charter, edited and saved at once.
   await page.locator('.lay-layer-fixed a', { hasText: 'Knowledge' }).click();
   await page.waitForURL(/\/pages\/knowledge$/);
-  await page.locator('aludel-layer-knowledge').waitFor();
-  await oneBar('Pages knowledge', ['Map', 'Pages', 'Flows']);
-  const charter = page.locator('#kn-doc');
-  await page.waitForFunction(() => /^## Purpose$/m.test(document.querySelector('#kn-doc')?.value || ''));
+  await page.locator('aludel-layer-knowledge .kn-title').waitFor();
+  await oneBar('Pages knowledge', ['Map', 'Pages', 'Flows', 'Kit']);
+  await page.locator('.kn-side').getByRole('link', { name: 'Charter', exact: true }).click();
+  await page.locator('.kn-read').getByRole('button', { name: 'Edit' }).click();
+  const charter = page.locator('.kn-editor textarea');
+  await page.waitForFunction(() => /^## Purpose$/m.test(document.querySelector('.kn-editor textarea')?.value || ''));
   await charter.fill((await charter.inputValue()) + '\n## Accessibility\n\nEvery flow is checked at 390px and with a keyboard.\n');
-  await page.getByRole('button', { name: 'Save new revision' }).click();
-  await page.locator('.success-message', { hasText: 'Charter saved' }).waitFor();
+  await page.locator('.kn-read').getByRole('button', { name: 'Save', exact: true }).click();
+  await page.locator('.success-message', { hasText: 'Saved.' }).waitFor();
+  await page.locator('.kn-md', { hasText: 'Every flow is checked at 390px' }).waitFor();
   await shot('04-pages-knowledge');
   await audit('Pages knowledge');
-  await page.locator('.lay-mg-side a.lay-mg-doc').first().click();
-  await page.waitForURL(/\/pages\/knowledge\/.+/);
-  step('Knowledge tab: charter first and editable for a built-in; Manage has settings and connections only');
+  await page.locator('.kn-side .kn-link', { hasText: 'Flow method' }).click();
+  await page.waitForURL(/\/pages\/knowledge\/doc\/.+/);
+  step('Knowledge tab: a docs site whose charter is saved at once for a built-in; Manage has settings only');
 
   // Old links open their new places.
   for (const [from, to] of [['/pages/operations', '/pages/tasks'], ['/pages/operations/routines', '/pages/tasks/routines'], ['/pages/operations/connections', '/pages/manage/connections'], ['/pages/manage/knowledge', '/pages/knowledge'], ['/pages/operations/actions', '/pages/tasks/actions']]) {
@@ -217,19 +219,19 @@ try {
   // The charter is written in Knowledge, from the seeded headings; the checklist follows it.
   await page.locator('.lay-mg-side a', { hasText: 'Activate' }).click();
   await page.getByRole('link', { name: 'Open the charter in Knowledge' }).click();
-  await page.waitForURL(new RegExp(`/${layer.key}/knowledge/identity$`));
-  await page.locator('aludel-layer-knowledge').waitFor();
-  await page.waitForFunction(() => /<!--/.test(document.querySelector('#kn-doc')?.value || ''), null, { timeout: 10000 });
-  const seeded = await page.locator('#kn-doc').inputValue();
+  await page.waitForURL(new RegExp(`/${layer.key}/knowledge/doc/charter$`));
+  await page.locator('.kn-read').getByRole('button', { name: 'Edit' }).click();
+  await page.waitForFunction(() => /<!--/.test(document.querySelector('.kn-editor textarea')?.value || ''), null, { timeout: 10000 });
+  const seeded = await page.locator('.kn-editor textarea').inputValue();
   const answers = { 'Purpose': 'Collect and interpret customer research.', 'Contents and scope': 'Interviews, sources and synthesized findings.', 'Methodology': 'Record sources, then synthesize patterns.',
     'Output conventions and taxonomy': 'One Markdown file per source under sources/.', 'Quality bar': 'Every claim cites a source and date.', 'Role in the project': 'Evidence for product decisions in Vision.',
     'How this layer works with others': 'Publishes findings; reads the Vision brief.' };
   let written = seeded;
   for (const [heading, answer] of Object.entries(answers)) written = written.replace(new RegExp(`(## ${heading}\\n\\n)<!--[^>]*-->`), `$1${answer}`);
-  await page.locator('#kn-doc').fill(written);
-  await page.getByRole('button', { name: 'Save new revision' }).click();
-  await page.locator('.success-message', { hasText: 'Charter saved' }).waitFor();
-  await page.waitForFunction(() => document.querySelectorAll('.lay-kn-sections li.done').length === 7, null, { timeout: 10000 });
+  await page.locator('.kn-editor textarea').fill(written);
+  await page.locator('.kn-read').getByRole('button', { name: 'Save', exact: true }).click();
+  await page.locator('.success-message', { hasText: 'Saved.' }).waitFor();
+  await page.waitForFunction(() => document.querySelectorAll('.kn-checks li.done').length === 7, null, { timeout: 10000 });
   await page.locator('.lay-draft-banner', { hasText: '7 of 8 steps done' }).waitFor();
   await shot('06-research-charter');
   await audit('Research charter');

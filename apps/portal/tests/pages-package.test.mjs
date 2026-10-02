@@ -36,7 +36,7 @@ test('Pages installs separate pinned local repository copies and reads their dec
     assert.equal(definition.packageCommit, one.commit);
     assert.equal(definition.instanceId, layerInstanceId(db, 'one', 'pages'));
     assert.equal(definition.editorAdapter, 'pages-native');
-    assert.deepEqual(definition.outputTabs.map(tab => tab.label), ['Map', 'Pages', 'Flows']);
+    assert.deepEqual(definition.outputTabs.map(tab => tab.label), ['Map', 'Pages', 'Flows', 'Kit']);
     assert.match(definition.identity.markdown, /A project may start directly in Pages without Vision/);
     assert.match(pagesDocumentRead(db, 'owner', 'one', 'flow').content, /without Vision/);
     const charterPath = join(one.repo, 'knowledge/charter.md');

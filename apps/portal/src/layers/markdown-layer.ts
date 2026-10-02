@@ -719,7 +719,7 @@ function inlineSegments(text: string, base: string): Segment[] {
 }
 
 // A small CommonMark subset for the preview. Everything is escaped first; Angular's sanitizer still checks the result.
-function renderMarkdown(source: string): string {
+export function renderMarkdown(source: string): string {
   const escape = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const safeUrl = (url: string) => /^(https?:|mailto:|#|\.{0,2}\/|[\w-][^:]*$)/i.test(url.trim()) ? url.trim() : '';
   const inline = (text: string): string => {

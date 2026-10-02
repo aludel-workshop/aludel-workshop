@@ -105,11 +105,11 @@ const localLayers = [{ id: 'product', icon: 'lightbulb', label: 'Vision' }, { id
           <h1 tabindex="-1">Project not found</h1><p>You don't have access to this project, or it doesn't exist. <a href="/projects">Your apps</a></p>
         } @else if (ctx.data() && ctx.setup(); as ready) {
           @if (localLayer() && activeLocalLayer()) {
-            <!-- CUSTOM-LAYER-01: one bar per layer. Output tabs scroll on the left; Tasks and Manage stay put on the right. -->
+            <!-- CUSTOM-LAYER-01: one bar per layer. Output tabs scroll on the left; Tasks and Manage stay put on the right. The header is
+                 compact (LAYER-KNOWLEDGE-01); what the layer is for is its Knowledge overview. -->
             <header class="lay-layer-head">
               <span class="lay-tile" aria-hidden="true"><mat-icon>{{ localLayer()?.icon }}</mat-icon></span>
-              <div><h1 tabindex="-1">{{ localLayer()?.name }}@if (localLayer()?.lifecycle === 'draft') { <span class="lay-chip lay-plain lay-layer-draft">Draft</span> }</h1>
-                <p>{{ localLayer()?.description }}</p></div>
+              <h1 tabindex="-1" [attr.title]="localLayer()?.description">{{ localLayer()?.name }}@if (localLayer()?.lifecycle === 'draft') { <span class="lay-chip lay-plain lay-layer-draft">Draft</span> }</h1>
             </header>
             @if (setup(); as p) { @if (!(space() === 'manage' && (ctx.segments()[2] || 'activate') === 'activate')) {
               <div class="lay-draft-banner" role="status"><mat-icon aria-hidden="true">flag</mat-icon>

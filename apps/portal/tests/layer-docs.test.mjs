@@ -61,7 +61,7 @@ test('docs are listed where Knowledge shows them, and Save takes at once as a ne
   const listed = docs.list(id, helper.id, 'pages');
   assert.deepEqual(listed.docs.map(doc => [doc.group, doc.title]).slice(0, 3), [[null, 'Charter'], ['Methods', 'Page design method'], ['Methods', 'Flow method']]);
   assert.ok(!listed.docs.some(doc => doc.path === 'knowledge/page-output.md'), 'a part\'s doc sits with its part, not in the docs list');
-  assert.deepEqual(listed.docs.filter(doc => doc.group === 'Editor tabs').map(doc => [doc.tab, doc.edits.join(','), doc.exists]), [['map', 'map', false], ['page', 'pages', false], ['flows', 'flows', false]]);
+  assert.deepEqual(listed.docs.filter(doc => doc.group === 'Editor tabs').map(doc => [doc.tab, doc.edits.join(','), doc.exists]), [['map', 'map', false], ['page', 'pages', false], ['flows', 'flows', false], ['kit', 'kit,kit-tokens,kit-components,kit-brand', true]]);
 
   const before = pin(db, id, 'pages');
   const charter = docs.read(id, helper.id, 'pages', 'knowledge/charter.md');
@@ -92,17 +92,26 @@ test('docs are listed where Knowledge shows them, and Save takes at once as a ne
   assert.throws(() => docs.save(id, owner.id, 'pages', { path: 'knowledge/x.md', content: '  ', base: other.commit }), /needs content/);
   assert.throws(() => docs.read(id, owner.id, 'pages', 'knowledge/charter.md', '0'.repeat(40)), /not in this layer's history/);
   assert.throws(() => docs.list(id, 'nobody', 'pages'), /Project not found/);
+  // A save is checked as a package like any commit: the charter has a size limit.
+  assert.throws(() => docs.save(id, owner.id, 'pages', { path: 'knowledge/charter.md', content: `# Pages charter\n\n${'x'.repeat(25000)}`, base: pin(db, id, 'pages') }), /would make the layer invalid: Layer charter is too large/);
+  // A repository whose main moved past the pin outside Aludel is reconciled first, never written over.
+  const { repo } = layerBinding(db, id, 'pages'), env = { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@x', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@x' };
+  const at = pin(db, id, 'pages');
+  execFileSync('git', ['-C', repo, 'update-ref', 'refs/heads/main', execFileSync('git', ['-C', repo, 'commit-tree', `${at}^{tree}`, '-p', at, '-m', 'outside'], { encoding: 'utf8', env }).trim()]);
+  assert.throws(() => docs.save(id, owner.id, 'pages', { path: 'knowledge/flow-method.md', content: '# Flow method\n\nAgain.', base: at }), /reconcile it first/);
+  assert.equal(pin(db, id, 'pages'), at);
 }));
 
 test('the spec is saved whole, checked first, and a change raises Compare specs', { skip }, () => fixture(({ db, owner, id, docs, changed }) => {
   const base = pin(db, id, 'pages');
   const information = layerPackageForProject(db, id, 'pages').manifest.information;
-  assert.throws(() => docs.saveInformation(id, owner.id, 'pages', { information: [...information, { key: 'kit', title: 'Kit', intent: 'Copies.', select: { kind: 'kit_item' }, tab: 'nowhere' }], base }), /editor tab/);
+  const withKit = (fields) => information.map(node => node.key === 'kit' ? { ...node, ...fields } : node);
+  assert.throws(() => docs.saveInformation(id, owner.id, 'pages', { information: withKit({ tab: 'nowhere' }), base }), /editor tab/);
   assert.equal(pin(db, id, 'pages'), base, 'a refused spec leaves the layer as it was');
-  const next = [...information, { key: 'kit', title: 'Kit', intent: 'What pages are drawn with.', select: { kind: 'kit_item' }, tab: 'page' }];
+  const next = withKit({ intent: 'Everything Pages draws its pages with.' });
   const saved = docs.saveInformation(id, owner.id, 'pages', { information: next, base });
   assert.ok(saved.changed);
-  assert.deepEqual(layerPackageForProject(db, id, 'pages').manifest.information.map(node => node.key), ['map', 'pages', 'flows', 'kit']);
+  assert.equal(layerPackageForProject(db, id, 'pages').manifest.information.find(node => node.key === 'kit').intent, 'Everything Pages draws its pages with.');
   assert.deepEqual(changed, ['pages']);
   assert.equal(docs.saveInformation(id, owner.id, 'pages', { information: next, base: saved.commit }).changed, false);
   assert.deepEqual(changed, ['pages'], 'an unchanged spec raises nothing');

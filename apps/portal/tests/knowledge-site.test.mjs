@@ -3,7 +3,8 @@
 // Vision's Personas (handing over) proposes one binding as a chain; accepting it decides everything at once. A Branding
 // layer taking Design's brand assets renegotiates the live design-system binding.
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -81,7 +82,7 @@ test('a layer\'s site joins its spec, what each part holds, how it is shared, an
   assert.throws(() => site.contents(id, owner.id, 'product', 'nope'), /no information nope/);
 }));
 
-test('Personas binds its people folder with Vision\'s personas: one proposal, decided at once', { skip }, () => fixture(({ db, know, owner, id, store, docs, site }) => {
+test('Personas binds its people folder with Vision\'s personas: one proposal, decided at once', { skip }, () => fixture(({ db, know, owner, id, store, routines, docs, site }) => {
   const borrower = call(db, know, id, 'product', 'createPersona', { body: { persona: { name: 'Borrower', role: 'Needs a tool once' } } });
   call(db, know, id, 'pages', 'createFlow', { body: { flow: { title: 'Borrow a drill', persona: borrower.id, steps: [] } } });
   createMarkdownDefinition(db, owner.id, id, { name: 'Personas', key: 'personas', template: 'markdown' });
@@ -122,6 +123,9 @@ test('Personas binds its people folder with Vision\'s personas: one proposal, de
   assert.deepEqual(card.participants.map(p => [p.name, p.role, p.nodes.map(node => node.title).join()]), [['Personas', 'authority', 'Personas'], ['Vision', 'ceded', 'Personas']]);
   assert.ok(!vision.bindings.some(item => item.id === proposed.id), 'the proposal became the binding');
   assert.equal(store.all(id).find(item => item.id === binding.id).concept.description, input.statement);
+  // A retired binding is history: it leaves the cards.
+  routines.changes.request(id, owner.id, binding.id, { kind: 'lifecycle', lifecycle: 'retired' }, 'Done with it.');
+  assert.ok(!site.site(id, owner.id, 'product').bindings.some(item => item.id === binding.id));
 }));
 
 test('Branding takes Design\'s brand assets, renegotiating the design-system binding', { skip }, () => fixture(({ db, owner, id, store, routines, docs, site }) => {
@@ -152,9 +156,14 @@ test('a proposal needs two layers, one lead, roles each part supports, and a nam
   assert.throws(() => site.preview(id, owner.id, { name: 'x', participants: [people, { ...vision, lead: true }] }), /one layer that leads/);
   assert.throws(() => site.preview(id, owner.id, { name: 'x', participants: [people, { layer: 'personas', nodes: ['notes'] }] }), /takes part once/);
   assert.throws(() => site.preview(id, owner.id, { name: ' ', participants: [people, vision] }), /Name what is shared/);
-  // Design's kit is a design system Pages keeps a copy of; Pages' copy can't lead.
-  const pagesKit = layerPackageForProject(db, id, 'pages').manifest;
-  docs.saveInformation(id, owner.id, 'pages', { base: pin(db, id, 'pages'), information: [...pagesKit.information, { key: 'kit', title: 'Kit', intent: 'What pages are drawn with.', select: { kind: 'kit_item' }, tab: 'page' }] });
+  // A facet that only supports keeping a copy can't lead (a template may say so; here Pages' kit is narrowed to replica).
+  const { repo, commit } = layerBinding(db, id, 'pages');
+  const git = (...args) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8', env: { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@x', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@x' } }).trim();
+  const manifest = JSON.parse(git('show', `${commit}:layer.json`));
+  manifest.facets = manifest.facets.map(facet => facet.key === 'kit' ? { ...facet, roles: ['replica'] } : facet);
+  writeFileSync(join(repo, 'layer.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+  git('commit', '-q', '-am', 'Kit only keeps a copy');
+  db.prepare('UPDATE layer_package_bindings SET accepted_commit = ? WHERE project_id = ? AND layer_key = ?').run(git('rev-parse', 'HEAD'), id, 'pages');
   assert.throws(() => site.preview(id, owner.id, { name: 'x', participants: [{ layer: 'pages', nodes: ['kit'], lead: true }, { layer: 'design', nodes: ['tokens'] }] }), /Pages's App kit can't lead here: it supports keeps a copy/);
   const proposed = site.propose(id, owner.id, { name: 'People', participants: [people, vision] });
   const before = pin(db, id, 'product');

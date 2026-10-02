@@ -7,7 +7,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { editorTabs, packageAt } from './layer-package.mjs';
-import { projectLayerDefinition, saveLayerCharter } from './layer-registry.mjs';
+import { charterFromFields, charterTemplate, projectLayerDefinition, saveLayerCharter } from './layer-registry.mjs';
 import { layerBinding, settleLayerCheckout } from './layer-source.mjs';
 import { flatten, validateInformation } from './information.mjs';
 
@@ -84,9 +84,9 @@ export function layerDocs({ db, onSpecChange = () => {} }) {
     let content = show(pkg.repo, commit, path);
     const definition = custom(projectId, key);
     // A custom layer's charter is also its identity, which activation and discovery read; until the first save in
-    // Knowledge, the identity is the charter.
+    // Knowledge, the identity is the charter (a new one starts from the charter's prompted headings).
     if (path === pkg.manifest.knowledge.charter && definition && at === null && !history(projectId, userId, key, path).versions.some(version => version.saved))
-      content = definition.identity?.markdown ?? content;
+      content = definition.identity?.markdown || (definition.identity ? charterFromFields(definition.name, definition.identity) : charterTemplate(definition.name));
     if (content === null) return { path, commit, content: '', exists: false };
     return { path, commit, content, exists: true };
   }
@@ -129,8 +129,7 @@ export function layerDocs({ db, onSpecChange = () => {} }) {
     editor(projectId, userId);
     const pkg = current(projectId, key);
     if (base !== pkg.commit && show(pkg.repo, base, 'layer.json') !== show(pkg.repo, pkg.commit, 'layer.json')) fail('This layer\'s spec changed since you opened it. Reload to see it.', 409);
-    const manifest = { ...pkg.manifest, information };
-    validateInformation(manifest, { tabs: editorTabs(manifest) });
+    // The package check below validates the spec, as it does for any commit.
     const ordered = {};
     for (const [field, value] of Object.entries(pkg.manifest)) { if (field !== 'information') ordered[field] = value; if (field === 'outputs') ordered.information = information; }
     if (!('information' in ordered)) ordered.information = information;
