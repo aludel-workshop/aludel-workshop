@@ -1,5 +1,5 @@
 {
-  "repo": "../layer-base",
+  "repo": "layer-base",
   "templates": {
     "base": {
       "branch": "main",

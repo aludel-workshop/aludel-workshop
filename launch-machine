@@ -26,4 +26,6 @@ if ! "$machine_root/integrations/symphony/local-hosts"; then
   echo "Symphony local hosts: startup failed; the portal will start and queued agent work will remain Blocked." >&2
 fi
 
+# DEC-062: layers run from their template repositories (layer-base) by default. Set MACHINE_LAYER_TEMPLATES_ENABLED=0 to fall back.
+export MACHINE_LAYER_TEMPLATES_ENABLED="${MACHINE_LAYER_TEMPLATES_ENABLED:-1}"
 exec node --env-file-if-exists="$machine_root/.env" server/server.mjs

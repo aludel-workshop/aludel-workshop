@@ -35,3 +35,6 @@ __pycache__/
 .codex/
 .DS_Store
 Thumbs.db
+
+# The layer template repository (DEC-062): its own Git repository, checked out beside the portal until it is published to GitHub.
+/layer-base/
