@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, readFileSync, mkdtempSync, renameSync, rmSync, w
 import { resolve, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateAdapters, validateFacets, validateRefers } from './bindings.mjs';
+import { flatten, validateInformation } from './information.mjs';
 
 const portal = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const candidate = resolve(portal, '../..');
@@ -78,6 +79,8 @@ export function fileOutputs(manifest) {
 }
 // Commits are immutable, so a validated package at one is kept.
 const packages = new Map();
+// The editor tabs a layer's contents can be edited in: its own, plus the host adapter's (a Markdown layer's Files).
+export const editorTabs = manifest => [...(manifest.tabs || []).map(tab => tab.key), ...(manifest.editorAdapter === 'markdown-editor' ? ['files'] : [])];
 export function packageAt(repo, commit, key) {
   const cacheKey = `${repo}@${commit}#${key}`;
   if (!packages.has(cacheKey)) { const value = readPackage(repo, commit, key); packages.set(cacheKey, value); return value; }
@@ -110,6 +113,8 @@ function readPackage(repo, commit, key) {
   validateFacets(manifest);
   validateAdapters(manifest);
   validateRefers(manifest);
+  // LAYER-KNOWLEDGE-01: the layer's information as a spec; each part's doc must be in the package.
+  for (const node of flatten(validateInformation(manifest, { tabs: editorTabs(manifest) }))) if (node.doc) content(repo, commit, node.doc);
   if (manifest.hostCalls !== undefined && (!Array.isArray(manifest.hostCalls) || manifest.hostCalls.length > 20 || !manifest.hostCalls.every(name => typeof name === 'string' && /^[a-z][A-Za-z0-9]{1,40}$/.test(name))))
     throw new Error('Invalid layer host calls.');
   const charter = content(repo, commit, manifest.knowledge.charter);

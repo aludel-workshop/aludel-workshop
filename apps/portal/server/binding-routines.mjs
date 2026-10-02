@@ -73,26 +73,25 @@ export function bindingRoutines({ db, know, pool, store }) {
       store.logEvent(binding.id, { kind: 'proposed', detail: { by: 'discover', adapter: adapter.id }, workItemId: work.id });
       proposed.push(binding);
     }
-    // Assess overlap (R5): two layers' facets that share a hint, and are not already bound together, may describe the same
-    // thing. Nothing matches automatically: a person or an agent assesses it as soft Work, once per pair.
-    const assessed = new Set(db.prepare(`SELECT json_extract(context_json, '$.pair') AS pair FROM layer_work_items WHERE project_id = ?
-      AND json_extract(context_json, '$.routine') = 'assess-overlap'`).all(projectId).map(row => row.pair));
-    const bound = (a, b) => store.all(projectId).some(binding => binding.lifecycle !== 'retired'
-      && binding.participants.some(p => p.layer.key === a.layer.key && p.facet === a.facet.key) && binding.participants.some(p => p.layer.key === b.layer.key && p.facet === b.facet.key));
-    const facets = layers.flatMap(layer => layer.facets.map(facet => ({ layer, facet })));
-    for (const [i, a] of facets.entries()) for (const b of facets.slice(i + 1)) {
-      if (a.layer.key === b.layer.key) continue;
-      const shared = a.facet.hints.filter(hint => b.facet.hints.includes(hint));
-      if (!shared.length || bound(a, b)) continue;
-      const pair = JSON.stringify([`${a.layer.key}/${a.facet.key}`, `${b.layer.key}/${b.facet.key}`].sort());
-      if (assessed.has(pair)) continue;
-      know.createWork(projectId, { layer: 'work', layerScoped: true, type: 'research', state: 'suggested',
-        title: `Assess overlap: ${a.layer.name}'s ${a.facet.title.toLowerCase()} and ${b.layer.name}'s ${b.facet.title.toLowerCase()}`.slice(0, 160),
-        documents: ['Library › Bindings'], context: { routine: 'assess-overlap', pair, hints: shared, facets: [{ layer: a.layer.key, facet: a.facet.key }, { layer: b.layer.key, facet: b.facet.key }] },
-        logText: `Discover: both facets are marked ${shared.join(', ')}. Read both layers' charters and entries, and propose which part of each corresponds: refacets for each side that needs one, then a binding.` });
-      assessed.add(pair);
-    }
     return proposed;
+  }
+
+  // Compare specs (LAYER-KNOWLEDGE-01, replacing R5's hint matching): when a layer's spec changes, one Work item asks a person
+  // or an agent to compare it with every other installed layer's spec and propose bindings, or additions to existing ones,
+  // from Knowledge. Raised once per version of the spec; nothing is matched automatically.
+  function specChanged(projectId, key) {
+    const own = manifest(projectId, key);
+    if (!own?.information) return null;
+    const others = installed(projectId).filter(layer => layer.key !== key && manifest(projectId, layer.key)?.information?.length);
+    if (!others.length) return null;
+    const digest = createHash('sha256').update(JSON.stringify(own.information)).digest('hex').slice(0, 16);
+    const seen = db.prepare(`SELECT 1 FROM layer_work_items WHERE project_id = ? AND json_extract(context_json, '$.routine') = 'compare-specs'
+      AND json_extract(context_json, '$.layer') = ? AND json_extract(context_json, '$.digest') = ?`).get(projectId, key, digest);
+    if (seen) return null;
+    return know.createWork(projectId, { layer: 'work', layerScoped: true, type: 'research', state: 'suggested',
+      title: `Compare specs: ${own.name}'s spec changed`.slice(0, 160), documents: [`${own.name} › Knowledge`],
+      context: { routine: 'compare-specs', layer: key, digest, with: others.map(layer => layer.key) },
+      logText: `${own.name}'s information changed. Read its spec in Knowledge and compare each part's intent with ${others.map(layer => layer.name).join(', ')}. Where two layers keep the same information, propose a binding from Knowledge (tick the parts, choose who leads), or add the part to an existing binding.` });
   }
 
   // Binding Work raised earlier: open items by action, and closed ones not yet settled.
@@ -276,7 +275,7 @@ export function bindingRoutines({ db, know, pool, store }) {
       { state: 'done', context: { ...item.context, decision } }, { by: { kind: 'person', id: userId } });
     return watch(projectId, bindingId);
   }
-  const routines = { discover, watch, watchProject, snapshot, status, decideAssessment, adopted };
+  const routines = { discover, watch, watchProject, snapshot, status, decideAssessment, adopted, specChanged };
   // Every change to a binding is Work (R2); the routines raise and run them through the same items.
   const changes = bindingChanges({ db, know, store, routines });
   return Object.assign(routines, { changes });

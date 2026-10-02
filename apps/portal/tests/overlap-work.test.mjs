@@ -1,5 +1,5 @@
 // LAYER-BINDINGS-01 step 3, R5: a new, unrelated layer covers part of an existing one. On the pinned templates, a Personas
-// layer (from the Markdown template) declares a facet; Discover raises Assess overlap with Vision; the chain refacets
+// layer (from the Markdown template) declares a facet; the chain refacets
 // Vision and binds the two; Vision's personas are offered once and adopted (each adopt naming the document it produced);
 // Pages' references to them become Work; Vision's ceded personas refuse edits; and the whole thing merges back.
 import assert from 'node:assert/strict';
@@ -70,11 +70,9 @@ test('Vision cedes its personas to a new Personas layer, and the chain of Work m
   accept(work, id, owner, declared.item.id);
   assert.deepEqual(facets(db, id, 'personas'), ['people']);
 
-  // Discover notices the overlap (a shared hint) and raises it once, as soft Work; nothing is matched automatically.
-  routines.discover(id); routines.discover(id);
-  const assess = items(db, id, "json_extract(context_json, '$.routine') = 'assess-overlap'");
-  assert.deepEqual(assess.map(item => [item.layer, item.state]), [['work', 'suggested']]);
-  assert.match(assess[0].title, /^Assess overlap: /); assert.match(assess[0].title, /Vision's product intent/); assert.match(assess[0].title, /Personas's people/);
+  // Shared hints no longer raise anything (LAYER-KNOWLEDGE-01): overlap is found by comparing specs, as Work.
+  routines.discover(id);
+  assert.deepEqual(items(db, id, "json_extract(context_json, '$.routine') = 'assess-overlap'"), []);
 
   // The assessment's answer is a chain: refacet Vision so its personas are a facet, then bind them, Personas the authority.
   const chain = work.chain(id, owner.id, { rationale: 'Personas now keeps the people we design for.',

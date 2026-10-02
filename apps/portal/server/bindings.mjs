@@ -45,7 +45,7 @@ export const actionKinds = Object.freeze(['apply', 'import', 'review', 'adapter'
 // `notIn` is what remains of a kind once part of it is split off by value.
 const scalar = value => ['string', 'number', 'boolean'].includes(typeof value);
 const order = values => [...new Set(values)].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
-function normalClause(input, outputs, facetKey) {
+export function normalClause(input, outputs, facetKey) {
   if (!input || typeof input !== 'object' || typeof input.kind !== 'string' || !outputs.includes(input.kind))
     fail(`Facet ${facetKey} must select this layer's own output kinds.`);
   if (input.where === undefined) return { kind: input.kind };
@@ -56,7 +56,7 @@ function normalClause(input, outputs, facetKey) {
   return { kind: input.kind, where: { field: where.field, [ops[0] === 'notIn' ? 'notIn' : 'in']: order(values) } };
 }
 // Two clauses can select the same entry unless they narrow the same kind by the same field to disjoint values.
-function overlaps(a, b) {
+export function overlaps(a, b) {
   if (a.kind !== b.kind) return false;
   if (!a.where || !b.where || a.where.field !== b.where.field) return true;
   if (a.where.in && b.where.in) return a.where.in.some(value => b.where.in.includes(value));
@@ -64,10 +64,14 @@ function overlaps(a, b) {
   const [only, except] = a.where.in ? [a.where.in, b.where.notIn] : [b.where.in, a.where.notIn];
   return only.some(value => !except.includes(value));
 }
-const matches = (clause, entry) => {
+// `folder` is derived from an entry's `path` when its data has no folder of its own: the directory a file sits in ('' at the
+// top). It is how a folder of a Markdown layer's documents becomes a part of the layer's information (LAYER-KNOWLEDGE-01).
+export const fieldOf = (entry, field) => field === 'folder' && !own(entry.data || {}, 'folder') && typeof entry.data?.path === 'string'
+  ? (entry.data.path.includes('/') ? entry.data.path.slice(0, entry.data.path.lastIndexOf('/')) : '') : entry.data?.[field];
+export const matches = (clause, entry) => {
   if (entry?.kind !== clause.kind) return false;
   if (!clause.where) return true;
-  const value = entry.data?.[clause.where.field];
+  const value = fieldOf(entry, clause.where.field);
   return clause.where.in ? clause.where.in.includes(value) : !clause.where.notIn.includes(value);
 };
 // A declaration's clauses: `select`, or `kinds` as shorthand for whole kinds (the form step 2's templates use).
@@ -478,7 +482,7 @@ export function roleOf(layer, entry, bindings = []) {
 // ---- Refaceting: reshaping a layer's facets ----
 
 // Whether clause `part` selects only entries that `whole` selects, and what remains of `whole` once `part` is taken out.
-function contains(whole, part) {
+export function contains(whole, part) {
   if (whole.kind !== part.kind) return false;
   if (!whole.where) return true;
   if (!part.where || part.where.field !== whole.where.field) return false;
@@ -494,7 +498,7 @@ function subtract(whole, part) {
   return where('in', part.where.notIn.filter(value => !whole.where.notIn.includes(value)));
 }
 // The union of two facets' clauses, folded per kind: valid facets select each kind whole, or by one field.
-function union(a, b) {
+export function union(a, b) {
   const byKind = new Map();
   for (const clause of [...a, ...b]) {
     const prior = byKind.get(clause.kind);
@@ -511,7 +515,7 @@ function union(a, b) {
   }
   return [...byKind.values()];
 }
-const declaration = (facet, outputs) => {
+export const declaration = (facet, outputs) => {
   const { kinds, ...rest } = facet;
   return { ...rest, select: declaredSelect(facet, outputs) };
 };

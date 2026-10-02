@@ -1,9 +1,10 @@
 // LAYER-BASE-01 B6: each installed layer's own views are built from its repository's pinned `main` and served from a
-// separate origin into a sandboxed frame. A build is keyed by commit, layer key and the portal's frame SDK, so instances
-// on the same template commit share it. The frame has no network and no portal session: the portal page carries the
+// separate origin into a sandboxed frame. A build is keyed by what it compiles (the manifest's ui declaration and the
+// bytes of its files), the layer key and the portal's frame SDK, so instances with the same views share it, and a commit
+// that changes only docs or the spec (LAYER-KNOWLEDGE-01) reuses the build. The frame has no network and no portal session: the portal page carries the
 // calls it allows (see frameAllows) with the person's session.
 import { createHash } from 'node:crypto';
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { existsSync, readFileSync, renameSync, rmSync, statSync } from 'node:fs';
 import { dirname, extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,7 +24,16 @@ const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; ch
 export const frameLabel = instanceId => `i-${String(instanceId).replace(/-/g, '')}`;
 export function layerUi({ dataDirectory, layerOrigin, portalOrigin, appOriginFor = () => null }) {
   const cacheRoot = resolve(dataDirectory, 'layer-ui');
-  const buildKey = (commit, key) => createHash('sha256').update(`${commit}\0${key}\0${sdkDigest}`).digest('hex').slice(0, 32);
+  const sources = new Map();
+  const viewsDigest = (repo, commit, ui) => {
+    const cached = sources.get(`${repo}@${commit}`);
+    if (cached) return cached;
+    const blobs = execFileSync('git', ['-C', repo, 'rev-parse', ...ui.files.map(path => `${commit}:${path}`)], { encoding: 'utf8' }).trim();
+    const value = createHash('sha256').update(`${JSON.stringify(ui)}\0${blobs}`).digest('hex');
+    sources.set(`${repo}@${commit}`, value);
+    return value;
+  };
+  const buildKey = (pkg, key) => createHash('sha256').update(`${viewsDigest(pkg.repo, pkg.commit, pkg.manifest.ui)}\0${key}\0${sdkDigest}`).digest('hex').slice(0, 32);
 
   function start(repo, commit, key, id) {
     if (building.has(id)) return building.get(id);
@@ -49,14 +59,14 @@ export function layerUi({ dataDirectory, layerOrigin, portalOrigin, appOriginFor
     let pkg;
     try { pkg = layerPackageForProject(db, projectId, key); } catch { return { status: 'none' }; }
     if (!pkg?.manifest?.ui?.entry) return { status: 'none' };
-    const id = buildKey(pkg.commit, key);
+    const id = buildKey(pkg, key);
     const instance = db.prepare('SELECT instance_id FROM layer_instances WHERE project_id = ? AND layer_key = ?').get(projectId, key)?.instance_id;
     if (existsSync(join(cacheRoot, id, 'index.html'))) return { status: 'ready', url: `${layerOrigin(frameLabel(instance))}/${id}/index.html`, commit: pkg.commit };
     if (failed.has(id) && !building.has(id)) return { status: 'failed', error: failed.get(id), commit: pkg.commit };
     if (build) void start(pkg.repo, pkg.commit, key, id);
-    return { status: 'building', commit: pkg.commit };
+    return { status: 'building', commit: pkg.commit, id };
   }
-  const settle = (db, projectId, key) => { const value = status(db, projectId, key); return value.status === 'building' ? building.get(buildKey(value.commit, key)) : Promise.resolve(); };
+  const settle = (db, projectId, key) => { const value = status(db, projectId, key); return value.status === 'building' ? building.get(value.id) : Promise.resolve(); };
 
   // The layers origin serves only built views, sandboxed even when opened directly, and loadable from an opaque origin.
   function serve(request, response, pathname, label) {

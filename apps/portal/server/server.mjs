@@ -10,6 +10,8 @@ import { library } from './library.mjs';
 import { bindingRecords, initBindings } from './binding-records.mjs';
 import { bindingRoutines } from './binding-routines.mjs';
 import { refacets } from './refacets.mjs';
+import { layerDocs } from './layer-docs.mjs';
+import { knowledgeSite } from './knowledge-site.mjs';
 import { entryRoles } from './entry-roles.mjs';
 import { facetOf } from './bindings.mjs';
 import { commitOutputFile, initLayerFiles, readOutputFile } from './layer-files.mjs';
@@ -130,6 +132,9 @@ const pool = library({ db, know });
 const bindingStore = bindingRecords({ db });
 const bindings = bindingRoutines({ db, know, pool, store: bindingStore });
 const refacetWork = refacets({ db, know, pool, store: bindingStore, routines: bindings });
+// LAYER-KNOWLEDGE-01: a layer's docs and spec, kept in its repository and saved from Knowledge.
+const docs = layerDocs({ db, onSpecChange: (projectId, key) => bindings.specChanged(projectId, key) });
+const knowledgeSites = knowledgeSite({ db, pool, store: bindingStore, changes: bindings.changes, refacets: refacetWork, docs });
 // LAYER-BINDINGS-01: Discover proposes bindings where one layer reads another's facet; Watch keeps reconciling and active
 // bindings current. Both run after any successful change to a project, at start-up and with the routine tick.
 function runBindings(projectId) {
@@ -819,6 +824,32 @@ async function api(request, response, url) {
         logText: note ? `Proposed: ${note}` : 'Proposed' }, user.name);
       return json(response, 201, { item }, { 'cache-control': 'no-store' });
     }
+    return json(response, 405, { error: 'Method not allowed.' });
+  }
+  const siteRoute = /^\/api\/projects\/([^/]+)\/(?:layers\/([^/]+)\/knowledge\/(site|contents)|knowledge\/bindings\/([^/]+)(\/decide)?|knowledge\/(preview|propose))$/.exec(url.pathname);
+  if (siteRoute) {
+    const [projectId, layerKey, part, bindingId, decide, action] = siteRoute.slice(1).map(value => value ? decodeURIComponent(value) : value), noStore = { 'cache-control': 'no-store' };
+    if (request.method === 'GET' && part === 'site') return json(response, 200, knowledgeSites.site(projectId, user.id, layerKey), noStore);
+    if (request.method === 'GET' && part === 'contents') return json(response, 200, knowledgeSites.contents(projectId, user.id, layerKey, url.searchParams.get('node')), noStore);
+    if (request.method === 'GET' && bindingId && !decide) return json(response, 200, knowledgeSites.binding(projectId, user.id, bindingId), noStore);
+    if (request.method === 'POST' && bindingId && decide) return json(response, 200, knowledgeSites.decide(projectId, user.id, bindingId, (await readJson(request)).decision), noStore);
+    if (request.method === 'POST' && action === 'preview') return json(response, 200, knowledgeSites.preview(projectId, user.id, await readJson(request)), noStore);
+    if (request.method === 'POST' && action === 'propose') return json(response, 201, knowledgeSites.propose(projectId, user.id, await readJson(request)), noStore);
+    return json(response, 405, { error: 'Method not allowed.' });
+  }
+  const docsRoute = /^\/api\/projects\/([^/]+)\/layers\/([^/]+)\/knowledge\/(docs|doc|history|information)$/.exec(url.pathname);
+  if (docsRoute) {
+    const [projectId, layerKey, part] = docsRoute.slice(1).map(decodeURIComponent), noStore = { 'cache-control': 'no-store' };
+    const path = url.searchParams.get('path');
+    if (request.method === 'GET' && part === 'docs') return json(response, 200, docs.list(projectId, user.id, layerKey), noStore);
+    if (request.method === 'GET' && part === 'doc') return json(response, 200, docs.read(projectId, user.id, layerKey, path, url.searchParams.get('at')), noStore);
+    if (request.method === 'GET' && part === 'history') return json(response, 200, docs.history(projectId, user.id, layerKey, path), noStore);
+    if (request.method === 'PUT' && part === 'doc') {
+      const input = await readJson(request), saved = docs.save(projectId, user.id, layerKey, input);
+      if (saved.changed && /charter/.test(input.path || '')) stageLayerDiscovery(db, know, projectId);
+      return json(response, 200, saved, noStore);
+    }
+    if (request.method === 'PUT' && part === 'information') return json(response, 200, docs.saveInformation(projectId, user.id, layerKey, await readJson(request)), noStore);
     return json(response, 405, { error: 'Method not allowed.' });
   }
   const refacetRoute = /^\/api\/projects\/([^/]+)\/(?:layers\/([^/]+)\/refacets|refacets\/([^/]+)\/decide|binding-changes\/([^/]+)\/decide|overlaps)$/.exec(url.pathname);

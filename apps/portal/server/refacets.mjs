@@ -95,14 +95,22 @@ export function refacets({ db, know, pool, store, routines }) {
     const blockers = routines.changes.blockedBy(projectId, workId);
     if (blockers.length) fail('This refacet waits on other Work to finish first.', 409);
     const state = current(projectId, plan.layer);
-    if (state.commit !== plan.base) fail('The layer changed since this refacet was proposed. Dismiss it and propose it again.', 409);
+    // Docs and spec saves move the pin all the time (LAYER-KNOWLEDGE-01). If the facets are as they were at the proposal,
+    // the same change is committed again on the current pin; otherwise the proposal is stale.
+    let source = { branch: plan.branch, commit: plan.commit, base: plan.base };
+    if (state.commit !== plan.base) {
+      const was = JSON.parse(git(state.repo, ['show', `${plan.base}:layer.json`])).facets ?? null;
+      if (JSON.stringify(was) !== JSON.stringify(state.manifest.facets ?? null)) fail('The layer changed since this refacet was proposed. Dismiss it and propose it again.', 409);
+      const branch = `${plan.branch}-on-${state.commit.slice(0, 7)}`;
+      source = { branch, commit: commitFacets(state.repo, state.commit, plan.facets, branch, `Refacet ${plan.layer} (again on ${state.commit.slice(0, 7)})`), base: state.commit };
+    }
     // The facets follow from the manifest at the base and the change, so an unmoved layer gives exactly the reviewed ones;
     // the bindings' follow-through is recomputed, since Watch may have changed what they hold.
     const result = compute(state, plan.layer, plan.change);
     const reviewer = db.prepare('SELECT display_name FROM users WHERE id = ?').get(userId)?.display_name || 'Owner';
     const instance = db.prepare('SELECT instance_id FROM layer_instances WHERE project_id = ? AND layer_key = ?').get(projectId, plan.layer)?.instance_id;
     const merge = mergeLayerBranch(db, { projectId, key: plan.layer, reviewer, workId, workRef: `#${row.number}`, catalogs: know.catalogs,
-      source: { branch: plan.branch, commit: plan.commit, base: plan.base, files: [{ path: 'layer.json', status: 'modified', ownerReview: true }] },
+      source: { ...source, files: [{ path: 'layer.json', status: 'modified', ownerReview: true }] },
       recordsOf: kind => db.prepare('SELECT id, data_json FROM knowledge_records WHERE project_id = ? AND kind = ? AND layer_instance_id = ?').all(projectId, kind, instance)
         .map(record => ({ id: record.id, data: JSON.parse(record.data_json) })) });
     const why = `Refacet of ${plan.layer} (#${row.number}): ${describe(plan.change, result.preflight).what}`;
