@@ -53,7 +53,7 @@ export function refacets({ db, know, pool, store, routines }) {
   const compute = (state, key, change) => refacet({ key, outputs: state.manifest.outputs || [], tabs: state.manifest.tabs || [], facets: state.manifest.facets || [] },
     change, { entries: state.entries, bindings: state.bindings, references: state.references });
   const describe = (change, preflight) => {
-    const what = change.op === 'split' ? `split ${change.facet} into ${change.facet} and ${change.into?.key}` : change.op === 'merge' ? `merge ${change.from} into ${change.facet}` : `rename ${change.facet}`;
+    const what = change.op === 'declare' ? `declare the ${change.into?.key} facet` : change.op === 'split' ? `split ${change.facet} into ${change.facet} and ${change.into?.key}` : change.op === 'merge' ? `merge ${change.from} into ${change.facet}` : `rename ${change.facet}`;
     const kinds = Object.entries(preflight.byKind).map(([kind, count]) => `${count} ${kind.replaceAll('_', ' ')}`).join(', ');
     const detached = preflight.bindings.map(item => `${item.binding} holds ${item.detached.join(', ')}`).join('; ');
     const follow = preflight.follow.map(item => `${item.layer}'s ${item.facet} (${item.refs.length})`).join(', ');
@@ -133,5 +133,11 @@ export function refacets({ db, know, pool, store, routines }) {
     return { refacets: items, proposal };
   }
 
-  return { propose, decide, chain };
+  // Open refacets of one layer, newest first, with their preflight and whether other Work blocks them.
+  const pending = (projectId, key) => db.prepare(`SELECT id, number, title, state, context_json FROM layer_work_items WHERE project_id = ? AND archived_at IS NULL
+    AND json_extract(context_json, '$.routine') = 'refacet' AND json_extract(context_json, '$.refacet.layer') = ? AND state <> 'done' ORDER BY number DESC`).all(projectId, key)
+    .map(row => { const plan = JSON.parse(row.context_json).refacet;
+      return { id: row.id, number: row.number, title: row.title, state: row.state, change: plan.change, preflight: plan.preflight, blockedBy: routines.changes.blockedBy(projectId, row.id) }; });
+
+  return { propose, decide, chain, pending };
 }

@@ -1,6 +1,7 @@
 import { Component, computed, effect, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
+import { LayerFacetsComponent } from './layer-facets';
 import { ProjectContext } from './context';
 import { layerColourStyle, setupProgress } from './layer-nav';
 import { contrastRatio } from '../color';
@@ -18,7 +19,7 @@ export const pickerColours = ['#6b35c9', '#a8235a', '#1f4fb8', '#0b5d86', '#0f74
 // CUSTOM-LAYER-01 Manage: how the layer exists in the project. A draft layer starts on Activate, a checklist over its
 // Knowledge (the charter) and actions; identity itself is written in the Knowledge tab, not in a form here.
 @Component({
-  selector: 'aludel-layer-manage', standalone: true, imports: [FormsModule, MatIconModule],
+  selector: 'aludel-layer-manage', standalone: true, imports: [FormsModule, MatIconModule, LayerFacetsComponent],
   template: `
   <div class="lay-mg">
     <nav class="lay-mg-side" [attr.aria-label]="name() + ' management'">
@@ -28,6 +29,7 @@ export const pickerColours = ['#6b35c9', '#a8235a', '#1f4fb8', '#0b5d86', '#0f74
       }
       <a [href]="ctx.link(layerKey(),'manage','settings')" (click)="ctx.go(ctx.link(layerKey(),'manage','settings'),$event)" [class.active]="section() === 'settings'" [attr.aria-current]="section() === 'settings' ? 'page' : null"><mat-icon aria-hidden="true">tune</mat-icon>Settings</a>
       <a [href]="ctx.link(layerKey(),'manage','connections')" (click)="ctx.go(ctx.link(layerKey(),'manage','connections'),$event)" [class.active]="section() === 'connections'" [attr.aria-current]="section() === 'connections' && !selectedConnection() ? 'page' : null"><mat-icon aria-hidden="true">link</mat-icon>Connections<small>{{ activeConnectionCount() }}/{{ neighbors().length }}</small></a>
+      <a [href]="ctx.link(layerKey(),'manage','facets')" (click)="ctx.go(ctx.link(layerKey(),'manage','facets'),$event)" [class.active]="section() === 'facets'" [attr.aria-current]="section() === 'facets' ? 'page' : null"><mat-icon aria-hidden="true">category</mat-icon>Facets</a>
     </nav>
     <div class="lay-mg-body">
       @switch (section()) {
@@ -51,6 +53,7 @@ export const pickerColours = ['#6b35c9', '#a8235a', '#1f4fb8', '#0b5d86', '#0f74
               @if (p.remaining) { <p class="lay-muted small">{{ p.remaining }} {{ p.remaining === 1 ? 'step' : 'steps' }} left.</p> } }
           } @else { <h2 class="lay-tk-title">{{ name() }} is active</h2><p class="lay-muted">Other layers can discover it. Its charter lives in Knowledge.</p> }
         }
+        @case ('facets') { <aludel-layer-facets [layerKey]="layerKey()" /> }
         @case ('connections') {
           @if (selectedConnection(); as connection) {
             <a class="lay-back" [href]="ctx.link(layerKey(),'manage','connections')" (click)="ctx.go(ctx.link(layerKey(),'manage','connections'),$event)"><mat-icon aria-hidden="true">arrow_back</mat-icon>Connections</a>

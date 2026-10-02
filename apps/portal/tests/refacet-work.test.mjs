@@ -83,6 +83,9 @@ test('accepting or dismissing a proposal decides its Work item; a member\'s chan
   assert.equal(item(db, review.id).context.decision, 'accept');
   assert.equal(store.read(id, owner.id, proposal.id).lifecycle, 'active', 'accepted, reconciled and active once Watch has run');
   assert.throws(() => routines.changes.decide(id, owner.id, review.id, 'accept'), /already decided/);
+  routines.discover(id);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM layer_work_items WHERE project_id = ? AND json_extract(context_json, '$.routine') = 'assess-overlap'").get(id).n, 0,
+    'facets already bound together (both marked design-system) are not raised as an overlap to assess');
   routines.changes.decide(id, owner.id, asked.proposed.id, 'dismiss', 'It is accepted now.');
   assert.equal(store.read(id, owner.id, proposal.id).lifecycle, 'active', 'dismissing a change applies nothing');
   // Pausing directly is still Work: an item created and decided in one step.

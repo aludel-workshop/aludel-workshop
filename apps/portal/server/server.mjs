@@ -757,7 +757,7 @@ async function api(request, response, url) {
     return json(response, 405, { error: 'Method not allowed.' });
   }
   // LAYER-BINDINGS-01: one binding per shared concept, kept by Work with exact revisions and shown in Library › Bindings.
-  const bindingRoute = /^\/api\/projects\/([^/]+)\/bindings(?:\/([^/]+)(?:\/(history|status|decide|join|transfer|lifecycle|changes))?)?$/.exec(url.pathname);
+  const bindingRoute = /^\/api\/projects\/([^/]+)\/bindings(?:\/([^/]+)(?:\/(history|status|decide|join|transfer|lifecycle|changes|adopted))?)?$/.exec(url.pathname);
   if (bindingRoute) {
     const projectId = decodeURIComponent(bindingRoute[1]), id = bindingRoute[2] ? decodeURIComponent(bindingRoute[2]) : null, action = bindingRoute[3] || null;
     const noStore = { 'cache-control': 'no-store' };
@@ -772,6 +772,8 @@ async function api(request, response, url) {
       url.searchParams.has('revision') ? Number(url.searchParams.get('revision')) : null), noStore);
     if (request.method === 'GET' && action === 'history') return json(response, 200, { revisions: bindingStore.history(projectId, user.id, id) }, noStore);
     if (request.method === 'GET' && action === 'status') return json(response, 200, bindings.status(projectId, user.id, id), noStore);
+    // R5: an adopt item closes by naming the authority's entry it produced.
+    if (request.method === 'POST' && action === 'adopted') { const input = await readJson(request); return json(response, 200, bindings.adopted(projectId, user.id, id, String(input.workItemId || ''), String(input.ref || '')), noStore); }
     if (request.method === 'POST' && action === 'decide') { const input = await readJson(request); return json(response, 200, bindings.decideAssessment(projectId, user.id, id, String(input.workItemId || ''), input.decision), noStore); }
     if (request.method === 'PATCH' && id && !action) return json(response, 200, bindingStore.update(projectId, user.id, id, await readJson(request)), noStore);
     // Every binding change is Work (R2). The owner's change is decided at once, closing the item that proposed it (Discover's,
@@ -802,7 +804,8 @@ async function api(request, response, url) {
     const roles = entryRoles(db).resolver(projectId), facets = roles.facets(layerKey), declared = roles.layer(layerKey).facets;
     const entries = Object.fromEntries(pool.outputEntries(projectId).filter(entry => entry.layer.key === layerKey)
       .map(entry => [entry.ref, facetOf(declared, entry)]).filter(([, facet]) => facet));
-    if (request.method === 'GET' && !rolesRoute[2]) return json(response, 200, { facets, entries }, { 'cache-control': 'no-store' });
+    if (request.method === 'GET' && !rolesRoute[2]) return json(response, 200, { facets: facets.map(facet => ({ ...facet, select: declared.find(item => item.key === facet.key)?.select || [] })),
+      outputs: roles.layer(layerKey).outputs, entries }, { 'cache-control': 'no-store' });
     if (request.method === 'POST' && rolesRoute[2]) {
       const input = await readJson(request);
       const ref = typeof input.ref === 'string' ? input.ref : null;
@@ -819,6 +822,13 @@ async function api(request, response, url) {
     return json(response, 405, { error: 'Method not allowed.' });
   }
   const refacetRoute = /^\/api\/projects\/([^/]+)\/(?:layers\/([^/]+)\/refacets|refacets\/([^/]+)\/decide|binding-changes\/([^/]+)\/decide|overlaps)$/.exec(url.pathname);
+  // Open refacets of one layer, for its Manage › Facets.
+  const pendingRefacets = /^\/api\/projects\/([^/]+)\/layers\/([^/]+)\/refacets$/.exec(url.pathname);
+  if (pendingRefacets && request.method === 'GET') {
+    const [projectId, layerKey] = pendingRefacets.slice(1).map(decodeURIComponent);
+    requireMember(db, user, projectId);
+    return json(response, 200, { refacets: refacetWork.pending(projectId, layerKey) }, { 'cache-control': 'no-store' });
+  }
   if (refacetRoute && request.method === 'POST') {
     const [projectId, layerKey, refacetId, changeId] = refacetRoute.slice(1).map(value => value ? decodeURIComponent(value) : value);
     const input = await readJson(request), noStore = { 'cache-control': 'no-store' };

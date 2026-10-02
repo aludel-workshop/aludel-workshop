@@ -145,6 +145,15 @@ export function validateAdapters(manifest) {
   return adapters.map(({ id, facet, reads, mechanical, soft }) => ({ id, facet, reads, mechanical, soft }));
 }
 
+// A layer's `refers`: the kinds its references can point at, or ['*'] for Library pins. Null when it declares nothing.
+export function validateRefers(manifest) {
+  const refers = manifest?.refers;
+  if (refers === undefined) return null;
+  if (!Array.isArray(refers) || !refers.length || refers.length > 40 || !(refers.length === 1 && refers[0] === '*' || refers.every(kind => /^[a-z][a-z0-9_]*$/.test(kind))))
+    fail('refers names the kinds this layer\'s references point at, or ["*"].');
+  return refers[0] === '*' ? '*' : [...refers];
+}
+
 // ---- Bindings ----
 
 // The binding's one authority. Sharing part of a facet is a refacet, so there is no authority by area.
@@ -514,6 +523,7 @@ const declaration = (facet, outputs) => {
 //   layer:   { key, outputs, facets }   (as in layer.json; key is the instance's layer key)
 //   change:  { op: 'split', facet, into: { key, title, take: [clauses], roles?, views?, hints?, shape? }, join?: { binding, id, role } }
 //          | { op: 'merge', facet, from }   | { op: 'rename', facet, title }
+//          | { op: 'declare', into: { key, title, take, roles, views?, hints?, shape?, readOnly? }, join? }  (a facet over outputs in none)
 //   context: { entries: [{ ref, kind, data }], bindings: [binding], references: [{ layer, entry, to }] }
 export function refacet(layer, change, { entries = [], bindings = [], references = [] } = {}) {
   if (!layer || !Array.isArray(layer.facets) || !/^[a-z][a-z0-9_]{1,31}$/.test(layer.key || '')) fail('Refacet one installed layer.');
@@ -521,12 +531,23 @@ export function refacet(layer, change, { entries = [], bindings = [], references
   const manifest = facets => ({ key: layer.key, outputs, tabs: (layer.tabs || []), facets });
   const before = validateFacets(manifest(layer.facets));
   const declared = layer.facets.map(facet => declaration(facet, outputs));
-  const index = declared.findIndex(facet => facet.key === change?.facet);
-  if (index < 0) fail(`${layer.key} declares no ${change?.facet} facet.`);
-  const parent = declared[index];
+  // Declaring a facet takes outputs no facet holds yet: how a layer with no facets (a new one, or one built from the base or
+  // Markdown template) starts to share. Every other change reshapes an existing facet.
+  const index = change?.op === 'declare' ? -1 : declared.findIndex(facet => facet.key === change?.facet);
+  if (change?.op !== 'declare' && index < 0) fail(`${layer.key} declares no ${change?.facet} facet.`);
+  const parent = index >= 0 ? declared[index] : null;
   let after, moved = [], into = null, joined = null;
 
-  if (change.op === 'rename') {
+  if (change.op === 'declare') {
+    const spec = change.into || {};
+    if (!keyPattern.test(spec.key || '') || declared.some(facet => facet.key === spec.key)) fail('Name the new facet with a key this layer does not use.');
+    if (!text(spec.title, 80)) fail('Give the facet a title.');
+    if (!Array.isArray(spec.take) || !spec.take.length) fail('Name the outputs the facet holds.');
+    if (!Array.isArray(spec.roles) || !spec.roles.length) fail('Name the roles the facet supports.');
+    into = { key: spec.key, title: spec.title.trim(), select: spec.take.map(clause => normalClause(clause, outputs, spec.key)), roles: [...spec.roles],
+      ...(spec.views ? { views: spec.views } : {}), ...(spec.hints ? { hints: spec.hints } : {}), ...(spec.shape ? { shape: spec.shape } : {}), ...(spec.readOnly ? { readOnly: true } : {}) };
+    after = [...declared, into];
+  } else if (change.op === 'rename') {
     if (!text(change.title, 80)) fail('Give the facet a title.');
     after = declared.map(facet => facet.key === parent.key ? { ...facet, title: change.title.trim() } : facet);
   } else if (change.op === 'split') {
@@ -554,7 +575,7 @@ export function refacet(layer, change, { entries = [], bindings = [], references
     if (bound.length) fail(`${from.key} takes part in ${bound.map(binding => binding.id).sort().join(', ')}. Transfer or retire that binding before merging it.`, 409);
     after = declared.filter(facet => facet.key !== from.key).map(facet => facet.key !== parent.key ? facet : { ...facet, select: union(parent.select, from.select),
       ...(parent.views || from.views ? { views: [...new Set([...(parent.views || []), ...(from.views || [])])] } : {}) });
-  } else fail('Refacet by split, merge or rename.');
+  } else fail('Refacet by declare, split, merge or rename.');
 
   const next = validateFacets(manifest(after));
   // Every entry that was in a facet is still in exactly one, and only the facets named by the change gain or lose entries.
@@ -563,7 +584,7 @@ export function refacet(layer, change, { entries = [], bindings = [], references
   for (const entry of entries) {
     const a = facetWas.get(entry.ref), b = facetNow.get(entry.ref);
     if (a === b) continue;
-    const allowed = change.op === 'split' ? a === parent.key && b === into.key : change.op === 'merge' && a === change.from && b === parent.key;
+    const allowed = change.op === 'declare' ? a === null && b === into.key : change.op === 'split' ? a === parent.key && b === into.key : change.op === 'merge' && a === change.from && b === parent.key;
     if (!allowed) fail(`The refacet would move ${entry.ref} from ${a ?? 'no facet'} to ${b ?? 'no facet'}.`, 500);
     moved.push({ ref: entry.ref, kind: entry.kind, from: a, to: b });
   }
@@ -575,8 +596,9 @@ export function refacet(layer, change, { entries = [], bindings = [], references
   const changed = [], follow = [];
   for (const binding of bindings) {
     if (!live(binding)) continue;
+    if (change.op !== 'split') continue;
     const self = binding.participants.find(p => p.layer.key === layer.key && p.facet === parent.key);
-    if (!self || change.op !== 'split') continue;
+    if (!self) continue;
     const leaving = binding.correspondence.filter(entry => movedRefs.has(entry.refs[self.id]));
     if (!leaving.length) continue;
     const keys = new Set(leaving.map(entry => entry.key));
@@ -588,7 +610,7 @@ export function refacet(layer, change, { entries = [], bindings = [], references
       if (refs.length) follow.push({ binding: binding.id ?? null, participant: other.id, layer: other.layer.key, facet: other.facet, role: other.role, refs });
     }
   }
-  if (change.op === 'split' && change.join) {
+  if (['split', 'declare'].includes(change.op) && change.join) {
     const target = (changed.find(binding => binding.id === change.join.binding) || bindings.find(binding => binding.id === change.join.binding));
     if (!target || !live(target)) fail(`No live binding ${change.join.binding} to join.`, 404);
     if (!into.roles.includes(change.join.role)) fail(`${into.key} does not support ${change.join.role}.`);

@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { validateAdapters, validateFacets } from './bindings.mjs';
+import { validateAdapters, validateFacets, validateRefers } from './bindings.mjs';
 
 const portal = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const candidate = resolve(portal, '../..');
@@ -109,6 +109,7 @@ function readPackage(repo, commit, key) {
   // LAYER-BINDINGS-01: the facets the layer maintains and the binding roles each supports.
   validateFacets(manifest);
   validateAdapters(manifest);
+  validateRefers(manifest);
   if (manifest.hostCalls !== undefined && (!Array.isArray(manifest.hostCalls) || manifest.hostCalls.length > 20 || !manifest.hostCalls.every(name => typeof name === 'string' && /^[a-z][A-Za-z0-9]{1,40}$/.test(name))))
     throw new Error('Invalid layer host calls.');
   const charter = content(repo, commit, manifest.knowledge.charter);

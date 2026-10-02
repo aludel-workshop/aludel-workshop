@@ -284,3 +284,20 @@ test('detached entries are held by ref and by concept key until no participant p
   const released = evaluate({ ...split, detached: one.detached }, { 'design-kit': [], 'pages-kit': [] });
   assert.deepEqual([released.actions, released.detached], [[], []]);
 });
+
+test('declaring a facet takes outputs no facet holds yet, so a layer with no facets can start to share', () => {
+  const docs = [{ ref: 'doc-1', kind: 'markdown_document', data: { path: 'people/maker.md' } }, { ref: 'doc-2', kind: 'markdown_document', data: { path: 'notes.md' } }, { ref: 'fld-1', kind: 'markdown_folder', data: {} }];
+  const plain = { key: 'personas', outputs: ['markdown_document', 'markdown_folder'], facets: [] };
+  const declared = refacet(plain, { op: 'declare', into: { key: 'people', title: 'People', take: [{ kind: 'markdown_document' }], roles: ['authority', 'ceded'], hints: ['personas'] } }, { entries: docs });
+  assert.deepEqual(declared.facets.map(facet => [facet.key, facet.select]), [['people', [{ kind: 'markdown_document' }]]]);
+  assert.deepEqual(declared.preflight.records.map(item => [item.ref, item.from, item.to]), [['doc-1', null, 'people'], ['doc-2', null, 'people']]);
+  const layer = { ...plain, facets: declared.facets };
+  assert.throws(() => refacet(layer, { op: 'declare', into: { key: 'more', title: 'More', take: [{ kind: 'markdown_document', where: { field: 'path', equals: 'notes.md' } }], roles: ['authority'] } }), /both select markdown_document/,
+    'a declared facet cannot take what another holds; split that one instead');
+  assert.throws(() => refacet(layer, { op: 'declare', into: { key: 'people', title: 'Again', take: [{ kind: 'markdown_folder' }], roles: ['authority'] } }), /key this layer does not use/);
+  assert.throws(() => refacet(layer, { op: 'declare', into: { key: 'folders', title: 'Folders', take: [{ kind: 'markdown_folder' }] } }), /roles the facet supports/);
+  const binding = validateBinding({ id: 'bnd-p', concept: { name: 'Personas' }, lifecycle: 'active', authority: 'vision', participants: [
+    { id: 'vision', layer: { key: 'vision' }, facet: 'personas', role: 'authority', shape: 'vision.personas' }, { id: 'other', layer: { key: 'docs' }, facet: 'people', role: 'replica', shape: 'docs.people' }] });
+  const joined = refacet(layer, { op: 'declare', into: { key: 'folders', title: 'Folders', take: [{ kind: 'markdown_folder' }], roles: ['replica'] }, join: { binding: 'bnd-p', id: 'personas-folders', role: 'replica' } }, { entries: docs, bindings: [binding] });
+  assert.deepEqual(joined.bindings[0].participants.map(p => p.id), ['vision', 'other', 'personas-folders']);
+});
