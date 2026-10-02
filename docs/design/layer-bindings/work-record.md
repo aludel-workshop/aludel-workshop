@@ -195,10 +195,10 @@ Work found during step 3 that is outside its slices. Each names where it came fr
 | F6 | **Existing forked instances keep their old pins** until updated. This is the general template-update question (unchanged since step 2). | Step 2, R4 | Template-update packet (not yet named) |
 | F7 | **A schema note for the candidate** (tables and key columns): two guessed column names cost runs in R2. This is a hypothesis that it saves time. | R2 | Candidate `docs/` with the next schema-touching packet |
 | F8 | **The contract test checks that views import the roles module, not that they behave.** A behavioural check per template (render each role) would be stronger; today only the `roles` journey does this, for Design and Vision. | R4 | R5 journeys, then each template's own tests |
-| F9 | **Pages can't be an authority** until it publishes its kit and has write operations for it (walkthrough 1). | Step 1 | Pages template work after T03-CODE |
+| F9 | ~~**Pages can't be an authority** until it publishes its kit and has write operations for it (walkthrough 1).~~ **Done in LAYER-KNOWLEDGE-01 S5:** Pages has kit operations and a Kit tab, and its kit facet supports leading. Open: page sections can't yet use components from Pages' own kit. | Step 1 | LAYER-KNOWLEDGE-01 |
 | F10 | **Step 4: Code ⇄ Pages**, including migrating `layer_connections` and the hard-coded Pages reconciliation into bindings, keeping their data. | Step 1 plan | Step 4, after T03-CODE |
 | F11 | ~~Discover raising Assess overlap; Watch raising re-point Work (with `refers`); UI to propose refacets; Personas, Branding and merge-back journeys.~~ **Done in R5.** The overlap-chain UI moved to F12. | R2, R3 | R5 |
-| F12 | **A UI for answering an Assess overlap item.** Propose the chain (each side's refacet plus the binding they unblock) from the item itself; today the chain is proposed through `POST /overlaps`. | R5 | After the owner's step-3 review, with LAT-08A's layer-owned review |
+| F12 | ~~**A UI for answering an Assess overlap item.**~~ **Done in LAYER-KNOWLEDGE-01 S4:** propose a binding from Knowledge's tree; Compare specs replaced Assess overlap. Propose the chain (each side's refacet plus the binding they unblock) from the item itself; today the chain is proposed through `POST /overlaps`. | R5 | After the owner's step-3 review, with LAT-08A's layer-owned review |
 
 ## Readiness
 
@@ -356,3 +356,13 @@ Lessons from the T03 runs:
 
   F12 is added. The candidate's R5 changes are uncommitted. [Evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r5.md).
 - 2026-10-01: Owner chat: "commit, end server, and propose what our ux actually needs here for knowledge". R5 committed (candidate `10110b9`). The review server was stopped and its scratch data left disposable. Owner decision 8's follow-up answers were recorded. The proposal is [LAYER-KNOWLEDGE-01](../layer-knowledge/work-record.md), which is proposal only, with no build.
+- 2026-10-01: Owner answered LAYER-KNOWLEDGE-01's questions and said "go for it". K1–K3 (reference capture, spec drafts, static prototype) are authorized and recorded in that brief (A1–A8).
+- 2026-10-01: LAYER-KNOWLEDGE-01 K1–K3 done, agent-checked: 18 reference captures (11 cited), five spec drafts, and prototype v1 (22 screenshots, no errors, 390 px clean). The K2 agent check has not been run. v1 awaits owner review.
+- 2026-10-01: Owner reviewed LAYER-KNOWLEDGE-01 prototype v1 ("love love this prototype … no second prototype needed: work these changes into plan, and build it"). Feedback B1–B7 and the K5 build plan (S1–S6) are in that brief. The build is authorized under this packet's local scope: candidate and `layer-base` local commits and re-pins, with no push and no external effects.
+- 2026-10-01: LAYER-KNOWLEDGE-01 K5 built and agent-checked:
+  - candidate commits `7c6152c` and `30d4d37`;
+  - `layer-base` `main` `fee5f30`;
+  - pins: markdown `11f82de`, data `fc9a6f3`, design `550f846`, vision `e54c3f3`, pages `1cbeb03`;
+  - both suites pass, and the journeys pass (`overlap` was retired in favour of `knowledge`).
+
+  F9 and F12 are closed. **Process:** mutation checks can run in an isolated candidate worktree with `../layer-base` symlinked beside it, while the suites run on the real tree. This replaces the R3 note that a scratch worktree can't reach `layer-base`.

@@ -1,0 +1,574 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Layer Knowledge</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- LAYER-KNOWLEDGE-01 prototype v1 (static, clickable). Built from ../specs/*.json by build.mjs; edit src.html, not index.html.
+     Owner asks A1-A8 in ../work-record.md map to screens; see the prototype bar's notes. Contents are illustrative. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0&display=block">
+<style>
+:root{
+  --bg:#fafbff;--surface:#fff;--rail:#f0f4fc;--panel:#f3f6fd;--hover:#e3e9f7;--line:#dce2ef;--line-strong:#c5cee2;--ink:#141727;--muted:#52617d;
+  --primary:#3047b9;--on-primary:#fff;--container:#dfe5ff;--on-container:#163698;
+  --ok:#146446;--ok-bg:#d9f3e7;--warn:#6b4b00;--warn-bg:#fff0c9;--warn-line:#e0a100;--bad:#a1231f;--bad-bg:#fce1e0;
+  --code-bg:#141727;--code-ink:#e8ebf7;--shadow:0 18px 50px #1c2a5a26;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#10121a;--surface:#181b26;--rail:#141722;--panel:#1f2331;--hover:#262b3c;--line:#2b3144;--line-strong:#3a4259;--ink:#e6e9f5;--muted:#9da8c2;
+  --primary:#a3b3ff;--on-primary:#0f1a55;--container:#2b3670;--on-container:#e0e6ff;
+  --ok:#94e2bc;--ok-bg:#12392a;--warn:#ffd680;--warn-bg:#3b2d0b;--warn-line:#b88400;--bad:#ffaca7;--bad-bg:#491a1a;
+  --code-bg:#0b0d14;--code-ink:#dfe3f2;--shadow:0 18px 50px #00000080;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10121a;--surface:#181b26;--rail:#141722;--panel:#1f2331;--hover:#262b3c;--line:#2b3144;--line-strong:#3a4259;--ink:#e6e9f5;--muted:#9da8c2;
+  --primary:#a3b3ff;--on-primary:#0f1a55;--container:#2b3670;--on-container:#e0e6ff;
+  --ok:#94e2bc;--ok-bg:#12392a;--warn:#ffd680;--warn-bg:#3b2d0b;--warn-line:#b88400;--bad:#ffaca7;--bad-bg:#491a1a;
+  --code-bg:#0b0d14;--code-ink:#dfe3f2;--shadow:0 18px 50px #00000080;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{background:var(--bg);color:var(--ink)}
+body{margin:0;font:14px/1.55 Roboto,system-ui,-apple-system,"Segoe UI",sans-serif}
+button,input,textarea,select{font:inherit;color:inherit}
+a{color:var(--primary)}
+.ms{font-family:"Material Symbols Rounded";font-weight:normal;font-style:normal;font-size:20px;line-height:1;display:inline-block;vertical-align:middle;letter-spacing:normal;text-transform:none;white-space:nowrap;-webkit-font-smoothing:antialiased;user-select:none}
+.ms.sm{font-size:17px}.ms.xs{font-size:15px}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.mono{font-family:"Roboto Mono",ui-monospace,monospace;font-size:12.5px}
+.muted{color:var(--muted)}.small{font-size:12.5px}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* prototype bar */
+.proto{position:sticky;top:0;z-index:40;display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:7px 16px;background:var(--code-bg);color:var(--code-ink);font-size:12.5px}
+.proto b{font-weight:500;margin-right:4px}
+.proto button{border:1px solid #ffffff30;background:transparent;border-radius:999px;padding:3px 10px;cursor:pointer;color:var(--code-ink)}
+.proto button[aria-current="true"]{background:var(--code-ink);color:var(--code-bg)}
+.proto .sp{flex:1}.proto .note{color:#aab3cc}
+
+/* shell */
+.app{display:grid;grid-template-columns:64px minmax(0,1fr);min-height:calc(100vh - 38px)}
+.rail{background:var(--rail);border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0}
+.rail a{display:grid;place-items:center;width:44px;height:40px;border-radius:12px;color:var(--muted);text-decoration:none}
+.rail a:hover{background:var(--hover)}
+.rail a[aria-current="page"]{background:var(--lb);color:var(--lc)}
+.main{min-width:0;display:flex;flex-direction:column}
+.lhead{display:flex;align-items:center;gap:10px;padding:14px 24px 0}
+.lhead .lic{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:var(--lb);color:var(--lc)}
+.lhead h1{font-size:20px;font-weight:500;margin:0}
+.lhead .chip{margin-left:4px}
+.lbar{display:flex;gap:2px;align-items:flex-end;padding:8px 24px 0;border-bottom:1px solid var(--line);overflow-x:auto}
+.lbar a{padding:8px 12px;text-decoration:none;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap;font-weight:500}
+.lbar a:hover{color:var(--ink)}
+.lbar a[aria-current="page"]{color:var(--lc);border-bottom-color:var(--lc)}
+.lbar .sp{flex:1}
+.lbar .new{font-size:10.5px;background:var(--warn-bg);color:var(--warn);border-radius:6px;padding:0 5px;margin-left:4px;vertical-align:1px}
+
+/* knowledge layout: one sidebar (Docs, then Information), reading pane, outline */
+.kn{display:grid;grid-template-columns:300px minmax(0,1fr) 200px;flex:1;min-height:0}
+.side{border-right:1px solid var(--line);padding:14px 10px 90px;position:sticky;top:38px;align-self:start;max-height:calc(100vh - 38px);overflow:auto;background:var(--surface)}
+.search{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:10px;padding:6px 10px;margin:0 4px 12px;color:var(--muted);background:var(--bg)}
+.search input{border:0;background:transparent;outline:0;flex:1;min-width:0}
+.sec-h{display:flex;align-items:center;justify-content:space-between;margin:16px 6px 6px;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--muted)}
+.sec-h:first-of-type{margin-top:4px}
+.sec-h button{letter-spacing:0;text-transform:none;font-weight:500;font-size:12.5px}
+.nl{display:flex;align-items:center;gap:6px;width:100%;padding:5px 8px;border-radius:8px;color:var(--ink);text-decoration:none;border:0;background:transparent;text-align:left;cursor:pointer;min-height:32px}
+.nl:hover{background:var(--hover)}
+.nl[aria-current="page"]{background:var(--lb);color:var(--lc);font-weight:500}
+.nl .tw{width:18px;flex:none;display:grid;place-items:center;color:var(--muted);border-radius:4px}
+.nl .tw:hover{background:var(--line)}
+.nl .lbl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nl .cnt{font-size:11.5px;color:var(--muted)}
+.nl input[type=checkbox]{margin:0 2px 0 0;width:16px;height:16px;accent-color:var(--lc)}
+.nl .badge{font-size:10.5px;background:var(--warn-bg);color:var(--warn);border-radius:6px;padding:0 5px}
+.kids{margin-left:14px;border-left:1px solid var(--line);padding-left:4px}
+.group-h{display:flex;align-items:center;gap:6px;padding:5px 8px;color:var(--muted);font-weight:500;cursor:pointer;border:0;background:transparent;width:100%;text-align:left;border-radius:8px;min-height:32px}
+.group-h:hover{background:var(--hover)}
+.local-h{font-size:12px;color:var(--muted);margin:6px 8px 2px}
+.bcard{border:1px solid var(--line-strong);border-radius:12px;margin:10px 2px 4px;background:var(--bg);overflow:hidden}
+.bcard.proposed{border-style:dashed;border-color:var(--warn-line)}
+.bcard.draft{border-style:dashed;border-color:var(--primary)}
+.bcard-h{display:block;padding:8px 10px 6px;text-decoration:none;color:var(--ink);border-bottom:1px solid var(--line)}
+.bcard-h:hover{background:var(--hover)}
+.bcard-h[aria-current="page"]{background:var(--container);color:var(--on-container)}
+.bcard-h .t{display:flex;align-items:center;gap:6px;font-weight:500}
+.bcard-h .w{font-size:12px;color:var(--muted);margin-top:2px;padding-left:24px}
+.bcard .nodes{padding:4px}
+.selbar{position:sticky;bottom:-90px;margin:14px -10px -90px;padding:10px 14px 16px;background:var(--surface);border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:8px;align-items:center;box-shadow:0 -8px 20px #1c2a5a14}
+.selbar .n{flex:1;font-weight:500}
+
+.read{padding:24px 40px 80px;min-width:0;max-width:900px}
+.crumbs{font-size:12.5px;color:var(--muted);margin-bottom:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.crumbs a{color:var(--muted);text-decoration:none}.crumbs a:hover{text-decoration:underline}
+.read h2.title{font-size:28px;line-height:1.25;font-weight:500;margin:0 0 6px}
+.lead{font-size:16.5px;color:var(--muted);margin:0 0 14px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 18px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-left:auto}
+.read h3{font-size:18px;font-weight:500;margin:28px 0 8px;scroll-margin-top:60px}
+.md h2{font-size:19px;font-weight:500;margin:22px 0 6px}
+.md p,.md ul,.md ol{margin:0 0 10px}
+.md code{font-family:"Roboto Mono",monospace;font-size:12.5px;background:var(--panel);padding:1px 5px;border-radius:5px}
+.md blockquote{margin:0 0 10px;padding:4px 12px;border-left:3px solid var(--line-strong);color:var(--muted)}
+pre.fmt{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow:auto;font-family:"Roboto Mono",monospace;font-size:12.5px;margin:0 0 10px;white-space:pre-wrap}
+.chip{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:500;background:var(--panel);color:var(--muted);border:1px solid var(--line);white-space:nowrap}
+.meta .chip{white-space:normal;max-width:100%}
+.chip.layer{background:var(--lb);color:var(--lc);border-color:transparent}
+.chip.live{background:var(--ok-bg);color:var(--ok);border-color:transparent}
+.chip.proposed{background:var(--warn-bg);color:var(--warn);border-color:transparent}
+.chip.draft{background:var(--container);color:var(--on-container);border-color:transparent}
+.chip.new{background:var(--warn-bg);color:var(--warn);border-color:transparent}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line-strong);background:var(--surface);border-radius:999px;padding:6px 14px;cursor:pointer;font-weight:500;text-decoration:none;color:var(--ink);min-height:34px}
+.btn:hover{background:var(--hover)}
+.btn.primary{background:var(--primary);color:var(--on-primary);border-color:var(--primary)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.sm{padding:3px 10px;min-height:28px;font-size:12.5px}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--primary)}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+table.t{width:100%;border-collapse:collapse;margin:0 0 8px;font-size:13.5px}
+table.t th{text-align:left;font-weight:500;color:var(--muted);font-size:12px;border-bottom:1px solid var(--line);padding:6px 8px}
+table.t td{border-bottom:1px solid var(--line);padding:7px 8px;vertical-align:top}
+.tbl{overflow-x:auto}
+.box{border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:var(--surface);margin:0 0 12px}
+.box.warn{background:var(--warn-bg);border-color:transparent;color:var(--warn)}
+.box.ok{background:var(--ok-bg);border-color:transparent;color:var(--ok)}
+.box.info{background:var(--container);border-color:transparent;color:var(--on-container)}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;margin:0 0 12px}
+.card{display:block;border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--surface);text-decoration:none;color:var(--ink)}
+.card:hover{border-color:var(--line-strong);background:var(--hover)}
+.card .h{display:flex;align-items:center;gap:6px;font-weight:500;margin-bottom:4px}
+.card p{margin:0;color:var(--muted);font-size:13px}
+.parts{display:grid;gap:10px}
+.part{display:grid;grid-template-columns:150px minmax(0,1fr) 150px;gap:12px;align-items:start;border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--surface)}
+.part .nodes a{display:inline-block;margin:0 6px 4px 0}
+.role{font-size:12.5px;font-weight:500}
+.role small{display:block;font-weight:400;color:var(--muted)}
+.outline{position:sticky;top:60px;align-self:start;padding:28px 16px;font-size:12.5px}
+.outline b{display:block;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.outline a{display:block;color:var(--muted);text-decoration:none;padding:3px 0 3px 10px;border-left:2px solid var(--line)}
+.outline a:hover{color:var(--ink);border-left-color:var(--line-strong)}
+.editor{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.editor textarea{width:100%;min-height:340px;border:1px solid var(--line-strong);border-radius:10px;padding:10px 12px;background:var(--surface);font-family:"Roboto Mono",monospace;font-size:12.5px;resize:vertical}
+.editor .pv{border:1px solid var(--line);border-radius:10px;padding:10px 14px;min-height:340px;background:var(--surface);overflow:auto}
+.compose{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.compose .col{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--surface);min-width:0}
+.compose h4{margin:0 0 8px;font-size:14px;font-weight:500;display:flex;align-items:center;gap:6px}
+.picktree .nl{min-height:30px}
+.field{display:grid;gap:4px;margin:0 0 12px}
+.field label{font-weight:500;font-size:13px}
+.field input,.field textarea,.field select{border:1px solid var(--line-strong);border-radius:8px;padding:7px 10px;background:var(--surface)}
+.field textarea{min-height:84px;resize:vertical}
+.leads{display:flex;flex-wrap:wrap;gap:8px}
+.leads label{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:4px 12px;cursor:pointer}
+.leads input{accent-color:var(--primary)}
+ul.effects{margin:0;padding-left:18px}ul.effects li{margin:0 0 6px}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--code-bg);color:var(--code-ink);padding:10px 16px;border-radius:10px;box-shadow:var(--shadow);z-index:60;max-width:min(560px,calc(100vw - 32px))}
+.swatches{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+.sw{width:88px;border:1px solid var(--line);border-radius:10px;overflow:hidden;font-size:11.5px;background:var(--surface)}
+.sw i{display:block;height:44px}
+.sw span{display:block;padding:4px 6px}
+.rolenote{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin:0 0 16px}
+.tabpage{padding:24px}
+.mtoggle{display:none}
+@media (max-width:1279px){.kn{grid-template-columns:280px minmax(0,1fr)}.outline{display:none}}
+@media (max-width:860px){
+  .app{grid-template-columns:minmax(0,1fr)}.rail{display:none}
+  .kn{grid-template-columns:minmax(0,1fr)}
+  .side{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);display:none;padding-bottom:16px}
+  .kn.open .side{display:block}
+  .selbar{position:static;margin:14px 0 0;bottom:auto}
+  .mtoggle{display:flex;margin:12px 16px 0}
+  .read{padding:16px 16px 60px}
+  .lhead,.lbar{padding-left:16px;padding-right:16px}
+  .part{grid-template-columns:1fr}
+  .editor,.compose{grid-template-columns:1fr}
+  .read h2.title{font-size:23px}
+}
+</style>
+</head>
+<body>
+<div class="proto" role="region" aria-label="Prototype controls">
+  <b>LAYER-KNOWLEDGE-01 · v1</b><span class="note">Tool Share · open a layer:</span>
+  <span id="layerBtns"></span>
+  <span class="sp"></span>
+  <button type="button" id="theme">Theme</button>
+  <button type="button" id="reset">Reset</button>
+</div>
+<div class="app" id="app"></div>
+<script id="data" type="application/json">/*DATA*/</script>
+<script>
+const DATA = JSON.parse(document.getElementById('data').textContent);
+const fresh = () => JSON.parse(JSON.stringify(DATA.project));
+let state = { project: fresh(), select: false, picked: new Set(), open: {}, edits: {}, draft: null, tab: null, menu: false };
+const L = key => DATA.layers[key];
+const poss = n => esc(n) + (String(n).endsWith('s') ? '\u2019' : '\u2019s');
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const roleWords = { authority: ['Leads', 'Others follow it'], replica: ['Keeps a copy', 'Read-only; propose changes'], ceded: ['Hands over', 'Points to the lead'] };
+
+// ---- tree helpers ----
+function walk(nodes, fn, parent = null) { for (const n of nodes) { fn(n, parent); walk(n.children || [], fn, n); } }
+function findNode(layer, key) { let hit = null, par = null; walk(L(layer).information, (n, p) => { if (n.key === key) { hit = n; par = p; } }); return hit && { node: hit, parent: par }; }
+function pathOf(layer, key) { const out = []; let cur = findNode(layer, key); while (cur) { out.unshift(cur.node); cur = cur.parent ? findNode(layer, cur.parent.key) : null; } return out; }
+function descendants(node) { const out = [node.key]; walk(node.children || [], n => out.push(n.key)); return out; }
+// Bindings a node takes part in, directly or through an ancestor (a bound node brings its children).
+function bindingsOf(layer, key, includeProposed = true) {
+  const keys = pathOf(layer, key).map(n => n.key);
+  return state.project.bindings.filter(b => (includeProposed || b.status === 'live') && b.participants.some(p => p.layer === layer && p.nodes.some(k => keys.includes(k))));
+}
+function participant(b, layer) { return b.participants.find(p => p.layer === layer); }
+function layerBindings(layer) { return state.project.bindings.filter(b => b.participants.some(p => p.layer === layer)); }
+function boundTop(layer) { const s = new Set(); for (const b of layerBindings(layer)) for (const k of participant(b, layer).nodes) s.add(k); return s; }
+function inBoundSubtree(layer, key) { const bound = boundTop(layer); return pathOf(layer, key).some(n => bound.has(n.key)); }
+function localView(layer) {
+  const bound = boundTop(layer);
+  const strip = n => { if (bound.has(n.key)) return null; if (!n.children) return n; const kids = n.children.map(strip).filter(Boolean); return kids.length ? { ...n, children: kids } : null; };
+  return L(layer).information.map(strip).filter(Boolean);
+}
+// Remove `k` from a binding's node list: drop it, or split the bound ancestor into its other parts.
+function without(layer, nodes, k) {
+  const split = x => x === k ? [] : findNode(layer, x).node.children.flatMap(c => c.key === k ? [] : descendants(c).includes(k) ? split(c.key) : [c.key]);
+  return nodes.flatMap(x => descendants(findNode(layer, k).node).includes(x) ? [] : descendants(findNode(layer, x).node).includes(k) ? split(x) : [x]);
+}
+function referencedBy(layer, key) { const out = []; for (const [lk, l] of Object.entries(DATA.layers)) walk(l.information, n => { for (const r of n.refersTo || []) if (r === `${layer}:${key}`) out.push([lk, n]); }); return out; }
+
+// ---- markdown (enough for docs pages) ----
+function md(src, layer) {
+  const inline = s => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\[([^\]]+)\]\(#([^)]+)\)/g, (m, t, h) => `<a href="#${layer}/${h}">${t}</a>`);
+  const out = []; let list = null;
+  const close = () => { if (list) { out.push(`</${list}>`); list = null; } };
+  for (const raw of String(src || '').split('\n')) {
+    const line = raw.trimEnd();
+    if (/^## /.test(line)) { close(); out.push(`<h2>${inline(line.slice(3))}</h2>`); }
+    else if (/^# /.test(line)) { close(); out.push(`<h2>${inline(line.slice(2))}</h2>`); }
+    else if (/^- /.test(line)) { if (list !== 'ul') { close(); out.push('<ul>'); list = 'ul'; } out.push(`<li>${inline(line.slice(2))}</li>`); }
+    else if (/^\d+\. /.test(line)) { if (list !== 'ol') { close(); out.push('<ol>'); list = 'ol'; } out.push(`<li>${inline(line.replace(/^\d+\. /, ''))}</li>`); }
+    else if (/^> /.test(line)) { close(); out.push(`<blockquote>${inline(line.slice(2))}</blockquote>`); }
+    else if (!line) close();
+    else { close(); out.push(`<p>${inline(line)}</p>`); }
+  }
+  close(); return out.join('');
+}
+
+// ---- routing: #layer/kind/key ----
+function route() {
+  const [layer = 'pages', kind = 'doc', ...rest] = location.hash.slice(1).split('/');
+  return { layer: DATA.layers[layer] ? layer : 'pages', kind, key: rest.join('/') || (kind === 'doc' ? 'overview' : '') };
+}
+const go = h => { location.hash = h; };
+function toast(text) { document.querySelectorAll('.toast').forEach(t => t.remove()); const t = document.createElement('div'); t.className = 'toast'; t.setAttribute('role', 'status'); t.textContent = text; document.body.append(t); setTimeout(() => t.remove(), 4200); }
+
+// ---- sidebar ----
+function nodeLink(layer, n, r, depth) {
+  const kids = n.children || [];
+  const open = state.open[`${layer}:${n.key}`] ?? depth === 0;
+  const cur = r.kind === 'node' && r.key === n.key;
+  const picked = state.picked.has(`${layer}:${n.key}`);
+  const inherited = !picked && pathOf(layer, n.key).slice(0, -1).some(a => state.picked.has(`${layer}:${a.key}`));
+  const box = state.select && state.selectLayer === layer ? `<input type="checkbox" data-pick="${layer}:${n.key}" ${picked || inherited ? 'checked' : ''} ${inherited ? 'disabled' : ''} aria-label="Select ${esc(n.title)}${kids.length ? ' and what it contains' : ''}">` : '';
+  const tw = kids.length ? `<span class="tw" data-toggle="${layer}:${n.key}" role="button" tabindex="0" aria-label="${open ? 'Collapse' : 'Expand'} ${esc(n.title)}" aria-expanded="${open}"><span class="ms xs">${open ? 'expand_more' : 'chevron_right'}</span></span>` : '<span class="tw"></span>';
+  return `<div class="nl" ${cur ? 'aria-current="page"' : ''}>${tw}${box}<a class="lbl" style="color:inherit;text-decoration:none" href="#${layer}/node/${n.key}">${esc(n.title)}</a><span class="cnt">${n.sample?.count ?? ''}</span></div>`
+    + (kids.length && open ? `<div class="kids">${kids.map(c => nodeLink(layer, c, r, depth + 1)).join('')}</div>` : '');
+}
+function sidebar(r) {
+  const l = L(r.layer);
+  const docs = l.docs; const loose = docs.filter(d => !d.group); const groups = [...new Set(docs.filter(d => d.group).map(d => d.group))];
+  const docLink = d => `<a class="nl" href="#${r.layer}/doc/${d.key}" ${r.kind === 'doc' && r.key === d.key ? 'aria-current="page"' : ''}><span class="tw"></span><span class="lbl">${esc(d.title)}</span>${d.isNew ? '<span class="badge">new</span>' : ''}${state.edits[`${r.layer}:doc:${d.key}`] ? '<span class="badge">unmerged</span>' : ''}</a>`;
+  let h = `<div class="search"><span class="ms sm">search</span><input aria-label="Search ${esc(l.layer.name)} knowledge" placeholder="Search ${esc(l.layer.name)} knowledge"></div>`;
+  h += `<div class="sec-h"><span>Docs</span></div>`;
+  h += loose.map(docLink).join('');
+  for (const g of groups) {
+    const open = state.open[`${r.layer}:g:${g}`] ?? true;
+    h += `<button class="group-h" type="button" data-toggle="${r.layer}:g:${g}" aria-expanded="${open}"><span class="ms xs">${open ? 'expand_more' : 'chevron_right'}</span>${esc(g)}</button>`;
+    if (open) h += `<div class="kids">${docs.filter(d => d.group === g).map(docLink).join('')}</div>`;
+  }
+  const selecting = state.select && state.selectLayer === r.layer;
+  h += `<div class="sec-h"><a href="#${r.layer}/info" style="color:inherit;text-decoration:none" ${r.kind === 'info' ? 'aria-current="page"' : ''}>Information</a>${selecting ? '' : `<button class="btn sm ghost" type="button" data-act="select"><span class="ms xs">checklist</span>Select</button>`}</div>`;
+  const bound = boundTop(r.layer);
+  // Nodes in no binding come first. A bound part leaves its parent here and sits on its binding's card instead.
+  h += localView(r.layer).map(n => nodeLink(r.layer, n, r, 0)).join('');
+  for (const b of layerBindings(r.layer)) {
+    const me = participant(b, r.layer); const others = b.participants.filter(p => p.layer !== r.layer);
+    const nodes = me.nodes.map(k => findNode(r.layer, k)?.node).filter(Boolean);
+    const cur = r.kind === 'binding' && r.key === b.id;
+    h += `<div class="bcard ${b.status}"><a class="bcard-h" href="#${r.layer}/binding/${b.id}" ${cur ? 'aria-current="page"' : ''}><span class="t"><span class="ms sm">link</span>${esc(b.name)}</span>`
+      + `<span class="w">${b.status === 'live' ? '' : `<span class="chip ${b.status}" style="padding:0 6px;font-size:11px">${b.status === 'draft' ? 'Draft' : 'Proposed'}</span> `}with ${others.map(p => esc(L(p.layer).layer.name)).join(', ')} · ${roleWords[me.role][0].toLowerCase()}</span></a>`
+      + `<div class="nodes">${nodes.map(n => nodeLink(r.layer, n, r, 0)).join('')}</div></div>`;
+  }
+  if (selecting) {
+    const n = [...state.picked].length;
+    h += `<div class="selbar"><span class="n">${n} selected</span><button class="btn sm" type="button" data-act="cancel-select">Cancel</button><button class="btn sm primary" type="button" data-act="propose" ${n ? '' : 'disabled'}><span class="ms xs">add_link</span>Propose a binding</button></div>`;
+  }
+  return h;
+}
+
+// ---- reading pane ----
+function crumbs(r, items) { return `<nav class="crumbs" aria-label="Breadcrumb"><a href="#${r.layer}/doc/overview">${esc(L(r.layer).layer.name)} knowledge</a>${items.map(([t, h]) => `<span class="ms xs">chevron_right</span>${h ? `<a href="${h}">${esc(t)}</a>` : `<span>${esc(t)}</span>`}`).join('')}</nav>`; }
+function layerChip(k) { const l = L(k).layer; return `<span class="chip layer" style="--lc:${l.colour};--lb:${l.bg}"><span class="ms xs">${l.icon}</span>${esc(l.name)}</span>`; }
+function nodeRef(layer, key, withLayer = true) { const n = findNode(layer, key)?.node; return n ? `<a href="#${layer}/node/${key}">${withLayer ? esc(L(layer).layer.name) + ' › ' : ''}${pathOf(layer, key).map(p => esc(p.title)).join(' › ')}</a>` : key; }
+function selectText(s) { if (s.path) return `files ${s.path}`; const k = [].concat(s.kind).join(', '); return s.where ? `${k} where ${s.where.field} is ${s.where.in.join(', ')}` : k; }
+function tabLabel(layer, key) { return (L(layer).layer.tabs.find(t => t[0] === key) || [key, key])[1]; }
+
+function docPage(r) {
+  const d = L(r.layer).docs.find(x => x.key === r.key) || L(r.layer).docs[0];
+  const edited = state.edits[`${r.layer}:doc:${d.key}`];
+  const body = edited ?? d.body;
+  let h = crumbs(r, d.key === 'overview' ? [] : [[d.group || 'Docs'], [d.title]]);
+  h += `<h2 class="title">${esc(d.key === 'overview' ? L(r.layer).layer.name : d.title)}</h2>`;
+  h += `<div class="meta">${d.path ? `<span class="chip"><span class="ms xs">description</span><span class="mono">${esc(d.path)}</span></span>` : ''}<span class="chip">at ${esc(L(r.layer).layer.pin)}</span>${d.isNew ? '<span class="chip new">New tab (A2)</span>' : ''}<span class="actions"><a class="btn sm" href="#${r.layer}/edit/doc/${d.key}"><span class="ms xs">edit</span>Edit</a></span></div>`;
+  if (edited) h += unmergedBox(r.layer, `doc:${d.key}`, false);
+  h += `<div class="md">${md(body, r.layer)}</div>`;
+  if (d.key === 'overview') h += overviewExtras(r);
+  if (d.group === 'Editor tabs') h += `<p><a class="btn" href="#${r.layer}/tab/${d.key.replace(/^tab-/, '')}"><span class="ms xs">open_in_new</span>Open the ${esc(d.title)} tab</a></p>`;
+  return h;
+}
+function overviewExtras(r) {
+  const l = L(r.layer);
+  let h = `<h3 id="keeps">What ${esc(l.layer.name)} keeps</h3><div class="cards">`;
+  h += l.information.map(n => `<a class="card" href="#${r.layer}/node/${n.key}"><span class="h"><span class="ms sm">${n.children ? 'account_tree' : 'article'}</span>${esc(n.title)}<span class="cnt muted small" style="margin-left:auto">${n.sample?.count ?? ''}</span></span><p>${esc(n.intent)}</p></a>`).join('');
+  h += `</div>`;
+  const bs = layerBindings(r.layer);
+  h += `<h3 id="shared">Shared with</h3>`;
+  h += bs.length ? `<div class="cards">${bs.map(b => bindingCard(r.layer, b)).join('')}</div>` : `<p class="muted">Nothing yet. Select information and propose a binding.</p>`;
+  return h;
+}
+function bindingCard(layer, b) {
+  const me = participant(b, layer); const others = b.participants.filter(p => p.layer !== layer);
+  return `<a class="card" href="#${layer}/binding/${b.id}"><span class="h"><span class="ms sm">link</span>${esc(b.name)}<span class="chip ${b.status}" style="margin-left:auto">${b.status === 'live' ? 'Live' : b.status === 'draft' ? 'Draft' : 'Proposed'}</span></span><p>${me.nodes.map(k => esc(findNode(layer, k)?.node.title)).join(', ')} · ${roleWords[me.role][0].toLowerCase()}<br>with ${others.map(p => esc(L(p.layer).layer.name)).join(', ')}</p></a>`;
+}
+
+function infoPage(r) {
+  const l = L(r.layer); const bound = boundTop(r.layer);
+  let h = crumbs(r, [['Information']]) + `<h2 class="title">Information</h2><p class="lead">What ${esc(l.layer.name)} keeps, as a spec. Each part says what it is for and what form it takes; its contents are edited in the tab it names.</p>`;
+  h += `<div class="meta"><span class="chip"><span class="ms xs">data_object</span><span class="mono">layer.json › information</span></span><span class="actions"><button class="btn sm" type="button" data-act="select"><span class="ms xs">checklist</span>Select to bind</button><a class="btn sm" href="#${r.layer}/edit/spec/"><span class="ms xs">add</span>Add information</a></span></div>`;
+  const local = localView(r.layer);
+  h += `<h3 id="local">Only in ${esc(l.layer.name)}</h3>`;
+  h += local.length ? `<div class="cards">${local.map(n => `<a class="card" href="#${r.layer}/node/${n.key}"><span class="h">${esc(n.title)}<span class="cnt muted small" style="margin-left:auto">${n.sample?.count ?? ''}</span></span><p>${esc(n.intent)}</p></a>`).join('')}</div>` : '<p class="muted">Everything is shared.</p>';
+  h += `<h3 id="bindings">Shared</h3>`;
+  const bs = layerBindings(r.layer);
+  h += bs.length ? `<div class="cards">${bs.map(b => bindingCard(r.layer, b)).join('')}</div>` : '<p class="muted">Nothing is shared yet.</p>';
+  return h;
+}
+
+function nodePage(r) {
+  const hit = findNode(r.layer, r.key); if (!hit) return '<p>Not found.</p>';
+  const n = hit.node; const l = L(r.layer);
+  const path = pathOf(r.layer, n.key);
+  const bs = bindingsOf(r.layer, n.key);
+  const edited = state.edits[`${r.layer}:node:${n.key}`];
+  let h = crumbs(r, [['Information', `#${r.layer}/info`], ...path.slice(0, -1).map(p => [p.title, `#${r.layer}/node/${p.key}`]), [n.title]]);
+  h += `<h2 class="title">${esc(n.title)}</h2><p class="lead">${esc(n.intent)}</p>`;
+  h += `<div class="meta"><a class="chip" href="#${r.layer}/tab/${n.tab}" style="text-decoration:none"><span class="ms xs">edit_square</span>Edited in the ${esc(tabLabel(r.layer, n.tab))} tab</a>`
+    + `<span class="chip" title="What this part covers"><span class="ms xs">filter_alt</span><span class="mono">${esc(selectText(n.select))}</span></span>`
+    + bs.map(b => `<a class="chip ${b.status}" style="text-decoration:none" href="#${r.layer}/binding/${b.id}"><span class="ms xs">link</span>${esc(b.name)} · ${roleWords[participant(b, r.layer).role][0].toLowerCase()}</a>`).join('')
+    + `<span class="actions"><button class="btn sm" type="button" data-act="select-node" data-node="${r.layer}:${n.key}"><span class="ms xs">add_link</span>Bind…</button><a class="btn sm" href="#${r.layer}/edit/node/${n.key}"><span class="ms xs">edit</span>Edit spec</a></span></div>`;
+  if (edited) h += unmergedBox(r.layer, `node:${n.key}`, true);
+  h += `<h3 id="about">About</h3><div class="md">${md(edited ?? n.body, r.layer) || '<p class="muted">No description yet.</p>'}</div>`;
+  if (n.children) h += `<h3 id="parts">Parts</h3><div class="cards">${n.children.map(c => `<a class="card" href="#${r.layer}/node/${c.key}"><span class="h">${esc(c.title)}<span class="cnt muted small" style="margin-left:auto">${c.sample?.count ?? ''}</span></span><p>${esc(c.intent)}</p></a>`).join('')}</div>`;
+  h += `<h3 id="shape">Shape</h3>`;
+  if (n.shape?.fields) h += `<div class="tbl"><table class="t"><thead><tr><th>Field</th><th>Type</th><th>Meaning</th></tr></thead><tbody>${n.shape.fields.map(f => `<tr><td class="mono">${esc(f[0])}</td><td class="mono muted">${esc(f[1])}</td><td>${esc(f[2])}</td></tr>`).join('')}</tbody></table></div><p class="small muted">From ${poss(l.layer.name)} API spec.</p>`;
+  else if (n.shape?.format) h += `<p>Each item must follow this format:</p><pre class="fmt">${esc(n.shape.format)}</pre>`;
+  else h += `<p class="muted">Free text. No required format.</p>`;
+  const s = n.sample;
+  if (s) {
+    h += `<h3 id="contents">Contents <span class="muted small">${s.count}</span></h3><div class="tbl"><table class="t"><thead><tr>${s.columns.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${s.rows.map(row => `<tr>${row.map((c, i) => `<td>${i === 0 && c && !c.startsWith('…') ? `<a href="#${r.layer}/tab/${n.tab}">${esc(c)}</a>` : esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+    h += `<p><a class="btn sm" href="#${r.layer}/tab/${n.tab}"><span class="ms xs">open_in_new</span>Edit in the ${esc(tabLabel(r.layer, n.tab))} tab</a></p>`;
+  }
+  h += `<h3 id="sharing">Sharing</h3>`;
+  if (bs.length) for (const b of bs) {
+    const me = participant(b, r.layer);
+    const pairs = (b.pairs || []).filter(p => p.some(x => x === `${r.layer}:${n.key}`)).flatMap(p => p.filter(x => x !== `${r.layer}:${n.key}`));
+    h += `<div class="box"><p style="margin:0 0 6px"><span class="chip ${b.status}">${b.status === 'live' ? 'Live' : 'Proposed'}</span> In <a href="#${r.layer}/binding/${b.id}">${esc(b.name)}</a>. ${esc(L(r.layer).layer.name)} ${roleWords[me.role][0].toLowerCase()}: ${esc(roleWords[me.role][1].toLowerCase())}.</p>`
+      + (pairs.length ? `<p class="small" style="margin:0">Matches ${pairs.map(x => { const [lk, nk] = x.split(':'); return nodeRef(lk, nk); }).join(', ')}.</p>` : '') + `</div>`;
+  } else if (n.children && descendants(n).slice(1).some(k => bindingsOf(r.layer, k).length)) {
+    h += `<p>Its parts are shared separately:</p><ul class="effects">${descendants(n).slice(1).filter(k => boundTop(r.layer).has(k)).map(k => `<li>${nodeRef(r.layer, k, false)}: ${bindingsOf(r.layer, k).map(b => `<a href="#${r.layer}/binding/${b.id}">${esc(b.name)}</a>`).join(', ')}</li>`).join('')}</ul>`;
+  } else h += `<p class="muted">Not shared. Only ${esc(l.layer.name)} uses it. <button class="btn sm ghost" type="button" data-act="select-node" data-node="${r.layer}:${n.key}">Bind it with another layer…</button></p>`;
+  const refs = referencedBy(r.layer, n.key); if (n.refersTo) h += `<h3 id="refers">Points to</h3><p>${n.refersTo.map(x => { const [lk, nk] = x.split(':'); return nodeRef(lk, nk); }).join(', ')}</p>`;
+  if (refs.length) h += `<h3 id="refby">Referenced by</h3><p>${refs.map(([lk, rn]) => nodeRef(lk, rn.key)).join(', ')}</p>`;
+  return h;
+}
+function unmergedBox(layer, what, isSpec) {
+  return `<div class="box warn"><strong>Unmerged change</strong> on branch <span class="mono">knowledge/${esc(what.replace(':', '-'))}</span>. ${isSpec ? 'Merging it creates a task to compare this spec change with the other layers, for a person or an agent to pick up.' : ''} <span style="display:inline-flex;gap:8px;margin-left:6px"><button class="btn sm" type="button" data-act="merge" data-what="${layer}:${what}">Merge</button><button class="btn sm ghost" type="button" data-act="discard" data-what="${layer}:${what}">Discard</button></span></div>`;
+}
+
+function bindingPage(r) {
+  const b = state.project.bindings.find(x => x.id === r.key); if (!b) return '<p>Not found.</p>';
+  let h = crumbs(r, [['Information', `#${r.layer}/info`], [b.name]]);
+  h += `<h2 class="title">${esc(b.name)}</h2><p class="lead">${b.participants.map(p => esc(L(p.layer).layer.name)).join(' · ')}</p>`;
+  h += `<div class="meta"><span class="chip ${b.status}">${b.status === 'live' ? 'Live since ' + esc(b.since) : b.status === 'draft' ? 'Draft' : 'Proposed ' + esc(b.since)}</span><span class="chip"><span class="ms xs">history</span>${esc(b.origin)}</span></div>`;
+  if (b.status === 'proposed') h += `<div class="box warn"><strong>Waiting for your decision.</strong> Accepting applies everything under “What changes”.<span style="display:flex;gap:8px;margin-top:10px"><button class="btn primary" type="button" data-act="accept" data-b="${b.id}">Accept</button><button class="btn" type="button" data-act="dismiss" data-b="${b.id}">Dismiss</button></span></div>`;
+  h += `<h3 id="what">What it binds</h3><div class="md"><p>${esc(b.statement)}</p></div>`;
+  h += `<div class="parts">${b.participants.map(p => `<div class="part" style="--lc:${L(p.layer).layer.colour};--lb:${L(p.layer).layer.bg}"><div>${layerChip(p.layer)}</div><div class="nodes">${p.nodes.map(k => `<a class="chip" style="text-decoration:none" href="#${p.layer}/node/${k}">${pathOf(p.layer, k).map(x => esc(x.title)).join(' › ')}</a>`).join('')}<div class="small muted">${p.nodes.map(k => esc(findNode(p.layer, k)?.node.intent)).join(' ')}</div></div><div class="role">${roleWords[p.role][0]}<small>${roleWords[p.role][1]}</small></div></div>`).join('')}</div>`;
+  if (b.pairs?.length) h += `<h3 id="pairs">Matching parts</h3><div class="tbl"><table class="t"><tbody>${b.pairs.map(pr => `<tr>${pr.map(x => { const [lk, nk] = x.split(':'); return `<td>${nodeRef(lk, nk)}</td>`; }).join('<td class="muted" style="width:30px"><span class="ms xs">sync_alt</span></td>')}</tr>`).join('')}</tbody></table></div>`;
+  if (b.effects) h += `<h3 id="changes">What changes</h3><ul class="effects">${b.effects.map(e => `<li>${e}</li>`).join('')}</ul>`;
+  else if (b.status === 'proposed') h += `<h3 id="changes">What changes</h3><ul class="effects"><li>Vision's Personas become read-only and point to Personas' documents. New people are added in Personas.</li><li>Vision's 2 personas are offered to Personas once, as Work, so nothing is lost.</li><li>Pages' Flows point at Vision personas (3 references). Pages gets Work to point them at Personas instead.</li></ul>`;
+  if (b.status === 'live') h += `<h3 id="manage">Change it</h3><p class="small muted">Each change is proposed and decided like the binding itself.</p><div style="display:flex;flex-wrap:wrap;gap:8px"><button class="btn sm" type="button" data-act="todo">Add information</button><button class="btn sm" type="button" data-act="todo">Change who leads</button><button class="btn sm" type="button" data-act="todo">End the binding</button></div>`;
+  h += `<h3 id="activity">Activity</h3><div class="tbl"><table class="t"><tbody>${b.activity.map(a => `<tr><td class="muted" style="width:110px">${esc(a[0])}</td><td>${esc(a[1])}</td></tr>`).join('')}</tbody></table></div>`;
+  return h;
+}
+
+// ---- propose a binding from the selection ----
+function startPropose(layer) {
+  const mine = [...state.picked].filter(x => x.startsWith(layer + ':')).map(x => x.split(':')[1]);
+  state.draft = { from: layer, nodes: mine, with: {}, leads: layer, name: '', statement: '' };
+  state.select = false; go(`#${layer}/propose`);
+}
+function draftEffects(d) {
+  const out = []; const renegotiate = new Map();
+  const all = [[d.from, d.nodes], ...Object.entries(d.with)].filter(([, ns]) => ns.length);
+  for (const [lk, ns] of all) for (const k of ns) for (const b of state.project.bindings) {
+    const p = participant(b, lk); if (!p) continue;
+    const keys = pathOf(lk, k).map(n => n.key);
+    const inIt = p.nodes.some(x => keys.includes(x) || descendants(findNode(lk, k).node).includes(x));
+    if (inIt) { if (!renegotiate.has(b.id)) renegotiate.set(b.id, []); renegotiate.get(b.id).push([lk, k]); }
+  }
+  for (const [lk, ns] of all) {
+    const what = `${poss(L(lk).layer.name)} ${ns.map(k => esc(findNode(lk, k).node.title)).join(', ')}`, lead = esc(L(d.leads).layer.name);
+    if (lk === d.leads) out.push(`${what} lead: changes are made there.`);
+    else if (roleOf(d, lk) === 'ceded') out.push(`${what} hand over to ${lead}: what's there now is offered to ${lead} once, as Work, then stays as read-only history pointing to ${lead}.`);
+    else out.push(`${what} keep a copy of ${lead}'s: read-only in ${esc(L(lk).layer.name)}, with Propose a change.`);
+  }
+  const refs = all.flatMap(([lk, ns]) => lk === d.leads ? [] : ns.flatMap(k => referencedBy(lk, k).map(([rl, rn]) => [rl, rn, lk, k])));
+  for (const [rl, rn, lk, k] of refs) if (roleOf(d, lk) === 'ceded') out.push(`${nodeRef(rl, rn.key)} point at ${nodeRef(lk, k)}. ${esc(L(rl).layer.name)} gets Work to point them at ${esc(L(d.leads).layer.name)} instead.`);
+  for (const [id, parts] of renegotiate) {
+    const b = state.project.bindings.find(x => x.id === id);
+    out.push(`<strong>Renegotiates ${esc(b.name)}:</strong> ${parts.map(([lk, k]) => nodeRef(lk, k)).join(', ')} ${parts.length > 1 ? 'leave' : 'leaves'} it and ${parts.length > 1 ? 'follow' : 'follows'} this binding instead. ${esc(b.name)} keeps the rest. One decision covers both.`);
+  }
+  return { out, renegotiate };
+}
+function roleOf(d, lk) { return lk === d.leads ? 'authority' : (d.roles?.[lk] || 'replica'); }
+function proposePage(r) {
+  const d = state.draft;
+  if (!d || d.from !== r.layer) return crumbs(r, [['Propose a binding']]) + `<h2 class="title">Propose a binding</h2><p>Select information first: choose <strong>Select</strong> next to Information in the sidebar.</p>`;
+  const others = Object.keys(DATA.layers).filter(k => k !== d.from);
+  let h = crumbs(r, [['Information', `#${r.layer}/info`], ['Propose a binding']]);
+  h += `<h2 class="title">Propose a binding</h2><p class="lead">Bind ${poss(L(d.from).layer.name)} selected information with the matching information in another layer.</p>`;
+  h += `<div class="compose"><div class="col"><h4>${layerChip(d.from)} Selected</h4>${d.nodes.map(k => `<div class="nl"><span class="ms xs">check_box</span><span class="lbl">${pathOf(d.from, k).map(x => esc(x.title)).join(' › ')}</span><button class="btn sm ghost" type="button" data-act="unpick" data-node="${k}" aria-label="Remove ${esc(findNode(d.from, k).node.title)}">Remove</button></div><p class="small muted" style="margin:0 0 6px 26px">${esc(findNode(d.from, k).node.intent)}</p>`).join('')}</div>`;
+  h += `<div class="col"><h4>With</h4><div class="field"><label for="withLayer">Layer</label><select id="withLayer"><option value="">Choose a layer…</option>${others.map(k => `<option value="${k}" ${d.focus === k ? 'selected' : ''}>${esc(L(k).layer.name)}</option>`).join('')}</select></div>`;
+  if (d.focus) {
+    const pick = (n, depth) => { const on = (d.with[d.focus] || []).includes(n.key); return `<label class="nl" style="padding-left:${8 + depth * 16}px"><input type="checkbox" data-with="${d.focus}:${n.key}" ${on ? 'checked' : ''}><span class="lbl">${esc(n.title)}</span>${bindingsOf(d.focus, n.key).length ? `<span class="chip" style="padding:0 6px;font-size:11px">in ${esc(bindingsOf(d.focus, n.key)[0].name)}</span>` : ''}</label><p class="small muted" style="margin:-2px 0 4px ${34 + depth * 16}px">${esc(n.intent)}</p>` + (n.children || []).map(c => pick(c, depth + 1)).join(''); };
+    h += `<div class="picktree">${L(d.focus).information.map(n => pick(n, 0)).join('')}</div>`;
+  }
+  h += `</div></div>`;
+  const chosen = Object.entries(d.with).filter(([, ns]) => ns.length);
+  if (chosen.length) {
+    const lead = [d.from, ...chosen.map(([k]) => k)];
+    const { out } = draftEffects(d);
+    h += `<h3>Who leads?</h3><p class="small muted">The leading layer is where this information is changed. The others follow it.</p><div class="leads">${lead.map(k => `<label><input type="radio" name="lead" value="${k}" ${d.leads === k ? 'checked' : ''}>${esc(L(k).layer.name)}</label>`).join('')}</div>`;
+    h += `<h3>What the others do</h3><div class="tbl"><table class="t"><tbody>${lead.filter(k => k !== d.leads).map(k => `<tr><td>${layerChip(k)}</td><td><div class="leads"><label><input type="radio" name="role-${k}" data-role="${k}" value="replica" ${roleOf(d, k) === 'replica' ? 'checked' : ''}>Keep a copy</label><label><input type="radio" name="role-${k}" data-role="${k}" value="ceded" ${roleOf(d, k) === 'ceded' ? 'checked' : ''}>Hand over</label></div></td></tr>`).join('')}</tbody></table></div><p class="small muted">Keep a copy: it stays in this layer, read-only, kept in step. Hand over: the lead takes it over and this layer points there.</p>`;
+    h += `<h3>Describe it</h3><div class="field"><label for="bname">Name</label><input id="bname" value="${esc(d.name)}" placeholder="e.g. The app's brand"></div><div class="field"><label for="bstate">How the parts match</label><textarea id="bstate" placeholder="Say why these are the same information and how one side drives the other, even though each layer keeps it in its own form.">${esc(d.statement)}</textarea></div>`;
+    h += `<h3>What changes if accepted</h3><ul class="effects">${out.map(e => `<li>${e}</li>`).join('')}</ul>`;
+    h += `<p style="display:flex;gap:8px;margin-top:16px"><button class="btn primary" type="button" data-act="submit">Propose</button><button class="btn" type="button" data-act="cancel-propose">Cancel</button></p>`;
+  }
+  return h;
+}
+
+// ---- edit (docs and spec) ----
+function editPage(r) {
+  const [what, key] = r.key.split('/');
+  let title, body, isSpec = what !== 'doc';
+  if (what === 'doc') { const d = L(r.layer).docs.find(x => x.key === key); title = d.title; body = state.edits[`${r.layer}:doc:${key}`] ?? d.body; }
+  else if (what === 'node') { const n = findNode(r.layer, key).node; title = n.title; body = state.edits[`${r.layer}:node:${key}`] ?? n.body; }
+  else { title = 'New information'; body = '# Title\n\nWhat it is for.\n\n## Form\n…'; }
+  let h = crumbs(r, [[isSpec ? 'Information' : 'Docs'], [title, isSpec && key ? `#${r.layer}/node/${key}` : `#${r.layer}/doc/${key}`], ['Edit']]);
+  h += `<h2 class="title">Edit ${esc(title)}</h2>`;
+  h += `<p class="muted">${isSpec ? 'This is part of the spec. Saving puts the change on a branch of the layer repository; merging it creates a “Compare specs” task for a person or an agent.' : 'Saving puts the change on a branch of the layer repository, for you to merge.'}</p>`;
+  h += `<div class="editor"><div><label class="vh" for="ed">Markdown</label><textarea id="ed">${esc(body)}</textarea></div><div class="pv md" id="pv" aria-label="Preview">${md(body, r.layer)}</div></div>`;
+  h += `<p style="display:flex;gap:8px;margin-top:12px"><button class="btn primary" type="button" data-act="save-edit" data-what="${what}:${key}">Save to a branch</button><a class="btn" href="#${r.layer}/${what === 'doc' ? 'doc' : what === 'node' ? 'node' : 'info'}/${key}">Cancel</a></p>`;
+  return h;
+}
+
+// ---- an editor tab (A2: Pages' Kit) ----
+function tabPage(r) {
+  if (r.layer === 'pages' && r.key === 'kit') {
+    return `<div class="tabpage"><div class="rolenote"><span class="ms">link</span><span style="flex:1"><strong>A copy of Design's design system.</strong> Changes are made in Design and arrive here automatically.</span><a class="btn sm" href="#design/binding/design-system">About this binding</a><button class="btn sm" type="button" data-act="todo">Propose a change</button></div>
+      <h3>Tokens</h3><div class="swatches">${[['Primary', '#2e7d5b'], ['On primary', '#ffffff'], ['Surface', '#f7faf8'], ['Accent', '#c76b1e'], ['Error', '#b3261e']].map(([n, c]) => `<div class="sw"><i style="background:${c}"></i><span>${n}<br><span class="mono">${c}</span></span></div>`).join('')}</div>
+      <h3>Components</h3><div class="cards">${['Button', 'Card', 'List row', 'Form field', 'Avatar', 'Badge'].map(c => `<div class="card"><span class="h">${c}</span><p>From Design › Components</p></div>`).join('')}</div>
+      <h3>Brand</h3><div class="cards">${['Name: Tool Share', 'Mark: Spanner', 'Hero: Neighbours lending'].map(c => `<div class="card"><span class="h">${c}</span><p>From Design › Brand</p></div>`).join('')}</div>
+      <p class="small muted">Prototype note (A2): Pages' Kit is contents, so it gets an editor tab. While Design leads, it is read-only here.</p></div>`;
+  }
+  return `<div class="tabpage"><p class="muted">The ${esc(tabLabel(r.layer, r.key))} tab is the layer's existing editor; it isn't part of this prototype.</p><p><a href="#${r.layer}/doc/overview">Back to Knowledge</a></p></div>`;
+}
+
+function outline(r) {
+  const ids = { node: [['about', 'About'], ['parts', 'Parts'], ['shape', 'Shape'], ['contents', 'Contents'], ['sharing', 'Sharing'], ['refers', 'Points to'], ['refby', 'Referenced by']], binding: [['what', 'What it binds'], ['pairs', 'Matching parts'], ['changes', 'What changes'], ['manage', 'Change it'], ['activity', 'Activity']], info: [['local', 'Only here'], ['bindings', 'Shared']], doc: [['keeps', 'What it keeps'], ['shared', 'Shared with']] }[r.kind] || [];
+  const present = ids.filter(([id]) => document.getElementById(id));
+  return present.length ? `<b>On this page</b>${present.map(([id, t]) => `<a href="#" data-jump="${id}">${t}</a>`).join('')}` : '';
+}
+
+// ---- render ----
+function render() {
+  const r = route(); const l = L(r.layer).layer;
+  document.querySelectorAll('#layerBtns button').forEach(b => b.setAttribute('aria-current', String(b.dataset.layer === r.layer)));
+  const app = document.getElementById('app');
+  app.style.setProperty('--lc', l.colour); app.style.setProperty('--lb', l.bg);
+  const tabs = l.tabs.map(([k, t]) => `<a href="#${r.layer}/tab/${k}" ${r.kind === 'tab' && r.key === k ? 'aria-current="page"' : ''}>${esc(t)}${r.layer === 'pages' && k === 'kit' ? '<span class="new">new</span>' : ''}</a>`).join('');
+  const inKn = r.kind !== 'tab';
+  let body;
+  if (!inKn) body = tabPage(r);
+  else {
+    const pane = { doc: docPage, info: infoPage, node: nodePage, binding: bindingPage, propose: proposePage, edit: editPage }[r.kind] || docPage;
+    body = `<div class="kn ${state.menu ? 'open' : ''}"><button class="btn sm mtoggle" type="button" data-act="menu" aria-expanded="${state.menu}"><span class="ms xs">menu</span>${esc(l.name)} knowledge</button><aside class="side" aria-label="${esc(l.name)} knowledge">${sidebar(r)}</aside><main class="read" id="read">${pane(r)}</main><nav class="outline" id="outline" aria-label="On this page"></nav></div>`;
+  }
+  app.innerHTML = `<nav class="rail" aria-label="Layers">${Object.entries(DATA.layers).map(([k, x]) => `<a href="#${k}/doc/overview" title="${esc(x.layer.name)}" aria-label="${esc(x.layer.name)}" ${k === r.layer ? 'aria-current="page"' : ''} style="--lc:${x.layer.colour};--lb:${x.layer.bg}"><span class="ms">${x.layer.icon}</span></a>`).join('')}</nav>
+    <div class="main"><div class="lhead"><span class="lic"><span class="ms">${l.icon}</span></span><h1>${esc(l.name)}</h1>${l.custom ? '<span class="chip">Markdown layer</span>' : ''}</div>
+    <nav class="lbar" aria-label="${esc(l.name)}">${tabs}<span class="sp"></span><a href="#${r.layer}/tab/tasks">Tasks</a><a href="#${r.layer}/doc/overview" ${inKn ? 'aria-current="page"' : ''}>Knowledge</a><a href="#${r.layer}/tab/manage">Manage</a></nav>${body}</div>`;
+  const o = document.getElementById('outline'); if (o) o.innerHTML = outline(r);
+  const ed = document.getElementById('ed'); if (ed) ed.addEventListener('input', () => { document.getElementById('pv').innerHTML = md(ed.value, r.layer); });
+  const wl = document.getElementById('withLayer'); if (wl) wl.addEventListener('change', () => { state.draft.focus = wl.value; render(); });
+  document.querySelectorAll('input[data-role]').forEach(i => i.addEventListener('change', () => { state.draft.roles = { ...(state.draft.roles || {}), [i.dataset.role]: i.value }; keepFields(); render(); }));
+  document.querySelectorAll('input[name=lead]').forEach(i => i.addEventListener('change', () => { state.draft.leads = i.value; keepFields(); render(); }));
+}
+function keepFields() { const n = document.getElementById('bname'), s = document.getElementById('bstate'); if (n && state.draft) { state.draft.name = n.value; state.draft.statement = s.value; } }
+
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-toggle],[data-act],[data-jump]'); if (!t) return;
+  const r = route();
+  if (t.dataset.toggle) { e.preventDefault(); const k = t.dataset.toggle; const depth0 = !k.includes(':g:') && L(r.layer).information.some(n => `${r.layer}:${n.key}` === k); state.open[k] = !(state.open[k] ?? (k.includes(':g:') || depth0)); render(); return; }
+  if (t.dataset.jump) { e.preventDefault(); document.getElementById(t.dataset.jump)?.scrollIntoView({ behavior: 'smooth' }); return; }
+  const act = t.dataset.act;
+  if (act === 'menu') { state.menu = !state.menu; render(); }
+  if (act === 'select') { state.select = true; state.selectLayer = r.layer; state.picked = new Set(); state.menu = true; render(); }
+  if (act === 'select-node') { state.select = true; state.selectLayer = r.layer; state.picked = new Set([t.dataset.node]); state.menu = true; render(); toast('Selected. Tick more if you like, then choose Propose a binding.'); }
+  if (act === 'cancel-select') { state.select = false; state.picked = new Set(); render(); }
+  if (act === 'propose') startPropose(r.layer);
+  if (act === 'unpick') { state.draft.nodes = state.draft.nodes.filter(k => k !== t.dataset.node); keepFields(); render(); }
+  if (act === 'cancel-propose') { state.draft = null; go(`#${r.layer}/info`); }
+  if (act === 'submit') {
+    keepFields(); const d = state.draft; const { renegotiate } = draftEffects(d);
+    const id = 'b' + Date.now().toString(36);
+    const participants = [[d.from, d.nodes], ...Object.entries(d.with)].filter(([, ns]) => ns.length).map(([lk, ns]) => ({ layer: lk, nodes: ns, role: roleOf(d, lk) }));
+    const effects = draftEffects(d).out;
+    state.project.bindings.push({ id, name: d.name || 'Untitled binding', status: 'proposed', since: 'just now', origin: 'Proposed by you from ' + L(d.from).layer.name + "'s Knowledge", statement: d.statement || '(No description yet.)', participants, effects, renegotiates: [...renegotiate].map(([bid, parts]) => ({ bid, parts })), activity: [['just now', 'Proposed by you']] });
+    state.draft = null; state.picked = new Set(); go(`#${d.from}/binding/${id}`); toast('Proposed. It waits for the owner’s decision, here or in Work.');
+  }
+  if (act === 'accept') {
+    const b = state.project.bindings.find(x => x.id === t.dataset.b);
+    for (const rn of b.renegotiates || []) { const old = state.project.bindings.find(x => x.id === rn.bid); for (const [lk, k] of rn.parts) { const p = participant(old, lk); if (!p) continue; p.nodes = without(lk, p.nodes, k);
+      old.pairs = (old.pairs || []).filter(pr => !pr.some(x => { const [a, b] = x.split(':'); return a === lk && (descendants(findNode(lk, k).node).includes(b)); })); }
+      old.participants = old.participants.filter(p => p.nodes.length);
+      old.activity.unshift(['just now', `Renegotiated by ${b.name}`]); }
+    b.status = 'live'; b.since = 'today'; b.activity.unshift(['just now', 'Accepted by the owner']); render(); toast('Accepted. Work was raised for each layer that has something to do.');
+  }
+  if (act === 'dismiss') { state.project.bindings = state.project.bindings.filter(x => x.id !== t.dataset.b); go(`#${r.layer}/info`); toast('Dismissed.'); }
+  if (act === 'save-edit') { const [what, key] = t.dataset.what.split(':'); const v = document.getElementById('ed').value; if (what !== 'spec') state.edits[`${r.layer}:${what}:${key}`] = v; go(what === 'doc' ? `#${r.layer}/doc/${key}` : what === 'node' ? `#${r.layer}/node/${key}` : `#${r.layer}/info`); toast('Saved to a branch. Merge it when you are happy.'); }
+  if (act === 'merge') { const [lk, what, key] = t.dataset.what.split(':'); const v = state.edits[t.dataset.what]; delete state.edits[t.dataset.what];
+    if (what === 'doc') L(lk).docs.find(x => x.key === key).body = v; else { findNode(lk, key).node.body = v; }
+    render(); toast(what === 'node' ? 'Merged. Created W-32 “Compare specs: ' + L(lk).layer.name + '’s ' + findNode(lk, key).node.title + ' changed”, for a person or an agent.' : 'Merged into the layer repository.'); }
+  if (act === 'discard') { delete state.edits[t.dataset.what]; render(); }
+  if (act === 'todo') toast('Not in this prototype round.');
+});
+document.addEventListener('change', e => {
+  const p = e.target.closest('[data-pick]'); if (p) { const k = p.dataset.pick; p.checked ? state.picked.add(k) : state.picked.delete(k);
+    // A ticked parent brings its children; drop children that are now implied.
+    const [lk, nk] = k.split(':'); if (p.checked) for (const d of descendants(findNode(lk, nk).node).slice(1)) state.picked.delete(`${lk}:${d}`); render(); return; }
+  const w = e.target.closest('[data-with]'); if (w) { const [lk, nk] = w.dataset.with.split(':'); const cur = new Set(state.draft.with[lk] || []); w.checked ? cur.add(nk) : cur.delete(nk); state.draft.with[lk] = [...cur]; keepFields(); render(); }
+});
+document.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-toggle][role=button]')) { e.preventDefault(); e.target.click(); } });
+document.getElementById('layerBtns').innerHTML = Object.entries(DATA.layers).map(([k, x]) => `<button type="button" data-layer="${k}">${esc(x.layer.name)}</button>`).join(' ');
+document.getElementById('layerBtns').addEventListener('click', e => { const b = e.target.closest('button'); if (b) go(`#${b.dataset.layer}/doc/overview`); });
+document.getElementById('theme').addEventListener('click', () => { const d = document.documentElement; d.dataset.theme = d.dataset.theme === 'dark' ? 'light' : 'dark'; });
+document.getElementById('reset').addEventListener('click', () => { location.reload(); });
+window.addEventListener('hashchange', () => { state.menu = false; render(); window.scrollTo(0, 0); });
+render();
+</script>
+</body>
+</html>

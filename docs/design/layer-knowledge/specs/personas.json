@@ -1,0 +1,19 @@
+{
+  "layer": { "key": "personas", "name": "Personas", "template": "markdown", "colour": "#475467", "bg": "#eceff3", "icon": "groups",
+    "tabs": [["files", "Files"]], "pin": "c41e0d2", "custom": true },
+  "docs": [
+    { "key": "overview", "title": "Overview", "body": "Personas is a small Markdown layer for the people Tool Share is designed for, written in more depth than Vision's one-line personas, plus loose notes on improvements.\n\n**Start here:** [Charter](#doc/charter), then [Personas](#node/people) for the required format." },
+    { "key": "charter", "title": "Charter", "path": "knowledge/charter.md", "body": "## Purpose\n\nKeep a full portrait of each person we design for, grounded in interviews, so pages and flows are written for real people.\n\n## Contents and scope\n\nOne document per persona, and a folder of improvement notes. Product goals stay in Vision." },
+    { "key": "tab-files", "title": "Files", "group": "Editor tabs", "path": "knowledge/tabs/files.md", "body": "A Markdown editor over the layer's files, with a folder tree.\n\n**Edits:** [Personas](#node/people), [Notes](#node/notes)." }
+  ],
+  "information": [
+    { "key": "people", "title": "Personas", "intent": "One document per person we design for, in the required format below.", "tab": "files",
+      "select": { "path": "personas/*.md" },
+      "body": "Each file in `personas/` describes one persona. The file name is the persona's key (`borrower.md`). Other layers may refer to a persona by that key.",
+      "shape": { "format": "# {Name}\n\n> {One line: their situation}\n\n## Needs\n- …\n\n## Frustrations\n- …\n\n## Evidence\n- Interview or source, with date" },
+      "sample": { "count": 3, "columns": ["File", "Persona", "Evidence"], "rows": [["personas/borrower.md", "Borrower", "3 interviews"], ["personas/lender.md", "Lender", "2 interviews"], ["personas/organiser.md", "Street organiser", "1 interview"]] } },
+    { "key": "notes", "title": "Notes", "intent": "Loose notes on app improvements, any number, any form.", "tab": "files",
+      "select": { "path": "notes/*.md" }, "body": "Unstructured. Agents may read these for ideas but should not treat them as decisions.", "shape": { "free": true },
+      "sample": { "count": 4, "columns": ["File", "Updated"], "rows": [["notes/deposits.md", "today"], ["notes/late-returns.md", "2 days ago"], ["notes/photos.md", "1 week ago"], ["notes/trust-badges.md", "1 week ago"]] } }
+  ]
+}

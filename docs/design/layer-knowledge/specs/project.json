@@ -1,0 +1,24 @@
+{
+  "project": "Tool Share",
+  "bindings": [
+    { "id": "design-system", "name": "Design system", "status": "live", "since": "2026-09-29",
+      "origin": "Declared by the Design and Pages templates; accepted by the owner",
+      "statement": "Pages draws every page with Design's design system. Its Kit is a copy that Pages' kit adapter converts into the shape its canvas renders. Design leads; a change in Design reaches Pages' Kit automatically, and Pages proposes changes back as Work.",
+      "participants": [
+        { "layer": "design", "nodes": ["tokens", "components", "brand"], "role": "authority" },
+        { "layer": "pages", "nodes": ["kit"], "role": "replica" } ],
+      "pairs": [["design:tokens", "pages:kit-tokens"], ["design:components", "pages:kit-components"], ["design:brand", "pages:kit-brand"]],
+      "activity": [["2 min ago", "Accent colour change copied to Pages' Kit"], ["2026-09-29", "Accepted by the owner"]] },
+    { "id": "people", "name": "The people we design for", "status": "proposed", "since": "today",
+      "origin": "Proposed by Work W-31, “Compare specs: Personas' spec changed”, done by an agent",
+      "statement": "Personas' documents are full portraits of the same people Vision names in one line. Personas leads: Vision's personas become pointers to Personas' documents, and new people are added in Personas.",
+      "participants": [
+        { "layer": "personas", "nodes": ["people"], "role": "authority" },
+        { "layer": "vision", "nodes": ["personas"], "role": "ceded" } ],
+      "pairs": [["personas:people", "vision:personas"]],
+      "activity": [["today", "Proposed by an agent on W-31"]] }
+  ],
+  "work": [
+    { "id": "W-31", "title": "Compare specs: Personas' spec changed", "state": "done", "by": "Agent" }
+  ]
+}

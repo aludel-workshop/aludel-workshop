@@ -1,0 +1,37 @@
+{
+  "layer": { "key": "design", "name": "Design", "template": "design", "colour": "#8a6100", "bg": "#fff3cc", "icon": "palette",
+    "tabs": [["tokens", "Tokens"], ["components", "Components"], ["brand", "Brand"], ["docs", "Docs"]], "pin": "a924ed2" },
+  "docs": [
+    { "key": "overview", "title": "Overview", "body": "Design keeps the app's design system: the tokens, components and brand every screen is drawn with. Other layers draw with copies of it.\n\n**Start here**\n\n1. [Charter](#doc/charter).\n2. [Information](#info): what the design system contains, and who holds copies.\n3. The method for your task: [Tokens](#doc/tokens-method), [Components](#doc/component-method) or [Brand](#doc/brand-method)." },
+    { "key": "charter", "title": "Charter", "path": "knowledge/charter.md", "body": "## Purpose\n\nKeep one design system for the app, so every screen looks like the same product.\n\n## Contents and scope\n\nTokens, components and brand assets. Page layouts belong to Pages; built styles belong to Code." },
+    { "key": "tokens-method", "title": "Tokens method", "group": "Methods", "path": "knowledge/tokens-method.md", "body": "Edit tokens as a draft against the live preview, then save one revision of the whole set with a note saying what changed and why. Keep each colour role at WCAG AA against its pair in both light and dark mode." },
+    { "key": "component-method", "title": "Components method", "group": "Methods", "path": "knowledge/component-method.md", "body": "A component is a contract: its name, props, variants and the states it must render. Change the contract deliberately; copies in other layers follow it." },
+    { "key": "brand-method", "title": "Brand method", "group": "Methods", "path": "knowledge/brand-method.md", "body": "The name and mark come first; imagery follows the mark's colours. Every asset has alt text and a usage note." },
+    { "key": "tab-tokens", "title": "Tokens", "group": "Editor tabs", "path": "knowledge/tabs/tokens.md", "body": "Two panes: the token tree and a live preview. Change raw values on the preview; change what a role points at in the tree.\n\n**Edits:** [Tokens](#node/tokens)." },
+    { "key": "tab-components", "title": "Components", "group": "Editor tabs", "path": "knowledge/tabs/components.md", "body": "**Edits:** [Components](#node/components)." },
+    { "key": "tab-brand", "title": "Brand", "group": "Editor tabs", "path": "knowledge/tabs/brand.md", "body": "**Edits:** [Brand assets](#node/brand)." },
+    { "key": "tab-docs", "title": "Docs", "group": "Editor tabs", "path": "knowledge/tabs/docs.md", "body": "Usage guidance written for designers and builders, such as when to use a card or a list.\n\n**Edits:** [Usage docs](#node/usage)." }
+  ],
+  "information": [
+    { "key": "tokens", "title": "Tokens", "intent": "Colour roles, type, spacing and corners: the values every screen is styled with.", "tab": "tokens",
+      "select": { "kind": "design_tokens" },
+      "body": "One token set per project, saved as whole revisions. Roles (primary, surface, on-surface…) point at palette values; each role has a light and a dark value.\n\nThe set describes groups — colour roles, type scale, spacing, corners — but they are parts of one record, not separate nodes.",
+      "shape": { "fields": [["palette", "object", "Named raw colours"], ["roles", "object", "Role → palette value, light and dark"], ["type", "object", "Scale steps: size, weight, line height"], ["spacing", "number[]", "Spacing steps"], ["corners", "object", "Radius per size"], ["note", "string", "Why this revision changed"]] },
+      "sample": { "count": 1, "columns": ["Token set", "Revision", "Changed"], "rows": [["Tool Share tokens", "r7", "Accent moved to #2e7d5b"]] } },
+    { "key": "components", "title": "Components", "intent": "The building blocks screens are made of, with their props, variants and states.", "tab": "components",
+      "select": { "kind": "component" },
+      "body": "Each component is a contract other layers build against.",
+      "shape": { "fields": [["name", "string", ""], ["props", "Prop[]", "Name, type, default"], ["variants", "string[]", ""], ["states", "string[]", "Hover, focus, disabled, error…"]] },
+      "sample": { "count": 12, "columns": ["Component", "Variants", "States"], "rows": [["Button", "3", "4"], ["Card", "2", "2"], ["List row", "2", "3"], ["Form field", "4", "5"], ["… 8 more", "", ""]] } },
+    { "key": "brand", "title": "Brand assets", "intent": "The app's name, mark and approved imagery.", "tab": "brand",
+      "select": { "kind": "brand_asset" },
+      "body": "Each asset has a role (name, mark, imagery), a file, alt text and a usage note.",
+      "shape": { "fields": [["role", "enum", "name, mark, imagery"], ["file", "url", ""], ["alt", "string", ""], ["usage", "string", ""]] },
+      "sample": { "count": 3, "columns": ["Asset", "Role", "Usage"], "rows": [["Tool Share", "name", "Wordmark text"], ["Spanner mark", "mark", "App icon and header"], ["Neighbours lending", "imagery", "Home hero"]] } },
+    { "key": "usage", "title": "Usage docs", "intent": "Guidance on when and how to use each part of the system.", "tab": "docs",
+      "select": { "kind": "doc", "where": { "field": "layer", "in": ["design"] } },
+      "body": "Short Markdown pages, one per topic.",
+      "shape": { "free": true },
+      "sample": { "count": 2, "columns": ["Doc", "Updated"], "rows": [["Cards or lists?", "3 days ago"], ["Writing button labels", "1 week ago"]] } }
+  ]
+}

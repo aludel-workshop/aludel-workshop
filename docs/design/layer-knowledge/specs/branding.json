@@ -1,0 +1,17 @@
+{
+  "layer": { "key": "branding", "name": "Branding", "template": "markdown", "colour": "#475467", "bg": "#eceff3", "icon": "sell",
+    "tabs": [["files", "Files"]], "pin": "9d02b7a", "custom": true },
+  "docs": [
+    { "key": "overview", "title": "Overview", "body": "Branding keeps Tool Share's brand guide and its logo files, so the brand has one home that a brand designer owns.\n\n**Start here:** [Charter](#doc/charter), then [Brand guide](#node/guide)." },
+    { "key": "charter", "title": "Charter", "path": "knowledge/charter.md", "body": "## Purpose\n\nOwn the app's brand: name, voice, mark and the rules for using them." },
+    { "key": "tab-files", "title": "Files", "group": "Editor tabs", "path": "knowledge/tabs/files.md", "body": "**Edits:** [Brand guide](#node/guide), [Logos](#node/logos)." }
+  ],
+  "information": [
+    { "key": "guide", "title": "Brand guide", "intent": "The app's name, voice and rules for using the mark.", "tab": "files", "select": { "path": "brand.md" },
+      "body": "A single document.", "shape": { "format": "# {App name}\n\n## Voice\n…\n\n## Mark\nClear space, minimum size, colours\n\n## Don'ts\n…" },
+      "sample": { "count": 1, "columns": ["File", "Updated"], "rows": [["brand.md", "today"]] } },
+    { "key": "logos", "title": "Logos", "intent": "The mark and wordmark files in each approved colourway.", "tab": "files", "select": { "path": "logos/*" },
+      "body": "SVG files named `{mark|wordmark}-{colourway}.svg`.", "shape": { "format": "{mark|wordmark}-{colourway}.svg" },
+      "sample": { "count": 4, "columns": ["File"], "rows": [["logos/mark-green.svg"], ["logos/mark-white.svg"], ["logos/wordmark-green.svg"], ["logos/wordmark-white.svg"]] } }
+  ]
+}

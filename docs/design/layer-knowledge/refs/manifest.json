@@ -1,0 +1,184 @@
+{
+  "stripe-docs": {
+    "url": "https://docs.stripe.com/payments/checkout",
+    "note": "Docs site: sectioned left nav, reading pane, on-this-page outline",
+    "accessed": "2026-10-02T02:11:57.788Z",
+    "status": 200,
+    "finalUrl": "https://docs.stripe.com/payments/checkout",
+    "title": "Build a payments page | Stripe Documentation",
+    "file": "stripe-docs.png",
+    "ok": true
+  },
+  "stripe-api-object": {
+    "url": "https://docs.stripe.com/api/customers/object",
+    "note": "API reference: an object's spec as an attribute list beside an example",
+    "accessed": "2026-10-02T02:12:17.103Z",
+    "status": 200,
+    "finalUrl": "https://docs.stripe.com/api/customers/object",
+    "title": "The Customer object | Stripe API Reference",
+    "file": "stripe-api-object.png",
+    "ok": true
+  },
+  "mintlify-docs": {
+    "url": "https://mintlify.com/docs",
+    "note": "Docs site: grouped sidebar sections, landing page cards",
+    "accessed": "2026-10-02T02:12:36.053Z",
+    "status": 200,
+    "finalUrl": "https://www.mintlify.com/docs",
+    "title": "Introduction - Mintlify",
+    "file": "mintlify-docs.png",
+    "ok": true
+  },
+  "docusaurus-docs": {
+    "url": "https://docusaurus.io/docs",
+    "note": "Docs site: collapsible sidebar categories",
+    "accessed": "2026-10-02T02:12:40.695Z",
+    "status": 200,
+    "finalUrl": "https://docusaurus.io/docs",
+    "title": "Introduction | Docusaurus",
+    "file": "docusaurus-docs.png",
+    "ok": true
+  },
+  "gitbook-docs": {
+    "url": "https://gitbook.com/docs",
+    "note": "Docs site: nested sidebar, page actions",
+    "accessed": "2026-10-02T02:12:43.741Z",
+    "status": 200,
+    "finalUrl": "https://gitbook.com/docs",
+    "title": "GitBook documentation | GitBook Documentation",
+    "file": "gitbook-docs.png",
+    "ok": true
+  },
+  "carbon-storybook": {
+    "url": "https://react.carbondesignsystem.com/",
+    "note": "Storybook: docs entries at the top of one sidebar, the component tree below",
+    "accessed": "2026-10-02T02:12:48.242Z",
+    "status": 200,
+    "finalUrl": "https://react.carbondesignsystem.com/?path=/docs/getting-started-welcome--welcome",
+    "title": "Getting Started / Welcome - Welcome ⋅ Storybook",
+    "file": "carbon-storybook.png",
+    "ok": true
+  },
+  "backstage-entity": {
+    "url": "https://demo.backstage.io/catalog/default/component/artist-web",
+    "note": "Catalog entity page: about, relations, links",
+    "accessed": "2026-10-02T02:13:08.286Z",
+    "status": 200,
+    "finalUrl": "https://demo.backstage.io/catalog/default/component/artist-web",
+    "title": "artist-web | Backstage Demo",
+    "file": "backstage-entity.failed.png",
+    "ok": false,
+    "problem": "not found"
+  },
+  "backstage-api": {
+    "url": "https://demo.backstage.io/catalog/default/api/spotify",
+    "note": "Catalog API entity: definition and who provides or consumes it",
+    "accessed": "2026-10-02T02:13:15.351Z",
+    "status": 200,
+    "finalUrl": "https://demo.backstage.io/catalog/default/api/spotify",
+    "title": "spotify | Backstage Demo",
+    "file": "backstage-api.failed.png",
+    "ok": false,
+    "problem": "not found"
+  },
+  "airbyte-schema": {
+    "url": "https://docs.airbyte.com/platform/using-airbyte/configuring-schema",
+    "note": "Selecting streams and fields to sync between two systems",
+    "accessed": "2026-10-02T02:13:22.389Z",
+    "status": 200,
+    "finalUrl": "https://docs.airbyte.com/platform/using-airbyte/configuring-schema",
+    "title": "Configuring schemas | Airbyte Docs",
+    "file": "airbyte-schema.png",
+    "ok": true
+  },
+  "datahub-contracts": {
+    "url": "https://docs.datahub.com/docs/managed-datahub/observe/data-contract",
+    "note": "Data contracts between producers and consumers",
+    "accessed": "2026-10-02T02:13:28.336Z",
+    "status": 200,
+    "finalUrl": "https://docs.datahub.com/docs/managed-datahub/observe/data-contract",
+    "title": "Data Contracts | DataHub",
+    "file": "datahub-contracts.png",
+    "ok": true
+  },
+  "datahub-data-products": {
+    "url": "https://docs.datahub.com/docs/dataproducts",
+    "note": "Grouping selected assets into a data product",
+    "accessed": "2026-10-02T02:13:34.064Z",
+    "status": 200,
+    "finalUrl": "https://docs.datahub.com/docs/dataproducts",
+    "title": "Data Products | DataHub",
+    "file": "datahub-data-products.png",
+    "ok": true
+  },
+  "unity-catalog-explorer": {
+    "url": "https://docs.databricks.com/aws/en/catalog-explorer/",
+    "note": "Catalog explorer: tree of catalogs, schemas and tables; a table page with schema and sample data",
+    "accessed": "2026-10-02T02:13:40.456Z",
+    "status": 200,
+    "finalUrl": "https://docs.databricks.com/aws/en/catalog-explorer/",
+    "title": "What is Catalog Explorer? | Databricks on AWS",
+    "file": "unity-catalog-explorer.png",
+    "ok": true
+  },
+  "dbt-docs": {
+    "url": "https://docs.getdbt.com/docs/explore/explore-projects",
+    "note": "dbt Explorer: model page with description, columns and lineage",
+    "accessed": "2026-10-02T02:13:48.809Z",
+    "status": 200,
+    "finalUrl": "https://docs.getdbt.com/docs/explore/explore-projects?version=2",
+    "title": "Discover data with Catalog | dbt Developer Hub",
+    "file": "dbt-docs.png",
+    "ok": true
+  },
+  "dbt-model-details": {
+    "url": "https://docs.getdbt.com/img/docs/collaborate/dbt-explorer/example-model-details.png?v=2",
+    "note": "dbt Catalog (product screenshot in its docs): resource tree sidebar, a model page with description, columns and lineage",
+    "accessed": "2026-10-02T02:14:52.398Z",
+    "status": 200,
+    "finalUrl": "https://docs.getdbt.com/img/docs/collaborate/dbt-explorer/example-model-details.png?v=2",
+    "title": "example-model-details.png (2488×1462)",
+    "file": "dbt-model-details.png",
+    "ok": true
+  },
+  "dbt-lineage": {
+    "url": "https://docs.getdbt.com/img/docs/collaborate/dbt-explorer/example-project-lineage-graph.png?v=2",
+    "note": "dbt Catalog (product screenshot): project lineage graph",
+    "accessed": "2026-10-02T02:14:54.761Z",
+    "status": 200,
+    "finalUrl": "https://docs.getdbt.com/img/docs/collaborate/dbt-explorer/example-project-lineage-graph.png?v=2",
+    "title": "example-project-lineage-graph.png (2326×1542)",
+    "file": "dbt-lineage.png",
+    "ok": true
+  },
+  "datahub-add-assets": {
+    "url": "https://raw.githubusercontent.com/datahub-project/static-assets/3ca67aad505de1157a5c5a14ef527dd2d88a1cd1/imgs/data_products/dataproducts-add-assets.png",
+    "note": "DataHub (product screenshot): Add Assets to a Data Product, selecting existing assets into a grouping",
+    "accessed": "2026-10-02T02:14:57.028Z",
+    "status": 200,
+    "finalUrl": "https://raw.githubusercontent.com/datahub-project/static-assets/3ca67aad505de1157a5c5a14ef527dd2d88a1cd1/imgs/data_products/dataproducts-add-assets.png",
+    "title": "dataproducts-add-assets.png (2434×1398)",
+    "file": "datahub-add-assets.png",
+    "ok": true
+  },
+  "datahub-product-profile": {
+    "url": "https://raw.githubusercontent.com/datahub-project/static-assets/3ca67aad505de1157a5c5a14ef527dd2d88a1cd1/imgs/data_products/dataproducts-marketplace-profile.png",
+    "note": "DataHub (product screenshot): a Data Product page with Output Ports, Assets and Lineage tabs",
+    "accessed": "2026-10-02T02:14:59.441Z",
+    "status": 200,
+    "finalUrl": "https://raw.githubusercontent.com/datahub-project/static-assets/3ca67aad505de1157a5c5a14ef527dd2d88a1cd1/imgs/data_products/dataproducts-marketplace-profile.png",
+    "title": "dataproducts-marketplace-profile.png (1424×634)",
+    "file": "datahub-product-profile.png",
+    "ok": true
+  },
+  "datahub-set-product": {
+    "url": "https://raw.githubusercontent.com/datahub-project/static-assets/3ca67aad505de1157a5c5a14ef527dd2d88a1cd1/imgs/data_products/dataproducts-set.png",
+    "note": "DataHub (product screenshot): an asset's sidebar names the Data Product it belongs to",
+    "accessed": "2026-10-02T02:15:01.772Z",
+    "status": 200,
+    "finalUrl": "https://raw.githubusercontent.com/datahub-project/static-assets/3ca67aad505de1157a5c5a14ef527dd2d88a1cd1/imgs/data_products/dataproducts-set.png",
+    "title": "dataproducts-set.png (1250×1262)",
+    "file": "datahub-set-product.png",
+    "ok": true
+  }
+}

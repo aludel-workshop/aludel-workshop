@@ -1,0 +1,490 @@
+{
+ "layer": {
+  "key": "vision",
+  "name": "Vision",
+  "template": "vision",
+  "colour": "#b93c0a",
+  "bg": "#ffeddc",
+  "icon": "flag",
+  "tabs": [
+   [
+    "brief",
+    "Brief"
+   ],
+   [
+    "map",
+    "Story map"
+   ],
+   [
+    "docs",
+    "Documents"
+   ]
+  ],
+  "pin": "58eb74f"
+ },
+ "docs": [
+  {
+   "key": "overview",
+   "title": "Overview",
+   "body": "Vision says what the product is for and who it serves, and breaks that into the story map other layers build from.\n\n**Start here**\n\n1. [Charter](#doc/charter).\n2. [Information](#info).\n3. [Brief method](#doc/brief-method) or [Story method](#doc/story-method)."
+  },
+  {
+   "key": "charter",
+   "title": "Charter",
+   "path": "knowledge/charter.md",
+   "body": "## Purpose\n\nHold the product's intent: the vision, the people it serves, and the stories that deliver it."
+  },
+  {
+   "key": "brief-method",
+   "title": "Brief method",
+   "group": "Methods",
+   "path": "knowledge/brief-method.md",
+   "body": "Write the vision board top-down: vision, target group, needs, product, business goals. Every claim cites its evidence or is marked as an assumption."
+  },
+  {
+   "key": "story-method",
+   "title": "Story method",
+   "group": "Methods",
+   "path": "knowledge/story-method.md",
+   "body": "Activities left to right as a narrative; steps under each; stories stacked by necessity. The top row is the walking skeleton."
+  },
+  {
+   "key": "tab-brief",
+   "title": "Brief",
+   "group": "Editor tabs",
+   "path": "knowledge/tabs/brief.md",
+   "body": "**Edits:** [Brief](#node/brief), [Personas](#node/personas)."
+  },
+  {
+   "key": "tab-map",
+   "title": "Story map",
+   "group": "Editor tabs",
+   "path": "knowledge/tabs/map.md",
+   "body": "**Edits:** [Story map](#node/story-map)."
+  },
+  {
+   "key": "tab-docs",
+   "title": "Documents",
+   "group": "Editor tabs",
+   "path": "knowledge/tabs/docs.md",
+   "body": "**Edits:** [Documents](#node/documents)."
+  }
+ ],
+ "information": [
+  {
+   "key": "brief",
+   "title": "Brief",
+   "intent": "The product's vision, target group, needs and goals, as claims with evidence.",
+   "tab": "brief",
+   "select": {
+    "kind": [
+     "vision_section",
+     "brief_claim"
+    ]
+   },
+   "body": "Sections of the vision board, each holding claims.",
+   "shape": {
+    "fields": [
+     [
+      "vision_section",
+      "record",
+      "section, text"
+     ],
+     [
+      "brief_claim",
+      "record",
+      "text, evidence, assumption"
+     ]
+    ]
+   },
+   "children": [
+    {
+     "key": "sections",
+     "title": "Sections",
+     "intent": "The vision board's sections: vision, target group, needs, product, goals.",
+     "tab": "brief",
+     "select": {
+      "kind": "vision_section"
+     },
+     "body": "",
+     "shape": {
+      "fields": [
+       [
+        "section",
+        "enum",
+        "vision, target, needs, product, goals"
+       ],
+       [
+        "text",
+        "markdown",
+        ""
+       ]
+      ]
+     },
+     "sample": {
+      "count": 5,
+      "columns": [
+       "Section",
+       "Claims"
+      ],
+      "rows": [
+       [
+        "Vision",
+        "1"
+       ],
+       [
+        "Target group",
+        "3"
+       ],
+       [
+        "Needs",
+        "4"
+       ],
+       [
+        "Product",
+        "2"
+       ],
+       [
+        "Goals",
+        "1"
+       ]
+      ]
+     }
+    },
+    {
+     "key": "claims",
+     "title": "Claims",
+     "intent": "Single statements in the brief, each with evidence or marked as an assumption.",
+     "tab": "brief",
+     "select": {
+      "kind": "brief_claim"
+     },
+     "body": "",
+     "shape": {
+      "fields": [
+       [
+        "text",
+        "string",
+        ""
+       ],
+       [
+        "evidence",
+        "ref[]",
+        ""
+       ],
+       [
+        "assumption",
+        "boolean",
+        ""
+       ]
+      ]
+     },
+     "sample": {
+      "count": 11,
+      "columns": [
+       "Claim",
+       "Section",
+       "Evidence"
+      ],
+      "rows": [
+       [
+        "Most tools are used under 13 minutes in their life",
+        "needs",
+        "assumption"
+       ],
+       [
+        "Neighbours trust each other more than strangers",
+        "target",
+        "2 interviews"
+       ],
+       [
+        "… 9 more",
+        "",
+        ""
+       ]
+      ]
+     }
+    }
+   ],
+   "sample": {
+    "count": 16,
+    "columns": [
+     "Part",
+     "Count"
+    ],
+    "rows": [
+     [
+      "Sections",
+      "5"
+     ],
+     [
+      "Claims",
+      "11"
+     ]
+    ]
+   }
+  },
+  {
+   "key": "personas",
+   "title": "Personas",
+   "intent": "The people the product is designed for: who they are, what they need, what gets in their way.",
+   "tab": "brief",
+   "select": {
+    "kind": "persona"
+   },
+   "body": "One record per persona. Flows and stories reference personas by id, so a persona is renamed, not replaced.",
+   "shape": {
+    "fields": [
+     [
+      "name",
+      "string",
+      ""
+     ],
+     [
+      "role",
+      "string",
+      "One line: their situation"
+     ],
+     [
+      "needs",
+      "string[]",
+      ""
+     ],
+     [
+      "frustrations",
+      "string[]",
+      ""
+     ]
+    ]
+   },
+   "sample": {
+    "count": 2,
+    "columns": [
+     "Persona",
+     "Role"
+    ],
+    "rows": [
+     [
+      "Borrower",
+      "Needs a tool once"
+     ],
+     [
+      "Lender",
+      "Owns tools that sit idle"
+     ]
+    ]
+   }
+  },
+  {
+   "key": "story-map",
+   "title": "Story map",
+   "intent": "Activities, steps and stories in the order people experience them.",
+   "tab": "map",
+   "select": {
+    "kind": [
+     "activity",
+     "step",
+     "story"
+    ]
+   },
+   "body": "Activities left to right; steps under each; stories stacked by necessity.",
+   "shape": {
+    "fields": [
+     [
+      "activity",
+      "record",
+      "Title, order"
+     ],
+     [
+      "step",
+      "record",
+      "Activity, title, order"
+     ],
+     [
+      "story",
+      "record",
+      "Step, title, release, acceptance"
+     ]
+    ]
+   },
+   "children": [
+    {
+     "key": "activities",
+     "title": "Activities",
+     "intent": "Big things people do, in narrative order.",
+     "tab": "map",
+     "select": {
+      "kind": "activity"
+     },
+     "body": "",
+     "shape": {
+      "fields": [
+       [
+        "title",
+        "string",
+        ""
+       ],
+       [
+        "order",
+        "number",
+        ""
+       ]
+      ]
+     },
+     "sample": {
+      "count": 4,
+      "columns": [
+       "Activity"
+      ],
+      "rows": [
+       [
+        "Find a tool"
+       ],
+       [
+        "Borrow it"
+       ],
+       [
+        "Return it"
+       ],
+       [
+        "Lend my tools"
+       ]
+      ]
+     }
+    },
+    {
+     "key": "steps",
+     "title": "Steps",
+     "intent": "Tasks under each activity.",
+     "tab": "map",
+     "select": {
+      "kind": "step"
+     },
+     "body": "",
+     "shape": {
+      "fields": [
+       [
+        "title",
+        "string",
+        ""
+       ],
+       [
+        "activity",
+        "ref",
+        ""
+       ]
+      ]
+     },
+     "sample": {
+      "count": 13,
+      "columns": [
+       "Step",
+       "Activity"
+      ],
+      "rows": [
+       [
+        "Search nearby",
+        "Find a tool"
+       ],
+       [
+        "Request dates",
+        "Borrow it"
+       ],
+       [
+        "… 11 more",
+        ""
+       ]
+      ]
+     }
+    },
+    {
+     "key": "stories",
+     "title": "Stories",
+     "intent": "Deliverable slices with acceptance criteria.",
+     "tab": "map",
+     "select": {
+      "kind": "story"
+     },
+     "body": "",
+     "shape": {
+      "fields": [
+       [
+        "title",
+        "string",
+        ""
+       ],
+       [
+        "release",
+        "string",
+        ""
+       ],
+       [
+        "acceptance",
+        "string[]",
+        ""
+       ]
+      ]
+     },
+     "sample": {
+      "count": 27,
+      "columns": [
+       "Story",
+       "Release"
+      ],
+      "rows": [
+       [
+        "See tools within 1 km",
+        "Skeleton"
+       ],
+       [
+        "Request a tool for given dates",
+        "Skeleton"
+       ],
+       [
+        "… 25 more",
+        ""
+       ]
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "key": "documents",
+   "title": "Documents",
+   "intent": "Specs and research notes behind the brief.",
+   "tab": "docs",
+   "select": {
+    "kind": [
+     "spec",
+     "research"
+    ]
+   },
+   "body": "Free-form documents.",
+   "shape": {
+    "free": true
+   },
+   "sample": {
+    "count": 3,
+    "columns": [
+     "Document",
+     "Kind"
+    ],
+    "rows": [
+     [
+      "Interview notes: 2 lenders",
+      "research"
+     ],
+     [
+      "Deposit rules",
+      "spec"
+     ],
+     [
+      "Competitor scan",
+      "research"
+     ]
+    ]
+   }
+  }
+ ]
+}
