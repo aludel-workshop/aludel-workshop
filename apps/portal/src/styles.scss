@@ -713,6 +713,8 @@ aludel-project-shell{
 .lay-lc-home{--lc:var(--lay-home);--lb:var(--lay-home-bg)}.lay-lc-product{--lc:var(--lay-product);--lb:var(--lay-product-bg)}.lay-lc-design{--lc:var(--lay-design);--lb:var(--lay-design-bg)}
 .lay-lc-pages{--lc:var(--lay-pages);--lb:var(--lay-pages-bg)}.lay-lc-data{--lc:var(--lay-data);--lb:var(--lay-data-bg)}.lay-lc-platform{--lc:var(--lay-platform);--lb:var(--lay-platform-bg)}.lay-lc-deploy{--lc:var(--lay-deploy);--lb:var(--lay-deploy-bg)}
 .lay-lc-work{--lc:var(--lay-work);--lb:var(--lay-work-bg)}.lay-lc-library{--lc:var(--lay-library);--lb:var(--lay-library-bg)}.lay-lc-settings{--lc:var(--lay-settings);--lb:var(--lay-settings-bg)}
+/* T03-CODE: a template view's own layer colour, whatever key it was installed under (the view sets --lay-here). */
+.lay-l-here{background:var(--lay-here-bg);color:var(--lay-here)}
 .lay-l-library{background:var(--lay-library-bg);color:var(--lay-library)}.lay-l-home{background:var(--lay-home-bg);color:var(--lay-home)}
 .lay-ref-library mat-icon{color:var(--lay-library)}
 /* Nav: a tile per layer (like Confluence space avatars). Active: the row takes the tint and the tile goes solid. */

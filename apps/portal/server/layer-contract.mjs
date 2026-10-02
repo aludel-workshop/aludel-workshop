@@ -44,10 +44,14 @@ if (templateConfig) {
 }
 // Converted built-ins use the accepted repository manifest as their declaration. Historical
 // compiled declarations remain only for keys whose template is not yet converted.
+// A converted layer keeps the legacy host projections its template doesn't define, held by the host until they move
+// (T03-CODE: Code's route observations, until LAYER-BINDINGS-01 step 4).
 const declarations = legacyDeclarations.map(layer => {
   const manifest = pinnedManifests.get(layer.key);
-  return manifest ? { key: manifest.key, name: manifest.name, outputs: manifest.outputs,
-    authority: manifest.authority, path: manifest.path, ownKinds: Boolean(manifest.api) } : layer;
+  if (!manifest) return layer;
+  const hostHeld = layer.outputs.filter(kind => own(projections, kind) && !manifest.outputs.includes(kind));
+  return { key: manifest.key, name: manifest.name, outputs: [...manifest.outputs, ...hostHeld], hostHeld,
+    authority: manifest.authority, path: manifest.path, ownKinds: Boolean(manifest.api) };
 });
 
 export function validateLayerDeclarations(input = declarations) {

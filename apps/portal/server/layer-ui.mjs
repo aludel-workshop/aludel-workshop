@@ -99,7 +99,16 @@ export const hostFeatures = Object.freeze({
   uploads: [['POST', /^\/assets$/]],
   // The Library's own records a layer's views may write through the generic record routes: shared documents and the links
   // that reference a source or finding from a record. The kinds are fixed here; a layer can only ask for the feature.
-  libraryRecords: []
+  libraryRecords: [],
+  // T03-CODE: a layer whose repository is a codebase. Reading its tracked source at the pin, settling with the repository
+  // (a build's newer commit, or GitHub's), drafting and recording releases, publishing one to GitHub, the CI results for a
+  // commit, and route observations (host data until LAYER-BINDINGS-01 step 4).
+  repositorySource: [['GET', /^\/code\/files$/], ['GET', /^\/code\/file$/]],
+  repositorySync: [['GET', /^\/layers\/[a-z][a-z0-9_]*\/sync$/], ['POST', /^\/layers\/[a-z][a-z0-9_]*\/sync$/]],
+  releaseDrafts: [['GET', /^\/code\/releases$/], ['POST', /^\/code\/releases$/]],
+  releasePublishing: [['POST', /^\/code\/releases-publish$/]],
+  ciResults: [['GET', /^\/code\/ci$/]],
+  routeObservations: [['GET', /^\/layers\/code\/route-observations$/], ['POST', /^\/layers\/code\/route-observations$/]]
 });
 export const hostRecordFeatures = Object.freeze({ libraryRecords: Object.freeze(['doc', 'evidence_link']) });
 // What the portal page may do for a layer's frame, checked on the server for every call it carries. Reads of the project
@@ -112,12 +121,14 @@ export function frameAllows({ key, projectId, method, pathname, features = [] })
   // LAYER-BINDINGS-01 R4: the roles of this layer's own facets (the server reads the layer from the frame), and proposing
   // a change to a replica or ceded entry, which becomes Work in the authority's layer.
   if (method === 'POST' && rest === '/roles/propose') return true;
-  if (method === 'GET') return rest === '/roles' || rest === '/knowledge' || rest === '/layer-instances' || rest === '/library' || rest === '/library/entry' || /^\/assets\/[^/]+$/.test(rest) || rest === `/layers/${key}/api` || rest === `/layers/${key}/files`;
+  // Reads, plus this layer's own Knowledge docs (T03-CODE: Code's Overview counts the app's docs and their checks).
+  if (method === 'GET' && (rest === '/roles' || rest === '/knowledge' || rest === '/layer-instances' || rest === '/library' || rest === '/library/entry' || /^\/assets\/[^/]+$/.test(rest)
+    || rest === `/layers/${key}/api` || rest === `/layers/${key}/files` || rest === `/layers/${key}/knowledge/docs`)) return true;
   if (/^\/records(?:\/[^/]+)?$/.test(rest)) return ['POST', 'PUT', 'DELETE'].includes(method);
   if (method === 'POST' && new RegExp(`^/layers/${key}/api/[A-Za-z][A-Za-z0-9]*$`).test(rest)) return true;
   if (method === 'POST' && rest === '/work') return true;
   // T03-G2: this layer's own output files, read and edited by the person using its views.
   if (method === 'PUT' && rest === `/layers/${key}/files`) return true;
-  for (const name of features) for (const [allowed, pattern] of hostFeatures[name] || []) if (method === allowed && pattern.test(rest)) return true;
+  for (const name of features) for (const [allowed, pattern] of hostFeatures[name] || []) if (method === allowed && pattern.test(rest) && (!/^\/layers\/[^/]+\/sync$/.test(rest) || rest === `/layers/${key}/sync`)) return true;
   return false;
 }

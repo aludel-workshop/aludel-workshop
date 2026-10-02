@@ -247,8 +247,7 @@ export function codeLinks({ db, know }) {
     }
   }
 
-  function index(projectId, root) {
-    const units = indexWorkspace(root);
+  function index(projectId, root, { units = indexWorkspace(root) } = {}) {
     const indexed = now();
     const lastCommit = new Map();
     for (const path of new Set(units.map(unit => unit.path))) {
@@ -288,6 +287,49 @@ export function codeLinks({ db, know }) {
       }
     }
     return { units: units.length, indexedAt: indexed };
+  }
+
+  // T03-CODE: with Code as a template, its units and generation links come from the Library at the layer's pin (units parsed
+  // by the host, links from .aludel/outputs/trace-links.json). These tables are the host's cache of them, so Reconcile,
+  // builtBy and the views work as before. Trailer and test-name links are still derived at the commit. `revisionOf(id)` is
+  // a linked entry's current revision (a record's or a file entry's), undefined when it is gone.
+  function indexFrom(projectId, root, { units, fileLinks, revisionOf }) {
+    const result = index(projectId, root, { units });
+    const kept = new Set();
+    const at = now();
+    for (const entry of fileLinks) {
+      const unit = unitId(projectId, entry.unit);
+      const current = revisionOf(entry.record.ref);
+      if (current === undefined || !db.prepare('SELECT 1 FROM code_units WHERE id = ?').get(unit)) continue;
+      kept.add(entry.id);
+      const state = entry.record.revision < current ? 'suspect' : 'current';
+      db.prepare(`INSERT INTO trace_links(id, project_id, record_id, record_revision, unit_id, kind, source, state, work_ref, derived, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'manifest', ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET record_revision = excluded.record_revision, state = excluded.state, unit_id = excluded.unit_id, derived = excluded.derived, updated_at = excluded.updated_at`)
+        .run(entry.id, projectId, entry.record.ref, entry.record.revision, unit, entry.kind, state, entry.workRef || null, entry.derived ? 1 : 0, at, at);
+      const record = state === 'suspect' && know.get(projectId, entry.record.ref);
+      if (record) ensureReconcile(projectId, record, entry.record.revision);
+    }
+    for (const row of db.prepare("SELECT id FROM trace_links WHERE project_id = ? AND source = 'manifest'").all(projectId)) if (!kept.has(row.id)) db.prepare('DELETE FROM trace_links WHERE id = ?').run(row.id);
+    return result;
+  }
+  // The file links the scaffold's manifest asks for, keeping each existing link's pin unless it was regenerated from the
+  // record itself (a derived page), which pins it at the current revision. Returns the full list for the file.
+  function manifestFileLinks(projectId, manifest, existing, revisionOf, kindOf, unitKeys) {
+    const byId = new Map(existing.map(entry => [entry.id, entry]));
+    const missing = [];
+    for (const entry of manifest) {
+      const key = `${entry.path}#${entry.symbol}`;
+      if (!unitKeys.has(key)) { missing.push(key); continue; }
+      for (const recordId of entry.recordIds) {
+        const current = revisionOf(recordId);
+        if (current === undefined) continue;
+        const id = `tl-${hash(`${recordId}:${unitId(projectId, key)}:generated:manifest`).slice(0, 12)}`;
+        const before = byId.get(id);
+        const revision = before && !(entry.derived && current > before.record.revision) ? before.record.revision : current;
+        byId.set(id, { id, record: { ref: recordId, kind: kindOf(recordId), revision }, unit: key, kind: 'generated', source: 'manifest', derived: Boolean(entry.derived), workRef: null });
+      }
+    }
+    return { links: [...byId.values()], missing };
   }
 
   // The scaffold's manifest: { path, symbol, recordIds, derived } for everything it generated.
@@ -348,7 +390,7 @@ export function codeLinks({ db, know }) {
       tests: code.filter(unit => unit.kind === 'test' && (unit.links.some(entry => entry.recordId === reconcile.recordId) || unit.calls.some(id => linked.some(other => other.id === id)))).map(unit => unit.symbol) };
   }
 
-  return { index, recordManifest, snapshot, builtBy, reconcileContext, link };
+  return { index, indexFrom, manifestFileLinks, closeResolved, recordManifest, snapshot, builtBy, reconcileContext, link, unitId };
 }
 
 export const workspaceIsIndexable = root => existsSync(root) && statSync(root).isDirectory() && sourceDirectories.some(directory => existsSync(join(root, directory)));

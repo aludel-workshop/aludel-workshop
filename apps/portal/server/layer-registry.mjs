@@ -61,7 +61,8 @@ export function seedBuiltInDefinitions(db,projectId,declarations,presentation) {
   const at=now();
   for(const layer of declarations){
     const pkg=ensureLayerPackage(db,projectId,layer.key);
-    if(pkg && (pkg.manifest.authority!==layer.authority || JSON.stringify(pkg.manifest.outputs)!==JSON.stringify(layer.outputs))) throw new Error('Layer package output authority differs from the migration contract.');
+    const packaged=layer.outputs.filter(kind=>!(layer.hostHeld||[]).includes(kind));
+    if(pkg && (pkg.manifest.authority!==layer.authority || JSON.stringify(pkg.manifest.outputs)!==JSON.stringify(packaged))) throw new Error('Layer package output authority differs from the migration contract.');
     const manifest=pkg?.manifest;
     const [fallbackCategory,fallbackIcon,fallbackDescription]=presentation[layer.key];
     const identity=pkg?{...parseCharter(pkg.charter),markdown:pkg.charter}:builtInIdentity[layer.key];

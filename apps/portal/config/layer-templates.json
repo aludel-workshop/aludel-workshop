@@ -24,12 +24,17 @@
     "design": {
       "branch": "design",
       "commit": "550f84662244c6c1445676be5c7f2dc193244082"
+    },
+    "code": {
+      "branch": "code",
+      "commit": "1b500d1e136d2048d80bcf985cbaaf1fd6eda436"
     }
   },
   "builtIn": {
     "product": "vision",
     "pages": "pages",
     "data": "data",
-    "design": "design"
+    "design": "design",
+    "platform": "code"
   }
 }

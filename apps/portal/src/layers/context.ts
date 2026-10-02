@@ -401,6 +401,10 @@ export class ProjectContext {
 
   // The Product layer lives at /vision (ROADMAP-01); callers keep naming it by its layer key.
   // Internal layer keys stay stable; URLs use the names people see (ROADMAP-01 Vision, PLATFORM-UX-01 Code).
+  // F1 (LAYER-BINDINGS-01, T03-CODE): a link inside the layer showing this view, whatever key it was installed under, so a
+  // template's views never name their own layer.
+  readonly hereKey = computed(() => { const segment = this.path().split('/').filter(Boolean)[2]; return this.layerInstances().find(layer => layer.path === `/${segment}`)?.key || null; });
+  here(...parts: string[]) { const layer = this.path().split('/').filter(Boolean)[2] || ''; return `/p/${encodeURIComponent(this.slug())}/${layer}${parts.length ? '/' + parts.map(encodeURIComponent).join('/') : ''}`; }
   link(...parts: string[]) { if (parts[0] === 'product') parts = ['vision', ...parts.slice(1)]; if (parts[0] === 'platform') parts = ['code', ...parts.slice(1)]; return `/p/${encodeURIComponent(this.slug())}${parts.length ? '/' + parts.map(encodeURIComponent).join('/') : ''}`; }
 
   async api<T>(path: string, method = 'GET', body?: unknown): Promise<T> {

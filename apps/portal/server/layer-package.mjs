@@ -53,6 +53,8 @@ export function initLayerPackages(db) {
   if (!columns.has('layer_instance_id')) db.exec('ALTER TABLE layer_package_bindings ADD COLUMN layer_instance_id TEXT');
   // LAYER-BASE-01: the template branch and commit an instance was forked from, for later template updates.
   for (const column of ['template', 'template_commit']) if (!columns.has(column)) db.exec(`ALTER TABLE layer_package_bindings ADD COLUMN ${column} TEXT`);
+  // T03-CODE: when a file layer's install seed ran, so it runs once per instance.
+  if (!columns.has('seeded_at')) db.exec('ALTER TABLE layer_package_bindings ADD COLUMN seeded_at TEXT');
   if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='layer_instances'").get()) return;
   db.exec(`UPDATE layer_package_bindings SET layer_instance_id = (
     SELECT instance_id FROM layer_instances WHERE layer_instances.project_id = layer_package_bindings.project_id
@@ -94,8 +96,10 @@ export function fileOutputs(manifest) {
         || !files.repository.every(glob => typeof glob === 'string' && repositoryGlob.test(glob) && !glob.split('/').includes('..')))
       // `units`: globs of source files the host parses into code units for the indexer (G-CODE host index library).
       || files.units !== undefined && (!files.repository || !Array.isArray(files.units) || !files.units.length || files.units.length > 20
-        || !files.units.every(glob => typeof glob === 'string' && repositoryGlob.test(glob) && !glob.split('/').includes('..')))) throw new Error('Invalid layer file outputs.');
-  return { paths: files.paths, kinds: files.kinds, indexer: files.indexer, repository: files.repository || [], units: files.units || [] };
+        || !files.units.every(glob => typeof glob === 'string' && repositoryGlob.test(glob) && !glob.split('/').includes('..')))
+      // `seeds`: host events the indexer's seed(event, context) answers with starting files (T03-CODE: Code's starter docs).
+      || files.seeds !== undefined && (!Array.isArray(files.seeds) || !files.seeds.every(event => event === 'install'))) throw new Error('Invalid layer file outputs.');
+  return { paths: files.paths, kinds: files.kinds, indexer: files.indexer, repository: files.repository || [], units: files.units || [], seeds: files.seeds || [] };
 }
 const globPattern = glob => new RegExp(`^${glob.replace(/\/$/, '/**').split('/').map(part => part === '**' ? '\u0000' : part.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*')).join('/')
   .replace(/\u0000\//g, '(?:.*/)?').replace(/\/\u0000/g, '(?:/.*)?').replace(/\u0000/g, '.*')}$`);
@@ -122,6 +126,9 @@ export function repositoryPaths(pkg) {
   const patterns = [...ownWritablePatterns.map(pattern => root + pattern), ...outside.map(glob => `${glob} (not ${root}, .env*, .github/workflows/)`)];
   return { root, own, writable, authority, patterns };
 }
+// Why a layer that lives in the project's repository isn't installed yet (an uncommitted change, say), for its views to show.
+const waiting = new Map();
+export const layerInstallWaiting = (projectId, key) => waiting.get(`${projectId}:${key}`) || null;
 // Commits are immutable, so a validated package at one is kept.
 const packages = new Map();
 // The editor tabs a layer's contents can be edited in: its own, plus the host adapter's (a Markdown layer's Files).
@@ -161,6 +168,8 @@ function readPackage(repo, commit, key) {
   validateRefers(manifest);
   // LAYER-KNOWLEDGE-01: the layer's information as a spec; each part's doc must be in the package.
   for (const node of flatten(validateInformation(manifest, { tabs: editorTabs(manifest) }))) if (node.doc) content(repo, commit, node.doc, root);
+  // T03-CODE: a template whose repository is the project's own (Code's is the app's codebase) installs into it under .aludel/.
+  if (manifest.install !== undefined && (manifest.install !== 'project-repository' || !fileOutputs(manifest)?.repository.length)) throw new Error('Invalid layer install target.');
   if (manifest.hostCalls !== undefined && (!Array.isArray(manifest.hostCalls) || manifest.hostCalls.length > 20 || !manifest.hostCalls.every(name => typeof name === 'string' && /^[a-z][A-Za-z0-9]{1,40}$/.test(name))))
     throw new Error('Invalid layer host calls.');
   const charter = content(repo, commit, manifest.knowledge.charter, root);
@@ -184,6 +193,14 @@ export function ensureLayerPackage(db, projectId, key, { template = null, name =
   if (!pin) return null;
   const existing = binding(db, projectId, key);
   if (existing) return packageAt(existing.repo, existing.commit, key);
+  // A layer that lives in the project's repository waits for that repository, and is installed into it (one commit on main).
+  if (JSON.parse(git(pin.repo, 'show', `${pin.commit}:layer.json`)).install === 'project-repository') {
+    let workspace = null;
+    try { workspace = db.prepare('SELECT workspace_path AS path FROM project_setup WHERE project_id = ?').get(projectId)?.path; } catch { /* no project setup here: no repository yet */ }
+    if (!workspace || !existsSync(join(workspace, '.git'))) return null;
+    try { const installed = installLayerPackageInto(db, projectId, key, workspace, { template: pin.template, name, path }); waiting.delete(`${projectId}:${key}`); return installed; }
+    catch (error) { if (error.status === 409) { waiting.set(`${projectId}:${key}`, error.message); return null; } throw error; }
+  }
   const id = instanceId(db, projectId, key);
   const target = projectRoot(projectId,id);
   if (existsSync(target)) {
@@ -270,6 +287,23 @@ export function installLayerPackageInto(db, projectId, key, repo, { template = n
       installed_at = excluded.installed_at, template = excluded.template, template_commit = excluded.template_commit`)
     .run(projectId, key, id, repo, commit, new Date().toISOString(), pin.template, pin.commit);
   return { ...pkg, installed: present === null };
+}
+// Built-in layers that live in the project's repository install once that repository exists (after the first build, say).
+export function ensureProjectRepositoryLayers(db, projectId) {
+  if (!enabled()) return [];
+  const config = catalog(), installed = [];
+  for (const [key, template] of Object.entries(config.builtIn)) {
+    const pin = config.templates[template];
+    let manifest;
+    try { manifest = JSON.parse(git(resolve(candidate, config.repo), 'show', `${pin.commit}:layer.json`)); } catch { continue; }
+    if (manifest.install !== 'project-repository' || !db.prepare('SELECT 1 FROM layer_instances WHERE project_id = ? AND layer_key = ?').get(projectId, key)) continue;
+    const pkg = ensureLayerPackage(db, projectId, key);
+    if (!pkg) continue;
+    db.prepare('UPDATE layer_definitions SET output_tabs_json = ?, package_commit = ? WHERE project_id = ? AND layer_key = ? AND built_in = 1 AND package_commit IS NULL')
+      .run(JSON.stringify(pkg.manifest.tabs), pkg.commit, projectId, key);
+    installed.push(key);
+  }
+  return installed;
 }
 // The host features an installed layer's views may use. Forks pinned before templates declared `hostCalls` keep what their
 // template's views already relied on, keyed by the template they were forked from, until a template update reaches them.

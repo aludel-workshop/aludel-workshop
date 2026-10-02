@@ -158,10 +158,19 @@ export function starterDocs(workspace, { project, stories, personas, objects, op
 const semver = /^(\d+)\.(\d+)\.(\d+)$/;
 const newer = (a, b) => { const x = semver.exec(a).slice(1).map(Number); const y = semver.exec(b).slice(1).map(Number); for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] > y[i]; return false; };
 function packageAt(workspace, commit) { if (!commit) return {}; const result = git(workspace, ['show', `${commit}:package.json`]); const pkg = result.status === 0 ? parse(result.stdout, {}) : {}; return { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) }; }
-export function codeReleases({ db }) {
+// What changed between two commits: package versions and new migration files. The first release has nothing to compare.
+export function releaseChanges(workspace, from, to = 'HEAD') {
+  const before = packageAt(workspace, from); const after = packageAt(workspace, to);
+  const changes = from ? [...new Set([...Object.keys(before), ...Object.keys(after)])].sort().filter(name => before[name] !== after[name]).map(name => ({ name, from: before[name] || null, to: after[name] || null })) : [];
+  const added = git(workspace, from ? ['diff', '--name-only', '--diff-filter=A', `${from}..${to}`] : ['ls-tree', '-r', '--name-only', to]);
+  const migrations = added.status === 0 ? added.stdout.split('\n').filter(path => /(^|\/)migrations\/[^/]+\.sql$/.test(path)) : [];
+  return { stack: after, changes, migrations };
+}
+// `releasesOf(projectId)`, newest first, replaces the table when the releases live in the Code layer's repository (T03-CODE).
+export function codeReleases({ db, releasesOf = null }) {
   const row = entry => entry && { id: entry.id, version: entry.version, commit: entry.commit_sha, notes: entry.notes, stories: parse(entry.stories_json, []), stack: parse(entry.stack_json, {}), changes: parse(entry.changes_json, []),
     migrations: parse(entry.migrations_json, []), createdBy: entry.created_by, createdAt: entry.created_at, publishedAt: entry.published_at, url: entry.url || null };
-  const list = projectId => db.prepare('SELECT * FROM code_releases WHERE project_id = ? ORDER BY created_at DESC').all(projectId).map(row);
+  const list = projectId => (releasesOf && releasesOf(projectId)) || db.prepare('SELECT * FROM code_releases WHERE project_id = ? ORDER BY created_at DESC').all(projectId).map(row);
   // What the next release would hold: commits since the last release, the stories their trailers name, stack and migration changes.
   // The first release has nothing to compare with: it ships what is built so far (code links), with no stack diff.
   function draft(projectId, workspace, stories, built = []) {
@@ -170,14 +179,12 @@ export function codeReleases({ db }) {
     if (!head) return null;
     const last = list(projectId)[0] || null;
     const range = last ? [`${last.commit}..HEAD`] : ['HEAD'];
-    const log = git(workspace, ['log', ...range, '--format=%h%x1f%s%x1f%(trailers:key=Aludel-Work,valueonly,separator=%x2C)%x1f%(trailers:key=Implements,valueonly,separator=%x2C)%x1e']);
+    // Commits that only touch Aludel's own files (.aludel/: the Code layer's links, releases and definition) aren't app changes.
+    const log = git(workspace, ['log', ...range, '--format=%h%x1f%s%x1f%(trailers:key=Aludel-Work,valueonly,separator=%x2C)%x1f%(trailers:key=Implements,valueonly,separator=%x2C)%x1e', '--', '.', ':(exclude).aludel']);
     const commits = log.status === 0 ? log.stdout.split('\x1e').map(item => item.trim()).filter(Boolean).map(item => { const [hash, subject, work, refs] = item.split('\x1f'); return { hash, subject, work: work.trim() || null, implements: refs.trim() || null }; }) : [];
     const refs = new Set(commits.flatMap(commit => (commit.implements || '').split(',').map(ref => ref.trim()).filter(Boolean)));
     const shipped = stories.filter(story => (last ? refs.has(story.ref) : refs.has(story.ref) || built.includes(story.id))).map(story => story.id);
-    const before = packageAt(workspace, last?.commit); const after = packageAt(workspace, 'HEAD');
-    const changes = last ? [...new Set([...Object.keys(before), ...Object.keys(after)])].sort().filter(name => before[name] !== after[name]).map(name => ({ name, from: before[name] || null, to: after[name] || null })) : [];
-    const added = git(workspace, last ? ['diff', '--name-only', '--diff-filter=A', `${last.commit}..HEAD`] : ['ls-files']);
-    const migrations = added.status === 0 ? added.stdout.split('\n').filter(path => /(^|\/)migrations\/[^/]+\.sql$/.test(path)) : [];
+    const { stack: after, changes, migrations } = releaseChanges(workspace, last?.commit || null);
     const base = last?.version || '0.0.0';
     const [major, minor, patch] = semver.exec(base).slice(1).map(Number);
     const suggested = !last ? '0.1.0' : shipped.length || migrations.length ? `${major}.${minor + 1}.0` : `${major}.${minor}.${patch + 1}`;

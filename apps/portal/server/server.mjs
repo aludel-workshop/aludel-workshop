@@ -46,7 +46,9 @@ import { readActionSource, readAttemptSource, checkPinnedActionEffect } from './
 import { decideFollowUp, hasElevated, initLayerScope, layerAccess, requireElevated, setLayerDefaultAssignee, setLayerElevated } from './layer-scope.mjs';
 import { applyOperation, kindOwners, layerApi, layerApiForKind, recordOperations } from './layer-api.mjs';
 import { frameAllows, frameLabel, hostRecordFeatures, layerUi } from './layer-ui.mjs';
-import { layerHostCalls } from './layer-package.mjs';
+import { ensureProjectRepositoryLayers, layerHostCalls, layerInstallWaiting } from './layer-package.mjs';
+import { codeRepository, initCodeRepository } from './code-repository.mjs';
+import { initLayerRemotes, layerRemotes } from './layer-remote.mjs';
 import { initLayerContract, layerDescriptors, layerInstances, updateLayerInstance, layerCatalog, layerOutputRead, layerMigrationInventory } from './layer-contract.mjs';
 import { answerDecision, createProposal, ensureB02Fixture, getDecision, getProposal, listDecisions, listDownstreamRecords, listProposals, reassessRecord, reviseProposal } from './product-records.mjs';
 import { openSecretStore } from './secret-store.mjs';
@@ -174,7 +176,38 @@ const markdown = markdownOutputs({ db, know, dataDirectory });
 for (const projectId of layerProjects()) for (const layer of projectLayerDefinitions(db, projectId)) try { views.status(db, projectId, layer.key); } catch { /* shown on the layer */ }
 const links = codeLinks({ db, know });
 const ops = platformOps({ db, backupRoot: join(dataDirectory, 'backups') });
-const codeRelease = codeReleases({ db });
+// T03-CODE: when Code is installed from its template, its repository is the project's own and its outputs live there.
+initCodeRepository(db); initLayerRemotes(db);
+const codeRepo = codeRepository({ db, know, links });
+const codeRelease = codeReleases({ db, releasesOf: projectId => codeRepo.releases(projectId) });
+// The Code repository stays in sync with the project's GitHub repository (the existing repository binding, not a second one).
+// Git talks to GitHub with a fresh installation token only; what goes wrong is shown on the layer, never thrown at the person.
+const tokenError = error => Object.assign(error, { code: error.status === 409 ? 'not-connected' : error.status === 401 ? 'expired' : error.status === 404 ? 'uninstalled' : 'unavailable' });
+const remotes = layerRemotes({ db,
+  tokenFor: async (projectId, remote) => { try { return await github.installationTokenForRepository(projectId, remote.name); } catch (error) { throw tokenError(error); } },
+  onAdvance: projectId => codeRepo.refresh(projectId),
+  onHeld: (projectId, key, change) => know.createWork(projectId, { layer: key, layerScoped: true, state: 'ready', title: `Review GitHub changes to what this layer runs (${change.to.slice(0, 7)})`,
+    suggestion: `GitHub's main changes ${change.paths.join(', ')}. Review the change and accept it in Code before the layer runs it.` }, 'Aludel'),
+  onDiverged: (projectId, key, change) => know.createWork(projectId, { layer: key, layerScoped: true, state: 'ready', title: `Bring this copy and GitHub back together (${change.pin.slice(0, 7)} and ${change.remote.slice(0, 7)})`,
+    suggestion: 'Both this copy and GitHub changed main. Rebase or merge them in a run, then push.' }, 'Aludel') });
+function codeRemote(projectId) {
+  const code = codeRepo.layer(projectId);
+  const repo = db.prepare('SELECT owner, name, clone_url, html_url, status FROM repository_bindings WHERE project_id = ?').get(projectId);
+  if (!code || repo?.status !== 'ready') return null;
+  if (!remotes.status(projectId, code.key)) remotes.connect(projectId, code.key, { owner: repo.owner, name: repo.name, cloneUrl: repo.clone_url, htmlUrl: repo.html_url, source: 'project-repository' });
+  return code;
+}
+// Settles the Code layer with its repository: a newer local main first, then GitHub. Returns the sync state to show.
+async function syncCode(projectId) {
+  const local = codeRepo.settleLocal(projectId);
+  const code = codeRemote(projectId);
+  const remote = code ? await remotes.sync(projectId, code.key) : null;
+  return { local, remote };
+}
+// Existing projects: Code's generation links and releases move into its repository once (idempotent).
+for (const projectId of layerProjects()) try { if (codeRepo.layer(projectId)) { codeRepo.adopt(projectId); codeRepo.seed(projectId, pool.outputEntries); } } catch (error) { console.error(`Could not adopt Code's records for ${projectId}: ${error.message}`); }
+// Closing a Reconcile item relinks the record's generation links in Code's repository too.
+know.onWorkDone(({ projectId, item }) => { const recordId = item.type === 'reconcile' && item.context?.reconcile?.recordId; if (recordId) try { codeRepo.relink(projectId, recordId); } catch (error) { console.error(`Relink in Code's repository failed: ${error.message}`); } });
 const storyRefs = projectId => know.list(projectId, 'story').map(story => ({ ...story, ref: `S${story.number}` }));
 const symphonyWorkspaceRoot = resolve(process.env.MACHINE_SYMPHONY_WORKSPACE_ROOT || join(dataDirectory, 'symphony-workspaces'));
 const candidates = codeCandidates({ db, candidateRoot: join(dataDirectory, 'code-candidates'), externalRoot: symphonyWorkspaceRoot });
@@ -352,6 +385,15 @@ async function generateSkeleton(user, projectId) {
   writeBinaries(setup.workspacePath, binaries);
   copyMedia(setup.workspacePath, media);
   const result = commitWorkspace({ repository: setup.workspacePath, profile: projectGitProfile, message: `feat: generate ${setup.project.name} skeleton from ${setup.stack.preset}`, ...commitIdentity(user) });
+  // LAY-07D: read the code and attach the manifest, so template-built records have code links from the start.
+  // T03-CODE: with Code from its template, this repository is Code's. It is installed once, its pin follows the build, and
+  // the links go into its file, all before the push so GitHub gets one main.
+  let manifestResult = { missing: [] };
+  try {
+    ensureProjectRepositoryLayers(db, projectId);
+    if (codeRepo.layer(projectId)) { codeRepo.settleLocal(projectId); manifestResult = codeRepo.recordManifest(projectId, manifest, result.commit, user?.name || 'Aludel') || manifestResult; codeRepo.seed(projectId, pool.outputEntries); }
+    else { links.index(projectId, setup.workspacePath); manifestResult = links.recordManifest(projectId, manifest, result.commit); }
+  } catch (error) { console.error(`Code index failed for ${projectId}: ${error.message}`); }
   const binding = github.status(user.id, projectId, null).repository;
   let pushed = false; let pushError = null;
   if (binding?.status === 'ready') {
@@ -363,10 +405,6 @@ async function generateSkeleton(user, projectId) {
   }
   flows.markStep(user, projectId, 'build');
   know.recordBuild(projectId, result.commit, { auth: Boolean(setup.stack.options?.auth) });
-  // LAY-07D: read the code and attach the manifest, so template-built records have code links from the start.
-  let manifestResult = { missing: [] };
-  try { links.index(projectId, setup.workspacePath); manifestResult = links.recordManifest(projectId, manifest, result.commit); }
-  catch (error) { console.error(`Code index failed for ${projectId}: ${error.message}`); }
   // LAY-07B: every preview build is a release; the preview database is backed up before the app restarts.
   const backup = await ops.backup(projectId, setup.workspacePath, 'before release').catch(() => null);
   const built = links.builtBy(projectId);
@@ -839,6 +877,17 @@ async function api(request, response, url) {
     if (request.method === 'POST' && action === 'propose') return json(response, 201, knowledgeSites.propose(projectId, user.id, await readJson(request)), noStore);
     return json(response, 405, { error: 'Method not allowed.' });
   }
+  // T03-CODE: a layer whose repository has a remote (Code and the project's GitHub repository): its sync state, and Sync.
+  const syncRoute = /^\/api\/projects\/([^/]+)\/layers\/([^/]+)\/sync$/.exec(url.pathname);
+  if (syncRoute) {
+    const [projectId, layerKey] = syncRoute.slice(1).map(decodeURIComponent), noStore = { 'cache-control': 'no-store' };
+    if (!user || !isMember(db, user.id, projectId)) return json(response, 404, { error: 'Project not found.' });
+    const code = codeRepo.layer(projectId);
+    if (!code || code.key !== layerKey) return json(response, 404, { error: 'This layer has no repository to sync.' });
+    if (request.method === 'GET') { codeRemote(projectId); return json(response, 200, { commit: code.commit, remote: remotes.status(projectId, layerKey), waiting: layerInstallWaiting(projectId, layerKey) }, noStore); }
+    if (request.method === 'POST') { const result = await syncCode(projectId); return json(response, 200, { ...result, commit: codeRepo.layer(projectId).commit }, noStore); }
+    return json(response, 405, { error: 'Method not allowed.' });
+  }
   const docsRoute = /^\/api\/projects\/([^/]+)\/layers\/([^/]+)\/knowledge\/(docs|doc|history|information)$/.exec(url.pathname);
   if (docsRoute) {
     const [projectId, layerKey, part] = docsRoute.slice(1).map(decodeURIComponent), noStore = { 'cache-control': 'no-store' };
@@ -849,6 +898,8 @@ async function api(request, response, url) {
     if (request.method === 'PUT' && part === 'doc') {
       const input = await readJson(request), saved = docs.save(projectId, user.id, layerKey, input);
       if (saved.changed && /charter/.test(input.path || '')) stageLayerDiscovery(db, know, projectId);
+      // T03-CODE: a save to a layer whose repository has a remote is pushed (best effort; the sync state shows any problem).
+      if (saved.changed && codeRemote(projectId)?.key === layerKey) void remotes.sync(projectId, layerKey).catch(error => console.error(`Sync after a Knowledge save failed: ${error.message}`));
       return json(response, 200, saved, noStore);
     }
     if (request.method === 'PUT' && part === 'information') return json(response, 200, docs.saveInformation(projectId, user.id, layerKey, await readJson(request)), noStore);
@@ -1179,7 +1230,12 @@ async function api(request, response, url) {
           targets: changed.map(source => ({ id: source.id, label: `${source.kind} revision ${source.revision} → ${source.current}` })) }, user.name));
       }
       if (item === 'releases' && method === 'GET') return json(response, 200, { releases: codeRelease.list(projectId), draft: codeRelease.draft(projectId, workspace, storyRefs(projectId), [...links.builtBy(projectId).keys()]) });
-      if (item === 'releases' && method === 'POST') return json(response, 201, codeRelease.record(projectId, workspace, storyRefs(projectId), await readJson(request), user.name, [...links.builtBy(projectId).keys()]));
+      if (item === 'releases' && method === 'POST') {
+        const input = await readJson(request);
+        // T03-CODE: a release is recorded in Code's repository when Code is installed from its template.
+        if (codeRepo.layer(projectId)) return json(response, 201, codeRepo.recordRelease(projectId, codeRelease.draft(projectId, workspace, storyRefs(projectId), [...links.builtBy(projectId).keys()]), input, user.name));
+        return json(response, 201, codeRelease.record(projectId, workspace, storyRefs(projectId), input, user.name, [...links.builtBy(projectId).keys()]));
+      }
       // Round 3 (owner-authorized): publish a recorded release to the project's own GitHub repository as a tag and a GitHub Release.
       // The repository's release workflow then builds the image into GitHub Packages.
       if (item === 'releases-publish' && method === 'POST') {
@@ -1191,7 +1247,7 @@ async function api(request, response, url) {
         const titles = new Map(storyRefs(projectId).map(story => [story.id, `${story.ref} ${story.title}`]));
         const body = [release.notes, release.stories.length ? `Ships:\n${release.stories.map(id => `- ${titles.get(id) || id}`).join('\n')}` : '', release.changes.length ? `Stack changes:\n${release.changes.map(change => `- ${change.name} ${change.from || 'added'} → ${change.to || 'removed'}`).join('\n')}` : ''].filter(Boolean).join('\n\n');
         const published = await github.createRelease(projectId, { tag: `v${release.version}`, sha, name: `v${release.version}`, body });
-        return json(response, 200, codeRelease.markPublished(projectId, release.version, published.url));
+        return json(response, 200, codeRepo.layer(projectId) ? codeRepo.markPublished(projectId, release.version, published.url) : codeRelease.markPublished(projectId, release.version, published.url));
       }
       if (item === 'ci' && method === 'GET') return json(response, 200, await github.ciResults(projectId, codeRelease.fullSha(workspace, url.searchParams.get('sha') || 'HEAD')));
     }
@@ -1199,6 +1255,8 @@ async function api(request, response, url) {
     if (section === 'code' && item === 'index' && method === 'POST') {
       const workspace = flows.projectSetup(user, projectId).workspacePath;
       if (!workspaceIsIndexable(workspace)) return json(response, 409, { error: 'Build the app first; there is no code to read yet.' });
+      // T03-CODE: the code is read at Code's pin, which follows the repository (and GitHub, when connected).
+      if (codeRepo.layer(projectId)) { await syncCode(projectId); return json(response, 200, codeRepo.refresh(projectId)); }
       return json(response, 200, links.index(projectId, workspace));
     }
     if (section === 'reconcile' && item && method === 'GET') {
@@ -1264,6 +1322,9 @@ async function api(request, response, url) {
       // People stage suggestions; reconcile and routine contexts are only ever written by the server.
       const input = await readJson(request);
       delete input.layerScoped;
+      // T03-CODE: Work a layer's own view creates, with no action and no layer named, is that layer's (views never name it).
+      const frame = request.headers['x-aludel-layer-frame'];
+      if (frame !== undefined && !input.action && !input.layer) input.layer = String(frame);
       if (input.action) {
         const selected = know.view(user, projectId).layerActions.find(action => action.id === input.action);
         if (!selected || input.layer && input.layer !== selected.layer || input.type && input.type !== selected.type) throw Object.assign(new Error('Choose an installed layer action.'), { status: 400 });

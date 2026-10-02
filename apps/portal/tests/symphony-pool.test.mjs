@@ -85,7 +85,8 @@ test('managed pool switches profiles and admits 2 + 1 slots before a queued 3-sl
     try {
       const origin = `http://127.0.0.1:${port}`;
       let ready = false;
-      for (let index = 0; index < 160 && !ready; index++) {
+      // A fresh portal starts in about 1.5 s alone, but well past 8 s while the whole suite runs in parallel (T03-CODE run 1).
+      for (const deadline = Date.now() + 30_000; !ready && Date.now() < deadline;) {
         try { ready = (await fetch(origin + '/api/session')).ok; } catch { await new Promise(resolve => setTimeout(resolve, 50)); }
       }
       assert.ok(ready, 'disposable portal started');

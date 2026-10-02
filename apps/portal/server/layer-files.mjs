@@ -172,13 +172,16 @@ export function commitOutputFiles(db, { projectId, key, files, expectedCommit, a
   } finally { try { execFileSync('rm', ['-f', index]); } catch { /* none */ } }
   try { indexAt(db, projectId, key, repo, next); } catch (error) { fail(`The edited file does not index: ${error.message}`, error.status === 500 ? 400 : error.status); }
   const own = !db.isTransaction;
+  // Whether the checkout can follow: decided before main moves (afterwards it always looks changed).
+  const clean = !git(repo, ['status', '--porcelain']).trim();
   if (own) db.exec('BEGIN IMMEDIATE');
   try {
     git(repo, ['update-ref', 'refs/heads/main', next, main]);
     db.prepare('UPDATE layer_package_bindings SET accepted_commit = ? WHERE project_id = ? AND layer_key = ?').run(next, projectId, key);
     const entries = syncFileEntries(db, projectId, key, { author: author || null, rationale: rationale || message || null, workItemId });
     if (own) db.exec('COMMIT');
-    try { if (!git(repo, ['status', '--porcelain']).trim()) git(repo, ['reset', '--quiet', '--hard', 'main']); } catch { /* the pin is authoritative */ }
+    // The checkout follows only a final write: inside a caller's transaction, main may still be rolled back.
+    try { if (own && clean && git(repo, ['symbolic-ref', '--quiet', 'HEAD']).trim() === 'refs/heads/main') git(repo, ['reset', '--quiet', '--hard', 'main']); } catch { /* the pin is authoritative */ }
     return { commit: next, entries };
   } catch (error) {
     if (own) db.exec('ROLLBACK');
@@ -311,4 +314,45 @@ export function fileEntryHistory(db, projectId, id) {
   const columns = `SELECT revision, COALESCE(author, 'Aludel') AS author, COALESCE(rationale, 'Edited') AS rationale, work_item_id AS workItemId, created_at AS createdAt FROM layer_file_entries`;
   return projectId ? db.prepare(`${columns} WHERE project_id = ? AND entry_id = ? AND content_hash IS NOT NULL ORDER BY revision DESC`).all(projectId, id)
     : db.prepare(`${columns} WHERE entry_id = ? AND content_hash IS NOT NULL ORDER BY revision DESC`).all(id);
+}
+
+// T03-CODE: a file layer's install seed. Its reviewed indexer's seed('install', context) returns starting files; the host
+// writes each one that is among the layer's declared docs (knowledge.docs) and doesn't exist yet. The map and the sources
+// sidecar may be extended, since the layer is given their current text. One commit as Aludel; it runs once per instance.
+export function seedRepositoryDocs(db, { projectId, key, context = {} }) {
+  const bound = binding(db, projectId, key) || fail('This layer has no installed repository.', 409);
+  if (db.prepare('SELECT seeded_at FROM layer_package_bindings WHERE project_id = ? AND layer_key = ?').get(projectId, key)?.seeded_at) return { written: [] };
+  const pkg = packageAt(bound.repo, bound.commit, key);
+  const declared = fileOutputs(pkg.manifest);
+  const docs = pkg.manifest.knowledge?.docs;
+  const mark = () => db.prepare('UPDATE layer_package_bindings SET seeded_at = ? WHERE project_id = ? AND layer_key = ?').run(now(), projectId, key);
+  if (!declared?.seeds.includes('install') || !docs) { mark(); return { written: [] }; }
+  const source = read(bound.repo, bound.commit, declared.indexer) ?? fail('The layer indexer is missing.', 500);
+  if (!sourceReviewed(db, projectId, key, declared.indexer, createHash('sha256').update(source).digest('hex'))) fail(`The ${key} indexer at this commit has not passed review.`, 409);
+  const tree = git(bound.repo, ['ls-tree', '-r', '--name-only', bound.commit]).split('\n').filter(Boolean).filter(path => !(pkg.root && path.startsWith(pkg.root)));
+  const show = path => { try { return git(bound.repo, ['show', `${bound.commit}:${path}`]); } catch { return null; } };
+  const extendable = [docs.map, docs.sources].filter(Boolean);
+  const existing = Object.fromEntries(extendable.map(path => [path, show(path)]));
+  const result = runPure(source, 'seed', ['install', { ...context, tree, existing }]);
+  const files = result?.files && typeof result.files === 'object' ? result.files : {};
+  const inDocs = path => docs.paths.some(entry => entry.endsWith('/') ? path.startsWith(entry) : path === entry) || extendable.includes(path);
+  const allowed = Object.entries(files).filter(([path, content]) => typeof content === 'string' && Buffer.byteLength(content) <= maxFileBytes && /^[A-Za-z0-9_][A-Za-z0-9_./-]*$/.test(path)
+    && !path.split('/').some(part => part === '..' || /^\.env/.test(part)) && !(pkg.root && path.startsWith(pkg.root)) && inDocs(path) && (extendable.includes(path) || !tree.includes(path)));
+  if (!allowed.length) { mark(); return { written: [] }; }
+  refuseDirtySharedCheckout(bound.repo, pkg.root);
+  const clean = !git(bound.repo, ['status', '--porcelain']).trim();
+  const index = `${bound.repo}/.git/aludel-index-${process.pid}-${Date.now()}`;
+  const env = { ...process.env, GIT_INDEX_FILE: index, GIT_AUTHOR_NAME: 'Aludel', GIT_AUTHOR_EMAIL: 'aludel@aludel.invalid', GIT_COMMITTER_NAME: 'Aludel', GIT_COMMITTER_EMAIL: 'aludel@aludel.invalid' };
+  let next;
+  try {
+    git(bound.repo, ['read-tree', bound.commit], { env });
+    for (const [path, content] of allowed) git(bound.repo, ['update-index', '--add', '--cacheinfo', `100644,${git(bound.repo, ['hash-object', '-w', '--stdin'], { input: content }).trim()},${path}`], { env });
+    next = git(bound.repo, ['commit-tree', git(bound.repo, ['write-tree'], { env }).trim(), '-p', bound.commit, '-m', `Starter docs for ${pkg.manifest.name}`], { env }).trim();
+  } finally { try { execFileSync('rm', ['-f', index]); } catch { /* none */ } }
+  if (git(bound.repo, ['rev-parse', 'refs/heads/main']).trim() !== bound.commit) fail('The layer repository\'s main branch is not at its pin; reconcile it first.', 409);
+  git(bound.repo, ['update-ref', 'refs/heads/main', next, bound.commit]);
+  db.prepare('UPDATE layer_package_bindings SET accepted_commit = ?, seeded_at = ? WHERE project_id = ? AND layer_key = ?').run(next, now(), projectId, key);
+  try { if (clean && git(bound.repo, ['symbolic-ref', '--quiet', 'HEAD']).trim() === 'refs/heads/main') git(bound.repo, ['reset', '--quiet', '--hard', 'main']); } catch { /* the pin is authoritative */ }
+  syncFileEntries(db, projectId, key, { author: 'Aludel', rationale: 'Starter docs' });
+  return { written: allowed.map(([path]) => path), commit: next };
 }

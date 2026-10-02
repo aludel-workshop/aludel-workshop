@@ -20,5 +20,8 @@
   "server/design-api.mjs": [
     "29389220f727471f9aa2431b7fb2f17f77eda67696233f41a6ca57b76ec94d7c",
     "2360d3a6176f377c859cfc96636c23ecccc2335a978b48e736fbf56a2671b5b4"
+  ],
+  "server/code-index.mjs": [
+    "d408e737e54133901592915346092fba327bf6947d04c49dd2ff08881dde28e3"
   ]
 }
