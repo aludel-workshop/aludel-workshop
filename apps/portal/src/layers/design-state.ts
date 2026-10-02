@@ -1,4 +1,4 @@
-import { Directive, ElementRef, Injectable, computed, effect, inject, input, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 import { Tokens, bannerSvg, markSvg, roleColor, tokenVariables } from '../design-tokens';
 import { ProjectContext } from './context';
@@ -55,19 +55,5 @@ export function strip(tokens: Tokens) {
   return rest as unknown as Tokens;
 }
 
-// Applies a token set's CSS variables to its host, so Angular Material components inside render in the project's theme.
-@Directive({ selector: '[aludelTheme]', standalone: true })
-export class ThemeScopeDirective {
-  readonly aludelTheme = input<Record<string, string>>({});
-  private readonly element = inject(ElementRef<HTMLElement>);
-  private applied: string[] = [];
-  constructor() {
-    effect(() => {
-      const style = this.element.nativeElement.style;
-      const vars = this.aludelTheme();
-      for (const name of this.applied) if (!(name in vars)) style.removeProperty(name);
-      for (const [name, value] of Object.entries(vars)) style.setProperty(name, value);
-      this.applied = Object.keys(vars);
-    });
-  }
-}
+// The theme scope moved to the app-kit host SDK (T03-DESIGN); this path still exports it for layers pinned before the move.
+export { ThemeScopeDirective } from '../app-kit/theme-scope';

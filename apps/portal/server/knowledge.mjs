@@ -1,3 +1,4 @@
+import { pagesInstanceId } from './layer-output-scope.mjs';
 // Project knowledge by layer (DEC-036/037). Record kinds and fields follow
 // docs/design/portal-layers/knowledge-structures.md. One table with a kind whitelist and an explicit
 // validator per kind: typed at the domain layer, not an open-ended entity store. New kinds need a
@@ -9,6 +10,12 @@ import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { requireMember } from './accounts.mjs';
+import { actionGrant, recordNewWorkAction } from './lat08-migration.mjs';
+import { hasElevated, layerDefaultAssignee, layerWorkScope } from './layer-scope.mjs';
+import { kindOwners, layerApi, layerApiForKind, normalizeRecord, seedLayer } from './layer-api.mjs';
+import { currentFileEntries, fileEntry, fileEntryExists, fileEntryHistory, fileLayerFor, writeFileEntries } from './layer-files.mjs';
+import { compiledLocalActions } from './lat07-actions.mjs';
+import { actionForProject, actionsForDefinition, projectLayerDefinition, projectLayerDefinitions } from './layer-registry.mjs';
 import { cleanBrandAsset, cleanComponent, cleanTokens, componentStatus, ensureDesign as seedDesign, syncTokensFromLook } from './design.mjs';
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
@@ -151,6 +158,10 @@ export function initKnowledge(db) {
       record_id TEXT NOT NULL, revision INTEGER NOT NULL, data_json TEXT NOT NULL, author TEXT NOT NULL,
       rationale TEXT, work_item_id TEXT, created_at TEXT NOT NULL, PRIMARY KEY(record_id, revision)
     );
+    CREATE TABLE IF NOT EXISTS knowledge_deletions (
+      record_id TEXT PRIMARY KEY, project_id TEXT NOT NULL, kind TEXT NOT NULL, parent_id TEXT,
+      position REAL NOT NULL, last_revision INTEGER NOT NULL, data_json TEXT NOT NULL, deleted_at TEXT NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS layer_work_items (
       id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id), number INTEGER NOT NULL,
       layer TEXT NOT NULL, type TEXT NOT NULL, title TEXT NOT NULL, state TEXT NOT NULL,
@@ -175,6 +186,14 @@ export function initKnowledge(db) {
   // ROADMAP-01: the plan project an item belongs to (not project_id, which is the Aludel project that owns the item),
   // and the project checkpoint it counts towards.
   for (const column of ['plan_project_id', 'checkpoint']) if (!workColumns.has(column)) db.exec(`ALTER TABLE layer_work_items ADD COLUMN ${column} TEXT`);
+  // DEC-057: 'layer' marks an item scoped to its layer rather than an action; it is never back-filled with one.
+  if (!workColumns.has('work_scope')) db.exec('ALTER TABLE layer_work_items ADD COLUMN work_scope TEXT');
+  // DEC-056 bridge: current Pages records, revisions and tombstones carry instance identity.
+  for (const table of ['knowledge_records', 'knowledge_revisions', 'knowledge_deletions']) {
+    const columns = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(column => column.name));
+    if (!columns.has('layer_instance_id')) db.exec(`ALTER TABLE ${table} ADD COLUMN layer_instance_id TEXT`);
+  }
+  if (!workColumns.has('layer_instance_id')) db.exec('ALTER TABLE layer_work_items ADD COLUMN layer_instance_id TEXT');
   // Archived work leaves normal planning views without losing its task, runs, review or activity trail.
   for (const column of ['archived_at', 'archived_by']) if (!workColumns.has(column)) db.exec(`ALTER TABLE layer_work_items ADD COLUMN ${column} TEXT`);
 }
@@ -396,11 +415,18 @@ const validators = {
   project_instructions: data => ({ body: text(data.body, 8000, 'Project instructions') }),
   // Work › Routines (LAY-04C): a definition only; runs are recorded in routine_runs, not as revisions.
   routine: data => {
-    if (!layers.includes(data.layer)) fail('Unknown layer.');
+    if (!layers.includes(data.layer) && !/^[a-z][a-z0-9_]{2,31}$/.test(data.layer)) fail('Unknown layer.');
     if (!workTypes.includes(data.type)) fail('Unknown work type.');
     if (!cadences.includes(data.cadence)) fail(`Choose how often: ${cadences.join(', ')}.`);
+    const executor = data.executor || 'utility', trigger = data.trigger || 'schedule';
+    if (!['utility', 'agent'].includes(executor)) fail('Choose a utility or agent executor.');
+    if (!['manual', 'schedule', 'output-change'].includes(trigger)) fail('Choose a supported trigger.');
     return { key: data.key ? text(data.key, 40, 'Key') : null, title: text(data.title, 120, 'Routine', true), layer: data.layer, type: data.type, cadence: data.cadence,
-      documents: lines(data.documents, 300, 'Document'), enabled: data.enabled !== false };
+      documents: lines(data.documents, 300, 'Document'), enabled: data.enabled !== false, executor, trigger,
+      actionKey: data.actionKey ? text(data.actionKey, 32, 'Routine action') : null,
+      instructionDoc: data.instructionDoc ? text(data.instructionDoc, 80, 'Instruction document') : null,
+      allowedReads: lines(data.allowedReads, 80, 'Allowed read').slice(0, 20), capabilities: lines(data.capabilities, 80, 'Capability').slice(0, 20),
+      outputKinds: lines(data.outputKinds, 80, 'Allowed output').slice(0, 20) };
   }
 };
 export const cadences = ['weekly', 'monthly', 'before-release'];
@@ -408,7 +434,8 @@ const cadenceDays = { weekly: 7, monthly: 30 };
 // Types whose output is a change to their target records, so closing them checks for a revision made from the item.
 // Implement, reconcile, review and audit produce code, links or findings; LAY-05 verifies those.
 const verifiedTypes = ['define', 'spec', 'plan', 'design', 'research', 'configure'];
-const kinds = Object.keys(validators);
+export const knowledgeKinds = Object.freeze(Object.keys(validators));
+const kinds = knowledgeKinds;
 const prefixes = { vision_section: 'vis', persona: 'per', phase: 'pha', activity: 'act', step: 'stp', story: 'sto', spec: 'spc', research: 'res', doc: 'doc', page: 'pag', flow: 'flw', page_map: 'pmp',
   data_object: 'obj', data_operation: 'opr', access_rule: 'acc', agent_profile: 'agt', project_instructions: 'ins', routine: 'rtn', role: 'rol', work_action: 'wac',
   brief_claim: 'clm', source: 'src', finding: 'fnd', insight: 'isg', evidence_link: 'evl', project: 'prj', design_tokens: 'tok', component: 'cmp', brand_asset: 'bra' };
@@ -430,7 +457,7 @@ const references = {
   flow: clean => [...(clean.activity ? [[clean.activity, 'activity']] : []), ...(clean.persona ? [[clean.persona, 'persona']] : []),
     ...clean.steps.flatMap(step => [...(step.page ? [[step.page, 'page']] : []), ...(step.persona ? [[step.persona, 'persona']] : []), ...(step.story ? [[step.story, 'story']] : [])])]
 };
-const newId = kind => `${prefixes[kind]}-${randomBytes(4).toString('hex')}`;
+const newId = kind => `${prefixes[kind] || kind.replace(/[^a-z]/g, "").slice(0, 3)}-${randomBytes(4).toString("hex")}`;
 
 export function loadAgentDefaults(configDirectory) {
   const defaults = JSON.parse(readFileSync(join(configDirectory, 'agent-profiles.json'), 'utf8'));
@@ -467,57 +494,118 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
   const doneListeners = [];
   const row = id => db.prepare('SELECT * FROM knowledge_records WHERE id = ?').get(id);
   const hydrate = record => record && { id: record.id, kind: record.kind, parentId: record.parent_id, position: record.position, revision: record.revision, updatedAt: record.updated_at, ...parse(record.data_json, {}) };
-  const list = (projectId, kind) => db.prepare('SELECT * FROM knowledge_records WHERE project_id = ? AND kind = ? ORDER BY position, created_at').all(projectId, kind).map(hydrate);
+  const pagesKind = kind => ['page_map', 'page', 'flow'].includes(kind);
+  const design = { layer: 'design' };
+  // LAYER-BASE-01: a record belongs to the layer instance that owns it. Pages kinds always carry their instance (DEC-056);
+  // any other kind carries one when the owning layer publishes an API. A named layer narrows a kind several layers own.
+  const instanceFor = (projectId, kind, layer = null) => pagesKind(kind) ? pagesInstanceId(db, projectId)
+    : layer ? kindOwners(db, projectId, kind).find(owner => owner.key === layer)?.instanceId || null : null;
+  const scope = (projectId, kind) => pagesKind(kind) ? pagesInstanceId(db, projectId) : null;
+  const inScope = (projectId, record) => record && record.project_id === projectId && (pagesKind(record.kind) ? record.layer_instance_id === pagesInstanceId(db, projectId)
+    : !record.layer_instance_id || kindOwners(db, projectId, record.kind).some(owner => owner.instanceId === record.layer_instance_id));
+  // DEC-059 / T03-G2: a kind an installed layer keeps as files reads from its pinned files, shaped like records.
+  const fromFile = (entry, position = 0) => entry && { id: entry.id, kind: entry.kind, parentId: null, position, revision: entry.revision, updatedAt: entry.updatedAt || null, ...entry.data };
+  // LAYER-BINDINGS-01 R3: kinds are per instance. Two installed layers may own the same kind; a read that names no layer
+  // then has to say which, instead of mixing both. A kind one layer owns reads that instance (and untagged legacy rows).
+  const list = (projectId, kind, { layer = null } = {}) => {
+    const fileKey = fileLayerFor(db, projectId, kind);
+    if (fileKey) return currentFileEntries(db, projectId, fileKey).filter(entry => entry.kind === kind).map(fromFile);
+    const owners = pagesKind(kind) ? [] : kindOwners(db, projectId, kind);
+    if (!layer && owners.length > 1) fail(`Several layers own ${kind.replaceAll('_', ' ')} records here. Name the layer.`, 409);
+    // Untagged legacy rows belong to a kind's only owner, as in the Library.
+    const sole = owners.length === 1 && (!layer || owners[0].key === layer) ? owners[0] : null;
+    if (sole) return db.prepare('SELECT * FROM knowledge_records WHERE project_id = ? AND kind = ? AND (layer_instance_id = ? OR layer_instance_id IS NULL) ORDER BY position, created_at')
+      .all(projectId, kind, sole.instanceId).map(hydrate);
+    const instanceId = instanceFor(projectId, kind, layer);
+    return (instanceId ? db.prepare('SELECT * FROM knowledge_records WHERE project_id = ? AND layer_instance_id = ? AND kind = ? ORDER BY position, created_at').all(projectId, instanceId, kind)
+      : db.prepare('SELECT * FROM knowledge_records WHERE project_id = ? AND kind = ? ORDER BY position, created_at').all(projectId, kind)).map(hydrate);
+  };
   const counter = (projectId, kind) => {
     const current = db.prepare('SELECT next FROM knowledge_counters WHERE project_id = ? AND kind = ?').get(projectId, kind)?.next || 1;
     db.prepare('INSERT INTO knowledge_counters(project_id, kind, next) VALUES (?, ?, ?) ON CONFLICT(project_id, kind) DO UPDATE SET next = excluded.next').run(projectId, kind, current + 1);
     return current;
   };
 
-  function insert(projectId, kind, data, { parentId = null, position, author = 'Aludel', rationale = null, workItemId = null } = {}) {
-    if (!kinds.includes(kind)) fail('Unknown record kind.');
-    const clean = validators[kind](data, catalogs);
-    checkReferences(projectId, kind, clean);
-    checkDesign(projectId, kind, clean, { parentId });
+  // PAGES-API-01: an installed layer API owns its outputs' rules; `prepared` is a record its operation already normalized.
+  const layerRules = (projectId, kind, data, prepared, hint = {}) => {
+    if (prepared) return prepared;
+    const owner = layerApiForKind(db, projectId, kind, hint);
+    return owner ? normalizeRecord(owner.api, kind, data, catalogs) : null;
+  };
+  function insert(projectId, kind, data, { parentId = null, position, author = 'Aludel', rationale = null, workItemId = null, id: givenId = null, prepared = null, layer = null } = {}) {
+    const fileKey = fileLayerFor(db, projectId, kind);
+    if (fileKey) {
+      const id = /^[a-z]+-[a-z0-9]{6,12}$/.test(String(givenId)) && !row(givenId) && !fileEntry(db, projectId, givenId) ? givenId : newId(kind);
+      writeFileEntries(db, { projectId, key: fileKey, ops: [{ op: 'create', kind, id, data }], author, rationale, workItemId, checkReferences: list => checkReferenceList(projectId, list) });
+      return get(projectId, id);
+    }
+    if (!kinds.includes(kind) && !kindOwners(db, projectId, kind).length) fail('Unknown record kind.');
+    const owner = pagesKind(kind) ? null : layerApiForKind(db, projectId, kind, { layerKey: layer });
+    const rules = layerRules(projectId, kind, data, prepared, { layerKey: owner?.key || layer });
+    if (!rules && !validators[kind]) fail('Unknown record kind.');
+    const clean = rules ? rules.data : validators[kind](data, catalogs);
+    if (kind === 'routine') checkRoutineAction(projectId, clean);
+    if (rules) checkReferenceList(projectId, rules.references); else checkReferences(projectId, kind, clean);
+    checkDesign(projectId, kind, clean, { parentId, layer: owner?.key || layer || null });
     if (['story', 'spec', 'project'].includes(kind) && !clean.number) clean.number = counter(projectId, kind);
     if (kind === 'brief_claim') counter(projectId, 'brief');
-    if (parentId && !db.prepare('SELECT 1 FROM knowledge_records WHERE id = ? AND project_id = ?').get(parentId, projectId)) fail('Parent record not found.', 404);
-    const id = newId(kind);
+    const instanceId = pagesKind(kind) ? scope(projectId, kind) : owner?.instanceId || null;
+    if (parentId && !db.prepare('SELECT 1 FROM knowledge_records WHERE id = ? AND project_id = ? AND (layer_instance_id IS NULL OR layer_instance_id = ?)').get(parentId, projectId, instanceId)) fail('Parent record not found.', 404);
+    const id = prepared && /^[a-z]+-[a-z0-9]{6,12}$/.test(String(givenId)) && !row(givenId) ? givenId : newId(kind);
     const created = now();
     const place = position ?? ((db.prepare('SELECT MAX(position) AS max FROM knowledge_records WHERE project_id = ? AND kind = ? AND COALESCE(parent_id, \'\') = COALESCE(?, \'\')').get(projectId, kind, parentId)?.max ?? -1) + 1);
-    db.prepare('INSERT INTO knowledge_records(id, project_id, kind, parent_id, position, data_json, revision, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)')
-      .run(id, projectId, kind, parentId, place, JSON.stringify(clean), created, created);
-    db.prepare('INSERT INTO knowledge_revisions(record_id, revision, data_json, author, rationale, work_item_id, created_at) VALUES (?, 1, ?, ?, ?, ?, ?)')
-      .run(id, JSON.stringify(clean), author, rationale, workItemId, created);
+    db.prepare('INSERT INTO knowledge_records(id, project_id, kind, parent_id, position, data_json, revision, created_at, updated_at, layer_instance_id) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)')
+      .run(id, projectId, kind, parentId, place, JSON.stringify(clean), created, created, instanceId);
+    db.prepare('INSERT INTO knowledge_revisions(record_id, revision, data_json, author, rationale, work_item_id, created_at, layer_instance_id) VALUES (?, 1, ?, ?, ?, ?, ?, ?)')
+      .run(id, JSON.stringify(clean), author, rationale, workItemId, created, instanceId);
     return hydrate(row(id));
   }
 
-  function checkReferences(projectId, kind, clean) {
-    for (const [id, expected] of references[kind]?.(clean) || []) {
+  function checkRoutineAction(projectId, routine) {
+    const definition = projectLayerDefinition(db, projectId, routine.layer);
+    if (!layers.includes(routine.layer) && !definition) fail('Install the routine layer first.', 409);
+    if (definition?.outputProvider !== 'markdown-files' || !routine.enabled) return;
+    if (definition.lifecycle !== 'active') fail('Activate this layer before enabling or running its routine.', 409);
+    const action = actionForProject(db, projectId, `${routine.layer}.${routine.actionKey || ''}`);
+    if (!action || action.legacy || !action.humanRunnable) fail('Choose a configured domain action before enabling this routine.', 409);
+  }
+
+  function checkReferences(projectId, kind, clean) { checkReferenceList(projectId, references[kind]?.(clean) || []); }
+  function checkReferenceList(projectId, list) {
+    for (const [id, expected] of list) {
       const target = row(id);
       const allowed = Array.isArray(expected) ? expected : [expected];
-      if (!target || target.project_id !== projectId || !allowed.includes(target.kind)) fail(`A linked ${Array.isArray(expected) ? 'record' : expected.replace('_', ' ')} was not found.`, 404);
+      // DEC-059: or an entry another layer keeps as repository files (T03-G2).
+      if (!target && fileEntryExists(db, projectId, id, allowed)) continue;
+      if (!inScope(projectId, target) || !allowed.includes(target.kind)) fail(`A linked ${Array.isArray(expected) ? 'record' : expected.replace('_', ' ')} was not found.`, 404);
     }
   }
   // Design records (DESIGN-UX-01): uploads belong to the project, colour roles exist, one token set, one asset per brand key.
-  function checkDesign(projectId, kind, clean, { id = null, parentId = null } = {}) {
+  // The rules hold per layer instance (R3): a second Design-like layer keeps its own token set and brand keys.
+  function checkDesign(projectId, kind, clean, { id = null, parentId = null, layer = null } = {}) {
     if (clean.assetId && !db.prepare('SELECT 1 FROM project_assets WHERE id = ? AND project_id = ?').get(clean.assetId, projectId)) fail('That upload was not found.', 404);
-    if (kind === 'design_tokens' && !id && list(projectId, 'design_tokens').length) fail('The project already has a token set. Change it instead.', 409);
+    const named = { layer };
+    if (kind === 'design_tokens' && !id && list(projectId, 'design_tokens', named).length) fail('The project already has a token set. Change it instead.', 409);
     if (kind === 'component' && parentId && row(parentId)?.kind !== 'component') fail('A component nests inside another component.');
     if (kind === 'brand_asset') {
-      const tokens = list(projectId, 'design_tokens')[0];
+      const tokens = list(projectId, 'design_tokens', named)[0];
       if (tokens) cleanBrandAsset(clean, new Set(tokens.roles.map(role => role.id)));
-      if (clean.key && list(projectId, 'brand_asset').some(asset => asset.key === clean.key && asset.id !== id)) fail(`Another asset is already the app's ${clean.key}. Change that one, or clear its key first.`, 409);
+      if (clean.key && list(projectId, 'brand_asset', named).some(asset => asset.key === clean.key && asset.id !== id)) fail(`Another asset is already the app's ${clean.key}. Change that one, or clear its key first.`, 409);
     }
   }
 
-  function update(projectId, id, changes, { expectedRevision, author = 'Aludel', rationale = null, workItemId = null, position, parentId } = {}) {
+  function update(projectId, id, changes, { expectedRevision, author = 'Aludel', rationale = null, workItemId = null, position, parentId, prepared = null } = {}) {
     const current = row(id);
-    if (!current || current.project_id !== projectId) fail('Record not found.', 404);
+    if (!current && fileEntry(db, projectId, id)?.currentRevision) return updateFileEntry(projectId, id, changes, { expectedRevision, author, rationale, workItemId });
+    if (!inScope(projectId, current)) fail('Record not found.', 404);
     if (expectedRevision !== undefined && Number(expectedRevision) !== current.revision) fail('This record changed since you opened it. Reload to see the latest; your edit is kept.', 409);
-    const merged = validators[current.kind]({ ...parse(current.data_json, {}), ...changes }, catalogs);
-    checkReferences(projectId, current.kind, merged);
-    checkDesign(projectId, current.kind, merged, { id, parentId: parentId ?? current.parent_id });
+    const rules = layerRules(projectId, current.kind, { ...parse(current.data_json, {}), ...changes }, prepared, { instanceId: current.layer_instance_id || null });
+    if (!rules && !validators[current.kind]) fail('This record changes only through its layer.', 409);
+    const merged = rules ? rules.data : validators[current.kind]({ ...parse(current.data_json, {}), ...changes }, catalogs);
+    if (current.kind === 'routine') checkRoutineAction(projectId, merged);
+    if (rules) checkReferenceList(projectId, rules.references); else checkReferences(projectId, current.kind, merged);
+    checkDesign(projectId, current.kind, merged, { id, parentId: parentId ?? current.parent_id,
+      layer: current.layer_instance_id ? kindOwners(db, projectId, current.kind).find(owner => owner.instanceId === current.layer_instance_id)?.key || null : null });
     if (current.kind === 'project') checkProjectDeps(projectId, id, merged.deps);
     const contentChanged = JSON.stringify(merged) !== current.data_json;
     const same = !contentChanged && position === undefined && parentId === undefined;
@@ -527,23 +615,51 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     const updated = now();
     db.prepare('UPDATE knowledge_records SET data_json = ?, revision = ?, updated_at = ?, position = COALESCE(?, position), parent_id = CASE WHEN ? THEN ? ELSE parent_id END WHERE id = ?')
       .run(JSON.stringify(merged), revision, updated, position ?? null, parentId !== undefined ? 1 : 0, parentId ?? null, id);
-    db.prepare('INSERT INTO knowledge_revisions(record_id, revision, data_json, author, rationale, work_item_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      .run(id, revision, JSON.stringify(merged), author, rationale, workItemId, updated);
+    db.prepare('INSERT INTO knowledge_revisions(record_id, revision, data_json, author, rationale, work_item_id, created_at, layer_instance_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(id, revision, JSON.stringify(merged), author, rationale, workItemId, updated, current.layer_instance_id);
     // Moving a record is not a change to what it says; only content changes reach code links (LAY-07D).
     if (contentChanged) for (const listener of revisionListeners) listener({ projectId, record: hydrate(row(id)), fromRevision: current.revision, toRevision: revision, author });
     return hydrate(row(id));
   }
 
+  function updateFileEntry(projectId, id, changes, { expectedRevision, author, rationale, workItemId = null }) {
+    const before = get(projectId, id);
+    const key = fileLayerFor(db, projectId, before.kind) || fail('This record changes only through its layer.', 409);
+    writeFileEntries(db, { projectId, key, ops: [{ op: 'update', id, data: changes, expectedRevision }], author, rationale, workItemId, checkReferences: list => checkReferenceList(projectId, list) });
+    const after = get(projectId, id);
+    if (after.revision !== before.revision) for (const listener of revisionListeners) listener({ projectId, record: after, fromRevision: before.revision, toRevision: after.revision, author });
+    return after;
+  }
+  // Several file entries of one layer go in one commit; the usual clean-up then runs for each.
+  function removeMany(projectId, ids) {
+    const entries = ids.map(id => row(id) ? null : get(projectId, id)).filter(Boolean);
+    const key = entries.length && fileLayerFor(db, projectId, entries[0].kind);
+    if (!key || entries.length !== ids.length) { for (const id of ids) remove(projectId, id); return; }
+    writeFileEntries(db, { projectId, key, ops: entries.map(entry => ({ op: 'delete', id: entry.id })), author: 'Aludel', rationale: 'Removed with its story pack' });
+    for (const entry of entries) afterRemove(projectId, entry.id, entry.kind);
+  }
   function remove(projectId, id) {
     const current = row(id);
-    if (!current || current.project_id !== projectId) fail('Record not found.', 404);
+    if (!current) {
+      const entry = get(projectId, id);
+      const key = entry && fileLayerFor(db, projectId, entry.kind);
+      if (!key) fail('Record not found.', 404);
+      writeFileEntries(db, { projectId, key, ops: [{ op: 'delete', id }], author: 'Aludel', rationale: null });
+      return afterRemove(projectId, id, entry.kind);
+    }
+    if (!inScope(projectId, current)) fail('Record not found.', 404);
     const children = db.prepare('SELECT id FROM knowledge_records WHERE parent_id = ?').all(id);
     for (const child of children) remove(projectId, child.id);
+    db.prepare('INSERT OR IGNORE INTO knowledge_deletions(record_id,project_id,kind,parent_id,position,last_revision,data_json,deleted_at,layer_instance_id) VALUES (?,?,?,?,?,?,?,?,?)')
+      .run(current.id,current.project_id,current.kind,current.parent_id,current.position,current.revision,current.data_json,now(),current.layer_instance_id);
     db.prepare('DELETE FROM knowledge_records WHERE id = ?').run(id);
+    afterRemove(projectId, id, current.kind);
+  }
+  function afterRemove(projectId, id, kind) {
     // ROADMAP-01: evidence and plans that point at the record let go of it rather than dangle.
-    const kind = current.kind;
     for (const link of list(projectId, 'evidence_link').filter(entry => entry.recordId === id || entry.insightId === id || entry.sourceRef === id)) db.prepare('DELETE FROM knowledge_records WHERE id = ?').run(link.id);
-    if (kind === 'component') for (const other of list(projectId, 'component').filter(entry => entry.slots.some(slot => slot.accepts.includes(id)))) {
+    // IDs are unique, so the components that accepted it are found by ID in whichever instance they are.
+    if (kind === 'component') for (const other of db.prepare("SELECT * FROM knowledge_records WHERE project_id = ? AND kind = 'component'").all(projectId).map(hydrate).filter(entry => entry.slots.some(slot => slot.accepts.includes(id)))) {
       update(projectId, other.id, { slots: other.slots.map(slot => ({ ...slot, accepts: slot.accepts.filter(entry => entry !== id) })) }, { rationale: 'A component it accepted was deleted' });
     }
     if (kind === 'source') for (const finding of list(projectId, 'finding').filter(entry => entry.sourceId === id)) remove(projectId, finding.id);
@@ -587,14 +703,29 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
   }
   const briefRevision = projectId => (db.prepare('SELECT next FROM knowledge_counters WHERE project_id = ? AND kind = ?').get(projectId, 'brief')?.next || 1) - 1;
 
-  const history = id => db.prepare('SELECT revision, author, rationale, work_item_id AS workItemId, created_at AS createdAt FROM knowledge_revisions WHERE record_id = ? AND rationale IS NOT NULL ORDER BY revision DESC').all(id);
-  const revisionData = (id, revision) => parse(db.prepare('SELECT data_json FROM knowledge_revisions WHERE record_id = ? AND revision = ?').get(id, revision)?.data_json, null);
+  // A file entry's history continues its record's (DEC-059): file revisions first, then the archived record's.
+  const history = id => [...fileEntryHistory(db, null, id).filter(entry => entry.rationale !== 'Adopted from records'),
+    ...db.prepare('SELECT revision, author, rationale, work_item_id AS workItemId, created_at AS createdAt FROM knowledge_revisions WHERE record_id = ? AND rationale IS NOT NULL ORDER BY revision DESC').all(id)]
+    .filter((entry, index, all) => all.findIndex(other => other.revision === entry.revision) === index);
+  const revisionData = (id, revision) => {
+    const project = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_file_entries'").get()
+      && db.prepare('SELECT project_id FROM layer_file_entries WHERE entry_id = ? LIMIT 1').get(id)?.project_id;
+    const entry = project && fileEntry(db, project, id, revision);
+    return entry ? entry.data : parse(db.prepare('SELECT data_json FROM knowledge_revisions WHERE record_id = ? AND revision = ?').get(id, revision)?.data_json, null);
+  };
   // The record's revision at a moment in time, for links declared by a past commit.
-  const revisionAt = (id, at) => db.prepare('SELECT MAX(revision) AS revision FROM knowledge_revisions WHERE record_id = ? AND created_at <= ?').get(id, at)?.revision || null;
-  const get = (projectId, id) => { const record = row(id); return record && record.project_id === projectId ? hydrate(record) : null; };
+  const revisionAt = (id, at) => Math.max(db.prepare('SELECT MAX(revision) AS revision FROM knowledge_revisions WHERE record_id = ? AND created_at <= ?').get(id, at)?.revision || 0,
+    db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_file_entries'").get()
+      ? db.prepare('SELECT revision FROM layer_file_entries WHERE entry_id = ? AND created_at <= ? AND content_hash IS NOT NULL ORDER BY revision DESC LIMIT 1').get(id, at)?.revision || 0 : 0) || null;
+  const get = (projectId, id) => {
+    const record = row(id);
+    if (record) return inScope(projectId, record) ? hydrate(record) : null;
+    const entry = fileEntry(db, projectId, id);
+    return entry?.currentRevision ? fromFile({ ...entry, revision: entry.currentRevision }) : null;
+  };
 
   // ---- Seeds ----
-  function ensureProject(projectId, { pitch = '' } = {}) {
+  function ensureProject(projectId, { pitch = '', seedRoutines = true } = {}) {
     if (!list(projectId, 'phase').length) {
       insert(projectId, 'phase', { key: 'demo', label: 'Demo', goal: 'A clickable core flow with sample data.', appetite: '1 week', exit: 'The core flow works end to end', current: true });
       insert(projectId, 'phase', { key: 'mvp', label: 'MVP', goal: 'Real people use it for real.', appetite: '3 weeks', exit: 'Testers complete the core flow with real data' });
@@ -604,7 +735,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     if (!list(projectId, 'brief_claim').length && !list(projectId, 'vision_section').length && pitch.trim()) insert(projectId, 'brief_claim', { section: 'value', text: pitch.trim().slice(0, 400) }, { rationale: 'From the elevator pitch in onboarding' });
     ensureBrief(projectId);
     ensureAgents(projectId);
-    ensureRoutines(projectId);
+    if (seedRoutines) ensureRoutines(projectId);
   }
 
   // ---- Vision › Brief (ROADMAP-01): claims per section, migrated once from the older vision sections ----
@@ -643,7 +774,9 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
   }
 
   // ---- Design (DESIGN-UX-01): the token set, component contracts, starter brand assets and documents ----
-  function ensureDesign(projectId) { seedDesign({ projectId, list, insert, update, once, db, catalogs }); }
+  // The compiled kit seeding runs only for kinds no installed template seeds itself (T03-DESIGN-SEED); the Library documents
+  // and reference media from onboarding stay with the host.
+  function ensureDesign(projectId) { seedDesign({ projectId, list, insert, update, once, db, catalogs, seedKit: !seedLayers(projectId, 'install').has('design_tokens') }); }
   function addBrandTemplate(user, projectId, templateId) {
     const template = catalogs.brandTemplates?.[templateId];
     if (!template) fail('Unknown brand template.', 404);
@@ -651,7 +784,35 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     return template.assets.map(asset => insert(projectId, 'brand_asset', { ...asset, banner: asset.banner ? { ...asset.banner, headline: asset.banner.headline || name } : undefined, template: templateId },
       { author: user.name, rationale: `From the ${template.label} template` }).id);
   }
-  function syncDesignFromLook(projectId) { syncTokensFromLook({ projectId, list, update, db, catalogs }); }
+  function syncDesignFromLook(projectId) { if (!seedLayers(projectId, 'look').has('design_tokens')) syncTokensFromLook({ projectId, list, update, db, catalogs }); }
+
+  // ---- Layer seeds (T03-DESIGN-SEED): a template's handler supplies its own starter content and answers host events ----
+  // The project facts any layer's seed may use. Missing values stay undefined so a layer's own defaults apply.
+  function projectFacts(projectId) {
+    const setup = db.prepare('SELECT p.name, p.description, p.accent_color, s.feel FROM projects p JOIN project_setup s ON s.project_id = p.id WHERE p.id = ?').get(projectId);
+    if (!setup) return null;
+    const key = setup.feel || 'sleek-saas';
+    const feel = catalogs.feels?.[key] || Object.values(catalogs.feels || {})[0] || {};
+    return { name: setup.name, description: setup.description || '', look: { feel: key, label: feel.label, accent: setup.accent_color || feel.accent, font: feel.font, radius: feel.radius } };
+  }
+  // Runs `event` for every installed layer whose handler declares it, and returns the output kinds those layers own, which
+  // the host then leaves to them. `install` runs once per instance, after it succeeds.
+  function seedLayers(projectId, event) {
+    const kinds = new Set();
+    const facts = projectFacts(projectId);
+    if (!facts || !db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_instances'").get()) return kinds;
+    for (const { key, instanceId } of db.prepare('SELECT layer_key AS key, instance_id AS instanceId FROM layer_instances WHERE project_id = ? ORDER BY rowid').all(projectId)) {
+      let api;
+      try { api = layerApi(db, projectId, key); } catch { api = null; }
+      if (!api?.seeds.includes(event)) continue;
+      for (const kind of api.outputs) kinds.add(kind);
+      const flag = `layer-seed:${instanceId}`;
+      if (event === 'install' && db.prepare('SELECT 1 FROM knowledge_counters WHERE project_id = ? AND kind = ?').get(projectId, flag)) continue;
+      seedLayer({ db, know: { insert, update, remove, get }, api, projectId, event, project: facts });
+      if (event === 'install') counter(projectId, flag);
+    }
+    return kinds;
+  }
 
   // ---- Vision › Documents (ROADMAP-01): generated from the Brief's claims, and out of date when the Brief changes ----
   function composeDoc(projectId, generator) {
@@ -779,8 +940,12 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     }
     fail('Assign the item to a person or an agent profile.');
   }
-  // Elevated actions (the shield) are for leads of their role; the project owner may do anything (ROADMAP-01).
+  // LAT-08: installed layer grants replace role-lead admission. Old test/fixture databases
+  // without the migration table retain their legacy boundary until migrated.
   function mayDo(user, projectId, actionId) {
+    if (db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_action_installations'").get()) {
+      try { actionGrant(db, user, projectId, actionId); return true; } catch { return false; }
+    }
     const action = actionRecord(projectId, actionId);
     const elevated = action ? action.elevated ?? Boolean(catalogs.roles.actions.get(actionId)?.elevated) : Boolean(catalogs.roles.actions.get(actionId)?.elevated);
     if (!elevated) return true;
@@ -788,18 +953,23 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     const role = list(projectId, 'role').find(entry => entry.layer === String(actionId || '').split('.')[0]);
     return Boolean(role?.members?.some(member => member.id === user.id && member.lead));
   }
+  function layerAssignee(projectId, layerKey) {
+    try { return resolveAssignee(projectId, layerDefaultAssignee(db, projectId, layerKey)); } catch { return null; }
+  }
   function defaultAssignee(projectId, actionId) {
-    const assignee = actionRecord(projectId, actionId)?.assignee;
+    const installed = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_action_installations'").get()
+      ? db.prepare('SELECT assignee_kind, assignee_id FROM layer_action_installations WHERE project_id = ? AND action_id = ?').get(projectId, actionId) : null;
+    const assignee = installed ? installed.assignee_id ? { kind: installed.assignee_kind, id: installed.assignee_id } : null : actionRecord(projectId, actionId)?.assignee;
     try { return resolveAssignee(projectId, assignee); } catch { return null; }
   }
 
   // What an agent reads, in order: product principles, project instructions, the role's, the action's, then its profile's
   // own. Pinned when a run starts, so later edits never change a run in progress.
-  function instructionPins(projectId, profile, actionId) {
+  function instructionPins(projectId, profile, actionId, { legacyRole = false } = {}) {
     const principleClaims = list(projectId, 'brief_claim').filter(claim => claim.section === 'principles');
     const project = list(projectId, 'project_instructions')[0];
     const action = actionRecord(projectId, actionId);
-    const role = action?.parentId ? get(projectId, action.parentId) : null;
+    const role = (legacyRole || !db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_action_installations'").get()) && action?.parentId ? get(projectId, action.parentId) : null;
     const pin = record => record ? { id: record.id, revision: record.revision } : null;
     // Principles are several Brief claims; the pin is the Brief's revision, with the first principle as its record.
     return { principles: principleClaims.length ? { id: principleClaims[0].id, revision: briefRevision(projectId) } : null, project: pin(project), role: pin(role), action: action ? { ...pin(action), key: action.key } : null, profile: pin(profile) };
@@ -910,7 +1080,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
           else if (page.stories.some(story => storyIds.has(story))) update(projectId, page.id, { stories: page.stories.filter(story => !storyIds.has(story)) });
         }
         remove(projectId, activity.id);
-        for (const kind of ['access_rule', 'data_operation', 'data_object']) for (const record of list(projectId, kind)) if (record.pack === packs[id].label && record.revision === 1) remove(projectId, record.id);
+        removeMany(projectId, ['access_rule', 'data_operation', 'data_object'].flatMap(kind => list(projectId, kind)).filter(record => record.pack === packs[id].label && record.revision === 1).map(record => record.id));
       }
     }
     for (const id of selected.filter(id => !previous.includes(id))) seedPack(projectId, id);
@@ -964,6 +1134,24 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     const byName = new Map(list(projectId, 'data_object').map(object => [object.name, object.id]));
     const refs = node => node && JSON.parse(JSON.stringify(node), (key, value) => key === '$ref' ? (byName.get(value) || fail(`Pack ${packId} refers to an unknown object ${value}.`)) : value);
     const created = [];
+    // DEC-059: when Data keeps its contract as a file, the pack arrives as one commit, its IDs chosen up front so
+    // relations and $refs resolve in the same write.
+    const fileKey = fileLayerFor(db, projectId, 'data_object');
+    if (fileKey) {
+      const fresh = (pack.objects || []).filter(object => !byName.has(object.name));
+      for (const object of fresh) byName.set(object.name, newId('data_object'));
+      const packTemplate = Boolean(pack.objects?.some(object => object.template));
+      const ops = [
+        ...fresh.map(object => ({ op: 'create', kind: 'data_object', id: byName.get(object.name), data: { name: object.name, description: object.description, schema: refs(object.schema),
+          relations: (object.relations || []).filter(relation => byName.has(relation.target)).map(relation => ({ ...relation, target: byName.get(relation.target) })), states: object.states || [],
+          stories: pick(object.stories), contract: object.template ? 'accepted' : 'proposed', origin: `${pack.label} pack`, pack: pack.label, template: Boolean(object.template) } })),
+        ...(pack.operations || []).map(operation => { const template = operation.template ?? packTemplate; return { op: 'create', kind: 'data_operation', id: newId('data_operation'),
+          data: { ...operation, objectId: operation.object ? byName.get(operation.object) : null, request: refs(operation.request), response: refs(operation.response),
+            stories: pick(operation.stories), contract: template ? 'accepted' : 'proposed', pack: pack.label, template } }; }),
+        ...(pack.access || []).map(rule => ({ op: 'create', kind: 'access_rule', id: newId('access_rule'), data: { ...rule, objectId: byName.get(rule.object), pack: pack.label } }))];
+      if (ops.length) writeFileEntries(db, { projectId, key: fileKey, ops, author: 'Aludel', rationale, checkReferences: list => checkReferenceList(projectId, list) });
+      return;
+    }
     for (const object of pack.objects || []) {
       if (byName.has(object.name)) continue;
       const record = insert(projectId, 'data_object', { name: object.name, description: object.description, schema: object.schema, relations: [], states: object.states || [], stories: pick(object.stories),
@@ -998,16 +1186,22 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
   const workRow = item => {
     if (!item) return null;
     const context = parse(item.context_json, null);
-    return { id: item.id, number: item.number, ref: `W-${item.number}`, layer: item.layer, type: item.type, action: item.action || null, title: item.title, state: item.state,
-      status: statusOf(item.state, context), priority: priorities.includes(item.priority) ? item.priority : 'medium',
+    const ownerInstance = item.layer === 'pages' ? pagesInstanceId(db, item.project_id) : null;
+    if (ownerInstance && item.layer_instance_id !== ownerInstance) return null;
+    const workTargets = parse(item.targets_json, []);
+    if (workTargets.some(target => target.layerInstanceId && ['page_map','page','flow'].includes(target.kind) && target.layerInstanceId !== pagesInstanceId(db, item.project_id))) return null;
+    const migration = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_work_migration'").get()
+      ? db.prepare('SELECT action_id AS actionId, action_revision AS actionRevision, disposition, reason FROM layer_work_migration WHERE project_id = ? AND work_id = ?').get(item.project_id, item.id) : null;
+    return { id: item.id, number: item.number, ref: `W-${item.number}`, layer: item.layer, layerInstanceId: item.layer_instance_id || null, type: item.type, action: item.action || null, scope: item.work_scope === 'layer' ? 'layer' : 'action', title: item.title, state: item.state,
+      status: migration?.disposition === 'blocked' && item.state !== 'done' ? 'blocked' : statusOf(item.state, context), migration, priority: priorities.includes(item.priority) ? item.priority : 'medium',
       assignee: item.assignee_kind ? { kind: item.assignee_kind, id: item.assignee_id || (item.assignee_kind === 'agent' ? item.profile_id : null), label: item.assignee_label } : null,
-      targets: parse(item.targets_json, []), question: parse(item.question_json, null), documents: parse(item.documents_json, []), log: parse(item.log_json, []),
+      targets: workTargets, question: parse(item.question_json, null), documents: parse(item.documents_json, []), log: parse(item.log_json, []),
       createdAt: item.created_at, updatedAt: item.updated_at, profileId: item.profile_id || null, instructions: parse(item.instructions_json, null), context,
       blocks: parse(item.blocks_json, []), checks: parse(item.checks_json, []), project: item.plan_project_id || null, checkpoint: item.checkpoint || null };
   };
   const workById = (projectId, id) => workRow(db.prepare('SELECT * FROM layer_work_items WHERE id = ? AND project_id = ? AND archived_at IS NULL').get(id, projectId));
   function workList(projectId) {
-    const rows = db.prepare('SELECT * FROM layer_work_items WHERE project_id = ? AND archived_at IS NULL ORDER BY number DESC').all(projectId).map(workRow);
+    const rows = db.prepare('SELECT * FROM layer_work_items WHERE project_id = ? AND archived_at IS NULL ORDER BY number DESC').all(projectId).map(workRow).filter(Boolean);
     // Jira's "is blocked by": the open items that list this one in their blocks.
     for (const item of rows) item.blockedBy = rows.filter(other => other.state !== 'done' && other.blocks.includes(item.id)).map(other => other.id);
     return rows;
@@ -1033,34 +1227,47 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
   }
 
   function createWork(projectId, input, author = 'Aludel') {
+    // Optional layer apps can originate the first task before legacy project seeding. Work owns its shared profiles and roles.
+    if (!defaultProfile(projectId)) ensureAgents(projectId);
     const targets = (Array.isArray(input.targets) ? input.targets : []).map(target => {
       const record = row(target.id);
-      if (!record || record.project_id !== projectId) fail('A work target was not found.', 404);
-      return { id: record.id, kind: record.kind, label: text(target.label, 160, 'Target') || record.kind };
+      // DEC-059: a target may be an entry a layer keeps as files.
+      const file = !record && fileEntry(db, projectId, target.id);
+      if (file?.currentRevision) return { id: file.id, kind: file.kind, label: text(target.label, 160, 'Target') || file.kind, layerInstanceId: file.instanceId };
+      if (!inScope(projectId, record)) fail('A work target was not found.', 404);
+      return { id: record.id, kind: record.kind, label: text(target.label, 160, 'Target') || record.kind,
+        ...(record.layer_instance_id ? { layerInstanceId: record.layer_instance_id } : {}) };
     });
     const question = input.question ? { text: text(input.question.text, 400, 'Question', true), options: lines(input.question.options, 200, 'Option') } : null;
-    const actionId = catalogs.roles.actions.has(input.action) ? input.action : actionIdFor(input.layer, input.type, { question, routineKey: input.routineKey });
-    const definition = catalogs.roles.actions.get(actionId);
+    // DEC-057: an item for a layer-scoped layer (or an agent follow-up) names only its layer; the layer's charter guides it.
+    const layerScoped = !input.action && typeof input.layer === 'string' && (input.layerScoped === true || Boolean(layerWorkScope(db, projectId, input.layer)));
+    const installedAction = layerScoped ? null : compiledLocalActions.find(action => action.id === input.action) || actionForProject(db,projectId,input.action);
+    const actionId = layerScoped ? null : catalogs.roles.actions.has(input.action) || installedAction ? input.action : actionIdFor(input.layer, input.type, { question, routineKey: input.routineKey });
+    const definition = layerScoped ? { layer: input.layer, type: 'design', checks: [`The change fits the ${projectLayerDefinition(db, projectId, input.layer)?.name || input.layer} charter and cites the exact inputs it used`] }
+      : catalogs.roles.actions.get(actionId) || (installedAction ? { layer: installedAction.layer, type: installedAction.key === 'edit' ? 'implement' : 'audit', checks: installedAction.checks } : null);
+    if (!definition) fail('Action not found.', 404);
     const layer = input.layer ?? definition.layer;
+    const layerInstanceId = layer === 'pages' ? pagesInstanceId(db, projectId) : null;
     const type = input.type ?? definition.type;
-    if (!layers.includes(layer)) fail('Unknown layer.');
+    if (!projectLayerDefinition(db,projectId,layer) && !layers.includes(layer)) fail('Unknown layer.');
     if (!workTypes.includes(type)) fail('Unknown work type.');
     if (!workStates.includes(input.state || 'ready')) fail('Unknown work state.');
     if (input.priority !== undefined && !priorities.includes(input.priority)) fail(`Choose a priority: ${priorities.join(', ')}.`);
     const number = counter(projectId, 'work');
     const id = `wrk-${randomBytes(4).toString('hex')}`;
     const created = now();
-    const assignee = input.assignee ? resolveAssignee(projectId, input.assignee) : defaultAssignee(projectId, actionId);
-    const checks = checkList(input.checks?.length ? input.checks : actionRecord(projectId, actionId)?.checks || definition.checks, targets);
+    const assignee = input.assignee ? resolveAssignee(projectId, input.assignee) : layerScoped ? layerAssignee(projectId, layer) : defaultAssignee(projectId, actionId);
+    const checks = checkList(input.checks?.length ? input.checks : (!layerScoped && actionRecord(projectId, actionId)?.checks) || definition.checks, targets);
     const projectRecord = input.project !== undefined ? (input.project ? get(projectId, input.project) : null) : projectFor(projectId, targets);
     if (input.project && projectRecord?.kind !== 'project') fail('Project not found.', 404);
     db.prepare(`INSERT INTO layer_work_items(id, project_id, number, layer, type, title, state, assignee_kind, assignee_label, targets_json, question_json, documents_json, log_json, created_at, updated_at,
-      context_json, action, assignee_id, profile_id, priority, blocks_json, checks_json, plan_project_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      context_json, action, assignee_id, profile_id, priority, blocks_json, checks_json, plan_project_id, layer_instance_id, work_scope) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(id, projectId, number, layer, type, text(input.title, 160, 'Work title', true), input.state || 'ready',
         assignee?.kind || null, assignee?.label || null, JSON.stringify(targets), question ? JSON.stringify(question) : null,
         JSON.stringify(lines(input.documents, 300, 'Document')), JSON.stringify([{ at: created, text: input.logText || `Created by ${author}`, refs: targets.map(target => target.id) }]), created, created,
         input.context && typeof input.context === 'object' ? JSON.stringify(input.context) : null, actionId, assignee?.id || null, assignee?.kind === 'agent' ? assignee.id : null,
-        input.priority || priorityLevel(projectId, type, targets), '[]', JSON.stringify(checks), projectRecord?.id || null);
+        input.priority || priorityLevel(projectId, type, targets), '[]', JSON.stringify(checks), projectRecord?.id || null, layerInstanceId, layerScoped ? 'layer' : null);
+    if (actionId) recordNewWorkAction(db, projectId, id, actionId);
     return workById(projectId, id);
   }
 
@@ -1263,7 +1470,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     }
     if (state !== undefined) {
       if (!workStates.includes(state)) fail('Unknown work state.');
-      if (state === 'review' && ['product.define', 'product.clarify', 'data.contract', 'design.audit', 'pages.a11y', 'deploy.review', 'work.review'].includes(item.action) && item.assignee?.kind === 'agent' && !item.context?.workProposal?.id)
+      if (state === 'review' && (item.action?.endsWith('.discover') || ['product.define', 'product.clarify', 'data.contract', 'design.audit', 'pages.a11y', 'pages.flows', 'deploy.review', 'work.review'].includes(item.action)) && item.assignee?.kind === 'agent' && !item.context?.workProposal?.id)
         fail('Submit a Work proposal before reviewing this agent task.', 409);
       if (state === 'review' && item.action === 'product.brief' && item.assignee?.kind === 'agent' && !item.context?.visionProposal?.id)
         fail('Submit a Vision proposal before reviewing this work.', 409);
@@ -1271,7 +1478,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
           !db.prepare("SELECT 1 FROM code_candidates WHERE project_id = ? AND work_id = ? AND state = 'review' LIMIT 1").get(projectId, workId))
         fail('Build and check a code candidate before reviewing this work.', 409);
       if (state === 'done') {
-        if (['product.define', 'product.clarify', 'data.contract', 'design.audit', 'pages.a11y', 'deploy.review', 'work.review'].includes(item.action) && item.assignee?.kind === 'agent' &&
+        if ((item.scope === 'layer' || item.action?.endsWith('.discover') || ['product.define', 'product.clarify', 'data.contract', 'design.audit', 'pages.a11y', 'pages.flows', 'deploy.review', 'work.review'].includes(item.action)) && item.assignee?.kind === 'agent' &&
             (item.state !== 'review' || !input.proposalId || !db.prepare("SELECT 1 FROM symphony_proposals WHERE id = ? AND project_id = ? AND work_id = ? AND state = 'accepted'").get(input.proposalId, projectId, workId)))
           fail('Accept the exact Work proposal before closing this agent task.', 409);
         if (item.action === 'product.brief' && item.assignee?.kind === 'agent' && (item.state !== 'review' || !input.visionProposalId ||
@@ -1284,9 +1491,17 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
           fail('Accept an exact, independently checked code candidate before closing this work.', 409);
         if (!outputs.length && !checks.length) fail('Name what this work checks or documents before closing it (DEC-036: logs are not documentation).', 409);
         if (item.state === 'review' && checks.some(check => check.verdict !== 'accept')) fail('Accept every check before accepting the work, or send it back.', 409);
-        if (item.state === 'review' && item.action && !mayDo(user, projectId, item.action)) fail(`Only a lead of the ${catalogs.roles.roles.find(role => role.layer === item.action.split('.')[0])?.name || 'role'} can accept ${item.ref}: its action is elevated.`, 403);
-        if (verifiedTypes.includes(item.type) && item.assignee?.kind !== 'template') {
-          const missing = item.targets.filter(target => !db.prepare('SELECT 1 FROM knowledge_revisions WHERE record_id = ? AND work_item_id = ?').get(target.id, item.id));
+        if (item.state === 'review' && item.scope === 'layer' && !hasElevated(db, user.id, projectId, item.layer))
+          fail(`Elevated access to this layer is required to accept ${item.ref}.`, 403);
+        if (item.state === 'review' && item.action && !mayDo(user, projectId, item.action)) {
+          const migrated = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_action_installations'").get();
+          fail(migrated ? `A grant for ${item.action} is required to accept ${item.ref}.`
+            : `Only a lead of the ${catalogs.roles.roles.find(role => role.layer === item.action.split('.')[0])?.name || 'role'} can accept ${item.ref}: its action is elevated.`, 403);
+        }
+        if (verifiedTypes.includes(item.type) && item.assignee?.kind !== 'template' && !((item.action === 'pages.flows' || item.scope === 'layer') && item.assignee?.kind === 'agent' && input.proposalId)) {
+          const fileEntries = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_file_entries'").get();
+          const missing = item.targets.filter(target => !db.prepare('SELECT 1 FROM knowledge_revisions WHERE record_id = ? AND work_item_id = ?').get(target.id, item.id)
+            && !(fileEntries && db.prepare('SELECT 1 FROM layer_file_entries WHERE entry_id = ? AND work_item_id = ?').get(target.id, item.id)));
           if (missing.length) fail(`${missing.map(target => `“${target.label}”`).join(', ')} ${missing.length === 1 ? 'has' : 'have'} no change from ${item.ref} yet. Edit ${missing.length === 1 ? 'it' : 'them'} from this item (or apply the answer), then close it.`, 409);
         }
       }
@@ -1329,7 +1544,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
   function workChanges(projectId, workId) {
     const item = workById(projectId, workId);
     if (!item) fail('Work item not found.', 404);
-    return db.prepare('SELECT record_id AS recordId, revision, author, rationale, created_at AS createdAt FROM knowledge_revisions WHERE work_item_id = ? ORDER BY created_at').all(workId).map(entry => {
+    const knowledgeChanges = db.prepare('SELECT record_id AS recordId, revision, author, rationale, created_at AS createdAt FROM knowledge_revisions WHERE work_item_id = ? ORDER BY created_at').all(workId).map(entry => {
       const record = row(entry.recordId);
       const after = revisionData(entry.recordId, entry.revision) || {};
       const before = entry.revision > 1 ? revisionData(entry.recordId, entry.revision - 1) || {} : {};
@@ -1337,6 +1552,23 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
         .map(field => ({ field, before: before[field] ?? null, after: after[field] ?? null }));
       return { ...entry, kind: record?.kind || null, exists: Boolean(record), fields };
     });
+    const fileChanges = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='markdown_file_revisions'").get()
+      ? db.prepare(`SELECT r.file_id AS recordId,r.revision,r.path,r.operation,r.author_id AS author,r.created_at AS createdAt,f.deleted
+          FROM markdown_file_revisions r JOIN markdown_files f ON f.id=r.file_id WHERE r.work_id=? AND f.project_id=? ORDER BY r.created_at`).all(workId,projectId).map(entry => ({
+            recordId:entry.recordId,revision:entry.revision,author:entry.author,rationale:entry.operation,createdAt:entry.createdAt,
+            kind:'markdown_document',exists:!entry.deleted,fields:[{field:'path',before:null,after:entry.path},{field:'operation',before:null,after:entry.operation}]})) : [];
+    // DEC-059: entries a layer keeps as files, changed under this item.
+    const entryChanges = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='layer_file_entries'").get()
+      ? db.prepare('SELECT entry_id AS recordId, revision, kind, content_hash, author, rationale, created_at AS createdAt FROM layer_file_entries WHERE project_id = ? AND work_item_id = ? ORDER BY created_at')
+        .all(projectId, workId).map(entry => {
+          const after = entry.content_hash ? revisionData(entry.recordId, entry.revision) || {} : {};
+          const before = entry.revision > 1 ? revisionData(entry.recordId, entry.revision - 1) || {} : {};
+          const fields = [...new Set([...Object.keys(before), ...Object.keys(after)])].filter(key => JSON.stringify(before[key]) !== JSON.stringify(after[key]))
+            .map(field => ({ field, before: before[field] ?? null, after: after[field] ?? null }));
+          return { recordId: entry.recordId, revision: entry.revision, author: entry.author || 'Aludel', rationale: entry.rationale, createdAt: entry.createdAt, kind: entry.kind,
+            exists: Boolean(entry.content_hash && get(projectId, entry.recordId)), fields };
+        }) : [];
+    return [...knowledgeChanges,...fileChanges,...entryChanges].sort((a,b)=>a.createdAt.localeCompare(b.createdAt));
   }
 
   // An edit made "from" a work item carries its id, so closing the item can verify the change happened (LAY-04A).
@@ -1422,7 +1654,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     const owner = ownerOf(projectId);
     const people = members(projectId);
     const routineKeys = new Map(list(projectId, 'routine').map(routine => [routine.id, routine.key]));
-    for (const item of workList(projectId).filter(entry => !entry.action)) {
+    for (const item of workList(projectId).filter(entry => !entry.action && entry.scope !== 'layer')) {
       const actionId = actionIdFor(item.layer, item.type, { question: item.question, routineKey: routineKeys.get(item.context?.routine) });
       const person = item.assignee?.kind === 'person' ? (people.find(member => member.name === item.assignee.label)?.id || owner) : null;
       const context = item.state === 'claimed' && item.assignee?.kind === 'person' ? { ...(item.context || {}), staged: true } : item.context;
@@ -1440,20 +1672,24 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
   }
   const lastRun = routineId => db.prepare('SELECT * FROM routine_runs WHERE routine_id = ? ORDER BY id DESC LIMIT 1').get(routineId) || null;
   function nextRunAt(routine) {
-    if (!routine.enabled || routine.cadence === 'before-release') return null;
+    if (!routine.enabled || routine.trigger !== 'schedule' || routine.cadence === 'before-release') return null;
     const from = lastRun(routine.id)?.ran_at || db.prepare('SELECT created_at FROM knowledge_records WHERE id = ?').get(routine.id).created_at;
     return new Date(Date.parse(from) + cadenceDays[routine.cadence] * 86400000).toISOString();
   }
   // Runs what is due (schedule), every before-release routine (release) or one routine now (manual). One open item per routine.
-  function runRoutines(projectId, { trigger = 'schedule', at = now(), routineId = null } = {}) {
+  function runRoutines(projectId, { trigger = 'schedule', at = now(), routineId = null, layerKey = null } = {}) {
     const created = [];
     for (const routine of list(projectId, 'routine')) {
-      if (routineId ? routine.id !== routineId : !routine.enabled) continue;
+      if ((!routine.enabled && !routineId) || (routineId && routine.id !== routineId) || (layerKey && routine.layer !== layerKey)) continue;
+      if (!routineId && trigger === 'output-change' && routine.trigger !== 'output-change') continue;
+      if (!routineId && trigger === 'schedule' && routine.trigger !== 'schedule') continue;
       if (!routineId && trigger === 'schedule' && (routine.cadence === 'before-release' || nextRunAt(routine) > at)) continue;
       if (!routineId && trigger === 'release' && routine.cadence !== 'before-release') continue;
       const open = workList(projectId).find(item => item.context?.routine === routine.id && item.state !== 'done');
       if (open) { if (routineId) fail(`${open.ref} from this routine is still open.`, 409); continue; }
-      const item = createWork(projectId, { layer: routine.layer, type: routine.type, state: 'ready', title: `${routine.title} · ${at.slice(0, 10)}`, targets: [], documents: routine.documents,
+      const custom = projectLayerDefinition(db,projectId,routine.layer)?.outputProvider === 'markdown-files';
+      if (custom) checkRoutineAction(projectId, {...routine, enabled:true});
+      const item = createWork(projectId, { action:custom ? `${routine.layer}.${routine.actionKey}` : undefined, layer: routine.layer, type: routine.type, state: 'ready', title: `${routine.title} · ${at.slice(0, 10)}`, targets: [], documents: routine.documents,
         context: { routine: routine.id }, routineKey: routine.key, logText: `Created by the “${routine.title}” routine (${trigger === 'schedule' ? routine.cadence : trigger})` });
       db.prepare('INSERT INTO routine_runs(routine_id, project_id, ran_at, trigger, work_item_id) VALUES (?, ?, ?, ?, ?)').run(routine.id, projectId, at, trigger, item.id);
       created.push(item);
@@ -1511,9 +1747,10 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
       specs: list(projectId, 'spec').map(spec => ({ ...spec, ref: `SPEC-${String(spec.number).padStart(2, '0')}` })),
       research: list(projectId, 'research'), docs: list(projectId, 'doc').map(doc => ({ ...doc, showsIn: doc.showsIn || ['product'] })),
       // DESIGN-UX-01: Design's records, each with its revisions.
-      tokens: (() => { const record = list(projectId, 'design_tokens')[0]; return record ? { ...record, history: history(record.id) } : null; })(),
-      components: list(projectId, 'component').map(component => ({ ...component, status: componentStatus(component), history: history(component.id) })),
-      brand: list(projectId, 'brand_asset').map(asset => ({ ...asset, history: history(asset.id) })),
+      // The built-in Design layer's own view (R3: named, since another layer may own the same kinds).
+      tokens: (() => { const record = list(projectId, 'design_tokens', design)[0]; return record ? { ...record, history: history(record.id) } : null; })(),
+      components: list(projectId, 'component', design).map(component => ({ ...component, status: componentStatus(component), history: history(component.id) })),
+      brand: list(projectId, 'brand_asset', design).map(asset => ({ ...asset, history: history(asset.id) })),
       pages: pages.map(page => ({ ...page, sections: page.sections || [], links: page.links || [], states: page.states || {}, history: history(page.id) })), work,
       pageMap: list(projectId, 'page_map')[0] || null,
       flows: list(projectId, 'flow').map(flow => ({ ...flow, history: history(flow.id) })),
@@ -1524,7 +1761,19 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
       access: list(projectId, 'access_rule'),
       profiles: profiles(projectId).map(({ workTypes: legacyTypes, writes, approvalRequired, budget, icon, role, accountId, ...profile }) => ({ ...profile, history: history(profile.id) })),
       projectInstructions: list(projectId, 'project_instructions')[0] || null,
-      roles: roleView(projectId), members: members(projectId), workTypes, routines: routineView(projectId),
+      roles: roleView(projectId),
+      layerActions: db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_action_installations'").get()
+        ? [...compiledLocalActions, ...projectLayerDefinitions(db,projectId).flatMap(actionsForDefinition)].filter(action => (action.humanRunnable || action.agentRunnable) && !action.legacy && (projectLayerDefinition(db,projectId,action.layer)?.lifecycle === 'active' || !projectLayerDefinition(db,projectId,action.layer))).flatMap(action => {
+          const installed = db.prepare('SELECT assignee_kind, assignee_id FROM layer_action_installations WHERE project_id = ? AND action_id = ?').get(projectId, action.id);
+          const legacy = catalogs.roles.actions.get(action.id);
+          return installed ? [{ id: action.id, layer: action.layer, name: action.title, description: action.purpose,
+            type: legacy?.type || (action.key === 'edit' ? 'implement' : 'audit'), changes: legacy?.changes || [], checks: action.checks, elevated: action.permissions.elevated,
+            assignee: installed.assignee_id ? { kind: installed.assignee_kind, id: installed.assignee_id } : null,
+            agentRunnable: action.agentRunnable, humanRunnable: action.humanRunnable }] : [];
+        }) : [],
+      layerGrants: db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_action_grants'").get()
+        ? db.prepare('SELECT user_id AS userId, layer_key AS layer, action_id AS actionId, level FROM layer_action_grants WHERE project_id = ? ORDER BY layer_key, level').all(projectId) : [],
+      members: members(projectId), workTypes, routines: routineView(projectId),
       services: Object.entries(catalogs.services || {}).map(([key, service]) => ({ key, ...service, stories: stories.filter(story => story.services.includes(key)).map(story => story.id) }))
     };
   }
@@ -1631,7 +1880,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     }
   }
 
-  return { ensureFlows, requestPageChange, reviewFlow, ensureDesign, syncDesignFromLook, addBrandTemplate, ensureProject, ensureAgents, ensureRoles, ensurePackData, ensureBrief, ensurePlan, ensureLibrary, addComment, generateDoc, briefRevision, mayDo, projectFor, insert, update, remove, list, get, view, navRoutes, seedPages, saveNavRoutes, applyPacks, createWork, updateWork, appendLog,
+  return { catalogs, ensureFlows, requestPageChange, reviewFlow, ensureDesign, syncDesignFromLook, addBrandTemplate, ensureProject, ensureAgents, ensureRoles, ensurePackData, ensureBrief, ensurePlan, ensureLibrary, addComment, generateDoc, briefRevision, mayDo, projectFor, insert, update, remove, list, get, view, navRoutes, seedPages, saveNavRoutes, applyPacks, createWork, updateWork, appendLog,
     setWorkContext, workList, workById, blockersOf, workChanges, recordBuild, history, revisionData, revisionAt, kinds, openApi, referrers, openWorkItem, applyAnswer, suggestions, syncBacklog,
     migrateWork, ensureRoutines, runRoutines, instructionPins, actionRecord, actionIdFor, roleView, resolveAssignee, defaultProfile, members, agentExport,
     onRevision: listener => revisionListeners.push(listener), onWorkDone: listener => doneListeners.push(listener) };

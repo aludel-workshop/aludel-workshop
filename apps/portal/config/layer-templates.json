@@ -1,0 +1,35 @@
+{
+  "repo": "../layer-base",
+  "templates": {
+    "base": {
+      "branch": "main",
+      "commit": "fee5f30cba02f4cfcf2b704bd8bb445edcc946a5"
+    },
+    "pages": {
+      "branch": "pages",
+      "commit": "1cbeb0325d5ba10ac7bca4191816f1f223ae3318"
+    },
+    "markdown": {
+      "branch": "markdown",
+      "commit": "11f82de996dc0bdd59c4bc42474d4b061a848566"
+    },
+    "data": {
+      "branch": "data",
+      "commit": "fc9a6f3ce3e433055d3fa079cd398364a08c5ef5"
+    },
+    "vision": {
+      "branch": "vision",
+      "commit": "e54c3f3d41f5ae34e24ae32f94e20f9c8c5f2656"
+    },
+    "design": {
+      "branch": "design",
+      "commit": "550f84662244c6c1445676be5c7f2dc193244082"
+    }
+  },
+  "builtIn": {
+    "product": "vision",
+    "pages": "pages",
+    "data": "data",
+    "design": "design"
+  }
+}

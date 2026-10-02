@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { followUpsForAttempt } from './layer-scope.mjs';
 
 // WORK-ITEM-UX-01: a work item's runs. A run is one Symphony attempt that a worker actually started. It is read from the
 // attempt, the task snapshot pinned in its Go bundle, and the outputs it submitted. Each run is reviewed and signed on its
@@ -41,6 +42,7 @@ export function workRuns({ db, know, candidates = null }) {
   const events = attemptId => db.prepare('SELECT kind, created_at AS at FROM symphony_attempt_events WHERE attempt_id = ? ORDER BY created_at').all(attemptId);
   const steps = attemptId => db.prepare('SELECT seq, kind, payload_json, created_at FROM work_run_steps WHERE attempt_id = ? ORDER BY seq').all(attemptId)
     .map(row => ({ seq: row.seq, kind: row.kind, at: row.created_at, ...parse(row.payload_json, {}) }));
+  const layerName = (projectId, key) => db.prepare('SELECT name FROM layer_definitions WHERE project_id = ? AND layer_key = ?').get(projectId, key)?.name || key;
   const sectionName = key => ({ problem: 'Problem', audience: 'Audience', value: 'Value', differentiators: 'Differentiators', scope: 'Scope', constraints: 'Constraints' })[key]
     || String(key || 'Brief').replace(/^./, first => first.toUpperCase());
 
@@ -55,9 +57,35 @@ export function workRuns({ db, know, candidates = null }) {
       const content = parse(proposal.content_json, {});
       const vision = content.visionProposal || (proposal.action_id === 'product.brief'
         ? parse(db.prepare('SELECT content_json FROM vision_proposals WHERE id = ?').get(proposal.id)?.content_json, null) : null);
-      if (vision) changes.push({ id: proposal.id, kind: 'claim', icon: 'lightbulb', name: `Vision › Brief › ${sectionName(vision.section)}`,
+      if (content.scope === 'layer') {
+        // PAGES-API-01: one row per record the run's API calls changed, with the fields that differ.
+        const kindName = { page: 'Page', flow: 'Flow', page_map: 'Map' };
+        // Record IDs read as their names, so a reviewer sees "Browse tools (pag-…)" rather than an ID.
+        const named = id => { const record = know.get(projectId, id); const label = record && (record.title || record.label || record.name || record.text); return label ? `${label} (${id})` : id; };
+        const show = value => typeof value === 'string' ? named(value) : JSON.stringify(value, (key, entry) => typeof entry === 'string' && /^[a-z]+-[a-z0-9]{6,12}$/.test(entry) ? named(entry) : entry, 2);
+        const empty = value => value === null || value === '' || Array.isArray(value) && !value.length || value && typeof value === 'object' && !Array.isArray(value) && !Object.keys(value).length;
+        for (const change of content.changes) {
+          const keys = [...new Set([...Object.keys(change.before || {}), ...Object.keys(change.after || {})])];
+          const fields = keys.filter(key => JSON.stringify(change.before?.[key]) !== JSON.stringify(change.after?.[key]) && !(change.op === 'create' && empty(change.after?.[key])))
+            .map(key => ({ name: key, before: change.before ? show(change.before[key] ?? '') : null, after: show(change.after?.[key] ?? '') }));
+          const label = change.after?.title || change.after?.label || (change.kind === 'page_map' ? 'Placement' : change.id);
+          changes.push({ id: `${proposal.id}:${change.id}`, kind: 'record', icon: change.kind === 'flow' ? 'route' : change.kind === 'page_map' ? 'map' : 'web',
+            name: `${layerName(projectId, content.layer)} › ${kindName[change.kind] || change.kind} › ${label}`, op: change.op === 'create' ? 'created' : 'modified',
+            size: change.op === 'create' ? '' : `${fields.length} ${fields.length === 1 ? 'field' : 'fields'} · r${change.baseRevision}`, fields });
+        }
+        // LAYER-SOURCE-01: files the run changed in its layer's repository, as one reviewed commit.
+        for (const file of content.source?.files || []) changes.push({ id: `${proposal.id}:src:${file.path}`, kind: 'source', icon: file.ownerReview ? 'code' : 'description',
+          name: `${layerName(projectId, content.layer)} repository › ${file.path}`, op: file.status === 'added' ? 'created' : file.status === 'deleted' ? 'removed' : 'modified',
+          size: `+${file.added} −${file.removed}`, diff: file.diff, ownerReview: file.ownerReview, commit: content.source.commit });
+        if (content.notes) changes.push({ id: `${proposal.id}:notes`, kind: 'report', icon: 'notes', name: 'Notes', op: 'created', size: '', after: content.notes });
+      } else if (vision) changes.push({ id: proposal.id, kind: 'claim', icon: 'lightbulb', name: `Vision › Brief › ${sectionName(vision.section)}`,
         op: vision.targetId ? 'modified' : 'created', size: '1 claim', before: vision.beforeText || null, after: vision.text, note: vision.note || '', basis: vision.basis || '' });
-      else {
+      else if (proposal.action_id === 'pages.flows' && content.semanticReview) {
+        const review = content.semanticReview;
+        changes.push({ id:proposal.id, kind:'flow-revision', icon:'route', name:`Pages › Flow › ${review.before.title}`,
+          op:'modified', size:`r${review.target.expectedRevision} → r${review.target.acceptedRevision}`,
+          before:JSON.stringify(review.before,null,2), after:JSON.stringify(review.after,null,2) });
+      } else {
         const targets = bundle?.work?.targets || [];
         changes.push({ id: proposal.id, kind: 'proposal', icon: 'edit_document', name: targets.length ? targets.map(target => target.label).join(', ') : content.summary || proposal.action_id,
           op: targets.length ? 'modified' : 'created', size: `${Object.keys(content.content || {}).length} fields`, after: content.summary || '', content: content.content || {} });
@@ -72,7 +100,12 @@ export function workRuns({ db, know, candidates = null }) {
     }
     const candidate = row.candidate_id && candidates ? candidates.get(projectId, row.candidate_id) : null;
     if (candidate) for (const file of candidate.files || []) changes.push({ id: `${candidate.id}:${file}`, kind: 'file', icon: 'code', name: file, op: 'modified', size: '', candidateId: candidate.id });
-    return { changes, candidate: candidate ? { id: candidate.id, state: candidate.state, commit: candidate.commit, base: candidate.base, checks: candidate.checks } : null,
+    // LAYER-BASE-01 B5: the run's work branch of the layer repository and the tests the agent ran on it in its sandbox.
+    const layerSource = proposal ? parse(proposal.content_json, {}).source || null : null;
+    return { changes, layerSource: layerSource && { branch: layerSource.branch, commit: layerSource.commit, base: layerSource.base,
+        tests: (layerSource.tests || []).map(test => ({ ...test, source: 'agent-report' })) }, followUps: proposal ? followUpsForAttempt(db, row.id).map(entry => ({ ...entry, layerName: layerName(projectId, entry.layer),
+        createdRef: entry.createdWorkId ? know.workById(projectId, entry.createdWorkId)?.ref || null : null })) : [], summary: proposal ? parse(proposal.content_json, {}).summary || null : null,
+      candidate: candidate ? { id: candidate.id, state: candidate.state, commit: candidate.commit, base: candidate.base, checks: candidate.checks } : null,
       proposalId: proposal?.id || null, reportId: report?.id || null };
   }
 
@@ -127,7 +160,7 @@ export function workRuns({ db, know, candidates = null }) {
         },
         live: live ? { phases: live.phases || [], phase: live.phase ?? null, activity: live.activity || '', model: live.model || null, usage: live.usage || null } : null,
         steps: planned.filter(step => step.kind !== 'evidence'),
-        evidence: resolveEvidence(planned, outputs.changes, outputs.candidate),
+        evidence: resolveEvidence(planned, outputs.changes, outputs.candidate, outputs.layerSource),
         blockReason: state === 'failed' ? item.context?.executionBlock?.reason || progress.find(step => step.status === 'stuck')?.note
           || item.log.filter(entry => /^Blocked: /.test(entry.text)).pop()?.text.slice(9) || null : null,
         ...outputs,
@@ -262,7 +295,7 @@ export function workRuns({ db, know, candidates = null }) {
     return available.filter(change => !wanted.size || wanted.has(`${change.recordId}:${change.revision}`)).map(change => {
       const record = know.get(projectId, change.recordId);
       return { id: `${change.recordId}:${change.revision}`, kind: 'proposal', icon: 'edit_note',
-        name: record?.name || record?.title || record?.label || change.recordId, op: change.revision === 1 ? 'created' : 'modified',
+        name: record?.name || record?.title || record?.label || (change.kind === 'markdown_document' ? String(change.fields.find(field => field.field === 'path')?.after || change.recordId) : change.recordId), op: change.revision === 1 ? 'created' : 'modified',
         size: `${change.fields.length} ${change.fields.length === 1 ? 'field' : 'fields'}`,
         after: change.rationale || '', content: Object.fromEntries(change.fields.map(field => [field.field, field.after])) };
     });
@@ -368,16 +401,19 @@ export function workRuns({ db, know, candidates = null }) {
     });
   }
   function recordEvidence(attemptId, evidence) { if (evidence.length) addStep(attemptId, 'evidence', { items: evidence }); }
-  function resolveEvidence(steps, changes, candidate) {
+  // A layer run's evidence names a record by its ID or title, a repository file by its path, and a test by the name it
+  // reported to aludel_layer_commit; tests are the candidate's checks, or else the layer branch's reported tests.
+  function resolveEvidence(steps, changes, candidate, layerSource = null) {
     const items = [...steps].reverse().find(step => step.kind === 'evidence')?.items || [];
+    const tests = candidate?.checks?.length ? candidate.checks : layerSource?.tests || [];
     return items.map(item => {
       if (item.type === 'change') {
-        const change = changes.find(entry => entry.id === item.ref || entry.name === item.ref || entry.kind === item.ref || entry.name.endsWith(item.ref));
+        const change = changes.find(entry => entry.id === item.ref || entry.id.endsWith(`:${item.ref}`) || entry.name === item.ref || entry.kind === item.ref || entry.name.endsWith(item.ref));
         return { ...item, found: Boolean(change), target: change ? `change:${change.id}` : null, label: change?.name || item.ref };
       }
       if (item.type === 'test') {
-        const index = (candidate?.checks || []).findIndex(check => check.name === item.ref);
-        const check = candidate?.checks?.[index];
+        const index = tests.findIndex(check => check.name === item.ref);
+        const check = tests[index];
         return { ...item, found: Boolean(check), target: check ? `test:${index}` : null, label: item.ref, result: check?.status || null, independent: check ? check.source !== 'agent-report' : false };
       }
       return { ...item, found: Boolean(candidate), target: candidate ? 'preview' : null, label: item.ref };

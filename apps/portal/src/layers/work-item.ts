@@ -24,11 +24,12 @@ interface ReconcileContext { recordId: string; fromRevision: number; toRevision:
           @case ('backlog') { <button type="button" class="lay-button" (click)="update({ state: 'ready' }, work.ref + ' queued.')"><mat-icon aria-hidden="true">add</mat-icon>Queue</button> }
           @case ('queued') { <button type="button" class="lay-button" (click)="update({ stage: true }, work.ref + ' staged.')" [disabled]="!!stageBlock()" [matTooltip]="stageBlock() || ''"><mat-icon aria-hidden="true">playlist_add</mat-icon>Stage in {{ work.assignee?.kind === 'agent' ? ctx.whoName(work.assignee) + '\\'s batch' : 'your batch' }}</button> }
           @case ('staged') { @if (work.assignee?.kind === 'person') { <button type="button" class="lay-button" (click)="startPerson()"><mat-icon aria-hidden="true">play_arrow</mat-icon>I'm working</button> } }
-          @case ('blocked') { @if (!work.blockedBy.length && !work.context?.batch) { <button type="button" class="lay-button" (click)="update({ stage: true }, work.ref + ' staged to retry.')">Stage again</button> } }
+          @case ('blocked') { @if (work.migration?.disposition !== 'blocked' && !work.blockedBy.length && !work.context?.batch) { <button type="button" class="lay-button" (click)="update({ stage: true }, work.ref + ' staged to retry.')">Stage again</button> } }
         } }
         @if (canArchive()) { <button type="button" class="lay-button ghost" [matMenuTriggerFor]="itemMenu" aria-label="More task actions"><mat-icon aria-hidden="true">more_horiz</mat-icon></button>
           <mat-menu #itemMenu="matMenu" class="lay-menu"><button mat-menu-item type="button" (click)="archive()"><mat-icon aria-hidden="true">archive</mat-icon><span>Archive task</span></button></mat-menu> }
       </div></div>
+    @if (work.migration?.disposition === 'blocked') { <p class="lay-lock-note lay-lock-warn" role="status">This historical action needs reassessment: {{ work.migration?.reason }}</p> }
     <div class="wi-facts">
       <button type="button" class="lay-prio-btn" [matMenuTriggerFor]="priorityMenu" [attr.aria-label]="'Priority: ' + priorityLabel[work.priority] + '. Change'"><aludel-priority [value]="work.priority" [text]="true" /><mat-icon aria-hidden="true">expand_more</mat-icon></button>
       <mat-menu #priorityMenu="matMenu" class="lay-menu">@for (level of priorities; track level) { <button mat-menu-item type="button" (click)="update({ priority: level }, work.ref + ' is now ' + priorityLabel[level] + ' priority.')"><aludel-priority [value]="level" /><span>{{ priorityLabel[level] }}</span>@if (level === work.priority) { <mat-icon class="lay-menu-check" aria-label="current">check</mat-icon> }</button> }</mat-menu>

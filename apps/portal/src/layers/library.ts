@@ -1,9 +1,11 @@
-import { Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
+import { Component, ElementRef, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
-import { Finding, Insight, ProjectContext, Region, Source, layerLabel, sourceTypeIcon } from './context';
+import { Finding, Insight, LibraryEntry, LibraryRead, ProjectContext, Region, Source, layerLabel, sourceTypeIcon } from './context';
 import { DocsComponent } from './doc-view';
+import { LibraryBindingsComponent } from './library-bindings';
 import { FindingComponent } from './evidence';
+import { markdownBlocks } from './markdown';
 import { RefChipComponent } from './work-shared';
 
 type Segment = { text: string; finding?: Finding };
@@ -12,8 +14,9 @@ const layerOf: Record<string, string> = { brief_claim: 'product', persona: 'prod
 // Library (ROADMAP-01, DEC-042/043): everything learned, as atomic research. Sources hold the raw material; findings are
 // passages highlighted in them (or facts and data noted from them); insights interpret findings and are attached as
 // evidence to records in every layer. A utility beside Settings, not a layer.
+// DEC-059: it is also where layers read each other. Layers pools every installed layer's outputs and Knowledge.
 @Component({
-  selector: 'aludel-library', standalone: true, imports: [FormsModule, MatIconModule, RefChipComponent, FindingComponent, DocsComponent],
+  selector: 'aludel-library', standalone: true, imports: [FormsModule, MatIconModule, RefChipComponent, FindingComponent, DocsComponent, LibraryBindingsComponent],
   template: `
   @switch (view()) {
     @case ('insight') {
@@ -57,6 +60,32 @@ const layerOf: Record<string, string> = { brief_claim: 'product', persona: 'prod
       } @else { <h1 tabindex="-1">Insight not found</h1><p><a [href]="ctx.link('library')" (click)="ctx.go(ctx.link('library'), $event)">Back to the Library</a></p> }
     }
 
+    @case ('entry') {
+      <p class="lay-eyebrow lay-layer"><mat-icon aria-hidden="true">local_library</mat-icon><a [href]="ctx.link('library', 'layers')" (click)="ctx.go(ctx.link('library', 'layers'), $event)">Library</a> · Layers</p>
+      @if (entry(); as e) {
+        <h1 tabindex="-1">{{ e.title }}</h1>
+        <p class="lay-muted">{{ e.layer.name }} · {{ kindLabel(e.kind) }} · {{ sourceLabel[e.source] }} · revision {{ e.revision }}
+          @if (e.currentRevision !== e.revision) { <span class="lay-muted"> (current is {{ e.currentRevision }})</span> }
+          @if (e.source === 'output' && ctx.recordHref(e.kind, e.ref); as href) { · <a [href]="href" (click)="ctx.go(href, $event)">Open in {{ e.layer.name }}</a> }</p>
+        @if (e.content !== undefined) {
+          <article class="lay-card lay-docbody">
+            @for (block of blocks(); track $index) {
+              @switch (block.tag) {
+                @case ('h1') { <h2 class="lay-doc-h1">{{ plain(block.parts) }}</h2> }
+                @case ('h2') { <h3 class="lay-doc-h2">{{ plain(block.parts) }}</h3> }
+                @case ('ul') { <ul>@for (item of block.items; track $index) { <li>{{ plain(item) }}</li> }</ul> }
+                @default { <p>{{ plain(block.parts) }}</p> }
+              }
+            } @empty { <p class="lay-muted">This document is empty.</p> }
+          </article>
+        } @else {
+          <dl class="lay-card lay-libfields">
+            @for (field of fields(); track field.name) { <dt>{{ field.name }}</dt><dd>{{ field.value }}</dd> }
+          </dl>
+        }
+      } @else if (entryError()) { <h1 tabindex="-1">Not in the Library</h1><p class="lay-muted">{{ entryError() }}</p> }
+      @else { <p class="lay-muted" role="status">Loading…</p> }
+    }
     @case ('source') {
       @if (source(); as s) {
         <p class="lay-eyebrow lay-layer"><mat-icon aria-hidden="true">local_library</mat-icon><a [href]="ctx.link('library', 'sources')" (click)="ctx.go(ctx.link('library', 'sources'), $event)">Library</a> · {{ s.type }}</p>
@@ -113,8 +142,28 @@ const layerOf: Record<string, string> = { brief_claim: 'product', persona: 'prod
         <a [href]="ctx.link('library')" (click)="ctx.go(ctx.link('library'), $event)" [class.active]="view() === 'insights'" [attr.aria-current]="view() === 'insights' ? 'page' : null"><mat-icon aria-hidden="true">insights</mat-icon>Insights</a>
         <a [href]="ctx.link('library', 'sources')" (click)="ctx.go(ctx.link('library', 'sources'), $event)" [class.active]="view() === 'sources'" [attr.aria-current]="view() === 'sources' ? 'page' : null"><mat-icon aria-hidden="true">article</mat-icon>Sources</a>
         <a [href]="ctx.link('library', 'docs')" (click)="ctx.go(ctx.link('library', 'docs'), $event)" [class.active]="view() === 'docs'" [attr.aria-current]="view() === 'docs' ? 'page' : null"><mat-icon aria-hidden="true">description</mat-icon>Documents</a>
+        <a [href]="ctx.link('library', 'layers')" (click)="ctx.go(ctx.link('library', 'layers'), $event)" [class.active]="view() === 'layers'" [attr.aria-current]="view() === 'layers' ? 'page' : null"><mat-icon aria-hidden="true">layers</mat-icon>Layers</a>
+        <a [href]="ctx.link('library', 'bindings')" (click)="ctx.go(ctx.link('library', 'bindings'), $event)" [class.active]="view() === 'bindings'" [attr.aria-current]="view() === 'bindings' ? 'page' : null"><mat-icon aria-hidden="true">link</mat-icon>Bindings</a>
       </nav>
       @if (view() === 'docs') { <aludel-docs layer="library" [base]="['library', 'docs']" /> }
+      @else if (view() === 'bindings') { <aludel-library-bindings /> }
+      @else if (view() === 'layers') {
+        <p class="lay-muted">Everything every layer has published: its outputs and its Knowledge (charter, methods, policies), with the Library's own research and documents. Layers and agents read each other here.</p>
+        <div class="lay-toolbar">
+          <label class="lay-search2"><mat-icon aria-hidden="true">search</mat-icon><span class="visually-hidden">Search the Library</span><input type="search" [ngModel]="lq()" (ngModelChange)="lq.set($event)" placeholder="Search every layer"></label>
+          <label>Layer<select [ngModel]="llayer()" (ngModelChange)="llayer.set($event)"><option value="">Any layer</option>@for (entry of installed(); track entry.key) { <option [value]="entry.key">{{ entry.name }}</option> }<option value="library">Library</option></select></label>
+          <label>Show<select [ngModel]="lsource()" (ngModelChange)="lsource.set($event)"><option value="">Everything</option><option value="output">Outputs</option><option value="knowledge">Knowledge</option><option value="library">Research and documents</option></select></label>
+          <span class="lay-muted small" role="status">{{ found().total }} {{ found().total === 1 ? 'entry' : 'entries' }}</span>
+        </div>
+        <div class="lay-card lay-flush">
+          @for (e of found().results; track e.ref) {
+            <a class="lay-insrow" [href]="entryLink(e)" (click)="ctx.go(entryLink(e), $event)"><strong>{{ e.title }}</strong>
+              <span class="lay-meta3"><span>{{ e.layer.name }}</span><span>{{ kindLabel(e.kind) }}</span><span>{{ sourceLabel[e.source] }}</span><span>rev {{ e.revision }}</span></span>
+              @if (lq().trim().length > 1 && e.excerpt) { <small class="lay-muted">{{ e.excerpt }}</small> }</a>
+          } @empty { <p class="lay-muted lay-pad">{{ searchError() || 'Nothing matches.' }}</p> }
+          @if (found().nextCursor !== null) { <button type="button" class="lay-link-button lay-pad" (click)="more()">Show more</button> }
+        </div>
+      }
       @else if (view() === 'sources') {
         <div class="lay-grid lay-g-side">
           <ul class="lay-list lay-card">
@@ -162,7 +211,44 @@ export class LibraryComponent {
   readonly types = Object.keys(sourceTypeIcon);
   readonly strengths = ['weak', 'moderate', 'strong'];
   readonly layers = ['product', 'design', 'pages', 'data', 'work'];
-  readonly view = computed(() => { const segment = this.ctx.segments()[1] || 'insights'; return ['insight', 'source', 'sources', 'docs'].includes(segment) ? segment : 'insights'; });
+  readonly view = computed(() => { const segment = this.ctx.segments()[1] || 'insights'; return ['insight', 'source', 'sources', 'docs', 'layers', 'bindings', 'entry'].includes(segment) ? segment : 'insights'; });
+  // Layers: the pooled index, searched on the server as filters change.
+  readonly sourceLabel: Record<string, string> = { output: 'Output', knowledge: 'Knowledge', library: 'Library' };
+  readonly installed = computed(() => this.ctx.layerInstances().filter(layer => layer.enabled));
+  readonly lq = signal(''); readonly llayer = signal(''); readonly lsource = signal('');
+  readonly found = signal<{ results: LibraryEntry[]; total: number; nextCursor: number | null }>({ results: [], total: 0, nextCursor: null });
+  readonly searchError = signal('');
+  private searchSeq = 0;
+  private readonly searchEffect = effect(onCleanup => {
+    if (this.view() !== 'layers' || !this.ctx.projectId()) return;
+    const q = this.lq().trim(), layer = this.llayer(), source = this.lsource();
+    const timer = setTimeout(() => untracked(() => this.runSearch({ q: q.length > 1 ? q : '', layer, source }, false)), q ? 200 : 0);
+    onCleanup(() => clearTimeout(timer));
+  });
+  private runSearch(query: { q: string; layer: string; source: string }, append: boolean) {
+    const seq = ++this.searchSeq, cursor = append ? this.found().nextCursor || 0 : 0;
+    this.ctx.librarySearch({ ...query, cursor }).then(result => {
+      if (seq !== this.searchSeq) return;
+      this.searchError.set('');
+      this.found.set(append ? { ...result, results: [...this.found().results, ...result.results] } : result);
+    }, (error: Error) => { if (seq === this.searchSeq) { this.searchError.set(error.message); this.found.set({ results: [], total: 0, nextCursor: null }); } });
+  }
+  more() { const q = this.lq().trim(); this.runSearch({ q: q.length > 1 ? q : '', layer: this.llayer(), source: this.lsource() }, true); }
+  entryLink(entry: LibraryEntry) { return this.ctx.link('library', 'entry', entry.ref); }
+  kindLabel(kind: string) { return kind.replaceAll('_', ' '); }
+  readonly entry = signal<LibraryRead | null>(null);
+  readonly entryError = signal('');
+  private readonly entryEffect = effect(() => {
+    const ref = this.view() === 'entry' ? this.ctx.segments()[2] || '' : '';
+    untracked(() => { this.entry.set(null); this.entryError.set(''); });
+    if (!ref || !this.ctx.projectId()) return;
+    this.ctx.libraryRead(ref).then(value => this.entry.set(value), (error: Error) => this.entryError.set(error.message));
+  });
+  readonly blocks = computed(() => markdownBlocks(this.entry()?.content || ''));
+  plain(parts: { text?: string; ref?: string }[]) { return parts.map(part => part.text ?? part.ref ?? '').join(''); }
+  // A record's fields as readable text, for outputs without a view here.
+  readonly fields = computed(() => Object.entries(this.entry()?.data || {}).filter(([name]) => !['id', 'kind', 'parentId', 'position', 'revision', 'updatedAt'].includes(name))
+    .map(([name, value]) => ({ name, value: typeof value === 'string' ? value : JSON.stringify(value) })).filter(field => field.value && field.value !== '[]' && field.value !== '{}' && field.value !== 'null'));
   readonly insight = computed(() => this.view() === 'insight' ? this.ctx.insightById().get(this.ctx.segments()[2] || '') || null : null);
   readonly source = computed(() => this.view() === 'source' ? this.ctx.sourceById().get(this.ctx.segments()[2] || '') || null : null);
   readonly q = signal(''); readonly layer = signal(''); readonly tag = signal(''); readonly sort = signal('used');

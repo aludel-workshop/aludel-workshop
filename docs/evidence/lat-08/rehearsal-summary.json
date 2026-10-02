@@ -1,0 +1,256 @@
+{
+  "sourceTables": 59,
+  "tableCounts": {
+    "agent_batches": 5,
+    "app_previews": 1,
+    "auth_config": 0,
+    "candidate_previews": 0,
+    "change_proposals": 1,
+    "code_candidates": 0,
+    "code_releases": 0,
+    "code_units": 31,
+    "decision_revisions": 1,
+    "decisions": 1,
+    "downstream_records": 2,
+    "editor_contexts": 0,
+    "editor_tokens": 0,
+    "github_identities": 1,
+    "github_installations": 0,
+    "github_sign_ins": 1,
+    "github_user_installations": 2,
+    "github_users": 0,
+    "import_runs": 51,
+    "knowledge_counters": 19,
+    "knowledge_records": 169,
+    "knowledge_revisions": 208,
+    "layer_work_items": 5,
+    "login_tickets": 0,
+    "onboarding_drafts": 2,
+    "owner_requests": 0,
+    "product_dependencies": 0,
+    "product_record_revisions": 10,
+    "product_records": 10,
+    "project_assets": 0,
+    "project_connections": 1,
+    "project_members": 3,
+    "project_setup": 2,
+    "projects": 3,
+    "proposal_revisions": 1,
+    "record_dependencies": 1,
+    "releases": 1,
+    "repository_bindings": 1,
+    "routine_runs": 1,
+    "sessions": 10,
+    "source_documents": 160,
+    "source_links": 959,
+    "source_revisions": 261,
+    "symphony_attempt_events": 9,
+    "symphony_attempts": 5,
+    "symphony_bundles": 5,
+    "symphony_pools": 2,
+    "symphony_proposals": 2,
+    "symphony_reports": 1,
+    "symphony_worker_tokens": 0,
+    "trace_links": 4,
+    "users": 2,
+    "vision_proposals": 2,
+    "work_events": 0,
+    "work_items": 0,
+    "work_person_run_reviews": 0,
+    "work_person_runs": 0,
+    "work_run_reviews": 3,
+    "work_run_steps": 14
+  },
+  "preservedTables": 45,
+  "preservedRows": 1954,
+  "excluded": [
+    {
+      "table": "auth_config",
+      "count": 0,
+      "reason": "owner credential hash"
+    },
+    {
+      "table": "sessions",
+      "count": 10,
+      "reason": "browser session tokens"
+    },
+    {
+      "table": "login_tickets",
+      "count": 0,
+      "reason": "login tokens"
+    },
+    {
+      "table": "editor_tokens",
+      "count": 0,
+      "reason": "editor credentials"
+    },
+    {
+      "table": "editor_contexts",
+      "count": 0,
+      "reason": "editor scoped context"
+    },
+    {
+      "table": "onboarding_drafts",
+      "count": 2,
+      "reason": "unclaimed draft token hashes"
+    },
+    {
+      "table": "project_connections",
+      "count": 1,
+      "reason": "encrypted integration credentials"
+    },
+    {
+      "table": "symphony_worker_tokens",
+      "count": 0,
+      "reason": "worker credentials"
+    },
+    {
+      "table": "symphony_pools",
+      "count": 2,
+      "reason": "worker pool credential hashes"
+    },
+    {
+      "table": "github_identities",
+      "count": 1,
+      "reason": "provider identity and tokens"
+    },
+    {
+      "table": "github_installations",
+      "count": 0,
+      "reason": "provider installation credentials"
+    },
+    {
+      "table": "github_sign_ins",
+      "count": 1,
+      "reason": "provider sign-in state"
+    },
+    {
+      "table": "github_user_installations",
+      "count": 2,
+      "reason": "provider installation mappings"
+    },
+    {
+      "table": "github_users",
+      "count": 0,
+      "reason": "provider identity and tokens"
+    }
+  ],
+  "scrubbed": [
+    "users.password_salt",
+    "users.password_hash"
+  ],
+  "knowledgeKinds": [
+    {
+      "kind": "activity",
+      "count": 1,
+      "revisionSum": 1
+    },
+    {
+      "kind": "agent_profile",
+      "count": 2,
+      "revisionSum": 4
+    },
+    {
+      "kind": "brand_asset",
+      "count": 10,
+      "revisionSum": 10
+    },
+    {
+      "kind": "brief_claim",
+      "count": 4,
+      "revisionSum": 4
+    },
+    {
+      "kind": "component",
+      "count": 30,
+      "revisionSum": 44
+    },
+    {
+      "kind": "data_operation",
+      "count": 1,
+      "revisionSum": 1
+    },
+    {
+      "kind": "design_tokens",
+      "count": 2,
+      "revisionSum": 3
+    },
+    {
+      "kind": "doc",
+      "count": 4,
+      "revisionSum": 4
+    },
+    {
+      "kind": "page",
+      "count": 5,
+      "revisionSum": 13
+    },
+    {
+      "kind": "phase",
+      "count": 6,
+      "revisionSum": 6
+    },
+    {
+      "kind": "project",
+      "count": 8,
+      "revisionSum": 8
+    },
+    {
+      "kind": "project_instructions",
+      "count": 2,
+      "revisionSum": 2
+    },
+    {
+      "kind": "role",
+      "count": 14,
+      "revisionSum": 14
+    },
+    {
+      "kind": "routine",
+      "count": 10,
+      "revisionSum": 10
+    },
+    {
+      "kind": "step",
+      "count": 1,
+      "revisionSum": 1
+    },
+    {
+      "kind": "story",
+      "count": 1,
+      "revisionSum": 1
+    },
+    {
+      "kind": "work_action",
+      "count": 68,
+      "revisionSum": 70
+    }
+  ],
+  "layers": {
+    "projects": 2,
+    "inserted": 12
+  },
+  "migrations": [
+    {
+      "installed": 19,
+      "grants": 12,
+      "mapped": 0,
+      "blocked": 0
+    },
+    {
+      "installed": 19,
+      "grants": 12,
+      "mapped": 5,
+      "blocked": 0
+    }
+  ],
+  "workDispositions": [
+    {
+      "disposition": "mapped",
+      "n": 5
+    }
+  ],
+  "repeatedPassChanges": 0,
+  "originalRowsUnchanged": true,
+  "integrity": "ok"
+}

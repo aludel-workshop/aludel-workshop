@@ -1,0 +1,310 @@
+{
+  "tableCounts": {
+    "agent_batches": {
+      "source": 5,
+      "copied": 5,
+      "exclusion": null
+    },
+    "app_previews": {
+      "source": 1,
+      "copied": 1,
+      "exclusion": null
+    },
+    "auth_config": {
+      "source": 0,
+      "copied": 0,
+      "exclusion": "credential or session data"
+    },
+    "candidate_previews": {
+      "source": 0,
+      "copied": 0,
+      "exclusion": null
+    },
+    "change_proposals": {
+      "source": 1,
+      "copied": 1,
+      "exclusion": null
+    },
+    "code_candidates": {
+      "source": 0,
+      "copied": 0,
+      "exclusion": null
+    },
+    "code_releases": {
+      "source": 0,
+      "copied": 0,
+      "exclusion": null
+    },
+    "code_units": {
+      "source": 31,
+      "copied": 31,
+      "exclusion": null
+    },
+    "decision_revisions": {
+      "source": 1,
+      "copied": 1,
+      "exclusion": null
+    },
+    "decisions": {
+      "source": 1,
+      "copied": 1,
+      "exclusion": null
+    },
+    "downstream_records": {
+      "source": 2,
+      "copied": 2,
+      "exclusion": null
+    },
+    "editor_contexts": {
+      "source": 0,
+      "copied": 0,
+      "exclusion": "credential or session data"
+    },
+    "editor_tokens": {
+      "source": 0,
+      "copied": 0,
+      "exclusion": "credential or session data"
+    },
+    "github_identities": {
+      "source": 1,
+      "copied": 0,
+      "exclusion": "credential or session data"
+    },
+    "github_installations": {
+      "source": 0,
+      "copied": 0,
+      "exclusion": "credential or session data"
+    },
+    "github_sign_ins": {
+      "source": 1,
+      "copied": 0,
+      "exclusion": "credential or session data"
+    },
+    "github_user_installations": {
+      "source": 2,
+      "copied": 0,
+      "exclusion": "credential or session data"
+    },
+    "github_users": {
+      "source": 0,
+      "copied": 0,
+      "exclusion": "credential or session data"
+    },
+    "import_runs": {
+      "source": 51,
+      "copied": 0,
+      "exclusion": "reimported corpus cache"
+    },
+    "knowledge_counters": {
+      "source": 19,
+      "copied": 19,
+      "exclusion": null
+    },
+    "knowledge_records": {
+      "source": 169,
+      "copied": 169,
+      "exclusion": null
+    },
+    "knowledge_revisions": {
+      "source": 208,
+      "copied": 208,
+      "exclusion": null
+    },
+    "layer_work_items": {
+      "source": 5,
+      "copied": 5,
+      "exclusion": null
+    },
+    "login_tickets": {
+      "source": 0,
+      "copied": 0,
+      "exclusion": "credential or session data"
+    },
+    "onboarding_drafts": {
+      "source": 2,
+      "copied": 0,
+      "exclusion": "credential or session data"
+    },
+    "owner_requests": {
+      "source": 0,
+      "copied": 0,
+      "exclusion": null
+    },
+    "product_dependencies": {
+      "source": 0,
+      "copied": 0,
+      "exclusion": null
+    },
+    "product_record_revisions": {
+      "source": 10,
+      "copied": 10,
+      "exclusion": null
+    },
+    "product_records": {
+      "source": 10,
+      "copied": 10,
+      "exclusion": null
+    },
+    "project_assets": {
+      "source": 0,
+      "copied": 0,
+      "exclusion": null
+    },
+    "project_connections": {
+      "source": 1,
+      "copied": 0,
+      "exclusion": "credential or session data"
+    },
+    "project_members": {
+      "source": 3,
+      "copied": 3,
+      "exclusion": null
+    },
+    "project_setup": {
+      "source": 2,
+      "copied": 2,
+      "exclusion": null
+    },
+    "projects": {
+      "source": 3,
+      "copied": 3,
+      "exclusion": null
+    },
+    "proposal_revisions": {
+      "source": 1,
+      "copied": 1,
+      "exclusion": null
+    },
+    "record_dependencies": {
+      "source": 1,
+      "copied": 1,
+      "exclusion": null
+    },
+    "releases": {
+      "source": 1,
+      "copied": 1,
+      "exclusion": null
+    },
+    "repository_bindings": {
+      "source": 1,
+      "copied": 1,
+      "exclusion": null
+    },
+    "routine_runs": {
+      "source": 1,
+      "copied": 1,
+      "exclusion": null
+    },
+    "sessions": {
+      "source": 10,
+      "copied": 0,
+      "exclusion": "credential or session data"
+    },
+    "source_documents": {
+      "source": 160,
+      "copied": 0,
+      "exclusion": "reimported corpus cache"
+    },
+    "source_links": {
+      "source": 959,
+      "copied": 0,
+      "exclusion": "reimported corpus cache"
+    },
+    "source_revisions": {
+      "source": 261,
+      "copied": 0,
+      "exclusion": "reimported corpus cache"
+    },
+    "symphony_attempt_events": {
+      "source": 9,
+      "copied": 9,
+      "exclusion": null
+    },
+    "symphony_attempts": {
+      "source": 5,
+      "copied": 5,
+      "exclusion": null
+    },
+    "symphony_bundles": {
+      "source": 5,
+      "copied": 5,
+      "exclusion": null
+    },
+    "symphony_pools": {
+      "source": 2,
+      "copied": 0,
+      "exclusion": "credential or session data"
+    },
+    "symphony_proposals": {
+      "source": 2,
+      "copied": 2,
+      "exclusion": null
+    },
+    "symphony_reports": {
+      "source": 1,
+      "copied": 1,
+      "exclusion": null
+    },
+    "symphony_worker_tokens": {
+      "source": 0,
+      "copied": 0,
+      "exclusion": "credential or session data"
+    },
+    "trace_links": {
+      "source": 4,
+      "copied": 4,
+      "exclusion": null
+    },
+    "users": {
+      "source": 2,
+      "copied": 2,
+      "exclusion": null
+    },
+    "vision_proposals": {
+      "source": 2,
+      "copied": 2,
+      "exclusion": null
+    },
+    "work_events": {
+      "source": 0,
+      "copied": 0,
+      "exclusion": null
+    },
+    "work_items": {
+      "source": 0,
+      "copied": 0,
+      "exclusion": null
+    },
+    "work_person_run_reviews": {
+      "source": 0,
+      "copied": 0,
+      "exclusion": null
+    },
+    "work_person_runs": {
+      "source": 0,
+      "copied": 0,
+      "exclusion": null
+    },
+    "work_run_reviews": {
+      "source": 3,
+      "copied": 3,
+      "exclusion": null
+    },
+    "work_run_steps": {
+      "source": 14,
+      "copied": 14,
+      "exclusion": null
+    }
+  },
+  "projects": 2,
+  "copiedRows": 523,
+  "rewrittenStrings": 4158,
+  "structuralStringsKept": 4263,
+  "excludedCredentialTables": 14,
+  "excludedCacheTables": 4,
+  "previewMemberships": 2,
+  "foreignKeyViolations": 0,
+  "secretPatternMatches": 0,
+  "integrity": "ok",
+  "output": "/tmp/aludel-lat08-preview-20260929/machine.sqlite"
+}

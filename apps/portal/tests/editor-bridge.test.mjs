@@ -46,8 +46,14 @@ test('editor connection scopes a versioned task bundle and live knowledge to its
   assert.throws(() => bridge.context(ben, adaProject, work.id), error => error.status === 404);
   assert.throws(() => bridge.record(adaProject, otherStory.id), error => error.status === 404);
   assert.equal(bridge.search(adaProject, story.title.slice(0, 12)).some(item => item.id === story.id), true);
+  const unsupported = know.createWork(adaProject, { action: 'work.milestone', title: 'Plan the next step', assignee: { kind: 'person', id: ada.id } }, ada.name);
+  assert.equal(bridge.context(ada, adaProject, unsupported.id).taskOpen.available, false, 'ordinary personal work remains readable without an agent adapter');
   const first = bridge.context(ada, adaProject, work.id);
   assert.equal(first.sources[0].revision, story.revision);
+  assert.equal(first.taskOpen.outputs[0].kind, 'code_candidate');
+  assert.equal(first.taskOpen.task.performer.kind, 'person');
+  assert.equal(first.taskOpen.capabilities.submit, 'none through editor bridge');
+  assert.equal(bridge.saved(ada, adaProject, first.digest).taskOpen.schemaVersion, 'aludel-task-open-v1');
   assert.equal(bridge.context(ada, adaProject, work.id).digest, first.digest, 'unchanged inputs keep the same bundle identity');
   assert.equal(bridge.saved(ada, adaProject, first.digest).work.id, work.id);
   know.update(adaProject, story.id, { why: 'A changed need' }, { expectedRevision: story.revision, author: ada.name, rationale: 'New evidence' });
@@ -72,7 +78,7 @@ test('editor connection scopes a versioned task bundle and live knowledge to its
     env: { ...process.env, MACHINE_DATA_DIR: root, MACHINE_PORT: String(port), MACHINE_PREVIEW_RUNTIME: 'process' }, stdio: 'ignore'
   });
   const origin = 'http://127.0.0.1:' + port;
-  const deadline = Date.now() + 8000;
+  const deadline = Date.now() + 20000; // a portal start under the parallel suite can exceed 8 seconds
   try {
     let ready = false;
     while (!ready && Date.now() < deadline) {

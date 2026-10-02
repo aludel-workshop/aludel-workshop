@@ -1,1 +1,56 @@
-{"compilerOptions":{"target":"ES2022","module":"ESNext","moduleResolution":"bundler","lib":["ES2022","dom"],"experimentalDecorators":true,"useDefineForClassFields":false,"strict":true,"skipLibCheck":true,"isolatedModules":true,"types":[]},"angularCompilerOptions":{"strictTemplates":true}}
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": [
+      "ES2022",
+      "dom"
+    ],
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
+    "strict": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "types": [],
+    "paths": {
+      "@aludel/host/context": [
+        "./src/layers/context.ts"
+      ],
+      "@aludel/host/built-by": [
+        "./src/layers/built-by.ts"
+      ],
+      "@aludel/host/design-components": [
+        "./src/layers/design-components.ts"
+      ],
+      "@aludel/host/design-state": [
+        "./src/layers/design-state.ts"
+      ],
+      "@aludel/host/page-blocks": [
+        "./src/page-blocks.ts"
+      ],
+      "@aludel/host/docs": [
+        "./src/layers/doc-view.ts"
+      ],
+      "@aludel/host/app-kit": [
+        "./src/app-kit/index.ts"
+      ],
+      "@aludel/host/design-tokens": [
+        "./src/design-tokens.d.ts"
+      ],
+      "@aludel/host/evidence": [
+        "./src/layers/evidence.ts"
+      ],
+      "@aludel/host/work-shared": [
+        "./src/layers/work-shared.ts"
+      ],
+      "@aludel/host/roles": [
+        "./src/layers/roles.ts"
+      ]
+    }
+  },
+  "angularCompilerOptions": {
+    "strictTemplates": true
+  }
+}

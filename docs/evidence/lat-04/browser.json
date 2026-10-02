@@ -1,0 +1,25 @@
+{
+  "projectId": "p-3dac5f2471",
+  "checks": [
+    "catalog",
+    "zero-layer home",
+    "Pages alone",
+    "native Pages",
+    "empty Operations",
+    "no neighbors",
+    "routine edit",
+    "knowledge revision",
+    "Vision connection review",
+    "source removal",
+    "Pages-only onboarding with blank navigation",
+    "wide and 390 axe"
+  ],
+  "calls": [
+    "POST /api/accounts 201",
+    "GET /api/session 200",
+    "GET /api/projects/p-3dac5f2471/knowledge 200",
+    "GET /api/projects/p-3dac5f2471/knowledge 200",
+    "GET /api/projects/p-3dac5f2471/layers/pages/connections 200"
+  ],
+  "errors": []
+}

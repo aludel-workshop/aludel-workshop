@@ -3,22 +3,36 @@
 const priority = { highest: 1, high: 2, medium: 3, low: 4, lowest: 5 };
 const safe = value => String(value || '').replace(/[^A-Za-z0-9_-]/g, '-').replace(/-+/g, '-').slice(0, 70);
 
+// LAYER-TOOLS-02: a layer task makes its changes, staged for review. The read-only proposal wording is only for actions;
+// given to a layer task it led a live agent to describe the changes instead of making them.
+const layerBrief = key => `Open the task card. This is a ${key} layer task: make the requested changes. Change ${key} data only with aludel_layer_call, ` +
+  'and the layer itself only in layer/, committed with aludel_layer_commit after its tests. Everything is staged for review; submit with aludel_submit_proposal and evidence for each criterion. ' +
+  'Do not change other project records or the project repository.';
 export function symphonyIssue({ project, item, batch, action, bundle, repositoryCommit }) {
-  if (!project?.id || !project?.slug || !item?.id || !batch?.id || !action || !bundle?.digest || !/^[a-f0-9]{40}$/.test(repositoryCommit || '')) return null;
+  // DEC-057: a layer-scoped item is pinned to its layer's change scope instead of an action.
+  const layerScoped = item?.scope === 'layer';
+  if (!project?.id || !project?.slug || !item?.id || !batch?.id || !(action || layerScoped) || !bundle?.digest || !/^[a-f0-9]{40}$/.test(repositoryCommit || '')) return null;
   // Only the items captured by Go are eligible. Staging into a live batch is not a new authorization.
   if (batch.state !== 'running' || !batch.snapshot?.includes(item.id) || item.context?.batch !== batch.id || item.state !== 'claimed' || item.context?.skip) return null;
   if (item.blockedBy?.length || item.question && !item.question.answer && item.action !== 'product.clarify' || item.assignee?.kind !== 'agent' || item.assignee.id !== batch.profileId) return null;
-  const coding = action.id === 'platform.implement' && action.tools?.includes('code') && action.changes?.some(change => change.startsWith('Code › '));
-  const audit = action.id === 'platform.security' && action.tools?.includes('read') && !action.changes?.length;
-  const proposal = ['product.define', 'product.clarify', 'product.brief', 'data.contract'].includes(action.id) && action.tools?.includes('read');
-  const assessment = ['design.audit', 'pages.a11y', 'deploy.review', 'work.review'].includes(action.id) && action.tools?.includes('read') && !action.changes?.length;
-  if (action.id !== item.action || action.elevated && !['product.brief', 'deploy.review', 'work.review'].includes(action.id) || !(coding || audit || proposal || assessment)) return null;
-  if (bundle.work?.id !== item.id || bundle.project?.id !== project.id || bundle.repository?.commit !== repositoryCommit) return null;
-  if (bundle.guidance?.action?.id !== action.id || !bundle.guidance.action.revision) return null;
+  if (layerScoped) {
+    if (bundle.work?.id !== item.id || bundle.project?.id !== project.id || bundle.repository?.commit !== repositoryCommit) return null;
+    if (bundle.guidance?.layerScope?.key !== item.layer || !bundle.guidance.layerScope.commit) return null;
+  } else {
+    const coding = action.id === 'platform.implement' && action.tools?.includes('code') && action.changes?.some(change => change.startsWith('Code › '));
+    const audit = action.id === 'platform.security' && action.tools?.includes('read') && !action.changes?.length;
+    const proposal = ['product.define', 'product.clarify', 'product.brief', 'data.contract'].includes(action.id) && action.tools?.includes('read');
+    const pagesFlow = action.id === 'pages.flows' && action.tools?.includes('read') && action.tools?.includes('revise');
+    const assessment = action.id.endsWith('.discover') && action.tools?.includes('read') && !action.changes?.length || ['design.audit', 'pages.a11y', 'deploy.review', 'work.review'].includes(action.id) && action.tools?.includes('read') && !action.changes?.length;
+    if (action.id !== item.action || action.elevated && !['product.brief', 'deploy.review', 'work.review'].includes(action.id) || !(coding || audit || proposal || assessment || pagesFlow)) return null;
+    if (bundle.work?.id !== item.id || bundle.project?.id !== project.id || bundle.repository?.commit !== repositoryCommit) return null;
+    if (bundle.guidance?.action?.id !== action.id || !bundle.guidance.action.revision) return null;
+  }
+  const audit = !layerScoped && action.id === 'platform.security', coding = !layerScoped && action.id === 'platform.implement';
   const identifier = `${safe(project.slug).toUpperCase()}-${safe(item.ref)}`;
   return {
     id: `${project.id}:${item.id}`, identifier, title: item.title,
-    description: `Aludel work ${item.ref}. Authorized batch ${batch.ref}. Context digest ${bundle.digest}. Repository base ${repositoryCommit}. ${audit ? 'Open the task card before auditing. Submit a findings report; do not change files.' : coding ? 'Read the pinned Aludel task bundle before changing files.' : 'Open the task card. Submit a review proposal; do not change project records or files.'}`,
+    description: `Aludel work ${item.ref}. Authorized batch ${batch.ref}. Context digest ${bundle.digest}. Repository base ${repositoryCommit}. ${layerScoped ? layerBrief(item.layer) : audit ? 'Open the task card before auditing. Submit a findings report; do not change files.' : coding ? 'Read the pinned Aludel task bundle before changing files.' : 'Open the task card. Submit a review proposal; do not change project records or files.'}`,
     priority: priority[item.priority] ?? 3, state: 'Ready', dispatchable: true,
     url: null, branch_name: null, labels: ['aludel-ready', `profile-${safe(batch.profileId)}`],
     native_ref: { project_id: project.id, work_id: item.id, batch_id: batch.id, bundle_digest: bundle.digest, repository_commit: repositoryCommit,

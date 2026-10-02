@@ -6,6 +6,15 @@ import { aludelProjectId, createExternalUser, createLoginTicket, createSession, 
 import { hostTopology } from './hosts.mjs';
 import { initOnboarding, loadCatalogs, onboarding } from './onboarding.mjs';
 import { botColors, efforts, initKnowledge, knowledge } from './knowledge.mjs';
+import { library } from './library.mjs';
+import { bindingRecords, initBindings } from './binding-records.mjs';
+import { bindingRoutines } from './binding-routines.mjs';
+import { refacets } from './refacets.mjs';
+import { layerDocs } from './layer-docs.mjs';
+import { knowledgeSite } from './knowledge-site.mjs';
+import { entryRoles } from './entry-roles.mjs';
+import { facetOf } from './bindings.mjs';
+import { commitOutputFile, initLayerFiles, readOutputFile } from './layer-files.mjs';
 import { previewManager, previewRuntime } from './previews.mjs';
 import { agentsGuide, copyMedia, initialFiles, loadScaffoldSources, sitePages, skeletonFiles, workflowPaths, writeBinaries, writeFiles } from './scaffold.mjs';
 import { brandUsage, componentStatus } from './design.mjs';
@@ -24,6 +33,21 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { importCorpus } from './importer.mjs';
 import { openDatabase } from './storage.mjs';
+import { initPagesLayerApp, pagesDocumentList, pagesDocumentRead, pagesDocumentUpdate, pagesConnections, pagesConnectionCreate, pagesConnectionUpdate } from './pages-layer-app.mjs';
+import { initLayerDiscovery, stageLayerDiscovery, layerDiscoveryStatus } from './layer-discovery.mjs';
+import { actionForProject, createMarkdownDefinition, projectLayerDefinitions, projectLayerDefinition, saveLayerIdentity, saveLayerPresentation, layerIdentityHistory, addDomainAction, activateLayerDefinition } from './layer-registry.mjs';
+import { initMarkdownLayer } from './markdown-layer.mjs';
+import { adoptMarkdownLayer, markdownOutputs } from './markdown-outputs.mjs';
+import { layerDocumentList, layerDocumentRead, layerDocumentUpdate, layerConnections, layerConnectionCreate, layerConnectionUpdate, layerRoutineRuns } from './layer-space.mjs';
+import { initPagesReconciliation, pagesReconciliationView, pagesGapDecision, reconcilePagesFlow } from './pages-reconciliation.mjs';
+import { initPagesCodeObservations, codeRouteObservations, recordCodeRouteObservation, pagesObservationRelations, proposePagesObservationRelation, reviewPagesObservationRelation, stagePagesFlowFromObservation } from './pages-code-observations.mjs';
+import { initActionMigration, migrateActionProject, layerActionSettings, setActionAssignee, setProjectWorkStyle, setLayerActionGrant, setActionMethod } from './lat08-migration.mjs';
+import { readActionSource, readAttemptSource, checkPinnedActionEffect } from './code-action-gateway.mjs';
+import { decideFollowUp, hasElevated, initLayerScope, layerAccess, requireElevated, setLayerDefaultAssignee, setLayerElevated } from './layer-scope.mjs';
+import { applyOperation, kindOwners, layerApi, layerApiForKind, recordOperations } from './layer-api.mjs';
+import { frameAllows, frameLabel, hostRecordFeatures, layerUi } from './layer-ui.mjs';
+import { layerHostCalls } from './layer-package.mjs';
+import { initLayerContract, layerDescriptors, layerInstances, updateLayerInstance, layerCatalog, layerOutputRead, layerMigrationInventory } from './layer-contract.mjs';
 import { answerDecision, createProposal, ensureB02Fixture, getDecision, getProposal, listDecisions, listDownstreamRecords, listProposals, reassessRecord, reviseProposal } from './product-records.mjs';
 import { openSecretStore } from './secret-store.mjs';
 import { githubIntegration, initGithubIdentities } from './github-integration.mjs';
@@ -56,8 +80,31 @@ initCodeCandidates(db);
 initEditorBridge(db);
 initSymphonyWorker(db);
 initWorkRuns(db);
+initLayerContract(db);
+initMarkdownLayer(db);
+initActionMigration(db);
+initLayerScope(db);
+// LAYER-BASE-01: a generic record write for a kind some layer's API owns becomes that layer's operation.
+function recordCall(db, projectId, kind, { layer = null, instanceId = null, mode }) {
+  const owner = layerApiForKind(db, projectId, kind, { layerKey: layer, instanceId });
+  if (!owner) return null;
+  const operation = recordOperations(owner.api, kind)[mode];
+  if (!operation) throw Object.assign(new Error(`The ${owner.key} layer has no operation to ${mode === 'remove' ? 'delete' : mode} ${kind.replace('_', ' ')} records.`), { status: 405 });
+  return { owner, operation };
+}
+initPagesLayerApp(db);
+initLayerFiles(db);
+initPagesReconciliation(db);
+initBindings(db);
+initPagesCodeObservations(db);
+initLayerDiscovery(db);
 const secrets = openSecretStore(dataDirectory);
 const topology = hostTopology(process.env, port);
+// A layer's views may embed their own project's running app (the Pages Built view), never the portal.
+const views = layerUi({ dataDirectory, layerOrigin: topology.layerOrigin, portalOrigin: topology.portalOrigin, appOriginFor: label => {
+  const instance = db.prepare("SELECT project_id FROM layer_instances WHERE 'i-' || replace(instance_id, '-', '') = ?").get(label);
+  const row = instance && db.prepare('SELECT slug FROM projects WHERE id = ?').get(instance.project_id);
+  return row ? topology.appOrigin(row.slug) : null; } });
 const setupConfigPath = join(portalRoot, 'config', 'project-setup.json');
 const gitSetup = loadGitProfile(setupConfigPath, 'the-machine');
 const projectGitProfile = (config => config.sourceControlProfiles[config.defaultSourceControlProfile])(JSON.parse(readFileSync(setupConfigPath, 'utf8')));
@@ -67,7 +114,12 @@ const modelCatalog = providerModelCatalog({ codexCommand: process.env.MACHINE_CO
 const scaffoldSources = loadScaffoldSources(portalRoot);
 const workspaceRoot = join(dataDirectory, 'workspaces');
 const previews = previewManager({ db, portalRoot, workspaceRoot, logRoot: join(dataDirectory, 'preview-logs'), runtime: previewRuntime() });
-const appUrls = slug => ({ portal: topology.portalOrigin, app: topology.appOrigin(slug) });
+// LAYER-BASE-01 B6: the project's Pages views run in their own frame, which the app's preview bridge also answers.
+const appUrls = slug => {
+  const projectId = db.prepare('SELECT id FROM projects WHERE slug = ?').get(slug)?.id;
+  const instance = projectId && db.prepare("SELECT instance_id FROM layer_instances WHERE project_id = ? AND layer_key = 'pages'").get(projectId)?.instance_id;
+  return { portal: topology.portalOrigin, app: topology.appOrigin(slug), frames: instance ? [topology.layerOrigin(frameLabel(instance))] : [] };
+};
 const commitIdentity = user => ({ name: user?.name || 'Aludel', email: user?.email || 'owner@aludel.invalid' });
 // A new project's repository starts local; GitHub publishing is a later, separate step.
 function createWorkspace(setup, user) {
@@ -76,16 +128,29 @@ function createWorkspace(setup, user) {
   commitWorkspace({ repository: setup.workspacePath, profile: projectGitProfile, message: `chore: start ${setup.project.name} with Aludel`, ...commitIdentity(user) });
 }
 const know = knowledge({ db, catalogs, packs: catalogs.packs });
+const pool = library({ db, know });
+const bindingStore = bindingRecords({ db });
+const bindings = bindingRoutines({ db, know, pool, store: bindingStore });
+const refacetWork = refacets({ db, know, pool, store: bindingStore, routines: bindings });
+// LAYER-KNOWLEDGE-01: a layer's docs and spec, kept in its repository and saved from Knowledge.
+const docs = layerDocs({ db, onSpecChange: (projectId, key) => bindings.specChanged(projectId, key) });
+const knowledgeSites = knowledgeSite({ db, pool, store: bindingStore, changes: bindings.changes, refacets: refacetWork, docs });
+// LAYER-BINDINGS-01: Discover proposes bindings where one layer reads another's facet; Watch keeps reconciling and active
+// bindings current. Both run after any successful change to a project, at start-up and with the routine tick.
+function runBindings(projectId) {
+  try { bindings.discover(projectId); bindings.watchProject(projectId); } catch (error) { console.error(`Bindings for ${projectId}: ${error.message}`); }
+}
 const flows = onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot: join(dataDirectory, 'project-assets'), createWorkspace, know });
 // One-time: projects created before the layers (LAY-03) get phases, a vision and page records from their onboarding data.
 for (const project of db.prepare(`SELECT p.id, p.description, s.feel FROM projects p JOIN project_setup s ON s.project_id = p.id
-  WHERE p.id <> 'the-machine' AND NOT EXISTS (SELECT 1 FROM knowledge_records k WHERE k.project_id = p.id AND k.kind = 'phase')`).all()) {
+  WHERE p.id <> 'the-machine' AND s.layer_onboarding_version = 0`).all()
+  .filter(project => !db.prepare("SELECT 1 FROM knowledge_records WHERE project_id = ? AND kind = 'phase'").get(project.id))) {
   know.ensureProject(project.id, { pitch: project.description });
   know.seedPages(project.id, project.feel);
 }
 // LAY-07: projects from before the Data layer and agent profiles get them (idempotent), before code links start listening.
 const layerProjects = () => db.prepare("SELECT p.id FROM projects p JOIN project_setup s ON s.project_id = p.id WHERE p.id <> 'the-machine'").all().map(row => row.id);
-for (const projectId of layerProjects()) {
+for (const projectId of layerProjects().filter(id => !db.prepare('SELECT layer_onboarding_version FROM project_setup WHERE project_id = ?').get(id)?.layer_onboarding_version)) {
   know.ensureAgents(projectId);
   know.ensurePackData(projectId);
   know.ensureRoutines(projectId);
@@ -98,6 +163,13 @@ for (const projectId of layerProjects()) {
   // DESIGN-UX-01: the token set, template component contracts, starter brand assets and documents.
   know.ensureDesign(projectId);
 }
+for (const projectId of layerProjects()) migrateActionProject(db, projectId);
+// LAYER-BASE-01: custom Markdown layers from before layer repositories get their own repository and move their files into it.
+for (const projectId of layerProjects()) for (const layer of projectLayerDefinitions(db, projectId).filter(entry => !entry.builtIn && entry.outputProvider === 'markdown-files'))
+  try { adoptMarkdownLayer({ db, know, dataDirectory, projectId, key: layer.key }); } catch (error) { console.error(`Could not move the ${layer.key} layer into its repository: ${error.message}`); }
+const markdown = markdownOutputs({ db, know, dataDirectory });
+// Build every installed layer's views at its pinned commit; instances on the same template commit share one build.
+for (const projectId of layerProjects()) for (const layer of projectLayerDefinitions(db, projectId)) try { views.status(db, projectId, layer.key); } catch { /* shown on the layer */ }
 const links = codeLinks({ db, know });
 const ops = platformOps({ db, backupRoot: join(dataDirectory, 'backups') });
 const codeRelease = codeReleases({ db });
@@ -117,7 +189,8 @@ function settleSymphonyBatch(projectId, batchId) {
     if (typeof runs !== 'undefined') runs.admit(projectId);
   }
 }
-const worker = symphonyWorker({ db, know, candidates, workspaceRoot: symphonyWorkspaceRoot });
+const worker = symphonyWorker({ db, know, candidates, workspaceRoot: symphonyWorkspaceRoot,
+  runLimit: Number(process.env.MACHINE_SYMPHONY_RUN_LIMIT || 3) });
 const symphonyDispatchEnabled = process.env.MACHINE_SYMPHONY_DISPATCH === '1';
 const workerPoolView = projectId => ({ ...worker.poolStatus(projectId), dispatchEnabled: symphonyDispatchEnabled });
 
@@ -153,6 +226,7 @@ async function acceptCandidate(user, projectId, candidateId, commit) {
   const work = know.workById(projectId, candidate.workId);
   if (!work || work.action !== 'platform.implement' || work.state !== 'review' || work.checks.some(check => check.verdict !== 'accept'))
     return { status: 409, body: { error: 'Accept every Work check before accepting this candidate.' } };
+  checkPinnedActionEffect(db, projectId, candidate.workId, 'commit-candidate', candidate.files, candidate.base);
   const preview = candidatePreviews.status(candidateId);
   if (preview.commit !== candidate.commit || preview.status !== 'running' || !(await candidatePreviews.probe(candidateId)).ok)
     return { status: 409, body: { error: 'The exact candidate preview must be healthy before acceptance.' } };
@@ -178,7 +252,8 @@ const editor = editorBridge({ db, know, projectSetup: (user, id) => flows.projec
 // LAY-04: routines that are due create work, and each layer's gaps become backlog items (DEC-041). At start-up, then every ten minutes.
 function tickRoutines() {
   for (const projectId of layerProjects()) {
-    try { know.runRoutines(projectId); know.syncBacklog(projectId); } catch (error) { console.error(`Routines for ${projectId}: ${error.message}`); }
+    try { know.runRoutines(projectId); know.syncBacklog(projectId); reconcilePagesFlow(db, know, projectId); } catch (error) { console.error(`Routines for ${projectId}: ${error.message}`); }
+    runBindings(projectId);
   }
 }
 tickRoutines();
@@ -254,8 +329,8 @@ function scaffoldSetup(user, projectId) {
   know.ensureDesign(projectId);
   // DESIGN-UX-01: the Design layer's tokens, contracts and brand drive the generated styles, token files and brand.
   const brandUploads = new Map(flows.projectAssets(projectId, 'brand').map(asset => [asset.id, asset]));
-  const designSystem = { tokens: know.list(projectId, 'design_tokens')[0] || null,
-    components: know.list(projectId, 'component').map(component => ({ ...component, status: componentStatus(component) })), brand: know.list(projectId, 'brand_asset').map(asset => ({ ...asset, upload: asset.assetId ? brandUploads.get(asset.assetId) || null : null })) };
+  const designSystem = { tokens: know.list(projectId, 'design_tokens', { layer: 'design' })[0] || null,
+    components: know.list(projectId, 'component', { layer: 'design' }).map(component => ({ ...component, status: componentStatus(component) })), brand: know.list(projectId, 'brand_asset', { layer: 'design' }).map(asset => ({ ...asset, upload: asset.assetId ? brandUploads.get(asset.assetId) || null : null })) };
   return { ...setup, data: { objects: know.list(projectId, 'data_object'), operations: know.list(projectId, 'data_operation') }, agents: know.agentExport(projectId), designSystem,
     pageRecords: know.list(projectId, 'page') };
 }
@@ -319,7 +394,20 @@ function overview() {
 }
 
 async function api(request, response, url) {
+  const changedProject = request.method !== 'GET' && /^\/api\/projects\/([^/]+)\//.exec(url.pathname);
+  if (changedProject) {
+    const projectId = decodeURIComponent(changedProject[1]);
+    response.once('finish', () => { if (response.statusCode < 400 && projectId !== aludelProjectId) setImmediate(() => runBindings(projectId)); });
+  }
   const user = currentUser(request);
+  // LAYER-BASE-01 B6: a call the portal page carries for a layer's sandboxed frame may do only what frames are allowed.
+  const frameLayer = request.headers['x-aludel-layer-frame'];
+  if (frameLayer !== undefined) {
+    const project = /^\/api\/projects\/([^/]+)\//.exec(url.pathname);
+    if (!project || !/^[a-z][a-z0-9_]{2,31}$/.test(String(frameLayer)) || !frameAllows({ key: String(frameLayer), projectId: decodeURIComponent(project[1]), method: request.method, pathname: url.pathname,
+      features: layerHostCalls(db, decodeURIComponent(project[1]), String(frameLayer)) }))
+      return json(response, 403, { error: 'A layer view cannot do that.' });
+  }
   if (url.pathname === '/api/session' && request.method === 'GET') return json(response, 200, {
     authenticated: Boolean(user), user,
     setupRequired: !db.prepare('SELECT id FROM auth_config WHERE id = 1').get(),
@@ -431,13 +519,24 @@ async function api(request, response, url) {
   // Symphony host credentials have no browser/session authority. Pool requests resolve their pinned profile per attempt.
   if (url.pathname.startsWith('/api/worker/')) {
     const workerAuth = worker.authenticate(request.headers.authorization);
-    const attemptRoute = /^\/api\/worker\/attempts\/([^/]+)(?:\/(workspace|runs|events|candidate|commit|audit|proposal|question|plan|progress))?$/.exec(url.pathname);
+    const attemptRoute = /^\/api\/worker\/attempts\/([^/]+)(?:\/(workspace|runs|events|candidate|commit|audit|proposal|question|plan|progress|source|layer|layer-commit|layer-workspace|layer-bundle))?$/.exec(url.pathname);
     if (attemptRoute) {
       const [, attemptId, operation] = attemptRoute;
       const scope = worker.scopeForAttempt(workerAuth, attemptId);
       if (!operation && request.method === 'GET') return json(response, 200, worker.attemptStatus(scope, attemptId), { 'cache-control': 'no-store' });
+      if (operation === 'layer-workspace' && request.method === 'GET') return json(response, 200, worker.layerWorkspace(scope, attemptId), { 'cache-control': 'no-store' });
+      if (operation === 'layer-bundle' && request.method === 'GET') {
+        const body = worker.layerSourceBundle(scope, attemptId);
+        response.writeHead(200, { 'content-type': 'application/octet-stream', 'content-length': body.length, 'cache-control': 'no-store' });
+        return response.end(body);
+      }
+      if (operation === 'source' && request.method === 'GET') return json(response, 200, readAttemptSource(db, scope, attemptId, url.searchParams.get('path')), { 'cache-control': 'no-store' });
       if (request.method === 'POST' && operation) {
         const input = await readJson(request, ['audit', 'proposal'].includes(operation) ? 128 * 1024 : 64 * 1024);
+        // PAGES-API-01: a layer-scoped run calls its layer's API; writes stage in the run's draft until review.
+        // LAYER-BASE-01 B5: the host commits the sandbox's layer checkout as the run's work branch, with the agent's test results.
+        if (operation === 'layer-commit') return json(response, 200, worker.commitLayer(scope, { attemptId, message: input.message, tests: input.tests ?? [] }), { 'cache-control': 'no-store' });
+        if (operation === 'layer') return json(response, 200, worker.callLayer(scope, { attemptId, operation: input.operation, id: input.id ?? null, body: input.body ?? {} }), { 'cache-control': 'no-store' });
         // WORK-ITEM-UX-01 WI-5: the agent's own plan and progress, shown as the run's objectives.
         if (operation === 'plan') return json(response, 200, runHistory.reportPlan(workerAuth.projectId, attemptId, input.objectives), { 'cache-control': 'no-store' });
         if (operation === 'progress') {
@@ -446,8 +545,8 @@ async function api(request, response, url) {
           return json(response, 200, result, { 'cache-control': 'no-store' });
         }
         const evidence = ['candidate', 'commit', 'audit', 'proposal'].includes(operation) ? runHistory.checkEvidence(workerAuth.projectId, attemptId, input.evidence) : [];
-        const result = operation === 'workspace' ? worker.registerWorkspace(scope, { attemptId, path: input.path })
-          : operation === 'runs' ? worker.reserveRun(scope, { attemptId })
+        const result = operation === 'workspace' ? worker.registerWorkspace(scope, { attemptId, path: input.path, hostId: input.hostId })
+          : operation === 'runs' ? worker.reserveRun(scope, { attemptId, hostId: input.hostId })
           : operation === 'events' ? worker.appendEvent(scope, { attemptId, ...input })
             : operation === 'commit' ? worker.commitCandidate(scope, { attemptId, message: input.message, checks: input.checks })
               : operation === 'audit' ? worker.submitAudit(scope, { attemptId, report: input.report })
@@ -503,9 +602,380 @@ async function api(request, response, url) {
   if (url.pathname === '/api/onboarding/claim' && request.method === 'POST') {
     const token = cookie(request).aludel_draft;
     const setup = flows.claimDraft(token, user, user);
+    know.ensureAgents(setup.project.id);
+    migrateActionProject(db, setup.project.id);
     return json(response, 201, { project: setup.project }, { 'set-cookie': draftCookie('', 0) });
   }
   if (url.pathname === '/api/projects' && request.method === 'GET') return json(response, 200, { projects: userProjects(db, user.id) });
+  const codeObservationRoute = /^\/api\/projects\/([^/]+)\/layers\/code\/route-observations$/.exec(url.pathname);
+  if (codeObservationRoute) {
+    const projectId = decodeURIComponent(codeObservationRoute[1]);
+    if (request.method === 'GET') return json(response, 200, { observations: codeRouteObservations(db, user.id, projectId) }, { 'cache-control': 'no-store' });
+    if (request.method === 'POST') {
+      requireMember(db, user, projectId);
+      const workspace = db.prepare('SELECT workspace_path FROM project_setup WHERE project_id = ?').get(projectId)?.workspace_path;
+      if (!workspace) return json(response, 409, { error: 'Project repository is unavailable.' });
+      return json(response, 201, recordCodeRouteObservation(db, user.id, projectId, workspace, await readJson(request)), { 'cache-control': 'no-store' });
+    }
+    return json(response, 405, { error: 'Method not allowed.' });
+  }
+  const actionSourceRoute = /^\/api\/projects\/([^/]+)\/layers\/code\/action-source$/.exec(url.pathname);
+  if (actionSourceRoute && request.method === 'GET') {
+    const projectId = decodeURIComponent(actionSourceRoute[1]);
+    return json(response, 200, readActionSource(db, user, projectId, url.searchParams.get('action'),
+      url.searchParams.get('commit'), url.searchParams.get('path')), { 'cache-control': 'no-store' });
+  }
+  const pagesCodeRelationRoute = /^\/api\/projects\/([^/]+)\/layers\/pages\/code-relations(?:\/([^/]+)\/(review|stage))?$/.exec(url.pathname);
+  if (pagesCodeRelationRoute) {
+    const projectId = decodeURIComponent(pagesCodeRelationRoute[1]);
+    const relationId = pagesCodeRelationRoute[2] && decodeURIComponent(pagesCodeRelationRoute[2]);
+    if (request.method === 'GET' && !relationId) return json(response, 200, { relations: pagesObservationRelations(db, user.id, projectId) }, { 'cache-control': 'no-store' });
+    if (request.method === 'POST' && !relationId) {
+      const input = await readJson(request);
+      return json(response, 201, proposePagesObservationRelation(db, user.id, projectId, input.observationId, input.rationale), { 'cache-control': 'no-store' });
+    }
+    if (request.method === 'POST' && pagesCodeRelationRoute[3] === 'review')
+      return json(response, 200, reviewPagesObservationRelation(db, user.id, projectId, relationId, await readJson(request)), { 'cache-control': 'no-store' });
+    if (request.method === 'POST' && pagesCodeRelationRoute[3] === 'stage')
+      return json(response, 200, stagePagesFlowFromObservation(db, know, user.id, projectId, relationId), { 'cache-control': 'no-store' });
+    return json(response, 405, { error: 'Method not allowed.' });
+  }
+  const pagesReconcileRoute = /^\/api\/projects\/([^/]+)\/layers\/pages\/reconciliation(?:\/([^/]+))?$/.exec(url.pathname);
+  if (pagesReconcileRoute) {
+    const projectId = decodeURIComponent(pagesReconcileRoute[1]);
+    if (request.method === 'GET' && !pagesReconcileRoute[2]) return json(response, 200, pagesReconciliationView(db, user.id, projectId), { 'cache-control': 'no-store' });
+    if (request.method === 'POST' && pagesReconcileRoute[2] === 'run') {
+      pagesReconciliationView(db, user.id, projectId);
+      if (db.prepare('SELECT role FROM project_members WHERE project_id = ? AND user_id = ?').get(projectId, user.id)?.role !== 'owner') return json(response, 403, { error: 'Project owner required.' });
+      return json(response, 200, reconcilePagesFlow(db, know, projectId, { trigger: 'manual' }), { 'cache-control': 'no-store' });
+    }
+    if (request.method === 'POST' && pagesReconcileRoute[2])
+      return json(response, 200, pagesGapDecision(db, know, user.id, projectId, decodeURIComponent(pagesReconcileRoute[2]), await readJson(request)), { 'cache-control': 'no-store' });
+  }
+  const pagesRunsRoute = /^\/api\/projects\/([^/]+)\/layers\/pages\/routines\/([^/]+)\/runs$/.exec(url.pathname);
+  if (pagesRunsRoute && request.method === 'GET') {
+    const projectId = decodeURIComponent(pagesRunsRoute[1]), routineId = decodeURIComponent(pagesRunsRoute[2]);
+    requireMember(db, user, projectId);
+    if (!layerInstances(db, user.id, projectId).some(layer => layer.key === 'pages' && layer.enabled)
+      || !know.list(projectId, 'routine').some(routine => routine.id === routineId && routine.layer === 'pages'))
+      return json(response, 404, { error: 'Pages routine not found.' });
+    return json(response, 200, { runs: db.prepare(`SELECT r.id, r.ran_at AS ranAt, r.trigger, r.work_item_id AS workItemId,
+      w.title AS workTitle, w.state AS workState FROM routine_runs r LEFT JOIN layer_work_items w ON w.id = r.work_item_id
+      WHERE r.project_id = ? AND r.routine_id = ? ORDER BY r.id DESC`).all(projectId, routineId) }, { 'cache-control': 'no-store' });
+  }
+  const pagesDocRoute = /^\/api\/projects\/([^/]+)\/layers\/pages\/documents(?:\/([^/]+))?$/.exec(url.pathname);
+  if (pagesDocRoute) {
+    const projectId = decodeURIComponent(pagesDocRoute[1]), key = pagesDocRoute[2] ? decodeURIComponent(pagesDocRoute[2]) : null;
+    if (request.method === 'GET' && !key) return json(response, 200, { documents: layerDocumentList(db, user.id, projectId, 'pages') }, { 'cache-control': 'no-store' });
+    if (request.method === 'GET' && key) return json(response, 200, layerDocumentRead(db, user.id, projectId, 'pages', key, url.searchParams.has('revision') ? Number(url.searchParams.get('revision')) : null), { 'cache-control': 'no-store' });
+    if (request.method === 'PUT' && key) { const doc = layerDocumentUpdate(db, user.id, projectId, 'pages', key, await readJson(request)); if (key === 'identity') stageLayerDiscovery(db, know, projectId); return json(response, 200, doc, { 'cache-control': 'no-store' }); }
+    return json(response, 405, { error: 'Method not allowed.' });
+  }
+  const pagesConnectionRoute = /^\/api\/projects\/([^/]+)\/layers\/pages\/connections(?:\/([^/]+))?$/.exec(url.pathname);
+  if (pagesConnectionRoute) {
+    const projectId = decodeURIComponent(pagesConnectionRoute[1]), id = pagesConnectionRoute[2] ? decodeURIComponent(pagesConnectionRoute[2]) : null;
+    if (request.method === 'GET' && !id) return json(response, 200, { connections: pagesConnections(db, user.id, projectId) }, { 'cache-control': 'no-store' });
+    if (request.method === 'POST' && !id) { const input = await readJson(request); return json(response, 201, pagesConnectionCreate(db, user.id, projectId, input.sourceKey), { 'cache-control': 'no-store' }); }
+    if (request.method === 'PUT' && id) {
+      const updated = pagesConnectionUpdate(db, user.id, projectId, id, await readJson(request));
+      reconcilePagesFlow(db, know, projectId);
+      return json(response, 200, updated, { 'cache-control': 'no-store' });
+    }
+    return json(response, 405, { error: 'Method not allowed.' });
+  }
+  const definitionsRoute = /^\/api\/projects\/([^/]+)\/layer-definitions$/.exec(url.pathname);
+  if (definitionsRoute) {
+    const projectId=decodeURIComponent(definitionsRoute[1]);
+    if(request.method==='GET'){requireMember(db,user,projectId);return json(response,200,{layers:projectLayerDefinitions(db,projectId)}, {'cache-control':'no-store'});}
+    if(request.method==='POST'){
+      const definition=createMarkdownDefinition(db,user.id,projectId,await readJson(request));
+      return json(response,201,definition,{'cache-control':'no-store'});
+    }
+    return json(response,405,{error:'Method not allowed.'});
+  }
+  const definitionDetailRoute = /^\/api\/projects\/([^/]+)\/layer-definitions\/([^/]+)(?:\/(identity|actions|activate|history|presentation))?$/.exec(url.pathname);
+  if(definitionDetailRoute){
+    const projectId=decodeURIComponent(definitionDetailRoute[1]),key=decodeURIComponent(definitionDetailRoute[2]),section=definitionDetailRoute[3]||'';
+    if(request.method==='GET'&&section==='history')return json(response,200,{revisions:layerIdentityHistory(db,user.id,projectId,key)},{'cache-control':'no-store'});
+    if(request.method==='GET'&&!section){requireMember(db,user,projectId);const definition=projectLayerDefinition(db,projectId,key);return definition?json(response,200,definition,{'cache-control':'no-store'}):json(response,404,{error:'Layer not found.'});}
+    if(request.method==='PUT'&&section==='presentation')return json(response,200,saveLayerPresentation(db,user.id,projectId,key,await readJson(request)),{'cache-control':'no-store'});
+    if(request.method==='PUT'&&section==='identity'){
+      const definition=saveLayerIdentity(db,user.id,projectId,key,await readJson(request));
+      if(definition.lifecycle==='active')stageLayerDiscovery(db,know,projectId);
+      return json(response,200,definition,{'cache-control':'no-store'});
+    }
+    if(request.method==='POST'&&section==='actions'){
+      const definition=addDomainAction(db,user.id,projectId,key,await readJson(request));
+      migrateActionProject(db,projectId);
+      return json(response,201,definition,{'cache-control':'no-store'});
+    }
+    if(request.method==='POST'&&section==='activate'){
+      const definition=activateLayerDefinition(db,user.id,projectId,key);
+      migrateActionProject(db,projectId);
+      stageLayerDiscovery(db,know,projectId);
+      return json(response,200,definition,{'cache-control':'no-store'});
+    }
+    return json(response,405,{error:'Method not allowed.'});
+  }
+  const markdownRoute = /^\/api\/projects\/([^/]+)\/layers\/([^/]+)\/markdown\/(tree|folders|files)(?:\/([^/]+))?(?:\/(move))?$/.exec(url.pathname);
+  if(markdownRoute){
+    const projectId=decodeURIComponent(markdownRoute[1]),key=decodeURIComponent(markdownRoute[2]),section=markdownRoute[3],fileId=markdownRoute[4]?decodeURIComponent(markdownRoute[4]):null;
+    if(section==='tree'&&request.method==='GET')return json(response,200,markdown.tree(user.id,projectId,key),{'cache-control':'no-store'});
+    if(section==='folders'){
+      if(request.method==='POST'&&!fileId){const created=markdown.folderCreate(user.id,projectId,key,(await readJson(request)).path);know.runRoutines(projectId,{trigger:'output-change',layerKey:key});return json(response,201,created);}
+      if(request.method==='PUT'&&!fileId){const input=await readJson(request);const moved=markdown.folderMove(user.id,projectId,key,input.from,input.to);know.runRoutines(projectId,{trigger:'output-change',layerKey:key});return json(response,200,moved);}
+      if(request.method==='DELETE'&&!fileId){const deleted=markdown.folderDelete(user.id,projectId,key,url.searchParams.get('path'));know.runRoutines(projectId,{trigger:'output-change',layerKey:key});return json(response,200,deleted);}
+    }
+    if(section==='files'){
+      if(request.method==='POST'&&!fileId){const input=await readJson(request);const created=markdown.fileCreate(user.id,projectId,key,input.path,input.content||'',input.workId||null);know.runRoutines(projectId,{trigger:'output-change',layerKey:key});return json(response,201,created);}
+      if(request.method==='GET'&&fileId&&!markdownRoute[5])return json(response,200,markdown.read(user.id,projectId,key,fileId,url.searchParams.has('revision')?Number(url.searchParams.get('revision')):null),{'cache-control':'no-store'});
+      if(request.method==='PUT'&&fileId&&!markdownRoute[5]){const saved=markdown.fileSave(user.id,projectId,key,fileId,await readJson(request));know.runRoutines(projectId,{trigger:'output-change',layerKey:key});return json(response,200,saved);}
+      if(request.method==='POST'&&fileId&&markdownRoute[5]==='move'){const moved=markdown.fileMove(user.id,projectId,key,fileId,await readJson(request));know.runRoutines(projectId,{trigger:'output-change',layerKey:key});return json(response,200,moved);}
+      if(request.method==='DELETE'&&fileId&&!markdownRoute[5]){const deleted=markdown.fileDelete(user.id,projectId,key,fileId,Number(url.searchParams.get('expectedRevision')));know.runRoutines(projectId,{trigger:'output-change',layerKey:key});return json(response,200,deleted);}
+    }
+    return json(response,405,{error:'Method not allowed.'});
+  }
+  const discoveryRoute = /^\/api\/projects\/([^/]+)\/layers\/([^/]+)\/discovery$/.exec(url.pathname);
+  if (discoveryRoute && request.method === 'GET') return json(response, 200, { runs: layerDiscoveryStatus(db,user.id,decodeURIComponent(discoveryRoute[1]),decodeURIComponent(discoveryRoute[2])) }, { 'cache-control': 'no-store' });
+  const layerSpaceRoute = /^\/api\/projects\/([^/]+)\/layers\/([^/]+)\/(documents|connections|routines)(?:\/([^/]+))?(?:\/(runs))?$/.exec(url.pathname);
+  if (layerSpaceRoute) {
+    const projectId = decodeURIComponent(layerSpaceRoute[1]), layerKey = decodeURIComponent(layerSpaceRoute[2]);
+    const section = layerSpaceRoute[3], id = layerSpaceRoute[4] ? decodeURIComponent(layerSpaceRoute[4]) : null;
+    if (section === 'documents') {
+      if (request.method === 'GET' && !id) return json(response, 200, { documents: layerDocumentList(db,user.id,projectId,layerKey) }, { 'cache-control': 'no-store' });
+      if (request.method === 'GET' && id) return json(response, 200, layerDocumentRead(db,user.id,projectId,layerKey,id,
+        url.searchParams.has('revision') ? Number(url.searchParams.get('revision')) : null), { 'cache-control': 'no-store' });
+      // A changed charter of an active layer stages fresh neighbor discovery; drafts stay invisible until activated.
+      if (request.method === 'PUT' && id) { const doc = layerDocumentUpdate(db,user.id,projectId,layerKey,id,await readJson(request)); if (id === 'identity' && projectLayerDefinition(db,projectId,layerKey)?.lifecycle === 'active') stageLayerDiscovery(db,know,projectId); return json(response, 200, doc, { 'cache-control': 'no-store' }); }
+    }
+    if (section === 'connections') {
+      if (request.method === 'GET' && !id) return json(response, 200, { connections: layerConnections(db,user.id,projectId,layerKey) }, { 'cache-control': 'no-store' });
+      if (request.method === 'POST' && !id) return json(response, 201, layerConnectionCreate(db,user.id,projectId,layerKey,(await readJson(request)).sourceKey), { 'cache-control': 'no-store' });
+      if (request.method === 'PUT' && id) {
+        const updated = layerConnectionUpdate(db,user.id,projectId,layerKey,id,await readJson(request));
+        if (layerKey === 'pages') reconcilePagesFlow(db,know,projectId);
+        return json(response, 200, updated, { 'cache-control': 'no-store' });
+      }
+    }
+    if (section === 'routines' && id && layerSpaceRoute[5] === 'runs' && request.method === 'GET')
+      return json(response, 200, { runs: layerRoutineRuns(db,user.id,projectId,layerKey,id) }, { 'cache-control': 'no-store' });
+    return json(response, 405, { error: 'Method not allowed.' });
+  }
+  // LAYER-BINDINGS-01: one binding per shared concept, kept by Work with exact revisions and shown in Library › Bindings.
+  const bindingRoute = /^\/api\/projects\/([^/]+)\/bindings(?:\/([^/]+)(?:\/(history|status|decide|join|transfer|lifecycle|changes|adopted))?)?$/.exec(url.pathname);
+  if (bindingRoute) {
+    const projectId = decodeURIComponent(bindingRoute[1]), id = bindingRoute[2] ? decodeURIComponent(bindingRoute[2]) : null, action = bindingRoute[3] || null;
+    const noStore = { 'cache-control': 'no-store' };
+    if (request.method === 'GET' && !id) return json(response, 200, { bindings: bindingStore.list(projectId, user.id) }, noStore);
+    // A new binding starts as a proposal with its accept item, as Discover's do.
+    if (request.method === 'POST' && !id) {
+      const created = bindingStore.create(projectId, user.id, await readJson(request));
+      bindings.changes.propose(projectId, { bindingId: created.id, change: { kind: 'lifecycle', lifecycle: 'reconciling' }, by: { kind: 'person', id: user.id } });
+      return json(response, 201, created, noStore);
+    }
+    if (request.method === 'GET' && id && !action) return json(response, 200, bindingStore.read(projectId, user.id, id,
+      url.searchParams.has('revision') ? Number(url.searchParams.get('revision')) : null), noStore);
+    if (request.method === 'GET' && action === 'history') return json(response, 200, { revisions: bindingStore.history(projectId, user.id, id) }, noStore);
+    if (request.method === 'GET' && action === 'status') return json(response, 200, bindings.status(projectId, user.id, id), noStore);
+    // R5: an adopt item closes by naming the authority's entry it produced.
+    if (request.method === 'POST' && action === 'adopted') { const input = await readJson(request); return json(response, 200, bindings.adopted(projectId, user.id, id, String(input.workItemId || ''), String(input.ref || '')), noStore); }
+    if (request.method === 'POST' && action === 'decide') { const input = await readJson(request); return json(response, 200, bindings.decideAssessment(projectId, user.id, id, String(input.workItemId || ''), input.decision), noStore); }
+    if (request.method === 'PATCH' && id && !action) return json(response, 200, bindingStore.update(projectId, user.id, id, await readJson(request)), noStore);
+    // Every binding change is Work (R2). The owner's change is decided at once, closing the item that proposed it (Discover's,
+    // for an accept); anyone else's waits for the owner. Watch runs before the answer, so the page shows the imports it caused.
+    if (request.method === 'POST' && ['join', 'transfer', 'lifecycle', 'changes'].includes(action)) {
+      const input = await readJson(request);
+      const change = action === 'changes' ? input.change : action === 'lifecycle' ? { kind: 'lifecycle', lifecycle: input.lifecycle }
+        : action === 'join' ? { kind: 'join', participant: input.participant, policy: input.policy, adapters: input.adapters } : { kind: 'transfer', change: input.change };
+      const result = action === 'changes' ? { proposed: bindings.changes.propose(projectId, { bindingId: id, change, rationale: input.rationale || null, by: { kind: 'person', id: user.id } }) }
+        : bindings.changes.request(projectId, user.id, id, change, input.rationale || null);
+      if (result.proposed) return json(response, 202, { proposed: result.proposed }, noStore);
+      return json(response, 200, bindingStore.read(projectId, user.id, id), noStore);
+    }
+    return json(response, 405, { error: 'Method not allowed.' });
+  }
+  // LAYER-BINDINGS-01 step 3: refacets are reviewed Work in the layer they change; binding changes and refacets are decided
+  // by the owner; an overlap chain raises the refacets and the binding proposal that waits on them.
+  // LAYER-BINDINGS-01 R4: a layer's facets with their roles, and which facet each of its entries is in, for its own views
+  // (@aludel/host/roles). A view never names its own layer (a template can be installed under any key): the layer is the
+  // frame asking (x-aludel-layer-frame), or `?layer=` outside a frame. A replica's or ceded facet's "Propose a change"
+  // raises Work in the authority's layer.
+  const rolesRoute = /^\/api\/projects\/([^/]+)\/roles(\/propose)?$/.exec(url.pathname);
+  if (rolesRoute) {
+    const projectId = decodeURIComponent(rolesRoute[1]);
+    const layerKey = String(frameLayer ?? url.searchParams.get('layer') ?? '');
+    requireMember(db, user, projectId);
+    if (!/^[a-z][a-z0-9_]{2,31}$/.test(layerKey)) return json(response, 400, { error: 'Name the layer.' });
+    const roles = entryRoles(db).resolver(projectId), facets = roles.facets(layerKey), declared = roles.layer(layerKey).facets;
+    const entries = Object.fromEntries(pool.outputEntries(projectId).filter(entry => entry.layer.key === layerKey)
+      .map(entry => [entry.ref, facetOf(declared, entry)]).filter(([, facet]) => facet));
+    if (request.method === 'GET' && !rolesRoute[2]) return json(response, 200, { facets: facets.map(facet => ({ ...facet, select: declared.find(item => item.key === facet.key)?.select || [] })),
+      outputs: roles.layer(layerKey).outputs, entries }, { 'cache-control': 'no-store' });
+    if (request.method === 'POST' && rolesRoute[2]) {
+      const input = await readJson(request);
+      const ref = typeof input.ref === 'string' ? input.ref : null;
+      const facet = facets.find(item => item.key === (ref ? entries[ref] : input.facet));
+      if (!facet || !['replica', 'ceded'].includes(facet.role)) return json(response, 409, { error: 'Changes to this are made here.' });
+      const note = typeof input.note === 'string' ? input.note.trim().slice(0, 1000) : '';
+      const title = ref ? pool.read(projectId, user.id, ref).title : facet.title;
+      const item = know.createWork(projectId, { layer: facet.authority.layer, layerScoped: true, type: 'review', state: 'suggested',
+        title: `Change proposed from ${roles.layer(layerKey).name}: ${title}`.slice(0, 160), documents: ['Library › Bindings'],
+        context: { routine: 'role-proposal', binding: facet.binding, from: { layer: layerKey, facet: facet.key, ref }, note },
+        logText: note ? `Proposed: ${note}` : 'Proposed' }, user.name);
+      return json(response, 201, { item }, { 'cache-control': 'no-store' });
+    }
+    return json(response, 405, { error: 'Method not allowed.' });
+  }
+  const siteRoute = /^\/api\/projects\/([^/]+)\/(?:layers\/([^/]+)\/knowledge\/(site|contents)|knowledge\/bindings\/([^/]+)(\/decide)?|knowledge\/(preview|propose))$/.exec(url.pathname);
+  if (siteRoute) {
+    const [projectId, layerKey, part, bindingId, decide, action] = siteRoute.slice(1).map(value => value ? decodeURIComponent(value) : value), noStore = { 'cache-control': 'no-store' };
+    if (request.method === 'GET' && part === 'site') return json(response, 200, knowledgeSites.site(projectId, user.id, layerKey), noStore);
+    if (request.method === 'GET' && part === 'contents') return json(response, 200, knowledgeSites.contents(projectId, user.id, layerKey, url.searchParams.get('node')), noStore);
+    if (request.method === 'GET' && bindingId && !decide) return json(response, 200, knowledgeSites.binding(projectId, user.id, bindingId), noStore);
+    if (request.method === 'POST' && bindingId && decide) return json(response, 200, knowledgeSites.decide(projectId, user.id, bindingId, (await readJson(request)).decision), noStore);
+    if (request.method === 'POST' && action === 'preview') return json(response, 200, knowledgeSites.preview(projectId, user.id, await readJson(request)), noStore);
+    if (request.method === 'POST' && action === 'propose') return json(response, 201, knowledgeSites.propose(projectId, user.id, await readJson(request)), noStore);
+    return json(response, 405, { error: 'Method not allowed.' });
+  }
+  const docsRoute = /^\/api\/projects\/([^/]+)\/layers\/([^/]+)\/knowledge\/(docs|doc|history|information)$/.exec(url.pathname);
+  if (docsRoute) {
+    const [projectId, layerKey, part] = docsRoute.slice(1).map(decodeURIComponent), noStore = { 'cache-control': 'no-store' };
+    const path = url.searchParams.get('path');
+    if (request.method === 'GET' && part === 'docs') return json(response, 200, docs.list(projectId, user.id, layerKey), noStore);
+    if (request.method === 'GET' && part === 'doc') return json(response, 200, docs.read(projectId, user.id, layerKey, path, url.searchParams.get('at')), noStore);
+    if (request.method === 'GET' && part === 'history') return json(response, 200, docs.history(projectId, user.id, layerKey, path), noStore);
+    if (request.method === 'PUT' && part === 'doc') {
+      const input = await readJson(request), saved = docs.save(projectId, user.id, layerKey, input);
+      if (saved.changed && /charter/.test(input.path || '')) stageLayerDiscovery(db, know, projectId);
+      return json(response, 200, saved, noStore);
+    }
+    if (request.method === 'PUT' && part === 'information') return json(response, 200, docs.saveInformation(projectId, user.id, layerKey, await readJson(request)), noStore);
+    return json(response, 405, { error: 'Method not allowed.' });
+  }
+  const refacetRoute = /^\/api\/projects\/([^/]+)\/(?:layers\/([^/]+)\/refacets|refacets\/([^/]+)\/decide|binding-changes\/([^/]+)\/decide|overlaps)$/.exec(url.pathname);
+  // Open refacets of one layer, for its Manage › Facets.
+  const pendingRefacets = /^\/api\/projects\/([^/]+)\/layers\/([^/]+)\/refacets$/.exec(url.pathname);
+  if (pendingRefacets && request.method === 'GET') {
+    const [projectId, layerKey] = pendingRefacets.slice(1).map(decodeURIComponent);
+    requireMember(db, user, projectId);
+    return json(response, 200, { refacets: refacetWork.pending(projectId, layerKey) }, { 'cache-control': 'no-store' });
+  }
+  if (refacetRoute && request.method === 'POST') {
+    const [projectId, layerKey, refacetId, changeId] = refacetRoute.slice(1).map(value => value ? decodeURIComponent(value) : value);
+    const input = await readJson(request), noStore = { 'cache-control': 'no-store' };
+    if (layerKey) return json(response, 201, refacetWork.propose(projectId, user.id, layerKey, input), noStore);
+    if (refacetId) return json(response, 200, refacetWork.decide(projectId, user.id, refacetId, input.decision, input.reason || null), noStore);
+    if (changeId) return json(response, 200, bindings.changes.decide(projectId, user.id, changeId, input.decision, input.reason || null), noStore);
+    return json(response, 201, refacetWork.chain(projectId, user.id, input), noStore);
+  }
+  const layerRoute = /^\/api\/projects\/([^/]+)\/layers(?:\/([^/]+)\/outputs\/([^/]+)\/([^/]+))?$/.exec(url.pathname);
+  if (layerRoute && request.method === 'GET') {
+    const [, projectId, layerKey, kind, recordId] = layerRoute.map(value => value ? decodeURIComponent(value) : value);
+    if (!layerKey) return json(response, 200, { layers: layerDescriptors(db, user.id, projectId) }, { 'cache-control': 'no-store' });
+    return json(response, 200, layerOutputRead(db, user.id, projectId, layerKey, kind, recordId), { 'cache-control': 'no-store' });
+  }
+  if (url.pathname === '/api/layer-catalog' && request.method === 'GET') return json(response, 200, { layers: layerCatalog });
+  const workStyleRoute = /^\/api\/projects\/([^/]+)\/work-style$/.exec(url.pathname);
+  if (workStyleRoute && request.method === 'PUT') {
+    const projectId = decodeURIComponent(workStyleRoute[1]);
+    return json(response, 200, setProjectWorkStyle(db, user, projectId, (await readJson(request)).workStyle));
+  }
+  const layerGrantRoute = /^\/api\/projects\/([^/]+)\/layer-grants$/.exec(url.pathname);
+  if (layerGrantRoute && request.method === 'PUT') {
+    const projectId = decodeURIComponent(layerGrantRoute[1]);
+    return json(response, 200, setLayerActionGrant(db, user, projectId, await readJson(request)));
+  }
+  // LAYER-BASE-01 B6: the state of a layer's own views, built from its pinned commit; asking starts a missing build.
+  const layerUiRoute = /^\/api\/projects\/([^/]+)\/layers\/([^/]+)\/ui$/.exec(url.pathname);
+  if (layerUiRoute && request.method === 'GET') {
+    const [projectId, layerKey] = layerUiRoute.slice(1).map(decodeURIComponent);
+    requireMember(db, user, projectId);
+    return json(response, 200, views.status(db, projectId, layerKey), { 'cache-control': 'no-store' });
+  }
+  // T03-G2 (DEC-059): a layer's repository-mode output files. GET reads one at the pin; PUT commits a person's edit to main.
+  const layerFilesRoute = /^\/api\/projects\/([^/]+)\/layers\/([^/]+)\/files$/.exec(url.pathname);
+  if (layerFilesRoute) {
+    const [projectId, layerKey] = layerFilesRoute.slice(1).map(decodeURIComponent);
+    requireMember(db, user, projectId);
+    const path = url.searchParams.get('path') || '';
+    if (request.method === 'GET') return json(response, 200, readOutputFile(db, projectId, layerKey, path), { 'cache-control': 'no-store' });
+    if (request.method === 'PUT') {
+      const input = await readJson(request);
+      return json(response, 200, commitOutputFile(db, { projectId, key: layerKey, path, content: input.content, expectedCommit: input.expectedCommit, author: user.name,
+        message: typeof input.message === 'string' ? input.message : null }), { 'cache-control': 'no-store' });
+    }
+    return json(response, 405, { error: 'Method not allowed.' });
+  }
+  // PAGES-API-01: a layer's API. GET returns its OpenAPI document; POST calls one operation and applies it at once.
+  const layerApiRoute = /^\/api\/projects\/([^/]+)\/layers\/([^/]+)\/api(?:\/([A-Za-z][A-Za-z0-9]*))?$/.exec(url.pathname);
+  if (layerApiRoute) {
+    const [projectId, layerKey, operationId] = layerApiRoute.slice(1).map(value => value && decodeURIComponent(value));
+    requireMember(db, user, projectId);
+    const api = layerApi(db, projectId, layerKey);
+    if (!api) return json(response, 404, { error: 'This layer publishes no API.' });
+    if (request.method === 'GET' && !operationId) return json(response, 200, api.spec, { 'cache-control': 'no-store' });
+    if (request.method === 'POST' && operationId) {
+      const input = await readJson(request);
+      const work = know.openWorkItem(projectId, input.workItemId);
+      return json(response, 200, applyOperation({ db, know, api, projectId, operationId, id: input.id ?? null, body: input.body ?? {}, elevated: hasElevated(db, user.id, projectId, layerKey),
+        author: user.name, rationale: typeof input.rationale === 'string' ? input.rationale.slice(0, 300) : null, workItemId: work?.id || null }), { 'cache-control': 'no-store' });
+    }
+    return json(response, 405, { error: 'Method not allowed.' });
+  }
+  // DEC-057: per-layer elevated access and default assignee, shown in the layer's Manage › Access.
+  const layerAccessRoute = /^\/api\/projects\/([^/]+)\/layer-access\/([^/]+)$/.exec(url.pathname);
+  if (layerAccessRoute) {
+    const projectId = decodeURIComponent(layerAccessRoute[1]), layerKey = decodeURIComponent(layerAccessRoute[2]);
+    if (request.method === 'GET') return json(response, 200, layerAccess(db, user, projectId, layerKey), { 'cache-control': 'no-store' });
+    if (request.method === 'PUT') {
+      const input = await readJson(request);
+      if (Object.hasOwn(input, 'elevated')) setLayerElevated(db, user, projectId, { userId: input.userId, layerKey, enabled: input.elevated });
+      else if (Object.hasOwn(input, 'defaultAssignee')) setLayerDefaultAssignee(db, user, projectId, layerKey, input.defaultAssignee);
+      else return json(response, 400, { error: 'Change elevated access or the default assignee.' });
+      return json(response, 200, layerAccess(db, user, projectId, layerKey), { 'cache-control': 'no-store' });
+    }
+    return json(response, 405, { error: 'Method not allowed.' });
+  }
+  // DEC-057: a reviewer creates or dismisses each follow-up an agent proposed.
+  const followUpRoute = /^\/api\/projects\/([^/]+)\/work\/([^/]+)\/follow-ups\/([^/]+)$/.exec(url.pathname);
+  if (followUpRoute && request.method === 'POST') {
+    const [projectId, workId, followUpId] = followUpRoute.slice(1).map(decodeURIComponent);
+    requireMember(db, user, projectId);
+    return json(response, 200, decideFollowUp(db, know, user, projectId, workId, followUpId, String((await readJson(request)).decision || '')), { 'cache-control': 'no-store' });
+  }
+  const layerActionRoute = /^\/api\/projects\/([^/]+)\/layer-actions\/([^/]+)(?:\/([^/]+))?$/.exec(url.pathname);
+  if (layerActionRoute) {
+    const projectId = decodeURIComponent(layerActionRoute[1]);
+    const layerKey = decodeURIComponent(layerActionRoute[2]);
+    if (request.method === 'GET' && !layerActionRoute[3]) return json(response, 200, { actions: layerActionSettings(db, user, projectId, layerKey) }, { 'cache-control': 'no-store' });
+    if (request.method === 'PUT' && layerActionRoute[3]) {
+      const actionId = decodeURIComponent(layerActionRoute[3]);
+      if (!actionId.startsWith(`${layerKey}.`)) return json(response, 404, { error: 'Action not found.' });
+      const input = await readJson(request);
+      if (Object.hasOwn(input, 'method')) return json(response, 200, setActionMethod(db, user, projectId, actionId, input.method, input.expectedRevision));
+      if (Object.hasOwn(input, 'assignee')) return json(response, 200, setActionAssignee(db, user, projectId, actionId, input.assignee));
+      return json(response, 400, { error: 'Choose method or default assignee.' });
+    }
+    return json(response, 405, { error: 'Method not allowed.' });
+  }
+  const instanceRoute = /^\/api\/projects\/([^/]+)\/layer-instances(?:\/([^/]+))?$/.exec(url.pathname);
+  if (instanceRoute) {
+    const projectId = decodeURIComponent(instanceRoute[1]);
+    if (request.method === 'GET' && !instanceRoute[2]) return json(response, 200, { layers: layerInstances(db, user.id, projectId) }, { 'cache-control': 'no-store' });
+    if (request.method === 'PUT' && instanceRoute[2]) {
+      const updated = updateLayerInstance(db, user.id, projectId, decodeURIComponent(instanceRoute[2]), await readJson(request));
+      if (updated.enabled && updated.key === 'product') { know.ensureProject(projectId, { pitch: flows.projectSetup(user, projectId).project.description, seedRoutines: false }); know.ensurePlan(projectId); }
+      if (updated.enabled && updated.key === 'design') know.ensureDesign(projectId);
+      if (updated.enabled) migrateActionProject(db, projectId);
+      stageLayerDiscovery(db, know, projectId);
+      if (['product','pages'].includes(updated.key)) reconcilePagesFlow(db, know, projectId);
+      return json(response, 200, updated, { 'cache-control': 'no-store' });
+    }
+    return json(response, 405, { error: 'Method not allowed.' });
+  }
+  const inventoryRoute = /^\/api\/projects\/([^/]+)\/layers-inventory$/.exec(url.pathname);
+  if (inventoryRoute && request.method === 'GET') return json(response, 200, layerMigrationInventory(db, user.id, decodeURIComponent(inventoryRoute[1])), { 'cache-control': 'no-store' });
+
   const candidateAcceptRoute = /^\/api\/projects\/([^/]+)\/candidates\/([^/]+)\/accept$/.exec(url.pathname);
   if (candidateAcceptRoute) {
     const [, projectId, candidateId] = candidateAcceptRoute;
@@ -532,6 +1002,8 @@ async function api(request, response, url) {
     if (operation === 'review' && request.method === 'PUT') return json(response, 200, runHistory.saveReview(projectId, workId, attemptId, await readJson(request)), { 'cache-control': 'no-store' });
     if (operation === 'sign' && request.method === 'POST') {
       const input = await readJson(request);
+      const signing = know.workById(projectId, workId);
+      if (signing?.scope === 'layer') requireElevated(db, user, projectId, signing.layer, 'sign this review');
       const stamp = () => new Date().toISOString();
       const signed = await runHistory.sign(user, projectId, workId, attemptId, { outcome: String(input.outcome || ''), comment: typeof input.comment === 'string' ? input.comment : '' }, {
         accept: async run => {
@@ -554,6 +1026,8 @@ async function api(request, response, url) {
         },
       });
       settleSymphonyBatch(projectId, signed.batchId);
+      // An accepted merge moves the layer's main; build its views now so the next visit is ready.
+      if (signing?.scope === 'layer') views.status(db, projectId, signing.layer);
       return json(response, 200, { run: signed, work: know.workById(projectId, workId) }, { 'cache-control': 'no-store' });
     }
     return json(response, 405, { error: 'Method not allowed.' });
@@ -588,7 +1062,7 @@ async function api(request, response, url) {
       return json(response, 200, { preview, url: link }, { 'cache-control': 'no-store' });
     } finally { rmSync(snapshot, { recursive: true, force: true }); }
   }
-  const projectRoute = /^\/api\/projects\/([^/]+)\/(setup|preferences|design|pages|assets|features|stack|connections\/agent|steps|repository|skeleton|preview|knowledge|records|work|editor|candidates|openapi\.json|platform|database|code|reconcile|agents|changes|routines|batches|docs|comments|brand-templates)(?:\/([^/]+))?$/.exec(url.pathname);
+  const projectRoute = /^\/api\/projects\/([^/]+)\/(setup|preferences|design|pages|assets|features|stack|connections\/agent|steps|repository|skeleton|preview|knowledge|records|work|editor|candidates|openapi\.json|platform|database|code|reconcile|agents|changes|routines|batches|docs|comments|brand-templates|library)(?:\/([^/]+))?$/.exec(url.pathname);
   if (projectRoute) {
     const [, rawId, section, rawItem] = projectRoute;
     const projectId = decodeURIComponent(rawId);
@@ -597,7 +1071,7 @@ async function api(request, response, url) {
     const method = request.method;
     // After any successful change to a project's layers, the gaps they reveal become backlog items (DEC-041).
     if (method !== 'GET' && projectId !== aludelProjectId && ['records', 'work', 'features', 'pages', 'skeleton', 'routines', 'batches'].includes(section)) {
-      response.once('finish', () => { if (response.statusCode < 400) { try { know.syncBacklog(projectId); } catch (error) { console.error(`Backlog for ${projectId}: ${error.message}`); } } });
+      response.once('finish', () => { if (response.statusCode < 400) { try { know.syncBacklog(projectId); reconcilePagesFlow(db, know, projectId); } catch (error) { console.error(`Backlog for ${projectId}: ${error.message}`); } } });
     }
     // Candidate evidence is project-scoped and read-only. Promotion needs a separate reviewed flow.
     if (section === 'candidates' && method === 'GET') {
@@ -618,14 +1092,27 @@ async function api(request, response, url) {
     if (section === 'editor' && method === 'POST') return json(response, 201, editor.issue(user, projectId), { 'cache-control': 'no-store' });
     if (section === 'editor' && method === 'DELETE') return json(response, 200, editor.revoke(user, projectId));
     if (section === 'setup' && method === 'GET') return json(response, 200, projectView(user, projectId));
+    // DEC-059: the Library pools every layer's accepted outputs and Knowledge with research; layers read each other here.
+    if (section === 'library' && !item && method === 'GET') {
+      const param = name => url.searchParams.get(name) || null;
+      return json(response, 200, pool.search(projectId, user.id, { q: param('q') || '', layer: param('layer'), kind: param('kind'), source: param('source'),
+        cursor: Number(param('cursor') || 0), limit: Number(param('limit') || 50), withData: param('data') === '1' }), { 'cache-control': 'no-store' });
+    }
+    if (section === 'library' && item === 'entry' && method === 'GET') {
+      const revision = url.searchParams.get('revision');
+      return json(response, 200, pool.read(projectId, user.id, url.searchParams.get('ref'), revision === null ? null : Number(revision)), { 'cache-control': 'no-store' });
+    }
     // LAY-03: the layers read one project snapshot and write records and work items through the knowledge module.
     if (section === 'knowledge' && method === 'GET') {
+      know.ensureAgents(projectId);
       ensureWorkerPool(projectId);
       if (projectId === aludelProjectId) return json(response, 409, { error: 'Aludel’s own knowledge moves into its layers in LAY-06.' });
       // A project made after start-up plans itself the first time its layers are opened (after onboarding chose its story packs).
-      know.ensurePlan(projectId);
-      know.ensureDesign(projectId);
-      know.ensureFlows(projectId);
+      const active = new Set(layerInstances(db, user.id, projectId).filter(layer => layer.enabled).map(layer => layer.key));
+      if (active.has('product')) know.ensurePlan(projectId);
+      if (active.has('design')) know.ensureDesign(projectId);
+      if (active.has('pages') && active.has('product')) know.ensureFlows(projectId);
+      stageLayerDiscovery(db, know, projectId);
       const view = know.view(user, projectId, { builtBy: links.builtBy(projectId) });
       const batchView = runs.view(projectId);
       const poolView = workerPoolView(projectId);
@@ -678,7 +1165,7 @@ async function api(request, response, url) {
         if (!inspectGitRepository(workspace).committed) return json(response, 409, { error: 'The repository does not exist yet. Finish setup first.' });
         const setup = flows.projectSetup(user, projectId);
         return json(response, 200, starterDocs(workspace, { project: setup.project, stories: storyRefs(projectId), personas: know.list(projectId, 'persona'), objects: know.list(projectId, 'data_object'),
-          operations: know.list(projectId, 'data_operation'), tokens: know.list(projectId, 'design_tokens')[0] || null, components: know.list(projectId, 'component'), stack: readStack(workspace) }));
+          operations: know.list(projectId, 'data_operation'), tokens: know.list(projectId, 'design_tokens', { layer: 'design' })[0] || null, components: know.list(projectId, 'component', { layer: 'design' }), stack: readStack(workspace) }));
       }
       if (item === 'docs-refresh' && method === 'POST') {
         const input = await readJson(request);
@@ -725,17 +1212,43 @@ async function api(request, response, url) {
       writeFiles(setup.workspacePath, { 'docs/agents.md': agentsGuide(setup, catalogs) });
       return json(response, 200, { written: 'docs/agents.md', committed: false });
     }
+    // A layer frame changes only records its own layer owns, and Library records when it asks for that host feature.
+    const frameOwns = kind => frameLayer === undefined || kindOwners(db, projectId, kind).some(owner => owner.key === frameLayer)
+      || layerHostCalls(db, projectId, String(frameLayer)).some(name => hostRecordFeatures[name]?.includes(kind));
     if (section === 'records' && method === 'POST' && !item) {
       const input = await readJson(request);
+      if (!frameOwns(String(input.kind || ''))) return json(response, 403, { error: 'A layer view changes only its own records.' });
+      if (['role', 'work_action'].includes(input.kind)) return json(response, 409, { error: 'Historical role records are read-only. Configure actions in their layer.' });
       const work = know.openWorkItem(projectId, input.workItemId);
+      // A kind a layer's API owns changes only through that API.
+      const call = recordCall(db, projectId, String(input.kind || ''), { layer: typeof input.layer === 'string' ? input.layer : null, mode: 'create' });
+      if (call) return json(response, 201, applyOperation({ db, know, api: call.owner.api, projectId, operationId: call.operation.operationId,
+        body: call.operation.singleton ? input.data || {} : { [call.operation.field]: input.data || {}, ...(call.operation.parentField && input.parentId ? { [call.operation.parentField]: input.parentId } : {}) },
+        elevated: hasElevated(db, user.id, projectId, call.owner.key),
+        author: user.name, rationale: input.rationale || null, workItemId: work?.id || null }).record);
       return json(response, 201, know.insert(projectId, String(input.kind || ''), input.data || {}, { parentId: input.parentId || null, author: user.name, rationale: input.rationale || null, workItemId: work?.id || null }));
     }
+    if (section === 'records' && ['PUT', 'DELETE'].includes(method) && item && !frameOwns(know.get(projectId, item)?.kind || '')) return json(response, 403, { error: 'A layer view changes only its own records.' });
     if (section === 'records' && method === 'PUT' && item) {
       const input = await readJson(request);
+      if (['role', 'work_action'].includes(know.get(projectId, item)?.kind)) return json(response, 409, { error: 'Historical role records are read-only. Configure actions in their layer.' });
       const work = know.openWorkItem(projectId, input.workItemId);
+      const existing = know.get(projectId, item);
+      const call = existing && recordCall(db, projectId, existing.kind, { instanceId: db.prepare('SELECT layer_instance_id FROM knowledge_records WHERE id = ?').get(item)?.layer_instance_id || null, mode: 'update' });
+      const expected = input.expectedRevision !== undefined ? { expectedRevision: Number(input.expectedRevision) } : {};
+      if (call) return json(response, 200, applyOperation({ db, know, api: call.owner.api, projectId, operationId: call.operation.operationId,
+        id: call.operation.singleton ? null : item, elevated: hasElevated(db, user.id, projectId, call.owner.key),
+        body: call.operation.singleton ? { ...Object.fromEntries(Object.entries(existing).filter(([key]) => !['id', 'kind', 'parentId', 'position', 'revision', 'updatedAt'].includes(key))), ...(input.data || {}), ...expected }
+          : { changes: input.data || {}, ...expected, ...(call.operation.parentField && input.parentId ? { [call.operation.parentField]: input.parentId } : {}) },
+        author: user.name, rationale: input.rationale || null, workItemId: work?.id || null, ...(input.position !== undefined ? { position: input.position } : {}) }).record);
       return json(response, 200, know.update(projectId, item, input.data || {}, { expectedRevision: input.expectedRevision, author: user.name, rationale: input.rationale || null, position: input.position, parentId: input.parentId, workItemId: work?.id || null }));
     }
     if (section === 'records' && method === 'DELETE' && item) {
+      const existing = know.get(projectId, item);
+      const owner = existing && layerApiForKind(db, projectId, existing.kind, { instanceId: db.prepare('SELECT layer_instance_id FROM knowledge_records WHERE id = ?').get(item)?.layer_instance_id || null });
+      const remove = owner && recordOperations(owner.api, existing.kind).remove;
+      if (remove) { applyOperation({ db, know, api: owner.api, projectId, operationId: remove.operationId, id: item, body: {}, elevated: hasElevated(db, user.id, projectId, owner.key), author: user.name });
+        return json(response, 200, { deleted: item }); }
       const record = ['story', 'spec', 'doc', 'research', 'persona', 'activity', 'step', 'data_object', 'data_operation', 'access_rule', 'brief_claim', 'source', 'finding', 'insight', 'evidence_link', 'project', 'component', 'brand_asset', 'flow', 'page'].flatMap(kind => know.list(projectId, kind)).find(entry => entry.id === item);
       if (!record) return json(response, 409, { error: 'That record cannot be deleted here.' });
       // PAGES-UX-01: only page blanks go from the Map. Pages in the navigation change in the navigation editor; built pages change through a change request.
@@ -748,11 +1261,12 @@ async function api(request, response, url) {
     if (section === 'work' && method === 'POST' && !item) {
       // People stage suggestions; reconcile and routine contexts are only ever written by the server.
       const input = await readJson(request);
+      delete input.layerScoped;
       if (input.action) {
-        const selected = know.roleView(projectId).flatMap(role => role.actions.map(action => ({ ...action, layer: role.layer }))).find(action => action.id === input.action);
-        if (!selected || input.layer && input.layer !== selected.layer || input.type && input.type !== selected.type) throw Object.assign(new Error('Choose a current role action.'), { status: 400 });
+        const selected = know.view(user, projectId).layerActions.find(action => action.id === input.action);
+        if (!selected || input.layer && input.layer !== selected.layer || input.type && input.type !== selected.type) throw Object.assign(new Error('Choose an installed layer action.'), { status: 400 });
       }
-      return json(response, 201, know.createWork(projectId, { ...input, context: typeof input.suggestion === 'string' ? { suggestion: input.suggestion.slice(0, 2000) } : null }, user.name));
+      return json(response, 201, know.createWork(projectId, { ...input, context: typeof input.suggestion === 'string' ? { suggestion: input.suggestion.slice(0, 2000) } : (actionForProject(db,projectId,input.action)?.result?.kind === 'markdown_document' && typeof input.context?.markdownPath === 'string' ? { markdownPath: input.context.markdownPath.slice(0,240), markdownFileId: typeof input.context.markdownFileId === 'string' ? input.context.markdownFileId.slice(0,80) : null, markdownRevision: Number.isInteger(input.context.markdownRevision) ? input.context.markdownRevision : null } : null) }, user.name));
     }
     if (section === 'work' && method === 'PUT' && item) {
       const input = await readJson(request);
@@ -775,6 +1289,7 @@ async function api(request, response, url) {
       if (input.stop === true) return json(response, 200, runs.stopItem(user, projectId, item));
       if (input.assignee !== undefined) return json(response, 200, runs.reassign(user, projectId, item, input.assignee));
       if (typeof input.note === 'string' && input.note.trim()) know.appendLog(item, input.note.trim().slice(0, 500), {}, { by: { kind: 'person', id: user.id } });
+      if (input.sendBack && know.workById(projectId, item)?.scope === 'layer') requireElevated(db, user, projectId, know.workById(projectId, item).layer, 'send this back');
       if (input.sendBack && know.workById(projectId, item)?.action === 'platform.implement') {
         const before = know.workById(projectId, item);
         const result = know.updateWork(user, projectId, item, input);
@@ -798,7 +1313,7 @@ async function api(request, response, url) {
         worker.rejectProposal(projectId, item, before.context.visionProposal.id);
       }
       if (before?.context?.workProposal?.id && input.sendBack) worker.rejectProposal(projectId, item, before.context.workProposal.id);
-      if (['platform.security', 'product.define', 'product.clarify', 'product.brief', 'data.contract', 'design.audit', 'pages.a11y', 'deploy.review', 'work.review'].includes(before?.action) &&
+      if ((before?.scope === 'layer' || ['platform.security', 'product.define', 'product.clarify', 'product.brief', 'data.contract', 'design.audit', 'pages.a11y', 'pages.flows', 'deploy.review', 'work.review'].includes(before?.action)) &&
           (input.sendBack || input.state === 'done' || input.answer !== undefined)) settleSymphonyBatch(projectId, before.context?.batch);
       return json(response, 200, updated);
     }
@@ -808,7 +1323,7 @@ async function api(request, response, url) {
       const input = await readJson(request);
       if (item === 'start') { const { batch } = runs.start(user, projectId, String(input.batchId || ''), input.requestedSlots ?? 1); return json(response, 202, { batch }); }
       if (item === 'stop') return json(response, 200, { batch: runs.stop(user, projectId, String(input.batchId || '')) });
-      if (item === 'next') return json(response, 200, runs.next(user, projectId, input.assignee, input.count));
+      if (item === 'next') return json(response, 200, runs.next(user, projectId, input.assignee, input.count, typeof input.layer === 'string' && input.layer ? input.layer : null));
     }
     // ROADMAP-01: documents generated from the Brief, and comments on insights.
     if (section === 'docs' && method === 'POST') return json(response, item ? 200 : 201, know.generateDoc(user, projectId, { generator: String((await readJson(request)).generator || ''), id: item }));
@@ -994,7 +1509,7 @@ function serveStatic(response, pathname) {
 function serveFile(response, path) {
   const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml' }[extname(path)] || 'application/octet-stream';
   const body = readFileSync(path);
-  response.writeHead(200, { 'content-type': mime, 'content-length': body.length, 'x-content-type-options': 'nosniff', 'content-security-policy': `default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-src ${topology.appOrigin('*')}; frame-ancestors 'self'` });
+  response.writeHead(200, { 'content-type': mime, 'content-length': body.length, 'x-content-type-options': 'nosniff', 'content-security-policy': `default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-src ${topology.appOrigin('*')} ${topology.layerOrigins}; frame-ancestors 'self'` });
   response.end(body);
 }
 
@@ -1030,17 +1545,37 @@ async function serveApp(request, response, slug) {
 const server = createServer(async (request, response) => {
   try {
     const target = topology.classify(request.headers.host);
-    if (target.kind === 'app') return await serveApp(request, response, target.slug);
-    if (target.kind !== 'portal') return appPage(response, 421, 'Unknown address', 'This host is not served by Aludel.');
-    const url = new URL(request.url, `http://${host}:${port}`);
-    if (url.pathname.startsWith('/api/')) await api(request, response, url);
-    else serveStatic(response, url.pathname);
+    // PROJECT-DB-01: each request runs with its project as the current project, so its statements reach only that
+    // project's database. The project comes from the URL, the worker credential or the app host.
+    const projectId = requestProject(request, target);
+    if (projectId) return await db.withProject(projectId, () => handle(request, response, target));
+    return await handle(request, response, target);
   } catch (error) {
     if (!error.status) console.error(error);
     if (!response.headersSent) json(response, error.status || 500, { error: error.status ? error.message : 'The local portal could not complete that operation.', currentRevision: error.currentRevision });
     else response.end();
   }
 });
+function requestProject(request, target) {
+  const known = id => id && db.prepare('SELECT 1 FROM projects WHERE id = ?').get(id) ? id : null;
+  if (target.kind === 'app') return db.prepare('SELECT id FROM projects WHERE slug = ?').get(target.slug)?.id || null;
+  if (target.kind !== 'portal') return null;
+  const path = new URL(request.url, 'http://portal').pathname;
+  const scoped = /^\/api\/projects\/([^/]+)/.exec(path);
+  if (scoped) return known(decodeURIComponent(scoped[1]));
+  if (path.startsWith('/api/worker/')) { try { return worker.authenticate(request.headers.authorization).projectId; } catch { return null; } }
+  return null;
+}
+async function handle(request, response, target) {
+  {
+    if (target.kind === 'app') return await serveApp(request, response, target.slug);
+    if (target.kind === 'layers') return views.serve(request, response, new URL(request.url, `http://${host}:${port}`).pathname, target.label);
+    if (target.kind !== 'portal') return appPage(response, 421, 'Unknown address', 'This host is not served by Aludel.');
+    const url = new URL(request.url, `http://${host}:${port}`);
+    if (url.pathname.startsWith('/api/')) await api(request, response, url);
+    else serveStatic(response, url.pathname);
+  }
+}
 
 server.listen(port, host, () => {
   console.log(`Aludel is running at ${topology.portalOrigin} (also http://${host}:${port})`);

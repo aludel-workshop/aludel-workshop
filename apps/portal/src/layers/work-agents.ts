@@ -144,7 +144,7 @@ export class WorkAgentsComponent {
   attach() { if (this.draft.attach) { this.draft.context = [...this.draft.context, this.draft.attach]; this.draft.attach = ''; } }
   randomSeed() { return `${Math.random().toString(36).slice(2, 10)}`; }
   openWork(profile: AgentProfile) { return (this.ctx.data()?.work || []).filter(item => item.assignee?.kind === 'agent' && item.assignee.id === profile.id && item.status !== 'done').length; }
-  defaultFor(profile: AgentProfile) { return (this.ctx.data()?.roles || []).flatMap(role => role.actions).filter(action => action.assignee?.kind === 'agent' && action.assignee.id === profile.id).length; }
+  defaultFor(profile: AgentProfile) { return (this.ctx.data()?.layerActions || []).filter(action => action.assignee?.kind === 'agent' && action.assignee.id === profile.id).length; }
   // Tokens from runs recorded on work items, for the profile: this batch run (the latest) and this calendar month.
   private usage(profile: AgentProfile, filter: (run: { at?: string; batch?: string }) => boolean) {
     return (this.ctx.data()?.work || []).map(item => item.context?.run).filter(run => run?.profileId === profile.id && run.usage && filter(run))

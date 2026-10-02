@@ -119,7 +119,9 @@ export function answerDecision(db, id, input) {
   return getDecision(db, id);
 }
 
+// Downstream records are the-machine's own bootstrap records (PROJECT-DB-01).
 export function listDownstreamRecords(db) {
+  if (db.withProject && !db.currentProject) return db.withProject('the-machine', () => listDownstreamRecords(db));
   return db.prepare(`SELECT r.*,
     (SELECT COUNT(*) FROM record_dependencies x WHERE x.downstream_record_id = r.id) AS dependency_count
     FROM downstream_records r ORDER BY CASE r.currency WHEN 'stale' THEN 0 ELSE 1 END, r.id`).all();

@@ -16,6 +16,8 @@ defmodule SymphonyElixir.Aludel.Adapter do
   @read_tool "aludel_knowledge_read"
   @audit_tool "aludel_submit_audit"
   @proposal_tool "aludel_submit_proposal"
+  @layer_tool "aludel_layer_call"
+  @layer_commit_tool "aludel_layer_commit"
   @ask_tool "aludel_task_ask"
   @plan_tool "aludel_task_plan"
   @progress_tool "aludel_task_progress"
@@ -40,7 +42,7 @@ defmodule SymphonyElixir.Aludel.Adapter do
     cond do
       is_nil(uri) or is_nil(uri.host) or
           not (uri.scheme == "https" or
-                   (uri.scheme == "http" and uri.host in ["localhost", "aludel.localhost", "127.0.0.1", "::1"])) ->
+                   (uri.scheme == "http" and uri.host in ["localhost", "aludel.localhost", "aludel.layers.localhost", "127.0.0.1", "::1"])) ->
         {:error, :invalid_aludel_endpoint}
 
       not is_list(settings.active_states) or "Ready" not in settings.active_states ->
@@ -253,7 +255,7 @@ defmodule SymphonyElixir.Aludel.Adapter do
       %{
         "name" => @proposal_tool,
         "description" =>
-          "Submit a bounded read-only action proposal to Aludel Work review. Product.brief content needs section, text, note, basis. Other supported actions use their task card output fields.",
+          "Submit this run to Aludel Work review. For a layer task: its staged layer API changes and committed layer branch go with it; give a summary, notes, follow-ups, and evidence for each criterion. For an action task: a bounded read-only proposal (product.brief content needs section, text, note, basis; other actions use their task card output fields).",
         "inputSchema" => %{
           "type" => "object",
           "additionalProperties" => false,
@@ -267,10 +269,67 @@ defmodule SymphonyElixir.Aludel.Adapter do
               "properties" => %{
                 "summary" => %{"type" => "string", "minLength" => 10, "maxLength" => 1000},
                 "content" => %{"type" => "object"},
+                "followUps" => %{
+                  "type" => "array",
+                  "maxItems" => 5,
+                  "items" => %{
+                    "type" => "object",
+                    "required" => ["layer", "title", "why"],
+                    "properties" => %{
+                      "layer" => %{"type" => "string"},
+                      "title" => %{"type" => "string", "maxLength" => 160},
+                      "brief" => %{"type" => "string", "maxLength" => 2000},
+                      "why" => %{"type" => "string", "minLength" => 10, "maxLength" => 1000}
+                    }
+                  }
+                },
                 "usedInputs" => %{
                   "type" => "array",
                   "maxItems" => 40,
                   "items" => %{"type" => "object", "required" => ["id", "revision"], "properties" => %{"id" => %{"type" => "string"}, "revision" => %{"type" => "integer", "minimum" => 1}}}
+                }
+              }
+            }
+          }
+        }
+      },
+      %{
+        "name" => @layer_tool,
+        "description" =>
+          "Call an operation of this task's layer API (listed in the task card's layerApi OpenAPI document). Reads include your staged changes; writes are staged for this run and apply only after an elevated reviewer accepts it.",
+        "inputSchema" => %{
+          "type" => "object",
+          "additionalProperties" => false,
+          "required" => ["attemptId", "operation"],
+          "properties" => %{
+            "attemptId" => %{"type" => "string", "pattern" => "^att-[0-9a-f-]{36}$"},
+            "operation" => %{"type" => "string", "pattern" => "^[A-Za-z][A-Za-z0-9]*$"},
+            "id" => %{"type" => "string", "pattern" => "^[a-z]+-[a-z0-9]{6,12}$"},
+            "body" => %{"type" => "object"}
+          }
+        }
+      },
+      %{
+        "name" => @layer_commit_tool,
+        "description" =>
+          "Commit your edits in layer/ as this run's work branch of the layer repository, with the result of each test you ran (node --test tests/*.test.mjs). An elevated reviewer sees the diff and results; accepting merges the branch.",
+        "inputSchema" => %{
+          "type" => "object",
+          "additionalProperties" => false,
+          "required" => ["attemptId", "message", "tests"],
+          "properties" => %{
+            "attemptId" => %{"type" => "string", "pattern" => "^att-[0-9a-f-]{36}$"},
+            "message" => %{"type" => "string", "minLength" => 3, "maxLength" => 300},
+            "tests" => %{
+              "type" => "array",
+              "maxItems" => 200,
+              "items" => %{
+                "type" => "object",
+                "required" => ["name", "status"],
+                "properties" => %{
+                  "name" => %{"type" => "string", "maxLength" => 200},
+                  "status" => %{"type" => "string", "enum" => ["passed", "failed", "skipped"]},
+                  "detail" => %{"type" => "string", "maxLength" => 2000}
                 }
               }
             }
@@ -408,6 +467,27 @@ defmodule SymphonyElixir.Aludel.Adapter do
     settings = Keyword.get_lazy(opts, :tracker_settings, fn -> Config.settings!().tracker end)
 
     case post_request("attempts/" <> attempt_id <> "/proposal", %{"proposal" => proposal, "evidence" => Map.get(args, "evidence", [])}, settings) do
+      {:ok, result} -> tool_result(true, result)
+      {:error, reason} -> tool_result(false, %{"error" => inspect(reason)})
+    end
+  end
+
+  @impl true
+  def execute_agent_tool(@layer_commit_tool, %{"attemptId" => attempt_id, "message" => message} = args, opts) do
+    settings = Keyword.get_lazy(opts, :tracker_settings, fn -> Config.settings!().tracker end)
+
+    case post_request("attempts/" <> attempt_id <> "/layer-commit", %{"message" => message, "tests" => Map.get(args, "tests", [])}, settings) do
+      {:ok, result} -> tool_result(true, result)
+      {:error, reason} -> tool_result(false, %{"error" => inspect(reason)})
+    end
+  end
+
+  @impl true
+  def execute_agent_tool(@layer_tool, %{"attemptId" => attempt_id, "operation" => operation} = args, opts) do
+    settings = Keyword.get_lazy(opts, :tracker_settings, fn -> Config.settings!().tracker end)
+    payload = %{"operation" => operation, "id" => Map.get(args, "id"), "body" => Map.get(args, "body", %{})}
+
+    case post_request("attempts/" <> attempt_id <> "/layer", payload, settings) do
       {:ok, result} -> tool_result(true, result)
       {:error, reason} -> tool_result(false, %{"error" => inspect(reason)})
     end

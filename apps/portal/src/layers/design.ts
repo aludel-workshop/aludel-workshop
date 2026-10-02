@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, DestroyRef, computed, effect, inject } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { ProjectContext } from './context';
 import { DesignBrandComponent } from './design-brand';
@@ -14,11 +14,6 @@ import { DocsComponent } from './doc-view';
   imports: [MatIconModule, DesignTokensComponent, DesignComponentsComponent, DesignBrandComponent, DocsComponent],
   providers: [DesignState],
   template: `
-  <p class="lay-eyebrow">Design · the design system</p>
-  <h1 tabindex="-1">{{ ctx.setup()?.project?.name }}'s design system</h1>
-  <nav class="lay-tabs" aria-label="Design sections">
-    @for (entry of tabs; track entry[0]) { <a [href]="ctx.link('design', entry[0])" (click)="ctx.go(ctx.link('design', entry[0]), $event)" [class.active]="tab() === entry[0]" [attr.aria-current]="tab() === entry[0] ? 'page' : null"><mat-icon aria-hidden="true">{{ entry[2] }}</mat-icon>{{ entry[1] }}@if (entry[0] === 'tokens' && ds.dirty()) { <span class="lay-ds-dirtydot" aria-label="unsaved changes"></span> }</a> }
-  </nav>
   @if (!ctx.data()?.tokens) { <p class="lay-muted">Loading the design system…</p> }
   @else {
     @switch (tab()) {
@@ -33,6 +28,9 @@ import { DocsComponent } from './doc-view';
 export class DesignLayerComponent {
   readonly ctx = inject(ProjectContext);
   readonly ds = inject(DesignState);
+  // The shell's layer bar marks the Tokens tab while it has unsaved edits.
+  private readonly markDirty = effect(() => { const dirty = this.ds.dirty(); this.ctx.dirtyTabs.update(tabs => ({ ...tabs, 'design/tokens': dirty })); });
+  private readonly clearDirty = inject(DestroyRef).onDestroy(() => this.ctx.dirtyTabs.update(tabs => ({ ...tabs, 'design/tokens': false })));
   readonly tabs = [['tokens', 'Tokens', 'tune'], ['components', 'Components', 'widgets'], ['brand', 'Brand', 'verified'], ['docs', 'Docs', 'description']];
   // Older links (foundations, patterns, guidelines, sources) land on Tokens.
   readonly tab = computed(() => { const tab = this.ctx.segments()[1]; return ['components', 'brand', 'docs'].includes(tab) ? tab : 'tokens'; });

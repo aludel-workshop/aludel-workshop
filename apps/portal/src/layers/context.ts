@@ -67,8 +67,9 @@ export interface AgentProfile extends RecordBase { key: string | null; name: str
   context: string[]; limits: ProfileLimits; active: boolean; history: Revision[]; }
 export interface Pin { id: string; revision: number; key?: string; }
 export interface InstructionPins { principles: Pin | null; project: Pin | null; role: Pin | null; action: Pin | null; profile: Pin | null; }
-// Work › Roles: one role per layer, and the actions it performs, each with its own setup.
+// Historical Work roles remain readable; installed actions are owned by their layers.
 export interface Assignee { kind: 'person' | 'agent' | 'template'; id: string | null; label?: string; }
+export interface LayerWorkAction { id: string; layer: string; name: string; description: string; type: string; changes: string[]; checks: string[]; elevated: boolean; assignee: Assignee | null; agentRunnable: boolean; humanRunnable: boolean; }
 export interface WorkAction { id: string; recordId: string | null; revision: number; name: string; description: string; type: string; routine: string | null; assignee: Assignee | null;
   instructions: string; reads: string[]; changes: string[]; tools: string[]; asks: string; phases: string[]; checks: string[]; elevated: boolean; }
 export interface Role { id: string | null; layer: string; name: string; blurb: string; instructions: string; revision: number; members: { id: string; lead: boolean }[]; actions: WorkAction[]; }
@@ -85,10 +86,10 @@ export interface LogEntry { at: string; text: string; refs?: string[]; by?: { ki
 export interface ExecutionBlock { code: string; reason: string; recovery: 'deploy' | 'agents' | 'retry'; }
 export interface RunState { phases?: string[]; phase?: number; activity?: string; startedAt?: string; finishedAt?: string; model?: string; provider?: string; batch?: string; profileId?: string;
   usage?: { input: number; output: number }; at?: string; done?: boolean; }
-export interface WorkItem { id: string; number: number; ref: string; layer: string; type: string; action: string | null; title: string; state: string; status: WorkStatus; priority: string;
+export interface WorkItem { id: string; number: number; ref: string; layer: string; type: string; action: string | null; scope?: 'layer' | 'action'; title: string; state: string; status: WorkStatus; priority: string;
   assignee: Assignee | null; targets: WorkTarget[]; blocks: string[]; blockedBy: string[]; checks: WorkCheck[];
   question: { text: string; options: string[]; answer?: string; rationale?: string; answeredBy?: string; applied?: string[]; recommendation?: string; reasoning?: string } | null; documents: string[]; log: LogEntry[]; createdAt: string; updatedAt: string;
-  profileId: string | null; instructions: InstructionPins | null; project: string | null; checkpoint: string | null;
+  profileId: string | null; instructions: InstructionPins | null; migration?: { actionId: string | null; actionRevision: number | null; disposition: 'mapped' | 'blocked'; reason: string | null } | null; project: string | null; checkpoint: string | null;
   context: { reconcile?: { recordId: string; fromRevision: number; toRevision: number }; routine?: string; suggestion?: string; batch?: string; staged?: boolean; skip?: boolean;
     feedback?: { check: string; note: string; by: string; at: string }[]; reviewComment?: string | null; run?: RunState; personRun?: string; executionBlock?: ExecutionBlock;
     visionProposal?: { id: string; section: string; text: string; note: string; basis: string; targetId: string | null;
@@ -99,9 +100,16 @@ export interface WorkItem { id: string; number: number; ref: string; layer: stri
 export interface FieldChange { field: string; before: unknown; after: unknown; }
 // WORK-ITEM-UX-01: one started run of a work item, with the task it was given, what it produced and how it was signed.
 export type WorkRunState = 'working' | 'needs' | 'review' | 'failed' | 'stopped' | 'accepted' | 'sent' | 'closed';
-export interface RunChange { id: string; kind: 'claim' | 'proposal' | 'report' | 'file'; icon: string; name: string; op: 'created' | 'modified' | 'removed'; size: string;
-  before?: string | null; after?: string; note?: string; basis?: string; content?: Record<string, unknown>; findings?: { severity: string; title: string; affected: string; evidence: string; recommendation: string }[]; candidateId?: string; }
+export interface RunChange { id: string; kind: 'claim' | 'proposal' | 'flow' | 'flow-revision' | 'record' | 'source' | 'report' | 'file'; icon: string; name: string; op: 'created' | 'modified' | 'removed'; size: string;
+  before?: string | null; after?: string; note?: string; basis?: string; content?: Record<string, unknown>; findings?: { severity: string; title: string; affected: string; evidence: string; recommendation: string }[]; candidateId?: string;
+  // PAGES-API-01: the fields a layer API change sets, before and after.
+  fields?: { name: string; before: string | null; after: string }[];
+  // LAYER-SOURCE-01: a changed file in the layer's repository.
+  diff?: string; ownerReview?: boolean; commit?: string; }
 export interface RunStep { seq: number; kind: 'plan' | 'progress' | 'note'; at: string; objectives?: string[]; index?: number; status?: 'active' | 'done' | 'stuck'; note?: string; text?: string; }
+// DEC-057: work an agent proposed for another (or its own) layer; the reviewer creates or dismisses each one.
+export interface RunFollowUp { id: string; position: number; layer: string; layerName: string; sourceLayer: string; title: string; brief: string; why: string;
+  state: 'proposed' | 'created' | 'dismissed'; createdWorkId: string | null; createdRef: string | null; decidedBy: string | null; decidedAt: string | null; }
 export interface WorkRun { id: string; number: number; batchId: string | null; state: WorkRunState;
   performer: { kind: 'agent' | 'person'; id: string; label: string; model: string | null; effort: string | null };
   startedAt: string; finishedAt: string | null; turns: { used: number; limit: number };
@@ -111,10 +119,12 @@ export interface WorkRun { id: string; number: number; batchId: string | null; s
   steps: RunStep[]; blockReason: string | null; changes: RunChange[];
   evidence: { criterion: number; type: 'change' | 'test' | 'try' | 'note'; ref: string; note: string; found: boolean; target: string | null; label: string; result?: string | null; independent?: boolean }[];
   candidate: { id: string; state: string; commit: string | null; base: string; checks: { name: string; status: string; detail: string; source?: string }[] } | null;
-  proposalId: string | null; reportId: string | null; summary?: string | null;
+  proposalId: string | null; reportId: string | null; summary?: string | null; followUps?: RunFollowUp[];
+  layerSource?: { branch: string; commit: string; base: string; tests: { name: string; status: string; detail?: string; source?: string }[] } | null;
   review: { verdicts: Record<string, { value: 'accept' | 'reject' | 'skip'; note: string }>; flags: Record<string, string>; outcome: WorkRunState | null; comment: string | null; signedBy: string | null; signedAt: string | null }; }
 export interface WorkChange { recordId: string; revision: number; author: string; rationale: string | null; createdAt: string; kind: string | null; exists: boolean; fields: FieldChange[]; }
-export interface Routine extends RecordBase { key: string | null; title: string; layer: string; type: string; cadence: string; documents: string[]; enabled: boolean; nextRunAt: string | null; lastRunAt: string | null; lastWorkId: string | null; history: Revision[]; }
+export interface Routine extends RecordBase { key: string | null; title: string; layer: string; type: string; cadence: string; documents: string[]; enabled: boolean; actionKey?: string | null; executor?: 'utility' | 'agent'; trigger?: 'manual' | 'schedule' | 'output-change'; instructionDoc?: string | null; allowedReads?: string[]; capabilities?: string[]; outputKinds?: string[]; nextRunAt: string | null; lastRunAt: string | null; lastWorkId: string | null; history: Revision[]; }
+export interface LayerInstance { key: string; instanceId: string; name: string; path: string; category: string; icon: string; color: string | null; description: string; enabled: boolean; visible: boolean; dashboardVisible: boolean; outputProvider: string; editorAdapter: string; outputTabs?: {key:string;label:string}[]; packageCommit?: string | null; workScope?: Record<string, string[]> | null; elevated?: boolean; frameUi?: boolean; builtIn: boolean; lifecycle: 'draft' | 'active'; identityRevision: number; identity: Record<string,string> | null; domainActions: {key:string;title:string;purpose:string;method:string;checks:string[];revision:number}[]; }
 export interface Knowledge {
   vision: Record<string, VisionSection>; personas: Persona[]; phases: Phase[]; activities: Activity[]; stories: Story[]; specs: Spec[];
   research: Research[]; docs: Doc[]; pages: Page[]; work: WorkItem[]; selectedPacks: string[];
@@ -122,7 +132,7 @@ export interface Knowledge {
   packs: Record<string, { label: string; summary: string; icon: string; stories: number; template: number }>;
   objects: DataObject[]; operations: DataOperation[]; access: AccessRule[]; services: Service[];
   profiles: AgentProfile[]; projectInstructions: (RecordBase & { body: string }) | null; workTypes: string[];
-  roles: Role[]; members: Member[];
+  roles: Role[]; layerActions: LayerWorkAction[]; layerGrants: { userId: string; layer: string; actionId: string; level: 'normal' | 'elevated' }[]; members: Member[];
   code: { indexedAt: string | null; units: CodeUnit[] };
   routines: Routine[]; batches: Batch[]; symphonyProfiles: string[]; workerPool: WorkerPool;
   claims: Claim[]; briefRevision: number; sources: Source[]; findings: Finding[]; insights: Insight[]; evidence: EvidenceLink[]; projects: PlanProject[];
@@ -168,16 +178,32 @@ export const projectStatusIcon: Record<string, string> = { backlog: 'radio_butto
 export const healthLabel: Record<string, string> = { on: 'On track', risk: 'At risk', off: 'Off track' };
 export const sourceTypeIcon: Record<string, string> = { interview: 'record_voice_over', observation: 'visibility', survey: 'ballot', link: 'link', article: 'article', competitor: 'storefront', screenshot: 'image', analytics: 'query_stats', note: 'edit_note' };
 export const layerLabel: Record<string, string> = { product: 'Vision', library: 'Library', design: 'Design', pages: 'Pages', data: 'Data', platform: 'Code', deploy: 'Deploy', work: 'Work' };
+// Built-in layers are editable templates (CUSTOM-LAYER-01), so their names come from the project's definitions.
+// reload() refreshes this map before it sets the signals that make templates render.
+const defaultLayerLabels = { ...layerLabel };
+function applyLayerNames(layers: { key: string; name: string }[]) {
+  for (const key of Object.keys(layerLabel)) if (!(key in defaultLayerLabels)) delete layerLabel[key];
+  Object.assign(layerLabel, defaultLayerLabels);
+  for (const layer of layers) layerLabel[layer.key] = layer.name;
+}
 export const dataStatusLabel: Record<string, string> = { proposed: 'Proposed', contracted: 'Contracted', built: 'Built', shipped: 'Shipped' };
 export const unitStateLabel: Record<string, string> = { healthy: 'Healthy', suspect: 'Suspect', untraced: 'Untraced', dead: 'Unused' };
 
 // One project's state for every layer component. Layers never fetch on their own; they call api() then reload().
+export type LibrarySource = 'output' | 'knowledge' | 'library';
+export type LibraryEntry = { ref: string; source: LibrarySource; layer: { key: string; name: string; instanceId: string | null }; kind: string; title: string;
+  revision: number; updatedAt: string | null; excerpt: string };
+export type LibraryRead = Omit<LibraryEntry, 'excerpt' | 'updatedAt'> & { currentRevision: number; content?: string; data?: Record<string, unknown> };
+
 @Injectable()
 export class ProjectContext {
   readonly session = signal<Session | null>(null);
   readonly setup = signal<ProjectSetup | null>(null);
   readonly data = signal<Knowledge | null>(null);
   readonly catalog = signal<Catalog | null>(null);
+  readonly layerInstances = signal<LayerInstance[]>([]);
+  // Output tabs with unsaved edits, keyed `layer/tab`. The shell's layer bar marks them; the layer component reports them.
+  readonly dirtyTabs = signal<Record<string, boolean>>({});
   readonly error = signal('');
   readonly notice = signal('');
   readonly path = signal(location.pathname);
@@ -192,7 +218,8 @@ export class ProjectContext {
   readonly unitById = computed(() => new Map((this.data()?.code.units || []).map(unit => [unit.id, unit])));
   readonly workById = computed(() => new Map((this.data()?.work || []).map(item => [item.id, item])));
   readonly memberById = computed(() => new Map((this.data()?.members || []).map(member => [member.id, member])));
-  readonly actionById = computed(() => new Map((this.data()?.roles || []).flatMap(role => role.actions.map(action => [action.id, action] as [string, WorkAction]))));
+  readonly actionById = computed(() => { const map = new Map((this.data()?.roles || []).flatMap(role => role.actions.map(action => [action.id, action] as [string, WorkAction])));
+    for (const action of this.data()?.layerActions || []) { const legacy = map.get(action.id); map.set(action.id, { recordId:null,revision:1,routine:null,instructions:'',reads:[],tools:[],asks:'',phases:[],...legacy,...action }); } return map; });
   readonly roleByLayer = computed(() => new Map((this.data()?.roles || []).map(role => [role.layer, role])));
   readonly claimById = computed(() => new Map((this.data()?.claims || []).map(claim => [claim.id, claim])));
   readonly insightById = computed(() => new Map((this.data()?.insights || []).map(insight => [insight.id, insight])));
@@ -266,7 +293,8 @@ export class ProjectContext {
     if (kind === 'data_operation') return this.link('data', 'api', id);
     if (kind === 'agent_profile') return this.link('work', 'agents', id);
     if (kind === 'work_item') return this.link('work', 'item', id);
-    if (kind === 'role' || kind === 'work_action') return this.link('work', 'roles', id);
+    if (kind === 'role' || kind === 'work_action') { const role = this.data()?.roles.find(entry => entry.id === id || entry.actions.some(action => action.recordId === id));
+      return role ? this.link(role.layer, 'tasks', 'actions') : this.link('work', 'items'); }
     if (kind === 'project_instructions') return this.link('work', 'agents');
     if (kind === 'doc') return this.link('library', 'docs', id);
     if (kind === 'component') return this.link('design', 'components', id);
@@ -339,9 +367,9 @@ export class ProjectContext {
     if (work) return info('work_item', 'Work item', 'task_alt', 'work', `${work.ref} ${work.title}`, work.title, { status: workStatusLabel[work.status], where: 'Work',
       facts: [['Priority', priorityLabel[work.priority]], ['Assignee', this.whoName(work.assignee)], ...(work.blockedBy.length ? [['Blocked by', work.blockedBy.map(other => this.workById().get(other)?.ref).join(', ')] as [string, string]] : [])] });
     const role = data.roles.find(entry => entry.id === id);
-    if (role) return info('role', 'Role instructions', 'menu_book', 'work', `${role.name} instructions`, `${role.name} instructions`, { where: 'Work › Roles', note: role.instructions, facts: [['Revision', String(role.revision)]] });
+    if (role) return info('role', 'Role instructions', 'menu_book', 'work', `${role.name} instructions`, `${role.name} instructions`, { where: `${layerLabel[role.layer]} › Operations · historical role`, note: role.instructions, facts: [['Revision', String(role.revision)]] });
     const action = data.roles.flatMap(entry => entry.actions).find(entry => entry.recordId === id);
-    if (action) return info('work_action', 'Action', 'tune', 'work', action.name, action.name, { where: 'Work › Roles', note: action.instructions || action.description, href: this.link('work', 'roles', action.id), facts: [['Revision', String(action.revision)]] });
+    if (action) return info('work_action', 'Action', 'tune', 'work', action.name, action.name, { where: 'Historical Work action', note: action.instructions || action.description, href: this.recordHref('work_action', id), facts: [['Revision', String(action.revision)]] });
     if (data.projectInstructions?.id === id) return info('project_instructions', 'Project instructions', 'menu_book', 'work', 'Project instructions', 'Project instructions', { where: 'Work › Agents', note: data.projectInstructions.body.slice(0, 240) });
     const unit = this.unitById().get(id);
     if (unit) return info('code_unit', 'Code unit', 'code', 'platform', unit.symbol, unit.symbol, { status: unitStateLabel[unit.state], where: 'Code › Explorer', facts: [['Path', unit.path], ['Kind', unit.kind]] });
@@ -383,20 +411,43 @@ export class ProjectContext {
   }
 
   // Evidence and documents write through here too.
+  // DEC-059: the Library pools every installed layer's outputs and Knowledge with its own research and documents.
+  librarySearch(query: { q?: string; layer?: string; kind?: string; source?: string; cursor?: number }) {
+    const params = new URLSearchParams(Object.entries(query).filter(([, value]) => value !== undefined && value !== '').map(([key, value]) => [key, String(value)]));
+    return this.api<{ results: LibraryEntry[]; total: number; nextCursor: number | null }>(`/api/projects/${encodeURIComponent(this.projectId())}/library?${params}`);
+  }
+  libraryRead(ref: string, revision: number | null = null) {
+    return this.api<LibraryRead>(`/api/projects/${encodeURIComponent(this.projectId())}/library/entry?ref=${encodeURIComponent(ref)}${revision === null ? '' : `&revision=${revision}`}`);
+  }
   comment(insightId: string, text: string) { return this.api(`/api/projects/${encodeURIComponent(this.projectId())}/comments/${encodeURIComponent(insightId)}`, 'POST', { text }); }
   generate(generator: string, id = '') { return this.api<Doc>(`/api/projects/${encodeURIComponent(this.projectId())}/docs${id ? '/' + encodeURIComponent(id) : ''}`, 'POST', { generator }); }
-  next(assignee: Assignee, count: number) { return this.api<{ added: string[] }>(`/api/projects/${encodeURIComponent(this.projectId())}/batches/next`, 'POST', { assignee, count }); }
+  next(assignee: Assignee, count: number, layer: string | null = null) { return this.api<{ added: string[] }>(`/api/projects/${encodeURIComponent(this.projectId())}/batches/next`, 'POST', { assignee, count, ...(layer ? { layer } : {}) }); }
 
   async reload() {
-    const value = await this.api<{ setup: ProjectSetup; knowledge: Knowledge; catalog: Catalog }>(`/api/projects/${encodeURIComponent(this.projectId())}/knowledge`);
-    this.setup.set(value.setup); this.data.set(value.knowledge); this.catalog.set(value.catalog);
+    const [value, instances] = await Promise.all([
+      this.api<{ setup: ProjectSetup; knowledge: Knowledge; catalog: Catalog }>(`/api/projects/${encodeURIComponent(this.projectId())}/knowledge`),
+      this.api<{ layers: LayerInstance[] }>(`/api/projects/${encodeURIComponent(this.projectId())}/layer-instances`)
+    ]);
+    applyLayerNames(instances.layers);
+    this.setup.set(value.setup); this.data.set(value.knowledge); this.catalog.set(value.catalog); this.layerInstances.set(instances.layers);
+  }
+
+  setLayerPreference(key: string, settings: { enabled?: boolean; dashboardVisible?: boolean }) {
+    return this.api<LayerInstance>(`/api/projects/${encodeURIComponent(this.projectId())}/layer-instances/${encodeURIComponent(key)}`, 'PUT', settings);
   }
 
   // Every write goes through here: errors surface in the shell, success reloads the whole snapshot.
-  async write(action: () => Promise<unknown>, success = '') {
-    this.error.set(''); this.notice.set('');
-    try { await action(); await this.reload(); if (success) this.notice.set(success); return true; }
-    catch (error) { this.error.set(error instanceof Error ? error.message : String(error)); return false; }
+  // Writes from a view run one at a time, each after the previous write and its reload, so an edit made right after
+  // another (a blank's title, then its note) runs against the record's latest revision instead of racing it.
+  private writes: Promise<unknown> = Promise.resolve();
+  write(action: () => Promise<unknown>, success = ''): Promise<boolean> {
+    const run = this.writes.then(async () => {
+      this.error.set(''); this.notice.set('');
+      try { await action(); await this.reload(); if (success) this.notice.set(success); return true; }
+      catch (error) { this.error.set(error instanceof Error ? error.message : String(error)); return false; }
+    });
+    this.writes = run;
+    return run;
   }
 
   record(kind: string, data: unknown, parentId: string | null = null, rationale = '') {

@@ -34,6 +34,8 @@ for name in "${scripts[@]}"; do
     echo "pass  $name  $(grep -m1 '^PASS' "$work/$name.log" | cut -c1-120)"
   else
     failed=1; echo "FAIL  $name"; grep -v -e ExperimentalWarning -e '^\s*at ' "$work/$name.log" | head -12 | sed 's/^/      /'
+    # The server's own errors (routines log and carry on), which the journey only sees as a missing effect.
+    grep -iE 'error|failed|bindings for' "$work/$name-portal.log" | grep -v ExperimentalWarning | tail -8 | sed 's/^/      portal: /'
   fi
   stop
 done

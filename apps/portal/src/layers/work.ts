@@ -1,4 +1,4 @@
-import { Component, OnDestroy, computed, effect, inject, untracked } from '@angular/core';
+import { Component, computed, effect, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { ProjectContext, layerLabel, lines, workStatusLabel } from './context';
@@ -7,15 +7,15 @@ import { WorkBoardComponent } from './work-board';
 import { WorkCreateComponent } from './work-create';
 import { WorkItemComponent } from './work-item';
 import { WorkReviewComponent } from './work-review';
-import { WorkRolesComponent } from './work-roles';
 import { WorkItemsComponent, WorkProjectsComponent } from './work-plan';
 import { WorkTeamComponent } from './work-team';
+import { pollLiveBatches } from './work-shared';
 
 // Work: the shared bench (DEC-036), redesigned in WORK-UX-01. Board (batches per assignee, then Queue, Backlog and Done),
 // the item page, Roles (who takes each action and how), Agents (who does agent work) and Routines.
 @Component({
   selector: 'aludel-work-layer', standalone: true,
-  imports: [FormsModule, MatIconModule, WorkBoardComponent, WorkCreateComponent, WorkItemComponent, WorkReviewComponent, WorkRolesComponent, WorkAgentsComponent, WorkItemsComponent, WorkProjectsComponent, WorkTeamComponent],
+  imports: [FormsModule, MatIconModule, WorkBoardComponent, WorkCreateComponent, WorkItemComponent, WorkReviewComponent, WorkAgentsComponent, WorkItemsComponent, WorkProjectsComponent, WorkTeamComponent],
   template: `
   @if (tab() === 'create') { <aludel-work-create /> }
   @else if (tab() === 'item' && ctx.segments()[3] === 'review') { <aludel-work-review [id]="ctx.segments()[2] || ''" [number]="ctx.segments()[4] || ''" /> }
@@ -30,7 +30,6 @@ import { WorkTeamComponent } from './work-team';
       @for (entry of tabs; track entry[0]) { <a [href]="ctx.link('work', entry[0])" (click)="ctx.go(ctx.link('work', entry[0]), $event)" [class.active]="tab() === entry[0] || (entry[0] === 'team' && tab() === 'agents')" [attr.aria-current]="tab() === entry[0] ? 'page' : null"><mat-icon aria-hidden="true">{{ entry[2] }}</mat-icon>{{ entry[1] }}</a> }
     </nav>
     @switch (tab()) {
-      @case ('roles') { <aludel-work-roles [focus]="ctx.segments()[2] || null" /> }
       @case ('items') { <aludel-work-items [selectedId]="ctx.segments()[2] || null" /> }
       @case ('projects') { <aludel-work-projects /> }
       @case ('team') { <aludel-work-team /> }
@@ -38,7 +37,7 @@ import { WorkTeamComponent } from './work-team';
       @case ('routines') {
         <div class="lay-table-wrap" tabindex="0" role="region" aria-label="Routines"><table><thead><tr><th>Routine</th><th>Role</th><th>Runs</th><th>Next</th><th>Last item</th><th>On</th><th><span class="visually-hidden">Run</span></th></tr></thead><tbody>
           @for (routine of routines(); track routine.id) { <tr><td><strong>{{ routine.title }}</strong>@if (actionFor(routine); as action) { <br><span class="lay-muted small">Goes to {{ ctx.whoName(action.assignee) }}, like any “{{ action.name }}” item</span> }</td>
-            <td><span [class]="'lay-chip lay-l-' + routine.layer">{{ ctx.roleByLayer().get(routine.layer)?.name || layerLabel[routine.layer] }}</span></td>
+            <td><span [class]="'lay-chip lay-l-' + routine.layer">{{ layerLabel[routine.layer] }}</span></td>
             <td>{{ cadenceLabel[routine.cadence] }}</td><td class="small">{{ !routine.enabled ? 'Off' : routine.cadence === 'before-release' ? 'Next build' : when(routine.nextRunAt) }}</td>
             <td class="small">@if (routine.lastWorkId && ctx.workById().get(routine.lastWorkId); as last) { <a [href]="ctx.link('work', 'item', last.id)" (click)="ctx.go(ctx.link('work', 'item', last.id), $event)">{{ last.ref }}</a> {{ statusLabel[last.status] }} } @else { — }</td>
             <td><input type="checkbox" [checked]="routine.enabled" (change)="toggleRoutine(routine.id, routine.revision, $any($event.target).checked)" [attr.aria-label]="(routine.enabled ? 'Turn off ' : 'Turn on ') + routine.title"></td>
@@ -55,14 +54,13 @@ import { WorkTeamComponent } from './work-team';
     }
   }`
 })
-export class WorkLayerComponent implements OnDestroy {
+export class WorkLayerComponent {
   readonly ctx = inject(ProjectContext);
   // ROADMAP-01 (DEC-043): Items and Projects follow Linear; Team holds people and the agent profiles; tabs carry their records' icons.
-  readonly tabs: [string, string, string][] = [['board', 'Board', 'view_kanban'], ['items', 'Items', 'task_alt'], ['projects', 'Projects', 'deployed_code_history'], ['roles', 'Roles', 'badge'], ['team', 'Team', 'group'], ['routines', 'Routines', 'event_repeat']];
+  readonly tabs: [string, string, string][] = [['board', 'Board', 'view_kanban'], ['items', 'Items', 'task_alt'], ['projects', 'Projects', 'deployed_code_history'], ['team', 'Team', 'group'], ['routines', 'Routines', 'event_repeat']];
   readonly heading: Record<string, string> = { board: 'Board', items: 'Items', projects: 'Projects', roles: 'Roles', team: 'Team', agents: 'Team', routines: 'Routines' };
   readonly lead: Record<string, string> = {
     board: 'Batches are what\'s being worked on now, by you and by agents. Next fills a batch from the current milestone.',
-    roles: 'Each layer has a role that owns its work. Every action says who takes it, what they must know and what they may do. A shield marks an action for leads only.',
     routines: 'Each run creates an ordinary item, assigned like any other by its action. A routine never opens a second item while its last one is open.'
   };
   readonly layerLabel = layerLabel;
@@ -71,28 +69,20 @@ export class WorkLayerComponent implements OnDestroy {
   readonly cadenceEntries = Object.entries(this.cadenceLabel);
   readonly layerEntries = Object.entries(layerLabel);
   // /work, /work/board, and the old /work/queue and /work/style addresses all land somewhere sensible.
-  readonly tab = computed(() => { const segment = this.ctx.segments()[1] || 'board'; return segment === 'queue' ? 'board' : segment === 'style' ? 'roles' : segment; });
+  readonly tab = computed(() => { const segment = this.ctx.segments()[1] || 'board'; return segment === 'queue' ? 'board' : segment === 'style' || segment === 'roles' ? 'items' : segment; });
   readonly routines = computed(() => this.ctx.data()?.routines || []);
-  readonly live = computed(() => (this.ctx.data()?.batches || []).some(batch => ['queued', 'running', 'stopping'].includes(batch.state)));
   newRoutine = { title: '', layer: 'product', type: 'audit', cadence: 'weekly', documents: '' };
-  private poll: ReturnType<typeof setInterval> | null = null;
-  private clock: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
-    // While a batch waits or runs: refresh capacity, queue order and progress without a manual reload.
     effect(() => {
-      const running = this.live();
-      untracked(() => {
-        if (running && !this.poll) { this.poll = setInterval(() => void this.ctx.reload().catch(() => undefined), 2000); this.clock = setInterval(() => this.ctx.now.set(Date.now()), 1000); }
-        if (!running && this.poll) { clearInterval(this.poll); clearInterval(this.clock!); this.poll = this.clock = null; }
-      });
+      if (['roles', 'style'].includes(this.ctx.segments()[1] || '')) { const path = this.ctx.link('work', 'items'); history.replaceState({}, '', path); this.ctx.path.set(path); }
     });
+    pollLiveBatches(this.ctx);
   }
-  ngOnDestroy() { if (this.poll) clearInterval(this.poll); if (this.clock) clearInterval(this.clock); }
 
   actionFor(routine: { key: string | null; layer: string; type: string }) {
-    const actions = (this.ctx.data()?.roles || []).flatMap(role => role.actions.map(action => ({ ...action, layer: role.layer })));
-    return actions.find(action => routine.key && action.routine === routine.key) || actions.find(action => action.layer === routine.layer && action.type === routine.type) || null;
+    const actions = this.ctx.data()?.layerActions || [];
+    return actions.find(action => action.layer === routine.layer && action.type === routine.type) || null;
   }
   typeLabel(type: string) { return type.charAt(0).toUpperCase() + type.slice(1); }
   when(at: string | null) { return at ? new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '—'; }

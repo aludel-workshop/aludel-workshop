@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+candidate_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+portal_dir="$candidate_root/apps/portal"
+current_data="$(realpath -m "$candidate_root/../aludel-workshop/apps/portal/.data")"
+candidate_data="$(realpath -m "$candidate_root/.data")"
+runtime_node="/tmp/machine-md3-runtime/node_modules/node/bin"
+
+if [[ "$candidate_data" == "$current_data" || "$candidate_data" == "$current_data/"* ]]; then
+  echo "Candidate data overlaps the current portal data." >&2
+  exit 1
+fi
+if [[ "$candidate_data" != "$candidate_root/.data" ]]; then
+  echo "Candidate data must be this worktree's .data directory." >&2
+  exit 1
+fi
+if [[ -x "$runtime_node/node" ]]; then
+  export PATH="$runtime_node:$PATH"
+fi
+node_major="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || true)"
+if [[ -z "$node_major" || "$node_major" -lt 24 ]]; then
+  echo "Aludel candidate requires Node 24." >&2
+  exit 1
+fi
+
+cd "$portal_dir"
+if [[ ! -x node_modules/.bin/vite ]]; then
+  npm ci
+fi
+npm run build
+mkdir -p "$candidate_data"
+exec env -i PATH="$PATH" HOME="$candidate_data"   MACHINE_HOST=127.0.0.1   MACHINE_PORT=4311   MACHINE_PUBLIC_PORT=4311   MACHINE_BASE_DOMAIN=layers.localhost   MACHINE_PUBLIC_SCHEME=http   MACHINE_PUBLIC_BASE_URL=http://aludel.layers.localhost:4311   MACHINE_DATA_DIR="$candidate_data"   MACHINE_PREVIEW_RUNTIME=process   MACHINE_SYMPHONY_DISPATCH=0   MACHINE_LAYER_TEMPLATES_ENABLED=1   node server/server.mjs

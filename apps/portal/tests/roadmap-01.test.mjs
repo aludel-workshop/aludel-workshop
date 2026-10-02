@@ -150,6 +150,16 @@ test('Next N follows a fixed rule: the assignee, queued, unblocked, active miles
   assert.ok(low && highOld && highNew);
 });
 
+test('Next from a layer board fills the batch only from that layer', () => {
+  const { know, runs, ada, id } = fixture();
+  const demo = know.list(id, 'project').find(project => project.milestone === 'demo');
+  const me = { kind: 'person', id: ada.id };
+  const make = (layer, title) => know.createWork(id, { layer, type: 'research', title, targets: [], assignee: me, project: demo.id, priority: 'high' });
+  make('product', 'Product item'); make('design', 'Design item');
+  assert.deepEqual(runs.next(ada, id, me, 5, 'design').added.map(entry => know.workById(id, entry).title), ['Design item']);
+  assert.deepEqual(runs.next(ada, id, me, 5).added.map(entry => know.workById(id, entry).title), ['Product item'], 'without a layer, Next still takes every layer');
+});
+
 test('elevated actions: agents never default to them, and only a lead of the role (or the owner) accepts their review', () => {
   const { know, ada, id, db } = fixture({ profile: 'dreamer' });
   const roles = know.roleView(id);

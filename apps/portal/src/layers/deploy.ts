@@ -21,11 +21,6 @@ const buildState: Record<string, [string, string]> = { building: ['lay-plain', '
   selector: 'aludel-deploy-layer', standalone: true,
   imports: [FormsModule, MatIconModule, NgTemplateOutlet, RefChipComponent],
   template: `
-  <p class="lay-eyebrow">Deploy · where it runs</p>
-  <h1 tabindex="-1">{{ titles[tab()] }}</h1>
-  <nav class="lay-tabs" aria-label="Deploy sections">
-    @for (entry of tabs; track entry[0]) { <a [href]="ctx.link('deploy', entry[0])" (click)="ctx.go(ctx.link('deploy', entry[0]), $event)" [class.active]="tab() === entry[0]" [attr.aria-current]="tab() === entry[0] ? 'page' : null">{{ entry[1] }}</a> }
-  </nav>
   @switch (tab()) {
     @case ('environments') {
       <p class="lay-lead">Where {{ ctx.setup()?.project?.name }} runs and what each place runs. Each environment runs the app's own container, built from its Dockerfile.</p>

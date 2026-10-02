@@ -33,6 +33,8 @@ workspace_root="${MACHINE_SYMPHONY_WORKSPACE_ROOT:-$(env_value MACHINE_SYMPHONY_
 workspace_root="${workspace_root:-$data_dir/symphony-workspaces}"
 portal_port="${PORT:-$(env_value PORT)}"
 portal_port="${portal_port:-4310}"
+base_domain="${MACHINE_BASE_DOMAIN:-$(env_value MACHINE_BASE_DOMAIN)}"
+worker_host="aludel.${base_domain:-localhost}"
 auth_file="${CODEX_AUTH_FILE:-$HOME/.codex/auth.json}"
 node_bin="$(command -v node)"
 node_prefix="$(cd "$(dirname "$node_bin")/.." && pwd)"
@@ -111,8 +113,8 @@ while IFS=$'\t' read -r project_id project_slug capacity token_file; do
   container="aludel-symphony-$safe_slug"
   workflow="$runtime_root/workflows/$safe_slug.md"
   cp "$repo_root/integrations/symphony/WORKFLOW.example.md" "$workflow"
-  perl -0pi -e "s#endpoint: http://127\\.0\\.0\\.1:4310/api/worker#endpoint: http://aludel.localhost:$portal_port/api/worker#; s/max_concurrent_agents: 1/max_concurrent_agents: $capacity/" "$workflow"
-  config_hash="$(printf '%s\n' "$project_id" "$capacity" "$build_root" "$gateway" "$source_repo" "$workflow" "$portal_port" "$node_bin" "$codex_entry" "$codex_wrapper_hash" "$sandbox_security" | sha256sum | cut -c1-20)"
+  perl -0pi -e "s#endpoint: http://127\\.0\\.0\\.1:4310/api/worker#endpoint: http://$worker_host:$portal_port/api/worker#; s/max_concurrent_agents: 1/max_concurrent_agents: $capacity/" "$workflow"
+  config_hash="$(printf '%s\n' "$project_id" "$capacity" "$build_root" "$gateway" "$source_repo" "$workflow" "$portal_port" "$worker_host" "$node_bin" "$codex_entry" "$codex_wrapper_hash" "$sandbox_security" | sha256sum | cut -c1-20)"
   existing_hash="$(docker inspect "$container" --format '{{index .Config.Labels "aludel.local-host-config"}}' 2>/dev/null || true)"
   if [[ -n "$existing_hash" && "$existing_hash" != "$config_hash" ]] || { docker inspect "$container" >/dev/null 2>&1 && [[ -z "$existing_hash" ]]; }; then
     docker rm -f "$container" >/dev/null
@@ -125,11 +127,12 @@ while IFS=$'\t' read -r project_id project_slug capacity token_file; do
     docker run -d --name "$container" --restart unless-stopped --init --user "$uid_gid" \
       --security-opt seccomp=unconfined --security-opt no-new-privileges \
       --label "aludel.local-host-config=$config_hash" \
-      --add-host "aludel.localhost:$gateway" \
+      --add-host "$worker_host:$gateway" \
       -e HOME="$runtime_root/home" -e CODEX_HOME="$runtime_root/codex-home" -e MIX_HOME="$runtime_root/mix" \
       -e ALUDEL_WORKER_TOKEN_FILE="$token_file" \
+      -e ALUDEL_HOST_ID="$container" \
       -e ALUDEL_SOURCE_REPOSITORY="$source_repo" \
-      -e ALUDEL_WORKER_URL="http://aludel.localhost:$portal_port/api/worker" \
+      -e ALUDEL_WORKER_URL="http://$worker_host:$portal_port/api/worker" \
       -e ALUDEL_WORKSPACE_HOOK="$repo_root/integrations/symphony/workspace-hook.mjs" \
       -e SYMPHONY_WORKSPACE_ROOT="$workspace_root" \
       -e PATH="$runtime_root/codex-cli/node_modules/.bin:$node_prefix/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \

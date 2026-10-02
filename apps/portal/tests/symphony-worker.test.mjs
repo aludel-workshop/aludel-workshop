@@ -13,6 +13,7 @@ import { initOnboarding, loadCatalogs, onboarding } from '../server/onboarding.m
 import { ensureProductWorkspace } from '../server/product-workspace.mjs';
 import { openSecretStore } from '../server/secret-store.mjs';
 import { openDatabase } from '../server/storage.mjs';
+import { previewImageName } from '../server/previews.mjs';
 import { initSymphonyWorker, symphonyWorker } from '../server/symphony-worker.mjs';
 import { initWorkflow } from '../server/workflow.mjs';
 
@@ -93,7 +94,7 @@ test('worker token scopes pinned coding work; ID refresh withdraws skipped and s
   const origin = `http://127.0.0.1:${port}`;
   try {
     let ready = false;
-    const deadline = Date.now() + 8000;
+    const deadline = Date.now() + 20000; // a portal start under the parallel suite can exceed 8 seconds
     while (!ready && Date.now() < deadline) {
       try { ready = (await fetch(origin + '/api/session')).ok; }
       catch { await new Promise(resolve => setTimeout(resolve, 50)); }
@@ -146,13 +147,14 @@ test('worker token scopes pinned coding work; ID refresh withdraws skipped and s
   assert.equal(worker.registerWorkspace(scope, { attemptId: secondAttempt, path: clone }).registered, true, 'workspace registration is idempotent');
   assert.deepEqual(worker.reserveRun(scope, { attemptId: secondAttempt }), { attemptId: secondAttempt, runsStarted: 1, runLimit: 3 });
   assert.equal(worker.issues(scope, { states: ['Ready'] }).issues.length, 1, 'one reserved run still leaves work resumable');
-  writeFileSync(join(clone, 'resume.txt'), 'preserve pending work\n');
+  mkdirSync(join(clone, 'src'), { recursive: true });
+  writeFileSync(join(clone, 'src', 'resume.txt'), 'preserve pending work\n');
   const resumedPortal = spawn(process.execPath, [new URL('../server/server.mjs', import.meta.url).pathname], {
     env: { ...process.env, MACHINE_DATA_DIR: root, MACHINE_PORT: String(port), MACHINE_PREVIEW_RUNTIME: 'process' }, stdio: 'ignore'
   });
   try {
     let ready = false;
-    const deadline = Date.now() + 8000;
+    const deadline = Date.now() + 20000; // a portal start under the parallel suite can exceed 8 seconds
     while (!ready && Date.now() < deadline) {
       try { ready = (await fetch(`http://127.0.0.1:${port}/api/session`)).ok; }
       catch { await new Promise(resolve => setTimeout(resolve, 50)); }
@@ -163,13 +165,15 @@ test('worker token scopes pinned coding work; ID refresh withdraws skipped and s
     });
     assert.equal(resumed.status, 200, await resumed.clone().text());
     assert.equal((await resumed.json()).runsStarted, 2);
-    assert.equal(git(clone, 'status', '--porcelain').includes('resume.txt'), true, 'restart retained unfinished workspace edits');
+    assert.equal(existsSync(join(clone, 'src', 'resume.txt')), true, 'restart retained unfinished workspace edits');
   } finally {
     resumedPortal.kill();
     await new Promise(resolve => resumedPortal.once('exit', resolve));
   }
   assert.equal(worker.reserveRun(scope, { attemptId: secondAttempt }).runsStarted, 3);
-  assert.equal(worker.issues(scope, { states: ['Ready'] }).issues.length, 0, 'exhaustion withdraws dispatch');
+  assert.equal(worker.issues(scope, { states: ['Ready'] }).issues.length, 1, 'the final reserved turn remains routed while it runs');
+  worker.appendEvent(scope, { attemptId: secondAttempt, eventId: 'run-3-finished', kind: 'finished' });
+  assert.equal(worker.issues(scope, { states: ['Ready'] }).issues.length, 0, 'completion of the final turn withdraws dispatch');
   assert.equal(worker.issues(scope, { ids: [secondIssue.id] }).issues[0].state, 'Blocked');
   assert.deepEqual({ runsStarted: worker.attemptForWork(projectId, work.id).runsStarted, candidateId: worker.attemptForWork(projectId, work.id).candidateId },
     { runsStarted: 3, candidateId: null }, 'owner-facing attempt summary shows exhaustion before a candidate exists');
@@ -182,7 +186,7 @@ test('worker token scopes pinned coding work; ID refresh withdraws skipped and s
   });
   try {
     let ready = false;
-    const deadline = Date.now() + 8000;
+    const deadline = Date.now() + 20000; // a portal start under the parallel suite can exceed 8 seconds
     while (!ready && Date.now() < deadline) {
       try { ready = (await fetch(`http://127.0.0.1:${port}/api/session`)).ok; }
       catch { await new Promise(resolve => setTimeout(resolve, 50)); }
@@ -230,7 +234,7 @@ test('worker token scopes pinned coding work; ID refresh withdraws skipped and s
   try {
     const origin = `http://127.0.0.1:${port}`;
     let ready = false;
-    const deadline = Date.now() + 8000;
+    const deadline = Date.now() + 20000; // a portal start under the parallel suite can exceed 8 seconds
     while (!ready && Date.now() < deadline) {
       try { ready = (await fetch(origin + '/api/session')).ok; }
       catch { await new Promise(resolve => setTimeout(resolve, 50)); }
@@ -317,7 +321,7 @@ test('worker token scopes pinned coding work; ID refresh withdraws skipped and s
   worker.revoke(owner, projectId, profile.id);
   assert.throws(() => worker.authenticate('Bearer ' + nextToken.token), error => error.status === 401);
   db.close();
-  spawnSync('docker', ['image', 'rm', '-f', `aludel-candidate/${submitted.candidate.id}`], { stdio: 'ignore' });
+  spawnSync('docker', ['image', 'rm', '-f', previewImageName(join(root, 'candidate-preview-workspaces'), 'candidate', submitted.candidate.id)], { stdio: 'ignore' });
   rmSync(root, { recursive: true, force: true });
 });
 
@@ -331,6 +335,7 @@ test('existing Symphony attempts migrate to a durable run allowance', () => {
     state TEXT NOT NULL, workspace_path TEXT, candidate_id TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
     UNIQUE(project_id, work_id, batch_id)
   )`);
+  db.prepare("INSERT INTO projects(id, slug, name, description, created_at, updated_at) VALUES ('p', 'p', 'P', 'P', 'now', 'now')").run();
   db.prepare("INSERT INTO symphony_attempts VALUES ('att-old', 'p', 'a', 'w', 'b', 'digest', 'working', NULL, NULL, 'now', 'now')").run();
   initSymphonyWorker(db);
   const row = db.prepare("SELECT runs_started, run_limit FROM symphony_attempts WHERE id = 'att-old'").get();

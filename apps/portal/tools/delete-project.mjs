@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Deletes a generated project from the local portal: every database row that depends on it (found by following
+// Deletes a generated project from the local portal: its own database, every platform row that depends on it (found by following
 // foreign keys, so new tables are covered without editing this file), its workspace, uploaded assets, preview log, and its
 // preview container and image when Docker is available.
 // Local only: it never touches GitHub. Aludel's own project cannot be deleted. Dry run unless --yes is passed.
@@ -76,8 +76,15 @@ try {
   throw error;
 }
 
+// PROJECT-DB-01: the project's own database goes too, copied beside itself first like the platform database.
+const projectDatabase = id => join(dataDirectory, 'projects', `${id}.sqlite`);
 const files = projects.flatMap(({ id }) => [join(dataDirectory, 'workspaces', id), join(dataDirectory, 'project-assets', id),
-  join(dataDirectory, 'preview-logs', `${id}.log`)]).filter(path => existsSync(path));
+  join(dataDirectory, 'preview-logs', `${id}.log`), projectDatabase(id), `${projectDatabase(id)}-wal`, `${projectDatabase(id)}-shm`]).filter(path => existsSync(path));
+if (apply) for (const { id } of projects) if (existsSync(projectDatabase(id))) {
+  const copy = new DatabaseSync(projectDatabase(id));
+  copy.prepare('VACUUM INTO ?').run(`${projectDatabase(id)}.before-delete-${Date.now()}`);
+  copy.close();
+}
 if (apply) for (const path of files) rmSync(path, { recursive: true, force: true });
 const docker = (...values) => spawnSync('docker', values, { encoding: 'utf8', timeout: 30000 });
 const containers = []; const images = [];
