@@ -207,6 +207,8 @@ The agent check ("can an agent answer from the spec alone?") has **not been run*
 
 **K5 built, 2026-10-01 (agent-checked):** S1–S6 in candidate `7c6152c` and `30d4d37`, with `layer-base` `main` `fee5f30` and template pins as listed in the [evidence and retrospective](../../../pages-template-candidate/docs/evidence/layer-knowledge-01/README.md). Next: the owner's browser review.
 
+**Owner acceptance, 2026-10-01 (chat).** "im happy with current knowledge ui". This accepts the built K5 Knowledge interface as reviewed in the candidate. It is not a promotion of the candidate, and it does not accept anything outside K5. The open LAYER-BINDINGS-01 follow-ups (F1, F3–F8, F10) stay with their named packets. LAYER-KNOWLEDGE-01 and LAYER-BINDINGS-01 are closed locally, and `next_action` moves to T03-CODE.
+
 Authorization: build K5 in the candidate and on `layer-base` branches, under the same local scope as LAYER-BINDINGS-01: local commits and re-pins, no push, and no external, provider, deployment, spending or live-data effects.
 
 ## K5 build plan (owner-approved direction, 2026-10-01)

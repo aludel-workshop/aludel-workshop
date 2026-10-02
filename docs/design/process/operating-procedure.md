@@ -61,6 +61,10 @@ Select the ready packet that removes the most consequential uncertainty. Complet
 
 Do not create a prototype backlog first and retrofit groundwork beneath it. The next output may be a research question, journey, comparison or one corrected contract.
 
+### Authority versus guidance
+
+Before adding a declared, versioned contract, split what it holds into **authority** (what the host must enforce: writable outputs, effects, who can accept) and **guidance** (what a model or person reads to do the work well: purpose, method, checks, input hints). Only authority needs a validated, pinned and migrated contract. Keep guidance as plain layer Knowledge that can change without migrations. DEC-051's action declarations combined both, and keeping the guidance consistent became most of LAT-08's cost ([DEC-057](../layer-scoped-work/work-record.md)).
+
 ## 4. Execute and check a stage
 
 Stages can be combined for small changes when the record explains which existing evidence covers them. “Not applicable” needs a reason; it does not waive an applicable requirement.
@@ -108,7 +112,7 @@ Record acceptance per scope, never just per document or packet. Separate structu
 
 When inputs change, trace their consumers. Mark affected acceptance and readiness stale pending impact assessment; retain unaffected accepted scope with a written reason. A copy edit need not reopen the whole product. A changed actor or authorization model may invalidate several downstream journeys. Preserve past evidence and issue a new revision; never overwrite historical approval with current meaning.
 
-End each packet with a post-hoc: avoidable friction; what would make equivalent work easier; process change and evidence; task outcome; effects on downstream work and phase gates; questions created or resolved; exact current input revisions; unresolved gaps; one next action; and the stop condition. Apply justified routing, packet and question changes before marking the packet complete. A fresh agent should reach the same permissible next action from that record without reconstructing chat. In this bootstrap, status routes and linked work records supply detail. Future portal records and immutable context bundles should carry the same fields; this procedure does not implement that engine.
+End each packet with a post-hoc: avoidable friction; what would make equivalent work easier; process change and evidence; task outcome; effects on downstream work and phase gates; questions created or resolved; exact current input revisions; unresolved gaps; one next action; and the stop condition. Apply justified routing, packet and question changes before marking the packet complete. When the work lives in an isolated candidate, ask to commit it at each owner-reviewed pass. An uncommitted tree that several sessions share is not an exact input revision, and CUSTOM-LAYER-01 reached closeout with four passes unpinned. A fresh agent should reach the same permissible next action from that record without reconstructing chat. In this bootstrap, status routes and linked work records supply detail. Future portal records and immutable context bundles should carry the same fields; this procedure does not implement that engine.
 
 ## Trial and improvement
 

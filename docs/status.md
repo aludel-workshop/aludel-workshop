@@ -5,7 +5,7 @@ status: active
 updated: 2026-10-01
 current_phase: M1
 phase_state: in-progress
-next_action: LAYER-BINDINGS-01
+next_action: T03-CODE
 ---
 
 # Current project status
@@ -16,22 +16,14 @@ Finish the remaining Code layer-template conversion while preserving the running
 
 ## Next action
 
-**LAYER-BINDINGS-01: how layers share what they know (contract agreed, implement in a new session).** The owner made this higher priority than T03-CODE (chat, 2026-10-01). [The proposal](design/layer-bindings/work-record.md) covers:
-- facets: what a layer maintains, including former internal state;
-- roles: authority, replica or ceded;
-- one project-level binding per shared concept, with many participants, shown in Library › Bindings and run by Work routines: a baseline for two-way and external change, per-event policy, and consumer-owned import adapters through the authority;
-- authority transfer.
+**T03-CODE: the app repository as the Code layer, with GitHub sync (plan approved 2026-10-01; build in a fresh session).** Start from [the brief](design/layer-app-transition/t03-code-brief.md). The owner decided:
+- Aludel's files live in `.aludel/`;
+- the app's docs are Code's Knowledge;
+- the Code repository is created on, or imported from, the owner's GitHub and kept in sync.
 
-The owner agreed the contract on 2026-10-01: auto-apply mechanical changes, bindings shown in a Library tab, one multi-party binding per shared concept, and authority chosen per project with no code-first default. **Steps 1 and 2 are built and agent-checked** ([evidence](../pages-template-candidate/docs/evidence/layer-bindings-01/README.md)). The owner replaced the step-1 `peer` role with authority direction plus drift handling: adopt, rectify, or assess. The design-system binding now runs end to end: Discover proposes it, it is accepted in Library › Bindings, Pages keeps its own replica of the kit through its declared adapter, changes auto-apply, and drift is assessed. **The owner accepted step 2 in a browser review (2026-10-01). Step 3 is refaceting:** split, merge or rename a layer's facets as reviewed Work, so bindings contract on exactly the matching part, including partial overlaps with new, unrelated layers. Every action is Work ([plan](design/layer-bindings/refaceting.md)). **R1, the pure contract, is built and agent-checked** ([evidence](../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r1.md)) and committed. The owner accepted its defaults and behaviour changes. **R2 is built and agent-checked** ([evidence](../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r2.md)), uncommitted: every binding change and refacet is Work the owner decides, and Library › Bindings decides those items. **R3 is built and agent-checked** ([evidence](../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r3.md)), uncommitted: entries carry their role, people and agents can't write replica or ceded entries, and kinds are per instance. **R4 is built and agent-checked** ([evidence](../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r4.md)), uncommitted: Design's and Vision's views show each facet's role through `@aludel/host/roles`. **R5 is built and agent-checked** ([evidence](../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r5.md)): a new layer declares a facet in Manage › Facets, Discover raises Assess overlap, an overlap chain refacets both sides and binds them, Vision's personas are ceded to a Personas layer and merged back. **Step 3 is built and committed. The owner reviewed it in a browser (2026-10-01):** people shouldn't handle facets. The Knowledge tab becomes the layer's manual (spec, contents, docs), and bindings are proposed by selecting nodes in its information tree. This is proposed as [LAYER-KNOWLEDGE-01](design/layer-knowledge/work-record.md), which is now built and agent-checked ([evidence](../pages-template-candidate/docs/evidence/layer-knowledge-01/README.md)); next is the owner's browser review. Follow-up work found along the way (F1–F12: layer-relative host SDK modules, the frame-dialog rule, Work-board decisions for binding items, and more) is kept in the [work record's Follow-ups](design/layer-bindings/work-record.md#follow-ups-kept-here-so-they-arent-lost). Existing projects are out of scope.
+GitHub writes to the owner's own account are authorized only when the owner starts them in the browser. Tests use a fake GitHub. The owner's live round trip needs owner setup first: add the candidate's callback URL to the App, and provide a secrets file for the candidate launcher (see the brief). One open question doesn't block starting: whether the other layers' repositories also go to GitHub. Deploy stays deferred. No owner-data cutover, provider turn or promotion is authorized.
 
-**After that, T03-CODE: the app repository as the Code layer.** Design is now a repository-owned layer in records mode, and Pages reads its kit from the Library ([T03-DESIGN evidence and retrospective](../pages-template-candidate/docs/evidence/t03-design/README.md)). Start T03-CODE by writing its brief in the same form as [the T03-DESIGN brief](design/layer-app-transition/t03-design-brief.md), then get the owner's approval of the plan before changing code. Its scope comes from that brief's "After Design" section:
-- The app repository *is* the Code layer repository (DEC-059), and connecting an existing repository is supported.
-- Code units, releases and route observations are derived from the repository at a commit.
-- Trace links become a file in the repository.
-- The writable set is the codebase, not `outputs/`.
-- Code gets its own kit adapter, as Pages has (`pages-kit-adapter.ts`), instead of reading the project store. It adds no hard-coded reads of other layers, and its starters go in its template's `seed`.
-
-Deploy stays deferred. No owner-data cutover, provider turn, GitHub write or promotion is authorized.
+**Just closed:** LAYER-BINDINGS-01 (steps 1–3) and LAYER-KNOWLEDGE-01. The owner accepted the built Knowledge UI in chat on 2026-10-01 ("im happy with current knowledge ui"); see the [acceptance record](design/layer-knowledge/work-record.md#review--acceptance-record). Its open follow-ups stay with their named packets: F1 goes to T03-CODE, F3 to LAT-08A, F10 to bindings step 4 after T03-CODE, and F4–F8 are listed in the [follow-ups](design/layer-bindings/work-record.md#follow-ups-kept-here-so-they-arent-lost).
 
 ## Prior transition evidence
 
@@ -39,15 +31,8 @@ LAT-01–07 and the LAT-08 prototype established the isolated candidate, layer s
 
 ## Ready queue
 
-1. **LAYER-BINDINGS-01**: steps 1–2 built; step 2 owner-accepted 2026-10-01. Step 3 refaceting: R1 built and agent-checked ([evidence](../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r1.md)). Defaults and behaviour owner-accepted. R2 built and agent-checked ([evidence](../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r2.md)). R3 built and agent-checked ([evidence](../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r3.md)). R4 and R5 built, agent-checked and committed ([R5 evidence](../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r5.md)). Owner browser review of step 3 done 2026-10-01: the machinery stays, but its interface is replaced by a Knowledge-centred one, proposed as [LAYER-KNOWLEDGE-01](design/layer-knowledge/work-record.md). Prototype v1 owner-reviewed ("love love this prototype … build it"). **K5 is built and agent-checked** ([evidence](../pages-template-candidate/docs/evidence/layer-knowledge-01/README.md)):
-   - Knowledge is a docs site with the spec tree and binding cards;
-   - docs and spec are saved to the layer repository with history;
-   - bindings are proposed from the tree;
-   - Pages has a Kit tab;
-   - Manage › Connections and Manage › Facets are gone.
-
-   Next: the owner's browser review.
-2. **T03-CODE**: connect the app repository as the Code layer and support an existing repository. Brief and owner plan approval first. Its brief should take LAYER-BINDINGS-01 follow-up F1: host SDK modules that name a layer key must be layer-relative.
+1. **T03-CODE**: [brief](design/layer-app-transition/t03-code-brief.md) approved 2026-10-01 with GitHub sync added; next G-CODE contract generalizations on `layer-base`, the `code` template, adoption and connect. Takes LAYER-BINDINGS-01 follow-up F1.
+2. **LAYER-BINDINGS-01 step 4 (F10)**: Code ⇄ Pages binding, migrating `layer_connections` and the hard-coded Pages reconciliation, after T03-CODE.
 3. **LAT-08A**: build native-tab, layer-owned Work review on the template contract after LAT-T01–T03. Include LAYER-BINDINGS-01 follow-up F3: binding changes, refacets and drift assessments must be decidable from the Work board.
 4. **LAY-05**: coding proof preserved; candidate boundary, direct tracker, live retention, bounded runs and live interruption recovery pass; owner browser review follows the general Work flow.
 5. **PLATFORM-PIPELINE-01**: PP-01C onboarding → PP-01D environments → PP-01E guards ([work record](design/platform-pipeline/work-record.md)).
@@ -83,6 +68,7 @@ One packet at a time. B-03's worker/artifact/recovery work remains required and 
 
 ## Current facts and evidence
 
+- 2026-10-01: **LAYER-KNOWLEDGE-01 owner-accepted; T03-CODE brief written.** The owner accepted the built Knowledge UI in chat, which closes LAYER-BINDINGS-01 and LAYER-KNOWLEDGE-01 locally. [The T03-CODE brief](design/layer-app-transition/t03-code-brief.md) adds a contract-assumption check before the recipe. Code is the first layer whose repository is not Aludel-shaped. Owner plan approval is pending.
 - 2026-10-01: **LAYER-KNOWLEDGE-01 built locally.** Knowledge is the layer's docs site (Docs, then Information with a card per binding). Docs and spec are saved to the layer repository at once, with history. Bindings are proposed by ticking parts of the tree. Compare specs replaces hints. Pages has a Kit tab. Suites and 13 journeys pass. [Evidence](../pages-template-candidate/docs/evidence/layer-knowledge-01/README.md).
 - 2026-10-01: **Step 3 reviewed by the owner; LAYER-KNOWLEDGE-01 proposed.** [Brief](design/layer-knowledge/work-record.md): spec, contents and docs in a docs-site Knowledge tab; bindings by selecting spec nodes; Compare specs replaces hints; Manage › Connections and Facets go.
 - 2026-10-01: **LAYER-BINDINGS-01 step 3 built locally (R5 closes it).**
