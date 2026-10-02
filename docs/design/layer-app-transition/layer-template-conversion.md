@@ -334,3 +334,26 @@ Not built, by agreement:
 - a second (for example Figma) adapter.
 
 T03-CODE is next: its own adapter, and its starters in its template.
+
+## T03-CODE run 1 (2026-10-02)
+
+Code is a template whose repository is the project's own: `install: project-repository`, with its definition under `.aludel/`.
+
+- Its units are parsed by the host at the pin, and its generation links and releases are files in `.aludel/outputs/`.
+- The app's `AGENTS.md`, `README.md`, `ARCHITECTURE.md` and `docs/` are its Knowledge.
+- Its repository syncs with the owner's GitHub through the project's repository binding.
+
+The contract gained six generalizations, each tested on a non-Code layer:
+- a package root;
+- installing into an existing repository;
+- repository files as output;
+- host-parsed code units;
+- repository docs with generic doc checks;
+- a per-instance remote.
+
+It also gained `install: project-repository` and file-layer seeds. [Evidence and retrospective](../../evidence/t03-code/README.md).
+
+Remaining before the compiled modules retire:
+- the owner's browser look and live GitHub round trip;
+- the decision on candidate previews for layer-scoped Code Work.
+

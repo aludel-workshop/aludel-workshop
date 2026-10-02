@@ -2,7 +2,7 @@
 id: status-001
 kind: project-status
 status: active
-updated: 2026-10-01
+updated: 2026-10-02
 current_phase: M1
 phase_state: in-progress
 next_action: T03-CODE
@@ -16,12 +16,21 @@ Convert Code onto its template with GitHub sync, now on `main`: the layer-templa
 
 ## Next action
 
-**T03-CODE: the app repository as the Code layer, with GitHub sync (plan approved 2026-10-01; build in a fresh session).** Start from [the brief](design/layer-app-transition/t03-code-brief.md). The owner decided:
-- Aludel's files live in `.aludel/`;
-- the app's docs are Code's Knowledge;
-- the Code repository is created on, or imported from, the owner's GitHub and kept in sync.
-
-GitHub writes to the owner's own account are authorized only when the owner starts them in the browser. Tests use a fake GitHub. Since the promotion, the portal on :4310 has the App's callback and `.env`. The owner's setup is to sign in and check the App still works before the live round trip (see the brief). Every layer's repository goes to GitHub: Code first, then LAYER-GITHUB-01 (DEC-062). Deploy stays deferred. No provider turn, deployment or spending is authorized.
+**T03-CODE: the app repository as the Code layer, with GitHub sync (run 1 built and agent-checked 2026-10-02).** [Evidence and retrospective](evidence/t03-code/README.md) · [brief and run log](design/layer-app-transition/t03-code-brief.md).
+- **Done:**
+  - Code runs from its template (`layer-base` `code` `83ce28a`) in the project's own repository, under `.aludel/`;
+  - the app's docs are its Knowledge;
+  - releases and generation links live in the repository;
+  - existing projects adopt with IDs unchanged;
+  - an existing GitHub repository can be imported;
+  - the repository syncs with GitHub through the project's repository binding.
+- **G-CODE:** six contract generalizations on `layer-base` `main`, each tested on a non-Code layer.
+- **Checks:** both server suites, the `code-layer` and fake-GitHub journeys, and the reruns of the other template journeys pass (see the evidence).
+- **Next for the owner:**
+  1. Restart the portal and look at Code; existing projects adopt on restart, and the DEC-062 backup is the rollback.
+  2. Run the live GitHub round trip (create, import, a Knowledge save, a commit on github.com, a divergence).
+  3. Decide whether layer-scoped Code Work should also get the isolated candidate preview that `platform.implement` had.
+- **Then:** retire the compiled layer modules (except Deploy's) as one revertible commit. No provider turn, deployment or spending is authorized.
 
 **Promotion (DEC-062, 2026-10-01): the candidate is now `main`.**
 - The merge is `1c17c48`, and the launcher defaults to templates on (`1e425a2`).
@@ -40,7 +49,7 @@ LAT-01–07 and the LAT-08 prototype established the isolated candidate, layer s
 
 ## Ready queue
 
-1. **T03-CODE**: [brief](design/layer-app-transition/t03-code-brief.md) approved 2026-10-01 with GitHub sync added; next G-CODE contract generalizations on `layer-base`, the `code` template, adoption and connect. Takes LAYER-BINDINGS-01 follow-up F1.
+1. **T03-CODE**: run 1 built and agent-checked ([evidence](evidence/t03-code/README.md)). Waits on the owner's browser look, the live GitHub round trip and the candidate-preview question; then the compiled modules retire. F1 is done.
 2. **LAYER-GITHUB-01**: publish Vision, Design, Pages and Data repositories (and possibly `layer-base`) to the owner's GitHub with T03-CODE's sync (DEC-062).
 3. **LAYER-BINDINGS-01 step 4 (F10)**: Code ⇄ Pages binding, migrating `layer_connections` and the hard-coded Pages reconciliation, after T03-CODE.
 4. **LAT-08A**: build native-tab, layer-owned Work review on the template contract after LAT-T01–T03. Include LAYER-BINDINGS-01 follow-up F3: binding changes, refacets and drift assessments must be decidable from the Work board.
