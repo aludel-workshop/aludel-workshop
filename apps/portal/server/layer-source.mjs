@@ -133,6 +133,17 @@ export function mergeLayerBranch(db, { projectId, key, source, reviewer, workId,
   return { commit: merged, repo, clean, main };
 }
 
+// T03-CODE: a package nested in someone else's repository (an app) shares its checkout with that owner's work. Moving `main`
+// under uncommitted changes would leave the index behind, and the next `git add -A` commit would quietly undo the move,
+// so the host refuses instead.
+export function refuseDirtySharedCheckout(repo, root) {
+  if (!root) return;
+  let head = null;
+  try { head = git(repo, ['symbolic-ref', '--quiet', 'HEAD']).trim(); } catch { return; }
+  if (head === 'refs/heads/main' && git(repo, ['status', '--porcelain', '--untracked-files=no']).trim())
+    fail('The repository has uncommitted changes. Commit or discard them, then save again.', 409);
+}
+
 // After the transaction commits: bring a clean checkout of `main` up to the merge. A checkout with local edits is left alone.
 export function settleLayerCheckout(merge) {
   if (!merge?.clean) return;

@@ -11,6 +11,11 @@ const tokenOnly = ['-c', 'credential.helper='];
 const tokenEnvironment = token => ({ GIT_ASKPASS: fileURLToPath(new URL('./git-askpass.mjs', import.meta.url)),
   GIT_TERMINAL_PROMPT: '0', GCM_INTERACTIVE: 'never', MACHINE_GITHUB_PUSH_TOKEN: token });
 
+// T03-CODE: any git call that talks to GitHub (clone, fetch, push) goes through this, so it sends only the token it was given.
+export function gitWithToken(repository, args, token) {
+  return git(repository, [...tokenOnly, ...args], { env: tokenEnvironment(token), allowFailure: true, quiet: true });
+}
+
 function git(repository, args, options = {}) {
   const result = spawnSync('git', args, {
     cwd: repository,

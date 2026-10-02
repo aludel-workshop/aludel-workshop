@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, normalize, posix } from 'node:path';
 import { randomBytes } from 'node:crypto';
+import { docChecks } from './doc-checks.mjs';
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const now = () => new Date().toISOString();
@@ -83,26 +84,6 @@ export function readVariables(workspace) {
 
 // ---- Docs: AGENTS.md is the map, docs/ the system of record; the sidecar records where each section came from ----
 const docFile = path => path === 'AGENTS.md' || path === 'ARCHITECTURE.md' || path === 'README.md' || (path.startsWith('docs/') && !path.startsWith('docs/.aludel/') && /\.(md|txt)$/.test(path));
-function sections(text) {
-  const out = []; const lines = text.split('\n'); let fence = false;
-  lines.forEach((line, index) => {
-    if (/^```/.test(line)) fence = !fence;
-    const match = !fence && /^(#{1,3})\s+(.+?)\s*#*$/.exec(line);
-    if (match) out.push({ heading: match[2], level: match[1].length, line: index + 1 });
-  });
-  return out;
-}
-// Relative Markdown links that point at nothing. Web links and anchors are not checked.
-function brokenLinks(path, text, exists) {
-  const out = [];
-  for (const match of text.matchAll(/\]\(([^)\s]+)\)/g)) {
-    const target = match[1];
-    if (/^[a-z]+:|^#|^mailto:/i.test(target)) continue;
-    const resolved = posix.normalize(posix.join(posix.dirname(path), target.split('#')[0]));
-    if (!exists(resolved)) out.push(target);
-  }
-  return out;
-}
 // Docs on disk, tracked or not yet committed (a starter set is committed with the next build).
 function docsOnDisk(workspace, folder = 'docs') {
   const full = join(workspace, folder);
@@ -114,23 +95,11 @@ export function readDocs(workspace, revisionOf, files = trackedFiles(workspace))
   const paths = [...new Set([...files.map(file => file.path), ...docsOnDisk(workspace), ...['AGENTS.md', 'ARCHITECTURE.md', 'README.md'].filter(onDisk)].filter(docFile))].filter(onDisk).sort();
   const sidecar = parse(readText(workspace, sidecarPath), {});
   const agents = readText(workspace, 'AGENTS.md') || '';
-  // A doc is on the map when AGENTS.md names it or a folder that holds it.
-  const names = target => new RegExp(`(^|[\\s\`(\\[])${target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=[\\s\`)\\]:,]|\\.?$|\\.\\s)`, 'm').test(agents);
-  const onMap = path => path === 'AGENTS.md' || names(path) || path.split('/').slice(0, -1).some((_, index, parts) => names(parts.slice(0, index + 1).join('/') + '/'));
-  const docs = paths.map(path => {
-    const text = readText(workspace, path) ?? '';
-    const recorded = sidecar[path] || {};
-    const list = sections(text).map(section => {
-      const sources = (recorded[section.heading] || []).map(([kind, id, revision]) => {
-        const current = kind === 'finding' || revision == null ? null : revisionOf(id);
-        return { kind, id, revision: revision ?? null, current, state: current === undefined ? 'gone' : current !== null && revision !== null && current > revision ? 'changed' : 'current' };
-      });
-      return { ...section, sources, state: sources.some(source => source.state !== 'current') ? 'refresh' : sources.length ? 'current' : 'plain' };
-    });
-    return { path, lines: text ? text.split('\n').length : 0, text: text.length > fileLimit ? text.slice(0, fileLimit) : text, sections: list, onMap: onMap(path), broken: brokenLinks(path, text, target => onDisk(target)) };
-  });
+  // The checks are the ones Knowledge runs on every layer's docs (doc-checks.mjs).
+  const report = docChecks(paths.map(path => ({ path, text: readText(workspace, path) ?? '' })), { exists: onDisk, sidecar, mapPath: 'AGENTS.md', map: agents, revisionOf });
+  const docs = report.docs.map(doc => { const text = readText(workspace, doc.path) ?? ''; return { path: doc.path, lines: text ? text.split('\n').length : 0, text: text.length > fileLimit ? text.slice(0, fileLimit) : text, sections: doc.sections, onMap: doc.onMap, broken: doc.broken }; });
   return { docs, sidecar: existsSync(join(workspace, sidecarPath)), agentsLines: agents ? agents.split('\n').length : 0,
-    checks: { offMap: docs.filter(doc => !doc.onMap).map(doc => doc.path), broken: docs.flatMap(doc => doc.broken.map(target => `${doc.path} → ${target}`)), refresh: docs.reduce((count, doc) => count + doc.sections.filter(section => section.state === 'refresh').length, 0) } };
+    checks: report.checks };
 }
 
 // A starting docs tree from the layers. Developers own the docs, so an existing file is never overwritten; AGENTS.md

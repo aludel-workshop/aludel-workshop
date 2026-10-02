@@ -7,6 +7,8 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { runPure, sourceReviewed } from './layer-api.mjs';
+import { unitsAt } from './source-units.mjs';
+import { refuseDirtySharedCheckout } from './layer-source.mjs';
 import { fileOutputs, layerPackageForProject, outputPath, packageAt, packageRootAt } from './layer-package.mjs';
 
 export { fileOutputs, outputPath };
@@ -51,7 +53,11 @@ export function indexAt(db, projectId, key, repo, commit, { reviewed = true } = 
   const digest = createHash('sha256').update(source).digest('hex');
   if (reviewed && !sourceReviewed(db, projectId, key, declared.indexer, digest)) fail(`The ${key} indexer at this commit has not passed review.`, 409);
   const files = Object.fromEntries(declared.paths.map(path => [path, read(repo, commit, path)]).filter(([, text]) => text !== null));
-  const entries = runPure(source, 'entries', [files, { kinds: declared.kinds }]);
+  // A layer that asks for code units gets them parsed by the host at the same commit, outside its package, with IDs
+  // stable per project (the IDs Code's units always had).
+  const units = declared.units.length ? unitsAt(repo, commit, declared.units, { exclude: rootAt(repo, commit) || null,
+    idOf: unitKey => `cu-${createHash('sha256').update(`${projectId}:${unitKey}`).digest('hex').slice(0, 12)}` }) : undefined;
+  const entries = runPure(source, 'entries', [files, units ? { kinds: declared.kinds, units } : { kinds: declared.kinds }]);
   if (!Array.isArray(entries) || entries.length > maxEntries) fail('The layer indexer returned an invalid result.', 500);
   const seen = new Set();
   for (const entry of entries) {
@@ -148,6 +154,7 @@ export function commitOutputFiles(db, { projectId, key, files, expectedCommit, a
   }
   const { repo, commit: main } = bound;
   if (git(repo, ['rev-parse', 'refs/heads/main']).trim() !== main) fail('The layer repository\'s main branch is not at its pin; reconcile it first.', 409);
+  refuseDirtySharedCheckout(repo, rootAt(repo, main));
   const changed = Object.entries(files).filter(([path, content]) => read(repo, main, path) !== content);
   if (!changed.length) return { commit: main, entries: currentFileEntries(db, projectId, key), unchanged: true };
   const index = `${repo}/.git/aludel-index-${process.pid}-${Date.now()}`;

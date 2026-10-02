@@ -13,6 +13,9 @@ import { initLayerContract } from '../server/layer-contract.mjs';
 import { layerDocs } from '../server/layer-docs.mjs';
 import { installLayerPackageInto, layerPackageForProject, layerPackageTaskContext, matchesGlob, packageAt, repositoryPaths } from '../server/layer-package.mjs';
 import { initLayerSource } from '../server/layer-source.mjs';
+import { initSourceReviews } from '../server/layer-api.mjs';
+import { currentFileEntries, initLayerFiles } from '../server/layer-files.mjs';
+import { createHash } from 'node:crypto';
 import { createMarkdownDefinition } from '../server/layer-registry.mjs';
 import { initOnboarding, loadCatalogs, onboarding } from '../server/onboarding.mjs';
 import { initPagesLayerApp } from '../server/pages-layer-app.mjs';
@@ -39,7 +42,7 @@ function withPlainRepository(run) {
     const { token } = flows.saveDraft(null, { profile: 'planner' });
     flows.saveDraft(token, { name: 'Tool Share', pitch: 'Neighbours lend and borrow tools they rarely use.' });
     const { project } = flows.claimDraft(token, ada, ada);
-    initLayerContract(db); initLayerSource(db);
+    initLayerContract(db); initLayerSource(db); initSourceReviews(db); initLayerFiles(db);
     createMarkdownDefinition(db, ada.id, project.id, { name: 'Notes', template: 'base' });
     // Someone else's repository: an app with its own README, docs and source, made outside Aludel.
     const repo = join(data, 'app');
@@ -127,3 +130,77 @@ test('G-CODE: a nested package declares which repository files are its output; s
   assert.ok(flat.writable('knowledge/charter.md') && flat.authority('server/x.mjs'));
   assert.ok(matchesGlob('**', 'a/b/c') && !matchesGlob('src/*', 'src/a/b'));
 });
+
+// A nested layer that asks for code units: the host parses the repository's source at the pinned commit (not the working
+// tree), outside the package and never .env files, and passes the units to the layer's pure indexer.
+const unitIndexer = `export function entries(files, { units = [] } = {}) {
+  return units.map(unit => ({ id: unit.id, kind: 'note', title: unit.key, data: { path: unit.path, symbol: unit.symbol, kind: unit.kind, reachable: unit.reachable } }));
+}
+`;
+test('G-CODE: the host parses code units at the pinned commit and hands them to the layer\'s indexer', () => withPlainRepository(({ db, ada, id, repo }) => {
+  writeFileSync(join(repo, 'src/main.ts'), "import { greet } from './greet';\nconsole.log(greet('Ada'));\n");
+  writeFileSync(join(repo, 'src/greet.ts'), "export function greet(name: string) { return `Hi ${name}`; }\nexport function unused() { return 1; }\n");
+  writeFileSync(join(repo, '.env.local.ts'), 'export const secret = 1;\n');
+  git(repo, 'add', '-A'); git(repo, 'commit', '-q', '-m', 'Greeting');
+  installLayerPackageInto(db, id, 'notes', repo, { template: 'base', replace: true });
+  const manifest = JSON.parse(readFileSync(join(repo, '.aludel/layer.json'), 'utf8'));
+  Object.assign(manifest, { outputs: ['note'], files: { paths: [], kinds: ['note'], indexer: 'server/units.mjs', repository: ['**'], units: ['src/**', '*.ts'] } });
+  mkdirSync(join(repo, '.aludel/server'), { recursive: true });
+  writeFileSync(join(repo, '.aludel/layer.json'), JSON.stringify(manifest, null, 2) + '\n');
+  writeFileSync(join(repo, '.aludel/server/units.mjs'), unitIndexer);
+  git(repo, 'add', '-A'); git(repo, 'commit', '-q', '-m', 'Notes keeps units');
+  const head = git(repo, 'rev-parse', 'HEAD');
+  db.prepare("UPDATE layer_package_bindings SET accepted_commit = ? WHERE project_id = ? AND layer_key = 'notes'").run(head, id);
+  db.prepare("UPDATE layer_definitions SET output_kinds_json = ? WHERE project_id = ? AND layer_key = 'notes'").run(JSON.stringify(['note']), id);
+  db.prepare('INSERT INTO layer_source_reviews VALUES (?, ?, ?, ?, ?, ?, ?)').run(id, 'notes', 'server/units.mjs', createHash('sha256').update(unitIndexer).digest('hex'), ada.name, new Date().toISOString(), null);
+  // An uncommitted edit is not what the layer is pinned at.
+  writeFileSync(join(repo, 'src/greet.ts'), 'export function changed() {}\n');
+  const entries = currentFileEntries(db, id, 'notes');
+  const byKey = Object.fromEntries(entries.map(entry => [entry.title, entry]));
+  assert.deepEqual(Object.keys(byKey).sort(), ['src/app.ts#app', 'src/greet.ts#greet', 'src/greet.ts#unused']);
+  assert.equal(byKey['src/greet.ts#greet'].data.reachable, true, 'reachable from src/main.ts');
+  assert.equal(byKey['src/greet.ts#unused'].data.reachable, false);
+  assert.equal(byKey['src/greet.ts#greet'].id, `cu-${createHash('sha256').update(`${id}:src/greet.ts#greet`).digest('hex').slice(0, 12)}`, 'unit IDs are the ones Code always used');
+  assert.ok(!entries.some(entry => entry.title.startsWith('.aludel/') || entry.title.includes('.env')), 'the package and .env files are never parsed');
+}));
+
+// Docs the repository already keeps are the layer's Knowledge, with checks that apply to every layer's docs.
+test('G-CODE: Knowledge lists, reads, checks and saves docs the repository already keeps', () => withPlainRepository(({ db, ada, id, repo }) => {
+  writeFileSync(join(repo, 'AGENTS.md'), '# Tool Share\n\n## Where to look\n\n- `README.md`: what it is\n');
+  writeFileSync(join(repo, 'docs/setup.md'), '# Setup\n\n## Install\n\nSee [the guide](missing.md).\n');
+  mkdirSync(join(repo, 'docs/.aludel'));
+  writeFileSync(join(repo, 'docs/.aludel/sources.json'), JSON.stringify({ 'docs/setup.md': { Install: [['story', 'st-borrow', 1]] } }));
+  git(repo, 'add', '-A'); git(repo, 'commit', '-q', '-m', 'Docs');
+  installLayerPackageInto(db, id, 'notes', repo, { template: 'base', replace: true });
+  const manifest = JSON.parse(readFileSync(join(repo, '.aludel/layer.json'), 'utf8'));
+  manifest.knowledge.docs = { map: 'AGENTS.md', paths: ['README.md', 'docs/'], sources: 'docs/.aludel/sources.json' };
+  writeFileSync(join(repo, '.aludel/layer.json'), JSON.stringify(manifest, null, 2) + '\n');
+  writeFileSync(join(repo, '.aludel/knowledge/charter.md'), '# Notes\n\nSee [nowhere](nowhere.md).\n');
+  git(repo, 'add', '-A'); git(repo, 'commit', '-q', '-m', 'Notes names the app docs');
+  db.prepare("UPDATE layer_package_bindings SET accepted_commit = ? WHERE project_id = ? AND layer_key = 'notes'").run(git(repo, 'rev-parse', 'HEAD'), id);
+  const docs = layerDocs({ db, revisionOf: (projectId, ref) => ref === 'st-borrow' ? 3 : undefined });
+
+  const listed = docs.list(id, ada.id, 'notes');
+  assert.deepEqual(listed.docs.filter(doc => doc.group === 'In the repository').map(doc => [doc.path, doc.title, !!doc.map]),
+    [['/AGENTS.md', 'Tool Share', true], ['/README.md', 'Tool Share', false], ['/docs/setup.md', 'Setup', false]]);
+  assert.deepEqual(listed.checks.offMap, ['/docs/setup.md'], 'AGENTS.md names README.md but not docs/');
+  assert.deepEqual(listed.checks.broken.sort(), ['/docs/setup.md → missing.md', 'knowledge/charter.md → nowhere.md'], 'link checks cover the package\'s own docs too');
+  assert.equal(listed.checks.refresh, 1, 'the story behind Install changed since it was written');
+
+  const read = docs.read(id, ada.id, 'notes', '/docs/setup.md');
+  assert.deepEqual(read.sections.map(section => [section.heading, section.state]), [['Setup', 'plain'], ['Install', 'refresh']]);
+  assert.equal(read.sections[1].sources[0].state, 'changed');
+
+  const saved = docs.save(id, ada.id, 'notes', { path: '/docs/setup.md', content: '# Setup\n\n## Install\n\nRun `npm install`.\n', base: read.commit });
+  assert.deepEqual(git(repo, 'diff', '--name-only', read.commit, saved.commit).split('\n'), ['docs/setup.md'], 'the save commits at the repository path');
+  assert.equal(docs.history(id, ada.id, 'notes', '/docs/setup.md').versions[0].commit, saved.commit);
+  const created = docs.save(id, ada.id, 'notes', { path: '/docs/deploy.md', content: '# Deploy\n', base: saved.commit });
+  assert.equal(git(repo, 'show', `${created.commit}:docs/deploy.md`), '# Deploy');
+  // The app's own uncommitted work is never left behind a moved main (its next commit would undo the save).
+  writeFileSync(join(repo, 'src/app.ts'), 'export const app = 3;\n');
+  assert.throws(() => docs.save(id, ada.id, 'notes', { path: '/docs/deploy.md', content: '# Deploy\n\nLater.\n', base: created.commit }), /uncommitted changes/);
+  assert.equal(git(repo, 'rev-parse', 'main'), created.commit);
+  git(repo, 'checkout', '-q', '--', 'src/app.ts');
+  for (const path of ['/src/app.ts', '/notes/x.md', '/.env.md', '/docs/../.env', '/.aludel/knowledge/charter.md', '/docs/.aludel/x.md'])
+    assert.throws(() => docs.save(id, ada.id, 'notes', { path, content: '# x\n', base: created.commit }), /Choose one of this layer's docs/, `${path} is refused`);
+}));

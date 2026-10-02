@@ -92,8 +92,10 @@ export function fileOutputs(manifest) {
       || typeof files.indexer !== 'string' || !/^server\/[a-z][a-z0-9-]*\.mjs$/.test(files.indexer)
       || files.repository !== undefined && (!Array.isArray(files.repository) || !files.repository.length || files.repository.length > 20
         || !files.repository.every(glob => typeof glob === 'string' && repositoryGlob.test(glob) && !glob.split('/').includes('..')))
-      || files.units !== undefined && (typeof files.units !== 'boolean' || files.units && !files.repository)) throw new Error('Invalid layer file outputs.');
-  return { paths: files.paths, kinds: files.kinds, indexer: files.indexer, repository: files.repository || [], units: !!files.units };
+      // `units`: globs of source files the host parses into code units for the indexer (G-CODE host index library).
+      || files.units !== undefined && (!files.repository || !Array.isArray(files.units) || !files.units.length || files.units.length > 20
+        || !files.units.every(glob => typeof glob === 'string' && repositoryGlob.test(glob) && !glob.split('/').includes('..')))) throw new Error('Invalid layer file outputs.');
+  return { paths: files.paths, kinds: files.kinds, indexer: files.indexer, repository: files.repository || [], units: files.units || [] };
 }
 const globPattern = glob => new RegExp(`^${glob.replace(/\/$/, '/**').split('/').map(part => part === '**' ? '\u0000' : part.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*')).join('/')
   .replace(/\u0000\//g, '(?:.*/)?').replace(/\/\u0000/g, '(?:/.*)?').replace(/\u0000/g, '.*')}$`);

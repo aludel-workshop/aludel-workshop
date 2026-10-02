@@ -14,7 +14,7 @@ import { layerDocs } from './layer-docs.mjs';
 import { knowledgeSite } from './knowledge-site.mjs';
 import { entryRoles } from './entry-roles.mjs';
 import { facetOf } from './bindings.mjs';
-import { commitOutputFile, initLayerFiles, readOutputFile } from './layer-files.mjs';
+import { commitOutputFile, fileEntry, initLayerFiles, readOutputFile } from './layer-files.mjs';
 import { previewManager, previewRuntime } from './previews.mjs';
 import { agentsGuide, copyMedia, initialFiles, loadScaffoldSources, sitePages, skeletonFiles, workflowPaths, writeBinaries, writeFiles } from './scaffold.mjs';
 import { brandUsage, componentStatus } from './design.mjs';
@@ -133,7 +133,9 @@ const bindingStore = bindingRecords({ db });
 const bindings = bindingRoutines({ db, know, pool, store: bindingStore });
 const refacetWork = refacets({ db, know, pool, store: bindingStore, routines: bindings });
 // LAYER-KNOWLEDGE-01: a layer's docs and spec, kept in its repository and saved from Knowledge.
-const docs = layerDocs({ db, onSpecChange: (projectId, key) => bindings.specChanged(projectId, key) });
+// Doc checks compare a section's recorded sources with the Library's current revisions: records and file entries alike.
+const docs = layerDocs({ db, onSpecChange: (projectId, key) => bindings.specChanged(projectId, key),
+  revisionOf: (projectId, id) => { const record = know.get(projectId, id); if (record) return record.revision; return fileEntry(db, projectId, id)?.currentRevision ?? undefined; } });
 const knowledgeSites = knowledgeSite({ db, pool, store: bindingStore, changes: bindings.changes, refacets: refacetWork, docs });
 // LAYER-BINDINGS-01: Discover proposes bindings where one layer reads another's facet; Watch keeps reconciling and active
 // bindings current. Both run after any successful change to a project, at start-up and with the routine tick.

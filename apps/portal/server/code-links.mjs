@@ -5,8 +5,9 @@
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { dirname, join, relative } from 'node:path';
+import { join, relative } from 'node:path';
 import ts from 'typescript';
+import { indexSources } from './source-units.mjs';
 
 const now = () => new Date().toISOString();
 const hash = value => createHash('sha256').update(value).digest('hex');
@@ -14,7 +15,6 @@ const parse = (value, fallback) => { try { return value ? JSON.parse(value) : fa
 const sourceDirectories = ['src', 'server', 'tests'];
 const entryFiles = ['src/main.ts', 'server/server.mjs'];
 const isTestFile = path => /(^|\/)tests?\/|\.(test|spec)\.[cm]?[jt]s$/.test(path);
-const declarationKinds = new Set(['function', 'class', 'component', 'const']);
 const git = (cwd, args) => spawnSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 16 * 1024 * 1024 });
 
 export function initCodeLinks(db) {
@@ -138,53 +138,9 @@ function sourceFiles(root) {
 }
 
 // The whole workspace: units with stable keys, resolved references, and reachability from the entry points and tests.
+// The parsing itself is the host's index library (source-units.mjs), which also indexes a commit for a layer's indexer.
 export function indexWorkspace(root) {
-  const files = sourceFiles(root);
-  const parsed = new Map(files.map(path => [path, extractUnits(path, readFileSync(join(root, path), 'utf8'))]));
-  const all = [];
-  for (const [path, { units }] of parsed) {
-    const seen = new Map();
-    for (const unit of units) {
-      const count = (seen.get(unit.symbol) || 0) + 1; seen.set(unit.symbol, count);
-      unit.key = `${path}#${unit.symbol}${count > 1 ? ` (${count})` : ''}`; unit.path = path;
-      all.push(unit);
-    }
-  }
-  const resolve = (from, specifier) => {
-    const base = join(dirname(from), specifier).split('\\').join('/');
-    return [base, `${base}.ts`, `${base}.mjs`, `${base}.js`, `${base}/index.ts`, base.replace(/\.js$/, '.ts')].find(candidate => parsed.has(candidate)) || null;
-  };
-  const topLevel = (path, name) => parsed.get(path)?.units.find(unit => unit.parent === null && unit.name === name && declarationKinds.has(unit.kind)) || null;
-  const tables = new Map(all.filter(unit => unit.kind === 'table').map(unit => [unit.table.toLowerCase(), unit]));
-  const target = (path, name) => {
-    const local = topLevel(path, name);
-    if (local) return local;
-    const imported = parsed.get(path).imports.get(name);
-    const file = imported && resolve(path, imported.from);
-    return file ? topLevel(file, imported.name) : null;
-  };
-  const edges = unit => {
-    const out = new Set();
-    for (const name of unit.refs) { const found = target(unit.path, name); if (found && found !== unit) out.add(found); }
-    for (const name of unit.sql) { const found = tables.get(name.toLowerCase()); if (found && found !== unit) out.add(found); }
-    for (const child of parsed.get(unit.path).units.filter(item => item.parent !== null && parsed.get(unit.path).units[item.parent] === unit)) out.add(child);
-    return [...out];
-  };
-  for (const unit of all) unit.calls = edges(unit);
-  // Roots: file-level code of entry files (and what it references), file-level non-declarations there, and every test.
-  const roots = new Set();
-  for (const path of files) {
-    const entry = entryFiles.includes(path) || isTestFile(path);
-    if (!entry) continue;
-    const { units, residual } = parsed.get(path);
-    for (const unit of units) if (unit.parent === null && (!declarationKinds.has(unit.kind) || unit.kind === 'test')) roots.add(unit);
-    for (const unit of units) if (unit.kind === 'test') roots.add(unit);
-    for (const name of residual.names) { const found = target(path, name); if (found) roots.add(found); }
-  }
-  const reachable = new Set();
-  const queue = [...roots];
-  while (queue.length) { const unit = queue.pop(); if (reachable.has(unit)) continue; reachable.add(unit); queue.push(...unit.calls); }
-  return all.map(unit => ({ key: unit.key, path: unit.path, symbol: unit.symbol, kind: unit.kind, hash: unit.hash, line: unit.startLine, end: unit.endLine, reachable: reachable.has(unit), calls: unit.calls.map(item => item.key) }));
+  return indexSources(Object.fromEntries(sourceFiles(root).map(path => [path, readFileSync(join(root, path), 'utf8')])), { entries: entryFiles });
 }
 
 // ---- Commit trailers: `Aludel-Work: W-12` and `Implements: S4, SPEC-02/FR-001` on a commit link the units it changed ----
