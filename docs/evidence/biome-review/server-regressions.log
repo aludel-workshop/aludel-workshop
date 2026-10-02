@@ -1,0 +1,428 @@
+
+> aludel-portal@0.1.0 test:server
+> node --test --test-timeout=300000 tests/*.test.mjs
+
+✔ the check sends the key only as the provider expects, to the models list, and reads the answer (89.699973ms)
+✔ admin keys are refused and each provider has complete, https guidance (0.606818ms)
+✔ the user guide mirrors the in-app steps: same pages, same limits advice (6.039067ms)
+(node:2772544) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a binding is proposed, revised with exact history, and moved on by the owner (1311.347734ms)
+✔ participants are declared facets of installed layers, in roles those facets support (1123.11624ms)
+✔ authority moves by a reviewed transfer with a reason, and a joining participant must hold a supported role (2228.901774ms)
+(node:2772550) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+﹣ the design-system binding: proposed by Discover, accepted by the owner, imported and kept current through Pages' adapter (1.103292ms) # needs the pinned templates
+﹣ a dismissed proposal is not proposed again, and nothing binds while the proposal waits (1.099825ms) # needs the pinned templates
+✔ walkthrough: Pages first, Design later: one design-system binding, Design joins and takes authority (23.215576ms)
+✔ walkthrough: A Figma design system joins as the fourth participant and takes authority; Design cedes (3.078718ms)
+✔ walkthrough: An existing app and a blank Pages: user journeys with Pages as the authority (3.929535ms)
+✔ walkthrough: An existing app and a blank Pages, in a project that chose code as the authority (1.292027ms)
+✔ walkthrough: Flows first, then code (1.210294ms)
+✔ walkthrough: Both developed: the first reconcile is the merge (1.286288ms)
+✔ walkthrough: A Branding layer takes over branding: after refaceting, Design keeps name and mark as a replica, cedes the rest, and Pages' brand kit follows (3.846934ms)
+✔ every walkthrough has the same outcome, action IDs included, whatever order its inputs come in (31.820234ms)
+✔ the receiving participant's policy decides what the hub's change does there (1.66206ms)
+✔ two spokes drifting differently on one entry is a conflict for a person; the same drift is assessed once (1.409791ms)
+✔ drift: the drifted participants' contract decides, mixed answers are assessed, and an assessment decides adopt or rectify (2.953363ms)
+✔ facets name the layer's own outputs, one facet per kind, and the roles each supports (2.339273ms)
+✔ a binding is checked: one authority, whole facets, roles that hold, policies and adapters for its participants (18.532246ms)
+✔ authority moves only by transfer, and the previous authority is given a role (1.602797ms)
+✔ lifecycle: proposed → reconciling → active → paused | retired (0.630159ms)
+(node:2772557) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ an artifact zip is read without a dependency, and JUnit becomes pass, fail or skipped per test (5.669094ms)
+✔ releases go to the project's own repository; CI results come from its ci.yml run and test-results artifact (257.707067ms)
+✔ without the new permissions nothing breaks: pushes stay contents-only, workflows are left out, results say why (157.719584ms)
+✔ AGENTS.md starts as a short map; the generated guide is a doc (0.478583ms)
+(node:2772558) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+﹣ T03-CODE: on the first start with templates, an existing project's Code moves into its repository with IDs unchanged (2.221835ms) # SKIP
+(node:2772564) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ candidate worktree keeps source unchanged and commits a reviewable, attributed artifact (814.586128ms)
+✔ candidate rejects dirty bases, forbidden paths, and a base that moved (593.308423ms)
+✔ restart marks unfinished candidate interrupted without silently accepting it (364.90074ms)
+✔ Symphony-owned committed workspace becomes a submitted candidate without moving or deleting the source (870.137371ms)
+✔ external candidate rejects changed base, dirty workspace, forbidden files and a wrong Work trailer (1191.396706ms)
+✔ host commits only permitted Symphony workspace changes and can recover the committed HEAD (1982.545059ms)
+(node:2772593) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+﹣ T03-CODE github-sync: import, push, pick-up, divergence and unavailable states against a fake GitHub (0.889642ms) # SKIP
+(node:2772603) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ source is read only for tracked text files inside the workspace; .env never (147.269734ms)
+✔ starter docs never overwrite a developer's file; the sidecar marks sections whose sources changed (1357.381875ms)
+✔ releases are explicit: the draft names commits, stories from trailers, stack changes and new migrations (2399.088874ms)
+✔ Deploy has the Operator role; an older project's configure action and its open work move there (3064.165555ms)
+✔ with the scaffold's map already in AGENTS.md, a starter set adds its docs to that list (3992.374919ms)
+(node:2772613) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+﹣ T03-CODE parity: an existing project adopts its Code links and releases into its repository unchanged (1.167254ms) # SKIP
+﹣ T03-CODE: a build writes Code's links into its repository; a changed story makes them suspect and Reconcile relinks them there (0.220882ms) # SKIP
+﹣ T03-CODE: releases are recorded in Code's repository with a tag, keeping the release rules (0.175152ms) # SKIP
+﹣ T03-CODE: starter docs come from the template's seed, once, matching what the compiled layer wrote (0.146569ms) # SKIP
+﹣ T03-CODE: a coding run on Code's repository goes through the generic layer path; .env, CI and anything outside the writable set are refused (0.147153ms) # SKIP
+(node:2772624) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ T03-DATA: a new project's Data is a fork whose contract file holds the pack; no Data rows are left as records (11070.849914ms)
+✔ T03-DATA: record calls on Data become commits as the person, checked by the Data layer's rules (24370.579513ms)
+✔ T03-DATA: the Library publishes Data entries from the file; unselecting a pack removes its untouched entries in one commit (50827.506436ms)
+✔ T03-DATA: an existing project adopts its Data records into the file with ids and revisions intact (20904.457625ms)
+✔ T03-DATA: an agent branch changes the Data contract only after a checked merge (30074.170997ms)
+✔ T03-DATA: a failed adoption restores main and can be retried without losing records (27077.256951ms)
+(node:2772633) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ Design comes from its template: views, Knowledge, API and host calls (4662.53002ms)
+✔ the seeded kit is written through Design's rules into its instance, and people's changes keep the rules (9680.039972ms)
+✔ the Library is the kit's read path: every kit kind with its data, and an empty kit without Design (21581.599843ms)
+✔ an existing project's Design records join its instance when Design starts publishing its API (13521.910633ms)
+✔ a frame may upload and write Library records only when it asks for those features (1.079275ms)
+✔ a new project's kit is seeded by the Design template, and a Look & feel change follows an untouched token set (27906.526959ms)
+(node:2772640) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ tone maths: tones follow L*, seeds keep their colour, and Material 3 roles meet AA in both modes (10.353334ms)
+✔ a project gets its token set, template contracts, starter brand and documents once; the Look & feel drives untouched tokens (1519.20975ms)
+✔ token, component and brand validation (2869.659308ms)
+✔ references point at a source or finding; image findings mark a region; documents show in layers (3551.653027ms)
+✔ onboarding reference media move into the Library once (3374.26963ms)
+✔ the scaffold builds styles, token files and brand from the Design layer, and brand usage is read from the code (3007.77887ms)
+(node:2772685) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ editor connection scopes a versioned task bundle and live knowledge to its member and project (11129.066853ms)
+✔ Codex stdio adapter exposes read tools and forwards a bearer-scoped task request (156.353906ms)
+(node:2773495) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ references are found in other layers' entry data, nested or listed, never an entry's own ID or its own layer (46.384342ms)
+﹣ roles appear only once a binding is in force, in the Library and in the layer's own reads (0.202973ms) # needs the pinned templates
+﹣ a person or an agent cannot write an entry in a ceded facet; the authority's entries and the binding's imports still change (0.088578ms) # needs the pinned templates
+﹣ two instances that own one kind never mix: an unnamed project-wide read is refused, and each instance reads its own (0.092099ms) # needs the pinned templates
+﹣ a refacet's preflight lists other layers' references into the part that moves (0.147489ms) # needs the pinned templates
+﹣ an edit cannot move an entry out of a ceded facet by changing the field that narrows it (0.143965ms) # needs the pinned templates
+(node:2773764) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ vendor configuration validates once and app JWTs are short-lived and signed (10.786619ms)
+✔ organization flow verifies installation, seals user token, and recovers with fresh installation tokens (588.714161ms)
+✔ personal repository creation uses the required user token, then installation identity for Git (917.957459ms)
+✔ legacy project-keyed GitHub rows move once to the owner account (290.164027ms)
+✔ configured Git profile creates and pushes a clean initial repository (350.006454ms)
+✔ every tracked script with a shebang is committed executable (1119.773352ms)
+✔ continue with GitHub creates or finds one account, never takes over by email, and never shares an identity (490.604778ms)
+✔ the App's public identifiers are committed config; secrets come only from the environment (306.090201ms)
+✔ pushes use only the installation token, never a credential helper from the person's git config (811.741109ms)
+✔ every literal icon name used by the portal is in the committed font subset (47.136398ms)
+✔ generated apps ship a font for exactly the icons a page can be given (1.308461ms)
+✔ a valid tree comes back in normal form, with its parts flattened in order (12.01954ms)
+✔ each part says what it is for, what it covers and where it is edited, and parts nest and stay apart (38.070526ms)
+✔ a folder of Markdown documents is a part: `folder` comes from each document's path (3.54639ms)
+✔ ticked parts nothing holds yet are declared as a new facet (3.694019ms)
+✔ part of a facet is split off; when that facet is bound, its binding is renegotiated in the same decision (2.385978ms)
+✔ a facet that holds exactly the ticked parts is reused, unless it is already shared as a whole (0.913946ms)
+✔ parts kept apart, or kept differently, are bound separately (1.369851ms)
+(node:2773868) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+﹣ a layer's site joins its spec, what each part holds, how it is shared, and its docs (1.207843ms) # needs the pinned templates
+﹣ Personas binds its people folder with Vision's personas: one proposal, decided at once (0.303411ms) # needs the pinned templates
+﹣ Branding takes Design's brand assets, renegotiating the design-system binding (0.378659ms) # needs the pinned templates
+﹣ a proposal needs two layers, one lead, roles each part supports, and a name; dismissing it dismisses its refacets (0.167902ms) # needs the pinned templates
+✔ Vision, Pages and Code observation have layer-owned typed action declarations (18.688664ms)
+✔ a declaration cannot turn Code observation into a Pages write or widen file access (3.953106ms)
+(node:2774065) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a real pinned portal route supports useful and wrong Pages relations without rewriting Code evidence (81.539717ms)
+✔ every remaining built-in legacy action has an explicit, truthful disposition (2.623875ms)
+✔ remaining layer actions publish typed outputs and explicit effect/read boundaries with only registered runnable adapters (0.556688ms)
+(node:2774157) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ migration is idempotent and keeps historical pins while blocking unsupported open work (9.19431ms)
+✔ new Work items with no checked action are blocked without interrupting Pages review (12.00802ms)
+✔ layer grants separate owner, lead, ordinary member and elevated action (5.409454ms)
+✔ new layer installation seeds by current style and never rewrites earlier assignments (4.293559ms)
+✔ Code reads exact project commit and excludes secrets, symlinks, traversal and ungranted effects (233.976092ms)
+✔ all three work styles seed only available performers and never fabricate a fallback (32.200271ms)
+✔ layer method edits are revisioned, owner-scoped and do not rewrite historical action pins (3.828552ms)
+(node:2774507) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ LAY-04A: closing a record-changing item needs a revision made from it; code and findings work is exempt (3317.470673ms)
+✔ LAY-04A (as revised by WORK-UX-01): an answer lands in the record it changes, with its reason, and finishes the item (3372.855879ms)
+✔ WORK-UX-01 (DEC-041): each layer's gaps become backlog items, assigned by their action; filled gaps close them (4143.915195ms)
+✔ WORK-UX-01: roles by layer; the onboarding style only presets who takes each action (11998.884183ms)
+✔ WORK-UX-01: priority and blocking links as Jira has them (4143.839552ms)
+✔ LAY-04C: routines run when due, before releases or by hand, never twice while open (5083.554614ms)
+✔ LAY-04B (as revised by WORK-UX-01): reconcile items created by code links go to the reconcile action's assignee (6463.112324ms)
+✔ a custom routine stages its configured domain action only after layer activation (9404.199985ms)
+(node:2775024) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ LAY-07A: the Accounts pack seeds exactly the contract aludel-web-v1 generates, accepted (3417.098439ms)
+✔ LAY-07A: Data validators are structural and references must exist in the project (3428.911635ms)
+✔ LAY-07A: unselecting a pack removes its untouched Data records only (4233.251647ms)
+✔ LAY-07C (as revised by WORK-UX-01): one default agent; profiles hold model, effort, context and limits; DEC-038 role profiles migrate (4348.297109ms)
+✔ LAY-07D: the index reads units, references and reachability from a generated skeleton (6352.064501ms)
+✔ LAY-07D: a new revision makes links suspect and opens exactly one Reconcile item; closing it relinks (6067.138759ms)
+✔ LAY-07D: a rebuild regenerates pages from their records and resolves their Reconcile items (10403.740215ms)
+✔ LAY-07D: commit trailers link the units a commit changed, at the revision current when it was made (14562.24078ms)
+✔ LAY-07D: extractUnits keeps sibling tables from one SQL string at the same level (9.569572ms)
+✔ LAY-07B: preview database health, masked browsing, guarded read-only queries, backups and confirmed restore (10875.134658ms)
+✔ LAY-07B: backups sit outside the repository and restore needs confirmation (8745.574577ms)
+✔ LAY-07B: releases record checks from the preview result and the stories they carry (7218.198393ms)
+✔ a project workspace inside another repository gets its own repository and never commits the parent (1377.883275ms)
+✔ layer action IDs and first assignments are independent of a Work role (3.493344ms)
+✔ declarations reject foreign outputs, unregistered adapters and invented reads/effects (1.612824ms)
+✔ elevated actions seed a human and file writes require a candidate result (6.674828ms)
+(node:2775110) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ the charter is a seeded, editable Knowledge document that drives activation (49.086402ms)
+(node:2775229) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ declarations reject unknown kinds, duplicate kinds and wrong authority (2.908122ms)
+✔ migration is idempotent and scoped descriptors preserve native records (867.331405ms)
+✔ optional layer apps are owner-scoped and preserve native outputs across removal (685.001988ms)
+✔ legacy layer rows gain stable, immutable instance IDs on restart (11.209068ms)
+(node:2775280) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ neighbor discovery is reciprocal and idempotent for product then pages (18.761584ms)
+✔ neighbor discovery is reciprocal and idempotent for pages then product (1.637562ms)
+✔ source snapshot changes with an exact output revision (26.578503ms)
+✔ signed discovery output creates proposed documents and cannot overwrite active policy (20.53318ms)
+✔ non-Pages layers use the same revisioned Knowledge and connection contracts (17.269299ms)
+(node:2775573) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+﹣ docs are listed where Knowledge shows them, and Save takes at once as a new pin with every version kept (1.353659ms) # needs the pinned templates
+﹣ the spec is saved whole, checked first, and a change raises Compare specs (0.272226ms) # needs the pinned templates
+﹣ a docs-only commit reuses the views' build; a change to a view does not (0.176012ms) # needs the pinned templates
+﹣ a custom layer's charter is its identity: read from it, and saved to both (0.228181ms) # needs the pinned templates
+﹣ a refacet proposed before a docs save is still accepted; one whose facets changed meanwhile is not (0.217577ms) # needs the pinned templates
+(node:2776033) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ T03-G2: a layer's output files are Library entries with revisions per entry; a person's edit commits to main (14728.441819ms)
+✔ T03-G2: an agent's branch merges only when its output files still index, and the index follows the merge (12512.711421ms)
+✔ T03-G2: an indexer runs only as reviewed bytes, and a manifest cannot claim files outside outputs/ (21443.69305ms)
+(node:2776147) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+fatal: path 'docs/deploy.md' does not exist in '453b32976029f82c851a834322ae546ee2a707a7'
+✔ G-CODE: a layer installs into an existing repository under .aludel/ as one commit, and only on a clean tree (11144.029269ms)
+✔ G-CODE: Knowledge saves commit under the package root, and the package stays valid (11556.379819ms)
+✔ G-CODE: a nested package declares which repository files are its output; secrets, Git and CI never are (9.477743ms)
+✔ G-CODE: the host parses code units at the pinned commit and hands them to the layer's indexer (21229.882774ms)
+✔ G-CODE: Knowledge lists, reads, checks and saves docs the repository already keeps (26516.779994ms)
+(node:2776242) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ layer presentation is owner-only, validated and shared by built-in and custom layers (165.23029ms)
+✔ offered icons are the font subset and suggested colours pass contrast (1.566639ms)
+✔ the Manage picker lists match the server allowlists (0.700517ms)
+(node:2776794) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ G-CODE: a layer repository syncs with its remote using only the installation token (22975.23814ms)
+✔ installable layers come from the reviewed template pins (978.378075ms)
+✔ runtime catalog uses pins with templates on and retains compiled fallback with templates off (10783.676081ms)
+(node:2785347) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a layer frame may read the project, use its own layer, create Work and the host features its manifest requests; nothing else (8.302957ms)
+✔ each layer instance has its own frame origin, distinct from the portal and project apps (2.907565ms)
+✔ built views are served sandboxed, may embed only their project's app, and never outside the build (19.4262ms)
+✔ an instance's views are built from its own repository commit, and instances on one commit share the build (126822.036026ms)
+(node:2785799) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ T03-G1: outputs, Knowledge and research are one searchable pool, each entry naming its owning instance (19223.775629ms)
+✔ T03-G1: reads pin revisions, stay inside the project and installed layers, and refuse non-members (8504.114003ms)
+✔ T03-G1: layer frames may search and read the Library, and nothing else new (1.052915ms)
+(node:2786507) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ two project-scoped Markdown layers use the common descriptor and isolated revisioned output (276.082446ms)
+(node:2786697) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ accounts hash passwords, reject duplicates and resolve sessions to users (2688.296077ms)
+✔ sessions created before accounts keep working as the owner (330.538395ms)
+✔ a draft needs a working style and becomes exactly one project owned by the claimant (11725.308309ms)
+✔ working style is a preference set: overrides survive a switch and equal-to-default values are not overrides (4908.163673ms)
+✔ story packs seed ordinary stories and pages; unselecting removes only untouched pack content (8043.994396ms)
+✔ pages are records: deleting one that realises stories needs a home for them (5574.059607ms)
+✔ story status is derived from connected work, and work cannot close without documentation (5823.417769ms)
+✔ a build marks template stories built with a done template work item and gives every page a skeleton (6900.471787ms)
+✔ agent connections are checked, sealed, never returned, and work identically for Aludel itself (4622.639936ms)
+✔ look and feel validates choices and uploads enforce type, size and ownership (5542.881987ms)
+✔ only available stack presets can be chosen (4846.341724ms)
+✔ host topology separates the portal from app subdomains and supports a hosted domain (1.745248ms)
+✔ pages are seeded from the chosen feel, then saved as the person arranges them (5544.174777ms)
+✔ the skeleton is deterministic, builds pages from the navigation and never links dependencies into the repository (5469.381156ms)
+✔ a new candidate project may start with no layers or layer-owned output records (3037.487308ms)
+(node:2787996) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+﹣ Vision cedes its personas to a new Personas layer, and the chain of Work merges back (1.550348ms) # needs the pinned templates
+(node:2788282) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ reviewed Pages source runs on a disposable real flow and matches the host validator (17709.49449ms)
+✔ runner permission flags deny file reads, writes and subprocesses (496.416244ms)
+(node:2789108) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ Pages documents seed once, retain exact revisions and owner scope (38.827503ms)
+✔ connection proposal needs an installed source and review; removal retains it (6.433145ms)
+(node:2789222) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ Pages legacy outputs and tombstones backfill exact instance scope, and current writes preserve it (244.11463ms)
+(node:2789433) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ Pages installs separate pinned local repository copies and reads their declared tabs and Knowledge (12004.877021ms)
+(node:2789574) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ reviewed Pages policy has durable receipts, one Work suggestion per gap, and safe closure (133.123458ms)
+✔ source disappearance degrades coverage; rejected and excepted gaps stay quiet (52.552579ms)
+✔ the real Pages connection stages Work and a flow edit closes its untouched suggestion (7683.706289ms)
+✔ a touched Work suggestion cannot be silently quieted by a gap decision (3.302123ms)
+(node:2790012) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a page spec holds sections from the design system; a section that leads somewhere is also a link (8763.561982ms)
+✔ flows start as one per story-map activity, once, through the pages that realise their stories (9234.615393ms)
+✔ the Map keeps grid places in one record, so moving pages adds no page revisions (7389.223178ms)
+✔ a change request revises the spec with its reason and becomes Engineer › implement work (9849.16551ms)
+✔ reviewing a flow is Experience designer work: notes decide the verdict and finishing closes the item (8682.845598ms)
+✔ the scaffold routes every page, renders spec sections marked for Pages, and ships the preview bridge (8450.721159ms)
+(node:2790721) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ preview image tags are isolated by portal instance and preview kind (13.61938ms)
+✔ the skeleton declares how it runs, without setting its own limits (5939.223773ms)
+✔ a preview builds from the app's Dockerfile and runs in one limited container (50765.217603ms)
+✔ candidate preview has separate container, image, state and runtime data (32361.767518ms)
+(node:2790925) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ proposal revisions are immutable and retain their source request (1018.365579ms)
+✔ decision changes stale only linked records and reassessment is explicit (688.587742ms)
+(node:2791388) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ reconciles a useful product workspace without inventing calendar commitments (952.080018ms)
+✔ no-op direction save does not create a revision (844.948291ms)
+✔ stale expected revision is rejected and current record is preserved (727.684104ms)
+✔ only linked dependents become stale and roadmap edits do not authorize work (740.588866ms)
+(node:2791521) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ project brand copy and artwork are project-owned and replaceable (491.347716ms)
+(node:2791626) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ statements are classified by the tables they name (19.119542ms)
+✔ each project has its own database; platform rows stay in the platform database (663.587414ms)
+✔ a transaction spans every database it touches and rolls back together (327.077284ms)
+✔ a project database opened later is brought up to the current schema (343.073348ms)
+✔ a single-database install moves each project’s rows into its own database, keeping a backup (1566.742059ms)
+✔ no server statement names both platform and project tables (108.13196ms)
+(node:2791958) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+﹣ accepting or dismissing a proposal decides its Work item; a member's change waits for the owner (1.559616ms) # needs the pinned templates
+﹣ dismissing a proposal retires it, and Discover does not propose it again (1.634997ms) # needs the pinned templates
+﹣ a facet takes part in one live binding (0.410622ms) # needs the pinned templates
+﹣ a refacet is reviewed Work in its layer: a branch of layer.json that merges on acceptance, with the bindings following (0.189343ms) # needs the pinned templates
+﹣ a refacet whose layer moved on, or whose result would differ, is refused; a branch with overlapping facets is not a package (0.197501ms) # needs the pinned templates
+﹣ a partial overlap is a chain of Work: refacet each side, then the binding proposal that waits on them (0.445823ms) # needs the pinned templates
+﹣ only the owner decides, even a dismissal; a refacet waits on Work that blocks it; a split-off facet can join a named binding (0.242388ms) # needs the pinned templates
+✔ refacet case: Vision cedes its personas to a new Personas layer: refacet by kind, cede, adopt through Personas' adapter, then re-point Pages' references (44.178639ms)
+✔ refacet case: Design's branding goes to a Branding layer built from scratch: refacet within a kind, Pages' kit refaceted too, the design-system binding untouched (14.814841ms)
+✔ refacet case: Design's branding goes to an imported, read-only source: it takes no Work, so replicas are rectified and ceded content stays as history (14.328995ms)
+✔ refacet case: Design's branding goes to a heavily modified fork of Design: the same kind and facet names in two instances never mix (1.777049ms)
+✔ refacet case: A new Content layer overlaps part of Pages: both sides are refaceted, and one binding contracts on the overlap (2.174371ms)
+✔ refacet case: Personas merges back into Vision: transfer authority back to the ceded facet, reconcile, retire the binding, merge the facets (2.815385ms)
+✔ every refacet case has the same outcome, action IDs included, whatever order its inputs come in (117.280327ms)
+✔ facets never overlap: a kind is selected whole once, or narrowed by one field to disjoint values (2.96714ms)
+✔ a split keeps every record in exactly one facet, and merging it back restores the original membership (25.967492ms)
+✔ a split takes only part of the facet, under a new key; renaming keeps the key (1.529005ms)
+✔ bindings follow keys: the parent keeps its bindings, the split-off facet starts unbound or joins one named binding (2.063953ms)
+✔ a facet takes part in one live binding; a straddle is refaceted (0.680485ms)
+✔ an entry whose narrowing field changes moves facet, and its role moves with it (0.484397ms)
+✔ re-pointing waits for entries the authority has not adopted yet (0.773681ms)
+✔ detached entries are held by ref and by concept key until no participant publishes them (1.551281ms)
+✔ declaring a facet takes outputs no facet holds yet, so a layer with no facets can start to share (8.598723ms)
+(node:2792127) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ review destinations and recipe checks reject cross-origin navigation and malformed scenarios (1983.035387ms)
+✔ combined previews retain image identity, isolate scenarios, cap runtime, restart, reject stale bases and retire only closed artifacts (44590.071149ms)
+(node:2792197) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ the Brief starts from the pitch; older vision sections migrate once into claims, and principles reach agents (7316.573434ms)
+✔ evidence links insights to records; deleting cleans up instead of dangling; comments carry who said them (8049.106807ms)
+✔ generated documents compose from the Brief, go out of date when it changes, and agents read the ones marked (8763.831632ms)
+✔ specs and the story map become projects once; items join their project; dependencies cannot loop (8176.084029ms)
+✔ Next N follows a fixed rule: the assignee, queued, unblocked, active milestone, highest priority then oldest (7211.08793ms)
+✔ Next from a layer board fills the batch only from that layer (7839.318196ms)
+✔ elevated actions: agents never default to them, and only a lead of the role (or the owner) accepts their review (8041.564732ms)
+(node:2797310) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ security audit: Go, scoped reads, question, new Go, read-only report, review (24275.236874ms)
+(node:2797736) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ Markdown import is idempotent and preserves changed source revisions (835.985409ms)
+(node:2797915) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ managed pool switches profiles and admits 2 + 1 slots before a queued 3-slot batch (24773.546312ms)
+(node:2798933) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ runtime error event blocks the item with a retry reason (11255.205398ms)
+✔ Vision uses Symphony only, submits a read-only claim, then exact lead acceptance applies it once (8502.005554ms)
+✔ Data contract proposal changes its target only after checked acceptance (8801.001567ms)
+✔ Acceptance criteria remain a proposal until lead review, then revise the pinned story (7426.134803ms)
+✔ Vision send-back and changed Brief do not apply a stale Symphony proposal (8479.885414ms)
+✔ worker HTTP proposal route accepts only its scoped token and current attempt (10543.857589ms)
+✔ clarification question and options travel through the Symphony card and review (7425.256775ms)
+✔ Design, Pages, Deploy, and Work review reports use explicit read-only Symphony adapters (15269.424014ms)
+✔ Work staging keeps personal work separate, blocks unsupported actions, and pins a manual brief for Symphony (8375.898294ms)
+✔ a project with Symphony dispatch disabled cannot fall back to the legacy model caller (6651.283618ms)
+✔ Pages-origin Work pins reviewed policy and applies a proposed flow only after checked acceptance (8592.514997ms)
+✔ a direct Pages request without Vision reaches the same Go, proposal and checked review boundary (8198.255522ms)
+✔ pinned Code route observation can yield a reviewed Pages flow; wrong relation retains its source (7691.460977ms)
+✔ a changed Code relation withdraws the pinned attempt and prevents stale flow acceptance (6518.847784ms)
+✔ two hosts racing for one Go-pinned attempt have one workspace claim and one runnable owner (6517.244482ms)
+✔ layer discovery Go submits reviewed receiving policies without activating them (7057.62696ms)
+✔ discovery knowledge gateway follows the installed layer graph (6189.215832ms)
+✔ Pages flow task includes exact installed layer method and repository Knowledge alongside the same pinned targets (10896.595721ms)
+✔ a flow-only Pages task reviews Previous/Proposed and atomically revises one existing flow (11587.059683ms)
+✔ revising a flow rejects changed source, foreign instance and stale page without partial acceptance (28118.763312ms)
+✔ a cited persona revision is mandatory and stale persona denies flow acceptance (35867.661253ms)
+✔ an existing-flow agent task waits for a reviewed Pages package but still needs no story (8828.623893ms)
+✔ a layer-scoped Pages task changes Pages only through its API; review shows fields and follow-ups are signed as the agent from Pages (34587.68241ms)
+✔ T03-G1: a layer-scoped run reads other layers through the Library, and a cited Knowledge revision gates acceptance (26479.663409ms)
+✔ a staged draft is refused when a record it changes moved on, a reference is gone, or the layer source changed (24321.656159ms)
+✔ every host write of a Pages record uses the Pages API rules and messages; people call the same operations (25815.1818ms)
+✔ layer access keeps elevated grants layer-wide, never widens action grants, and seeds the layer default assignee (23262.059852ms)
+✔ without an opted-in layer package, an action-less request keeps the legacy action path (5915.614197ms)
+✔ a run edits its layer on a work branch in its sandbox, tests it against the output copy, and accepting merges the branch (22027.273873ms)
+✔ a run cannot commit files outside the layer contract, an invalid package, or an API that does not load (8338.79089ms)
+✔ an elevated reviewer merges a change to what the layer runs; the merged rules must accept existing records, and a moved main merges only when clean (18519.077835ms)
+✔ repository reviews refresh before acceptance, retain submissions and refuse a stale reviewed generation (32119.492963ms)
+✔ combined layer tests catch a clean merge whose API remains structurally valid (16541.674447ms)
+✔ adding a layer forks its template from the base repository into the instance's own repository (5257.082905ms)
+✔ a Markdown layer changes its files only through its own API and stays apart from another Markdown layer (6540.368892ms)
+✔ a Markdown layer from before layer repositories moves into its own repository with its files and charter (3888.976239ms)
+✔ an agent works on a Markdown layer through the same staged API, review and elevated acceptance as Pages (5367.275753ms)
+✔ a real person run submits an immutable repository branch and uses shared integration and checked acceptance (5539.961175ms)
+✔ only a Go-snapshotted, pinned coding item projects as Symphony work (67.656431ms)
+(node:2799912) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ worker token scopes pinned coding work; ID refresh withdraws skipped and stopped items (36761.438193ms)
+✔ existing Symphony attempts migrate to a durable run allowance (1328.09889ms)
+✔ task compiler binds an explicit output adapter to exact inputs (7.453388ms)
+(node:2800290) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ Vision template owns its pinned view and Knowledge; Library preserves story pins (15741.158492ms)
+✔ existing Vision instance adopts a repository without changing story identity or revision (10004.117156ms)
+✔ Vision changes go through its own API rules, and the story map keeps its hierarchy through that API (12638.092352ms)
+✔ an existing project's Vision records join its instance when Vision starts publishing its API (8190.182549ms)
+(node:2800566) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ an authorization no worker picked up is not a run (7787.197713ms)
+✔ each run keeps its own task; a signed send-back carries flags and comment into the next run (9495.424603ms)
+✔ a failed run can only be closed, which reopens the task (6780.014464ms)
+✔ a stuck objective ends the run immediately and prevents later objectives or submission (7056.028504ms)
+✔ an older submitted diagnostic with an unresolved stuck objective remains a failed, non-acceptable run (6387.951228ms)
+✔ active and genuinely reviewable work cannot be archived (6247.608729ms)
+✔ a working run reports its own plan and progress; the live run follows it (7148.836353ms)
+✔ evidence names a given criterion and a change, test or thing to try; unmatched references stay visible (8636.110509ms)
+✔ answering an agent question can amend the next run without changing this run snapshot (9920.765597ms)
+✔ the assigned person can start, submit and sign a run without synthetic agent telemetry (6412.988466ms)
+(node:2801325) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ supervised authorization, questions, cancellation and restart (1025.729285ms)
+ℹ tests 307
+ℹ suites 0
+ℹ pass 276
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 31
+ℹ todo 0
+ℹ duration_ms 665701.219457

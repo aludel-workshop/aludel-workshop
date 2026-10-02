@@ -83,6 +83,11 @@ export function objectivesOf(run: WorkRun, nowMs: number): { list: Objective[]; 
         <form class="wi-signoff" (ngSubmit)="submitPerson()">
           <h3><mat-icon aria-hidden="true">rate_review</mat-icon>Create the review packet</h3>
           <p class="small lay-muted">{{ editsSinceStart().length }} linked {{ editsSinceStart().length === 1 ? 'revision was' : 'revisions were' }} recorded during this run and will be included automatically.</p>
+          @if (r.task.layerRepository) {
+            <p class="small lay-muted">Submit a committed local branch from this layer's repository. It stays unmerged until review acceptance.</p>
+            <label for="person-branch">Local branch</label><input id="person-branch" name="personBranch" [(ngModel)]="branchDraft" placeholder="work/my-change">
+            <label for="person-commit">Exact commit</label><input id="person-commit" name="personCommit" [(ngModel)]="commitDraft" placeholder="Full commit SHA">
+          }
           <label for="person-summary">What is ready for review</label><textarea id="person-summary" name="personSummary" rows="3" [(ngModel)]="summaryDraft" required></textarea>
           @for (criterion of r.task.criteria; track criterion.index) {
             <label [for]="'person-evidence-' + criterion.index">Evidence for {{ criterion.index + 1 }}. {{ criterion.text }}</label>
@@ -160,7 +165,7 @@ export function objectivesOf(run: WorkRun, nowMs: number): { list: Objective[]; 
               @else if (r.review.flags[change.id]) { <p class="wi-flagnote"><mat-icon aria-hidden="true">subdirectory_arrow_right</mat-icon>{{ r.review.flags[change.id] }}</p> }
             }</li>
         } @empty { <li class="lay-muted small">Run {{ r.number }} {{ ['working', 'needs'].includes(r.state) ? 'has not submitted anything yet' : 'submitted no changes' }}.</li> }</ul>
-        @if (r.changes.length) { <p class="small lay-muted wi-applied"><mat-icon aria-hidden="true">info</mat-icon>{{ r.performer.kind === 'person'
+        @if (r.changes.length) { <p class="small lay-muted wi-applied"><mat-icon aria-hidden="true">info</mat-icon>{{ r.performer.kind === 'person' && !r.layerSource
           ? 'These linked revisions were recorded while the person worked; acceptance signs them off.'
           : r.state === 'accepted' ? 'Applied when the run was accepted.' : r.state === 'review' ? 'Nothing is applied until you accept this run.' : 'Not applied. Kept here and passed to the next run as context.' }}</p> }
       </div></details>
@@ -177,7 +182,7 @@ export class RunCardComponent {
   readonly logOpen = signal(false);
   readonly signing = signal<'accept' | 'reject' | 'close' | null>(null);
   readonly submitOpen = signal(false);
-  comment = ''; answerDraft = ''; whyDraft = ''; answerCriteria = ''; summaryDraft = ''; evidenceDraft: string[] = [];
+  comment = ''; answerDraft = ''; whyDraft = ''; answerCriteria = ''; summaryDraft = ''; branchDraft = ''; commitDraft = ''; evidenceDraft: string[] = [];
   readonly tone = computed(() => runTone[this.run().state]);
   readonly title = computed(() => runTitle[this.run().state]);
   readonly objectives = computed(() => objectivesOf(this.run(), this.ctx.now()));
@@ -195,11 +200,11 @@ export class RunCardComponent {
   readonly info = computed(() => {
     const r = this.run();
     switch (r.state) {
-      case 'working': if (r.performer.kind === 'person') return 'The task snapshot is pinned. Record linked changes from this item, then create a review packet.';
+      case 'working': if (r.performer.kind === 'person') return r.task.layerRepository ? 'The task and repository base are pinned. Commit your changes on a local branch, then submit it for review.' : 'The task snapshot is pinned. Record linked changes from this item, then create a review packet.';
         if (r.turns.used >= r.turns.limit && !r.candidate) return `This authorization has no turns left (${r.turns.used} of ${r.turns.limit}). No further turn starts until you authorize more.`;
         return r.live?.activity ? `${r.live.activity}…` : 'Nothing is applied while it runs. When it submits, this becomes ready for review.';
       case 'needs': return `${r.performer.label} paused on a question. Your answer can amend the next run's criteria.`;
-      case 'review': return r.performer.kind === 'person'
+      case 'review': return r.performer.kind === 'person' && !r.layerSource
         ? `${r.performer.label} submitted a review packet with ${r.changes.length} linked ${r.changes.length === 1 ? 'change' : 'changes'}. The revisions are already recorded; acceptance signs off the run.`
         : `${r.performer.label} submitted ${r.changes.length} ${r.changes.length === 1 ? 'change' : 'changes'} for ${r.task.criteria.length} ${r.task.criteria.length === 1 ? 'criterion' : 'criteria'}. Nothing is applied until you accept.`;
       case 'failed': return r.blockReason ? `${r.blockReason} Close the run to reopen the task.` : 'The run could not finish. Close it to reopen the task.';
@@ -222,7 +227,7 @@ export class RunCardComponent {
     return [count('created') && `${count('created')} created`, count('modified') && `${count('modified')} modified`, count('removed') && `${count('removed')} removed`, flagged && `${flagged} flagged`].filter(Boolean).join(' · '); });
   readonly signTitle = computed(() => { const kind = this.signing(); const n = this.run().number; return kind === 'accept' ? `Accept run ${n}` : kind === 'reject' ? `Send back run ${n}` : `Close run ${n}`; });
   readonly signHelp = computed(() => this.signing() === 'accept'
-    ? this.run().performer.kind === 'person' ? `Signs off the recorded work and closes ${this.item().ref}. Your signature and comment are kept with it.`
+    ? this.run().performer.kind === 'person' && !this.run().layerSource ? `Signs off the recorded work and closes ${this.item().ref}. Your signature and comment are kept with it.`
       : `Applies ${this.run().changes.length === 1 ? 'its change' : `its ${this.run().changes.length} changes`} and closes ${this.item().ref}. Your signature and comment are kept with it.`
     : 'Nothing is applied. The changes, your flags and your comment stay on this run and go to the next run as context. The task opens again as Next run.');
   readonly log = computed(() => this.run().steps.map(step => ({ at: step.at, text: step.kind === 'plan' ? `Planned ${step.objectives?.length || 0} objectives`
@@ -249,7 +254,7 @@ export class RunCardComponent {
   sign(kind: 'accept' | 'reject' | 'close') {
     const n = this.run().number;
     void this.ctx.write(async () => { await this.ctx.api(this.base() + '/sign', 'POST', { outcome: kind, comment: this.comment }); this.signing.set(null); this.changed.emit(); },
-      kind === 'accept' ? this.run().performer.kind === 'person' ? `Run ${n} accepted and signed off.` : `Run ${n} accepted and applied.`
+      kind === 'accept' ? this.run().performer.kind === 'person' && !this.run().layerSource ? `Run ${n} accepted and signed off.` : `Run ${n} accepted and applied.`
         : kind === 'reject' ? `Run ${n} sent back. The task is open again in Next run.` : `Run ${n} closed. The task is open again in Next run.`);
   }
   // A coding run that used its turns waits here; more turns stay on the same pinned task.
@@ -261,7 +266,7 @@ export class RunCardComponent {
     this.changed.emit();
   }, `Stopping ${this.item().ref}.`); }
   submitPerson() { const evidence = this.evidenceDraft.map((note, criterion) => ({ criterion, note: note?.trim() })).filter(entry => entry.note);
-    void this.ctx.write(async () => { await this.ctx.api(this.base() + '/submit', 'POST', { summary: this.summaryDraft, evidence }); this.submitOpen.set(false); this.changed.emit(); }, 'Ready for review.'); }
+    void this.ctx.write(async () => { await this.ctx.api(this.base() + '/submit', 'POST', { summary: this.summaryDraft, evidence, ...(this.branchDraft.trim() ? { source: { branch: this.branchDraft.trim(), commit: this.commitDraft.trim() } } : {}) }); this.submitOpen.set(false); this.changed.emit(); }, 'Ready for review.'); }
   answer() { const criteriaAmendment = this.answerCriteria.split('\n').map(value => value.trim()).filter(Boolean);
     void this.ctx.write(async () => { await this.ctx.updateWork(this.item().id, { answer: this.answerDraft, rationale: this.whyDraft, criteriaAmendment }); this.changed.emit(); }, 'Answered and updated the next run.'); }
   when(at: string) { const date = new Date(at); return `${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · ${date.toTimeString().slice(0, 5)}`; }

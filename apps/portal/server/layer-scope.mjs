@@ -36,15 +36,14 @@ const installed = (db, projectId, layerKey) => Boolean(db.prepare('SELECT 1 FROM
 const isOwner = (db, userId, projectId) => Boolean(db.prepare("SELECT 1 FROM project_members WHERE project_id = ? AND user_id = ? AND role = 'owner'").get(projectId, userId));
 const isMember = (db, userId, projectId) => Boolean(db.prepare('SELECT 1 FROM project_members WHERE project_id = ? AND user_id = ?').get(projectId, userId));
 
-// The layer's Work scope when its installed source opts in and publishes an API: the output kinds its write operations change.
+// Installed layers opt into Work through their manifest. Record writes require an API; repository-only layers use the same checked branch submission boundary.
 export function layerWorkScope(db, projectId, layerKey) {
   if (!installed(db, projectId, layerKey)) return null;
   let pkg, api;
   try { pkg = layerPackageForProject(db, projectId, layerKey); api = pkg?.manifest?.work?.scope === 'layer' ? layerApi(db, projectId, layerKey) : null; } catch { return null; }
-  if (!api) return null;
+  if (pkg?.manifest?.work?.scope !== 'layer') return null;
   const changes = {};
-  for (const operation of api.operations.values()) if (operation.output) (changes[operation.output] ||= []).push(operation.operationId);
-  if (!Object.keys(changes).length) return null;
+  for (const operation of api?.operations.values() || []) if (operation.output) (changes[operation.output] ||= []).push(operation.operationId);
   const instance = db.prepare('SELECT instance_id FROM layer_instances WHERE project_id = ? AND layer_key = ?').get(projectId, layerKey)?.instance_id;
   return { key: layerKey, instanceId: instance, commit: pkg.commit, changes, unavailable: [] };
 }

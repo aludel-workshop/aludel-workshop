@@ -1,5 +1,8 @@
+import { initLayerSource, layerReview, layerBinding, layerBranch, submitLayerBranch, prepareLayerReview, assertLayerReviewCurrent, mergeLayerBranch, settleLayerCheckout, undoLayerMerge } from './layer-source.mjs';
+import { packageAt } from './layer-package.mjs';
+import { layerInstanceId } from './layer-contract.mjs';
 import { randomUUID } from 'node:crypto';
-import { followUpsForAttempt } from './layer-scope.mjs';
+import { followUpsForAttempt, requireElevated } from './layer-scope.mjs';
 
 // WORK-ITEM-UX-01: a work item's runs. A run is one Symphony attempt that a worker actually started. It is read from the
 // attempt, the task snapshot pinned in its Go bundle, and the outputs it submitted. Each run is reviewed and signed on its
@@ -11,6 +14,7 @@ const parse = (value, fallback) => { try { return value ? JSON.parse(value) : fa
 const clip = (value, max) => String(value ?? '').replace(/\s+\n/g, '\n').trim().slice(0, max);
 
 export function initWorkRuns(db) {
+  initLayerSource(db);
   db.exec(`CREATE TABLE IF NOT EXISTS work_run_reviews (
     attempt_id TEXT PRIMARY KEY REFERENCES symphony_attempts(id), project_id TEXT NOT NULL, work_id TEXT NOT NULL,
     verdicts_json TEXT NOT NULL DEFAULT '{}', flags_json TEXT NOT NULL DEFAULT '{}',
@@ -24,6 +28,10 @@ export function initWorkRuns(db) {
     id TEXT PRIMARY KEY, project_id TEXT NOT NULL, work_id TEXT NOT NULL, performer_id TEXT NOT NULL, performer_name TEXT NOT NULL,
     task_json TEXT NOT NULL, changes_json TEXT NOT NULL DEFAULT '[]', evidence_json TEXT NOT NULL DEFAULT '[]',
     summary TEXT, state TEXT NOT NULL, started_at TEXT NOT NULL, submitted_at TEXT, updated_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS work_person_run_steps (
+    attempt_id TEXT NOT NULL REFERENCES work_person_runs(id), seq INTEGER NOT NULL, kind TEXT NOT NULL,
+    payload_json TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(attempt_id, seq)
   );
   CREATE TABLE IF NOT EXISTS work_person_run_reviews (
     run_id TEXT PRIMARY KEY REFERENCES work_person_runs(id), project_id TEXT NOT NULL, work_id TEXT NOT NULL,
@@ -40,7 +48,8 @@ export function workRuns({ db, know, candidates = null }) {
   const reviewTable = id => personId(id) ? ['work_person_run_reviews', 'run_id'] : ['work_run_reviews', 'attempt_id'];
   const reviewRow = id => { const [table, key] = reviewTable(id); return db.prepare(`SELECT * FROM ${table} WHERE ${key} = ?`).get(id); };
   const events = attemptId => db.prepare('SELECT kind, created_at AS at FROM symphony_attempt_events WHERE attempt_id = ? ORDER BY created_at').all(attemptId);
-  const steps = attemptId => db.prepare('SELECT seq, kind, payload_json, created_at FROM work_run_steps WHERE attempt_id = ? ORDER BY seq').all(attemptId)
+  const stepsTable = attemptId => personId(attemptId) ? 'work_person_run_steps' : 'work_run_steps';
+  const steps = attemptId => db.prepare(`SELECT seq, kind, payload_json, created_at FROM ${stepsTable(attemptId)} WHERE attempt_id = ? ORDER BY seq`).all(attemptId)
     .map(row => ({ seq: row.seq, kind: row.kind, at: row.created_at, ...parse(row.payload_json, {}) }));
   const layerName = (projectId, key) => db.prepare('SELECT name FROM layer_definitions WHERE project_id = ? AND layer_key = ?').get(projectId, key)?.name || key;
   const sectionName = key => ({ problem: 'Problem', audience: 'Audience', value: 'Value', differentiators: 'Differentiators', scope: 'Scope', constraints: 'Constraints' })[key]
@@ -52,6 +61,8 @@ export function workRuns({ db, know, candidates = null }) {
   // What the run proposed, as one row per changed thing. Nothing here is applied until the run is accepted.
   function changesOf(projectId, row, bundle) {
     const changes = [];
+    const integration = layerReview(db, projectId, row.id);
+    if (integration && db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'layer_review_builds'").get()) { const build = db.prepare('SELECT checks_json FROM layer_review_builds WHERE integration_id = ?').get(integration.id); if (build) integration.tests.push(...JSON.parse(build.checks_json)); }
     const proposal = db.prepare('SELECT * FROM symphony_proposals WHERE attempt_id = ?').get(row.id);
     if (proposal) {
       const content = parse(proposal.content_json, {});
@@ -74,9 +85,9 @@ export function workRuns({ db, know, candidates = null }) {
             size: change.op === 'create' ? '' : `${fields.length} ${fields.length === 1 ? 'field' : 'fields'} · r${change.baseRevision}`, fields });
         }
         // LAYER-SOURCE-01: files the run changed in its layer's repository, as one reviewed commit.
-        for (const file of content.source?.files || []) changes.push({ id: `${proposal.id}:src:${file.path}`, kind: 'source', icon: file.ownerReview ? 'code' : 'description',
+        for (const file of (integration || content.source)?.files || []) changes.push({ id: `${proposal.id}:src:${file.path}`, kind: 'source', icon: file.ownerReview ? 'code' : 'description',
           name: `${layerName(projectId, content.layer)} repository › ${file.path}`, op: file.status === 'added' ? 'created' : file.status === 'deleted' ? 'removed' : 'modified',
-          size: `+${file.added} −${file.removed}`, diff: file.diff, ownerReview: file.ownerReview, commit: content.source.commit });
+          size: `+${file.added} −${file.removed}`, diff: file.diff, ownerReview: file.ownerReview, commit: (integration || content.source).commit });
         if (content.notes) changes.push({ id: `${proposal.id}:notes`, kind: 'report', icon: 'notes', name: 'Notes', op: 'created', size: '', after: content.notes });
       } else if (vision) changes.push({ id: proposal.id, kind: 'claim', icon: 'lightbulb', name: `Vision › Brief › ${sectionName(vision.section)}`,
         op: vision.targetId ? 'modified' : 'created', size: '1 claim', before: vision.beforeText || null, after: vision.text, note: vision.note || '', basis: vision.basis || '' });
@@ -102,7 +113,7 @@ export function workRuns({ db, know, candidates = null }) {
     if (candidate) for (const file of candidate.files || []) changes.push({ id: `${candidate.id}:${file}`, kind: 'file', icon: 'code', name: file, op: 'modified', size: '', candidateId: candidate.id });
     // LAYER-BASE-01 B5: the run's work branch of the layer repository and the tests the agent ran on it in its sandbox.
     const layerSource = proposal ? parse(proposal.content_json, {}).source || null : null;
-    return { changes, layerSource: layerSource && { branch: layerSource.branch, commit: layerSource.commit, base: layerSource.base,
+    return { changes, integration: integration && { ...integration, appRepository: Boolean(bundle.layerPackage?.root), appChanged: Boolean(bundle.layerPackage?.root) && integration.files.some(file => (file.path === '.aludel/review.json' || !file.path.startsWith(bundle.layerPackage.root)) && !/^(?:docs\/|README\.md$|AGENTS\.md$|ARCHITECTURE\.md$)/.test(file.path)), current: layerBinding(db, projectId, bundle.guidance.layerScope.key).commit === integration.base }, layerSource: layerSource && { branch: layerSource.branch, commit: layerSource.commit, base: layerSource.base,
         tests: (layerSource.tests || []).map(test => ({ ...test, source: 'agent-report' })) }, followUps: proposal ? followUpsForAttempt(db, row.id).map(entry => ({ ...entry, layerName: layerName(projectId, entry.layer),
         createdRef: entry.createdWorkId ? know.workById(projectId, entry.createdWorkId)?.ref || null : null })) : [], summary: proposal ? parse(proposal.content_json, {}).summary || null : null,
       candidate: candidate ? { id: candidate.id, state: candidate.state, commit: candidate.commit, base: candidate.base, checks: candidate.checks } : null,
@@ -173,12 +184,18 @@ export function workRuns({ db, know, candidates = null }) {
     const people = db.prepare('SELECT * FROM work_person_runs WHERE project_id = ? AND work_id = ? ORDER BY started_at').all(projectId, workId).map(row => {
       const task = parse(row.task_json, {});
       const review = reviewRow(row.id);
+      const source = layerBranch(db, row.id), integrated = layerReview(db, projectId, row.id);
+      if (integrated && db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'layer_review_builds'").get()) { const build = db.prepare('SELECT checks_json FROM layer_review_builds WHERE integration_id = ?').get(integrated.id); if (build) integrated.tests.push(...JSON.parse(build.checks_json)); }
+      const repository = task.layerRepository;
+      const sourceChanges = (integrated || source)?.files.map(file => ({ id: `${row.id}:src:${file.path}`, kind: 'source', icon: file.ownerReview ? 'code' : 'description', name: file.path, op: file.status === 'added' ? 'created' : file.status === 'deleted' ? 'removed' : 'modified', size: `+${file.added} −${file.removed}`, diff: file.diff, ownerReview: file.ownerReview, commit: (integrated || source).commit })) || [];
       return {
         id: row.id, batchId: null, state: review?.outcome || row.state,
         performer: { kind: 'person', id: row.performer_id, label: row.performer_name, model: null, effort: null },
         startedAt: row.started_at, finishedAt: row.submitted_at, turns: { used: 0, limit: 0 }, task,
-        live: null, steps: [], evidence: parse(row.evidence_json, []), blockReason: null,
-        changes: parse(row.changes_json, []), candidate: null, proposalId: null, reportId: null, summary: row.summary || null,
+        live: null, steps: steps(row.id), evidence: parse(row.evidence_json, []), blockReason: null,
+        layerSource: source && { ...source, tests: source.tests.map(check => ({ ...check, source: 'person-report' })) },
+        integration: integrated && { ...integrated, appRepository: Boolean(repository?.root), appChanged: appChanged(integrated, repository?.root), current: layerBinding(db, projectId, repository.key).commit === integrated.base },
+        changes: [...parse(row.changes_json, []), ...sourceChanges], candidate: null, proposalId: null, reportId: null, summary: row.summary || null,
         review: { verdicts: parse(review?.verdicts_json, {}), flags: parse(review?.flags_json, {}),
           outcome: review?.outcome || null, comment: review?.comment || null, signedBy: review?.signed_by || null, signedAt: review?.signed_at || null },
       };
@@ -281,9 +298,11 @@ export function workRuns({ db, know, candidates = null }) {
     if (item.assignee?.kind !== 'person' || item.assignee.id !== user.id) fail('Only the assigned person can start this work.', 403);
     if (item.status !== 'staged') fail('Stage this item before starting work.', 409);
     if (db.prepare("SELECT 1 FROM work_person_runs WHERE project_id = ? AND work_id = ? AND state IN ('working', 'review')").get(projectId, workId)) fail('This item already has an open person run.', 409);
+    const task = taskSnapshot(item);
+    if (item.scope === 'layer') { const binding = layerBinding(db, projectId, item.layer); task.layerRepository = { key: item.layer, base: binding.commit, root: packageAt(binding.repo, binding.commit, item.layer).root }; }
     const id = `person-run-${randomUUID()}`, at = now();
     db.prepare("INSERT INTO work_person_runs(id, project_id, work_id, performer_id, performer_name, task_json, state, started_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'working', ?, ?)")
-      .run(id, projectId, workId, user.id, user.name, JSON.stringify(taskSnapshot(item)), at, at);
+      .run(id, projectId, workId, user.id, user.name, JSON.stringify(task), at, at);
     const context = { ...(item.context || {}), staged: undefined, personRun: id };
     know.appendLog(workId, 'Started work', { state: 'claimed', context }, { by: { kind: 'person', id: user.id } });
     return runFor(projectId, workId, id);
@@ -319,6 +338,11 @@ export function workRuns({ db, know, candidates = null }) {
       return { criterion, type: change ? 'change' : 'note', ref: ref || `criterion-${criterion}`, note,
         found: true, target: change ? `change:${change.id}` : null, label: change?.name || 'Performer note' };
     });
+    if (input.source) {
+      if (!task.layerRepository) fail('This run did not pin a layer repository.', 409);
+      if (changes.length) fail('Submit repository changes separately from already-applied record changes.', 409);
+      submitLayerBranch(db, { projectId, key: task.layerRepository.key, attemptId: runId, base: task.layerRepository.base, workRef: know.workById(projectId, workId).ref, branch: input.source.branch, commit: input.source.commit, tests: input.source.tests || [] });
+    }
     const at = now();
     db.prepare("UPDATE work_person_runs SET changes_json = ?, evidence_json = ?, summary = ?, state = 'review', submitted_at = ?, updated_at = ? WHERE id = ?")
       .run(JSON.stringify(changes), JSON.stringify(evidence), summary, at, at, runId);
@@ -335,6 +359,43 @@ export function workRuns({ db, know, candidates = null }) {
     const item = know.workById(projectId, workId);
     know.appendLog(workId, 'Stopped work; close the run to reopen the task', { state: 'ready', context: { ...(item.context || {}), personRun: undefined } }, { by: { kind: 'person', id: user.id } });
     return runFor(projectId, workId, runId);
+  }
+
+  const appChanged = (review, root) => Boolean(root) && review.files.some(file => (file.path === '.aludel/review.json' || !file.path.startsWith(root)) && !/^(?:docs\/|README\.md$|AGENTS\.md$|ARCHITECTURE\.md$)/.test(file.path));
+  function personRepository(user, projectId, workId, runId) {
+    const row = personRun(projectId, workId, runId), item = know.workById(projectId, workId);
+    if (!row || row.state !== 'review' || item?.state !== 'review' || item.context?.personRun !== runId) fail('This person run is not waiting for review.', 409);
+    requireElevated(db, user, projectId, item.layer, 'review this repository');
+    const task = parse(row.task_json, {}), source = layerBranch(db, runId);
+    if (!source || !task.layerRepository || source.base !== task.layerRepository.base) fail('This run has no pinned repository submission.', 409);
+    const instance = layerInstanceId(db, projectId, item.layer);
+    const recordsOf = kind => db.prepare('SELECT id, data_json FROM knowledge_records WHERE project_id = ? AND kind = ? AND layer_instance_id = ?').all(projectId, kind, instance).map(record => ({ id: record.id, data: JSON.parse(record.data_json) }));
+    return { item, task, source, recordsOf };
+  }
+  function preparePersonReview(user, projectId, workId, runId, force = false) {
+    const { item, source, recordsOf } = personRepository(user, projectId, workId, runId);
+    const before = layerReview(db, projectId, runId), run = runFor(projectId, workId, runId);
+    const integration = prepareLayerReview(db, { projectId, key: item.layer, attemptId: runId, source, catalogs: know.catalogs, recordsOf, force });
+    if (before?.id !== integration.id) {
+      addStep(runId, 'review-refresh', { previousIntegration: before?.id || null, integration: integration.id, previousReview: run.review });
+      db.prepare("UPDATE work_person_run_reviews SET verdicts_json = '{}', flags_json = '{}' WHERE run_id = ?").run(runId);
+    }
+    return integration;
+  }
+  function acceptPersonRepository(user, projectId, workId, runId, integrationId, assertBuilt) {
+    const { item, task, source, recordsOf } = personRepository(user, projectId, workId, runId);
+    const review = assertLayerReviewCurrent(db, projectId, item.layer, layerReview(db, projectId, runId), source);
+    if (review.id !== integrationId) fail('The review revision changed. Refresh before accepting.', 409);
+    if (appChanged(review, task.layerRepository.root)) { if (!assertBuilt) fail('Combined build checks are required.', 409); assertBuilt(review.id); }
+    let merge;
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      merge = mergeLayerBranch(db, { projectId, key: item.layer, source: review, reviewer: user.name, workId, workRef: item.ref, catalogs: know.catalogs, recordsOf });
+      know.updateWork(user, projectId, workId, { state: 'done' });
+      db.exec('COMMIT');
+    } catch (error) { if (db.isTransaction) db.exec('ROLLBACK'); undoLayerMerge(merge); throw error; }
+    settleLayerCheckout(merge);
+    return merge;
   }
 
   // WI-5: the agent reports its own plan and progress. `stuck` means a blocking objective, so it terminally fails the run;
@@ -422,10 +483,10 @@ export function workRuns({ db, know, candidates = null }) {
 
   // Numbered steps on a run.
   function addStep(attemptId, kind, payload) {
-    const seq = (db.prepare('SELECT max(seq) AS n FROM work_run_steps WHERE attempt_id = ?').get(attemptId)?.n || 0) + 1;
-    db.prepare('INSERT INTO work_run_steps VALUES (?, ?, ?, ?, ?)').run(attemptId, seq, kind, JSON.stringify(payload), now());
+    const seq = (db.prepare(`SELECT max(seq) AS n FROM ${stepsTable(attemptId)} WHERE attempt_id = ?`).get(attemptId)?.n || 0) + 1;
+    db.prepare(`INSERT INTO ${stepsTable(attemptId)} VALUES (?, ?, ?, ?, ?)`).run(attemptId, seq, kind, JSON.stringify(payload), now());
     return seq;
   }
 
-  return { list, runFor, saveReview, assertSignable, reviewNotes, recordSignature, sign, startPerson, submitPerson, stopPerson, reportPlan, reportProgress, checkEvidence, recordEvidence, addStep, steps };
+  return { list, runFor, preparePersonReview, acceptPersonRepository, saveReview, assertSignable, reviewNotes, recordSignature, sign, startPerson, submitPerson, stopPerson, reportPlan, reportProgress, checkEvidence, recordEvidence, addStep, steps };
 }

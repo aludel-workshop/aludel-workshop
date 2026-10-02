@@ -10,7 +10,7 @@ function compileLayerTask(bundle) {
   const { project, work, guidance, sources, repository, instructionPins, layerPackage } = bundle;
   const scope = guidance.layerScope;
   if (!project?.id || !work?.id || !guidance?.profile?.revision || !/^[a-f0-9]{40}$/.test(repository?.commit || '') ||
-      !scope?.key || scope.key !== work.layer || !layerPackage || layerPackage.commit !== scope.commit || bundle.layerApi?.commit !== scope.commit) fail('The task is missing pinned inputs.');
+      !scope?.key || scope.key !== work.layer || !layerPackage || layerPackage.commit !== scope.commit || bundle.layerApi && bundle.layerApi.commit !== scope.commit) fail('The task is missing pinned inputs.');
   const pinned = (target, list) => {
     const source = sources.find(record => record.id === target.id && record.kind === target.kind);
     if (!source?.revision) fail('A task target has no pinned project revision.');
@@ -19,8 +19,8 @@ function compileLayerTask(bundle) {
   const inputs = [];
   for (const target of work.targets || []) pinned(target, inputs);
   for (const ref of bundle.flowInputs || []) pinned(ref, inputs);
-  const spec = bundle.layerApi.spec;
-  const operations = Object.entries(spec.paths).flatMap(([path, item]) => Object.entries(item).filter(([, op]) => op?.operationId).map(([method, op]) => ({
+  const spec = bundle.layerApi?.spec || null;
+  const operations = Object.entries(spec?.paths || {}).flatMap(([path, item]) => Object.entries(item).filter(([, op]) => op?.operationId).map(([method, op]) => ({
     operationId: op.operationId, method: method.toUpperCase(), path, summary: op.summary || '', writes: op['x-aludel-output'] || null, reads: op['x-aludel-read']?.kind || null })));
   return {
     schemaVersion: 'aludel-task-open-v2',
@@ -31,7 +31,7 @@ function compileLayerTask(bundle) {
       profile: { id: guidance.profile.id, revision: guidance.profile.revision, name: guidance.profile.name, provider: guidance.profile.provider || 'codex', model: guidance.profile.model || '', effort: guidance.profile.effort || 'medium' } },
     guidance: { project: guidance.project, profile: guidance.profile.instructions,
       method: `Do this task as the ${scope.key} layer. Its charter and Knowledge below are your method. Read whatever project records help (reads are project-wide). ` +
-        `Change ${scope.key} data only by calling its API with aludel_layer_call (operation, id for a path id, body). The API document under layerApi defines every operation and schema. ` +
+        (spec ? `Change ${scope.key} data only by calling its API with aludel_layer_call (operation, id for a path id, body). The API document under layerApi defines every operation and schema. ` : 'This layer keeps its outputs in repository files and publishes no record-write API. Edit only its declared writable files through the layer repository checkout. ') +
         'Your writes are staged for this run, reads include what you staged, and nothing applies until an elevated reviewer accepts the run. ' +
         `To change the layer itself (its Knowledge, docs, API document, rules, views or tests), edit its repository in layer/ of your workspace, on your work branch. ` +
         `The layer package is ${layerPackage.root ? `in layer/${layerPackage.root}` : 'layer/ itself'}; its paths below are relative to it. ` +
@@ -39,7 +39,7 @@ function compileLayerTask(bundle) {
         'An elevated reviewer sees the diff and your results and accepting merges the branch into the layer. Changes to api/, server/, ui/, tests/ or layer.json change what the layer runs: say so in your summary. ' +
         'If something outside this layer should change, or a separate task would help, propose it as a follow-up with a clear reason instead of doing it. ' +
         'When you submit, give evidence for every criterion (see outputs[0].evidence); the reviewer judges each criterion against it. ' +
-        'Ask a question when a decision blocks the result. Do not change project records or repository files directly.' },
+        'Ask a question when a decision blocks the result. Do not change accepted project records or the host repository directly; use the layer/ checkout and submit its committed branch.' },
     layerSource: { key: layerPackage.key, instanceId: layerPackage.instanceId, commit: layerPackage.commit, charter: layerPackage.charter,
       documents: layerPackage.documents.map(doc => ({ path: doc.path, markdown: doc.markdown })) },
     origin: work.context?.createdBy ? { layer: work.context.createdBy.layer, kind: 'agent-follow-up', workRef: work.context.createdBy.workRef, why: work.context.createdBy.why } :
@@ -55,8 +55,9 @@ function compileLayerTask(bundle) {
       evidence: 'For each criterion (by index from 0), name what shows it is met: type change with ref = a record ID or title you staged, or a repository file path you committed; type test with ref = a test name exactly as reported to aludel_layer_commit. note says what the reviewer should check. Review shows each criterion with this evidence.',
       followUpLayers: guidance.followUpLayers || [], checks: (work.checks || []).map(check => check.text) }],
     library: 'Other layers are read only through the Library (DEC-059): knowledge search covers every installed layer\'s outputs and Knowledge (charters, methods, policies; ids like k:<layer>:<doc>) and research. Cite what you relied on in usedInputs with its revision.',
-    capabilities: { knowledge: ['map', 'search', 'read'], layerApi: scope.key, layerRepository: { checkout: 'layer/', base: layerPackage.commit, commitTool: 'aludel_layer_commit', writable: layerPackage.writable || writablePatterns },
+    capabilities: { knowledge: ['map', 'search', 'read'], layerApi: spec ? scope.key : null, layerRepository: { checkout: 'layer/', base: layerPackage.commit, commitTool: 'aludel_layer_commit', writable: layerPackage.writable || writablePatterns },
       repository: 'project repository: read-only pinned commit (your layer is writable in layer/)', submit: 'layer_api_draft' },
+    reviewPreparation: 'Repository submissions are integrated against the latest accepted head when review opens. For app changes, maintain .aludel/review.json version 1 with checks (name and command argument array) and scenarios (id, criterion index, label, expected, path, fixture, role; optional after). Implement POST /api/__aludel/review only when ALUDEL_REVIEW_PREVIEW=1 and its Bearer ALUDEL_REVIEW_TOKEN matches; prepare synthetic state/session for the named scenario. Never disable app authorization or use real credentials. App-specific fixtures must track migrations. Existing starter adapters cover starter pages/synthetic accounts only. Review uses the combined build; agent-reported tests remain separate evidence.',
     runtime: { authorization: 'Go-pinned attempt', repositoryCommit: repository.commit, instructionPins, staleInputs: 'withdraw this attempt when a pinned input changes' }
   };
 }

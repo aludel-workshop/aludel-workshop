@@ -301,6 +301,9 @@ test('the assigned person can start, submit and sign a run without synthetic age
     assert.equal(started.state, 'working');
     assert.equal(started.live, null);
     assert.deepEqual(started.steps, []);
+    agentRuns({ db: f.db, know: f.know, worker: f.worker, symphonyDispatch: true });
+    assert.equal(f.know.workById(f.projectId, work.id).state, 'claimed', 'restarting agent admission preserves active person work');
+    assert.equal(f.history.runFor(f.projectId, work.id, started.id).state, 'working');
     assert.throws(() => f.know.updateWork(f.owner, f.projectId, work.id, { task: { criteria: ['Changed too late'] } }), /locked/);
     const submitted = f.history.submitPerson(f.owner, f.projectId, work.id, started.id, {
       summary: 'Defined a concrete checkpoint outcome.', evidence: [{ criterion: 0, note: 'Review the outcome named in the project plan.' }] });

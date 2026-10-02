@@ -1,0 +1,14 @@
+{
+  "passed": true,
+  "checks": [
+    "review buttons open exact page IDs",
+    "real demo sessions without login",
+    "initial setup creates world",
+    "signup completes setup and opens world",
+    "map panning works",
+    "review API blocked at bridge",
+    "scenario reopening resets its fixture",
+    "390px viewport has no document overflow",
+    "no browser runtime errors"
+  ]
+}

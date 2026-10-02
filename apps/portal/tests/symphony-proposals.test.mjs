@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import test from 'node:test';
+import { waitForPortal, stopPortal } from './portal-support.mjs';
 import { createUser, initAccounts } from '../server/accounts.mjs';
 import { agentRuns, initAgentRuns } from '../server/agent-runs.mjs';
 import { initKnowledge, knowledge } from '../server/knowledge.mjs';
@@ -185,15 +186,10 @@ test('worker HTTP proposal route accepts only its scoped token and current attem
   const port = probe.address().port;
   await new Promise(resolve => probe.close(resolve));
   const portal = spawn(process.execPath, [new URL('../server/server.mjs', import.meta.url).pathname], {
-    env: { ...process.env, MACHINE_DATA_DIR: f.root, MACHINE_PORT: String(port), MACHINE_PREVIEW_RUNTIME: 'process' }, stdio: 'ignore' });
+    env: { ...process.env, MACHINE_DATA_DIR: f.root, MACHINE_PORT: String(port), MACHINE_PREVIEW_RUNTIME: 'process' }, stdio: ['ignore', 'pipe', 'pipe'] });
   try {
     const origin = `http://127.0.0.1:${port}`;
-    let ready = false;
-    // A fresh portal starts in about 1.5 s alone, but well past 5 s while the whole suite runs in parallel (T03-CODE run 1).
-    for (const deadline = Date.now() + 30_000; !ready && Date.now() < deadline;) {
-      try { ready = (await fetch(origin + '/api/session')).ok; } catch { await new Promise(resolve => setTimeout(resolve, 50)); }
-    }
-    assert.ok(ready);
+    await waitForPortal(portal, origin);
     const path = `/api/worker/attempts/${issue.native_ref.attempt_id}/proposal`;
     const proposal = { summary: 'Local value claim for the product owner to review.',
       content: { section: 'value', text: 'Borrow useful tools nearby.', note: '', basis: 'The product pitch describes sharing.' }, usedInputs: [] };
@@ -202,7 +198,7 @@ test('worker HTTP proposal route accepts only its scoped token and current attem
     const accepted = await fetch(origin + path, { method: 'POST', headers: { authorization: `Bearer ${f.credential}`, 'content-type': 'application/json' }, body: JSON.stringify({ proposal }) });
     assert.equal(accepted.status, 200, await accepted.clone().text());
     assert.ok((await accepted.json()).proposalId);
-  } finally { portal.kill(); await new Promise(resolve => portal.once('exit', resolve)); f.close(); }
+  } finally { await stopPortal(portal); f.close(); }
 });
 
 test('clarification question and options travel through the Symphony card and review', () => {
@@ -933,7 +929,8 @@ test('a run edits its layer on a work branch in its sandbox, tests it against th
   assert.deepEqual(reviewed.layerSource.tests.map(entry => entry.status), ['passed']);
   assert.match(reviewed.changes.find(change => change.kind === 'source').diff, /^\+Name the goal before the first step\.$/m);
   f.know.updateWork(f.owner, f.projectId, run.work.id, { verdict: { index: 0, value: 'accept' } });
-  const accepted = f.worker.acceptProposal(member, f.projectId, run.work.id, submitted.proposalId);
+  const prepared = f.worker.prepareProposalReview(member, f.projectId, run.work.id, submitted.proposalId);
+  const accepted = f.worker.acceptProposal(member, f.projectId, run.work.id, submitted.proposalId, prepared.id);
   assert.equal(accepted.sourceCommit, branch.commit, 'a branch from the current main fast-forwards');
   assert.equal(pinOf(f).commit, branch.commit);
   assert.equal(execFileSync('git', ['-C', before.repo, 'rev-parse', 'main'], { encoding: 'utf8' }).trim(), branch.commit, 'main is the pin');
@@ -975,19 +972,23 @@ test('an elevated reviewer merges a change to what the layer runs; the merged ru
 
   const outsider = addMember(f, 'viewer@example.com');
   assert.throws(() => f.worker.acceptProposal(outsider, f.projectId, code.work.id, codeProposal.proposalId), /Elevated access/);
-  f.worker.acceptProposal(member, f.projectId, code.work.id, codeProposal.proposalId);
+  const codeReview = f.worker.prepareProposalReview(member, f.projectId, code.work.id, codeProposal.proposalId);
+  f.worker.acceptProposal(member, f.projectId, code.work.id, codeProposal.proposalId, codeReview.id);
   assert.equal(f.db.prepare("SELECT reviewed_by FROM layer_source_reviews WHERE path = 'server/pages-api.mjs'").get().reviewed_by, 'designer');
   assert.equal(f.know.insert(f.projectId, 'page', { label: 'Detail', icon: 'article', pageType: 'detail' }).origin, 'Planner', 'the merged handler now runs');
   const afterCode = pinOf(f).commit;
   assert.notEqual(afterCode, base);
 
-  const merged = f.worker.acceptProposal(member, f.projectId, docs.work.id, docsProposal.proposalId);
+  const prepared = f.worker.prepareProposalReview(member, f.projectId, docs.work.id, docsProposal.proposalId);
+  assert.equal(pinOf(f).commit, afterCode, 'preparing a review never moves accepted main');
+  const merged = f.worker.acceptProposal(member, f.projectId, docs.work.id, docsProposal.proposalId, prepared.id);
+  assert.equal(merged.sourceCommit, prepared.commit, 'acceptance uses the exact combined commit shown for review');
   const parents = execFileSync('git', ['-C', pinOf(f).repo, 'show', '-s', '--format=%P', merged.sourceCommit], { encoding: 'utf8' }).trim().split(' ');
   assert.deepEqual(parents, [afterCode, f.db.prepare('SELECT commit_sha FROM layer_work_branches WHERE attempt_id = ?').get(docs.attemptId).commit_sha], 'a moved main gets a merge commit');
   assert.match(execFileSync('git', ['-C', pinOf(f).repo, 'show', `${merged.sourceCommit}:knowledge/map-output.md`], { encoding: 'utf8' }), /Places are kept per page/);
   assert.match(execFileSync('git', ['-C', pinOf(f).repo, 'show', `${merged.sourceCommit}:server/pages-api.mjs`], { encoding: 'utf8' }), /'Planner'/);
 
-  assert.throws(() => f.worker.acceptProposal(member, f.projectId, clash.work.id, clashProposal.proposalId), /no longer merges cleanly/);
+  assert.throws(() => f.worker.prepareProposalReview(member, f.projectId, clash.work.id, clashProposal.proposalId), /conflicts with the accepted repository/);
   assert.equal(pinOf(f).commit, merged.sourceCommit, 'a refused merge leaves main and the pin');
 
   const rule = sourceRun(f, 'Shorten page names');
@@ -998,12 +999,48 @@ test('an elevated reviewer merges a change to what the layer runs; the merged ru
   const tight = f.worker.submitProposal(f.scope, { attemptId: rule.attemptId, proposal: { summary: 'Limit page names to three characters.', content: {} } });
   f.know.updateWork(f.owner, f.projectId, rule.work.id, { verdict: { index: 0, value: 'accept' } });
   const pin = pinOf(f).commit;
-  assert.throws(() => f.worker.acceptProposal(member, f.projectId, rule.work.id, tight.proposalId), /reject the existing page “[^”]+”: Page name must be under 3 characters/);
+  assert.throws(() => f.worker.prepareProposalReview(member, f.projectId, rule.work.id, tight.proposalId), /reject page .*Page name must be under 3 characters/);
   assert.equal(pinOf(f).commit, pin);
   assert.equal(execFileSync('git', ['-C', pinOf(f).repo, 'rev-parse', 'main'], { encoding: 'utf8' }).trim(), pin, 'main is put back when acceptance fails');
 }));
 
 // ---- LAYER-BASE-01: every added layer is a fork of the base layer repository; Markdown proves it beside Pages ----
+test('repository reviews refresh before acceptance, retain submissions and refuse a stale reviewed generation', () => withPagesTemplate(async f => {
+  const first = sourceRun(f, 'Document one');
+  edit(first.file('knowledge/map-output.md'), text => text + '\nFirst clarification.\n');
+  first.commit('First clarification.', []);
+  const a = f.worker.submitProposal(f.scope, { attemptId: first.attemptId, proposal: { summary: 'First clarification.', content: {} } });
+  const second = sourceRun(f, 'Document two');
+  edit(second.file('knowledge/flow-method.md'), text => text + '\nSecond clarification.\n');
+  const submitted = second.commit('Second clarification.', []);
+  const b = f.worker.submitProposal(f.scope, { attemptId: second.attemptId, proposal: { summary: 'Second clarification.', content: {} } });
+  const ar = f.worker.prepareProposalReview(f.owner, f.projectId, first.work.id, a.proposalId);
+  const br = f.worker.prepareProposalReview(f.owner, f.projectId, second.work.id, b.proposalId);
+  assert.equal(f.worker.prepareProposalReview(f.owner, f.projectId, second.work.id, b.proposalId).id, br.id, 'unchanged integration reuses evidence');
+  for (const run of [first, second]) f.know.updateWork(f.owner, f.projectId, run.work.id, { verdict: { index: 0, value: 'accept' } });
+  assert.throws(() => f.worker.acceptProposal(f.owner, f.projectId, first.work.id, a.proposalId, 'wrong-review'), /review revision changed/);
+  f.worker.acceptProposal(f.owner, f.projectId, first.work.id, a.proposalId, ar.id);
+  assert.throws(() => f.worker.acceptProposal(f.owner, f.projectId, second.work.id, b.proposalId, br.id), /Refresh this review/);
+  const refreshed = f.worker.prepareProposalReview(f.owner, f.projectId, second.work.id, b.proposalId);
+  assert.notEqual(refreshed.id, br.id);
+  assert.equal(refreshed.submittedCommit, submitted.commit, 'the submission stays immutable');
+  assert.match(git(pinOf(f).repo, 'show', `${refreshed.commit}:knowledge/map-output.md`), /First clarification/);
+  assert.match(git(pinOf(f).repo, 'show', `${refreshed.commit}:knowledge/flow-method.md`), /Second clarification/);
+  assert.throws(() => f.worker.acceptProposal(f.owner, f.projectId, second.work.id, b.proposalId, br.id), /review revision changed/);
+  const accepted = f.worker.acceptProposal(f.owner, f.projectId, second.work.id, b.proposalId, refreshed.id);
+  assert.equal(accepted.sourceCommit, refreshed.commit);
+}));
+
+test('combined layer tests catch a clean merge whose API remains structurally valid', () => withPagesTemplate(async f => {
+  const run = sourceRun(f, 'Break behavior');
+  edit(run.file('tests/pages-api.test.mjs'), text => text + "\ntest('regression', () => assert.equal(1, 2));\n");
+  run.commit('Introduce a failing behavior check.', []);
+  const submitted = f.worker.submitProposal(f.scope, { attemptId: run.attemptId, proposal: { summary: 'A structurally valid but failing change.', content: {} } });
+  const before = pinOf(f).commit;
+  assert.throws(() => f.worker.prepareProposalReview(f.owner, f.projectId, run.work.id, submitted.proposalId), /combined layer tests failed/);
+  assert.equal(pinOf(f).commit, before);
+}));
+
 import { createMarkdownDefinition } from '../server/layer-registry.mjs';
 import { adoptMarkdownLayer, markdownOutputs } from '../server/markdown-outputs.mjs';
 import { initMarkdownLayer, markdownFileCreate, markdownFolderCreate } from '../server/markdown-layer.mjs';
@@ -1105,4 +1142,42 @@ test('an agent works on a Markdown layer through the same staged API, review and
   f.worker.acceptProposal(f.owner, f.projectId, work.id, submitted.proposalId);
   const md = markdownOutputs({ db: f.db, know: f.know, dataDirectory: process.env.MACHINE_DATA_DIR });
   assert.equal(md.read(f.owner.id, f.projectId, research.key, doc.staged.id).content, '# Summary');
+}));
+
+test('a real person run submits an immutable repository branch and uses shared integration and checked acceptance', () => withPagesTemplate(async f => {
+  const history = workRuns({ db: f.db, know: f.know });
+  const work = layerTask(f, 'Person repository review', { assignee: { kind: 'person', id: f.owner.id } });
+  f.runs.stage(f.owner, f.projectId, work.id);
+  const started = history.startPerson(f.owner, f.projectId, work.id), before = pinOf(f);
+  assert.equal(started.task.layerRepository.base, before.commit);
+  const checkout = join(f.root, 'person-checkout');
+  git(f.root, 'clone', '--quiet', before.repo, checkout);
+  git(checkout, 'switch', '-c', 'person-submission');
+  edit(join(checkout, 'knowledge/flow-method.md'), text => text + '\nA person reviews the same committed branch.\n');
+  git(checkout, 'add', '.');
+  git(checkout, '-c', 'user.name=Person', '-c', 'user.email=person@example.invalid', 'commit', '-qm', 'Person changes');
+  const commit = git(checkout, 'rev-parse', 'HEAD');
+  git(before.repo, 'fetch', '--quiet', checkout, 'person-submission:person-submission');
+  const input = { summary: 'Submit a real local branch for owner review.', source: { branch: 'person-submission', commit }, evidence: [{ criterion: 0, note: 'Review the flow-method change.' }] };
+  assert.throws(() => history.submitPerson({ id: 'foreign' }, f.projectId, work.id, started.id, input), /Only the person/);
+  assert.throws(() => history.submitPerson(f.owner, f.projectId, work.id, started.id, { ...input, source: { ...input.source, commit: before.commit } }), /branch changed/);
+  const submitted = history.submitPerson(f.owner, f.projectId, work.id, started.id, input);
+  assert.equal(submitted.state, 'review');assert.equal(submitted.performer.kind, 'person');assert.equal(submitted.layerSource.commit, commit);assert.ok(submitted.changes.some(change => change.name === 'knowledge/flow-method.md'));
+  assert.equal(pinOf(f).commit, before.commit);
+  assert.throws(() => history.preparePersonReview({ id: 'foreign' }, f.projectId, work.id, started.id), /elevated|owner|member/i);
+  const review = history.preparePersonReview(f.owner, f.projectId, work.id, started.id);
+  git(checkout, 'switch', '-c', 'person-parallel', before.commit);
+  writeFileSync(join(checkout, 'knowledge/parallel-note.md'), '# Parallel accepted note\n');
+  git(checkout, 'add', '.');git(checkout, '-c', 'user.name=Person', '-c', 'user.email=person@example.invalid', 'commit', '-qm', 'Another accepted change');
+  const parallel = git(checkout, 'rev-parse', 'HEAD');
+  git(before.repo, 'fetch', '--quiet', checkout, 'person-parallel:person-parallel');git(before.repo, 'update-ref', 'refs/heads/main', parallel);
+  f.db.prepare('UPDATE layer_package_bindings SET accepted_commit = ? WHERE project_id = ? AND layer_key = ?').run(parallel, f.projectId, 'pages');
+  assert.throws(() => history.acceptPersonRepository(f.owner, f.projectId, work.id, started.id, review.id), /accepted repository changed/);
+  history.saveReview(f.projectId, work.id, started.id, { verdict: { index: 0, value: 'accept' } });
+  const fresh = history.preparePersonReview(f.owner, f.projectId, work.id, started.id, true);
+  assert.notEqual(fresh.id, review.id);assert.deepEqual(history.runFor(f.projectId, work.id, started.id).review.verdicts, {});
+  assert.ok(history.steps(started.id).some(step => step.previousReview.verdicts[0]?.value === 'accept'));
+  assert.throws(() => history.acceptPersonRepository(f.owner, f.projectId, work.id, started.id, review.id), /revision changed/);
+  await history.sign(f.owner, f.projectId, work.id, started.id, { outcome: 'accept' }, { accept: () => history.acceptPersonRepository(f.owner, f.projectId, work.id, started.id, fresh.id) });
+  assert.equal(pinOf(f).commit, fresh.commit);assert.equal(git(before.repo,'show',fresh.commit+':knowledge/parallel-note.md'),'# Parallel accepted note');assert.equal(f.know.workById(f.projectId, work.id).state, 'done');assert.equal(history.runFor(f.projectId, work.id, started.id).state, 'accepted');
 }));

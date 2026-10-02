@@ -36,6 +36,10 @@ Record each run's start here before executing.
 
 ### Run log
 
+- **2026-10-02, review planning refinement (Codex, owner chat).** The owner clarified that every layer repository needs integration before review of repository writes, and that Code review steps must open the exact scenario without manual login/navigation. Scope: update local planning records to include these requirements and the preceding discussion's on-demand combined builds. No runtime implementation, external writes or acceptance is requested. Preserve T03-CODE as the single handoff; update LAT-08A's review contract and evidence plan.
+
+- **2026-10-02, preview planning (Codex, owner chat).** The owner asked how layer-scoped Code submissions should provide clickable review builds with evolving demo data, and what ten pending reviews would cost in space. Authorized scope: bounded read-only repository/primary-source research and a local planning/handoff note for this question. This is advice, not approval to implement preview infrastructure. Preserve T03-CODE as the handoff. Findings and proposed trial are recorded in [LAT-08A's preview lifecycle proposal](layer-owned-review.md#code-preview-lifecycle-proposal-2026-10-02).
+
 - **2026-10-01, run 1 (Claude, VS Code chat).** The owner said "start t03 code". Scope is exactly the authorization above: local code, tests, previews and evidence on `main` of this repository (from `53fcb92`), a new `code` branch and G-CODE commits on `layer-base` `main` (from `fee5f30`), and disposable local repositories. GitHub is exercised only against a fake GitHub. No live GitHub writes started by the agent, no provider turns, deployment, spending or live owner data. Order: ledger → G-CODE → `code` template → parity → host wiring → checks → closeout; the owner's live round trip comes after the fake-GitHub journey passes.
 - **2026-10-02, run 1 checkpoint (in progress).** Done so far, each tested on a non-Code fixture (a base-template layer under `.aludel/` in a plain repository):
   - **Ledger:** `layer-base` `code` has `docs/migration-ledger.md` and `docs/source-inventory.md`. Rows marked *pending* are settled at closeout.
@@ -78,3 +82,5 @@ Record each run's start here before executing.
     - Deploy reading releases from the Library;
     - Code › Docs actions in Knowledge (refresh a section as Work);
     - closeout and retiring compiled modules.
+
+- **2026-10-02, chat-authorized shared review implementation:** the host now prepares repository-writing layer submissions against the accepted head before review, accepts only that exact current integration, and builds/checks runnable Code changes on demand. Review-step buttons use pinned app scenarios and real synthetic sessions. [Evidence, app contract and retrospective](../../evidence/repository-review/README.md). This is the bounded LAT-08A integration/preview slice; native review renderer and owner usability gates remain open. No template pin, external repository, provider execution or owner data was changed.

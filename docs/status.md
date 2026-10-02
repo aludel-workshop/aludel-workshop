@@ -29,7 +29,7 @@ Convert Code onto its template with GitHub sync, now on `main`: the layer-templa
 - **Next for the owner:**
   1. Restart the portal and look at Code; existing projects adopt on restart, and the DEC-062 backup is the rollback.
   2. Run the live GitHub round trip (create, import, a Knowledge save, a commit on github.com, a divergence).
-  3. Decide whether layer-scoped Code Work should also get the isolated candidate preview that `platform.implement` had.
+  3. Try the [repository integration and guided Code review](evidence/repository-review/README.md) (built locally, agent-checked). Biome Work #3 waits for you to take, submit and review it in the normal UI ([steps](evidence/biome-review/README.md)); its guided steps move to journeys in JOURNEYS-01 J3.
 - **Then:** retire the compiled layer modules (except Deploy's) as one revertible commit. No provider turn, deployment or spending is authorized.
 
 **Promotion (DEC-062, 2026-10-01): the candidate is now `main`.**
@@ -50,16 +50,17 @@ LAT-01–07 and the LAT-08 prototype established the isolated candidate, layer s
 ## Ready queue
 
 1. **T03-CODE**: run 1 built and agent-checked ([evidence](evidence/t03-code/README.md)). Waits on the owner's browser look, the live GitHub round trip and the candidate-preview question; then the compiled modules retire. F1 is done.
-2. **LAYER-GITHUB-01**: publish Vision, Design, Pages and Data repositories (and possibly `layer-base`) to the owner's GitHub with T03-CODE's sync (DEC-062).
-3. **LAYER-BINDINGS-01 step 4 (F10)**: Code ⇄ Pages binding, migrating `layer_connections` and the hard-coded Pages reconciliation, after T03-CODE.
-4. **LAT-08A**: build native-tab, layer-owned Work review on the template contract after LAT-T01–T03. Include LAYER-BINDINGS-01 follow-up F3: binding changes, refacets and drift assessments must be decidable from the Work board.
-5. **LAY-05**: coding proof preserved; candidate boundary, direct tracker, live retention, bounded runs and live interruption recovery pass; owner browser review follows the general Work flow.
-6. **PLATFORM-PIPELINE-01**: PP-01C onboarding → PP-01D environments → PP-01E guards ([work record](design/platform-pipeline/work-record.md)).
-7. **ICONS-FONTS-01**: icon and font libraries in Design (unblocked in principle by PP-01A; waits behind PLATFORM-PIPELINE-01).
-8. **PAGES-UX-01**: built and agent-checked (DEC-048; [evidence](evidence/pages-ux-01-pages-layer.md)). Next: owner review of the built layer.
-9. **PLATFORM-UX-01**: **built and agent-checked** (DEC-049; [evidence](evidence/platform-ux-01-code-deploy.md)). Next: owner review of the built Code and Deploy layers ([work record](design/platform-layer/work-record.md), [prototype](design/platform-layer/v1/index.html)). It supplies PP-01D's Environments UX and absorbs the Platform half of DATA-PLATFORM-UX-01.
-10. **DATA-PLATFORM-UX-01**: the rest of Data (owner: "perhaps").
-11. **LAY-06**: Aludel's own knowledge into its layers; retire the hash workspace.
+2. **JOURNEYS-01** (proposed 2026-10-02): journey-driven Work and review. Spec, then implement; claims replace hand-written criteria; journeys, tests and review seams live in `.aludel/`; includes cleanup of Codex's guided-preview work ([plan](design/journeys/work-record.md)). J0–J1 done 2026-10-02; J2 onward after T03-CODE's owner look.
+3. **LAYER-GITHUB-01**: publish Vision, Design, Pages and Data repositories (and possibly `layer-base`) to the owner's GitHub with T03-CODE's sync (DEC-062).
+4. **LAYER-BINDINGS-01 step 4 (F10)**: Code ⇄ Pages binding, migrating `layer_connections` and the hard-coded Pages reconciliation, after T03-CODE.
+5. **LAT-08A**: build native-tab, layer-owned Work review on the template contract after LAT-T01–T03. Include LAYER-BINDINGS-01 follow-up F3: binding changes, refacets and drift assessments must be decidable from the Work board.
+6. **LAY-05**: coding proof preserved; candidate boundary, direct tracker, live retention, bounded runs and live interruption recovery pass; owner browser review follows the general Work flow.
+7. **PLATFORM-PIPELINE-01**: PP-01C onboarding → PP-01D environments → PP-01E guards ([work record](design/platform-pipeline/work-record.md)).
+8. **ICONS-FONTS-01**: icon and font libraries in Design (unblocked in principle by PP-01A; waits behind PLATFORM-PIPELINE-01).
+9. **PAGES-UX-01**: built and agent-checked (DEC-048; [evidence](evidence/pages-ux-01-pages-layer.md)). Next: owner review of the built layer.
+10. **PLATFORM-UX-01**: **built and agent-checked** (DEC-049; [evidence](evidence/platform-ux-01-code-deploy.md)). Next: owner review of the built Code and Deploy layers ([work record](design/platform-layer/work-record.md), [prototype](design/platform-layer/v1/index.html)). It supplies PP-01D's Environments UX and absorbs the Platform half of DATA-PLATFORM-UX-01.
+11. **DATA-PLATFORM-UX-01**: the rest of Data (owner: "perhaps").
+12. **LAY-06**: Aludel's own knowledge into its layers; retire the hash workspace.
 
 **Proposed cross-layer plan:** [EXISTING-PROJECTS-01](design/existing-projects/work-record.md) covers connecting existing repositories, reconstructing layer drafts from pinned evidence, and reconciling later external commits. The 2026-09-27 owner request authorized this plan and read-only inspection only. EX-01 research is the first proposed slice; knowledge authority, Work action coverage and app-defined environments remain dependencies. It does not replace T03-CODE as the current handoff.
 
@@ -246,6 +247,10 @@ New Operator role. Agent-checked: server 88/89 (1 pre-existing), all browser sui
 | M0 research/design | Product loop, local agent path, runner choice, recovery model, product workflow, knowledge boundary, experience architecture, and design-system strategy | [Execution plan](execution-plan.md), [decision register](decisions.md) |
 
 ## Latest handoff
+
+2026-10-02: **JOURNEYS-01 J0–J1 done.** Codex's repository integration and guided preview work is committed (both suites and typecheck/build pass). The rejected standalone trial tool is removed. J1's pure journey contract is in place: journeys, v2 recipe, claims, coverage, seams, and step IDs that survive reordering. Finding: a generated app has 14 Aludel seams, and its Dockerfile copies `.aludel/review.json` into the runtime image; J3 removes that. [Plan, run log and retrospective](design/journeys/work-record.md). T03-CODE remains the next action; J2 waits for its owner look.
+
+2026-10-02: **Shared repository review and guided Code previews implemented locally.** Review combines a submission with the accepted repository head, runs applicable checks and accepts only that exact current revision. Code builds on review opening; criterion buttons prepare synthetic app sessions and exact destinations. [Evidence and retrospective](evidence/repository-review/README.md) distinguish agent checks from owner acceptance and unmeasured disk budgets. Native review renderers remain LAT-08A work; T03-CODE is still the one next action.
 
 2026-10-01: **LAYER-BINDINGS-01 step 2 built; owner review, then step 3.**
 - Owner decision: no `peer`. Bindings have a clear authority direction, and changes made outside the binding are drift, which the binding adopts, rectifies or has assessed.

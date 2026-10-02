@@ -177,6 +177,7 @@ export function skeletonFiles(setup, catalogs, gitProfile, appUrl, assets, sourc
   };
   const files = {
     ...initialFiles(setup, catalogs, gitProfile, appUrl),
+    '.aludel/review.json': json({ version: 1, buildTarget: 'build', checks: [{ name: 'Server syntax', command: ['node', '--check', 'server/server.mjs'] }], scenarios: pages.map((page, index) => ({ id: `page-${index + 1}`, criterion: 0, label: `Review ${page.label || page.path}`, expected: 'The page loads with the starter demo session and renders its declared content.', path: page.path, fixture: 'starter', role: options.auth ? 'member' : 'anonymous' })) }),
     'aludel.json': json(manifest(setup, catalogs, media)),
     'docs/product.md': productDoc(setup, media, catalogs),
     'package.json': json({ name: setup.project.slug, version: '0.1.0', private: true, type: 'module', engines: { node: '^24.14.0' },
@@ -512,6 +513,7 @@ ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000 DATA_DIR=/data NODE_NO_WARNINGS=1
 WORKDIR /app
 COPY --from=build /app/package.json ./
 COPY --from=build /app/server ./server
+COPY --from=build /app/.aludel/review.json ./.aludel/review.json
 COPY --from=build /app/dist ./dist
 RUN mkdir -p /data && chown node:node /data
 USER node
@@ -579,14 +581,41 @@ const account = request => {
   if (!db || !value) return null;
   return db.prepare('SELECT a.email, a.name FROM sessions s JOIN accounts a ON a.email = s.email WHERE s.token_hash = ? AND s.expires_at > ?').get(digest(value), new Date().toISOString()) || null;
 };
+const sessionPolicy = process.env.ALUDEL_REVIEW_PREVIEW === '1'
+  ? 'SameSite=None; Secure; Partitioned' : 'SameSite=Lax';
+const clearSession = 'app_session=; HttpOnly; ' + sessionPolicy + '; Path=/; Max-Age=0';
 const startSession = email => {
   const value = randomBytes(32).toString('base64url');
   db.prepare('INSERT INTO sessions(token_hash, email, expires_at) VALUES (?, ?, ?)').run(digest(value), email, new Date(Date.now() + 30 * 86400000).toISOString());
-  return \`app_session=\${value}; HttpOnly; SameSite=Lax; Path=/; Max-Age=\${30 * 86400}\`;
+  return \`app_session=\${value}; HttpOnly; \${sessionPolicy}; Path=/; Max-Age=\${30 * 86400}\`;
 };
 
 async function api(request, response, pathname) {
   if (pathname === '/api/health') return send(response, 200, { ok: true });
+  // Review-only synthetic setup. Normal app execution never enables this route.
+  if (pathname === '/api/__aludel/review' && request.method === 'POST') {
+    const enabled = process.env.ALUDEL_REVIEW_PREVIEW === '1' && process.env.ALUDEL_REVIEW_TOKEN;
+    const received = Buffer.from(request.headers.authorization || '');
+    const expected = Buffer.from('Bearer ' + (process.env.ALUDEL_REVIEW_TOKEN || ''));
+    if (!enabled || received.length !== expected.length || !timingSafeEqual(received, expected)) return send(response, 404, { error: 'Not found.' });
+    const { scenario: id, reset = true } = await readJson(request);
+    const recipe = JSON.parse(readFileSync(join(root, '.aludel/review.json'), 'utf8'));
+    const scenario = recipe.scenarios.find(step => step.id === id);
+    if (!scenario || scenario.fixture !== 'starter') return send(response, 409, { error: 'This scenario needs an app-specific fixture adapter.' });
+    let cookie = clearSession;
+    if (scenario.role !== 'anonymous') {
+      if (!db) return send(response, 409, { error: 'This app does not support signed-in scenarios.' });
+      const email = scenario.role + '@demo.invalid', name = 'Demo ' + scenario.role;
+      if (reset) db.prepare('DELETE FROM sessions WHERE email = ?').run(email);
+      if (!db.prepare('SELECT 1 FROM accounts WHERE email = ?').get(email)) {
+        const salt = randomBytes(16).toString('hex');
+        db.prepare('INSERT INTO accounts VALUES (?, ?, ?, ?, ?)').run(email, name, salt, hashPassword(randomBytes(32).toString('hex'), salt), new Date().toISOString());
+      }
+      cookie = startSession(email);
+    }
+    return send(response, 200, { ready: true }, { 'set-cookie': cookie });
+  }
+
   if (!authEnabled) return send(response, 404, { error: 'Not found.' });
   if (pathname === '/api/session') return send(response, 200, { account: account(request) });
   if (pathname === '/api/sign-up' && request.method === 'POST') {
@@ -609,7 +638,7 @@ async function api(request, response, pathname) {
   if (pathname === '/api/sign-out' && request.method === 'POST') {
     const value = token(request);
     if (value) db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(digest(value));
-    return send(response, 200, { account: null }, { 'set-cookie': 'app_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0' });
+    return send(response, 200, { account: null }, { 'set-cookie': clearSession });
   }
   return send(response, 404, { error: 'Not found.' });
 }

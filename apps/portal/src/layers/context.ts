@@ -113,13 +113,14 @@ export interface RunFollowUp { id: string; position: number; layer: string; laye
 export interface WorkRun { id: string; number: number; batchId: string | null; state: WorkRunState;
   performer: { kind: 'agent' | 'person'; id: string; label: string; model: string | null; effort: string | null };
   startedAt: string; finishedAt: string | null; turns: { used: number; limit: number };
-  task: { title: string; request: string; action: string | null; criteria: { index: number; text: string; source: { id: string; revision?: number | null } | null }[];
+  task: { title: string; request: string; action: string | null; layerRepository?: { key: string; base: string; root: string }; criteria: { index: number; text: string; source: { id: string; revision?: number | null } | null }[];
     targets: { id: string; label: string; kind: string }[]; carried: { check: string; note: string; by: string }[]; carriedComment: string | null };
   live: { phases: string[]; phase: number | null; activity: string; model: string | null; usage: { input: number; output: number } | null } | null;
   steps: RunStep[]; blockReason: string | null; changes: RunChange[];
   evidence: { criterion: number; type: 'change' | 'test' | 'try' | 'note'; ref: string; note: string; found: boolean; target: string | null; label: string; result?: string | null; independent?: boolean }[];
   candidate: { id: string; state: string; commit: string | null; base: string; checks: { name: string; status: string; detail: string; source?: string }[] } | null;
   proposalId: string | null; reportId: string | null; summary?: string | null; followUps?: RunFollowUp[];
+  integration?: { id: string; base: string; commit: string; submittedCommit: string; current: boolean; appRepository: boolean; appChanged: boolean; tests: { name: string; status: string; detail?: string; source?: string }[] } | null;
   layerSource?: { branch: string; commit: string; base: string; tests: { name: string; status: string; detail?: string; source?: string }[] } | null;
   review: { verdicts: Record<string, { value: 'accept' | 'reject' | 'skip'; note: string }>; flags: Record<string, string>; outcome: WorkRunState | null; comment: string | null; signedBy: string | null; signedAt: string | null }; }
 export interface WorkChange { recordId: string; revision: number; author: string; rationale: string | null; createdAt: string; kind: string | null; exists: boolean; fields: FieldChange[]; }

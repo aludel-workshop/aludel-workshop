@@ -1,0 +1,12 @@
+(node:2848894) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ editor connection scopes a versioned task bundle and live knowledge to its member and project (20640.721104ms)
+✔ Codex stdio adapter exposes read tools and forwards a bearer-scoped task request (336.292006ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 22192.582851

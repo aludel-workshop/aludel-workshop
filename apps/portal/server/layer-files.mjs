@@ -45,13 +45,13 @@ const hash = value => createHash('sha256').update(JSON.stringify(value)).digest(
 const indexes = new Map();
 export function indexAt(db, projectId, key, repo, commit, { reviewed = true } = {}) {
   const cacheKey = `${repo}@${commit}`;
-  if (indexes.has(cacheKey)) return indexes.get(cacheKey);
   const manifest = packageAt(repo, commit, key).manifest;
   const declared = fileOutputs(manifest);
   if (!declared) return null;
   const source = read(repo, commit, declared.indexer) ?? fail('The layer indexer is missing.', 500);
   const digest = createHash('sha256').update(source).digest('hex');
   if (reviewed && !sourceReviewed(db, projectId, key, declared.indexer, digest)) fail(`The ${key} indexer at this commit has not passed review.`, 409);
+  if (indexes.has(cacheKey)) return indexes.get(cacheKey);
   const files = Object.fromEntries(declared.paths.map(path => [path, read(repo, commit, path)]).filter(([, text]) => text !== null));
   // A layer that asks for code units gets them parsed by the host at the same commit, outside its package, with IDs
   // stable per project (the IDs Code's units always had).

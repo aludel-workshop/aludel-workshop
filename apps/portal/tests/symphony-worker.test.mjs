@@ -5,6 +5,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync, existsSync } from 'node:
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
+import { waitForPortal, stopPortal } from './portal-support.mjs';
 import { createSession, createUser, initAccounts } from '../server/accounts.mjs';
 import { agentRuns, initAgentRuns } from '../server/agent-runs.mjs';
 import { codeCandidates, initCodeCandidates } from '../server/code-candidates.mjs';
@@ -89,17 +90,11 @@ test('worker token scopes pinned coding work; ID refresh withdraws skipped and s
   const port = probe.address().port;
   await new Promise(resolve => probe.close(resolve));
   const portal = spawn(process.execPath, [new URL('../server/server.mjs', import.meta.url).pathname], {
-    env: { ...process.env, MACHINE_DATA_DIR: root, MACHINE_PORT: String(port), MACHINE_PREVIEW_RUNTIME: 'process' }, stdio: 'ignore'
+    env: { ...process.env, MACHINE_DATA_DIR: root, MACHINE_PORT: String(port), MACHINE_PREVIEW_RUNTIME: 'process' }, stdio: ['ignore', 'pipe', 'pipe']
   });
   const origin = `http://127.0.0.1:${port}`;
   try {
-    let ready = false;
-    const deadline = Date.now() + 20000; // a portal start under the parallel suite can exceed 8 seconds
-    while (!ready && Date.now() < deadline) {
-      try { ready = (await fetch(origin + '/api/session')).ok; }
-      catch { await new Promise(resolve => setTimeout(resolve, 50)); }
-    }
-    assert.ok(ready, 'portal started on disposable data');
+    await waitForPortal(portal, `http://127.0.0.1:${port}`, 'portal started on disposable data');
     const auth = { authorization: 'Bearer ' + firstToken.token };
     assert.equal((await fetch(origin + '/api/worker/issues')).status, 401);
     const polled = await fetch(origin + '/api/worker/issues?states=Ready', { headers: auth });
@@ -118,8 +113,7 @@ test('worker token scopes pinned coding work; ID refresh withdraws skipped and s
     const pairing = await fetch(origin + `/api/projects/${projectId}/agents/symphony`, { method: 'POST', headers: { ...session, 'content-type': 'application/json' }, body: JSON.stringify({ profileId: profile.id }) });
     assert.equal(pairing.status, 404, 'Work no longer exposes manual worker pairing');
   } finally {
-    portal.kill();
-    await new Promise(resolve => portal.once('exit', resolve));
+    await stopPortal(portal);
   }
   writeFileSync(join(workspace, 'README.md'), 'Changed after Go\n');
   assert.equal(worker.saved(scope, bundle.digest).repository.commit, bundle.repository.commit, 'bundle remains pinned');
@@ -150,16 +144,10 @@ test('worker token scopes pinned coding work; ID refresh withdraws skipped and s
   mkdirSync(join(clone, 'src'), { recursive: true });
   writeFileSync(join(clone, 'src', 'resume.txt'), 'preserve pending work\n');
   const resumedPortal = spawn(process.execPath, [new URL('../server/server.mjs', import.meta.url).pathname], {
-    env: { ...process.env, MACHINE_DATA_DIR: root, MACHINE_PORT: String(port), MACHINE_PREVIEW_RUNTIME: 'process' }, stdio: 'ignore'
+    env: { ...process.env, MACHINE_DATA_DIR: root, MACHINE_PORT: String(port), MACHINE_PREVIEW_RUNTIME: 'process' }, stdio: ['ignore', 'pipe', 'pipe']
   });
   try {
-    let ready = false;
-    const deadline = Date.now() + 20000; // a portal start under the parallel suite can exceed 8 seconds
-    while (!ready && Date.now() < deadline) {
-      try { ready = (await fetch(`http://127.0.0.1:${port}/api/session`)).ok; }
-      catch { await new Promise(resolve => setTimeout(resolve, 50)); }
-    }
-    assert.ok(ready, 'portal restarted mid-attempt');
+    await waitForPortal(resumedPortal, `http://127.0.0.1:${port}`, 'portal restarted mid-attempt');
     const resumed = await fetch(`http://127.0.0.1:${port}/api/worker/attempts/${secondAttempt}/runs`, {
       method: 'POST', headers: { authorization: 'Bearer ' + firstToken.token, 'content-type': 'application/json' }, body: '{}'
     });
@@ -167,8 +155,7 @@ test('worker token scopes pinned coding work; ID refresh withdraws skipped and s
     assert.equal((await resumed.json()).runsStarted, 2);
     assert.equal(existsSync(join(clone, 'src', 'resume.txt')), true, 'restart retained unfinished workspace edits');
   } finally {
-    resumedPortal.kill();
-    await new Promise(resolve => resumedPortal.once('exit', resolve));
+    await stopPortal(resumedPortal);
   }
   assert.equal(worker.reserveRun(scope, { attemptId: secondAttempt }).runsStarted, 3);
   assert.equal(worker.issues(scope, { states: ['Ready'] }).issues.length, 1, 'the final reserved turn remains routed while it runs');
@@ -182,16 +169,10 @@ test('worker token scopes pinned coding work; ID refresh withdraws skipped and s
   assert.throws(() => worker.extendRuns(outsider, projectId, work.id, 3), error => error.status === 403);
   assert.throws(() => worker.extendRuns(owner, projectId, work.id, 2), error => error.status === 409, 'stale owner intent cannot extend twice');
   const ownerPortal = spawn(process.execPath, [new URL('../server/server.mjs', import.meta.url).pathname], {
-    env: { ...process.env, MACHINE_DATA_DIR: root, MACHINE_PORT: String(port), MACHINE_PREVIEW_RUNTIME: 'process' }, stdio: 'ignore'
+    env: { ...process.env, MACHINE_DATA_DIR: root, MACHINE_PORT: String(port), MACHINE_PREVIEW_RUNTIME: 'process' }, stdio: ['ignore', 'pipe', 'pipe']
   });
   try {
-    let ready = false;
-    const deadline = Date.now() + 20000; // a portal start under the parallel suite can exceed 8 seconds
-    while (!ready && Date.now() < deadline) {
-      try { ready = (await fetch(`http://127.0.0.1:${port}/api/session`)).ok; }
-      catch { await new Promise(resolve => setTimeout(resolve, 50)); }
-    }
-    assert.ok(ready, 'owner route started on persisted exhausted attempt');
+    await waitForPortal(ownerPortal, `http://127.0.0.1:${port}`, 'owner route started on persisted exhausted attempt');
     const response = await fetch(`http://127.0.0.1:${port}/api/projects/${projectId}/agents/symphony-runs`, {
       method: 'POST', headers: { cookie: createSession(db, owner.id).split(';')[0], 'content-type': 'application/json' },
       body: JSON.stringify({ workId: work.id, expectedRunLimit: 3 })
@@ -201,8 +182,7 @@ test('worker token scopes pinned coding work; ID refresh withdraws skipped and s
     assert.equal(extended.runLimit, 6);
     assert.equal(extended.runsStarted, 3);
   } finally {
-    ownerPortal.kill();
-    await new Promise(resolve => ownerPortal.once('exit', resolve));
+    await stopPortal(ownerPortal);
   }
   assert.throws(() => worker.extendRuns(owner, projectId, work.id, 3), error => error.status === 409);
   assert.equal(worker.issues(scope, { states: ['Ready'] }).issues.length, 1, 'explicit owner reauthorization resumes the same pinned item');
@@ -229,17 +209,11 @@ test('worker token scopes pinned coding work; ID refresh withdraws skipped and s
   rmSync(clone, { recursive: true, force: true }); // Symphony deletes terminal issue workspaces before owner review.
   assert.equal(existsSync(submitted.candidate.path), true, 'Aludel retained an independent exact-commit snapshot');
   const restartedPortal = spawn(process.execPath, [new URL('../server/server.mjs', import.meta.url).pathname], {
-    env: { ...process.env, MACHINE_DATA_DIR: root, MACHINE_PORT: String(port), MACHINE_PREVIEW_RUNTIME: 'process' }, stdio: 'ignore'
+    env: { ...process.env, MACHINE_DATA_DIR: root, MACHINE_PORT: String(port), MACHINE_PREVIEW_RUNTIME: 'process' }, stdio: ['ignore', 'pipe', 'pipe']
   });
   try {
     const origin = `http://127.0.0.1:${port}`;
-    let ready = false;
-    const deadline = Date.now() + 20000; // a portal start under the parallel suite can exceed 8 seconds
-    while (!ready && Date.now() < deadline) {
-      try { ready = (await fetch(origin + '/api/session')).ok; }
-      catch { await new Promise(resolve => setTimeout(resolve, 50)); }
-    }
-    assert.ok(ready, 'portal restored the submitted attempt');
+    await waitForPortal(restartedPortal, `http://127.0.0.1:${port}`, 'portal restored the submitted attempt');
     const auth = { authorization: 'Bearer ' + firstToken.token };
     const attemptStatus = await fetch(origin + `/api/worker/attempts/${secondAttempt}`, { headers: auth });
     assert.equal(attemptStatus.status, 200);
@@ -311,8 +285,7 @@ test('worker token scopes pinned coding work; ID refresh withdraws skipped and s
     assert.equal(git(workspace, 'rev-parse', 'HEAD'), commit, 'recovery does not merge a second time');
     assert.equal(know.workById(projectId, work.id).state, 'done');
   } finally {
-    restartedPortal.kill();
-    await new Promise(resolve => restartedPortal.once('exit', resolve));
+    await stopPortal(restartedPortal);
   }
   assert.equal(db.prepare('SELECT state FROM agent_batches WHERE id = ?').get(nextBatch.id).state, 'done');
   db.prepare("UPDATE agent_batches SET state = 'done' WHERE id IN (?, ?)").run(batchId, nextBatch.id);

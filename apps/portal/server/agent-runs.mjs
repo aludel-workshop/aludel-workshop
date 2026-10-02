@@ -77,6 +77,7 @@ export function agentRuns({ db, know, worker = null, symphonyDispatch = false })
   // it): it goes back to ready, staged if it is in a batch that hasn't finished, otherwise queued.
   for (const row of db.prepare("SELECT id, project_id, context_json FROM layer_work_items WHERE state = 'claimed'").all()) {
     const context = parse(row.context_json, {}) || {};
+    if (context.personRun && db.prepare("SELECT state FROM work_person_runs WHERE id = ? AND project_id = ? AND work_id = ?").get(context.personRun, row.project_id, row.id)?.state === 'working') continue;
     const batch = context.batch && getBatch(row.project_id, context.batch);
     if (batch?.state === 'running' && db.prepare('SELECT execution_kind FROM agent_batches WHERE id = ?').get(batch.id)?.execution_kind === 'symphony') continue;
     const { run, skip, ...rest } = context;

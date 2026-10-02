@@ -30,18 +30,20 @@ export function previewRuntime(environment = process.env, docker = 'docker') {
 }
 
 export const previewInstanceId = (workspaceRoot, kind = 'project') =>
-  createHash('sha256').update(workspaceRoot + (kind === 'candidate' ? ':candidate' : '')).digest('hex').slice(0, 12);
+  createHash('sha256').update(workspaceRoot + (kind === 'project' ? '' : `:${kind}`)).digest('hex').slice(0, 12);
 export const previewImageName = (workspaceRoot, kind, projectId) =>
-  `aludel-${kind === 'candidate' ? 'candidate' : 'preview'}/${previewInstanceId(workspaceRoot, kind)}-${projectId}`;
+  `aludel-${kind === 'project' ? 'preview' : kind}/${previewInstanceId(workspaceRoot, kind)}-${projectId}`;
 
-export function previewManager({ db, portalRoot, workspaceRoot, logRoot, runtime = 'process', docker = 'docker', limits = containerLimits, kind = 'project', dataRoot = null }) {
-  if (!['project', 'candidate'].includes(kind)) throw new Error('Unknown preview kind.');
-  const table = kind === 'candidate' ? 'candidate_previews' : 'app_previews';
-  const owner = kind === 'candidate' ? 'code_candidates' : 'projects';
+export function previewManager({ db, portalRoot, workspaceRoot, logRoot, runtime = 'process', docker = 'docker', limits = containerLimits, kind = 'project', dataRoot = null, extraEnvironment = () => ({}) }) {
+  if (!['project', 'candidate', 'review'].includes(kind)) throw new Error('Unknown preview kind.');
+  const table = kind === 'review' ? 'layer_review_previews' : kind === 'candidate' ? 'candidate_previews' : 'app_previews';
+  const identity = kind === 'review' ? 'integration_id' : 'project_id';
+  const owner = kind === 'review' ? 'layer_review_integrations' : kind === 'candidate' ? 'code_candidates' : 'projects';
   db.exec(`CREATE TABLE IF NOT EXISTS ${table} (
-    project_id TEXT PRIMARY KEY REFERENCES ${owner}(id), status TEXT NOT NULL, commit_sha TEXT, port INTEGER,
+    ${identity} TEXT PRIMARY KEY REFERENCES ${owner}(id), status TEXT NOT NULL, commit_sha TEXT, port INTEGER,
     last_error TEXT, built_at TEXT, updated_at TEXT NOT NULL
   )`);
+  if (!db.prepare(`PRAGMA table_info(${table})`).all().some(column => column.name === 'image_digest')) db.exec(`ALTER TABLE ${table} ADD COLUMN image_digest TEXT`);
   // Nothing survives a portal restart: previews come back on demand from their last build.
   db.prepare(`UPDATE ${table} SET status = CASE WHEN built_at IS NULL THEN 'failed' ELSE 'stopped' END, port = NULL WHERE status IN ('building', 'starting', 'running')`).run();
   mkdirSync(workspaceRoot, { recursive: true });
@@ -66,13 +68,13 @@ export function previewManager({ db, portalRoot, workspaceRoot, logRoot, runtime
   const processes = new Map();
   const pending = new Map();
 
-  const row = projectId => db.prepare(`SELECT * FROM ${table} WHERE project_id = ?`).get(projectId);
+  const row = projectId => db.prepare(`SELECT * FROM ${table} WHERE ${identity} = ?`).get(projectId);
   const logPath = projectId => join(logRoot, `${projectId}.log`);
   function update(projectId, values) {
     const current = row(projectId);
     const next = { status: 'stopped', commit_sha: null, port: null, last_error: null, built_at: null, ...current, ...values, updated_at: now() };
-    db.prepare(`INSERT INTO ${table}(project_id, status, commit_sha, port, last_error, built_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(project_id) DO UPDATE SET status=excluded.status, commit_sha=excluded.commit_sha, port=excluded.port,
+    db.prepare(`INSERT INTO ${table}(${identity}, status, commit_sha, port, last_error, built_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(${identity}) DO UPDATE SET status=excluded.status, commit_sha=excluded.commit_sha, port=excluded.port,
       last_error=excluded.last_error, built_at=excluded.built_at, updated_at=excluded.updated_at`)
       .run(projectId, next.status, next.commit_sha, next.port, next.last_error, next.built_at, next.updated_at);
   }
@@ -80,9 +82,17 @@ export function previewManager({ db, portalRoot, workspaceRoot, logRoot, runtime
   function run(command, args, options, log) {
     return new Promise((resolveRun, reject) => {
       const child = spawn(command, args, { ...options, stdio: ['ignore', 'pipe', 'pipe'] });
-      child.stdout.pipe(log, { end: false }); child.stderr.pipe(log, { end: false });
-      child.on('error', reject);
-      child.on('exit', code => code === 0 ? resolveRun() : reject(new Error(`The build exited with code ${code}. See the build log.`)));
+      let bytes = 0, limitError = null;
+      const timer = kind === 'review' ? setTimeout(() => { limitError = new Error('The review build exceeded its two-minute limit.'); child.kill(); }, 120000) : null;
+      const append = chunk => {
+        bytes += chunk.length;
+        if (kind === 'review' && bytes > 8 * 1024 * 1024) { limitError = new Error('The review build exceeded its 8 MiB log limit.'); child.kill(); return; }
+        log.write(chunk);
+      };
+      if (kind === 'review') { child.stdout.on('data', append); child.stderr.on('data', append); }
+      else { child.stdout.pipe(log, { end: false }); child.stderr.pipe(log, { end: false }); }
+      child.on('error', error => { clearTimeout(timer); reject(error); });
+      child.on('close', code => { clearTimeout(timer); if (limitError) reject(limitError); else if (code === 0) resolveRun(); else reject(new Error(`The build exited with code ${code}. See the build log.`)); });
     });
   }
 
@@ -112,9 +122,10 @@ export function previewManager({ db, portalRoot, workspaceRoot, logRoot, runtime
     const log = createWriteStream(logPath(projectId), { flags: 'a' });
     const run = dockerSync(['run', '-d', '--name', name, '--label', `aludel.preview=${instance}`, '--label', `aludel.project=${projectId}`,
       '--memory', limits.memory, '--memory-swap', limits.memory, '--cpus', limits.cpus, '--pids-limit', String(limits.pids),
-      '--read-only', '--tmpfs', `/tmp:size=${limits.tmp}`, '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
+      '--read-only', '--log-opt', 'max-size=1m', '--log-opt', 'max-file=2', '--tmpfs', `/tmp:size=${limits.tmp}`, '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
       '--env', `PORT=${containerPort}`, '--env', 'HOST=0.0.0.0', '--env', 'DATA_DIR=/data',
-      '--volume', `${dataDirectory}:/data`, '--publish', `127.0.0.1::${containerPort}`, imageName(projectId)]);
+      ...Object.entries(extraEnvironment(projectId)).flatMap(([key, value]) => ['--env', `${key}=${value}`]),
+      '--volume', `${dataDirectory}:/data`, '--publish', `127.0.0.1::${containerPort}`, row(projectId)?.image_digest || imageName(projectId)]);
     if (run.status !== 0) {
       log.end(`[${now()}] container did not start: ${run.stderr}\n`);
       update(projectId, { status: 'failed', last_error: 'The app container did not start. See the build log.' });
@@ -185,7 +196,7 @@ export function previewManager({ db, portalRoot, workspaceRoot, logRoot, runtime
         const size = statSync(path).size;
         log = readFileSync(path, 'utf8').slice(Math.max(0, size - 6000));
       } catch { /* No log yet. */ }
-      return { status: value.status, commit: value.commit_sha, builtAt: value.built_at, error: value.last_error, running: processes.has(projectId) && value.status === 'running', log };
+      return { status: value.status, imageDigest: value.image_digest || null, commit: value.commit_sha, builtAt: value.built_at, error: value.last_error, running: processes.has(projectId) && value.status === 'running', log };
     },
 
     // Serialised per project: a second request while one build runs joins it rather than starting another.
@@ -199,6 +210,9 @@ export function previewManager({ db, portalRoot, workspaceRoot, logRoot, runtime
           if (runtime === 'docker') {
             log.write(`[${now()}] building ${commit || 'workspace'} from the app's Dockerfile\n`);
             await run(docker, ['build', '--label', `aludel.preview=${instance}`, '--label', `aludel.project=${projectId}`, '--tag', imageName(projectId), workspacePath], { env: process.env }, log);
+            const digest = dockerSync(['image', 'inspect', '--format', '{{.Id}}', imageName(projectId)]).stdout?.trim();
+            if (!/^sha256:[a-f0-9]{64}$/.test(digest || '')) throw new Error('The built image identity is unavailable.');
+            db.prepare(`UPDATE ${table} SET image_digest = ? WHERE ${identity} = ?`).run(digest, projectId);
           } else {
             log.write(`[${now()}] building ${commit || 'workspace'} with the aludel-web-v1 toolchain\n`);
             await run(process.execPath, [join(portalRoot, 'node_modules', 'vite', 'bin', 'vite.js'), 'build'], { cwd: workspacePath, env: { PATH: process.env.PATH, HOME: process.env.HOME, NODE_NO_WARNINGS: '1' } }, log);
@@ -245,10 +259,21 @@ export function previewManager({ db, portalRoot, workspaceRoot, logRoot, runtime
     async stop(projectId) {
       const child = processes.get(projectId);
       if (!child) return;
-      if (child.container) return stop(projectId);
+      if (child.container) { stop(projectId); update(projectId, { status: 'stopped', port: null }); return; }
       const exited = new Promise(resolveExit => child.once('exit', resolveExit));
       stop(projectId);
       await Promise.race([exited, new Promise(resolveWait => setTimeout(resolveWait, 3000))]);
+      update(projectId, { status: 'stopped', port: null });
+    },
+
+    async retire(projectId) {
+      if (pending.has(projectId)) throw new Error('This preview is still preparing.');
+      await api.stop(projectId);
+      if (runtime === 'docker') {
+        const removed = dockerSync(['image', 'rm', imageName(projectId)]);
+        if (removed.status !== 0 && dockerSync(['image', 'inspect', imageName(projectId)]).status === 0) throw new Error('The preview image could not be retired.');
+      }
+      db.prepare(`UPDATE ${table} SET status = 'retired', built_at = NULL, image_digest = NULL, port = NULL WHERE ${identity} = ?`).run(projectId);
     },
 
     // A live GET /api/health against the running preview, with its response time.

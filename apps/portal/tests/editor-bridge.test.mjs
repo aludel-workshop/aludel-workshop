@@ -11,6 +11,7 @@ import { ensureProductWorkspace } from '../server/product-workspace.mjs';
 import { openSecretStore } from '../server/secret-store.mjs';
 import { openDatabase } from '../server/storage.mjs';
 import { initWorkflow } from '../server/workflow.mjs';
+import { waitForPortal, stopPortal } from './portal-support.mjs';
 
 test('editor connection scopes a versioned task bundle and live knowledge to its member and project', async () => {
   const root = mkdtempSync(join(tmpdir(), 'aludel-editor-'));
@@ -75,17 +76,11 @@ test('editor connection scopes a versioned task bundle and live knowledge to its
   const port = probe.address().port;
   await new Promise(resolve => probe.close(resolve));
   const server = spawn(process.execPath, [new URL('../server/server.mjs', import.meta.url).pathname], {
-    env: { ...process.env, MACHINE_DATA_DIR: root, MACHINE_PORT: String(port), MACHINE_PREVIEW_RUNTIME: 'process' }, stdio: 'ignore'
+    env: { ...process.env, MACHINE_DATA_DIR: root, MACHINE_PORT: String(port), MACHINE_PREVIEW_RUNTIME: 'process' }, stdio: ['ignore', 'pipe', 'pipe']
   });
   const origin = 'http://127.0.0.1:' + port;
-  const deadline = Date.now() + 20000; // a portal start under the parallel suite can exceed 8 seconds
   try {
-    let ready = false;
-    while (!ready && Date.now() < deadline) {
-      try { ready = (await fetch(origin + '/api/session')).ok; }
-      catch { await new Promise(resolve => setTimeout(resolve, 50)); }
-    }
-    assert.ok(ready, 'portal started on disposable data');
+    await waitForPortal(server, origin);
     const cookie = createSession(db, ada.id).split(';')[0];
     const auth = { cookie };
     const before = await fetch(origin + '/api/projects/' + adaProject + '/editor', { headers: auth });
@@ -122,8 +117,7 @@ test('editor connection scopes a versioned task bundle and live knowledge to its
     assert.equal((await fetch(origin + '/api/projects/' + adaProject + '/editor', { method: 'DELETE', headers: auth })).status, 200);
     assert.equal((await fetch(origin + '/api/editor/me', { headers: editorAuth })).status, 401);
   } finally {
-    server.kill('SIGTERM');
-    await new Promise(resolve => server.once('exit', resolve));
+    await stopPortal(server);
     db.close();
   }
 });

@@ -1,0 +1,5 @@
+(node:2849322) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+fatal: path 'AGENTS.md' does not exist in 'ad44a40bb3e802ad84d76a37348429dd236be97e'
+fatal: path 'docs/.aludel/sources.json' does not exist in 'ad44a40bb3e802ad84d76a37348429dd236be97e'
+PASS: generic Code review prepares/builds on open; author/viewer steps require no manual login/navigation; stale generation refused; notes survive unchanged refresh and remain in rebuild history; two Code branches integrate serially; person work stages, starts, submits an exact branch, appears in Done, previews both roles and accepts through the same guards; wide/narrow and axe pass.

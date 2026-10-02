@@ -25,6 +25,7 @@ import { agentRuns, initAgentRuns } from './agent-runs.mjs';
 import { codeCandidates, initCodeCandidates } from './code-candidates.mjs';
 import { editorBridge, initEditorBridge } from './editor-bridge.mjs';
 import { symphonyWorker, initSymphonyWorker } from './symphony-worker.mjs';
+import { reviewPreviews, reviewHost } from './review-previews.mjs';
 import { workRuns, initWorkRuns } from './work-runs.mjs';
 import { providerModelCatalog } from './provider-models.mjs';
 import { extname, join, normalize, resolve } from 'node:path';
@@ -215,6 +216,7 @@ const symphonyWorkspaceRoot = resolve(process.env.MACHINE_SYMPHONY_WORKSPACE_ROO
 const candidates = codeCandidates({ db, candidateRoot: join(dataDirectory, 'code-candidates'), externalRoot: symphonyWorkspaceRoot });
 const candidatePreviews = previewManager({ db, portalRoot, workspaceRoot: join(dataDirectory, 'candidate-preview-workspaces'),
   logRoot: join(dataDirectory, 'candidate-preview-logs'), dataRoot: join(dataDirectory, 'candidate-preview-data'), runtime: 'docker', kind: 'candidate' });
+const integrationPreviews = reviewPreviews({ db, portalRoot, dataDirectory, appOrigin: slug => topology.appOrigin(slug) });
 const candidateHost = id => `candidate-${createHash('sha256').update(id).digest('hex').slice(0, 12)}`;
 function settleSymphonyBatch(projectId, batchId) {
   if (!batchId) return;
@@ -227,7 +229,7 @@ function settleSymphonyBatch(projectId, batchId) {
   }
 }
 const worker = symphonyWorker({ db, know, candidates, workspaceRoot: symphonyWorkspaceRoot,
-  runLimit: Number(process.env.MACHINE_SYMPHONY_RUN_LIMIT || 3) });
+  runLimit: Number(process.env.MACHINE_SYMPHONY_RUN_LIMIT || 3), reviewBuildCheck: id => integrationPreviews.assertBuilt(id) });
 const symphonyDispatchEnabled = process.env.MACHINE_SYMPHONY_DISPATCH === '1';
 const workerPoolView = projectId => ({ ...worker.poolStatus(projectId), dispatchEnabled: symphonyDispatchEnabled });
 
@@ -1041,7 +1043,7 @@ async function api(request, response, url) {
     return json(response, result.status, result.body, { 'cache-control': 'no-store' });
   }
   // WORK-ITEM-UX-01: an item's runs, each with its own task snapshot, outputs, review and signature.
-  const runRoute = /^\/api\/projects\/([^/]+)\/work\/([^/]+)\/runs(?:\/([^/]+)\/(review|sign|submit|stop))?$/.exec(url.pathname);
+  const runRoute = /^\/api\/projects\/([^/]+)\/work\/([^/]+)\/runs(?:\/([^/]+)\/(review|sign|submit|stop|prepare|preview|scenario|close-preview))?$/.exec(url.pathname);
   if (runRoute) {
     const [, rawProject, rawWork, rawAttempt, operation] = runRoute;
     const projectId = decodeURIComponent(rawProject), workId = decodeURIComponent(rawWork), attemptId = rawAttempt ? decodeURIComponent(rawAttempt) : null;
@@ -1054,21 +1056,61 @@ async function api(request, response, url) {
     }
     if (operation === 'submit' && request.method === 'POST') return json(response, 200, runHistory.submitPerson(user, projectId, workId, attemptId, await readJson(request)), { 'cache-control': 'no-store' });
     if (operation === 'stop' && request.method === 'POST') return json(response, 200, runHistory.stopPerson(user, projectId, workId, attemptId), { 'cache-control': 'no-store' });
-    if (operation === 'review' && request.method === 'PUT') return json(response, 200, runHistory.saveReview(projectId, workId, attemptId, await readJson(request)), { 'cache-control': 'no-store' });
+    const reviewInputCurrent = (input, rejectionOnly = false) => {
+      const run = runHistory.runFor(projectId, workId, attemptId);
+      if (run.layerSource) {
+        if (input.integrationId !== run.integration?.id || !rejectionOnly && (!run.integration || !run.integration.current)) throw Object.assign(new Error('This repository review changed. Refresh before recording a verdict or accepting.'), { status: 409 });
+      }
+      return run;
+    };
+    if (['prepare', 'preview', 'scenario', 'close-preview'].includes(operation) && request.method === 'POST') {
+      const item = know.workById(projectId, workId);
+      requireElevated(db, user, projectId, item.layer, 'prepare this review');
+      const run = runHistory.runFor(projectId, workId, attemptId);
+      if (run.state !== 'review' || !run.layerSource || (!run.proposalId && run.performer.kind !== 'person')) return json(response, 409, { error: 'This run has no repository submission waiting for review.' });
+      const input = await readJson(request);
+      if (operation === 'prepare') {
+        const before = run.integration?.id;
+        const integration = run.performer.kind === 'person'
+          ? runHistory.preparePersonReview(user, projectId, workId, attemptId, input.rebuild === true)
+          : worker.prepareProposalReview(user, projectId, workId, run.proposalId, input.rebuild === true);
+        if (integration && integration.id !== before) {
+          if (run.performer.kind !== 'person') {
+            runHistory.addStep(attemptId, 'review-refresh', { previousIntegration: before || null, integration: integration.id, previousReview: run.review });
+            db.prepare("UPDATE work_run_reviews SET verdicts_json = '{}', flags_json = '{}' WHERE attempt_id = ?").run(attemptId);
+          }
+          if (before) { try { await integrationPreviews.close(before); } catch { /* sweep stops superseded previews after pending builds finish */ } }
+        }
+        return json(response, 200, { run: runHistory.runFor(projectId, workId, attemptId) }, { 'cache-control': 'no-store' });
+      }
+      if (operation === 'close-preview') {
+        if (!run.integration || input.integrationId !== run.integration.id) return json(response, 409, { error: 'This review revision changed.' });
+        await integrationPreviews.close(run.integration.id); return json(response, 200, { preview: integrationPreviews.status(run.integration.id) });
+      }
+      const reviewed = reviewInputCurrent(input);
+      if (operation === 'scenario') return json(response, 200, await integrationPreviews.openStep(reviewed.integration.id, String(input.scenario || '')), { 'cache-control': 'no-store' });
+      return json(response, 200, { preview: await integrationPreviews.build(reviewed.integration.id) }, { 'cache-control': 'no-store' });
+    }
+    if (operation === 'review' && request.method === 'PUT') { const input = await readJson(request); if (know.workById(projectId, workId)?.scope === 'layer') requireElevated(db, user, projectId, know.workById(projectId, workId).layer, 'review this run'); reviewInputCurrent(input, (!input.verdict || input.verdict.value === 'reject') && Boolean(input.flag || input.verdict)); return json(response, 200, runHistory.saveReview(projectId, workId, attemptId, input), { 'cache-control': 'no-store' }); }
     if (operation === 'sign' && request.method === 'POST') {
       const input = await readJson(request);
       const signing = know.workById(projectId, workId);
+      if (input.outcome === 'accept') reviewInputCurrent(input);
       if (signing?.scope === 'layer') requireElevated(db, user, projectId, signing.layer, 'sign this review');
       const stamp = () => new Date().toISOString();
       const signed = await runHistory.sign(user, projectId, workId, attemptId, { outcome: String(input.outcome || ''), comment: typeof input.comment === 'string' ? input.comment : '' }, {
         accept: async run => {
-          if (run.candidate) {
+          if (run.performer.kind === 'person' && run.layerSource) {
+            runHistory.acceptPersonRepository(user, projectId, workId, attemptId, input.integrationId, integrationPreviews.assertBuilt);
+          } else if (run.candidate) {
             const result = await acceptCandidate(user, projectId, run.candidate.id, run.candidate.commit);
             if (result.status !== 200) throw Object.assign(new Error(result.body.error), { status: result.status });
           } else if (run.proposalId && run.changes[0]?.kind === 'claim') {
             runs.acceptBrief(user, projectId, workId, run.proposalId);
             db.prepare("UPDATE symphony_proposals SET state = 'accepted', accepted_at = ? WHERE id = ? AND project_id = ?").run(stamp(), run.proposalId, projectId);
-          } else if (run.proposalId) worker.acceptProposal(user, projectId, workId, run.proposalId);
+          } else if (run.proposalId) {
+            worker.acceptProposal(user, projectId, workId, run.proposalId, input.integrationId);
+          }
           else know.updateWork(user, projectId, workId, { state: 'done' });
         },
         reject: async run => {
@@ -1080,6 +1122,7 @@ async function api(request, response, url) {
           if (run.proposalId) worker.rejectProposal(projectId, workId, run.proposalId);
         },
       });
+      for (const artifact of db.prepare('SELECT id FROM layer_review_integrations WHERE attempt_id = ?').all(attemptId)) { try { await integrationPreviews.close(artifact.id); } catch { /* sweep handles a still-pending rejected build */ } }
       settleSymphonyBatch(projectId, signed.batchId);
       // An accepted merge moves the layer's main; build its views now so the next visit is ready.
       if (signing?.scope === 'layer') views.status(db, projectId, signing.layer);
@@ -1343,7 +1386,7 @@ async function api(request, response, url) {
         return json(response, 200, accepted);
       }
       if (typeof input.acceptProposal === 'string') {
-        const accepted = worker.acceptProposal(user, projectId, item, input.acceptProposal);
+        const accepted = worker.acceptProposal(user, projectId, item, input.acceptProposal, input.integrationId);
         settleSymphonyBatch(projectId, accepted.work.context?.batch);
         return json(response, 200, accepted);
       }
@@ -1601,6 +1644,12 @@ function appPage(response, status, title, message) {
 
 // <slug>.<base> serves only that project's preview. Portal APIs and cookies never exist on app hosts.
 async function serveApp(request, response, slug) {
+  if (/^review-[a-f0-9]{12}$/.test(slug)) {
+    const matches = db.prepare('SELECT id FROM layer_review_integrations').all().filter(row => reviewHost(row.id) === slug);
+    if (matches.length !== 1) return appPage(response, 404, 'Review preview unavailable', 'Open this preview from its Work review.');
+    try { return await integrationPreviews.serve(matches[0].id, request, response); }
+    catch (error) { return appPage(response, error.status || 503, 'Review preview unavailable', error.message); }
+  }
   if (/^candidate-[a-f0-9]{12}$/.test(slug)) {
     const matching = db.prepare("SELECT id FROM code_candidates WHERE state IN ('submitted', 'review', 'accepted')").all()
       .filter(row => candidateHost(row.id) === slug);
@@ -1663,4 +1712,4 @@ server.listen(port, host, () => {
   console.log(`Symphony Work admission: ${symphonyDispatchEnabled ? 'enabled' : 'disabled'}; worker health: Deploy › Agents`);
 });
 
-for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => { previews.stopAll(); candidatePreviews.stopAll(); server.close(() => { db.close(); process.exit(0); }); server.closeAllConnections?.(); });
+for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => { previews.stopAll(); candidatePreviews.stopAll(); integrationPreviews.stopAll(); server.close(() => { db.close(); process.exit(0); }); server.closeAllConnections?.(); });

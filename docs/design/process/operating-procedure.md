@@ -1,8 +1,8 @@
 ---
 id: process-operation-001
-revision: 4
+revision: 5
 status: trial
-updated: 2026-09-19
+updated: 2026-10-02
 ---
 
 # From request to the next justified action
@@ -104,6 +104,10 @@ These principles apply to other work too: substitute its relevant contracts, evi
 
 For an executable demo, verify the exact owner-facing review URL from clean fixture state before handoff. Smoke-check every advertised top-level route before running deeper assertions, so a stopped server or route-parser failure is distinguished from an interaction failure. Walk the primary task using visible controls, without query editing, injected storage, or direct-route shortcuts. Use visible scenario controls for exceptional states. Verify reset preserves actual reviewer notes. Declare excluded transitions. When copying a prototype, mark inherited evidence and replace its output paths before checks. Update status at partial handoffs too. D-01E's [review-harness retrospective](../portal-visual/v1/review-harness-retrospective.md) records the owner-entry failure; D-04's [work record](../project-workspace/v5/work-record.md) records the route smoke-check application.
 
+For repository review or preview-runtime changes, supplement module fixtures with a generic Work journey through the real project store, integration, app setup and acceptance. Verify separate submission, integration and build identities, current-head refusal, and session isolation across two candidates. Use [the disposable portal helper](../../../apps/portal/tests/portal-support.mjs) for bounded health waiting, startup logs and child-process teardown; distinguish a startup failure from a failed interaction. At narrow widths, inspect screenshots and the bounds of advertised controls as well as document overflow: clipped controls can pass an overflow assertion. First application: [repository-review evidence](../../evidence/repository-review/README.md). The Biome correction also applies this helper to the editor-bridge test after its fixed startup wait failed under the template suite; the focused rerun passed with bounded health waiting and captured startup evidence.
+
+For a preview trial in a particular app, inventory its accepted repository, runtime and pending submissions first, and use the normal Work lifecycle as the owner entry point; a standalone diagnostic proves app mechanics only. Verify guided destinations inside the Preview tab with real app sessions, and that ordinary app runtime denies fixture setup. Never fabricate live runs or act as the owner: prove the path on a disposable project and leave the live item for the owner. First application: [Biome work record](../biome-review/work-record.md).
+
 For any new or changed collection/detail flow, the executable owner-entry check must contain at least two distinct records. Enter through the collection URL, choose each record using visible controls, reload the detail, return using a visible collection link, and reload the collection. Verify identity and that collection URLs do not render full details by default. Include empty/missing records and browser Back/Forward, filter/scroll and draft restoration when those behaviors are in scope. Do this before mutation/authorization checks; a single-item transaction fixture cannot prove navigation. The [B-03A navigation post-hoc](../../evidence/b-03a-work-navigation.md) records the missed requirement and its first two-item regression application.
 
 Before handing off a multi-page UI, inspect every advertised page at wide and narrow widths against the exact selected design-system foundation. Record hierarchy, component/pattern reuse or deviation, loaded typography/icons, selected-record identity, and the next owner action separately from automated accessibility. Do not defer composition or foundation compliance as “visual polish” when they are required inputs. Tie each behavior claim to an observable transition and affected record: seeing a label, warning, progress number or confirmation alone does not prove aggregation, selection-dependent mutation, preserved backlinks, staleness enforcement or authorization safety. Static composition studies must label drawn controls and cannot inherit interaction evidence from a prior prototype. The [D-04R audit](../project-workspace/v6/work-record.md) applied this check and exposed selection, inert-action and narrow-identity failures missed by D-04's presence assertions.
@@ -129,3 +133,8 @@ The [R-05 retrospective](../../evidence/r-05-retrospective.md) exposed that a br
 ### Revision 4 evidence
 
 The [D-01F groundwork record](../portal-system/v1/work-record.md) applies the acceptance reset and shared-versus-project model after owner correction. The same 24-capability schema describes Aludel and fictional BorrowBox, and seven deliberately invalid records are rejected. This demonstrates structural checks and earlier identification of scope assumptions; UI quality, independent handoff and live tool integration remain unproven.
+
+
+### Revision 5 evidence
+
+The [repository-review implementation](../../evidence/repository-review/README.md) exposed repository-only admission and project-storage identity defects that standalone helper tests missed, plus clipped controls despite an overflow assertion passing. Its real generic Code journey and shared disposable-server helper apply the added checks. The evidence distinguishes observed outcomes from unmeasured disk capacity and owner usability; reuse outside this slice remains to be demonstrated.

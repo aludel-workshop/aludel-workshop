@@ -85,15 +85,15 @@ export class WorkBoardComponent {
   readonly createLink = computed(() => this.layer() ? this.ctx.link(this.layer()!, 'tasks', 'create') : this.ctx.link('work', 'create'));
   readonly tabs: [string, string][] = [['queue', 'Queue'], ['backlog', 'Backlog'], ['done', 'Done']];
   readonly sub = signal('queue');
-  readonly hint: Record<string, string> = { queue: 'Staging puts an item in its assignee\'s batch: yours, or that agent\'s.', backlog: 'Gaps the layers found and work nobody has queued yet. Queue what you want done.', done: 'Cleared work. The records it changed keep the history.' };
+  readonly hint: Record<string, string> = { queue: 'Staging puts an item in its assignee\'s batch: yours, or that agent\'s.', backlog: 'Gaps the layers found and work nobody has queued yet. Queue what you want done.', done: 'Completed runs awaiting review and accepted work. Review is still required before changes apply.' };
   readonly empty: Record<string, string> = { queue: 'Nothing queued. Queue items from the backlog.', backlog: 'Nothing in the backlog.', done: 'Nothing done yet.' };
   private readonly allWork = computed(() => this.ctx.data()?.work || []);
   private readonly work = computed(() => { const layer = this.layer(); return layer ? this.allWork().filter(item => item.layer === layer) : this.allWork(); });
   private readonly filtered = computed(() => { const who = this.ctx.boardFilter(); return who ? this.work().filter(item => item.assignee?.id === who) : this.work(); });
-  readonly counts = computed(() => ({ queue: this.filtered().filter(item => item.status === 'queued').length, backlog: this.filtered().filter(item => item.status === 'backlog').length, done: this.filtered().filter(item => item.status === 'done').length } as Record<string, number>));
+  readonly counts = computed(() => ({ queue: this.filtered().filter(item => item.status === 'queued').length, backlog: this.filtered().filter(item => item.status === 'backlog').length, done: this.filtered().filter(item => ['review', 'done'].includes(item.status)).length } as Record<string, number>));
   readonly list = computed(() => {
     const status = this.sub() === 'queue' ? 'queued' : this.sub();
-    const items = this.filtered().filter(item => item.status === status);
+    const items = this.filtered().filter(item => status === 'done' ? ['review', 'done'].includes(item.status) : item.status === status);
     return status === 'done' ? items.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) : items.sort(byPriority);
   });
   readonly people = computed<Assignee[]>(() => [...(this.ctx.data()?.members || []).map(member => ({ kind: 'person' as const, id: member.id })),
