@@ -13,6 +13,9 @@ export function hostTopology(environment = process.env, listenPort = 4310) {
   return {
     baseDomain,
     portalOrigin: origin(portalHost),
+    // Every origin the portal answers on: its own host and the loopback names it also accepts (localhost, 127.0.0.1).
+    // Layer frames must allow all of them as ancestors, or a portal opened at http://localhost:4310 can't show any layer.
+    portalOrigins: [origin(portalHost), ...[...legacyPortalHosts].map(host => origin(host))],
     appOrigin: slug => origin(`${slug}.${baseDomain}`),
     // LAYER-BASE-01 B6: each layer instance's own views, served into a sandboxed frame from that instance's own origin.
     layerOrigin: label => origin(`${label}.layers.${baseDomain}`),

@@ -104,7 +104,7 @@ initLayerDiscovery(db);
 const secrets = openSecretStore(dataDirectory);
 const topology = hostTopology(process.env, port);
 // A layer's views may embed their own project's running app (the Pages Built view), never the portal.
-const views = layerUi({ dataDirectory, layerOrigin: topology.layerOrigin, portalOrigin: topology.portalOrigin, appOriginFor: label => {
+const views = layerUi({ dataDirectory, layerOrigin: topology.layerOrigin, portalOrigin: topology.portalOrigin, portalOrigins: topology.portalOrigins, appOriginFor: label => {
   const instance = db.prepare("SELECT project_id FROM layer_instances WHERE 'i-' || replace(instance_id, '-', '') = ?").get(label);
   const row = instance && db.prepare('SELECT slug FROM projects WHERE id = ?').get(instance.project_id);
   return row ? topology.appOrigin(row.slug) : null; } });
@@ -200,8 +200,14 @@ let importing = null;
 const importer = () => importing ||= codeImport({ db, github, importRoot: join(dataDirectory, 'imports'),
   afterInstall: projectId => { codeRepo.seed(projectId, pool.outputEntries); codeRepo.refresh(projectId); },
   sync: async projectId => { const code = codeRemote(projectId); return code ? remotes.sync(projectId, code.key) : null; } });
-// Existing projects: Code's generation links and releases move into its repository once (idempotent).
-for (const projectId of layerProjects()) try { if (codeRepo.layer(projectId)) { codeRepo.adopt(projectId); codeRepo.seed(projectId, pool.outputEntries); } } catch (error) { console.error(`Could not adopt Code's records for ${projectId}: ${error.message}`); }
+// Existing projects: Code installs into each project's repository, then its generation links and releases move there once
+// and its starter docs are seeded (all idempotent). It runs once the portal is listening, so a restart isn't held up.
+function adoptCodeRepositories() {
+  for (const projectId of layerProjects()) try {
+    ensureProjectRepositoryLayers(db, projectId);
+    if (codeRepo.layer(projectId)) { codeRepo.adopt(projectId); codeRepo.seed(projectId, pool.outputEntries); }
+  } catch (error) { console.error(`Could not move Code into ${projectId}'s repository: ${error.message}`); }
+}
 // Closing a Reconcile item relinks the record's generation links in Code's repository too.
 know.onWorkDone(({ projectId, item }) => { const recordId = item.type === 'reconcile' && item.context?.reconcile?.recordId; if (recordId) try { codeRepo.relink(projectId, recordId); } catch (error) { console.error(`Relink in Code's repository failed: ${error.message}`); } });
 const storyRefs = projectId => know.list(projectId, 'story').map(story => ({ ...story, ref: `S${story.number}` }));
@@ -1650,6 +1656,7 @@ async function handle(request, response, target) {
 }
 
 server.listen(port, host, () => {
+  setImmediate(adoptCodeRepositories);
   console.log(`Aludel is running at ${topology.portalOrigin} (also http://${host}:${port})`);
   console.log(`Project apps are served at ${topology.appOrigin('<app>')}`);
   console.log(`Database: ${databasePath}`);

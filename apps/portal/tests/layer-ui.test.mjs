@@ -50,7 +50,7 @@ test('each layer instance has its own frame origin, distinct from the portal and
 test('built views are served sandboxed, may embed only their project\'s app, and never outside the build', () => {
   const data = mkdtempSync(join(tmpdir(), 'aludel-layer-ui-'));
   try {
-    const ui = layerUi({ dataDirectory: data, layerOrigin: label => `http://${label}.layers.localhost:4310`, portalOrigin: 'http://aludel.localhost:4310',
+    const ui = layerUi({ dataDirectory: data, layerOrigin: label => `http://${label}.layers.localhost:4310`, portalOrigin: 'http://aludel.localhost:4310', portalOrigins: hostTopology({}, 4310).portalOrigins,
       appOriginFor: label => label === 'i-aaaa' ? 'http://tool-share.localhost:4310' : null });
     const build = join(data, 'layer-ui', 'b'.repeat(32));
     mkdirSync(join(build, 'assets'), { recursive: true });
@@ -62,7 +62,8 @@ test('built views are served sandboxed, may embed only their project\'s app, and
     assert.match(csp, /^sandbox allow-scripts allow-forms allow-same-origin allow-downloads;/);
     assert.match(csp, /connect-src 'none'/); assert.match(csp, /form-action 'none'/);
     assert.match(csp, /frame-src http:\/\/tool-share\.localhost:4310;/);
-    assert.match(csp, /frame-ancestors http:\/\/aludel\.localhost:4310$/);
+    // The portal answers on localhost and 127.0.0.1 too; a layer opened there must still show (owner report, 2026-10-02).
+    assert.match(csp, /frame-ancestors http:\/\/aludel\.localhost:4310 http:\/\/127\.0\.0\.1:4310 http:\/\/localhost:4310 http:\/\/\[::1\]:4310$/);
     assert.match(respond(`/${'b'.repeat(32)}/index.html`, 'i-bbbb').headers['content-security-policy'], /frame-src 'none'/, 'an unknown instance embeds nothing');
     assert.equal(respond(`/${'b'.repeat(32)}/assets/a.js`).headers['content-security-policy'], undefined);
     assert.equal(respond(`/${'b'.repeat(32)}/../../../etc/passwd`).status, 404);

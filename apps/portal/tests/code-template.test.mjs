@@ -196,3 +196,40 @@ test('T03-CODE: starter docs come from the template\'s seed, once, matching what
   assert.equal(git(workspace, 'log', '-1', '--format=%an %s'), 'Aludel Starter docs for Code');
   assert.deepEqual(code.seed(id, pool.outputEntries).written, [], 'the install seed runs once');
 });
+
+test('T03-CODE: a coding run on Code\'s repository goes through the generic layer path; .env, CI and anything outside the writable set are refused', { skip: !templates }, async () => {
+  const { commitLayerBranch, mergeLayerBranch, settleLayerCheckout } = await import('../server/layer-source.mjs');
+  const context = fixture();
+  const { db, code, id, workspace, root } = context;
+  start(context);
+  ensureProjectRepositoryLayers(db, id);
+  const { manifest, commit } = generate(context);
+  code.settleLocal(id); code.recordManifest(id, manifest, commit.commit);
+  const base = git(workspace, 'rev-parse', 'main');
+  // A local stand-in for the run's sandbox: the repository at the run's base, in layer/ of its workspace.
+  const run = join(root, 'run');
+  git(root, 'clone', '-q', workspace, join(run, 'layer'));
+  const sandbox = join(run, 'layer');
+  git(sandbox, 'config', 'user.email', 'agent@example.com'); git(sandbox, 'config', 'user.name', 'Agent');
+  const attempt = (name, files) => {
+    git(sandbox, 'reset', '-q', '--hard', base); git(sandbox, 'clean', '-qfdx');
+    for (const [path, body] of Object.entries(files)) { mkdirSync(join(sandbox, path, '..'), { recursive: true }); writeFileSync(join(sandbox, path), body); }
+    return () => commitLayerBranch(db, { projectId: id, key: 'platform', attemptId: `att-${name}-0000000000`, workspace: run, base, workRef: 'W-7', message: name });
+  };
+  // The app ignores .env files, so one never reaches the branch; an agent that also un-ignores it is refused by the host.
+  const ignored = attempt('ignored', { 'src/app.ts': git(workspace, 'show', 'main:src/app.ts') + '\n// ignored env\n', '.env.local': 'SECRET=1\n' })();
+  assert.deepEqual(ignored.files.map(file => file.path), ['src/app.ts'], 'an ignored .env file is not committed');
+  assert.throws(attempt('env', { '.gitignore': 'node_modules/\n', '.env.local': 'SECRET=1\n' }), /may not change \.env\.local/);
+  assert.throws(attempt('ci', { '.github/workflows/ci.yml': 'name: ci\n' }), /may not change \.github\/workflows\/ci\.yml/);
+  assert.throws(attempt('outside', { '.aludel/notes.txt': 'x\n' }), /may not change \.aludel\/notes\.txt/);
+  const branch = attempt('ok', { 'src/app.ts': git(workspace, 'show', 'main:src/app.ts') + '\n// a reviewed change\n', '.aludel/knowledge/units.md': '# Code units\n\nRevised.\n' })();
+  assert.deepEqual(branch.files.map(file => [file.path, file.ownerReview]).sort(), [['.aludel/knowledge/units.md', false], ['src/app.ts', false]]);
+  const handler = attempt('handler', { '.aludel/server/code-index.mjs': git(workspace, 'show', 'main:.aludel/server/code-index.mjs') + '\n// changed\n' })();
+  assert.deepEqual(handler.files.map(file => [file.path, file.ownerReview]), [['.aludel/server/code-index.mjs', true]], 'what runs on the host is marked for review');
+  // Accepting merges into main, and the pin moves with it.
+  const merged = mergeLayerBranch(db, { projectId: id, key: 'platform', source: branch, reviewer: 'Ada', workId: 'w-1', workRef: 'W-7', catalogs, recordsOf: () => [] });
+  settleLayerCheckout(merged);
+  assert.equal(git(workspace, 'rev-parse', 'main'), merged.commit);
+  assert.match(readFileSync(join(workspace, 'src/app.ts'), 'utf8'), /a reviewed change/);
+  assert.equal(db.prepare("SELECT accepted_commit AS c FROM layer_package_bindings WHERE project_id = ? AND layer_key = 'platform'").get(id).c, merged.commit);
+});

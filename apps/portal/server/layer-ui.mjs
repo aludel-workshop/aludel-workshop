@@ -22,7 +22,7 @@ const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; ch
 // Each instance's views are served from `i-<instance>.layers.<base>`: a real origin of their own, so a nested app preview
 // keeps its origin and one layer's browser storage never meets another's; the portal's session cookie is host-only.
 export const frameLabel = instanceId => `i-${String(instanceId).replace(/-/g, '')}`;
-export function layerUi({ dataDirectory, layerOrigin, portalOrigin, appOriginFor = () => null }) {
+export function layerUi({ dataDirectory, layerOrigin, portalOrigin, portalOrigins = [portalOrigin], appOriginFor = () => null }) {
   const cacheRoot = resolve(dataDirectory, 'layer-ui');
   const sources = new Map();
   const viewsDigest = (repo, commit, ui, root = '') => {
@@ -82,7 +82,7 @@ export function layerUi({ dataDirectory, layerOrigin, portalOrigin, appOriginFor
     // Sandboxed even when opened directly; no network, forms or top navigation; may embed only its own project's app.
     const app = appOriginFor(label);
     if (ext === '.html') headers['content-security-policy'] = `sandbox allow-scripts allow-forms allow-same-origin allow-downloads; default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; ` +
-      `font-src 'self'; img-src blob: data:; connect-src 'none'; form-action 'none'; base-uri 'none'; frame-src ${app || "'none'"}; frame-ancestors ${portalOrigin}`;
+      `font-src 'self'; img-src blob: data:; connect-src 'none'; form-action 'none'; base-uri 'none'; frame-src ${app || "'none'"}; frame-ancestors ${portalOrigins.join(' ')}`;
     response.writeHead(200, headers);
     response.end(body);
   }

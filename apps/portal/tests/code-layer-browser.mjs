@@ -52,6 +52,7 @@ try {
 
   // ---- Overview → Explorer down to a unit, read only ----
   await view.getByRole('heading', { name: 'Structure' }).waitFor({ timeout: 60000 });
+  await view.getByRole('region', { name: 'GitHub' }).getByText(/Not on GitHub yet/).waitFor();
   await view.getByRole('button', { name: /API server/ }).click();
   await view.getByRole('link', { name: 'POST /api/sign-up' }).first().click();
   await view.getByRole('heading', { name: 'POST /api/sign-up', level: 2 }).waitFor();

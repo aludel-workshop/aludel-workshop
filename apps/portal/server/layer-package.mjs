@@ -188,13 +188,16 @@ function readPackage(repo, commit, key) {
 }
 // Forks the layer's template into this instance's own repository. Its `main` starts at the template commit; an install
 // commit makes the manifest this instance's (key, name, path) when they differ. `main` is what the host builds and serves.
-export function ensureLayerPackage(db, projectId, key, { template = null, name = null, path = null, charter = null } = {}) {
+export function ensureLayerPackage(db, projectId, key, { template = null, name = null, path = null, charter = null, intoProjectRepository = false } = {}) {
   const pin = configured(key, template);
   if (!pin) return null;
   const existing = binding(db, projectId, key);
   if (existing) return packageAt(existing.repo, existing.commit, key);
   // A layer that lives in the project's repository waits for that repository, and is installed into it (one commit on main).
+  // Only when asked (ensureProjectRepositoryLayers): installing commits to the project's repository, which start-up seeding
+  // must not do before the portal is listening.
   if (JSON.parse(git(pin.repo, 'show', `${pin.commit}:layer.json`)).install === 'project-repository') {
+    if (!intoProjectRepository) return null;
     let workspace = null;
     try { workspace = db.prepare('SELECT workspace_path AS path FROM project_setup WHERE project_id = ?').get(projectId)?.path; } catch { /* no project setup here: no repository yet */ }
     if (!workspace || !existsSync(join(workspace, '.git'))) return null;
@@ -307,7 +310,7 @@ export function ensureProjectRepositoryLayers(db, projectId) {
     let manifest;
     try { manifest = JSON.parse(git(resolve(candidate, config.repo), 'show', `${pin.commit}:layer.json`)); } catch { continue; }
     if (manifest.install !== 'project-repository' || !db.prepare('SELECT 1 FROM layer_instances WHERE project_id = ? AND layer_key = ?').get(projectId, key)) continue;
-    const pkg = ensureLayerPackage(db, projectId, key);
+    const pkg = ensureLayerPackage(db, projectId, key, { intoProjectRepository: true });
     if (!pkg) continue;
     db.prepare('UPDATE layer_definitions SET output_tabs_json = ?, package_commit = ? WHERE project_id = ? AND layer_key = ? AND built_in = 1 AND package_commit IS NULL')
       .run(JSON.stringify(pkg.manifest.tabs), pkg.commit, projectId, key);
