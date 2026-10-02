@@ -37,6 +37,22 @@ Record each run's start here before executing.
 ### Run log
 
 - **2026-10-01, run 1 (Claude, VS Code chat).** The owner said "start t03 code". Scope is exactly the authorization above: local code, tests, previews and evidence on `main` of this repository (from `53fcb92`), a new `code` branch and G-CODE commits on `layer-base` `main` (from `fee5f30`), and disposable local repositories. GitHub is exercised only against a fake GitHub. No live GitHub writes started by the agent, no provider turns, deployment, spending or live owner data. Order: ledger → G-CODE → `code` template → parity → host wiring → checks → closeout; the owner's live round trip comes after the fake-GitHub journey passes.
+- **2026-10-02, run 1 checkpoint (in progress).** Done so far, each tested on a non-Code fixture (a base-template layer under `.aludel/` in a plain repository):
+  - **Ledger:** `layer-base` `code` has `docs/migration-ledger.md` and `docs/source-inventory.md`. Rows marked *pending* are settled at closeout.
+  - **G-CODE, all six:**
+    - base contract at `layer-base` `main` `e8490b4` (from `fee5f30`);
+    - host commits `a6fcdd3` (package root, install into an existing repository, writable set) and `3d50317` (host index library `source-units.mjs`, `doc-checks.mjs` plus Knowledge repository docs, `layer-remote.mjs` sync).
+  - **Template `code`** at `73aef0e`: manifest (instance key `platform`), charter, methods, the `code-index.mjs` indexer and rules with tests, and `knowledge.docs`. **Not yet built:** `ui/`, the Code-owned adapter, `seed('install')` for starter docs, and pins.
+  - **Checks:** templates off 271 pass, 0 fail, 24 skips. Templates on 287 pass, 7 skips and 1 failure; the failure (a changed refusal message in `layer-docs.test.mjs`) was fixed and its file rerun clean. A full rerun is still owed.
+  - **Decisions taken in this run**, for the owner to see at closeout:
+    1. Manifest paths, tests and the run sandbox's `.aludel/outputs/` copy are all relative to the package root.
+    2. `files.repository` (globs) names repository files as output, never `.env*`, `.git/` or `.github/workflows/`. `files.units` (globs) asks for host-parsed units. Code uses `src/**`, `server/**` and `tests/**`, so units match today's `code_units` with the same `cu-` IDs.
+    3. Trace links and releases are `.aludel/outputs/trace-links.json` and `.aludel/outputs/releases.json`, not the brief's `.aludel/trace-links.json`, to keep the `outputs/` convention.
+    4. Repository docs are addressed in Knowledge with a leading `/`.
+    5. **Deviation to confirm:** a GitHub fast-forward that touches `.aludel/` authority files is held whole until a person accepts it. The brief said the host keeps running the last reviewed handler while the rest moves; an unreviewed indexer can't index, so holding the whole change is the safe reading.
+    6. Saves into a nested package refuse a dirty checked-out `main`. Found while testing: the scaffold's next `git add -A` commit would otherwise undo a Knowledge save.
+  - **Found, pre-existing:** `symphony-proposals.test.mjs` gave a spawned portal 5 s to start. Under full-suite load that timed out; start-up itself is unchanged at about 1.5 s. The wait is now 30 s.
+  - **Next:** step 3's views, adapter and seed. Views need new host features for repository files, re-index, release drafts and CI. `frameAllows` only lets GETs through a fixed list, so read features need a generic change there. Then parity (step 4), host wiring with GitHub sync on the project's repository binding (step 5), and checks (step 6).
 
 ## Fixed decisions you must not reopen
 
