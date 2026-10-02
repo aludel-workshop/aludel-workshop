@@ -78,7 +78,7 @@ One packet at a time. B-03's worker/artifact/recovery work remains required and 
 
 ## Current facts and evidence
 
-- 2026-10-01: **Candidate promoted to `main` (DEC-062).** Merge `1c17c48`, launcher `1e425a2`. Live data was backed up, both server suites pass, and the copied-data rehearsal preserved every record. Details are under Next action.
+- 2026-10-01: **Candidate promoted to `main` (DEC-062).** Merge `1c17c48`, launcher `1e425a2`. Live data was backed up, both server suites pass, and the copied-data rehearsal preserved every record. [Evidence and retrospective](evidence/promotion-2026-10-01.md).
 - 2026-10-01: **LAYER-KNOWLEDGE-01 owner-accepted; T03-CODE brief written.** The owner accepted the built Knowledge UI in chat, which closes LAYER-BINDINGS-01 and LAYER-KNOWLEDGE-01 locally. [The T03-CODE brief](design/layer-app-transition/t03-code-brief.md) adds a contract-assumption check before the recipe. Code is the first layer whose repository is not Aludel-shaped. Owner plan approval is pending.
 - 2026-10-01: **LAYER-KNOWLEDGE-01 built locally.** Knowledge is the layer's docs site (Docs, then Information with a card per binding). Docs and spec are saved to the layer repository at once, with history. Bindings are proposed by ticking parts of the tree. Compare specs replaces hints. Pages has a Kit tab. Suites and 13 journeys pass. [Evidence](evidence/layer-knowledge-01/README.md).
 - 2026-10-01: **Step 3 reviewed by the owner; LAYER-KNOWLEDGE-01 proposed.** [Brief](design/layer-knowledge/work-record.md): spec, contents and docs in a docs-site Knowledge tab; bindings by selecting spec nodes; Compare specs replaces hints; Manage › Connections and Facets go.
