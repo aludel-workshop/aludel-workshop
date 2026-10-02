@@ -17,7 +17,7 @@ supersedes: "facet-splitting plan of 2026-10-01 (areas inside facets), rejected 
 
 Earlier the same day the owner said existing projects don't matter (only disposable tests exist), and asked for the general case rather than the Branding example.
 
-This document is the plan. It is step 3 of [the work record](work-record.md). **R1 (the pure contract) was built and agent-checked on 2026-10-01** ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r1.md)); R2–R5 aren't built. The owner accepted the defaults and R1's behaviour on 2026-10-01 (work record, decision 7). R1 settled some details differently from this text, and the evidence lists them: `notIn` in `where`; one field per kind; ceded participants offering their content once; a ceded facet taking authority back; narrow replicas using `added: ignore`.
+This document is the plan. It is step 3 of [the work record](work-record.md). **R1 (the pure contract) was built and agent-checked on 2026-10-01** ([evidence](../../evidence/layer-bindings-01/refaceting-r1.md)); R2–R5 aren't built. The owner accepted the defaults and R1's behaviour on 2026-10-01 (work record, decision 7). R1 settled some details differently from this text, and the evidence lists them: `notIn` in `where`; one field per kind; ceded participants offering their content once; a ceded facet taking authority back; narrow replicas using `added: ignore`.
 
 ## The idea in one paragraph
 
@@ -153,4 +153,4 @@ Unrelated layers may still choose the same kind names (two layers with `persona`
 
 ## Readiness
 
-R1 is built and owner-accepted. R2 (Work as the vehicle) is built and agent-checked ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r2.md)). R3 (host: roles in reads, the write guard, kinds per instance, a reference index) is built and agent-checked ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r3.md)). R4 (views) is built and agent-checked ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r4.md)). R5 (overlap and journeys) is built and agent-checked ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r5.md)). Step 3 awaits the owner's browser review. Nothing depends on existing projects.
+R1 is built and owner-accepted. R2 (Work as the vehicle) is built and agent-checked ([evidence](../../evidence/layer-bindings-01/refaceting-r2.md)). R3 (host: roles in reads, the write guard, kinds per instance, a reference index) is built and agent-checked ([evidence](../../evidence/layer-bindings-01/refaceting-r3.md)). R4 (views) is built and agent-checked ([evidence](../../evidence/layer-bindings-01/refaceting-r4.md)). R5 (overlap and journeys) is built and agent-checked ([evidence](../../evidence/layer-bindings-01/refaceting-r5.md)). Step 3 awaits the owner's browser review. Nothing depends on existing projects.

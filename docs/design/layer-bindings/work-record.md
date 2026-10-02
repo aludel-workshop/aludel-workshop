@@ -124,7 +124,7 @@ Layers stay simple. They publish facets to the Library, accept Work, own their a
 
 ## Proposed implementation order (after owner review)
 
-1. **Contract** — *built 2026-10-01, agent-checked ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/README.md)):*
+1. **Contract** — *built 2026-10-01, agent-checked ([evidence](../../evidence/layer-bindings-01/README.md)):*
    - facet declarations and role support in `layer.json`;
    - the binding record and its API in the Work layer;
    - the baseline, policy and correspondence evaluation as a pure module, with fixtures for every walkthrough above, including a third participant joining and an authority transfer re-pointing adapters (no UI).
@@ -134,7 +134,7 @@ Layers stay simple. They publish facets to the Library, accept Work, own their a
    - A token change auto-applies and is recorded.
    - Library › Bindings shows the binding.
    - Browser journey.
-3. **Refaceting** — *R1 (pure contract) built and owner-accepted 2026-10-01 ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r1.md)); R2 (Work as the vehicle) built and committed ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r2.md)); R3 (roles in the host) built and committed ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r3.md)); R4 (roles in the views) built and committed ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r4.md)); R5 (overlap and journeys) built and agent-checked ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r5.md)). **Step 3 is built; the owner's browser review is next.*** (owner 2026-10-01; replaces "roles in views" and a rejected areas-inside-facets plan): a layer's facets can be split, merged or renamed as reviewed Work, so a binding always contracts on exactly the matching part. A partial overlap with a new, unrelated layer is a chain of Work: assess overlap → refacet each side → propose binding → accept. Planned in [refaceting.md](refaceting.md).
+3. **Refaceting** — *R1 (pure contract) built and owner-accepted 2026-10-01 ([evidence](../../evidence/layer-bindings-01/refaceting-r1.md)); R2 (Work as the vehicle) built and committed ([evidence](../../evidence/layer-bindings-01/refaceting-r2.md)); R3 (roles in the host) built and committed ([evidence](../../evidence/layer-bindings-01/refaceting-r3.md)); R4 (roles in the views) built and committed ([evidence](../../evidence/layer-bindings-01/refaceting-r4.md)); R5 (overlap and journeys) built and agent-checked ([evidence](../../evidence/layer-bindings-01/refaceting-r5.md)). **Step 3 is built; the owner's browser review is next.*** (owner 2026-10-01; replaces "roles in views" and a rejected areas-inside-facets plan): a layer's facets can be split, merged or renamed as reviewed Work, so a binding always contracts on exactly the matching part. A partial overlap with a new, unrelated layer is a chain of Work: assess overlap → refacet each side → propose binding → accept. Planned in [refaceting.md](refaceting.md).
 4. **Code ⇄ Pages** after T03-CODE publishes observations, replacing the hard-coded reconciliation.
 
 ## Owner decisions (2026-10-01)
@@ -226,7 +226,7 @@ The contract is agreed, so step 1 is ready for a new session. The proof for step
 | Base layer contract (add facets and roles) | `layer-base` `main` `docs/layer-contract.md` |
 | T03 evidence and lessons | `pages-template-candidate/docs/evidence/t03-design/`, `t03-design-seed-adapt/` |
 
-**Step 1 is built** ([evidence and retrospective](../../../pages-template-candidate/docs/evidence/layer-bindings-01/README.md)). Its working-tree changes are uncommitted in both repositories until the owner asks for a commit:
+**Step 1 is built** ([evidence and retrospective](../../evidence/layer-bindings-01/README.md)). Its working-tree changes are uncommitted in both repositories until the owner asks for a commit:
 - `pages-template-candidate`: `apps/portal/server/bindings.mjs` and `binding-records.mjs`, the `layer-package.mjs` facet check, the `server.mjs` routes, `tests/bindings.test.mjs`, `tests/binding-records.test.mjs` and `tests/fixtures/binding-walkthroughs.json`;
 - `layer-base` `main`: `docs/layer-contract.md` and `tests/contract.test.mjs`.
 
@@ -234,25 +234,25 @@ Commit `layer-base` `main` before forking the Design and Pages branches from it.
 
 **Step 2 is built** (same evidence). The candidate's step-2 changes are uncommitted; the `layer-base` commits above exist because pins require them, and nothing was pushed.
 
-**Step 3, refaceting: R1 is built** ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r1.md)). It is uncommitted in the candidate. The owner accepted its defaults and behaviour changes (decision 7). **R2 is built and committed** ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r2.md)):
+**Step 3, refaceting: R1 is built** ([evidence](../../evidence/layer-bindings-01/refaceting-r1.md)). It is uncommitted in the candidate. The owner accepted its defaults and behaviour changes (decision 7). **R2 is built and committed** ([evidence](../../evidence/layer-bindings-01/refaceting-r2.md)):
   - every binding change and refacet is a Work item the owner decides;
   - Library › Bindings decides them;
   - a refacet is a reviewed `layer.json` branch merged through `mergeLayerBranch`;
   - `detached` is persisted, and a facet takes part in one live binding;
   - an overlap chain is a binding proposal blocked by its refacets.
 
-**R3 is built and committed** ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r3.md)):
+**R3 is built and committed** ([evidence](../../evidence/layer-bindings-01/refaceting-r3.md)):
   - roles in Library and API reads;
   - the write guard on every API write;
   - kinds per instance;
   - a data-scan reference index in the refacet preflight.
 
-**R4 is built and committed** ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r4.md)); the `layer-base` commits are local (`main` `b8994b7`, `design` `a924ed2`, `vision` `15eac6f`).
+**R4 is built and committed** ([evidence](../../evidence/layer-bindings-01/refaceting-r4.md)); the `layer-base` commits are local (`main` `b8994b7`, `design` `a924ed2`, `vision` `15eac6f`).
   - `@aludel/host/roles` (layer-relative: views never name their own layer);
   - the base contract's requirement and test;
   - Design and Vision show each facet's role.
 
-**Follow-ups F1–F12 are listed in [Follow-ups](#follow-ups-kept-here-so-they-arent-lost).** **R5 is built** ([evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r5.md)):
+**Follow-ups F1–F12 are listed in [Follow-ups](#follow-ups-kept-here-so-they-arent-lost).** **R5 is built** ([evidence](../../evidence/layer-bindings-01/refaceting-r5.md)):
   - `declare` for layers with no facets;
   - `refers` and re-point Work;
   - adopt naming its result;
@@ -289,13 +289,13 @@ Lessons from the T03 runs:
 ### Run log
 
 - **2026-10-01, step 1 started (Claude Code session).** Owner chat: "pick it up and get started" on the binding system, within the handoff's authorization above (local code, tests and evidence in `pages-template-candidate` at `f3b6ecb` and `layer-base` branches; no GitHub, provider, deployment, spending or live owner data). Scope of this run: step 1 only (facet and role declarations in the base contract and manifest validation; the binding record and its API; the pure evaluation module with fixtures for all six walkthroughs, a third participant joining and an authority transfer). Step 2 is not started in this run.
-- **2026-10-01, step 1 complete (agent-checked).** Pure module, record and API, base contract and fixtures were built. The 17 new tests pass; the server suite passes 240/240, and the templates suite has 233 passing, 7 skipped and none failing. Pins are unchanged and their per-pin checks pass. The `peer` role is defined for owner confirmation. Pages-as-authority needs Pages to publish its kit (open). [Evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/README.md).
+- **2026-10-01, step 1 complete (agent-checked).** Pure module, record and API, base contract and fixtures were built. The 17 new tests pass; the server suite passes 240/240, and the templates suite has 233 passing, 7 skipped and none failing. Pins are unchanged and their per-pin checks pass. The `peer` role is defined for owner confirmation. Pages-as-authority needs Pages to publish its kit (open). [Evidence](../../evidence/layer-bindings-01/README.md).
 - **2026-10-01, drift model and step 2 started (Claude Code session).** The owner replaced `peer` with authority direction plus drift handling (decision 5) and said to "go ahead and start step 2". Scope: rework the step-1 module and fixtures for drift; then step 2 (Design and Pages facets; local commits on `layer-base` `main`, `design` and `pages` and re-pins, which pins require; no push; snapshot reader; Discover; Watch; Library › Bindings; browser journey). Same exclusions as above.
-- **2026-10-01, step 2 complete (agent-checked).** Drift replaced `peer` in the pure module, fixtures and base contract. Pages keeps a replica of the app kit (`kit_item`), filled by its declared `aludel-kit` adapter, run by the handler's `adapt`. Design declares its kit facet. Commits on `layer-base`: `main` `20bdd95`, `design` `cd96d4c`, `pages` `331908f`, pinned in the candidate. Discover, Watch, the hold while a participant is off, and Library › Bindings are built. Results: the server suites pass with templates off (241, 2 skipped) and on (236, 7 skipped); the new `bindings` journey and eight other journeys pass. Owner review of Library › Bindings and Pages' replica behaviour is pending. [Evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/README.md#step-2-the-design-system-binding-end-to-end).
+- **2026-10-01, step 2 complete (agent-checked).** Drift replaced `peer` in the pure module, fixtures and base contract. Pages keeps a replica of the app kit (`kit_item`), filled by its declared `aludel-kit` adapter, run by the handler's `adapt`. Design declares its kit facet. Commits on `layer-base`: `main` `20bdd95`, `design` `cd96d4c`, `pages` `331908f`, pinned in the candidate. Discover, Watch, the hold while a participant is off, and Library › Bindings are built. Results: the server suites pass with templates off (241, 2 skipped) and on (236, 7 skipped); the new `bindings` journey and eight other journeys pass. Owner review of Library › Bindings and Pages' replica behaviour is pending. [Evidence](../../evidence/layer-bindings-01/README.md#step-2-the-design-system-binding-end-to-end).
 - **2026-10-01, step 2 accepted by the owner.** The owner reviewed it in a browser on a disposable templates-on portal (port 4330, seeded Tool Share project): "finished. looks good. like the way that bindings came out." Step 2 is owner-accepted. Not exercised in that review: Adopt/Rectify (there is no UI path to cause drift); the existing-projects question stays open.
 - **2026-10-01, step 3 replanned (owner).** The owner asked for a general process to split any part of a layer (for example part of Vision into its own layer) instead of a one-off Branding split, and said existing projects don't matter (disposable tests only). Work so far is committed: candidate `cd86e29`, workshop `9e8ad8f`. The plan was first written as facet-splitting.md, then rejected the same day in favour of [refaceting.md](refaceting.md); nothing is built yet.
 - **2026-10-01, step 3 R1 started (Claude Code session).** Owner chat: "pick up step 3 of our current plan please". The plan's four proposed defaults have not been answered explicitly, so this run applies them as proposed and reversible, and reports them for confirmation. Scope: R1 only, the pure contract in `pages-template-candidate`: facet `select` with `where`, distinctness and entry → facet resolution; bindings without areas or `keeps`; ceded participants offering their content once; pure `refacet` (split, merge, rename) with binding follow-through and preflight; re-point pairs; fixtures for every case in the plan with the order-reversal and mutation checks. Pinned templates keep `kinds` as shorthand for whole-kind clauses, so no `layer-base` commit or re-pin happens in this run. The callers that relied on areas (`binding-records.mjs`, `binding-routines.mjs` snapshots, the Library › Bindings wiring type) are adjusted only as far as the changed contract requires. R2–R5, GitHub, provider, deployment, spending and live owner data are excluded.
-- **2026-10-01, step 3 R1 complete (agent-checked).** The pure contract, the refacet cases and the rule tests are built: 30 binding and refacet tests, order reversal, and 14 of 14 mutations caught. Server suites: 256 pass, 2 skipped (templates off); 251 pass, 7 skipped (templates on). Per-pin UI checks, typecheck and build pass, and step 2's nine browser journeys pass. Pins are unchanged and nothing is committed. [Evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r1.md).
+- **2026-10-01, step 3 R1 complete (agent-checked).** The pure contract, the refacet cases and the rule tests are built: 30 binding and refacet tests, order reversal, and 14 of 14 mutations caught. Server suites: 256 pass, 2 skipped (templates off); 251 pass, 7 skipped (templates on). Per-pin UI checks, typecheck and build pass, and step 2's nine browser journeys pass. Pins are unchanged and nothing is committed. [Evidence](../../evidence/layer-bindings-01/refaceting-r1.md).
 - **2026-10-01, R1 accepted; R2 started (Claude Code session).** Owner chat: "accepting the 4 defaults. confirm behaivor changes. commit and start r2" (decision 7). R1 was committed in the candidate and the workshop.
   - Scope of R2, in `pages-template-candidate` only:
     - binding changes as Work items, applied when the Work is accepted;
@@ -312,7 +312,7 @@ Lessons from the T03 runs:
   - typecheck, build and per-pin checks pass;
   - step 2's nine browser journeys pass, `bindings` now also checking that Accept closes Discover's item and that the new routes answer.
 
-  Uncommitted. [Evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r2.md).
+  Uncommitted. [Evidence](../../evidence/layer-bindings-01/refaceting-r2.md).
 - **2026-10-01, R2 committed; R3 started (Claude Code session).** Owner chat: "go", in reply to "commit R2 and go on to R3?". R2 was committed in the candidate.
   - Scope of R3, in `pages-template-candidate` only:
     - each entry's role (facet, role, binding, authority) in Library entries and in the layer API's reads;
@@ -326,7 +326,7 @@ Lessons from the T03 runs:
   - suites at 257 pass, 13 skipped (templates off) and 263 pass, 7 skipped (templates on), none cancelled;
   - typecheck, build, per-pin checks and step 2's nine browser journeys pass.
 
-  A first full run hung for about 25 minutes on a startup crash that a test had hidden; it was fixed, and the suites now time out per test. Uncommitted. [Evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r3.md).
+  A first full run hung for about 25 minutes on a startup crash that a test had hidden; it was fixed, and the suites now time out per test. Uncommitted. [Evidence](../../evidence/layer-bindings-01/refaceting-r3.md).
 - **2026-10-01, R3 committed; R4 started (Claude Code session).** Owner chat: "go for it", in reply to "Should I commit R3 and start R4?". R3 was committed in the candidate.
   - Scope of R4:
     - a host SDK roles module (`@aludel/host/roles`) that views use to show an entry's role: read-only with "Propose a change" for a replica, a pointer with read-only history for ceded, full editing for the authority;
@@ -339,7 +339,7 @@ Lessons from the T03 runs:
   - suites at 257 pass (templates off) and 264 pass (templates on), none failing or cancelled;
   - typecheck, build, per-pin checks and all 10 journeys pass.
 
-  Uncommitted in the candidate. [Evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r4.md).
+  Uncommitted in the candidate. [Evidence](../../evidence/layer-bindings-01/refaceting-r4.md).
 - **2026-10-01, R4 committed; follow-ups recorded; R5 started (Claude Code session).** Owner chat: "yep, just make sure you're noting any of that follow up work somewhere it wont get lost". The follow-ups are in [Follow-ups](#follow-ups-kept-here-so-they-arent-lost) (F1–F11), with pointers from status (T03-CODE takes F1, LAT-08A takes F3).
   - Scope of R5, in the candidate and `layer-base`:
     - F2 in the base contract;
@@ -354,7 +354,7 @@ Lessons from the T03 runs:
   - the new `overlap` and `branding` journeys and the other ten pass;
   - suites at 258 pass (templates off) and 266 pass (templates on), none failing or cancelled.
 
-  F12 is added. The candidate's R5 changes are uncommitted. [Evidence](../../../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r5.md).
+  F12 is added. The candidate's R5 changes are uncommitted. [Evidence](../../evidence/layer-bindings-01/refaceting-r5.md).
 - 2026-10-01: Owner chat: "commit, end server, and propose what our ux actually needs here for knowledge". R5 committed (candidate `10110b9`). The review server was stopped and its scratch data left disposable. Owner decision 8's follow-up answers were recorded. The proposal is [LAYER-KNOWLEDGE-01](../layer-knowledge/work-record.md), which is proposal only, with no build.
 - 2026-10-01: Owner answered LAYER-KNOWLEDGE-01's questions and said "go for it". K1–K3 (reference capture, spec drafts, static prototype) are authorized and recorded in that brief (A1–A8).
 - 2026-10-01: LAYER-KNOWLEDGE-01 K1–K3 done, agent-checked: 18 reference captures (11 cited), five spec drafts, and prototype v1 (22 screenshots, no errors, 390 px clean). The K2 agent check has not been run. v1 awaits owner review.

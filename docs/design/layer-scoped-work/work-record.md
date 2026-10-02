@@ -58,7 +58,7 @@ The DEC-051 action declaration did two jobs in one record:
 
 ## Results (2026-09-30)
 
-- **Task outcome:** LSW-01–04 were done locally. Candidate `pages-template-candidate` commit `2e4bb58` implements layer-scoped Pages Work: host change adapters, per-layer elevated access, one default assignee per layer, the v2 task card, layer change sets, a Follow-ups review tab, and follow-up items signed as the agent's from the source layer. The Pages template `layer-template-pages` commit `07e2c74` declares `work.scope = layer` and drops its action inventory. [Evidence and retrospective](../../../pages-template-candidate/docs/evidence/lat-t02-layer-scoped-work/README.md).
+- **Task outcome:** LSW-01–04 were done locally. Candidate `pages-template-candidate` commit `2e4bb58` implements layer-scoped Pages Work: host change adapters, per-layer elevated access, one default assignee per layer, the v2 task card, layer change sets, a Follow-ups review tab, and follow-up items signed as the agent's from the source layer. The Pages template `layer-template-pages` commit `07e2c74` declares `work.scope = layer` and drops its action inventory. [Evidence and retrospective](../../evidence/lat-t02-layer-scoped-work/README.md).
 - **Checks:** server suite 180/180; template 5/5; typecheck and build pass; the new browser journey passes (axe clean on Access, Create and Follow-ups; 390px without horizontal scroll). The screenshots were inspected. The `layers` browser journey fails identically on the untouched base commit, so that failure predates this work.
 - **Process outcome:** the authority-versus-guidance rule was added to the operating procedure and applied. The tests show that the authority part is enforced with no action record. Whether agent output quality holds without per-action guidance is **unproven** until an authorized provider turn is compared.
 - **Remaining:**
@@ -97,7 +97,7 @@ The DEC-051 action declaration did two jobs in one record:
   - agents stage calls with `aludel_layer_call`, and review shows changed fields;
   - acceptance commits the draft only if its bases and references are unchanged.
   
-  [Evidence and retrospective](../../../pages-template-candidate/docs/evidence/pages-api-01/README.md).
+  [Evidence and retrospective](../../evidence/pages-api-01/README.md).
 - **Checks:** server 181/181; template 8/8 including spec/handler agreement; typecheck and build pass; the layer-scope browser journey passes; layer-bar passes with and without the template.
 - **Process outcome:** the output contract, the enforcement and the agent's instructions are now one document plus one handler, with an agreement test. Registering handler review is still a manual config entry.
 - **Not done:**
@@ -134,7 +134,7 @@ The DEC-051 action declaration did two jobs in one record:
   - Acceptance moves the pin, in the same transaction as any staged data.
   - Code, API and manifest changes need the project owner, record the handler's source digest as reviewed, and must re-accept every existing record.
   
-  [Evidence and retrospective](../../../pages-template-candidate/docs/evidence/layer-source-01/README.md).
+  [Evidence and retrospective](../../evidence/layer-source-01/README.md).
 - **Checks:** server 184/184; typecheck and build pass; the browser journey passes with a Knowledge edit reviewed and accepted; layer-bar passes with and without the template.
 - **Process outcome:** handler review is keyed by source digest across the API and flow runner, so doc commits no longer disable reviewed code.
 - **Not done:**
@@ -175,7 +175,7 @@ The DEC-051 action declaration did two jobs in one record:
 
 ### LAYER-BASE-01 results so far (2026-09-30)
 
-- **Done locally:** B1–B5 and B7 (Pages validated on the generic path, UI excepted). Candidate `1d31c10` + evidence; base repository `layer-base` (`main`, `markdown`, `pages`). [Evidence and retrospective](../../../pages-template-candidate/docs/evidence/layer-base-01/README.md). Server 188/188, hook 2/2, template branches pass their own tests, and the browser journeys pages / layer-bar / markdown-editor pass with and without templates.
+- **Done locally:** B1–B5 and B7 (Pages validated on the generic path, UI excepted). Candidate `1d31c10` + evidence; base repository `layer-base` (`main`, `markdown`, `pages`). [Evidence and retrospective](../../evidence/layer-base-01/README.md). Server 188/188, hook 2/2, template branches pass their own tests, and the browser journeys pages / layer-bar / markdown-editor pass with and without templates.
 - **Owner-directed changes applied:** review is elevated for any change; work is a sandbox branch with test results; accepting merges it.
 - **Open, needs owner choice (B6):** how each instance's own `ui/` runs:
   - (a) a sandboxed frame on a separate origin with a message-based host SDK, which is safe for agent-edited code but needs the Pages UI reworked to the SDK;
@@ -193,7 +193,7 @@ The DEC-051 action declaration did two jobs in one record:
   - Six UX regressions the frame introduced were found by that journey and fixed.
   - First render is 214 ms versus 135 ms median locally.
   
-  [Evidence](../../../pages-template-candidate/docs/evidence/layer-base-01/README.md#b6-layer-views-from-their-own-repository-in-a-sandboxed-frame-owner-chose-option-a).
+  [Evidence](../../evidence/layer-base-01/README.md#b6-layer-views-from-their-own-repository-in-a-sandboxed-frame-owner-chose-option-a).
 - **Process outcome:** the existing full browser journey, run unchanged in steps against the new runtime, was the effective UX gate; unit tests alone found none of the six regressions.
 - **Remaining:**
   - Views derived from a layer's API, for layers with outputs but no `ui/`.

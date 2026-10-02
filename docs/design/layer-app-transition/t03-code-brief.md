@@ -19,7 +19,7 @@ Start here. This brief gives a fresh session what it needs to convert Code onto 
   - **GitHub sync is in scope.** The Code repository is created on, or imported from, the owner's GitHub, and the two stay in sync (question 2, replaced).
 - **Authorized:**
   - Bounded local work: code, tests, previews and evidence in:
-    - `pages-template-candidate` (branch `feature/pages-layer-template`, from `30d4d37`);
+    - `main` of this repository (the candidate was promoted by DEC-062 at `1c17c48`; the portal is `apps/portal`);
     - a new `code` branch in `layer-base` (from `main` `fee5f30`);
     - disposable local repositories.
   - **GitHub writes to the owner's own account through the Aludel GitHub App, only when the owner starts them in the browser**: creating a repository, importing one, adding `.aludel/`, and pushing accepted commits.
@@ -58,7 +58,7 @@ Record each run's start here before executing.
 
 | What | Where |
 |---|---|
-| Candidate | `pages-template-candidate` `30d4d37`, branch `feature/pages-layer-template` |
+| Portal | `main` after the DEC-062 promotion (merge `1c17c48`). `./launch-machine` runs templates by default, and `layer-base` sits beside the portal (`config/layer-templates.json` `repo: layer-base`) |
 | Base layer | `layer-base` `main` `fee5f30` (information spec, facets, refacets, roles); template branches `markdown`, `pages`, `data`, `vision`, `design` |
 | Pins | `apps/portal/config/layer-templates.json`. `builtIn` maps `product`, `pages`, `data` and `design`. Code is still compiled, under the instance key `platform` |
 | Prior evidence to read | `docs/evidence/t03-g2-files` (repository-mode outputs), `t03-design`, `t03-design-seed-adapt`, `layer-bindings-01`, `layer-knowledge-01` |
@@ -139,13 +139,10 @@ The Aludel GitHub App and its personal-account path exist and were proven live i
 
 **Built generically.** The remote binding and sync state hang on the layer-instance repository, not on Code. Code turns them on in this packet. Publishing other layers' repositories is a separate decision (see the open question).
 
-**Owner setup the live proof needs.** The agent can't do these, because they involve the owner's GitHub account and the App's secrets:
-1. **App settings on github.com.** Add the candidate's callback URL `http://aludel.layers.localhost:4311/api/integrations/github/callback` to the App's callback URLs, which allow several.
-   - The App has one setup URL, and it stays pointed at the running portal.
-   - The existing personal-account installation is reused through "Refresh installations", so the candidate doesn't need its own setup redirect.
-2. **Secrets for the candidate.** The candidate launcher starts with an empty environment (`env -i`). It will read the App's client secret and key path from an owner-created file outside both repositories, named by a launcher argument. The agent writes that loading code but never opens the file.
-3. **Installation scope.** Importing needs the installation to reach the repository. The existing check requires "All repositories"; keep that, or the owner adds the repository to a selected list.
-4. **The live round trip, run by the owner** on disposable private repositories:
+**Owner setup the live proof needs.** Since the promotion (DEC-062), the portal on :4310 is the one with the GitHub App's registered callback and its `.env` secrets. The candidate-only steps (a second callback URL and a secrets file) are gone. What remains needs the owner's GitHub account:
+1. **Check the App still works.** PP-01B found the App's `.env` configuration missing once. Start the portal, sign in with GitHub and refresh installations; the agent checks only the binding metadata.
+2. **Installation scope.** Importing needs the installation to reach the repository. The existing check requires "All repositories"; keep that, or the owner adds the repository to a selected list.
+3. **The live round trip, run by the owner** on disposable private repositories:
    - create a project on GitHub;
    - import an existing repository;
    - save a Knowledge doc and see it on GitHub;
@@ -181,18 +178,17 @@ The Aludel GitHub App and its personal-account path exist and were proven live i
    - Pin `code` and add `"platform": "code"` to `builtIn`. Add the handler digests to the reviewed list.
    - Adopt existing projects: install `.aludel/` into `workspace_path` as one local commit, and bind the instance repository to that path.
    - GitHub sync (above) on the existing binding: create with `.aludel/`, import, push after each accepted change, fetch and fast-forward, hold on divergence, and unavailable states.
-   - Load the candidate launcher's secrets from the owner's file.
    - Fold Code › Docs into Knowledge.
    - Keep the compiled view as the templates-off fallback.
 6. **Checks.** Everything in the T03-DESIGN recipe, both modes, plus:
    - `tools/typecheck-layer-ui.mjs` at the `code` pin;
    - a `code-layer` journey through the frame (Overview, Explorer down to a unit, Tests, Releases, record a release, and Knowledge showing the app docs with their checks and a save; axe and 390 px);
    - a `github-sync` journey against a fake GitHub, in a separate process as in PP-01B. It covers create, import of a repository the scaffold didn't make, push after a Knowledge save, pick-up of an external commit, divergence held as Work, expired token and uninstalled App. It also checks that no person's credential helper is used and that no token appears in logs or the database;
-   - the owner's live round trip (owner setup step 4), recorded as owner-run evidence;
+   - the owner's live round trip (owner setup step 3), recorded as owner-run evidence;
    - reruns of `pages`, `design-layer`, `bindings`, `library`, `layer-bar`, `layer-scope` and every Deploy view;
    - one coding run through the generic path with a local stand-in, checking that a write outside the writable set, and to `.env`, is refused.
 7. **Closeout.**
-   - Evidence and retrospective in `pages-template-candidate/docs/evidence/t03-code/README.md`.
+   - Evidence and retrospective in `docs/evidence/t03-code/README.md`.
    - Update status and add a section to `layer-template-conversion.md`.
    - Then retire the compiled modules and `legacyDeclarations` for every converted layer, keeping Deploy's. That retirement is its own commit, so it can be reverted alone.
 
@@ -205,9 +201,9 @@ The Aludel GitHub App and its personal-account path exist and were proven live i
 - **Secrets.** `.env` is never read, indexed, published to the Library or writable. A connected repository might have committed secrets. Index paths only, and do not publish file contents to the Library beyond units and docs.
 - **The Symphony coding path pins `platform.implement`.** Moving it to layer scope touches `task-manifest.mjs`, `symphony-readiness.mjs` and `symphony-worker.mjs`. Keep LAY-05's retained-candidate and recovery tests green.
 
-## Open owner question (does not block starting)
+## Other layers' repositories (decided, DEC-062)
 
-**Should the other layers' repositories go to GitHub too?** Vision, Design, Pages and Data each have their own local repository today. The earlier [publication plan](github-publication.md) assumed every installed layer becomes an owner-owned GitHub repository. *Default:* this packet builds the sync generically but turns it on only for Code. Turning it on for the others is one small follow-up packet: naming (`<project>-layer-<key>`), privacy, and one live proof. This question only decides when that packet runs.
+Every layer of the app goes to the owner's GitHub. This packet builds the sync generically and turns it on for Code. A follow-up packet, **LAYER-GITHUB-01**, turns it on for Vision, Design, Pages and Data. It covers naming (`<project>-layer-<key>`), privacy, and one live proof. It may also publish `layer-base` itself.
 
 ## After Code
 

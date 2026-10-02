@@ -31,13 +31,13 @@ Record your own run's start in this file before executing.
 ### Run log
 
 - **2026-09-30, run 1 (Claude, VS Code chat).** The owner said "continue with this please t03-design-brief.md". Scope is exactly the authorization above: local code, tests, previews and evidence in `pages-template-candidate` (branch `feature/pages-layer-template`, starting at `ab021b0`) and a new `design` branch in `layer-base` (from `main` `4fa64e2`). No GitHub or provider writes, provider turns, deployment, spending or live owner data.
-- **2026-09-30, run 1 closed.** Local work complete. Candidate `f2fb8be` pins `design` `bc36f24`, `pages` `e693c19` and base `61565cf`. Shared rendering went to the default (a host SDK app kit). [Evidence and retrospective](../../../pages-template-candidate/docs/evidence/t03-design/README.md). `next_action` is T03-CODE.
+- **2026-09-30, run 1 closed.** Local work complete. Candidate `f2fb8be` pins `design` `bc36f24`, `pages` `e693c19` and base `61565cf`. Shared rendering went to the default (a host SDK app kit). [Evidence and retrospective](../../evidence/t03-design/README.md). `next_action` is T03-CODE.
 - **2026-09-30, run 2 (Claude, VS Code chat).** The owner confirmed layer-scoped Work with no actions for every layer. They said Design's starter belongs in its template, and that sources should never have to adopt "the Aludel way": each consuming layer owns an adapter from what a source publishes to its own representation. Asked to proceed ("go") with two packets:
   - **T03-DESIGN-SEED:** move the starter kit (Look & feel tokens and their sync, component seeds, brand starters, brand templates) into the `design` template.
   - **T03-ADAPT:** Pages consumes the kit through a Pages-owned adapter, with its source taken from the Library rather than the key `design`. Remove Design's hidden read of Pages.
 
   Scope and exclusions are the same as run 1: local code, tests and evidence in `pages-template-candidate` and `layer-base` only.
-- **2026-10-01, run 2 closed.** Both packets are complete locally: `design` `64e916f`, `pages` `96194a1`, base `2449ff8`. [Evidence and retrospective](../../../pages-template-candidate/docs/evidence/t03-design-seed-adapt/README.md). `next_action` is T03-CODE.
+- **2026-10-01, run 2 closed.** Both packets are complete locally: `design` `64e916f`, `pages` `96194a1`, base `2449ff8`. [Evidence and retrospective](../../evidence/t03-design-seed-adapt/README.md). `next_action` is T03-CODE.
 
 ## Fixed decisions you must not reopen
 

@@ -12,7 +12,7 @@ next_action: T03-CODE
 
 ## Objective
 
-Finish the remaining Code layer-template conversion while preserving the running portal and its existing Work loop. Deploy stays deferred.
+Convert Code onto its template with GitHub sync, now on `main`: the layer-template candidate was promoted by DEC-062. Then publish every layer's repository to the owner's GitHub. Deploy stays deferred.
 
 ## Next action
 
@@ -21,7 +21,16 @@ Finish the remaining Code layer-template conversion while preserving the running
 - the app's docs are Code's Knowledge;
 - the Code repository is created on, or imported from, the owner's GitHub and kept in sync.
 
-GitHub writes to the owner's own account are authorized only when the owner starts them in the browser. Tests use a fake GitHub. The owner's live round trip needs owner setup first: add the candidate's callback URL to the App, and provide a secrets file for the candidate launcher (see the brief). One open question doesn't block starting: whether the other layers' repositories also go to GitHub. Deploy stays deferred. No owner-data cutover, provider turn or promotion is authorized.
+GitHub writes to the owner's own account are authorized only when the owner starts them in the browser. Tests use a fake GitHub. Since the promotion, the portal on :4310 has the App's callback and `.env`. The owner's setup is to sign in and check the App still works before the live round trip (see the brief). Every layer's repository goes to GitHub: Code first, then LAYER-GITHUB-01 (DEC-062). Deploy stays deferred. No provider turn, deployment or spending is authorized.
+
+**Promotion (DEC-062, 2026-10-01): the candidate is now `main`.**
+- The merge is `1c17c48`, and the launcher defaults to templates on (`1e425a2`).
+- Live data is backed up at `.data/backups/portal-data-2026-10-01-pre-promotion`. It is git-ignored and passed an integrity check.
+- Server suites: templates on 282 pass, 0 fail, 7 explained skips; templates off 265 pass, 0 fail, 24 skips, all needing templates.
+- A rehearsal ran the merged code on a copy of the live data, with workspace paths rewritten to the copy, on :4341. It started cleanly, split project tables into per-project files (PROJECT-DB-01), and adopted the layers. All 169 records kept their IDs and revisions; Browser Buddy's one Data operation moved into Data's repository file under the same ID. Code units (31), trace links (4) and the repository binding (1) are unchanged.
+- **Next for the owner:** stop any old portal, run `./launch-machine`, sign in and look around. That browser review is the remaining evidence.
+- Rollback: stop the portal, restore the backup over `apps/portal/.data`, and `git checkout f18a8b7`.
+- The old candidate checkouts are left in place for the owner to remove. `pages-template-candidate`'s Git directory lives inside `lat08-candidate`, so remove them together.
 
 **Just closed:** LAYER-BINDINGS-01 (steps 1–3) and LAYER-KNOWLEDGE-01. The owner accepted the built Knowledge UI in chat on 2026-10-01 ("im happy with current knowledge ui"); see the [acceptance record](design/layer-knowledge/work-record.md#review--acceptance-record). Its open follow-ups stay with their named packets: F1 goes to T03-CODE, F3 to LAT-08A, F10 to bindings step 4 after T03-CODE, and F4–F8 are listed in the [follow-ups](design/layer-bindings/work-record.md#follow-ups-kept-here-so-they-arent-lost).
 
@@ -32,15 +41,16 @@ LAT-01–07 and the LAT-08 prototype established the isolated candidate, layer s
 ## Ready queue
 
 1. **T03-CODE**: [brief](design/layer-app-transition/t03-code-brief.md) approved 2026-10-01 with GitHub sync added; next G-CODE contract generalizations on `layer-base`, the `code` template, adoption and connect. Takes LAYER-BINDINGS-01 follow-up F1.
-2. **LAYER-BINDINGS-01 step 4 (F10)**: Code ⇄ Pages binding, migrating `layer_connections` and the hard-coded Pages reconciliation, after T03-CODE.
-3. **LAT-08A**: build native-tab, layer-owned Work review on the template contract after LAT-T01–T03. Include LAYER-BINDINGS-01 follow-up F3: binding changes, refacets and drift assessments must be decidable from the Work board.
-4. **LAY-05**: coding proof preserved; candidate boundary, direct tracker, live retention, bounded runs and live interruption recovery pass; owner browser review follows the general Work flow.
-5. **PLATFORM-PIPELINE-01**: PP-01C onboarding → PP-01D environments → PP-01E guards ([work record](design/platform-pipeline/work-record.md)).
-6. **ICONS-FONTS-01**: icon and font libraries in Design (unblocked in principle by PP-01A; waits behind PLATFORM-PIPELINE-01).
-7. **PAGES-UX-01**: built and agent-checked (DEC-048; [evidence](evidence/pages-ux-01-pages-layer.md)). Next: owner review of the built layer.
-8. **PLATFORM-UX-01**: **built and agent-checked** (DEC-049; [evidence](evidence/platform-ux-01-code-deploy.md)). Next: owner review of the built Code and Deploy layers ([work record](design/platform-layer/work-record.md), [prototype](design/platform-layer/v1/index.html)). It supplies PP-01D's Environments UX and absorbs the Platform half of DATA-PLATFORM-UX-01.
-9. **DATA-PLATFORM-UX-01**: the rest of Data (owner: "perhaps").
-10. **LAY-06**: Aludel's own knowledge into its layers; retire the hash workspace.
+2. **LAYER-GITHUB-01**: publish Vision, Design, Pages and Data repositories (and possibly `layer-base`) to the owner's GitHub with T03-CODE's sync (DEC-062).
+3. **LAYER-BINDINGS-01 step 4 (F10)**: Code ⇄ Pages binding, migrating `layer_connections` and the hard-coded Pages reconciliation, after T03-CODE.
+4. **LAT-08A**: build native-tab, layer-owned Work review on the template contract after LAT-T01–T03. Include LAYER-BINDINGS-01 follow-up F3: binding changes, refacets and drift assessments must be decidable from the Work board.
+5. **LAY-05**: coding proof preserved; candidate boundary, direct tracker, live retention, bounded runs and live interruption recovery pass; owner browser review follows the general Work flow.
+6. **PLATFORM-PIPELINE-01**: PP-01C onboarding → PP-01D environments → PP-01E guards ([work record](design/platform-pipeline/work-record.md)).
+7. **ICONS-FONTS-01**: icon and font libraries in Design (unblocked in principle by PP-01A; waits behind PLATFORM-PIPELINE-01).
+8. **PAGES-UX-01**: built and agent-checked (DEC-048; [evidence](evidence/pages-ux-01-pages-layer.md)). Next: owner review of the built layer.
+9. **PLATFORM-UX-01**: **built and agent-checked** (DEC-049; [evidence](evidence/platform-ux-01-code-deploy.md)). Next: owner review of the built Code and Deploy layers ([work record](design/platform-layer/work-record.md), [prototype](design/platform-layer/v1/index.html)). It supplies PP-01D's Environments UX and absorbs the Platform half of DATA-PLATFORM-UX-01.
+10. **DATA-PLATFORM-UX-01**: the rest of Data (owner: "perhaps").
+11. **LAY-06**: Aludel's own knowledge into its layers; retire the hash workspace.
 
 **Proposed cross-layer plan:** [EXISTING-PROJECTS-01](design/existing-projects/work-record.md) covers connecting existing repositories, reconstructing layer drafts from pinned evidence, and reconciling later external commits. The 2026-09-27 owner request authorized this plan and read-only inspection only. EX-01 research is the first proposed slice; knowledge authority, Work action coverage and app-defined environments remain dependencies. It does not replace T03-CODE as the current handoff.
 
@@ -50,13 +60,13 @@ LAT-01–07 and the LAT-08 prototype established the isolated candidate, layer s
 
 **Pages-first layer-app trial:** [LAYER-APP-TRIAL-01](design/layer-app-trial/work-record.md) is an isolated, agent-checked local prototype for a UX designer starting with Pages, Library and Work only. Its [v3 preview](design/layer-app-trial/v3/index.html) separates Map/Pages/Flows from shared Operations and Knowledge tabs, moves layer management and optional dashboard cards to Home, and uses a card stack for layer work. The earlier [v2 preview](design/layer-app-trial/v2/index.html) remains as comparison evidence. A browser trial passed the local discovery → sync task → flow → automatic closure path; agent results are local stand-ins. Owner trial and production architecture remain open; T03-CODE is the current handoff.
 
-**Active layer-app transition:** [LAYER-APP-TRANSITION-01](design/layer-app-transition/implementation-plan.md) has an isolated candidate. LAT-01–04 passed their local gates; LAT-05 now combines its utility/reconciliation evidence with the later authorized Pages Work proposal path ([closeout](../aludel-layer-model/docs/evidence/lat-05/README.md#2026-09-29-packet-closeout-after-work-handoff)). LAT-06 passed its revised local gate under DEC-053; LAT-07 passed its local inventory/view gate at candidate `3e1e848`. DEC-060 retires LAT-08 as a current handoff. LAT-T03 now continues with Code under DEC-055/059; the catalog, Vision, Data and Design have local evidence. [LAT-08A](design/layer-app-transition/layer-owned-review.md) will reuse affected layer tabs for candidate review under DEC-054. External/Figma layers and promotion remain deferred.
+**Active layer-app transition:** [LAYER-APP-TRANSITION-01](design/layer-app-transition/implementation-plan.md) has an isolated candidate. LAT-01–04 passed their local gates; LAT-05 now combines its utility/reconciliation evidence with the later authorized Pages Work proposal path ([closeout](evidence/lat-05/README.md#2026-09-29-packet-closeout-after-work-handoff)). LAT-06 passed its revised local gate under DEC-053; LAT-07 passed its local inventory/view gate at candidate `3e1e848`. DEC-060 retires LAT-08 as a current handoff. LAT-T03 now continues with Code under DEC-055/059; the catalog, Vision, Data and Design have local evidence. [LAT-08A](design/layer-app-transition/layer-owned-review.md) will reuse affected layer tabs for candidate review under DEC-054. External/Figma layers and promotion remain deferred.
 
 One packet at a time. B-03's worker/artifact/recovery work remains required and must not be displaced by later workspace expansion. [Proposed dependency order](design/project-workspace/v1/delivery-plan.md).
 
 ## Active blockers
 
-- **Template transition:** Code conversion remains; the G3 catalog, Vision, Data and Design have local agent evidence. Owner browser comparison is LAT-09; original-data cutover and recovery are LAT-10 gates. The old LAT-08 action-review gate is superseded by DEC-060. No new provider turn or promotion is authorized.
+- **Template transition:** promoted to `main` (DEC-062). The owner waived LAT-09 (comparison). LAT-10's cutover is covered by the backup and the rehearsal on copied data. The owner's browser check after restart is still open. Code conversion remains (T03-CODE).
 
 - **LAY-05 activation:** ADR-008 selects Aludel as Symphony's tracker. Agent submission, isolated preview, terminal-workspace retention, structured checks and live process-interruption recovery pass on disposable projects. Owner browser review still blocks real-work dispatch.
 - **Operational records:** PW-01A is complete and exposes unavailable states rather than synthetic telemetry. Connected milestone records and live agent/server/spend telemetry still depend on later domain and B-03 work. [Implementation evidence](evidence/pw-01a-work-implementation.md) · [passed design QA](../apps/portal/design-qa.md).
@@ -68,31 +78,32 @@ One packet at a time. B-03's worker/artifact/recovery work remains required and 
 
 ## Current facts and evidence
 
+- 2026-10-01: **Candidate promoted to `main` (DEC-062).** Merge `1c17c48`, launcher `1e425a2`. Live data was backed up, both server suites pass, and the copied-data rehearsal preserved every record. Details are under Next action.
 - 2026-10-01: **LAYER-KNOWLEDGE-01 owner-accepted; T03-CODE brief written.** The owner accepted the built Knowledge UI in chat, which closes LAYER-BINDINGS-01 and LAYER-KNOWLEDGE-01 locally. [The T03-CODE brief](design/layer-app-transition/t03-code-brief.md) adds a contract-assumption check before the recipe. Code is the first layer whose repository is not Aludel-shaped. Owner plan approval is pending.
-- 2026-10-01: **LAYER-KNOWLEDGE-01 built locally.** Knowledge is the layer's docs site (Docs, then Information with a card per binding). Docs and spec are saved to the layer repository at once, with history. Bindings are proposed by ticking parts of the tree. Compare specs replaces hints. Pages has a Kit tab. Suites and 13 journeys pass. [Evidence](../pages-template-candidate/docs/evidence/layer-knowledge-01/README.md).
+- 2026-10-01: **LAYER-KNOWLEDGE-01 built locally.** Knowledge is the layer's docs site (Docs, then Information with a card per binding). Docs and spec are saved to the layer repository at once, with history. Bindings are proposed by ticking parts of the tree. Compare specs replaces hints. Pages has a Kit tab. Suites and 13 journeys pass. [Evidence](evidence/layer-knowledge-01/README.md).
 - 2026-10-01: **Step 3 reviewed by the owner; LAYER-KNOWLEDGE-01 proposed.** [Brief](design/layer-knowledge/work-record.md): spec, contents and docs in a docs-site Knowledge tab; bindings by selecting spec nodes; Compare specs replaces hints; Manage › Connections and Facets go.
 - 2026-10-01: **LAYER-BINDINGS-01 step 3 built locally (R5 closes it).**
   - Layers declare and reshape facets in Manage › Facets, as reviewed Work.
   - Discover raises Assess overlap. Overlap chains refacet both sides before the binding can be accepted.
   - Cedes raise adopt Work and then re-point or adapter Work.
-  - New `overlap` and `branding` journeys pass with ten others, and the suites pass. [Evidence](../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r5.md).
-- 2026-10-01: **LAYER-BINDINGS-01 step 3 R4 built locally.** Layer views show a replica as read-only with "Propose a change" and ceded facets as a pointer, through `@aludel/host/roles`. The base contract requires it of facet views; Design and Vision adopt it, re-pinned. Checks: the new `roles` journey and nine others pass, and the suites pass. [Evidence](../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r4.md).
+  - New `overlap` and `branding` journeys pass with ten others, and the suites pass. [Evidence](evidence/layer-bindings-01/refaceting-r5.md).
+- 2026-10-01: **LAYER-BINDINGS-01 step 3 R4 built locally.** Layer views show a replica as read-only with "Propose a change" and ceded facets as a pointer, through `@aludel/host/roles`. The base contract requires it of facet views; Design and Vision adopt it, re-pinned. Checks: the new `roles` journey and nine others pass, and the suites pass. [Evidence](evidence/layer-bindings-01/refaceting-r4.md).
 - 2026-10-01: **LAYER-BINDINGS-01 step 3 R3 built locally.**
   - Library and API reads carry each entry's role.
   - API writes to replica or ceded entries are refused with "Managed in …".
   - Reads of a kind two instances own must name the layer.
   - Refacet preflights list other layers' references.
   - The server suites now time out per test.
-  - [Evidence](../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r3.md).
+  - [Evidence](evidence/layer-bindings-01/refaceting-r3.md).
 - 2026-10-01: **LAYER-BINDINGS-01 step 3 R2 built locally.**
   - Binding changes and refacets are Work items the owner decides. Accept in Library › Bindings now closes Discover's review item.
   - A refacet is a reviewed `layer.json` branch of the layer instance, merged on acceptance.
-  - Checks: 7 new server tests, 13 of 13 mutations caught, both suites passing, and step 2's nine browser journeys passing. [Evidence](../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r2.md).
+  - Checks: 7 new server tests, 13 of 13 mutations caught, both suites passing, and step 2's nine browser journeys passing. [Evidence](evidence/layer-bindings-01/refaceting-r2.md).
 - 2026-10-01: **LAYER-BINDINGS-01 step 3 R1 built locally (refaceting as a pure contract).**
   - Facets select kinds, or one kind narrowed by one field, and never overlap. Bindings contract on whole facets with one authority; areas and `keeps` are gone.
   - `refacet` splits, merges or renames a layer's facets. Moved entries are detached from their bindings until every participant lets go.
   - Ceded participants offer their content once. Read-only authorities rectify instead of adopting. `roleOf` and `repoint` are ready for R3 and R2.
-  - Checks: 30 binding and refacet tests, with order reversal and a 14-rule mutation check; server suites at 256 (templates off) and 251 (templates on), none failing. [Evidence](../pages-template-candidate/docs/evidence/layer-bindings-01/refaceting-r1.md).
+  - Checks: 30 binding and refacet tests, with order reversal and a 14-rule mutation check; server suites at 256 (templates off) and 251 (templates on), none failing. [Evidence](evidence/layer-bindings-01/refaceting-r1.md).
 - 2026-10-01: **LAYER-BINDINGS-01 step 2 built locally.**
   - Pages keeps a replica of the app kit (`kit_item`) through its declared `aludel-kit` adapter, instead of reading Design live.
   - Design declares its kit facet.
@@ -101,26 +112,26 @@ One packet at a time. B-03's worker/artifact/recovery work remains required and 
   - Server suites: templates off 241 pass, 2 skipped; on 236 pass, 7 skipped.
   - The new `bindings` journey and eight other journeys pass. The `design-layer` and `pages` journeys were updated to accept the binding.
 
-  [Evidence](../pages-template-candidate/docs/evidence/layer-bindings-01/README.md#step-2-the-design-system-binding-end-to-end).
+  [Evidence](evidence/layer-bindings-01/README.md#step-2-the-design-system-binding-end-to-end).
 
 - 2026-10-01: **LAYER-BINDINGS-01 step 1 built locally (uncommitted).** It adds:
   - facets in the base layer contract and host manifest check;
   - the pure binding module (`bindings.mjs`), with per-spoke baselines and adapters chosen by source shape;
   - the binding record and API (`/api/projects/:id/bindings`).
 
-  All six walkthroughs pass as data fixtures, and their outcomes are unchanged when every input list is reversed. A mutation check confirms the fixtures detect four separate logic breaks. Server suite 240/240; templates suite 233 pass, 7 skipped, 0 fail; pins are unchanged. No binding can be created until templates declare facets (step 2). [Evidence and retrospective](../pages-template-candidate/docs/evidence/layer-bindings-01/README.md).
+  All six walkthroughs pass as data fixtures, and their outcomes are unchanged when every input list is reversed. A mutation check confirms the fixtures detect four separate logic breaks. Server suite 240/240; templates suite 233 pass, 7 skipped, 0 fail; pins are unchanged. No binding can be created until templates declare facets (step 2). [Evidence and retrospective](evidence/layer-bindings-01/README.md).
 
-- 2026-09-29: **LAT-07 completed locally at candidate `3e1e848`.** All 17 remaining legacy layer actions have explicit dispositions; four built-in layers expose typed actions, unavailable reasons, Operations/Knowledge views and exact output revision reads. Candidate server suite 145/145, typecheck/build passed. Browser validation could not run because local Playwright/browser tooling is absent. Existing role-backed Work stays active until LAT-08 migration. [Evidence and retrospective](../aludel-layer-model/docs/evidence/lat-07/README.md). `LAT-08` is next.
+- 2026-09-29: **LAT-07 completed locally at candidate `3e1e848`.** All 17 remaining legacy layer actions have explicit dispositions; four built-in layers expose typed actions, unavailable reasons, Operations/Knowledge views and exact output revision reads. Candidate server suite 145/145, typecheck/build passed. Browser validation could not run because local Playwright/browser tooling is absent. Existing role-backed Work stays active until LAT-08 migration. [Evidence and retrospective](evidence/lat-07/README.md). `LAT-08` is next.
 
-- 2026-09-29: **LAT-06 completed locally at candidate `cbe7601` under DEC-053.** Layer-owned action declarations, exact Go pins, story-free Pages Work and useful/wrong Code observation relation review passed; full candidate server suite 143/143. Earlier wide/390px browser evidence passed; a final rerun could not start because its temporary Playwright module had been removed. Runtime grants, assignment installation and role migration are LAT-08 gates. [Evidence and retrospective](../aludel-layer-model/docs/evidence/lat-06/README.md). `LAT-07` is next.
+- 2026-09-29: **LAT-06 completed locally at candidate `cbe7601` under DEC-053.** Layer-owned action declarations, exact Go pins, story-free Pages Work and useful/wrong Code observation relation review passed; full candidate server suite 143/143. Earlier wide/390px browser evidence passed; a final rerun could not start because its temporary Playwright module had been removed. Runtime grants, assignment installation and role migration are LAT-08 gates. [Evidence and retrospective](evidence/lat-06/README.md). `LAT-07` is next.
 
-- 2026-09-28: **WORK-AGENTS-01 LAT adapter checkpoint, packet partial.** The isolated candidate through `5ff5433` now admits a Pages-origin `pages.flows` item through Go into a read-only flow proposal and exact Work acceptance. Reviewed policy and source origin are pinned; changed policy blocks acceptance. Candidate focused tests passed 16/16 and full server 133/133 before final link tightening; affected tests passed again, and typecheck/build passed. [Evidence and retrospective](../aludel-layer-model/docs/evidence/work-agents-01-lat-adapter.md). Later live retry reached Review; owner validation and DEC-051 action migration remain open. Normal candidate dispatch stays disabled.
+- 2026-09-28: **WORK-AGENTS-01 LAT adapter checkpoint, packet partial.** The isolated candidate through `5ff5433` now admits a Pages-origin `pages.flows` item through Go into a read-only flow proposal and exact Work acceptance. Reviewed policy and source origin are pinned; changed policy blocks acceptance. Candidate focused tests passed 16/16 and full server 133/133 before final link tightening; affected tests passed again, and typecheck/build passed. [Evidence and retrospective](evidence/work-agents-01-lat-adapter.md). Later live retry reached Review; owner validation and DEC-051 action migration remain open. Normal candidate dispatch stays disabled.
 
-- 2026-09-28: **LAT-05 utility checkpoint, packet partial.** The isolated candidate has durable exact-input receipts, a reviewed Vision → Pages flow-coverage utility, one Work suggestion per story gap, safe closure for untouched items, retained exceptions/rejections and degraded coverage on source removal. Focused 4/4, full server 130/130 before final run-link tightening, typecheck/build, and a disposable wide/390px browser journey with axe pass. [Evidence and retrospective](../aludel-layer-model/docs/evidence/lat-05/README.md). The later authorized Pages Go submitted a proposal into Work Review, closing this bounded agent handoff gate; DEC-051 layer-owned actions are LAT-06/07 work. Normal candidate dispatch remains off.
+- 2026-09-28: **LAT-05 utility checkpoint, packet partial.** The isolated candidate has durable exact-input receipts, a reviewed Vision → Pages flow-coverage utility, one Work suggestion per story gap, safe closure for untouched items, retained exceptions/rejections and degraded coverage on source removal. Focused 4/4, full server 130/130 before final run-link tightening, typecheck/build, and a disposable wide/390px browser journey with axe pass. [Evidence and retrospective](evidence/lat-05/README.md). The later authorized Pages Go submitted a proposal into Work Review, closing this bounded agent handoff gate; DEC-051 layer-owned actions are LAT-06/07 work. Normal candidate dispatch remains off.
 
-- 2026-09-28: **LAT-04 completed locally on the isolated candidate at `02d0670`.** Explicit catalog selection permits zero or one layer; Home can add/remove apps while retaining records; Pages now has versioned Knowledge, Operations board, routines and reviewed connection documents. Full server tests passed 128/128; typecheck/build and wide/390px browser journeys with axe passed. [Evidence and retrospective](../aludel-layer-model/docs/evidence/lat-04/README.md). Owner usefulness review and promotion remain open. Next: WORK-AGENTS-01 dependency before LAT-05 agent execution.
+- 2026-09-28: **LAT-04 completed locally on the isolated candidate at `02d0670`.** Explicit catalog selection permits zero or one layer; Home can add/remove apps while retaining records; Pages now has versioned Knowledge, Operations board, routines and reviewed connection documents. Full server tests passed 128/128; typecheck/build and wide/390px browser journeys with axe passed. [Evidence and retrospective](evidence/lat-04/README.md). Owner usefulness review and promotion remain open. Next: WORK-AGENTS-01 dependency before LAT-05 agent execution.
 
-- 2026-09-28: **LAT-03 completed on the isolated candidate at `46bc1cf`.** Persisted instance preferences drive the rail and Home layer cards; shared Operations/Knowledge slots preserve native output tabs. Focused tests passed 3/3; typecheck/build and authenticated wide/390px browser checks passed, including axe, search and two-record history. [Evidence and retrospective](../aludel-layer-model/docs/evidence/lat-03/README.md). Next: LAT-04; owner comparison and promotion remain later gates.
+- 2026-09-28: **LAT-03 completed on the isolated candidate at `46bc1cf`.** Persisted instance preferences drive the rail and Home layer cards; shared Operations/Knowledge slots preserve native output tabs. Focused tests passed 3/3; typecheck/build and authenticated wide/390px browser checks passed, including axe, search and two-record history. [Evidence and retrospective](evidence/lat-03/README.md). Next: LAT-04; owner comparison and promotion remain later gates.
 
 - PW-02 adds revisioned Direction, outcome Roadmap and Features records, then migrates primary navigation to Overview / Product / Work with utility destinations. Its primary-source reference study changed the implemented composition; product edits retain provenance, stale only exact dependents and never authorize Work. Node 24 typecheck/build, six server/domain suites, Product wide/narrow axe/browser checks and the existing Work lifecycle regression pass. [Evidence/retrospective](evidence/pw-02-product-workspace.md) · [research and references](design/project-workspace/pw-02/research.md).
 
@@ -162,9 +173,9 @@ One packet at a time. B-03's worker/artifact/recovery work remains required and 
 
 2026-09-29: **CUSTOM-LAYER-01 closed on owner acceptance.** The owner accepted the browser-reviewed custom Markdown layer candidate in chat ("all looks good"). It has one project-scoped definition reader, draft/active charter activation, one layer bar, and Tasks built from Work's components. Server tests 165/165; `layer-bar`, `markdown-editor`, `product`, `design` and `workflow` browser checks pass. The evidence is pinned at `6d43ed8` on `feature/custom-markdown-layer`, with the first checkpoint at `97fb422`. Agent discovery and browser person-run review remain unproved and are carried forward. [Closeout and retrospective](design/layer-app-transition/custom-markdown-layer.md#packet-closeout--owner-acceptance-2026-09-29).
 
-2026-09-29: **LAT-07 local gate passed at candidate `3e1e848`.** Design, Data, Code and Deploy inventories, unavailable states, shared layer views and exact output revision reads are agent-checked; full server suite 145/145. [Evidence and retrospective](../aludel-layer-model/docs/evidence/lat-07/README.md). Runtime migration and browser/owner comparison remain later gates.
+2026-09-29: **LAT-07 local gate passed at candidate `3e1e848`.** Design, Data, Code and Deploy inventories, unavailable states, shared layer views and exact output revision reads are agent-checked; full server suite 145/145. [Evidence and retrospective](evidence/lat-07/README.md). Runtime migration and browser/owner comparison remain later gates.
 
-2026-09-29: **LAT-06 local gate passed at candidate `cbe7601` under DEC-053.** Pages/Vision inventory, Code observation relation review and direct story-free Work path are agent-checked. [Evidence and retrospective](../aludel-layer-model/docs/evidence/lat-06/README.md). Runtime permissions remain LAT-08 work.
+2026-09-29: **LAT-06 local gate passed at candidate `cbe7601` under DEC-053.** Pages/Vision inventory, Code observation relation review and direct story-free Work path are agent-checked. [Evidence and retrospective](evidence/lat-06/README.md). Runtime permissions remain LAT-08 work.
 
 2026-09-27: **WORK-ITEM-UX-01 live-run correction.** Browser Buddy W-3 proved that a blocking `stuck` objective could still submit a report and appear complete. `stuck` is now terminal; failed runs retain diagnosis but cannot be accepted; the UI centers diagnostic review and exposes the pinned action. W-3 now reads as failed with its original namespace error. Focused tests pass 9/9; typecheck/build and the restarted live read model pass. The trace also proved its generic security plan came from choosing `platform.security` for a hello-world task, not missing task context. A bounded context-usage procedure was added after the diagnosis itself consumed excessive model usage. [Evidence and retrospective](evidence/work-item-ux-01-build.md).
 
@@ -174,13 +185,13 @@ One packet at a time. B-03's worker/artifact/recovery work remains required and 
 
 | Packet | Result | Evidence |
 |---|---|---|
-| T03-DESIGN-SEED / T03-ADAPT | Design's starter kit and Look & feel sync come from its template's `seed`. Pages reads the kit through its own adapter and names no layer. Design reads no later layer. Final pins `design` `64e916f`, `pages` `96194a1` | [Evidence and retrospective](../pages-template-candidate/docs/evidence/t03-design-seed-adapt/README.md) |
-| T03-DESIGN | Design repository (`design` `bc36f24`) owns its views, Knowledge, rules and 9-operation API in records mode; shared rendering moved to the host app-kit SDK; Pages (`e693c19`) reads the kit from the Library; templates on 215/0 (7 explained skips), off 222/222; `design-layer` journey 5/5 | [Evidence and retrospective](../pages-template-candidate/docs/evidence/t03-design/README.md) |
-| T03-G3 / T03-VISION | Reviewed pins drive converted declarations/catalog; Vision repository owns its native view, Knowledge, and (since `ab021b0`) its record rules and 38-operation API; template-mode suite added and green | [Catalog and view](../pages-template-candidate/docs/evidence/t03-vision/README.md) · [Rules, template-mode suite, host features](../pages-template-candidate/docs/evidence/t03-vision-rules/README.md) |
-| T03-DATA | Local template conversion checked; original-owner-data cutover remains a later gate | [Evidence and retrospective](../pages-template-candidate/docs/evidence/t03-data/README.md) |
-| WORK-AGENTS-01 | Bounded layer-origin → shared Work Go → proposal foundation and DEC-051 action contract accepted under DEC-052; disposable proposal itself remains in Review | [Trial](../aludel-layer-model/docs/evidence/work-agents-01-lat-adapter.md), [action groundwork](../aludel-layer-model/docs/evidence/work-agents-01-layer-actions-groundwork.md), [owner closeout](design/work-agents/work-record.md#2026-09-29-owner-closeout-and-lat-handoff) |
-| LAT-05 | Exact-input Pages reconciliation utility plus one authorized agent Work handoff; no self-Go or flow before acceptance | [Evidence and retrospective](../aludel-layer-model/docs/evidence/lat-05/README.md#2026-09-29-packet-closeout-after-work-handoff) |
-| LAT-02 | Six built-in layer descriptors, membership-scoped reads and idempotent instance migration; candidate commit `ca2e771` | [Evidence/retrospective](../aludel-layer-model/docs/evidence/lat-02/README.md) |
+| T03-DESIGN-SEED / T03-ADAPT | Design's starter kit and Look & feel sync come from its template's `seed`. Pages reads the kit through its own adapter and names no layer. Design reads no later layer. Final pins `design` `64e916f`, `pages` `96194a1` | [Evidence and retrospective](evidence/t03-design-seed-adapt/README.md) |
+| T03-DESIGN | Design repository (`design` `bc36f24`) owns its views, Knowledge, rules and 9-operation API in records mode; shared rendering moved to the host app-kit SDK; Pages (`e693c19`) reads the kit from the Library; templates on 215/0 (7 explained skips), off 222/222; `design-layer` journey 5/5 | [Evidence and retrospective](evidence/t03-design/README.md) |
+| T03-G3 / T03-VISION | Reviewed pins drive converted declarations/catalog; Vision repository owns its native view, Knowledge, and (since `ab021b0`) its record rules and 38-operation API; template-mode suite added and green | [Catalog and view](evidence/t03-vision/README.md) · [Rules, template-mode suite, host features](evidence/t03-vision-rules/README.md) |
+| T03-DATA | Local template conversion checked; original-owner-data cutover remains a later gate | [Evidence and retrospective](evidence/t03-data/README.md) |
+| WORK-AGENTS-01 | Bounded layer-origin → shared Work Go → proposal foundation and DEC-051 action contract accepted under DEC-052; disposable proposal itself remains in Review | [Trial](evidence/work-agents-01-lat-adapter.md), [action groundwork](evidence/work-agents-01-layer-actions-groundwork.md), [owner closeout](design/work-agents/work-record.md#2026-09-29-owner-closeout-and-lat-handoff) |
+| LAT-05 | Exact-input Pages reconciliation utility plus one authorized agent Work handoff; no self-Go or flow before acceptance | [Evidence and retrospective](evidence/lat-05/README.md#2026-09-29-packet-closeout-after-work-handoff) |
+| LAT-02 | Six built-in layer descriptors, membership-scoped reads and idempotent instance migration; candidate commit `ca2e771` | [Evidence/retrospective](evidence/lat-02/README.md) |
 | LAT-01 | Isolated sibling candidate, local launcher and deterministic fixture; concurrent portal, database, cookie and preview separation checked; candidate commit `a799756` | [Evidence/retrospective](design/layer-app-transition/work-record.md) |
 | PP-01R | Project-scoped read-only Codex bridge: Work → Team pairing, assigned tasks and live knowledge, saved context bundles, local MCP adapter; agent-checked on a disposable portal; owner live pairing pending | [Evidence/retrospective](evidence/pp-01r-editor-bridge.md), [guide](guides/co-work-with-codex.md) |
 | PLATFORM-UX-01 | Platform split into **Code** and **Deploy**.
@@ -267,7 +278,7 @@ The owner agreed the contract: one binding per shared concept with many particip
   - Start-up on unseeded projects went from 5.4 s to 3.3 s.
 - Pages reads the kit through `ui/pages-kit-adapter.ts`, with links to the source layer and Library entries. The host app kit only renders.
 - Next steps for the connection idea: wire connection records to adapter sources, and let routines propose adapter changes.
-- [Evidence and retrospective](../pages-template-candidate/docs/evidence/t03-design-seed-adapt/README.md).
+- [Evidence and retrospective](evidence/t03-design-seed-adapt/README.md).
 
 2026-09-30: **T03-DESIGN completed locally; T03-CODE next.**
 - Candidate `f2fb8be` pins `design` `bc36f24`, `pages` `e693c19` and base `61565cf`.
@@ -285,7 +296,7 @@ The owner agreed the contract: one binding per shared concept with many particip
   - the `design-layer` journey passed 5/5, and seven other journeys pass.
 - Owner answers, 2026-09-30: layer-scoped Work is accepted for every layer, with no per-action catalogs. Design's starter seeding belongs in its template (done: T03-DESIGN-SEED).
 - Limit: each handler call is one sandboxed child process (about 22 ms), so first-time seeding costs about 0.9 s per project.
-- [Evidence and retrospective](../pages-template-candidate/docs/evidence/t03-design/README.md).
+- [Evidence and retrospective](evidence/t03-design/README.md).
 
 2026-09-30: **T03-VISION completed with its rules in the layer; T03-DESIGN next.**
 - Candidate `ab021b0` pins `vision` `eac6132`:
@@ -300,6 +311,6 @@ The owner agreed the contract: one binding per shared concept with many particip
 - Owner questions:
   - Is DEC-057 layer scoping for Vision Work acceptable? It removes the `product.*` actions and per-style presets.
   - Should other Map and Flow edits get the latest-revision treatment?
-- [Evidence and retrospective](../pages-template-candidate/docs/evidence/t03-vision-rules/README.md).
+- [Evidence and retrospective](evidence/t03-vision-rules/README.md).
 
-2026-09-30: **T03-G3 and T03-VISION local checkpoints; T03-DESIGN next.** Pin-derived catalog/declarations preserve compiled Design, Code and Deploy choices and templates-off compatibility. Candidate `7ceebd7` pins Vision repository `ac96e2f`, which owns its manifest, Knowledge and native frame; disposable new/existing project, Library, stable-record and browser journeys passed. [Evidence and retrospective](../pages-template-candidate/docs/evidence/t03-vision/README.md). Owner comparison and original-data cutover remain LAT-09/10 gates.
+2026-09-30: **T03-G3 and T03-VISION local checkpoints; T03-DESIGN next.** Pin-derived catalog/declarations preserve compiled Design, Code and Deploy choices and templates-off compatibility. Candidate `7ceebd7` pins Vision repository `ac96e2f`, which owns its manifest, Knowledge and native frame; disposable new/existing project, Library, stable-record and browser journeys passed. [Evidence and retrospective](evidence/t03-vision/README.md). Owner comparison and original-data cutover remain LAT-09/10 gates.

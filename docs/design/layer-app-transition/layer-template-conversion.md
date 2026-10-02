@@ -88,7 +88,7 @@ The owner said “okay go go. pages first makes sense” after selecting the cus
 
 ## Pages-first local checkpoint (2026-09-29)
 
-The isolated Pages candidate `f6adc8e813aead602304080e1f0e18584e84d66d` and [Pages evidence](../../../pages-template-candidate/docs/evidence/lat-t01-pages/README.md) records a pinned local template repository, project-specific Git copies, repository-owned Charter/Knowledge/native UI source, generated compile from the accepted commit, and a passed Pages browser journey. Its full server suite passed 167/167. The observed process improvement was the capability ledger plus end-to-end native journey after extraction; that combination found and fixed a null-action crash in the candidate's Work mapping. The result is a source/registration checkpoint only. Pages output authority, server adapters, actions, routines, review, per-project UI bundle loading and owner repin/rollback still need checked boundaries and same-fixture migration proof. LAT-08 retains its owner browser and original-data gates; the one `next_action` remains LAT-08.
+The isolated Pages candidate `f6adc8e813aead602304080e1f0e18584e84d66d` and [Pages evidence](../../evidence/lat-t01-pages/README.md) records a pinned local template repository, project-specific Git copies, repository-owned Charter/Knowledge/native UI source, generated compile from the accepted commit, and a passed Pages browser journey. Its full server suite passed 167/167. The observed process improvement was the capability ledger plus end-to-end native journey after extraction; that combination found and fixed a null-action crash in the candidate's Work mapping. The result is a source/registration checkpoint only. Pages output authority, server adapters, actions, routines, review, per-project UI bundle loading and owner repin/rollback still need checked boundaries and same-fixture migration proof. LAT-08 retains its owner browser and original-data gates; the one `next_action` remains LAT-08.
 
 The next authorized local slice should first define the checked host SDK and repository revision review/install path, then move the Pages output adapter under one scoped database authority with semantic candidate revisions and an independent export/import comparison. A copied server file in the template is source inventory, not runnable code. Do not switch existing project output authority or retire portal adapters until the old and new fixtures agree on IDs, revisions, links, reviews and rollback.
 
@@ -102,7 +102,7 @@ The [provider readiness plan](github-publication.md) specifies six catalog templ
 
 ## Pages continuation checkpoint (2026-09-29)
 
-Candidate `1e9bbee3f2120fd86eaae8176964af1062868ced` and [isolated continuation evidence](../../../pages-template-candidate/docs/evidence/lat-t02-pages-continuation/README.md) traces the Pages owner decisions into organized template docs, adds a versioned host theme seam, compares the old and new model-facing packets on the same real Go-pinned flow task, and tests an offline per-repo SQLite/materialized-output design. The new packet preserves the old targets, controls, output shape and capabilities while adding exact Pages charter/Knowledge/method and package pin; a package repin withdraws the old packet. The existing agent adapter **cannot modify a flow**: it rejects a flow target and only inserts a new flow. That is an explicit LAT-T02 capability gap, not a claim of parity. The offline typed-file/per-repo SQLite design remains a tested export primitive; DEC-056 confirms database-authoritative outputs in a per-project local SQLite store, semantic change sets and independent export. The isolated candidate now records project-scoped metadata for future deletions, and the template exporter preserves those tombstones; historical orphaned revisions still need a bounded recovery decision. The next Pages implementation slice must add a checked revise-flow adapter, source-owned server boundary and same-fixture cutover proof.
+Candidate `1e9bbee3f2120fd86eaae8176964af1062868ced` and [isolated continuation evidence](../../evidence/lat-t02-pages-continuation/README.md) traces the Pages owner decisions into organized template docs, adds a versioned host theme seam, compares the old and new model-facing packets on the same real Go-pinned flow task, and tests an offline per-repo SQLite/materialized-output design. The new packet preserves the old targets, controls, output shape and capabilities while adding exact Pages charter/Knowledge/method and package pin; a package repin withdraws the old packet. The existing agent adapter **cannot modify a flow**: it rejects a flow target and only inserts a new flow. That is an explicit LAT-T02 capability gap, not a claim of parity. The offline typed-file/per-repo SQLite design remains a tested export primitive; DEC-056 confirms database-authoritative outputs in a per-project local SQLite store, semantic change sets and independent export. The isolated candidate now records project-scoped metadata for future deletions, and the template exporter preserves those tombstones; historical orphaned revisions still need a bounded recovery decision. The next Pages implementation slice must add a checked revise-flow adapter, source-owned server boundary and same-fixture cutover proof.
 
 ## Pages output-authority reconsideration — earlier owner signal, superseded by DEC-056
 
@@ -124,7 +124,7 @@ The owner asked to start the DEC-056 transition with Pages. This authorizes boun
 
 ## Pages DEC-056 identity checkpoint (2026-09-29)
 
-The isolated candidate now assigns immutable layer-instance IDs, migrates legacy Pages package bindings onto them, uses the ID in new repository paths and includes it in Pages descriptors and Go-pinned Work source context. The [candidate evidence and retrospective](../../../pages-template-candidate/docs/evidence/lat-t02-pages-dec056/README.md) records 169/169 server tests, typecheck and the exact remaining DEC-056 gates. This is a migration-safe identity bridge only: duplicate Pages instances, instance-scoped output/Work records, physical project databases, export/restore and mixed source/data acceptance remain open. LAT-08 remains `next_action` pending its separate owner/original-data gate.
+The isolated candidate now assigns immutable layer-instance IDs, migrates legacy Pages package bindings onto them, uses the ID in new repository paths and includes it in Pages descriptors and Go-pinned Work source context. The [candidate evidence and retrospective](../../evidence/lat-t02-pages-dec056/README.md) records 169/169 server tests, typecheck and the exact remaining DEC-056 gates. This is a migration-safe identity bridge only: duplicate Pages instances, instance-scoped output/Work records, physical project databases, export/restore and mixed source/data acceptance remain open. LAT-08 remains `next_action` pending its separate owner/original-data gate.
 
 ## Pages output-scope continuation (owner chat, 2026-09-29)
 
@@ -132,7 +132,7 @@ The owner directed continuation of the Pages transition. The next bounded local 
 
 ## Pages output-scope checkpoint (2026-09-29)
 
-Candidate `be5ff6fc5891c7d34c13ebee9d22e2617b393716` and [the scope evidence](../../../pages-template-candidate/docs/evidence/lat-t02-pages-scope/README.md) add an idempotent Pages record/revision/tombstone backfill, instance-tagged new writes and project/instance checks for the current Pages read/write path. The 170/170 server suite and typecheck passed. A foreign instance ID hid a page from reads, blocked its update/delete and caused migration to reject the wrong scope. This validates the additive identity bridge on disposable data, not the per-project database or accepted output cutover. The next slice must reconcile duplicate-template instance identity and Work targets before moving accepted output authority. LAT-08 remains `next_action`.
+Candidate `be5ff6fc5891c7d34c13ebee9d22e2617b393716` and [the scope evidence](../../evidence/lat-t02-pages-scope/README.md) add an idempotent Pages record/revision/tombstone backfill, instance-tagged new writes and project/instance checks for the current Pages read/write path. The 170/170 server suite and typecheck passed. A foreign instance ID hid a page from reads, blocked its update/delete and caused migration to reject the wrong scope. This validates the additive identity bridge on disposable data, not the per-project database or accepted output cutover. The next slice must reconcile duplicate-template instance identity and Work targets before moving accepted output authority. LAT-08 remains `next_action`.
 
 ## Pages Work identity continuation (owner chat, 2026-09-29)
 
@@ -140,7 +140,7 @@ The owner directed the next local Pages transition slice. Extend the additive DE
 
 ## Pages Work identity checkpoint (2026-09-29)
 
-Candidate `3a50b42f184b1753e5ffa753c6d4a845857eb778` and [the Work scope evidence](../../../pages-template-candidate/docs/evidence/lat-t02-pages-work-scope/README.md) backfill Pages-origin Work instance IDs and only those historical Pages targets verified by a current record or tombstone. New Pages Work/target links are pinned, wrong-instance rows are rejected, and a Vision story target retains its original scope. Full server 170/170 and typecheck passed. Missing historical Pages targets remain unresolved instead of receiving a guessed ID. Semantic change sets, mixed source/data review and atomic acceptance, duplicate-template instances and per-project SQLite remain open. The one `next_action` stays LAT-08.
+Candidate `3a50b42f184b1753e5ffa753c6d4a845857eb778` and [the Work scope evidence](../../evidence/lat-t02-pages-work-scope/README.md) backfill Pages-origin Work instance IDs and only those historical Pages targets verified by a current record or tombstone. New Pages Work/target links are pinned, wrong-instance rows are rejected, and a Vision story target retains its original scope. Full server 170/170 and typecheck passed. Missing historical Pages targets remain unresolved instead of receiving a guessed ID. Semantic change sets, mixed source/data review and atomic acceptance, duplicate-template instances and per-project SQLite remain open. The one `next_action` stays LAT-08.
 
 ## Pages semantic flow continuation (owner chat, 2026-09-30)
 
@@ -148,7 +148,7 @@ The owner directed continuation of the Pages-first DEC-056 transition. This loca
 
 ## Pages semantic flow candidate checkpoint (2026-09-30)
 
-The Pages owner-source repository at `e88409c78e790e8d4fdccc2ef4db043b6d3c39d3` now declares a pure v1 semantic existing-flow revision rule. The isolated portal candidate `2206727ebe3228c682b257c781fdd6217bdaf1d5` pins and validates that committed source without executing it. [Evidence and retrospective](../../../pages-template-candidate/docs/evidence/lat-t02-flow-candidate/README.md) records 4/4 template tests, 170/170 candidate server tests and typecheck, including foreign-instance, stale input/source, no-op and tamper rejection. This removes a source-ownership prerequisite for the flow-edit gap; it does **not** make the current create-only `pages.flows` action capable of revising a flow. A checked server SDK, full validator parity, Go/review wiring and atomic accepted output/Work transaction remain required. `next_action` stays LAT-08.
+The Pages owner-source repository at `e88409c78e790e8d4fdccc2ef4db043b6d3c39d3` now declares a pure v1 semantic existing-flow revision rule. The isolated portal candidate `2206727ebe3228c682b257c781fdd6217bdaf1d5` pins and validates that committed source without executing it. [Evidence and retrospective](../../evidence/lat-t02-flow-candidate/README.md) records 4/4 template tests, 170/170 candidate server tests and typecheck, including foreign-instance, stale input/source, no-op and tamper rejection. This removes a source-ownership prerequisite for the flow-edit gap; it does **not** make the current create-only `pages.flows` action capable of revising a flow. A checked server SDK, full validator parity, Go/review wiring and atomic accepted output/Work transaction remain required. `next_action` stays LAT-08.
 
 ## Pages semantic runtime proof (owner chat, 2026-09-30)
 
@@ -156,7 +156,7 @@ The owner's continued instruction authorizes the next bounded local Pages slice 
 
 ## Pages reviewed-source runner checkpoint (2026-09-30)
 
-The isolated candidate at `45e2480` runs only the separately reviewed Pages flow module digest from its installed Git commit, under derived project/instance/source pins in a limited child process. [Evidence and retrospective](../../../pages-template-candidate/docs/evidence/lat-t02-flow-runner/README.md) records a same-fixture comparison with the current host validator, no runner database write, denied read/write/subprocess probes, changed-commit denial, stale and foreign input checks, 172/172 server tests and typecheck. This tested the process rule of reviewing exact source before local execution. It remains a pilot for one page-backed flow shape: Node permission mode alone does not prove network isolation, and the current Work adapter still cannot revise a flow. General SDK isolation, full flow-shape parity, native Go/review/acceptance, duplicate instances and per-project SQLite remain open. `next_action` remains LAT-08.
+The isolated candidate at `45e2480` runs only the separately reviewed Pages flow module digest from its installed Git commit, under derived project/instance/source pins in a limited child process. [Evidence and retrospective](../../evidence/lat-t02-flow-runner/README.md) records a same-fixture comparison with the current host validator, no runner database write, denied read/write/subprocess probes, changed-commit denial, stale and foreign input checks, 172/172 server tests and typecheck. This tested the process rule of reviewing exact source before local execution. It remains a pilot for one page-backed flow shape: Node permission mode alone does not prove network isolation, and the current Work adapter still cannot revise a flow. General SDK isolation, full flow-shape parity, native Go/review/acceptance, duplicate instances and per-project SQLite remain open. `next_action` remains LAT-08.
 
 ## Pages flow-shape parity continuation (owner chat, 2026-09-30)
 
@@ -164,7 +164,7 @@ The owner's continued instruction authorizes another bounded local Pages slice: 
 
 ## Pages flow-shape parity checkpoint (2026-09-30)
 
-The Pages source repository at `7b18537648f872f3309b6d1dd2d3fca65d38d8c1` now covers gap steps, persona/activity references, optional names and zero to forty steps while pinning referenced revisions. The isolated candidate at `c328f72` advances the new-install commit and reviewed digest together and retains the old reviewed pair for existing installs. [Evidence and retrospective](../../../pages-template-candidate/docs/evidence/lat-t02-flow-shapes/README.md) records 5/5 source tests, 172/172 portal server tests, typecheck and two same-record host-validator comparisons (page-backed, then gap/persona). The applied process improvement is a host-validator parity matrix plus explicit legacy pin compatibility before Work wiring. The runner still accepts caller-supplied reference snapshots for this proof; production Work must derive them from current scoped records, then bind Go/review and atomic acceptance. General isolation, original-data parity and per-project SQLite remain open. `next_action` stays LAT-08.
+The Pages source repository at `7b18537648f872f3309b6d1dd2d3fca65d38d8c1` now covers gap steps, persona/activity references, optional names and zero to forty steps while pinning referenced revisions. The isolated candidate at `c328f72` advances the new-install commit and reviewed digest together and retains the old reviewed pair for existing installs. [Evidence and retrospective](../../evidence/lat-t02-flow-shapes/README.md) records 5/5 source tests, 172/172 portal server tests, typecheck and two same-record host-validator comparisons (page-backed, then gap/persona). The applied process improvement is a host-validator parity matrix plus explicit legacy pin compatibility before Work wiring. The runner still accepts caller-supplied reference snapshots for this proof; production Work must derive them from current scoped records, then bind Go/review and atomic acceptance. General isolation, original-data parity and per-project SQLite remain open. `next_action` stays LAT-08.
 
 ## Pages revise-existing Work continuation (owner chat, 2026-09-30)
 
@@ -275,7 +275,7 @@ The owner directed completion of the in-progress Data layer conversion and its l
 
 ## T03-DATA local closeout and next step (2026-09-30)
 
-The Data template at `12d08eb` now owns its OpenAPI output/indexer/normalizer, Knowledge, and Objects/API/Access view source and styles. The candidate pins that commit. [T03-DATA evidence and retrospective](../../../pages-template-candidate/docs/evidence/t03-data/README.md) records the same-fixture adoption, revision, branch-merge and browser checks. The portal's compiled Data screen remains a templates-off fallback while other layers convert.
+The Data template at `12d08eb` now owns its OpenAPI output/indexer/normalizer, Knowledge, and Objects/API/Access view source and styles. The candidate pins that commit. [T03-DATA evidence and retrospective](../../evidence/t03-data/README.md) records the same-fixture adoption, revision, branch-merge and browser checks. The portal's compiled Data screen remains a templates-off fallback while other layers convert.
 
 The plan's T03-G3 dependency was too broad for a one-layer test: Data's fork and record adoption passed, but the fixed six-key catalog still exists for the unconverted layers. T03-G3 is therefore the one next action: derive the installable catalog from reviewed template pins while preserving historical instance keys and templates-off compatibility. Then convert Vision, Design and Code. Deploy remains deferred by DEC-059. LAT-08's action migration is retired by DEC-060; original-owner-data cutover moves to LAT-10, not this local checkpoint.
 
@@ -287,7 +287,7 @@ Readiness: Data proved per-instance fork/adoption but left the fixed six-key ins
 
 ## T03-G3 and T03-VISION local closeout (2026-09-30)
 
-The reviewed template pins now supply declarations and install presentation for converted layers; compiled Design, Code and Deploy remain visible until converted, and templates-off keeps the historical stack. Candidate `7ceebd7` pins the `vision` branch at `ac96e2f`, which owns Vision's manifest, Knowledge and native view in records mode. Disposable new/existing adoption, stable IDs/revisions, Library, frame build, browser journey and accessibility checks passed. [Evidence and retrospective](../../../pages-template-candidate/docs/evidence/t03-vision/README.md). This is agent-checked local work, not owner acceptance or promotion. `T03-DESIGN` is next; Code follows, Deploy remains deferred.
+The reviewed template pins now supply declarations and install presentation for converted layers; compiled Design, Code and Deploy remain visible until converted, and templates-off keeps the historical stack. Candidate `7ceebd7` pins the `vision` branch at `ac96e2f`, which owns Vision's manifest, Knowledge and native view in records mode. Disposable new/existing adoption, stable IDs/revisions, Library, frame build, browser journey and accessibility checks passed. [Evidence and retrospective](../../evidence/t03-vision/README.md). This is agent-checked local work, not owner acceptance or promotion. `T03-DESIGN` is next; Code follows, Deploy remains deferred.
 
 ## T03-VISION completion and contract additions (2026-09-30)
 
@@ -298,7 +298,7 @@ On review, Codex's Vision checkpoint had moved the views and Knowledge but not t
 - **Instance backfill:** a layer that starts publishing an API takes over its untagged records.
 - **Process:** `test:server:templates` is now part of every conversion's checks, alongside the browser journey run several times when it is flaky.
 
-[Evidence](../../../pages-template-candidate/docs/evidence/t03-vision-rules/README.md).
+[Evidence](../../evidence/t03-vision-rules/README.md).
 
 ## T03-DESIGN local closeout (2026-09-30)
 
@@ -307,7 +307,7 @@ The owner approved the [T03-DESIGN plan](t03-design-brief.md) in chat on 2026-09
 - the Tokens, Components, Brand and Docs views, including the live token draft;
 - its rules and a 9-operation API, in **records mode**.
 
-Pages (`e693c19`) now reads the app kit from the Library. [Evidence and retrospective](../../../pages-template-candidate/docs/evidence/t03-design/README.md). This is agent-checked local work, not owner acceptance or promotion.
+Pages (`e693c19`) now reads the app kit from the Library. [Evidence and retrospective](../../evidence/t03-design/README.md). This is agent-checked local work, not owner acceptance or promotion.
 
 These additions apply to every later conversion:
 - **Shared rendering lives in the host SDK and takes data as input.** `@aludel/host/app-kit` draws the app kit whichever layer publishes it. A layer that previews another layer's output reads that output from the Library, never imports its code.
@@ -326,7 +326,7 @@ Owner direction (chat, 2026-09-30): Design's starter belongs in its template. A 
 - **Consumer-owned adapters:** Pages (`96194a1`) reads the kit through `ui/pages-kit-adapter.ts`, picks its source from the Library, and links to the source's own path or Library entries. The host app kit only renders. Design reads no later layer.
 - **Base contract** (`2449ff8`) documents both.
 
-[Evidence and retrospective](../../../pages-template-candidate/docs/evidence/t03-design-seed-adapt/README.md).
+[Evidence and retrospective](../../evidence/t03-design-seed-adapt/README.md).
 
 Not built, by agreement:
 - connection records choosing the source;

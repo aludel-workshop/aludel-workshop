@@ -205,7 +205,7 @@ The agent check ("can an agent answer from the spec alone?") has **not been run*
 | B6 | Propose a binding needs **several other layers**: a grid with an empty "click to add" block. | A participant grid with one card per layer plus an "Add a layer" card (S4). |
 | B7 | **The lead is easy to toggle**, and clearly visible on cards. Each non-lead has a **"Keep a local copy"** check. | Each participant card has a Lead toggle. Non-leads get "Keep a local copy" (checked keeps a copy; unchecked hands over). The lead is marked on binding cards in the nav and on binding pages (S3, S4). |
 
-**K5 built, 2026-10-01 (agent-checked):** S1–S6 in candidate `7c6152c` and `30d4d37`, with `layer-base` `main` `fee5f30` and template pins as listed in the [evidence and retrospective](../../../pages-template-candidate/docs/evidence/layer-knowledge-01/README.md). Next: the owner's browser review.
+**K5 built, 2026-10-01 (agent-checked):** S1–S6 in candidate `7c6152c` and `30d4d37`, with `layer-base` `main` `fee5f30` and template pins as listed in the [evidence and retrospective](../../evidence/layer-knowledge-01/README.md). Next: the owner's browser review.
 
 **Owner acceptance, 2026-10-01 (chat).** "im happy with current knowledge ui". This accepts the built K5 Knowledge interface as reviewed in the candidate. It is not a promotion of the candidate, and it does not accept anything outside K5. The open LAYER-BINDINGS-01 follow-ups (F1, F3–F8, F10) stay with their named packets. LAYER-KNOWLEDGE-01 and LAYER-BINDINGS-01 are closed locally, and `next_action` moves to T03-CODE.
 
