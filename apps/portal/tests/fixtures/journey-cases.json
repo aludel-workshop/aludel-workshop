@@ -1,0 +1,67 @@
+{
+  "note": "JOURNEYS-01 J1 fixtures. Two instances of a journey: a replica of a Pages flow (Biome-style, Pages is the authority) and an observed onboarding journey in a Code-only imported app, specified to a second revision. A design-kit token is the second instance of an opinion adopted into .aludel/ with a proof.",
+  "recipe": {
+    "version": 2,
+    "buildTarget": "build",
+    "checks": [{ "name": "App tests", "command": ["npm", "test"] }],
+    "personas": {
+      "visitor": { "fixture": "empty", "session": null },
+      "newcomer": { "fixture": "fresh", "session": null },
+      "member": { "fixture": "populated", "session": "member" }
+    }
+  },
+  "replica": {
+    "version": 1, "id": "first-world", "title": "Start a first world", "origin": "replica", "revision": 3, "persona": "newcomer",
+    "source": { "layer": "pages", "entry": "flow-first-world", "revision": 3 },
+    "steps": [
+      { "id": "marketing", "name": "Arrive on the marketing page", "page": "page-home", "route": "/", "persona": "visitor", "trigger": "Opens the site", "expected": "Sees what a biome is and a Start button", "test": "first-world.spec.mjs#marketing" },
+      { "id": "signup", "name": "Sign up", "page": "page-signup", "route": "/signup", "trigger": "Chooses Start", "expected": "Creates an account with email and password", "test": "first-world.spec.mjs#signup" },
+      { "id": "setup", "name": "Initial setup", "page": "page-setup", "route": "/setup", "trigger": "Account created", "expected": "Names the world and picks a climate", "test": "first-world.spec.mjs#setup" },
+      { "id": "world", "name": "See the world", "page": "page-world", "route": "/world", "persona": "member", "trigger": "Finishes setup", "expected": "The world fills the screen", "story": "story-12" }
+    ]
+  },
+  "onboarding": {
+    "version": 1, "id": "onboarding", "title": "New user onboarding", "origin": "observed", "revision": 1, "persona": "newcomer",
+    "proof": { "commit": "a1b2c3d", "status": "passed" },
+    "steps": [
+      { "id": "sign-up", "name": "Sign up", "route": "/signup", "trigger": "Opens the sign-up page", "expected": "Enters email and password", "test": "onboarding.spec.mjs#sign-up" },
+      { "id": "verify", "name": "Verify email", "route": "/verify", "trigger": "Submits the form", "expected": "Follows the link in the preview inbox", "test": "onboarding.spec.mjs#verify" },
+      { "id": "welcome", "name": "Welcome", "route": "/welcome", "trigger": "Email verified", "expected": "Sees a welcome page and continues", "test": "onboarding.spec.mjs#welcome" },
+      { "id": "tour", "name": "Product tour", "route": "/tour", "trigger": "Continues", "expected": "Steps through four tour cards", "test": "onboarding.spec.mjs#tour" },
+      { "id": "dashboard", "name": "Dashboard", "route": "/app", "trigger": "Finishes the tour", "expected": "Lands on an empty dashboard", "test": "onboarding.spec.mjs#dashboard" }
+    ]
+  },
+  "onboardingSpecified": {
+    "version": 1, "id": "onboarding", "title": "New user onboarding", "origin": "authored", "revision": 2, "persona": "newcomer",
+    "steps": [
+      { "id": "sign-up", "name": "Sign up", "route": "/signup", "trigger": "Opens the sign-up page", "expected": "Enters email and password", "test": "onboarding.spec.mjs#sign-up" },
+      { "id": "verify", "name": "Verify email", "route": "/verify", "trigger": "Submits the form", "expected": "Follows the link in the preview inbox", "test": "onboarding.spec.mjs#verify" },
+      { "id": "team", "name": "Name your team", "route": "/team", "trigger": "Email verified", "expected": "Names the team before a workspace exists" },
+      { "id": "dashboard", "name": "Dashboard", "route": "/app", "trigger": "Names the team", "expected": "Lands on the dashboard with the team created", "test": "onboarding.spec.mjs#dashboard" }
+    ]
+  },
+  "token": { "id": "color-primary", "origin": "observed", "value": "#3047b9", "proof": { "commit": "a1b2c3d", "status": "passed", "check": "computed --color-primary on /" } },
+  "codexV1Recipe": {
+    "version": 1, "buildTarget": "build", "checks": [{ "name": "App tests", "command": ["npm", "test"] }],
+    "scenarios": [{ "id": "edit-post", "criterion": 0, "label": "Review editing a published post", "expected": "The demo author can edit the published post.", "fixture": "post-v2", "role": "author", "path": "/posts/demo/edit" }]
+  },
+  "generatedSeams": {
+    "version": 1,
+    "seams": [
+      { "path": "aludel.json", "kind": "file", "purpose": "Setup choices Aludel generated the app from", "remove": "Delete the file" },
+      { "path": "src/aludel-bridge.ts", "kind": "file", "purpose": "Lets the Pages layer point at page sections in the preview", "remove": "Delete the file and its import in src/main.ts" },
+      { "path": "src/main.ts", "kind": "edit", "purpose": "Imports the Pages bridge", "remove": "Delete the aludel-bridge import" },
+      { "path": "src/app.html", "kind": "edit", "purpose": "data-aludel-page marks each page for the Pages layer", "remove": "Delete the data-aludel-page attributes" },
+      { "path": "src/site.ts", "kind": "edit", "purpose": "Generated from the Pages layer", "remove": "Keep the file; delete the generated-by comment" },
+      { "path": "src/page-blocks.ts", "kind": "edit", "purpose": "Shared page block layouts copied from Aludel", "remove": "Keep the file; delete the Aludel comments" },
+      { "path": "src/styles.scss", "kind": "edit", "purpose": "Feel and theme comment from Aludel's Look & feel step", "remove": "Delete the comment" },
+      { "path": "server/server.mjs", "kind": "edit", "purpose": "The preview-only review setup route (/api/__aludel/review)", "remove": "Delete the review setup handler" },
+      { "path": "Dockerfile", "kind": "edit", "purpose": "Copies .aludel/review.json into the runtime image for the setup route", "remove": "Delete the COPY of .aludel/review.json" },
+      { "path": ".github/workflows/ci.yml", "kind": "edit", "purpose": "Publishes the test-results artifact Aludel reads", "remove": "Keep the step; delete the comment" },
+      { "path": "README.md", "kind": "edit", "purpose": "Attribution and pointers into Aludel", "remove": "Delete the Aludel paragraph" },
+      { "path": "AGENTS.md", "kind": "edit", "purpose": "Pointers to Aludel-generated docs", "remove": "Delete the Aludel lines" },
+      { "path": "docs/agents.md", "kind": "file", "purpose": "Agent guidance exported from Aludel", "remove": "Delete the file" },
+      { "path": "docs/product.md", "kind": "file", "purpose": "Product intent exported from Aludel's Vision", "remove": "Delete the file" }
+    ]
+  }
+}
