@@ -37,7 +37,7 @@ export function runPagesFlowCandidate(db, projectId, operation, input) {
   const instanceId = layerInstanceId(db, projectId, 'pages');
   for (const [key, expected] of Object.entries({ projectId, layerInstanceId: instanceId, sourceCommit: pkg.commit }))
     if (input[key] != null && input[key] !== expected) throw new Error(`Pages flow ${key} does not match the installed package.`);
-  const source = execFileSync('git', ['-C', pkg.repo, 'show', `${pkg.commit}:${entry}`],
+  const source = execFileSync('git', ['-C', pkg.repo, 'show', `${pkg.commit}:${pkg.root || ''}${entry}`],
     { encoding: 'utf8', maxBuffer: 65536 });
   if (!sourceReviewed(db, projectId, 'pages', entry, createHash('sha256').update(source).digest('hex')))
     throw new Error('Pages flow source has not passed host review.');

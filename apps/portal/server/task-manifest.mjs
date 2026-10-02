@@ -34,7 +34,8 @@ function compileLayerTask(bundle) {
         `Change ${scope.key} data only by calling its API with aludel_layer_call (operation, id for a path id, body). The API document under layerApi defines every operation and schema. ` +
         'Your writes are staged for this run, reads include what you staged, and nothing applies until an elevated reviewer accepts the run. ' +
         `To change the layer itself (its Knowledge, docs, API document, rules, views or tests), edit its repository in layer/ of your workspace, on your work branch. ` +
-        'layer/.aludel/outputs/ holds a copy of the current outputs: run `node --test tests/*.test.mjs` in layer/, then call aludel_layer_commit with a message and each test result. ' +
+        `The layer package is ${layerPackage.root ? `in layer/${layerPackage.root}` : 'layer/ itself'}; its paths below are relative to it. ` +
+        `layer/${layerPackage.root || ''}.aludel/outputs/ holds a copy of the current outputs: run \`node --test tests/*.test.mjs\` in layer/${layerPackage.root || ''}, then call aludel_layer_commit with a message and each test result. ` +
         'An elevated reviewer sees the diff and your results and accepting merges the branch into the layer. Changes to api/, server/, ui/, tests/ or layer.json change what the layer runs: say so in your summary. ' +
         'If something outside this layer should change, or a separate task would help, propose it as a follow-up with a clear reason instead of doing it. ' +
         'When you submit, give evidence for every criterion (see outputs[0].evidence); the reviewer judges each criterion against it. ' +
@@ -54,7 +55,7 @@ function compileLayerTask(bundle) {
       evidence: 'For each criterion (by index from 0), name what shows it is met: type change with ref = a record ID or title you staged, or a repository file path you committed; type test with ref = a test name exactly as reported to aludel_layer_commit. note says what the reviewer should check. Review shows each criterion with this evidence.',
       followUpLayers: guidance.followUpLayers || [], checks: (work.checks || []).map(check => check.text) }],
     library: 'Other layers are read only through the Library (DEC-059): knowledge search covers every installed layer\'s outputs and Knowledge (charters, methods, policies; ids like k:<layer>:<doc>) and research. Cite what you relied on in usedInputs with its revision.',
-    capabilities: { knowledge: ['map', 'search', 'read'], layerApi: scope.key, layerRepository: { checkout: 'layer/', base: layerPackage.commit, commitTool: 'aludel_layer_commit', writable: writablePatterns },
+    capabilities: { knowledge: ['map', 'search', 'read'], layerApi: scope.key, layerRepository: { checkout: 'layer/', base: layerPackage.commit, commitTool: 'aludel_layer_commit', writable: layerPackage.writable || writablePatterns },
       repository: 'project repository: read-only pinned commit (your layer is writable in layer/)', submit: 'layer_api_draft' },
     runtime: { authorization: 'Go-pinned attempt', repositoryCommit: repository.commit, instructionPins, staleInputs: 'withdraw this attempt when a pinned input changes' }
   };

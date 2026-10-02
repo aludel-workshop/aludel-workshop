@@ -11,8 +11,10 @@ import angular from '@analogjs/vite-plugin-angular';
 const [repo, commit, key, outDir] = process.argv.slice(2);
 if (!repo || !/^[0-9a-f]{40}$/.test(commit || '') || !/^[a-z][a-z0-9_]{2,31}$/.test(key || '') || !outDir) throw new Error('Usage: build-layer-ui <repo> <commit> <key> <outDir>');
 const portal = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const git = (...args) => execFileSync('git', ['-C', repo, ...args], { maxBuffer: 16 * 1024 * 1024 });
-const manifest = JSON.parse(git('show', `${commit}:layer.json`).toString());
+const git = (...args) => execFileSync('git', ['-C', repo, ...args], { maxBuffer: 16 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] });
+// The package sits at the repository root, or under .aludel/ in a repository that belongs to something else (T03-CODE).
+const root = ['', '.aludel/'].find(prefix => { try { git('cat-file', '-e', `${commit}:${prefix}layer.json`); return true; } catch { return false; } }) ?? '';
+const manifest = JSON.parse(git('show', `${commit}:${root}layer.json`).toString());
 if (manifest.key !== key || !manifest.ui?.entry || !Array.isArray(manifest.ui.files) || !manifest.ui.files.includes(manifest.ui.entry)) throw new Error('This layer declares no views.');
 // A build stopped partway (the portal shut down mid-build) leaves its staging folder; clear any older than ten minutes.
 for (const name of readdirSync(portal).filter(name => name.startsWith('.layer-ui-src-')))
@@ -23,7 +25,7 @@ try {
   mkdirSync(ui);
   for (const path of manifest.ui.files) {
     if (!/^ui\/[a-z][a-z0-9-]*\.(?:ts|scss)$/.test(path)) throw new Error(`Invalid layer view path: ${path}`);
-    writeFileSync(join(scratch, path), git('show', `${commit}:${path}`));
+    writeFileSync(join(scratch, path), git('show', `${commit}:${root}${path}`));
   }
   writeFileSync(join(scratch, 'styles.scss'), manifest.ui.files.filter(path => path.endsWith('.scss')).map(path => `@use './${path.slice(0, -5)}';`).join('\n') + '\n');
   const base = JSON.parse(readFileSync(join(portal, 'tsconfig.json'), 'utf8'));

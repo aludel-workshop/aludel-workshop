@@ -83,7 +83,9 @@ if (layer?.layer) {
     try { git(checkout, 'merge-base', '--is-ancestor', layer.base, 'HEAD'); }
     catch { fail('The layer checkout is not descended from the run base.'); }
   }
-  const outputs = join(checkout, '.aludel', 'outputs');
+  // The outputs copy sits beside the layer's tests, under its package root (T03-CODE: `.aludel/` in an app repository).
+  if (!['', '.aludel/'].includes(layer.root ?? '')) fail('Aludel returned an invalid layer package root.');
+  const outputs = join(checkout, layer.root || '', '.aludel', 'outputs');
   mkdirSync(outputs, { recursive: true });
   for (const [kind, records] of Object.entries(layer.outputs || {})) if (/^[a-z][a-z0-9_]*$/.test(kind)) writeFileSync(join(outputs, `${kind}.json`), JSON.stringify(records, null, 2));
   writeFileSync(join(outputs, 'catalogs.json'), JSON.stringify(layer.catalogs || {}, null, 2));

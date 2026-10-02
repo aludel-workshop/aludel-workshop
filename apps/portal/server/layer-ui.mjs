@@ -25,15 +25,15 @@ export const frameLabel = instanceId => `i-${String(instanceId).replace(/-/g, ''
 export function layerUi({ dataDirectory, layerOrigin, portalOrigin, appOriginFor = () => null }) {
   const cacheRoot = resolve(dataDirectory, 'layer-ui');
   const sources = new Map();
-  const viewsDigest = (repo, commit, ui) => {
+  const viewsDigest = (repo, commit, ui, root = '') => {
     const cached = sources.get(`${repo}@${commit}`);
     if (cached) return cached;
-    const blobs = execFileSync('git', ['-C', repo, 'rev-parse', ...ui.files.map(path => `${commit}:${path}`)], { encoding: 'utf8' }).trim();
+    const blobs = execFileSync('git', ['-C', repo, 'rev-parse', ...ui.files.map(path => `${commit}:${root}${path}`)], { encoding: 'utf8' }).trim();
     const value = createHash('sha256').update(`${JSON.stringify(ui)}\0${blobs}`).digest('hex');
     sources.set(`${repo}@${commit}`, value);
     return value;
   };
-  const buildKey = (pkg, key) => createHash('sha256').update(`${viewsDigest(pkg.repo, pkg.commit, pkg.manifest.ui)}\0${key}\0${sdkDigest}`).digest('hex').slice(0, 32);
+  const buildKey = (pkg, key) => createHash('sha256').update(`${viewsDigest(pkg.repo, pkg.commit, pkg.manifest.ui, pkg.root)}\0${key}\0${sdkDigest}`).digest('hex').slice(0, 32);
 
   function start(repo, commit, key, id) {
     if (building.has(id)) return building.get(id);

@@ -7,7 +7,7 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { runPure, sourceReviewed } from './layer-api.mjs';
-import { fileOutputs, layerPackageForProject, outputPath, packageAt } from './layer-package.mjs';
+import { fileOutputs, layerPackageForProject, outputPath, packageAt, packageRootAt } from './layer-package.mjs';
 
 export { fileOutputs, outputPath };
 
@@ -28,9 +28,12 @@ export function initLayerFiles(db) {
   if (!columns.has('work_item_id')) db.exec('ALTER TABLE layer_file_entries ADD COLUMN work_item_id TEXT');
 }
 
+// Paths are the package's own, under its root (T03-CODE: `.aludel/` in a repository that belongs to the app).
+const roots = new Map();
+const rootAt = (repo, commit) => { const cacheKey = `${repo}@${commit}`; if (!roots.has(cacheKey)) roots.set(cacheKey, packageRootAt(repo, commit)); return roots.get(cacheKey); };
 const read = (repo, commit, path) => {
   let text;
-  try { text = git(repo, ['show', `${commit}:${path}`]); } catch { return null; }
+  try { text = git(repo, ['show', `${commit}:${rootAt(repo, commit)}${path}`]); } catch { return null; }
   if (Buffer.byteLength(text) > maxFileBytes) fail(`${path} is larger than ${maxFileBytes / 1024} KB.`);
   return text;
 };
@@ -155,7 +158,7 @@ export function commitOutputFiles(db, { projectId, key, files, expectedCommit, a
     git(repo, ['read-tree', main], { env });
     for (const [path, content] of changed) {
       const blob = git(repo, ['hash-object', '-w', '--stdin'], { input: content }).trim();
-      git(repo, ['update-index', '--add', '--cacheinfo', `100644,${blob},${path}`], { env });
+      git(repo, ['update-index', '--add', '--cacheinfo', `100644,${blob},${rootAt(repo, main)}${path}`], { env });
     }
     const tree = git(repo, ['write-tree'], { env }).trim();
     next = git(repo, ['commit-tree', tree, '-p', main, '-m', String(message || rationale || `Edit ${changed.map(([path]) => path).join(', ')}`).slice(0, 300)], { env }).trim();

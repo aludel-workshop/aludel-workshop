@@ -36,7 +36,7 @@ Record each run's start here before executing.
 
 ### Run log
 
-(none yet. Builds run in a fresh session, starting from this brief.)
+- **2026-10-01, run 1 (Claude, VS Code chat).** The owner said "start t03 code". Scope is exactly the authorization above: local code, tests, previews and evidence on `main` of this repository (from `53fcb92`), a new `code` branch and G-CODE commits on `layer-base` `main` (from `fee5f30`), and disposable local repositories. GitHub is exercised only against a fake GitHub. No live GitHub writes started by the agent, no provider turns, deployment, spending or live owner data. Order: ledger → G-CODE → `code` template → parity → host wiring → checks → closeout; the owner's live round trip comes after the fake-GitHub journey passes.
 
 ## Fixed decisions you must not reopen
 

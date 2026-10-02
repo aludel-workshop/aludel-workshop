@@ -189,7 +189,8 @@ test('worker HTTP proposal route accepts only its scoped token and current attem
   try {
     const origin = `http://127.0.0.1:${port}`;
     let ready = false;
-    for (let tries = 0; tries < 100 && !ready; tries++) {
+    // A fresh portal starts in about 1.5 s alone, but well past 5 s while the whole suite runs in parallel (T03-CODE run 1).
+    for (const deadline = Date.now() + 30_000; !ready && Date.now() < deadline;) {
       try { ready = (await fetch(origin + '/api/session')).ok; } catch { await new Promise(resolve => setTimeout(resolve, 50)); }
     }
     assert.ok(ready);

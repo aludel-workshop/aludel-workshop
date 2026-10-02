@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import Ajv2020 from 'ajv/dist/2020.js';
-import { layerPackageForProject } from './layer-package.mjs';
+import { layerPackageForProject, packageAt } from './layer-package.mjs';
 import { fileEntryExists } from './layer-files.mjs';
 import { entryRoles } from './entry-roles.mjs';
 
@@ -48,9 +48,10 @@ function message(errors) {
 function compile(key, repo, commit, manifest) {
   const cacheKey = `${repo}@${commit}`;
   if (cache.has(cacheKey)) return cache.get(cacheKey);
+  const root = packageAt(repo, commit, key).root;
   const read = path => {
     if (typeof path !== 'string' || !/^(?:api|server)\/[a-z][a-z0-9-]*\.(?:json|mjs)$/.test(path)) fail('Invalid layer API path.', 500);
-    return execFileSync('git', ['-C', repo, 'show', `${commit}:${path}`], { encoding: 'utf8', maxBuffer: 1024 * 1024 });
+    return execFileSync('git', ['-C', repo, 'show', `${commit}:${root}${path}`], { encoding: 'utf8', maxBuffer: 1024 * 1024 });
   };
   const spec = JSON.parse(read(manifest.api.spec));
   const source = read(manifest.api.handler);

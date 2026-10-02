@@ -683,7 +683,7 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
       const value = know.catalogs?.[name];
       return [name, Array.isArray(value) ? value : value && typeof value === 'object' ? Object.keys(value) : []];
     }));
-    return { layer: layer.key, base: bundle.layerPackage.commit, branch: workBranchName(bundle.work.ref, row.id), outputs, catalogs };
+    return { layer: layer.key, base: bundle.layerPackage.commit, branch: workBranchName(bundle.work.ref, row.id), root: bundle.layerPackage.root || '', outputs, catalogs };
   }
   function layerSourceBundle(scope, attemptId) {
     const { row, bundle, layer } = layerRun(scope, attemptId);

@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { refacet } from './bindings.mjs';
 import { referencesTo } from './entry-roles.mjs';
-import { packageAt } from './layer-package.mjs';
+import { packageAt, packageRootAt } from './layer-package.mjs';
 import { layerBinding, mergeLayerBranch, settleLayerCheckout, undoLayerMerge } from './layer-source.mjs';
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
@@ -22,14 +22,15 @@ const aludel = { GIT_AUTHOR_NAME: 'Aludel', GIT_AUTHOR_EMAIL: 'aludel@aludel.inv
 
 // Commits `layer.json` with new facets on top of `base`, without touching any checkout, as branch `name`.
 export function commitFacets(repo, base, facets, name, message) {
-  const manifest = JSON.parse(git(repo, ['show', `${base}:layer.json`]));
+  const root = packageRootAt(repo, base);
+  const manifest = JSON.parse(git(repo, ['show', `${base}:${root}layer.json`]));
   const content = `${JSON.stringify({ ...manifest, facets }, null, 2)}\n`;
   const scratch = mkdtempSync(join(tmpdir(), 'aludel-refacet-'));
   try {
     const env = { ...process.env, ...aludel, GIT_INDEX_FILE: join(scratch, 'index') };
     git(repo, ['read-tree', base], { env });
     const blob = git(repo, ['hash-object', '-w', '--stdin'], { input: content });
-    git(repo, ['update-index', '--cacheinfo', `100644,${blob},layer.json`], { env });
+    git(repo, ['update-index', '--cacheinfo', `100644,${blob},${root}layer.json`], { env });
     const tree = git(repo, ['write-tree'], { env });
     const commit = git(repo, ['commit-tree', tree, '-p', base, '-m', message], { env });
     git(repo, ['update-ref', `refs/heads/${name}`, commit]);
@@ -43,12 +44,12 @@ export function refacets({ db, know, pool, store, routines }) {
   // The layer as the pure refacet takes it: its manifest at the pin, its published entries, and the project's bindings.
   function current(projectId, key) {
     const { repo, commit } = layerBinding(db, projectId, key);
-    const { manifest } = packageAt(repo, commit, key);
+    const { manifest, root } = packageAt(repo, commit, key);
     const all = pool.outputEntries(projectId);
     const entries = all.filter(entry => entry.layer.key === key).map(entry => ({ ref: entry.ref, kind: entry.kind, data: entry.data || {} }));
     // Other layers' references into this layer's entries, for the preflight (R3's reference index).
     const references = referencesTo(all, entries.map(entry => entry.ref), { exceptLayer: key });
-    return { repo, commit, manifest, entries, references, bindings: store.all(projectId) };
+    return { repo, commit, root, manifest, entries, references, bindings: store.all(projectId) };
   }
   const compute = (state, key, change) => refacet({ key, outputs: state.manifest.outputs || [], tabs: state.manifest.tabs || [], facets: state.manifest.facets || [] },
     change, { entries: state.entries, bindings: state.bindings, references: state.references });
@@ -99,7 +100,7 @@ export function refacets({ db, know, pool, store, routines }) {
     // the same change is committed again on the current pin; otherwise the proposal is stale.
     let source = { branch: plan.branch, commit: plan.commit, base: plan.base };
     if (state.commit !== plan.base) {
-      const was = JSON.parse(git(state.repo, ['show', `${plan.base}:layer.json`])).facets ?? null;
+      const was = JSON.parse(git(state.repo, ['show', `${plan.base}:${packageRootAt(state.repo, plan.base)}layer.json`])).facets ?? null;
       if (JSON.stringify(was) !== JSON.stringify(state.manifest.facets ?? null)) fail('The layer changed since this refacet was proposed. Dismiss it and propose it again.', 409);
       const branch = `${plan.branch}-on-${state.commit.slice(0, 7)}`;
       source = { branch, commit: commitFacets(state.repo, state.commit, plan.facets, branch, `Refacet ${plan.layer} (again on ${state.commit.slice(0, 7)})`), base: state.commit };
@@ -110,7 +111,7 @@ export function refacets({ db, know, pool, store, routines }) {
     const reviewer = db.prepare('SELECT display_name FROM users WHERE id = ?').get(userId)?.display_name || 'Owner';
     const instance = db.prepare('SELECT instance_id FROM layer_instances WHERE project_id = ? AND layer_key = ?').get(projectId, plan.layer)?.instance_id;
     const merge = mergeLayerBranch(db, { projectId, key: plan.layer, reviewer, workId, workRef: `#${row.number}`, catalogs: know.catalogs,
-      source: { ...source, files: [{ path: 'layer.json', status: 'modified', ownerReview: true }] },
+      source: { ...source, files: [{ path: `${state.root || ''}layer.json`, status: 'modified', ownerReview: true }] },
       recordsOf: kind => db.prepare('SELECT id, data_json FROM knowledge_records WHERE project_id = ? AND kind = ? AND layer_instance_id = ?').all(projectId, kind, instance)
         .map(record => ({ id: record.id, data: JSON.parse(record.data_json) })) });
     const why = `Refacet of ${plan.layer} (#${row.number}): ${describe(plan.change, result.preflight).what}`;

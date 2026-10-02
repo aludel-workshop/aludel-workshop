@@ -10,17 +10,15 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { layerApiAt, normalizeRecord } from './layer-api.mjs';
-import { packageAt } from './layer-package.mjs';
+import { ownWritablePatterns, packageAt, repositoryPaths } from './layer-package.mjs';
 import { indexAt, syncFileEntries } from './layer-files.mjs';
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const now = () => new Date().toISOString();
 const maxFiles = 40, maxDiff = 60 * 1024;
-const writable = [/^knowledge\/[a-z0-9][a-z0-9-]*\.md$/, /^docs\/[a-z0-9][a-z0-9-]*\.md$/, /^(?:README|AGENTS)\.md$/, /^fixtures\/[a-z0-9][a-z0-9-]*\.(?:md|json)$/,
-  /^api\/[a-z0-9][a-z0-9-]*\.json$/, /^outputs\/[a-z0-9][a-z0-9-]*(?:\/[a-z0-9][a-z0-9-]*)*\.(?:json|md|ya?ml)$/, /^server\/[a-z0-9][a-z0-9-]*\.mjs$/, /^ui\/[a-z0-9][a-z0-9-]*\.(?:ts|scss)$/, /^tests\/[a-z0-9][a-z0-9-]*\.test\.mjs$/, /^layer\.json$/, /^\.gitignore$/];
-// Files that run on the host or define what the layer may do; review marks them.
-export const authorityPath = path => /^(?:server|ui|api|tests)\//.test(path) || path === 'layer.json';
-export const writablePatterns = ['knowledge/*.md', 'docs/*.md', 'README.md', 'AGENTS.md', 'fixtures/*.md|json', 'api/*.json', 'outputs/**/*.json|md|yaml', 'server/*.mjs', 'ui/*.ts|scss', 'tests/*.test.mjs', 'layer.json', '.gitignore'];
+// What a run may change and what review marks come from the package at the run's base (layer-package `repositoryPaths`):
+// the package's own files under its root, plus the repository files its manifest declares as output (T03-CODE).
+export const writablePatterns = ownWritablePatterns;
 const git = (repo, args, options = {}) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, ...options });
 const agentIdentity = { GIT_AUTHOR_NAME: 'Aludel agent', GIT_AUTHOR_EMAIL: 'agent@aludel.invalid', GIT_COMMITTER_NAME: 'Aludel', GIT_COMMITTER_EMAIL: 'aludel@aludel.invalid' };
 const validTests = tests => Array.isArray(tests) && tests.length <= 200 && tests.every(entry => entry && typeof entry.name === 'string' && entry.name.trim() && entry.name.length <= 200 &&
@@ -69,8 +67,9 @@ export function commitLayerBranch(db, { projectId, key, attemptId, workspace, ba
   if (head === base) fail('The layer checkout has no changes to submit.');
   const changed = git(checkout, ['diff', '--name-status', '--no-renames', base, head]).trim().split('\n').filter(Boolean).map(line => { const [status, path] = line.split('\t'); return { status, path }; });
   if (changed.length > maxFiles) fail(`A run may change at most ${maxFiles} files.`);
-  const refused = changed.filter(file => !writable.some(pattern => pattern.test(file.path)));
-  if (refused.length) fail(`A run may not change ${refused.map(file => file.path).join(', ')}. Writable: ${writablePatterns.join(', ')}.`, 403);
+  const paths = repositoryPaths(packageAt(repo, base, key));
+  const refused = changed.filter(file => !paths.writable(file.path));
+  if (refused.length) fail(`A run may not change ${refused.map(file => file.path).join(', ')}. Writable: ${paths.patterns.join(', ')}.`, 403);
   const branch = workBranchName(workRef, attemptId);
   git(repo, ['fetch', '--quiet', '--no-tags', checkout, `+${head}:refs/heads/${branch}`]);
   if (git(repo, ['rev-parse', `refs/heads/${branch}`]).trim() !== head) fail('The work branch did not arrive intact.', 409);
@@ -81,7 +80,7 @@ export function commitLayerBranch(db, { projectId, key, attemptId, workspace, ba
     let diff = git(repo, ['diff', '--no-color', '--no-ext-diff', base, head, '--', file.path]);
     if (diff.length > maxDiff) diff = diff.slice(0, maxDiff) + '\n… diff truncated';
     const lines = diff.split('\n');
-    return { path: file.path, status: file.status === 'A' ? 'added' : file.status === 'D' ? 'deleted' : 'modified', ownerReview: authorityPath(file.path),
+    return { path: file.path, status: file.status === 'A' ? 'added' : file.status === 'D' ? 'deleted' : 'modified', ownerReview: paths.authority(file.path),
       added: lines.filter(line => line.startsWith('+') && !line.startsWith('+++')).length, removed: lines.filter(line => line.startsWith('-') && !line.startsWith('---')).length, diff };
   });
   db.prepare(`INSERT INTO layer_work_branches VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(attempt_id) DO UPDATE SET branch = excluded.branch, commit_sha = excluded.commit_sha,
@@ -112,8 +111,10 @@ export function mergeLayerBranch(db, { projectId, key, source, reviewer, workId,
       { env: { ...process.env, GIT_AUTHOR_NAME: reviewer, GIT_AUTHOR_EMAIL: 'reviewer@aludel.invalid', GIT_COMMITTER_NAME: 'Aludel', GIT_COMMITTER_EMAIL: 'aludel@aludel.invalid' } }).trim();
   }
   const pkg = packageAt(repo, merged, key);
-  for (const file of source.files.filter(entry => entry.status !== 'deleted' && /^server\/.+\.mjs$/.test(entry.path)))
-    db.prepare('INSERT OR IGNORE INTO layer_source_reviews VALUES (?, ?, ?, ?, ?, ?, ?)').run(projectId, key, file.path,
+  // Reviewed bytes are recorded by the package's own path, which is how the host looks a handler up.
+  const own = repositoryPaths(pkg).own;
+  for (const file of source.files.filter(entry => entry.status !== 'deleted' && /^server\/.+\.mjs$/.test(own(entry.path) || '')))
+    db.prepare('INSERT OR IGNORE INTO layer_source_reviews VALUES (?, ?, ?, ?, ?, ?, ?)').run(projectId, key, own(file.path),
       createHash('sha256').update(git(repo, ['show', `${merged}:${file.path}`])).digest('hex'), reviewer, now(), workId);
   if (pkg.manifest.api) {
     const api = layerApiAt(key, repo, merged, pkg.manifest);

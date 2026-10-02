@@ -38,7 +38,7 @@ export function knowledgeSite({ db, pool, store, changes, refacets, docs }) {
 
   // A record schema's fields from the layer's own API document, for parts that don't state a shape.
   function fieldsFor(target, kinds) {
-    const spec = target.manifest.api?.spec && (() => { try { return JSON.parse(execFileSync('git', ['-C', target.repo, 'show', `${target.commit}:${target.manifest.api.spec}`], { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 })); } catch { return null; } })();
+    const spec = target.manifest.api?.spec && (() => { try { return JSON.parse(execFileSync('git', ['-C', target.repo, 'show', `${target.commit}:${target.root || ''}${target.manifest.api.spec}`], { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 })); } catch { return null; } })();
     const follow = ref => ref.split('/').slice(1).reduce((at, part) => at?.[part], spec);
     const resolve = schema => typeof schema === 'string' ? follow(schema) : schema?.$ref ? follow(schema.$ref) : schema;
     const fields = [];

@@ -28,10 +28,21 @@ const configured = (key, template = null) => {
 };
 const git = (repo, ...args) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8', maxBuffer: 1024 * 1024 }).trimEnd();
 const projectRoot = (projectId,instanceId) => join(resolve(process.env.MACHINE_DATA_DIR || join(portal, '.data')), 'layer-repos', createHash('sha256').update(projectId).digest('hex').slice(0, 20), instanceId);
-const content = (repo, commit, path) => {
+const content = (repo, commit, path, root = '') => {
   if (typeof path !== 'string' || !/^(?:knowledge|ui)\/[a-z][a-z0-9-]*\.(?:md|ts|scss)$/.test(path)) throw new Error(`Invalid layer package path: ${path}`);
-  return execFileSync('git', ['-C', repo, 'show', `${commit}:${path}`], { encoding: 'utf8', maxBuffer: 1024 * 1024 });
+  return execFileSync('git', ['-C', repo, 'show', `${commit}:${root}${path}`], { encoding: 'utf8', maxBuffer: 1024 * 1024 });
 };
+// T03-CODE (G-CODE): a repository holds its layer package at the root, or under `.aludel/` when the repository belongs to
+// something else (the app, for Code). Every path a manifest names is relative to that package root.
+export const packageRoots = ['', '.aludel/'];
+export function packageRootAt(repo, commit) {
+  for (const root of packageRoots) {
+    try { execFileSync('git', ['-C', repo, 'cat-file', '-e', `${commit}:${root}layer.json`], { stdio: 'ignore' }); return root; } catch { /* not here */ }
+  }
+  throw new Error('Layer package has no layer.json.');
+}
+// A file the package names, read at its commit from under the package root.
+export const packageFile = (pkg, path, options = {}) => execFileSync('git', ['-C', pkg.repo, 'show', `${pkg.commit}:${pkg.root || ''}${path}`], { encoding: 'utf8', maxBuffer: 1024 * 1024, ...options });
 export function initLayerPackages(db) {
   db.exec(`CREATE TABLE IF NOT EXISTS layer_package_bindings (
     project_id TEXT NOT NULL REFERENCES projects(id), layer_key TEXT NOT NULL, layer_instance_id TEXT,
@@ -69,13 +80,45 @@ function binding(db, projectId, key) {
 // T03-G2 (DEC-059): a manifest's repository-mode outputs: exact paths under outputs/, the kinds they hold and the pure
 // indexer that splits them into Library entries. Null when it declares none.
 export const outputPath = /^outputs\/[a-z0-9][a-z0-9-]*(?:\/[a-z0-9][a-z0-9-]*)*\.(?:json|md|ya?ml)$/;
+// T03-CODE (G-CODE): `files.repository` names the repository's own files, outside the package root, that are this layer's
+// output (Code's is the codebase). Globs relative to the repository root: `*` within a folder, `**` across folders.
+const repositoryGlob = /^(?:\*\*|[A-Za-z0-9_.*-]+)(?:\/(?:\*\*|[A-Za-z0-9_.*-]+))*\/?$/;
 export function fileOutputs(manifest) {
   const files = manifest?.files;
   if (files === undefined) return null;
-  if (!files || !Array.isArray(files.paths) || !files.paths.length || files.paths.length > 20 || !files.paths.every(path => typeof path === 'string' && outputPath.test(path))
+  if (!files || !Array.isArray(files.paths) || files.paths.length > 20 || !files.paths.every(path => typeof path === 'string' && outputPath.test(path))
+      || !files.paths.length && !files.repository
       || new Set(files.paths).size !== files.paths.length || !Array.isArray(files.kinds) || !files.kinds.length || !files.kinds.every(kind => manifest.outputs.includes(kind))
-      || typeof files.indexer !== 'string' || !/^server\/[a-z][a-z0-9-]*\.mjs$/.test(files.indexer)) throw new Error('Invalid layer file outputs.');
-  return { paths: files.paths, kinds: files.kinds, indexer: files.indexer };
+      || typeof files.indexer !== 'string' || !/^server\/[a-z][a-z0-9-]*\.mjs$/.test(files.indexer)
+      || files.repository !== undefined && (!Array.isArray(files.repository) || !files.repository.length || files.repository.length > 20
+        || !files.repository.every(glob => typeof glob === 'string' && repositoryGlob.test(glob) && !glob.split('/').includes('..')))
+      || files.units !== undefined && (typeof files.units !== 'boolean' || files.units && !files.repository)) throw new Error('Invalid layer file outputs.');
+  return { paths: files.paths, kinds: files.kinds, indexer: files.indexer, repository: files.repository || [], units: !!files.units };
+}
+const globPattern = glob => new RegExp(`^${glob.replace(/\/$/, '/**').split('/').map(part => part === '**' ? '\u0000' : part.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*')).join('/')
+  .replace(/\u0000\//g, '(?:.*/)?').replace(/\/\u0000/g, '(?:/.*)?').replace(/\u0000/g, '.*')}$`);
+export const matchesGlob = (glob, path) => globPattern(glob).test(path);
+// The package's own files a run may change, relative to its root, and the ones review marks because they run on the host
+// or define what the layer may do.
+const ownWritable = [/^knowledge\/[a-z0-9][a-z0-9-]*\.md$/, /^docs\/[a-z0-9][a-z0-9-]*\.md$/, /^(?:README|AGENTS)\.md$/, /^fixtures\/[a-z0-9][a-z0-9-]*\.(?:md|json)$/,
+  /^api\/[a-z0-9][a-z0-9-]*\.json$/, /^outputs\/[a-z0-9][a-z0-9-]*(?:\/[a-z0-9][a-z0-9-]*)*\.(?:json|md|ya?ml)$/, /^server\/[a-z0-9][a-z0-9-]*\.mjs$/, /^ui\/[a-z0-9][a-z0-9-]*\.(?:ts|scss)$/, /^tests\/[a-z0-9][a-z0-9-]*\.test\.mjs$/, /^layer\.json$/, /^\.gitignore$/];
+export const ownWritablePatterns = ['knowledge/*.md', 'docs/*.md', 'README.md', 'AGENTS.md', 'fixtures/*.md|json', 'api/*.json', 'outputs/**/*.json|md|yaml', 'server/*.mjs', 'ui/*.ts|scss', 'tests/*.test.mjs', 'layer.json', '.gitignore'];
+const ownAuthority = path => /^(?:server|ui|api|tests)\//.test(path) || path === 'layer.json';
+// Never a layer's output, whatever a manifest says: environment files (secrets), Git's own files, and CI workflows.
+const neverWritable = path => path.split('/').some(part => /^\.env(?:\..*)?$/.test(part)) || /^\.git(?:\/|$)/.test(path) || /^\.github\/workflows\//.test(path);
+// Which repository paths belong to the package, which a run may change, and which review marks.
+export function repositoryPaths(pkg) {
+  const root = pkg.root || '';
+  const own = path => !root ? path : path.startsWith(root) ? path.slice(root.length) : null;
+  const outside = root ? fileOutputs(pkg.manifest)?.repository || [] : [];
+  const writable = path => {
+    if (typeof path !== 'string' || !path || path.startsWith('/') || path.split('/').includes('..') || neverWritable(path)) return false;
+    const inside = own(path);
+    return inside !== null ? ownWritable.some(pattern => pattern.test(inside)) : outside.some(glob => matchesGlob(glob, path));
+  };
+  const authority = path => { const inside = own(path); return inside !== null && ownAuthority(inside); };
+  const patterns = [...ownWritablePatterns.map(pattern => root + pattern), ...outside.map(glob => `${glob} (not ${root}, .env*, .github/workflows/)`)];
+  return { root, own, writable, authority, patterns };
 }
 // Commits are immutable, so a validated package at one is kept.
 const packages = new Map();
@@ -88,7 +131,8 @@ export function packageAt(repo, commit, key) {
 }
 function readPackage(repo, commit, key) {
   if (!/^[0-9a-f]{40}$/.test(commit) || git(repo, 'rev-parse', '--verify', `${commit}^{commit}`) !== commit) throw new Error('Layer package commit is unavailable.');
-  const manifest = JSON.parse(git(repo, 'show', `${commit}:layer.json`));
+  const root = packageRootAt(repo, commit);
+  const manifest = JSON.parse(git(repo, 'show', `${commit}:${root}layer.json`));
   const tabs = manifest.tabs;
   // A base layer may start with no outputs and no tabs of its own; the host still provides Tasks, Knowledge and Manage.
   if (manifest.schemaVersion !== 1 || manifest.hostSdkVersion !== 1 || manifest.key !== key || typeof manifest.name !== 'string' || !manifest.name.trim()
@@ -114,10 +158,10 @@ function readPackage(repo, commit, key) {
   validateAdapters(manifest);
   validateRefers(manifest);
   // LAYER-KNOWLEDGE-01: the layer's information as a spec; each part's doc must be in the package.
-  for (const node of flatten(validateInformation(manifest, { tabs: editorTabs(manifest) }))) if (node.doc) content(repo, commit, node.doc);
+  for (const node of flatten(validateInformation(manifest, { tabs: editorTabs(manifest) }))) if (node.doc) content(repo, commit, node.doc, root);
   if (manifest.hostCalls !== undefined && (!Array.isArray(manifest.hostCalls) || manifest.hostCalls.length > 20 || !manifest.hostCalls.every(name => typeof name === 'string' && /^[a-z][A-Za-z0-9]{1,40}$/.test(name))))
     throw new Error('Invalid layer host calls.');
-  const charter = content(repo, commit, manifest.knowledge.charter);
+  const charter = content(repo, commit, manifest.knowledge.charter, root);
   if (charter.length > 20000) throw new Error('Layer charter is too large.');
   // Pure server contracts are declared and pinned here, but never executed by package loading.
   const changes = manifest.server?.semanticChanges || {};
@@ -126,10 +170,10 @@ function readPackage(repo, commit, key) {
     if (declaration?.schemaVersion !== 1 || declaration.mode !== 'pure-candidate' ||
         typeof declaration.entry !== 'string' || !/^server\/[a-z][a-z0-9-]*\.mjs$/.test(declaration.entry))
       throw new Error('Invalid layer semantic change source.');
-    const source = git(repo, 'show', `${commit}:${declaration.entry}`);
+    const source = git(repo, 'show', `${commit}:${root}${declaration.entry}`);
     if (!source || source.length > 40000) throw new Error('Layer semantic change source is unavailable or too large.');
   }
-  return { manifest, charter, repo, commit };
+  return { manifest, charter, repo, commit, root };
 }
 // Forks the layer's template into this instance's own repository. Its `main` starts at the template commit; an install
 // commit makes the manifest this instance's (key, name, path) when they differ. `main` is what the host builds and serves.
@@ -177,6 +221,54 @@ export function ensureLayerPackage(db, projectId, key, { template = null, name =
     return { ...pkg, repo: target };
   } catch (error) { rmSync(staging, { recursive: true, force: true }); throw error; }
 }
+// T03-CODE (G-CODE): installs a layer into a repository that already exists and belongs to something else (Code's is the
+// app). The template's package is copied under `.aludel/` as one commit on `main`; the template's history is kept as a ref
+// (`refs/aludel/template`), not as the repository's history. A working tree with uncommitted changes is refused rather than
+// committing someone else's edits. A repository that already holds this layer's package is bound as it is.
+const installRoot = '.aludel/';
+export function installLayerPackageInto(db, projectId, key, repo, { template = null, name = null, path = null, author = 'Aludel', replace = false } = {}) {
+  const pin = configured(key, template);
+  if (!pin) throw Object.assign(new Error('Layer templates are not enabled for this layer.'), { status: 409 });
+  const id = instanceId(db, projectId, key);
+  const existing = db.prepare('SELECT repository_path AS repo FROM layer_package_bindings WHERE project_id = ? AND layer_key = ?').get(projectId, key);
+  if (existing && existing.repo !== repo && !replace) throw Object.assign(new Error('This layer already has a repository. Adopt it into the new one explicitly.'), { status: 409 });
+  const run = (args, options = {}) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, stdio: ['pipe', 'pipe', 'pipe'], ...options }).trimEnd();
+  let head;
+  try { head = run(['rev-parse', '--verify', 'refs/heads/main^{commit}']); } catch { throw Object.assign(new Error('The repository has no main branch with a commit yet.'), { status: 409 }); }
+  let branch = null;
+  try { branch = run(['symbolic-ref', '--quiet', 'HEAD']); } catch { /* detached */ }
+  if (branch !== 'refs/heads/main') throw Object.assign(new Error('Check out main in the repository first.'), { status: 409 });
+  if (run(['status', '--porcelain', '--untracked-files=all'])) throw Object.assign(new Error('The repository has uncommitted changes. Commit or discard them first; Aludel won\'t commit someone else\'s work.'), { status: 409 });
+  let commit = head;
+  let present = null;
+  for (const root of packageRoots) { try { run(['cat-file', '-e', `${head}:${root}layer.json`]); present = root; break; } catch { /* not here */ } }
+  if (present === '') throw Object.assign(new Error('This repository is a layer repository; install it as one rather than into it.'), { status: 409 });
+  if (present === null) {
+    // Bring the template commit in, then build the install commit with a scratch index: the app's tree plus the package.
+    run(['fetch', '--quiet', '--no-tags', pin.repo, `+${pin.commit}:refs/aludel/template`]);
+    if (run(['rev-parse', 'refs/aludel/template']) !== pin.commit) throw new Error('Layer pin is absent from the template repository.');
+    const manifest = JSON.parse(run(['show', `${pin.commit}:layer.json`]));
+    const own = { ...manifest, key, name: name || manifest.name, path: path || (manifest.key === key ? manifest.path : `/${key.replace(/_/g, '-')}`) };
+    const scratch = mkdtempSync(join(repo, '.git', 'aludel-install-'));
+    const env = { ...process.env, GIT_INDEX_FILE: join(scratch, 'index'), GIT_AUTHOR_NAME: String(author).slice(0, 80), GIT_AUTHOR_EMAIL: 'person@aludel.invalid', GIT_COMMITTER_NAME: 'Aludel', GIT_COMMITTER_EMAIL: 'aludel@aludel.invalid' };
+    try {
+      run(['read-tree', head], { env });
+      run(['read-tree', `--prefix=${installRoot}`, pin.commit], { env });
+      const blob = run(['hash-object', '-w', '--stdin'], { input: JSON.stringify(own, null, 2) + '\n' });
+      run(['update-index', '--cacheinfo', `100644,${blob},${installRoot}layer.json`], { env });
+      const tree = run(['write-tree'], { env });
+      commit = run(['commit-tree', tree, '-p', head, '-m', `Add the ${own.name} layer in ${installRoot} from the ${pin.template} template\n\nAludel-Template: ${pin.template} ${pin.commit}`], { env });
+    } finally { rmSync(scratch, { recursive: true, force: true }); }
+    packageAt(repo, commit, key);
+    run(['merge', '--ff-only', '--quiet', commit]);
+  }
+  const pkg = packageAt(repo, commit, key);
+  db.prepare(`INSERT INTO layer_package_bindings(project_id,layer_key,layer_instance_id,repository_path,accepted_commit,installed_at,template,template_commit) VALUES (?,?,?,?,?,?,?,?)
+    ON CONFLICT(project_id,layer_key) DO UPDATE SET layer_instance_id = excluded.layer_instance_id, repository_path = excluded.repository_path, accepted_commit = excluded.accepted_commit,
+      installed_at = excluded.installed_at, template = excluded.template, template_commit = excluded.template_commit`)
+    .run(projectId, key, id, repo, commit, new Date().toISOString(), pin.template, pin.commit);
+  return { ...pkg, installed: present === null };
+}
 // The host features an installed layer's views may use. Forks pinned before templates declared `hostCalls` keep what their
 // template's views already relied on, keyed by the template they were forked from, until a template update reaches them.
 const hostCallsBefore = { pages: ['pageChanges', 'skeleton'], vision: ['documents'] };
@@ -201,7 +293,7 @@ export function pagesPackageDocuments(db, projectId) {
     const name = /^knowledge\/([a-z][a-z0-9-]*)\.md$/.exec(path)?.[1];
     const entry = mapping[name];
     if (!entry) throw new Error('Unsupported Pages Knowledge document.');
-    const markdown = content(pkg.repo, pkg.commit, path).trim();
+    const markdown = content(pkg.repo, pkg.commit, path, pkg.root).trim();
     const title = /^# (.+)$/m.exec(markdown)?.[1];
     if (!title || markdown.length > 8000) throw new Error('Invalid Pages Knowledge document.');
     return [entry[0],entry[1],title,markdown];
@@ -213,9 +305,10 @@ export function layerPackageTaskContext(db, projectId, key) {
   const pkg = layerPackageForProject(db, projectId, key);
   if (!pkg) return null;
   const documents = pkg.manifest.knowledge.documents.map(path => {
-    const markdown = content(pkg.repo, pkg.commit, path);
+    const markdown = content(pkg.repo, pkg.commit, path, pkg.root);
     if (markdown.length > 8000) throw new Error('Layer task document is too large.');
     return { path, markdown };
   });
-  return { key, instanceId: instanceId(db, projectId, key), commit: pkg.commit, charter: pkg.charter, documents };
+  const paths = repositoryPaths(pkg);
+  return { key, instanceId: instanceId(db, projectId, key), commit: pkg.commit, root: paths.root, writable: paths.patterns, charter: pkg.charter, documents };
 }

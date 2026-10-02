@@ -58,14 +58,14 @@ export function layerDocs({ db, onSpecChange = () => {} }) {
     const { manifest } = pkg;
     const nodes = flatten(validateInformation(manifest, { tabs: editorTabs(manifest) }));
     const nodeDocs = new Set(nodes.map(node => node.doc).filter(Boolean));
-    const titleOf = path => (show(pkg.repo, pkg.commit, path) || '').match(/^#\s+(.+)$/m)?.[1]?.trim() || path.slice(10, -3).replaceAll('-', ' ');
+    const titleOf = path => (show(pkg.repo, pkg.commit, pkg.root + path) || '').match(/^#\s+(.+)$/m)?.[1]?.trim() || path.slice(10, -3).replaceAll('-', ' ');
     const docs = [{ path: manifest.knowledge.charter, title: 'Charter', group: null, charter: true }];
     for (const path of manifest.knowledge.documents) if (!nodeDocs.has(path) && path !== manifest.knowledge.charter)
       docs.push({ path, title: titleOf(path), group: /-method\.md$/.test(path) ? 'Methods' : 'Docs' });
     const tabs = [...(manifest.tabs || []), ...(manifest.editorAdapter === 'markdown-editor' ? [{ key: 'files', label: 'Files' }] : [])];
     for (const tab of tabs) {
       const path = `knowledge/tab-${tab.key}.md`;
-      docs.push({ path, title: tab.label, group: 'Editor tabs', tab: tab.key, exists: show(pkg.repo, pkg.commit, path) !== null,
+      docs.push({ path, title: tab.label, group: 'Editor tabs', tab: tab.key, exists: show(pkg.repo, pkg.commit, pkg.root + path) !== null,
         edits: nodes.filter(node => node.tab === tab.key).map(node => node.key) });
     }
     return { commit: pkg.commit, docs };
@@ -81,7 +81,7 @@ export function layerDocs({ db, onSpecChange = () => {} }) {
       try { git(pkg.repo, ['merge-base', '--is-ancestor', at, pkg.commit]); } catch { fail('That version is not in this layer\'s history.', 404); }
     }
     const commit = at || pkg.commit;
-    let content = show(pkg.repo, commit, path);
+    let content = show(pkg.repo, commit, pkg.root + path);
     const definition = custom(projectId, key);
     // A custom layer's charter is also its identity, which activation and discovery read; until the first save in
     // Knowledge, the identity is the charter (a new one starts from the charter's prompted headings).
@@ -96,7 +96,7 @@ export function layerDocs({ db, onSpecChange = () => {} }) {
     member(projectId, userId);
     if (!docPath.test(path || '') && path !== 'layer.json') fail('Choose a knowledge/*.md document.');
     const pkg = current(projectId, key);
-    const out = git(pkg.repo, ['log', '--format=%H%x09%an%x09%aI%x09%s', pkg.commit, '--', path]);
+    const out = git(pkg.repo, ['log', '--format=%H%x09%an%x09%aI%x09%s', pkg.commit, '--', pkg.root + path]);
     // A save in Knowledge is marked by its subject; anything else came with the template or through reviewed Work.
     const versions = out ? out.split('\n').map(line => { const [commit, name, at, subject] = line.split('\t');
       return { commit, by: name, at, subject, saved: subject.startsWith('Knowledge:') }; }) : [];
@@ -112,13 +112,13 @@ export function layerDocs({ db, onSpecChange = () => {} }) {
     if (content.length > maxDoc) fail(`Keep a document under ${maxDoc} characters.`);
     const pkg = current(projectId, key);
     if (!commitPattern.test(base || '')) fail('Say which version you edited.');
-    if (base !== pkg.commit && show(pkg.repo, base, path) !== show(pkg.repo, pkg.commit, path)) fail('Someone changed this document since you opened it. Reload to see their version.', 409);
+    if (base !== pkg.commit && show(pkg.repo, base, pkg.root + path) !== show(pkg.repo, pkg.commit, pkg.root + path)) fail('Someone changed this document since you opened it. Reload to see their version.', 409);
     const text = content.endsWith('\n') ? content : `${content}\n`;
-    if (show(pkg.repo, pkg.commit, path) === text.trimEnd()) return { path, commit: pkg.commit, changed: false };
+    if (show(pkg.repo, pkg.commit, pkg.root + path) === text.trimEnd()) return { path, commit: pkg.commit, changed: false };
     const definition = custom(projectId, key);
     if (path === pkg.manifest.knowledge.charter && definition)
       saveLayerCharter(db, userId, projectId, key, { content: text, expectedRevision: definition.identityRevision });
-    const next = commitFiles(pkg.repo, pkg.commit, { [path]: text }, `Knowledge: ${path.slice(10)}`, author(userId));
+    const next = commitFiles(pkg.repo, pkg.commit, { [pkg.root + path]: text }, `Knowledge: ${path.slice(10)}`, author(userId));
     try { packageAt(pkg.repo, next, key); } catch (error) { fail(`That would make the layer invalid: ${error.message}`); }
     advance(projectId, key, pkg.repo, pkg.commit, next);
     return { path, commit: next, changed: true };
@@ -128,13 +128,13 @@ export function layerDocs({ db, onSpecChange = () => {} }) {
   function saveInformation(projectId, userId, key, { information, base } = {}) {
     editor(projectId, userId);
     const pkg = current(projectId, key);
-    if (base !== pkg.commit && show(pkg.repo, base, 'layer.json') !== show(pkg.repo, pkg.commit, 'layer.json')) fail('This layer\'s spec changed since you opened it. Reload to see it.', 409);
+    if (base !== pkg.commit && show(pkg.repo, base, pkg.root + 'layer.json') !== show(pkg.repo, pkg.commit, pkg.root + 'layer.json')) fail('This layer\'s spec changed since you opened it. Reload to see it.', 409);
     // The package check below validates the spec, as it does for any commit.
     const ordered = {};
     for (const [field, value] of Object.entries(pkg.manifest)) { if (field !== 'information') ordered[field] = value; if (field === 'outputs') ordered.information = information; }
     if (!('information' in ordered)) ordered.information = information;
     if (JSON.stringify(pkg.manifest.information ?? null) === JSON.stringify(information)) return { commit: pkg.commit, changed: false };
-    const next = commitFiles(pkg.repo, pkg.commit, { 'layer.json': `${JSON.stringify(ordered, null, 2)}\n` }, 'Knowledge: information', author(userId));
+    const next = commitFiles(pkg.repo, pkg.commit, { [pkg.root + 'layer.json']: `${JSON.stringify(ordered, null, 2)}\n` }, 'Knowledge: information', author(userId));
     try { packageAt(pkg.repo, next, key); } catch (error) { fail(`That would make the layer invalid: ${error.message}`); }
     advance(projectId, key, pkg.repo, pkg.commit, next);
     onSpecChange(projectId, key);
