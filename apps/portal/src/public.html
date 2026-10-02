@@ -235,6 +235,30 @@
             <div class="pub-actions"><button mat-flat-button type="button" (click)="installGithub()">Install the Aludel GitHub App</button><button mat-button type="button" (click)="refreshInstallations()" [disabled]="busy()">I've installed it, check again</button></div>
           } @else {
             <p>Connected as <strong>{{ current.github.login }}</strong>.</p>
+            <fieldset class="pub-choice">
+              <legend class="pub-select-label">Repository</legend>
+              <label class="pub-check"><input type="radio" name="repositorySource" value="new" [(ngModel)]="repositorySource"> Create a new repository</label>
+              <label class="pub-check"><input type="radio" name="repositorySource" value="existing" [(ngModel)]="repositorySource" (ngModelChange)="importCheck.set(null)"> Use a repository I already have</label>
+            </fieldset>
+            @if (repositorySource === 'existing') {
+              <form (ngSubmit)="importCheck() ? confirmImport() : checkImport()">
+                <label class="pub-select-label" for="import-installation">Owner</label>
+                <select id="import-installation" name="importInstallation" class="pub-select" [(ngModel)]="installationId" (ngModelChange)="importCheck.set(null)">
+                  @for (item of eligibleInstallations(); track item.installation_id) { <option [value]="item.installation_id">{{ item.account_login }} ({{ item.target_type === 'User' ? 'personal' : 'organization' }})</option> }
+                </select>
+                <mat-form-field appearance="outline" class="wide-field"><mat-label>Repository name</mat-label><input matInput name="existingName" [(ngModel)]="existingName" (ngModelChange)="importCheck.set(null)" pattern="[A-Za-z0-9._-]+"></mat-form-field>
+                <p class="field-hint">Its default branch must be <code>main</code>. This replaces the starter repository Aludel made, which is kept aside.</p>
+                @if (importCheck(); as found) {
+                  <div class="pub-status-card">
+                    <mat-icon aria-hidden="true">inventory_2</mat-icon>
+                    <div><strong>{{ found.repository.owner }}/{{ found.repository.name }}</strong>
+                      <span>{{ found.files }} files{{ found.repository.private ? ', private' : ', public' }}. {{ found.existing ? 'It already has Aludel\'s files; nothing will be added.' : 'Aludel will add ' + found.adds.length + ' files in .aludel/, plus starter docs where none exist, as its own commits, and push them.' }}</span>
+                      @if (found.adds.length) { <details><summary>Files Aludel adds</summary><ul class="pub-file-list">@for (path of found.adds; track path) { <li><code>{{ path }}</code></li> }</ul></details> }</div>
+                  </div>
+                }
+                <div class="pub-actions pub-footer-actions"><button mat-flat-button type="submit" [disabled]="busy() || !existingName.trim() || !installationId">{{ busy() ? 'Working…' : importCheck() ? 'Import and push' : 'Check repository' }}</button></div>
+              </form>
+            } @else {
             <form (ngSubmit)="createRepository()">
               <label class="pub-select-label" for="installation">Owner</label>
               <select id="installation" name="installation" class="pub-select" [(ngModel)]="installationId">
@@ -246,6 +270,7 @@
               <label class="pub-check"><input type="checkbox" name="private" [(ngModel)]="repositoryPrivate"> Private repository</label>
               <div class="pub-actions pub-footer-actions"><button mat-flat-button type="submit" [disabled]="busy() || !repositoryName || !installationId">{{ busy() ? 'Creating…' : 'Create repository' }}</button></div>
             </form>
+            }
           }
         </section>
       }

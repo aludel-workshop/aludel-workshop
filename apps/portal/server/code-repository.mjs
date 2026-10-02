@@ -176,3 +176,28 @@ export function codeRepository({ db, know, links }) {
 
   return { layer, refresh, settleLocal, recordManifest, releases, recordRelease, markPublished, adopt, relink, seed, revisionOf };
 }
+
+// The Code repository's remote is the project's GitHub repository: the existing repository binding, not a second one.
+// Tokens come from the GitHub integration, fresh for each fetch or push; a failure becomes a state the layer shows.
+export const githubTokenFor = github => async (projectId, remote) => {
+  try { return await github.installationTokenForRepository(projectId, remote.name); }
+  catch (error) { throw Object.assign(error, { code: error.status === 409 ? 'not-connected' : error.status === 401 ? 'expired' : error.status === 404 ? 'uninstalled' : 'unavailable' }); }
+};
+export function codeSync({ db, codeRepo, remotes }) {
+  function connect(projectId) {
+    const code = codeRepo.layer(projectId);
+    const repo = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'repository_bindings'").get()
+      && db.prepare('SELECT owner, name, clone_url, html_url, status FROM repository_bindings WHERE project_id = ?').get(projectId);
+    if (!code || repo?.status !== 'ready') return null;
+    if (!remotes.status(projectId, code.key)) remotes.connect(projectId, code.key, { owner: repo.owner, name: repo.name, cloneUrl: repo.clone_url, htmlUrl: repo.html_url, source: 'project-repository' });
+    return code;
+  }
+  // A newer local main first (a build's commit), then GitHub.
+  async function sync(projectId) {
+    const local = codeRepo.settleLocal(projectId);
+    const code = connect(projectId);
+    const remote = code ? await remotes.sync(projectId, code.key) : null;
+    return { local, remote };
+  }
+  return { connect, sync };
+}

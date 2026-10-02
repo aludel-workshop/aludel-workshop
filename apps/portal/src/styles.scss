@@ -145,6 +145,8 @@ fieldset{border:0;padding:0;margin:0;min-width:0}legend{font-weight:600;margin-b
 .pub-assets li{display:grid;grid-template-columns:48px minmax(0,1fr) auto;gap:14px;align-items:center;padding:8px 10px;border-radius:14px;background:var(--machine-canvas)}
 .pub-assets img{width:48px;height:48px;object-fit:cover;border-radius:10px}.pub-assets mat-icon{justify-self:center;color:var(--machine-muted)}
 .pub-assets span{display:flex;flex-direction:column;min-width:0}.pub-assets small{color:var(--machine-muted);font-size:14px;overflow:hidden;text-overflow:ellipsis}
+/* T03-CODE: new or existing repository, and the files an import adds. */
+.pub-choice{border:0;padding:0;margin:8px 0 12px;display:grid;gap:2px}.pub-file-list{max-height:200px;overflow:auto;margin:6px 0 0;padding-left:18px;font-size:13px}.pub-file-list code{overflow-wrap:anywhere}
 .pub-toggle,.pub-check{display:inline-flex;align-items:center;gap:10px;font-size:16px;margin:6px 0 12px;cursor:pointer}.pub-toggle input,.pub-check input{width:20px;height:20px;accent-color:var(--machine-accent)}
 .pub-feature-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:18px}
 .pub-feature{flex-direction:row;align-items:center;gap:14px;padding:16px 18px}.pub-feature mat-icon{color:var(--machine-accent)}

@@ -287,6 +287,29 @@ export function githubIntegration({ db, secrets, config, callbackUrl, setupUrl, 
       }
       return binding(projectId);
     },
+    // T03-CODE: an existing repository an installation can reach, to become the project's. The short-lived token is for
+    // the host's clone and push; it never leaves the server.
+    async existingRepository(userId, projectId, { installationId, name }) {
+      if (!/^[A-Za-z0-9._-]{1,100}$/.test(String(name || ''))) throw failure('Use a valid GitHub repository name.');
+      if (binding(projectId)) throw failure('This project already has a repository binding.', 409);
+      const installation = installations(userId).find(item => Number(item.installation_id) === Number(installationId));
+      if (!installation || !installation.eligible) throw failure('Choose an active all-repositories installation with Administration and Contents write permissions.', 409);
+      let token;
+      try { token = await installationToken(installation.installation_id, { permissions: { contents: 'write' }, repositories: [name] }); }
+      catch { throw failure(`The Aludel app on ${installation.account_login} can't reach a repository named ${name}.`, 404); }
+      const remote = await requestJson(api({ owner: installation.account_login, name }, ''), token, {}, fetcher);
+      return { installation, token, remote: { owner: remote.owner.login, name: remote.name, html_url: remote.html_url, clone_url: remote.clone_url,
+        default_branch: remote.default_branch, private: Boolean(remote.private) } };
+    },
+    bindExisting(projectId, installation, remote, commit, trackedFiles) {
+      if (binding(projectId)) throw failure('This project already has a repository binding.', 409);
+      const created = now();
+      db.prepare(`INSERT INTO repository_bindings(project_id, provider, owner, name, html_url, clone_url, default_branch,
+        private, status, commit_sha, tracked_files, installation_id, account_type, created_at, updated_at)
+        VALUES (?, 'github', ?, ?, ?, ?, ?, ?, 'ready', ?, ?, ?, ?, ?, ?)`).run(projectId, remote.owner, remote.name, remote.html_url, remote.clone_url,
+        remote.default_branch, remote.private ? 1 : 0, commit, trackedFiles, installation.installation_id, installation.target_type, created, created);
+      return binding(projectId);
+    },
     async finishLocalSetup(projectId, initialize) {
       const repo = binding(projectId);
       if (!repo || !['remote-created', 'local-setup-needed'].includes(repo.status)) throw failure('There is no recoverable local Git setup.', 409);

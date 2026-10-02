@@ -124,6 +124,10 @@ export class PublicComponent implements OnDestroy {
   stackOptions: Record<string, boolean> = {};
   repositoryName = '';
   repositoryPrivate = true;
+  // T03-CODE: start from a new repository, or bring one the owner already has on GitHub.
+  repositorySource: 'new' | 'existing' = 'new';
+  existingName = '';
+  readonly importCheck = signal<{ repository: { owner: string; name: string; url: string; private: boolean }; files: number; adds: string[]; existing: boolean } | null>(null);
   installationId = '';
 
   constructor() {
@@ -382,6 +386,21 @@ export class PublicComponent implements OnDestroy {
       }));
       const repository = this.setup()?.github.repository;
       this.notice.set(repository?.status === 'ready' ? 'Repository created and your first commit is on GitHub.' : 'The repository was created but the first push needs attention. Nothing will be created twice.');
+    });
+  }
+
+  checkImport() {
+    return this.run(async () => {
+      this.importCheck.set(null);
+      this.importCheck.set(await this.api(`/api/projects/${encodeURIComponent(this.projectId())}/repository/import`, 'POST', { installationId: Number(this.installationId), name: this.existingName.trim(), confirm: false }));
+    });
+  }
+
+  confirmImport() {
+    return this.run(async () => {
+      this.applySetup(await this.api<ProjectSetup>(`/api/projects/${encodeURIComponent(this.projectId())}/repository/import`, 'POST', { installationId: Number(this.installationId), name: this.existingName.trim(), confirm: true }));
+      this.importCheck.set(null);
+      this.notice.set('Imported. Aludel added its files in .aludel/ and pushed them to GitHub.');
     });
   }
 

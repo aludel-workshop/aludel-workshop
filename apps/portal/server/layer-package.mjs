@@ -288,6 +288,16 @@ export function installLayerPackageInto(db, projectId, key, repo, { template = n
     .run(projectId, key, id, repo, commit, new Date().toISOString(), pin.template, pin.commit);
   return { ...pkg, installed: present === null };
 }
+// The files a built-in layer that lives in the project's repository would add (under .aludel/), for an import's check.
+export function projectRepositoryTemplateFiles() {
+  if (!enabled()) return [];
+  const config = catalog();
+  for (const template of Object.values(config.builtIn)) {
+    const pin = config.templates[template], repo = resolve(candidate, config.repo);
+    try { if (JSON.parse(git(repo, 'show', `${pin.commit}:layer.json`)).install === 'project-repository') return git(repo, 'ls-tree', '-r', '--name-only', pin.commit).split('\n').filter(Boolean); } catch { /* not this one */ }
+  }
+  return [];
+}
 // Built-in layers that live in the project's repository install once that repository exists (after the first build, say).
 export function ensureProjectRepositoryLayers(db, projectId) {
   if (!enabled()) return [];

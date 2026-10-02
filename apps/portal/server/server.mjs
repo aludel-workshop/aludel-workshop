@@ -47,7 +47,8 @@ import { decideFollowUp, hasElevated, initLayerScope, layerAccess, requireElevat
 import { applyOperation, kindOwners, layerApi, layerApiForKind, recordOperations } from './layer-api.mjs';
 import { frameAllows, frameLabel, hostRecordFeatures, layerUi } from './layer-ui.mjs';
 import { ensureProjectRepositoryLayers, layerHostCalls, layerInstallWaiting } from './layer-package.mjs';
-import { codeRepository, initCodeRepository } from './code-repository.mjs';
+import { codeRepository, codeSync, githubTokenFor, initCodeRepository } from './code-repository.mjs';
+import { codeImport } from './code-import.mjs';
 import { initLayerRemotes, layerRemotes } from './layer-remote.mjs';
 import { initLayerContract, layerDescriptors, layerInstances, updateLayerInstance, layerCatalog, layerOutputRead, layerMigrationInventory } from './layer-contract.mjs';
 import { answerDecision, createProposal, ensureB02Fixture, getDecision, getProposal, listDecisions, listDownstreamRecords, listProposals, reassessRecord, reviseProposal } from './product-records.mjs';
@@ -182,28 +183,23 @@ const codeRepo = codeRepository({ db, know, links });
 const codeRelease = codeReleases({ db, releasesOf: projectId => codeRepo.releases(projectId) });
 // The Code repository stays in sync with the project's GitHub repository (the existing repository binding, not a second one).
 // Git talks to GitHub with a fresh installation token only; what goes wrong is shown on the layer, never thrown at the person.
-const tokenError = error => Object.assign(error, { code: error.status === 409 ? 'not-connected' : error.status === 401 ? 'expired' : error.status === 404 ? 'uninstalled' : 'unavailable' });
 const remotes = layerRemotes({ db,
-  tokenFor: async (projectId, remote) => { try { return await github.installationTokenForRepository(projectId, remote.name); } catch (error) { throw tokenError(error); } },
+  tokenFor: (projectId, remote) => githubTokenFor(github)(projectId, remote),
   onAdvance: projectId => codeRepo.refresh(projectId),
   onHeld: (projectId, key, change) => know.createWork(projectId, { layer: key, layerScoped: true, state: 'ready', title: `Review GitHub changes to what this layer runs (${change.to.slice(0, 7)})`,
     suggestion: `GitHub's main changes ${change.paths.join(', ')}. Review the change and accept it in Code before the layer runs it.` }, 'Aludel'),
   onDiverged: (projectId, key, change) => know.createWork(projectId, { layer: key, layerScoped: true, state: 'ready', title: `Bring this copy and GitHub back together (${change.pin.slice(0, 7)} and ${change.remote.slice(0, 7)})`,
     suggestion: 'Both this copy and GitHub changed main. Rebase or merge them in a run, then push.' }, 'Aludel') });
-function codeRemote(projectId) {
-  const code = codeRepo.layer(projectId);
-  const repo = db.prepare('SELECT owner, name, clone_url, html_url, status FROM repository_bindings WHERE project_id = ?').get(projectId);
-  if (!code || repo?.status !== 'ready') return null;
-  if (!remotes.status(projectId, code.key)) remotes.connect(projectId, code.key, { owner: repo.owner, name: repo.name, cloneUrl: repo.clone_url, htmlUrl: repo.html_url, source: 'project-repository' });
-  return code;
-}
+const codeSyncing = codeSync({ db, codeRepo, remotes });
+const codeRemote = projectId => codeSyncing.connect(projectId);
 // Settles the Code layer with its repository: a newer local main first, then GitHub. Returns the sync state to show.
-async function syncCode(projectId) {
-  const local = codeRepo.settleLocal(projectId);
-  const code = codeRemote(projectId);
-  const remote = code ? await remotes.sync(projectId, code.key) : null;
-  return { local, remote };
-}
+const syncCode = projectId => codeSyncing.sync(projectId);
+// Lazily, because the GitHub integration is created further down.
+const codeImporter = { preview: (...args) => importer().preview(...args), confirm: (...args) => importer().confirm(...args) };
+let importing = null;
+const importer = () => importing ||= codeImport({ db, github, importRoot: join(dataDirectory, 'imports'),
+  afterInstall: projectId => { codeRepo.seed(projectId, pool.outputEntries); codeRepo.refresh(projectId); },
+  sync: async projectId => { const code = codeRemote(projectId); return code ? remotes.sync(projectId, code.key) : null; } });
 // Existing projects: Code's generation links and releases move into its repository once (idempotent).
 for (const projectId of layerProjects()) try { if (codeRepo.layer(projectId)) { codeRepo.adopt(projectId); codeRepo.seed(projectId, pool.outputEntries); } } catch (error) { console.error(`Could not adopt Code's records for ${projectId}: ${error.message}`); }
 // Closing a Reconcile item relinks the record's generation links in Code's repository too.
@@ -1423,7 +1419,20 @@ async function api(request, response, url) {
     if (section === 'repository' && !item && method === 'POST' && projectId !== aludelProjectId) {
       const input = await readJson(request);
       const workspace = flows.projectSetup(user, projectId).workspacePath;
-      await github.createRepository(user.id, projectId, input, ({ remoteUrl, token }) => pushWorkspace({ repository: workspace, remoteUrl, token, branch: projectGitProfile.initialBranch }));
+      // T03-CODE: Code lives in this repository, so its .aludel/ goes with the first push.
+      await github.createRepository(user.id, projectId, input, ({ remoteUrl, token }) => {
+        try { if (ensureProjectRepositoryLayers(db, projectId).length) codeRepo.seed(projectId, pool.outputEntries); } catch (error) { console.error(`Code was not installed before the first push: ${error.message}`); }
+        return pushWorkspace({ repository: workspace, remoteUrl, token, branch: projectGitProfile.initialBranch });
+      });
+      codeRemote(projectId);
+      flows.markStep(user, projectId, 'github');
+      return json(response, 201, projectView(user, projectId));
+    }
+    // T03-CODE: an existing GitHub repository as the project's. `confirm: false` checks it and lists what would be added.
+    if (section === 'repository' && item === 'import' && method === 'POST' && projectId !== aludelProjectId) {
+      const input = await readJson(request);
+      if (!input.confirm) return json(response, 200, await codeImporter.preview(user.id, projectId, input));
+      await codeImporter.confirm(user.id, projectId, input, flows.projectSetup(user, projectId).workspacePath);
       flows.markStep(user, projectId, 'github');
       return json(response, 201, projectView(user, projectId));
     }
