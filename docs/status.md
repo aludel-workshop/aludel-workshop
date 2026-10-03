@@ -16,7 +16,7 @@ Convert Code onto its template with GitHub sync, now on `main`: the layer-templa
 
 ## Next action
 
-**JOURNEYS-01 J6: walk review, starting with an owner prototype round** (J5 done 2026-10-03 on branch `claude/compassionate-hamilton-wz7nwz`, stacked on J4's `claude/nice-cray-zn7gfg` and J3's `claude/brave-pascal-br7h4i`; none is on `main` yet). Run `tools/branch-handoffs.sh`, then start from the [handoff](design/journeys/handoff.md). **Before the owner's next restart:** the claims migration rewrites item criteria and saved run verdicts (rehearsed on data written by the pre-J4 code). The owner moved on from T03-CODE ("t03-code is fine for now"); its owner items below stay open.
+**JOURNEYS-01 J6: walk review, starting with an owner prototype round** (J5 done 2026-10-03; J3, J4 and J5 merged to `main` at the owner's request). Run `tools/branch-handoffs.sh`, then start from the [handoff](design/journeys/handoff.md). **Before the owner's next restart:** the claims migration rewrites item criteria and saved run verdicts (rehearsed on data written by the pre-J4 code). The owner moved on from T03-CODE ("t03-code is fine for now"); its owner items below stay open.
 
 **T03-CODE: the app repository as the Code layer, with GitHub sync (run 1 built and agent-checked 2026-10-02).** [Evidence and retrospective](evidence/t03-code/README.md) · [brief and run log](design/layer-app-transition/t03-code-brief.md).
 - **Done:**

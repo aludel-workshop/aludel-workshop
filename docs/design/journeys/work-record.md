@@ -29,6 +29,7 @@ depends_on: [T03-CODE, LAT-08A, LAYER-BINDINGS-01, EXISTING-PROJECTS-01, DEC-050
 
 - **2026-10-03, owner chat (J5, new cloud session):** "pick up j5 please". The J4 handoff said J5 needs the owner's go; this is it. Authorized: J5 in the same local scope as J4: host code, tests, template commits and pins if needed, local checks, and commits plus a push to this session's designated branch (`claude/compassionate-hamilton-wz7nwz`, fast-forwarded to J4's `claude/nice-cray-zn7gfg` at `55b52a0`, which isn't on `main` yet). Not authorized: pushes to `main` or `layer-base`, deployment, spending, live owner data, owner-impersonating actions, and restarting the owner's portal. Recorded before execution.
 - **2026-10-03, owner chat (J5 environment):** "youre good to go for layer-base and docker." Authorized: adding `aludel-workshop/layer-base` to this session (read; cloned to `./layer-base`) and starting `dockerd`, to run J5's template-mode checks, Docker review checks and browser journey. Same scope otherwise; no push to `layer-base`.
+- **2026-10-03, owner chat (merge):** "merge all three". Authorized: fast-forward `aludel-workshop` `main` to this branch's head, which carries J3 (`claude/brave-pascal-br7h4i`), J4 (`claude/nice-cray-zn7gfg`) and J5. Nothing else: no `layer-base` push, no deployment.
 
 ## Owner direction (2026-10-02 chat)
 
