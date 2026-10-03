@@ -162,6 +162,8 @@ J0–J2 are done (below). J3–J8 and depend on each other as listed. J6 needs a
 
 ## Run log
 
+**Handoff (2026-10-02):** the next agent starts at [handoff.md](handoff.md).
+
 ### J0 baseline and J1 contract (2026-10-02, Claude, VS Code chat)
 
 **J0.**
