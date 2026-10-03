@@ -5,9 +5,22 @@ status: active
 updated: 2026-10-03
 ---
 
-# JOURNEYS-01 handoff: continue at J5
+# JOURNEYS-01 handoff: J5 built; its browser journey and J6 next
 
 For a fresh agent (Claude in the cloud) picking up JOURNEYS-01. Run `tools/branch-handoffs.sh` first: this packet's slices have been landing on cloud-session branches that the owner hasn't merged into `main`, so the newest handoff may be on a branch. Then read this, [AGENTS.md](../../../AGENTS.md), [status](../../status.md), the [JOURNEYS-01 work record](work-record.md) (plan, authorizations, run log, retrospectives), [DEC-063](../../decisions.md) and the [deferred code-tracing record](../code-tracing/deferred.md).
+
+## Update 2026-10-03: J5 built on `claude/compassionate-hamilton-wz7nwz`
+
+J5 (Specify → Implement) is built and server-tested on branch `claude/compassionate-hamilton-wz7nwz`, which stacks on J4's `claude/nice-cray-zn7gfg` and J3's `claude/brave-pascal-br7h4i`. None is on `main`. The [J5 run log](work-record.md#j5-specify--implement-2026-10-03-claude-cloud-session) has the design, checks and retrospective.
+
+**Open in J5:** its exit evidence, the browser journey on a disposable imported app (create a request, specify, accept, Implement raised with step claims). This session couldn't run it: the private `layer-base` and starting `dockerd` were both declined by the session's permission checks, and the offer only appears when Code runs from its template. The server-level test covers the same chain without the browser or the Docker build. The next session with `layer-base` and Docker writes and runs the browser journey, then J6's prototype round can start (J6 needs the owner).
+
+What later slices can use from J5:
+- `POST /api/projects/:id/work/journey-offer` `{ title, brief }` answers which routes the request reaches, which journeys cover them, and whether to draft or revise a journey first.
+- `POST /api/projects/:id/work/specify` creates the Specify item (and the reviewable prerequisite, blocking it, when the app isn't reviewable yet). Items carry `context.journeyWork` (`kind`: `reviewable`, `specify` or `implement`).
+- Accepting a Specify run raises Implement from the sign route (`journeyItems.afterAccept` in `server.mjs`).
+
+**Start of a cloud session:** ask the owner up front to approve adding `aludel-workshop/layer-base` to the session and starting `dockerd`. Both need the owner's say-so in the session; without them, the template suite, the Code UI path and every Docker check are out of reach.
 
 ## Update 2026-10-03: J4 done, J5 next
 
@@ -90,6 +103,7 @@ Steps 2 and 4 each caught a real break in this packet that the suites didn't.
 - **Template updates don't reach existing installs.** Existing projects keep their forked template commit. The host SDK therefore keeps inert shims: `@aludel/host/built-by`, `ctx.builtBy()`, and unit `state`/`links`. Don't remove SDK surface older forks import without the same care.
 - **The legacy role inventory** (`server/lat07-actions.mjs`) must list every historical action in `config/roles.json`. Retire entries; don't delete them.
 - **Browser checks (2026-10-03):** every `tests/*-browser.mjs` passes through `tools/browser-checks.sh` with templates on. `design` declares `// browser-checks: templates off`, because it checks the compiled Design view. The superseded `layers`, `onboarding` and `lat03`–`lat06` scripts were retired; they are in git history.
+- **Code's layer key is `platform`.** DEC-049 named the Platform layer Code, and `config/layer-templates.json` installs the `code` template under the key `platform`. Work items, bindings and claims say `platform`; only the template branch and the UI say Code.
 - **Code view terms.** Units are "used/unused" (`state` `healthy`/`dead`). There are no trace links anywhere. Don't reintroduce story ↔ code links (DEC-063).
 - **Owner files.** The working tree may hold the owner's `notes.txt` edit and four untracked `*-candidate/` and `layer-template-pages/` checkouts. Leave them alone.
 

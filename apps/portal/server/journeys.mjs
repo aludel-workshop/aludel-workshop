@@ -189,6 +189,14 @@ export function claimProof(claim, { journeys = null, results = [] } = {}, claims
       : status === 'stale' ? `The reviewed build has ${claim.journey} at revision ${journey.revision}; this claim is for revision ${claim.revision}.` : null;
     return { status, detail, steps };
   }
+  // J5: a record claim on a Code journey entry is proven by the reviewed build holding that journey at that revision, authored.
+  if (journeyRecord(claim)) {
+    const journey = journeys?.find(entry => journeyEntry(entry.id) === claim.entry) || null;
+    const status = !journeys ? 'not-run' : !journey ? 'missing' : journey.revision !== claim.revision ? 'stale' : journey.origin !== 'authored' ? 'unsigned' : 'passed';
+    const detail = status === 'missing' ? `The reviewed build has no ${claim.entry}.` : status === 'stale' ? `The reviewed build has ${claim.entry} at revision ${journey.revision}; this claim is for revision ${claim.revision}.`
+      : status === 'unsigned' ? `The reviewed build's ${claim.entry} is ${journey.origin}; a specified journey is written as authored.` : null;
+    return { status, detail, steps: [] };
+  }
   if (claim.kind === 'invariant' && claim.covers === 'journeys') {
     const claimed = new Set(claims.filter(entry => entry.kind === 'journey').flatMap(entry => entry.steps.map(step => `${entry.journey}.${step}`)));
     const steps = results.filter(result => !claimed.has(result.id)).map(result => stepOf(result.id));
@@ -207,14 +215,86 @@ export function claimGate(claims, proofs, reasons = {}) {
 
 // Accepting a Specify item leaves a journey's revision ahead of what the code builds. The implement item it raises claims
 // the added and changed steps, and that every other journey still passes. Removed steps are claimed as gone.
-export function implementClaims(previous, next) {
+// J5: with the accepted build's step results, an added step whose characterization test already passed is built, not
+// claimed: a new journey drafted from the current app claims only what the app doesn't do yet. A changed step is always
+// claimed, because a test that still passes proves the old spec.
+export function implementClaims(previous, next, results = null) {
   const change = journeyChange(previous, next);
-  const steps = [...change.added, ...change.changed];
+  const passed = new Set((results || []).filter(result => result.status === 'passed').map(result => result.id));
+  const built = change.added.filter(step => passed.has(`${next.id}.${step}`));
+  const steps = [...change.added.filter(step => !built.includes(step)), ...change.changed];
+  const kept = [...change.unchanged, ...built];
   const claims = [];
-  if (steps.length) claims.push({ id: `${next.id}-steps`, kind: 'journey', journey: next.id, revision: next.revision, steps });
+  if (steps.length) claims.push({ id: `${next.id}-steps`, kind: 'journey', journey: next.id, revision: next.revision, steps: next.steps.map(step => step.id).filter(step => steps.includes(step)) });
   if (change.removed.length) claims.push({ id: `${next.id}-removed`, kind: 'invariant', text: `Steps ${change.removed.join(', ')} of ${next.title} are no longer part of the journey.` });
-  claims.push({ id: 'journeys-unchanged', kind: 'invariant', covers: 'journeys', text: `Every other journey still passes its tests${change.unchanged.length ? `, as do unchanged steps ${change.unchanged.join(', ')} of ${next.title}` : ''}.` });
-  return { change, claims: validateClaims(claims) };
+  claims.push({ id: 'journeys-unchanged', kind: 'invariant', covers: 'journeys', text: `Every other journey still passes its tests${kept.length ? `, as do steps ${kept.join(', ')} of ${next.title}` : ''}.` });
+  return { change: { ...change, built }, claims: validateClaims(claims) };
+}
+
+// ---- JOURNEYS-01 J5: Specify, then implement ----
+// Code keeps a journey as the entry `journey-<id>` of its journeys facet; a Specify item's record claim names it. Code's layer
+// key is `platform` (DEC-049 named the Platform layer Code; the `code` template installs under it).
+export const codeLayer = 'platform';
+export const journeyEntry = id => `journey-${id}`;
+export const journeyRecord = claim => claim?.kind === 'record' && claim.layer === codeLayer && /^journey-/.test(claim.entry || '');
+// The preview-only setup route a reviewable app implements (see the agent card's reviewPreparation).
+export const setupRoute = '/api/__aludel/review';
+
+const routePath = value => String(value).split(/[?#]/)[0].replace(/\/+$/, '') || '/';
+const segments = path => path.split('/').filter(part => part && !/^[:{[*]/.test(part)).map(part => part.toLowerCase());
+// Which of the app's routes a request is about. A path the request names matches itself (and the routes under it), even
+// when the app doesn't have it yet; a word of four letters or more matches a route segment that starts with it, or that
+// it starts with ("teams" and /team). API routes are never journey steps, so callers pass page routes and step routes only.
+export function matchRoutes(request, routes) {
+  const said = String(request || '');
+  const known = [...new Set(routes.filter(localPath).map(routePath))];
+  const named = [...said.matchAll(/(?:^|[\s(`'"])(\/[a-z0-9][a-z0-9/_-]*)/gi)].map(match => routePath(match[1].toLowerCase())).filter(localPath);
+  const words = [...new Set(said.replace(/\/[a-z0-9/_-]*/gi, ' ').toLowerCase().match(/[a-z]{4,}/g) || [])];
+  const byWord = known.filter(route => segments(route).some(part => part.length >= 3 && words.some(word => part.startsWith(word) || part.length >= 4 && word.startsWith(part))));
+  const byPath = named.flatMap(path => { const under = known.filter(route => route === path || route.startsWith(`${path}/`)); return under.length ? under : [path]; });
+  return [...new Set([...byPath, ...byWord])].sort();
+}
+
+const slug = value => String(value).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^[^a-z]+|-+$/g, '').slice(0, 48).replace(/-+$/, '') || 'journey';
+// What Code offers when a task is created: the routes the request is about and the journeys that reach them. When a
+// matched route has no journey, it offers to draft one from the current app first (Specify); when one journey reaches
+// every matched route, it offers to revise that journey first. No match means a trivial change, and no offer.
+export function journeyOffer(request, { routes = [], journeys = [] } = {}) {
+  journeys.forEach(validateJourney);
+  const matched = matchRoutes(`${request?.title || ''}\n${request?.brief || ''}`, [...routes, ...journeys.flatMap(journey => journey.steps.map(step => step.route).filter(Boolean))]);
+  const reaching = route => journeys.filter(journey => journey.steps.some(step => step.route && routePath(step.route) === route)).map(journey => journey.id);
+  const covered = matched.map(route => ({ route, journeys: reaching(route) }));
+  const uncovered = covered.filter(entry => !entry.journeys.length).map(entry => entry.route);
+  if (!matched.length) return { routes: [], covered, uncovered, offer: null };
+  if (uncovered.length) {
+    const taken = new Set(journeys.map(journey => journey.id));
+    const base = slug(request?.title || uncovered[0]);
+    let id = base, number = 2;
+    while (taken.has(id)) id = `${base.slice(0, 44)}-${number++}`;
+    return { routes: matched, covered, uncovered, offer: { kind: 'draft', journey: { id, title: String(request?.title || uncovered[0]).trim().slice(0, 200), revision: 1 }, routes: uncovered } };
+  }
+  const shared = journeys.find(journey => covered.every(entry => entry.journeys.includes(journey.id)));
+  return { routes: matched, covered, uncovered, offer: shared ? { kind: 'revise', journey: { id: shared.id, title: shared.title, revision: shared.revision + 1 }, routes: matched } : null };
+}
+
+// A Specify item's claims: the journey written at its next revision (proven by the reviewed build holding it, authored),
+// and every existing step test, the new characterization tests included, passing on that build.
+export function specifyClaims(journey) {
+  if (!idPattern.test(journey?.id || '') || !Number.isInteger(journey.revision) || journey.revision < 1) fail('Specify names a journey and the revision it writes.');
+  return validateClaims([
+    { id: 'journey-spec', kind: 'record', layer: codeLayer, entry: journeyEntry(journey.id), revision: journey.revision,
+      text: `Journey ${journey.id} at revision ${journey.revision}: the steps as the app works today, each proven by a characterization test, then the target steps, signed as authored` },
+    { id: 'journeys-unchanged', kind: 'invariant', covers: 'journeys', text: 'Every step test passes on the current app, the new characterization tests included.' }]);
+}
+
+// What stops an app's journeys being walked in review (once per app): a readable v2 recipe, a fixture for each persona the
+// journey is entered as, and the preview-only setup route. Each gap is an invariant claim for the prerequisite item.
+export function reviewableGaps({ recipe = null, recipeError = null, personas = [], setup = false }) {
+  const gaps = [];
+  if (recipeError || !recipe) gaps.push({ id: 'review-recipe', kind: 'invariant', text: recipeError ? `.aludel/review.json is readable as version 2 (now: ${recipeError})`.slice(0, 1000) : '.aludel/review.json exists as version 2, with the checks the app passes and a fixture for each persona' });
+  for (const persona of personas) if (recipe && !recipeError && !recipe.personas?.[persona]) gaps.push({ id: `persona-${persona}`.slice(0, 64), kind: 'invariant', text: `Persona ${persona} has a fixture (and a synthetic session when signed in), so review can enter the app as ${persona}` });
+  if (!setup) gaps.push({ id: 'setup-route', kind: 'invariant', text: `POST ${setupRoute} prepares the fixture and session it is sent, answers 404 unless ALUDEL_REVIEW_PREVIEW=1 with the review token, and is declared in .aludel/seams.json` });
+  return validateClaims(gaps);
 }
 
 // Existing items' hand-written criteria become note claims, nothing lost; each is unbacked until someone references a layer.

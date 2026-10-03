@@ -17,7 +17,7 @@ const stepResult: Record<StepResult['status'] | 'none', [string, string]> = { pa
 // JOURNEYS-01 J4: what each kind of claim is, and how a claim's automated proof reads.
 const claimKind: Record<ClaimKind, string> = { journey: 'Journey', record: 'Layer record', invariant: 'Invariant', note: 'Note · unbacked' };
 const proofStatus: Record<ProofStatus, [string, string]> = { passed: ['check_circle', 'Passed'], failed: ['cancel', 'Failed'], 'no-fixture': ['person_off', 'No fixture'], uncovered: ['remove', 'No test'],
-  skipped: ['radio_button_unchecked', 'Not run after a failure'], missing: ['help', 'Not in the build'], stale: ['history', 'Older revision built'], 'not-run': ['radio_button_unchecked', 'Not run yet'] };
+  skipped: ['radio_button_unchecked', 'Not run after a failure'], missing: ['help', 'Not in the build'], stale: ['history', 'Older revision built'], unsigned: ['edit_off', 'Not written as authored'], 'not-run': ['radio_button_unchecked', 'Not run yet'] };
 type Evidence = { type: 'change' | 'test' | 'try' | 'check' | 'note'; label: string; detail: string; look: string; result?: string; missing?: boolean };
 const evidenceType: Record<Evidence['type'], [string, string]> = { change: ['difference', 'Change'], test: ['science', 'Test'], try: ['touch_app', 'Try it'], check: ['verified', 'Aludel check'], note: ['person', 'Performer evidence'] };
 
@@ -143,7 +143,7 @@ const evidenceType: Record<Evidence['type'], [string, string]> = { change: ['dif
                   <h2>{{ c.text }}</h2>
                   @if (r.proofs[c.id]; as proof) {
                     <div class="wr-proof" [class.bad]="proof.status !== 'passed'"><p class="small"><mat-icon aria-hidden="true" [class]="'wr-t-' + (proof.status === 'passed' ? 'passed' : proof.status === 'failed' ? 'failed' : 'skipped')">{{ proofStatus[proof.status][0] }}</mat-icon>
-                      <strong>{{ c.covers === 'journeys' ? 'Every other journey step on this build' : 'Step tests on this build' }}: {{ proofStatus[proof.status][1] }}</strong>@if (proof.detail) { · {{ proof.detail }} }</p>
+                      <strong>{{ c.covers === 'journeys' ? 'Every other journey step on this build' : c.kind === 'record' ? 'The journey in this build' : 'Step tests on this build' }}: {{ proofStatus[proof.status][1] }}</strong>@if (proof.detail) { · {{ proof.detail }} }</p>
                       @if (proof.steps.length) { <ul class="wr-proof-steps">@for (stepProof of proof.steps; track stepProof.id) { @if (c.covers !== 'journeys' || stepProof.status === 'failed') {
                         <li class="small"><mat-icon aria-hidden="true" [class]="'wr-t-' + (stepProof.status === 'passed' ? 'passed' : stepProof.status === 'failed' ? 'failed' : 'skipped')">{{ proofStatus[stepProof.status][0] }}</mat-icon>{{ stepProof.id }}: {{ proofStatus[stepProof.status][1] }}
                           @if (stepProof.screenshot) { · <a [href]="screenshotUrl(stepProof.id)" target="_blank" rel="noopener">screenshot</a> }@if (stepProof.detail) { <span class="lay-muted"> · {{ stepProof.detail }}</span> }</li> } }</ul> }

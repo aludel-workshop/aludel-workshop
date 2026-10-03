@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { createUser, initAccounts } from '../server/accounts.mjs';
-import { claimAt, claimGate, claimProof, claimsFromCriteria, claimText, coverage, implementClaims, journeyChange, reviewSteps, standing, undeclaredSeams, validateClaims, validateJourney, validateReviewRecipe, validateSeams, nextNoteId } from '../server/journeys.mjs';
+import { claimAt, claimGate, claimProof, claimsFromCriteria, claimText, coverage, implementClaims, journeyChange, journeyOffer, matchRoutes, reviewableGaps, reviewSteps, specifyClaims, standing, undeclaredSeams, validateClaims, validateJourney, validateReviewRecipe, validateSeams, nextNoteId } from '../server/journeys.mjs';
 import { initKnowledge, knowledge } from '../server/knowledge.mjs';
 import { initOnboarding, loadCatalogs, onboarding } from '../server/onboarding.mjs';
 import { ensureProductWorkspace } from '../server/product-workspace.mjs';
@@ -151,7 +151,57 @@ test('accepting a Specify item raises implement claims for the added and changed
   assert.deepEqual(claims.map(claim => [claim.id, claim.kind, claim.steps ?? claim.text]), [
     ['onboarding-steps', 'journey', ['team', 'dashboard']],
     ['onboarding-removed', 'invariant', 'Steps welcome, tour of New user onboarding are no longer part of the journey.'],
-    ['journeys-unchanged', 'invariant', 'Every other journey still passes its tests, as do unchanged steps sign-up, verify of New user onboarding.']]);
+    ['journeys-unchanged', 'invariant', 'Every other journey still passes its tests, as do steps sign-up, verify of New user onboarding.']]);
+});
+
+test('J5: a journey drafted from the current app claims only the steps the accepted build does not pass', () => {
+  const drafted = { ...copy(cases.onboardingSpecified), revision: 1 };
+  const passed = id => ({ id: `onboarding.${id}`, status: 'passed' });
+  // New journey: its characterized steps passed on the accepted build, so only the new team step is claimed.
+  const fresh = implementClaims(null, drafted, [passed('sign-up'), passed('verify'), passed('dashboard'), { id: 'onboarding.team', status: 'uncovered' }]);
+  assert.deepEqual(fresh.claims.map(claim => [claim.id, claim.steps ?? claim.text]), [['onboarding-steps', ['team']],
+    ['journeys-unchanged', 'Every other journey still passes its tests, as do steps sign-up, verify, dashboard of New user onboarding.']]);
+  assert.deepEqual(fresh.change.built, ['sign-up', 'verify', 'dashboard']);
+  // A changed step is claimed even when its old test still passes: that test proves the old spec.
+  const revised = implementClaims(copy(cases.onboarding), copy(cases.onboardingSpecified), [passed('sign-up'), passed('verify'), passed('dashboard'), passed('team')]);
+  assert.deepEqual(revised.claims[0].steps, ['dashboard']);
+  // Claimed steps keep the journey's order, whichever way they were found.
+  assert.deepEqual(implementClaims(null, drafted, []).claims[0].steps, ['sign-up', 'verify', 'team', 'dashboard']);
+});
+
+test('J5: the offer matches a request to routes and offers to draft or revise a journey first', () => {
+  const journeys = [copy(cases.onboarding)];
+  const routes = ['/', '/settings', '/settings/billing', '/team/:id', '/app'];
+  assert.deepEqual(matchRoutes('Let people invite their teams from /settings', routes), ['/settings', '/settings/billing', '/team/:id']);
+  assert.deepEqual(matchRoutes('Fix the typo in the footer', routes), [], 'no route: a trivial change gets no offer');
+  assert.deepEqual(matchRoutes('Add a /pricing page', routes), ['/pricing'], 'a path the app does not have yet still counts');
+  const draft = journeyOffer({ title: 'Invite teammates', brief: 'From /settings, invite people by email.' }, { routes, journeys });
+  assert.deepEqual([draft.offer.kind, draft.offer.journey, draft.offer.routes], ['draft', { id: 'invite-teammates', title: 'Invite teammates', revision: 1 }, ['/settings', '/settings/billing', '/team/:id']]);
+  const revise = journeyOffer({ title: 'Shorten sign up', brief: 'Drop the verify step after /signup.' }, { routes, journeys });
+  assert.deepEqual([revise.offer.kind, revise.offer.journey, revise.uncovered], ['revise', { id: 'onboarding', title: 'New user onboarding', revision: 2 }, []]);
+  assert.equal(journeyOffer({ title: 'Fix the footer typo' }, { routes, journeys }).offer, null);
+  // A drafted ID never takes an existing journey's.
+  assert.equal(journeyOffer({ title: 'Onboarding', brief: 'A new /welcome-back page' }, { routes, journeys }).offer.journey.id, 'onboarding-2');
+});
+
+test('J5: Specify claims the journey at its next revision, proven only when the build holds it authored', () => {
+  const [spec, unchanged] = specifyClaims({ id: 'onboarding', revision: 2 });
+  assert.deepEqual([spec.kind, spec.layer, spec.entry, spec.revision, unchanged.covers], ['record', 'platform', 'journey-onboarding', 2, 'journeys']);
+  assert.equal(claimProof(spec, { journeys: null, results: [] }).status, 'not-run');
+  assert.equal(claimProof(spec, { journeys: [copy(cases.onboardingSpecified)], results: [] }).status, 'passed');
+  assert.match(claimProof(spec, { journeys: [copy(cases.onboarding)], results: [] }).detail, /revision 1; this claim is for revision 2/);
+  assert.equal(claimProof(spec, { journeys: [{ ...copy(cases.onboardingSpecified), origin: 'observed' }], results: [] }).status, 'unsigned');
+  assert.equal(claimProof(spec, { journeys: [copy(cases.replica)], results: [] }).status, 'missing');
+  // A record claim on another layer has no automated proof: the reviewer judges it.
+  assert.equal(claimProof({ id: 'x', kind: 'record', layer: 'data', entry: 'object-1', revision: 2 }, { journeys: [], results: [] }), null);
+  assert.deepEqual(claimGate([spec], { 'journey-spec': claimProof(spec, { journeys: [copy(cases.onboarding)], results: [] }) }).map(entry => entry.status), ['stale']);
+});
+
+test('J5: an app is reviewable with a v2 recipe, a fixture per persona and the setup route', () => {
+  assert.deepEqual(reviewableGaps({ recipe: copy(cases.recipe), personas: Object.keys(cases.recipe.personas), setup: true }), []);
+  assert.deepEqual(reviewableGaps({ recipe: null, setup: false }).map(gap => gap.id), ['review-recipe', 'setup-route']);
+  assert.deepEqual(reviewableGaps({ recipe: copy(cases.recipe), personas: ['auditor'], setup: true }).map(gap => [gap.id, gap.kind]), [['persona-auditor', 'invariant']]);
+  assert.match(reviewableGaps({ recipeError: 'Review recipes need version 2.', setup: true })[0].text, /readable as version 2 \(now: Review recipes need version 2\.\)/);
 });
 
 function generatedApp() {

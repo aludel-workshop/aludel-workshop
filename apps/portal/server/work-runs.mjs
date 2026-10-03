@@ -1,6 +1,6 @@
 import { initLayerSource, layerReview, layerBinding, layerBranch, submitLayerBranch, prepareLayerReview, assertLayerReviewCurrent, mergeLayerBranch, settleLayerCheckout, undoLayerMerge } from './layer-source.mjs';
 import { packageAt } from './layer-package.mjs';
-import { claimGate, claimProof, reviewInputPath, taskClaims } from './journeys.mjs';
+import { claimGate, claimProof, journeyRecord, reviewInputPath, taskClaims } from './journeys.mjs';
 import { reviewInputs } from './review-previews.mjs';
 import { layerInstanceId } from './layer-contract.mjs';
 import { randomUUID } from 'node:crypto';
@@ -224,7 +224,7 @@ export function workRuns({ db, know, candidates = null }) {
   // results are the step tests J3 ran on that exact build; the journeys are read from the same commit.
   function proven(projectId, run) {
     const claims = run.task.criteria || [];
-    if (!claims.some(claim => claim.kind === 'journey' || claim.covers === 'journeys')) return { proofs: {}, gate: [] };
+    if (!claims.some(claim => claim.kind === 'journey' || claim.covers === 'journeys' || journeyRecord(claim))) return { proofs: {}, gate: [] };
     let built = {};
     const integration = run.integration;
     if (integration && db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'layer_review_journeys'").get()) {

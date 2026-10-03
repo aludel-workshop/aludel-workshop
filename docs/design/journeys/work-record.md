@@ -27,6 +27,8 @@ depends_on: [T03-CODE, LAT-08A, LAYER-BINDINGS-01, EXISTING-PROJECTS-01, DEC-050
 
 - **2026-10-03, owner chat (J4, new cloud session):** "can you grab j4?". The J3 handoff said J4 needs the owner's go; this is it. Authorized: J4 in the same local scope as J3: host code, tests, template commits and pins if needed, local checks, and commits plus a push to this session's designated branch (`claude/nice-cray-zn7gfg`, started from J3's `claude/brave-pascal-br7h4i` at `6f89df0`, which isn't on `main` yet). Not authorized: pushes to `main` or `layer-base`, deployment, spending, live owner data (the owner's portal), owner-impersonating actions, and restarting the owner's portal. The claims migration runs on the owner's next restart, so the owner is told before it. Recorded before execution.
 
+- **2026-10-03, owner chat (J5, new cloud session):** "pick up j5 please". The J4 handoff said J5 needs the owner's go; this is it. Authorized: J5 in the same local scope as J4: host code, tests, template commits and pins if needed, local checks, and commits plus a push to this session's designated branch (`claude/compassionate-hamilton-wz7nwz`, fast-forwarded to J4's `claude/nice-cray-zn7gfg` at `55b52a0`, which isn't on `main` yet). Not authorized: pushes to `main` or `layer-base`, deployment, spending, live owner data, owner-impersonating actions, and restarting the owner's portal. Recorded before execution.
+
 ## Owner direction (2026-10-02 chat)
 
 1. **The reviewer deals with interaction and feel, not diffs.** For user-facing work the review is walking the journey in a live preview, with automated proof alongside.
@@ -169,7 +171,7 @@ J1 can start before T03-CODE closes. J2 onward changes the Code template that T0
 
 ## Readiness
 
-J0–J4 are done (below; J3's Biome evidence moves to J8). J4's gate sits at acceptance, not at the agent's submit call (see the J4 run log). J5–J8 depend on each other as listed. J6 needs a prototype round before building. No external effect, spending or live-data change is planned before J8, and in J8 the owner performs the live actions.
+J0–J4 are done (below; J3's Biome evidence moves to J8). J4's gate sits at acceptance, not at the agent's submit call (see the J4 run log). J5 is built and server-tested; its browser journey is open (see the J5 run log). J6–J8 depend on each other as listed. J6 needs a prototype round before building. No external effect, spending or live-data change is planned before J8, and in J8 the owner performs the live actions.
 
 ## Run log
 
@@ -541,3 +543,70 @@ This is a rehearsal on data the old code wrote, not on the owner's live data, wh
    - **Applied:** `tools/branch-handoffs.sh` and its AGENTS.md line. **Tested:** run in this repository, it lists exactly the J3 branch that had to be found by hand (`+5`, `next_action: JOURNEYS-01`). **Hypothesis:** that the next agent runs it before starting.
    - **Applied:** the exact runner-image commands in the handoff. **Tested:** they built the image this session.
    - **Applied:** the full browser set at closeout, as J3 set. It caught two scripts that J4's changes broke, which the server suites didn't.
+
+### J5 Specify → Implement (2026-10-03, Claude, cloud session)
+
+Authorization: see the 2026-10-03 "J5" entry above.
+
+**Design, decided before building.**
+- **Where it lives.** Host-side, in a new `server/journey-work.mjs` over J1's pure contract. No template change: Code's Journeys view already shows what Specify writes.
+- **The offer.** For a Code task, the host matches the request (title and brief) to the app's routes: Code's route and handler units at the accepted head, plus every journey step's route. An explicit path in the request matches itself; otherwise a word of four letters or more matches a route segment that starts with it. Matched routes that no journey step reaches produce the offer *Draft a journey from the current app first?* No match, or every match covered, means no offer: that is how a trivial change skips it. The person can always create the task as written.
+- **Reviewable app.** At Specify, the host checks the accepted head for a valid v2 recipe, a fixture for the persona the journey is entered as, and the setup route (`/api/__aludel/review`) in the app outside `.aludel/`. Anything missing raises one *Make the app reviewable* item per app (reused while open) with invariant claims, and it blocks the Specify item.
+- **Specify.** A Code task whose context names the journey and the original request. Its claims: a `record` claim on Code's `journey-<id>` at the next revision (current + 1, or 1 for a new journey), and the `journeys-unchanged` invariant. The agent writes characterization tests for the steps as they work today (they must pass on the build), then writes the journey at that revision as `authored`, with its target steps. Steps that are new or changed carry no test yet. **New in the contract:** a `record` claim on a journey entry is proven by the reviewed build holding that journey at that revision, authored; otherwise it blocks acceptance like a failing step.
+- **Implement.** Raised when the Specify run is accepted, from the journey at the run's base and at the accepted commit, and the step results on the accepted build. It claims the changed steps, and the added steps that don't already pass (for a new journey, the characterized steps are already built). Everything else is the `journeys-unchanged` invariant. Nothing to claim means nothing is raised, and the Specify item's log says so. Implement joins the Specify item's project, carries the original request, and the two items' logs name each other. The binding trigger (Pages flow publish) waits for LAYER-BINDINGS-01 step 4.
+
+**Built.**
+- **Contract** ([journeys.mjs](../../../apps/portal/server/journeys.mjs), [tests](../../../apps/portal/tests/journeys.test.mjs)):
+  - `matchRoutes` and `journeyOffer`: the routes a request reaches and the offer (draft a new journey, revise the one that covers every matched route, or none).
+  - `specifyClaims`: the `journey-spec` record claim at the next revision, plus `journeys-unchanged`.
+  - `reviewableGaps`: the prerequisite's invariant claims (recipe, persona fixtures, setup route).
+  - `implementClaims(previous, next, results)` takes the accepted build's step results. An added step that already passed is built, not claimed; a changed step is always claimed. Claimed steps keep the journey's order.
+  - `claimProof` proves a record claim on a Code journey entry: passed, missing, stale or unsigned (written but not as authored). `work-runs.mjs` computes it like a journey claim, so it gates acceptance.
+  - `codeLayer` names Code's key, `platform`.
+- **Host** ([journey-work.mjs](../../../apps/portal/server/journey-work.mjs)):
+  - The offer reads Code's journeys at the accepted head and its route units.
+  - Specify refuses a second open Specify for the same journey. When the app isn't reviewable it raises the prerequisite once, reusing it while open, and the prerequisite blocks the Specify item.
+  - After an accepted Specify run, the host reads the journey at the run's base and at the accepted commit, plus the step results on that build, and raises Implement once. When nothing is raised, the Specify item's log says why.
+  - Routes: `POST work/journey-offer` and `POST work/specify`. The sign route calls `afterAccept` on every acceptance ([server.mjs](../../../apps/portal/server/server.mjs)).
+- **UI** ([work-create.ts](../../../apps/portal/src/layers/work-create.ts)): creating a Code task first asks for the offer. When there is one, the form shows it with *Specify first* and *Create the task as written*; the journey name is editable for a new journey. The review shows the record proof as "The journey in this build", with *Not written as authored* for the unsigned state ([work-review.ts](../../../apps/portal/src/layers/work-review.ts)).
+- **The agent's instructions** for Specify and Implement are in each item's brief (`context.suggestion`): characterize, specify at revision N as authored, leave app code alone; then build the claimed steps and turn their characterization tests into step tests. The task card's existing reviewPreparation already covers step tests, so the card didn't change.
+- **Not built:** the binding trigger (a Pages flow publish raising Implement) waits for LAYER-BINDINGS-01 step 4, as planned. The "inbox stub" part of the prerequisite is in its brief only; no journey here sends mail.
+
+**Environment (this session).** The branch was fast-forwarded from `main` to J4's `claude/nice-cray-zn7gfg` (`55b52a0`). This session's permission checks declined two setup steps: adding the private `layer-base` repository to the session, and starting `dockerd`. Node 24.21.0 came from the npm package `node@24`. Template mode, the Code template's UI path and every Docker check were therefore out of reach. For the UI typecheck and build, the git-ignored Pages UI was stubbed, as in J3. The baseline ran from a worktree at `55b52a0`.
+
+| Check | Baseline `55b52a0` | J5 |
+|---|---|---|
+| `tests/journeys.test.mjs` | | 15 passed, 1 skipped (needs `layer-base`). Adds offer and route matching, Specify claims and their proof, reviewable gaps, and Implement claims from step results |
+| `tests/work-runs.test.mjs` | | 16 passed. Adds the chain on a disposable imported app: offer, Specify plus the prerequisite (reused, blocking), the refusal of a second Specify, a person run proven by its build, acceptance, Implement raised once with only the unbuilt step claimed, and the offer turning into *revise*. Also adds the refusal to accept a Specify build whose journey is missing, stale or unsigned |
+| Mutation: built steps claimed anyway | | 2 J5 tests failed, then passed once restored |
+| Mutation: no proof for the journey record | | 3 J5 tests failed, then passed once restored |
+| `npm run test:server`, templates off (no `layer-base`, no Docker) | 237 passed, 49 failed, 34 skipped | 243 passed, 49 failed, 34 skipped. **Identical failure sets**, all reading `layer-base` |
+| Same, templates on | 97 passed, 44 failed, 1 skipped (142 register; files that need `layer-base` abort at load) | The same counts and an **identical failure set**. The J5 tests are in files that abort at load in this mode |
+| `ngc` typecheck, `vite build` (Pages UI stubbed) | | Passed; no warnings in the changed files |
+| **Not run here** | | The exit evidence's browser journey; the template suite's pass count; the Docker review checks; `tools/browser-checks.sh` (needs `layer-base` for templates on) |
+
+**Findings.**
+- **Code's layer key is `platform`.** Nothing in the J3/J4 handoff said so. The first draft used `code` in three places: the host module, the claim's layer, and the UI check that decides whether to ask for the offer. The server test caught the first two. Adversarial review of the diff caught the third; with it, the offer would never have shown. The handoff's gotchas now name the key.
+- **The tool that finds unmerged handoffs lives on an unmerged branch.** J4 added `tools/branch-handoffs.sh` and its AGENTS.md line on its own branch. A session that starts from `main` sees neither: this one found J3 and J4 by listing remote branches by hand. Until the owner merges, `main` keeps pointing at J3.
+- **Proof needs the build, again.** A Specify run's record claim, like a journey claim, reads as not run until the review preview has been built and walked. An agent can't learn before submitting whether its journey file passes; that is J7's *Check my branch*, as J4 found.
+
+**Exit evidence status.** Not met: the browser journey on a disposable imported app wasn't run, because this session had neither `layer-base` nor Docker. The server-level test drives the same chain without the browser or the review build, and it passes. The handoff makes the browser journey the next session's first task, with `layer-base` and Docker approved at session start. J5 is **built and server-tested, not closed**.
+
+**Retrospective (J5).**
+1. *Harder than necessary:*
+   - Finding the work: `main` still said "J3 next", and J3 and J4 were on two unmerged session branches.
+   - Two environment steps the handoff treats as routine were declined in this session: adding `layer-base` and starting `dockerd`. Template mode and every Docker check were out of reach.
+   - Code's layer key (`platform`) wasn't written down anywhere a newcomer would look.
+2. *Would help next time:*
+   - The owner merging the stacked branches into `main`, so the handoff and `tools/branch-handoffs.sh` are where a new session starts.
+   - Asking the owner at session start to approve `layer-base` access and starting `dockerd`, before any work depends on them. The handoff now says so.
+3. *What the task revealed:*
+   - The offer's route match is a heuristic over Code's route units and journey step routes. An imported app whose routes Code doesn't detect as units gets an offer only when the request names a path.
+   - "Ahead of what the code builds" is measurable: the steps not passing on the accepted build. That replaced a step diff alone, which would have claimed a new journey's characterized steps.
+4. *Questions:*
+   - **Still open for the owner:** merge `claude/brave-pascal-br7h4i`, `claude/nice-cray-zn7gfg` and this branch to `main`? They stack, so merging this branch carries all three.
+   - **New:** should an agent's Specify be able to check its journey file before submitting? That is J7's path, now for J5 as well.
+5. *Process change:*
+   - **Applied:** the handoff's cloud-session prerequisites now say to ask for `layer-base` and `dockerd` approval first. Its gotchas name Code's key. **Hypothesis:** that the next session gets both approved before starting.
+   - **Applied:** a before/after failure-set comparison in both modes, as J3 did, to separate environment failures from regressions. **Tested:** identical sets in both modes.
+   - **Not done:** nothing changes the fact that `main` can't point at branch work without a merge. That needs the owner.

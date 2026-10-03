@@ -27,6 +27,7 @@ import { editorBridge, initEditorBridge } from './editor-bridge.mjs';
 import { symphonyWorker, initSymphonyWorker } from './symphony-worker.mjs';
 import { reviewPreviews, reviewHost } from './review-previews.mjs';
 import { workRuns, initWorkRuns } from './work-runs.mjs';
+import { journeyWork } from './journey-work.mjs';
 import { providerModelCatalog } from './provider-models.mjs';
 import { extname, join, normalize, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -253,6 +254,7 @@ const ensureWorkerPool = projectId => worker.ensurePool(projectId, join(dataDire
 for (const projectId of layerProjects()) ensureWorkerPool(projectId);
 const runs = agentRuns({ db, know, worker, symphonyDispatch: symphonyDispatchEnabled });
 const runHistory = workRuns({ db, know, candidates });
+const journeyItems = journeyWork({ db, know });
 // Accepting an exact code candidate: owner only, every check accepted, a healthy preview, and a fast-forward into the project.
 async function acceptCandidate(user, projectId, candidateId, commit) {
   if (!db.prepare("SELECT 1 FROM project_members WHERE project_id = ? AND user_id = ? AND role = 'owner'").get(projectId, user.id))
@@ -1129,6 +1131,8 @@ async function api(request, response, url) {
       });
       for (const artifact of db.prepare('SELECT id FROM layer_review_integrations WHERE attempt_id = ?').all(attemptId)) { try { await integrationPreviews.close(artifact.id); } catch { /* sweep handles a still-pending rejected build */ } }
       settleSymphonyBatch(projectId, signed.batchId);
+      // JOURNEYS-01 J5: an accepted Specify run leaves its journey ahead of the code, which raises Implement.
+      if (input.outcome === 'accept') { try { journeyItems.afterAccept(user, projectId, workId, attemptId); } catch (error) { know.appendLog(workId, `No Implement raised: ${error.message}`); } }
       // An accepted merge moves the layer's main; build its views now so the next visit is ready.
       if (signing?.scope === 'layer') views.status(db, projectId, signing.layer);
       return json(response, 200, { run: signed, work: know.workById(projectId, workId) }, { 'cache-control': 'no-store' });
@@ -1363,6 +1367,9 @@ async function api(request, response, url) {
       know.remove(projectId, item);
       return json(response, 200, { deleted: item });
     }
+    // JOURNEYS-01 J5: what Code offers for a request (specify the journey first?), and creating Specify with its prerequisite.
+    if (section === 'work' && method === 'POST' && item === 'journey-offer') return json(response, 200, journeyItems.offer(projectId, await readJson(request)), { 'cache-control': 'no-store' });
+    if (section === 'work' && method === 'POST' && item === 'specify') return json(response, 201, journeyItems.specify(user, projectId, await readJson(request)), { 'cache-control': 'no-store' });
     if (section === 'work' && method === 'POST' && !item) {
       // People stage suggestions; reconcile and routine contexts are only ever written by the server.
       const input = await readJson(request);

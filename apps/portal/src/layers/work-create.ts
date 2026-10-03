@@ -3,6 +3,8 @@ import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { ProjectContext, LayerWorkAction, WorkItem, layerLabel, lines, priorityOrder } from './context';
 
+type JourneyOffer = { kind: 'draft' | 'revise'; journey: { id: string; title: string; revision: number }; routes: string[] };
+
 // A task names its layer (DEC-057) or, for a layer not yet converted, an existing action. The brief sets the job;
 // neither can widen what the layer or action may change.
 @Component({
@@ -49,6 +51,20 @@ import { ProjectContext, LayerWorkAction, WorkItem, layerLabel, lines, priorityO
     </div>
     <label>Expected outputs, one per line<textarea name="outputs" [(ngModel)]="outputs" rows="2" placeholder="What should the task produce?"></textarea></label>
     <label>Review checks, one per line<textarea name="checks" [(ngModel)]="checks" rows="3" placeholder="How will you know it is done?"></textarea></label>
+    @if (offered(); as o) {
+      <div class="lay-card wc-offer" role="group" aria-labelledby="wc-offer-title"><mat-icon aria-hidden="true">route</mat-icon><div>
+        @if (o.kind === 'draft') {
+          <p id="wc-offer-title"><strong>No journey covers {{ o.routes.join(', ') }} yet.</strong> Draft one from the current app first?</p>
+          <p class="small">Specify writes the journey: tests for what the app does today, then the steps this change needs. Accepting it raises the Implement task with those steps as its claims.</p>
+        } @else {
+          <p id="wc-offer-title"><strong>“{{ o.journey.title }}” covers {{ o.routes.join(', ') }}.</strong> Revise that journey first?</p>
+          <p class="small">Specify writes revision {{ o.journey.revision }} of it; accepting it raises the Implement task with the changed steps as its claims.</p>
+        }
+        <label>Journey<input name="journeyTitle" [(ngModel)]="journeyTitle" maxlength="200" [readonly]="o.kind === 'revise'" /></label>
+        <div class="lay-row lay-wrap"><button type="button" class="lay-button" (click)="specifyFirst(o)" [disabled]="!journeyTitle.trim()">Specify first</button>
+          <button type="button" class="lay-button ghost" (click)="createAsWritten()">Create the task as written</button></div>
+      </div></div>
+    }
     @if (assignedAgent() && !runnable()) { <p class="lay-lock-note lay-lock-warn">This task is not ready for an agent run. It may need a linked target record, a connected agent, or an execution contract for this action. You can still create it for planning.</p> }
     @if (assignedAgent() && !target) { <p class="lay-muted small">Link a target record when the agent needs specific project context.</p> }
     <div class="lay-row lay-wrap"><button type="submit" class="lay-button" [disabled]="!title.trim() || !scope() && !selectedAction()">Create task</button>
@@ -84,6 +100,9 @@ export class WorkCreateComponent {
     ];
   });
   title = ''; brief = ''; target = ''; assignee = ''; state = 'ready'; priority = 'medium'; outputs = ''; checks = '';
+  // JOURNEYS-01 J5: Code offers to specify a journey first when the request reaches routes no journey covers.
+  readonly offered = signal<JourneyOffer | null>(null);
+  journeyTitle = '';
   constructor() {
     effect(() => {
       const layer = this.layer(), preset = this.preset(); this.actions();
@@ -116,13 +135,34 @@ export class WorkCreateComponent {
   create() {
     const chosen = this.selectedAction(), scoped = Boolean(this.scope());
     if (!scoped && !chosen || !this.title.trim()) return;
+    // Code is the `platform` layer (DEC-049).
+    if (scoped && this.role() === 'platform' && !this.offered()) {
+      void this.ctx.write(async () => {
+        const answer = await this.ctx.api<{ offer: JourneyOffer | null }>(`/api/projects/${encodeURIComponent(this.ctx.projectId())}/work/journey-offer`, 'POST', { title: this.title.trim(), brief: this.brief.trim() });
+        if (answer.offer) { this.journeyTitle = answer.offer.journey.title; this.offered.set(answer.offer); return; }
+        await this.save();
+      });
+      return;
+    }
+    void this.ctx.write(() => this.save(), 'Task created.');
+  }
+  createAsWritten() { void this.ctx.write(() => this.save(), 'Task created.'); }
+  specifyFirst(offer: JourneyOffer) {
+    const [kind, id] = this.assignee ? this.assignee.split(':', 2) : [];
+    const journey = { id: offer.journey.id, title: this.journeyTitle.trim() };
+    void this.ctx.write(async () => {
+      const created = await this.ctx.api<{ specify: WorkItem }>(`/api/projects/${encodeURIComponent(this.ctx.projectId())}/work/specify`, 'POST',
+        { title: this.title.trim(), brief: this.brief.trim(), journey, priority: this.priority, state: this.state, ...(kind && id ? { assignee: { kind, id } } : {}) });
+      this.ctx.go(this.ctx.link('work', 'item', created.specify.id));
+    }, 'Specify task created.');
+  }
+  private async save() {
+    const chosen = this.selectedAction(), scoped = Boolean(this.scope());
     const [kind, id] = this.assignee ? this.assignee.split(':', 2) : [];
     const body = { ...(scoped ? { layer: this.role() } : { action: chosen!.id }), title: this.title.trim(), suggestion: this.brief.trim(),
       targets: this.target ? [{ id: this.target }] : [], documents: lines(this.outputs), checks: lines(this.checks),
       priority: this.priority, state: this.state, ...(kind && id ? { assignee: { kind, id } } : {}) };
-    void this.ctx.write(async () => {
-      const created = await this.ctx.api<WorkItem>(`/api/projects/${encodeURIComponent(this.ctx.projectId())}/work`, 'POST', body);
-      this.ctx.go(this.ctx.link('work', 'item', created.id));
-    }, 'Task created.');
+    const created = await this.ctx.api<WorkItem>(`/api/projects/${encodeURIComponent(this.ctx.projectId())}/work`, 'POST', body);
+    this.ctx.go(this.ctx.link('work', 'item', created.id));
   }
 }

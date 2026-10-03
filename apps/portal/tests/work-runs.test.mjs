@@ -7,6 +7,8 @@ import test from 'node:test';
 import { createUser, initAccounts } from '../server/accounts.mjs';
 import { agentRuns, initAgentRuns } from '../server/agent-runs.mjs';
 import { initKnowledge, knowledge } from '../server/knowledge.mjs';
+import { initCodeUnits } from '../server/code-units.mjs';
+import { journeyWork } from '../server/journey-work.mjs';
 import { initLayerSource } from '../server/layer-source.mjs';
 import { initOnboarding, loadCatalogs, onboarding } from '../server/onboarding.mjs';
 import { ensureProductWorkspace } from '../server/product-workspace.mjs';
@@ -475,5 +477,120 @@ test('J4: a person run is proven by the step results of its reviewed build, or a
     assert.deepEqual(excused.run.gate.map(entry => entry.reason), ['The team form needs the design kit; tracked as W-9.']);
     await f.history.sign(f.owner, f.projectId, excused.work.id, excused.run.id, { outcome: 'accept' }, { accept: () => {} });
     assert.equal(f.history.runFor(f.projectId, excused.work.id, excused.run.id).state, 'accepted');
+  } finally { f.close(); }
+});
+
+// JOURNEYS-01 J5: an imported app with no journeys. A request about /settings is offered Specify; Specify raises the
+// reviewable prerequisite; accepting the Specify run raises Implement with only the steps the app doesn't do yet.
+test('J5: a request is specified first, and accepting Specify raises Implement with the unbuilt steps as claims', async () => {
+  const f = fixture();
+  try {
+    initLayerSource(f.db); initCodeUnits(f.db);
+    const at = new Date().toISOString(), commitAll = (repo, message) => { git(repo, 'add', '.'); git(repo, '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', message); return git(repo, 'rev-parse', 'HEAD'); };
+    const repo = join(f.root, 'imported-app'); mkdirSync(join(repo, '.aludel', 'outputs'), { recursive: true }); mkdirSync(join(repo, 'server'));
+    git(repo, 'init', '-q', '-b', 'main');
+    writeFileSync(join(repo, '.aludel', 'layer.json'), JSON.stringify({ schemaVersion: 1, hostSdkVersion: 1, key: 'platform', name: 'Code', path: '/code', authority: 'code_projection',
+      outputProvider: 'files', editorAdapter: 'none', outputs: [], tabs: [], knowledge: { charter: 'knowledge/charter.md', documents: [] }, work: { scope: 'layer' } }));
+    mkdirSync(join(repo, '.aludel', 'knowledge')); writeFileSync(join(repo, '.aludel', 'knowledge', 'charter.md'), '# Code\n');
+    writeFileSync(join(repo, '.aludel', 'review.json'), JSON.stringify({ version: 2, checks: [{ name: 'App tests', command: ['npm', 'test'] }], personas: { member: { fixture: 'team', session: 'member' } } }));
+    writeFileSync(join(repo, 'server', 'server.mjs'), "// The app's own server; it has no review setup route yet.\n");
+    const base = commitAll(repo, 'imported app');
+    // Code is the `platform` layer (DEC-049), bound to the imported app's repository.
+    f.db.prepare("INSERT OR IGNORE INTO layer_instances(project_id, layer_key, instance_id, created_at) VALUES (?, 'platform', 'inst-code', ?)").run(f.projectId, at);
+    const instance = f.db.prepare("SELECT instance_id FROM layer_instances WHERE project_id = ? AND layer_key = 'platform'").get(f.projectId).instance_id;
+    f.db.prepare("INSERT OR REPLACE INTO layer_package_bindings(project_id, layer_key, layer_instance_id, repository_path, accepted_commit, installed_at) VALUES (?, 'platform', ?, ?, ?, ?)").run(f.projectId, instance, repo, base, at);
+    for (const path of ['/', '/settings', '/app']) f.db.prepare('INSERT INTO code_units(id, project_id, unit_key, path, symbol, kind, hash, reachable, last_commit, line, calls_json, indexed_at) VALUES (?, ?, ?, ?, ?, ?, ?, 1, NULL, 1, ?, ?)')
+      .run(`unit-${path}`, f.projectId, `src/routes.ts#route ${path}`, 'src/routes.ts', `route ${path}`, 'route', 'h', '[]', at);
+    const items = journeyWork({ db: f.db, know: f.know });
+
+    // The offer: /settings has no journey, so Code offers to draft one; a footer typo gets no offer.
+    const request = { title: 'Invite teammates', brief: 'From /settings, a member invites people by email.' };
+    const offered = items.offer(f.projectId, request);
+    assert.deepEqual([offered.offer.kind, offered.offer.journey, offered.uncovered], ['draft', { id: 'invite-teammates', title: 'Invite teammates', revision: 1 }, ['/settings']]);
+    assert.equal(items.offer(f.projectId, { title: 'Fix the footer typo' }).offer, null);
+
+    // Specify: the journey's record claim and the invariant; no setup route, so the reviewable prerequisite blocks it.
+    const created = items.specify(f.owner, f.projectId, { ...request, journey: offered.offer.journey, persona: 'member', assignee: { kind: 'person', id: f.owner.id } });
+    const specify = created.specify;
+    assert.deepEqual(specify.checks.map(claim => [claim.id, claim.kind, claim.entry ?? claim.covers]), [['journey-spec', 'record', 'journey-invite-teammates'], ['journeys-unchanged', 'invariant', 'journeys']]);
+    assert.deepEqual([specify.scope, specify.layer, specify.context.journeyWork.revision], ['layer', 'platform', 1]);
+    assert.deepEqual(created.prerequisite.checks.map(claim => claim.id), ['setup-route']);
+    assert.deepEqual(f.know.workList(f.projectId).find(entry => entry.id === specify.id).blockedBy, [created.prerequisite.id]);
+    // Once per app: a second Specify reuses the open prerequisite.
+    const other = items.specify(f.owner, f.projectId, { title: 'Change billing', brief: 'On /settings/billing', journey: { id: 'billing', title: 'Billing' } });
+    assert.equal(other.prerequisite.id, created.prerequisite.id);
+    await assert.rejects(async () => items.specify(f.owner, f.projectId, { ...request, journey: offered.offer.journey }), /already being specified/);
+    f.know.updateWork(f.owner, f.projectId, created.prerequisite.id, { blocks: [] });
+
+    // The person specifies: characterization test for opening settings (passes), the new invite step without a test.
+    const step = (id, route, test) => ({ id, name: `Step ${id}`, route, persona: 'member', trigger: `Goes to ${route}`, expected: `${id} works`, ...(test ? { test } : {}) });
+    const journey = revision => ({ version: 1, id: 'invite-teammates', title: 'Invite teammates', origin: 'authored', revision, persona: 'member',
+      steps: [step('open-settings', '/settings', 'invite-teammates.spec.mjs#open-settings'), step('invite', '/settings/invite')] });
+    writeFileSync(join(repo, '.aludel', 'outputs', 'journeys.json'), JSON.stringify({ journeys: [journey(1)] }));
+    const specified = commitAll(repo, 'Specify invite teammates');
+    git(repo, 'checkout', '-q', '--detach', base);
+    f.runs.stage(f.owner, f.projectId, specify.id);
+    const started = f.history.startPerson(f.owner, f.projectId, specify.id);
+    assert.deepEqual(JSON.parse(f.db.prepare('SELECT task_json FROM work_person_runs WHERE id = ?').get(started.id).task_json).criteria.map(claim => claim.id), ['journey-spec', 'journeys-unchanged']);
+    f.history.submitPerson(f.owner, f.projectId, specify.id, started.id, { summary: 'Specified invite teammates.' });
+    const integration = `rvi-${started.id.slice(-8)}`;
+    f.db.prepare('INSERT INTO layer_review_integrations VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(integration, started.id, f.projectId, 'platform', specified, base, specified,
+      JSON.stringify({ id: integration, branch: 'review/specify', base, commit: specified, submittedCommit: specified, files: [], tests: [] }), at);
+    f.db.exec('CREATE TABLE IF NOT EXISTS layer_review_journeys (integration_id TEXT PRIMARY KEY, commit_sha TEXT NOT NULL, steps_json TEXT NOT NULL, separability_json TEXT NOT NULL, ran_at TEXT NOT NULL)');
+    f.db.withProject(f.projectId, () => f.db.prepare("INSERT INTO layer_review_journeys VALUES (?, ?, ?, '{}', ?)").run(integration, specified,
+      JSON.stringify([{ id: 'invite-teammates.open-settings', status: 'passed', detail: null, screenshot: true }, { id: 'invite-teammates.invite', status: 'uncovered', detail: null, screenshot: false }]), at));
+    const run = f.history.runFor(f.projectId, specify.id, started.id);
+    assert.deepEqual([run.proofs['journey-spec'].status, run.proofs['journeys-unchanged'].status, run.gate], ['passed', 'passed', []]);
+
+    // Accepting merges the specified commit (as the repository acceptance does) and raises Implement.
+    await f.history.sign(f.owner, f.projectId, specify.id, started.id, { outcome: 'accept' }, { accept: () => {
+      f.db.prepare("UPDATE layer_package_bindings SET accepted_commit = ? WHERE project_id = ? AND layer_key = 'platform'").run(specified, f.projectId);
+      f.know.updateWork(f.owner, f.projectId, specify.id, { state: 'done' });
+    } });
+    const implement = items.afterAccept(f.owner, f.projectId, specify.id, started.id);
+    assert.equal(implement.title, 'Implement: Invite teammates');
+    assert.deepEqual(implement.checks.map(claim => [claim.id, claim.kind, claim.steps ?? claim.text]), [['invite-teammates-steps', 'journey', ['invite']],
+      ['journeys-unchanged', 'invariant', 'Every other journey still passes its tests, as do steps open-settings of Invite teammates.']]);
+    assert.deepEqual([implement.scope, implement.layer, implement.context.journeyWork.specify, implement.context.journeyWork.request.title], ['layer', 'platform', specify.id, 'Invite teammates']);
+    assert.match(f.know.workById(f.projectId, specify.id).log.at(-1).text, new RegExp(`Raised ${implement.ref} to implement invite-teammates at revision 1; steps open-settings already pass`));
+    assert.equal(items.afterAccept(f.owner, f.projectId, specify.id, started.id).id, implement.id, 'raised once');
+    // The offer now sees the journey covering /settings, and offers to revise it.
+    assert.deepEqual([items.offer(f.projectId, request).offer.kind, items.offer(f.projectId, request).offer.journey.revision], ['revise', 2]);
+  } finally { f.close(); }
+});
+
+test('J5: a Specify run whose build lacks the journey, or holds it unsigned, cannot be accepted', async () => {
+  const f = fixture();
+  try {
+    initLayerSource(f.db);
+    const repo = join(f.root, 'app'); mkdirSync(join(repo, '.aludel', 'outputs'), { recursive: true });
+    git(repo, 'init', '-q', '-b', 'main');
+    writeFileSync(join(repo, '.aludel', 'review.json'), JSON.stringify({ version: 2, checks: [{ name: 'App tests', command: ['npm', 'test'] }], personas: {} }));
+    writeFileSync(join(repo, '.aludel', 'outputs', 'journeys.json'), JSON.stringify({ journeys: [{ version: 1, id: 'billing', title: 'Billing', origin: 'observed', revision: 1,
+      steps: [{ id: 'open', name: 'Open billing', route: '/billing', trigger: 'Opens it', expected: 'Billing shows.', test: 'billing.spec.mjs#open' }] }] }));
+    git(repo, 'add', '.'); git(repo, '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'app');
+    const commit = git(repo, 'rev-parse', 'HEAD'), at = new Date().toISOString();
+    f.db.prepare("INSERT INTO layer_instances(project_id, layer_key, instance_id, created_at) VALUES (?, 'j5app', 'inst-j5app', ?)").run(f.projectId, at);
+    f.db.prepare("INSERT INTO layer_package_bindings(project_id, layer_key, layer_instance_id, repository_path, accepted_commit, installed_at) VALUES (?, 'j5app', 'inst-j5app', ?, ?, ?)").run(f.projectId, repo, commit, at);
+    f.db.exec('CREATE TABLE IF NOT EXISTS layer_review_journeys (integration_id TEXT PRIMARY KEY, commit_sha TEXT NOT NULL, steps_json TEXT NOT NULL, separability_json TEXT NOT NULL, ran_at TEXT NOT NULL)');
+    const check = async (claim, status, pattern) => {
+      const work = f.know.createWork(f.projectId, { action: 'platform.docs', title: 'Specify billing', assignee: { kind: 'person', id: f.owner.id }, claims: [claim], checks: [] }, f.owner.name);
+      f.runs.stage(f.owner, f.projectId, work.id);
+      const started = f.history.startPerson(f.owner, f.projectId, work.id);
+      const task = JSON.parse(f.db.prepare('SELECT task_json FROM work_person_runs WHERE id = ?').get(started.id).task_json);
+      f.db.prepare('UPDATE work_person_runs SET task_json = ? WHERE id = ?').run(JSON.stringify({ ...task, layerRepository: { key: 'j5app', base: commit, root: '' } }), started.id);
+      f.history.submitPerson(f.owner, f.projectId, work.id, started.id, { summary: 'Specified billing.' });
+      const integration = `rvi-${started.id.slice(-8)}`;
+      f.db.prepare('INSERT INTO layer_review_integrations VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(integration, started.id, f.projectId, 'j5app', commit, commit, commit,
+        JSON.stringify({ id: integration, branch: 'review/x', base: commit, commit, submittedCommit: commit, files: [], tests: [] }), at);
+      f.db.withProject(f.projectId, () => f.db.prepare("INSERT INTO layer_review_journeys VALUES (?, ?, ?, '{}', ?)").run(integration, commit, JSON.stringify([{ id: 'billing.open', status: 'passed' }]), at));
+      const run = f.history.runFor(f.projectId, work.id, started.id);
+      assert.equal(run.proofs[claim.id].status, status);
+      await assert.rejects(f.history.sign(f.owner, f.projectId, work.id, started.id, { outcome: 'accept' }, { accept: () => {} }), pattern);
+    };
+    const spec = { id: 'journey-spec', kind: 'record', layer: 'platform', text: 'The journey, specified' };
+    await check({ ...spec, entry: 'journey-billing', revision: 2 }, 'stale', /not proven \(stale\)/);
+    await check({ ...spec, entry: 'journey-billing', revision: 1 }, 'unsigned', /not proven \(unsigned\)/);
+    await check({ ...spec, entry: 'journey-invite', revision: 1 }, 'missing', /not proven \(missing\)/);
   } finally { f.close(); }
 });

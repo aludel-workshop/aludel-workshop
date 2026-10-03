@@ -528,6 +528,8 @@ aludel-ref,aludel-role-chip,aludel-assignee{display:inline-flex;max-width:100%;m
 .lay-lane-who{min-width:0}.lay-lane-who strong{font-size:15px}.lay-lane-who small{display:block;font-size:12px;line-height:1.3;color:var(--machine-muted)}
 .lay-lane-right{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-left:auto}
 .lay-ticker{font-size:12px;line-height:1.3;text-align:right;color:var(--machine-muted);font-variant-numeric:tabular-nums}.lay-ticker strong{color:var(--machine-ink);font-size:12.5px}
+/* JOURNEYS-01 J5: Code's offer to specify a journey before creating a task. */
+.wc-offer{display:flex;align-items:flex-start;gap:10px;border-left:3px solid var(--machine-accent)}.wc-offer > div{flex:1;min-width:0}.wc-offer p{margin:0 0 6px}
 .lay-lock-note{display:flex;align-items:center;gap:6px;margin:0;padding:0 4px;font-size:12.5px;color:var(--machine-muted)}.lay-lock-note mat-icon{width:15px;height:15px;font-size:15px}
 .lay-lock-warn{color:#6b4500}
 .lay-lane-empty{margin:0;padding:14px;border:1px dashed var(--mat-sys-outline-variant);border-radius:14px;font-size:14px;text-align:center;color:var(--machine-muted)}

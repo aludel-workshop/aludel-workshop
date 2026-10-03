@@ -84,7 +84,7 @@ export type WorkStatus = 'backlog' | 'queued' | 'staged' | 'working' | 'blocked'
 // JOURNEYS-01 J4: a Work item's checks are its claims, with stable IDs. A note is unbacked free text; the others reference a layer.
 export type ClaimKind = 'journey' | 'record' | 'invariant' | 'note';
 export interface ClaimRef { id: string; kind: ClaimKind; backed: boolean; journey?: string; revision?: number; steps?: string[]; layer?: string; entry?: string; covers?: 'journeys'; }
-export type ProofStatus = 'passed' | 'failed' | 'no-fixture' | 'uncovered' | 'skipped' | 'missing' | 'stale' | 'not-run';
+export type ProofStatus = 'passed' | 'failed' | 'no-fixture' | 'uncovered' | 'skipped' | 'missing' | 'stale' | 'unsigned' | 'not-run';
 export interface ClaimProof { status: ProofStatus; detail: string | null; steps: { id: string; status: ProofStatus; detail: string | null; screenshot: boolean }[]; }
 export interface WorkCheck extends ClaimRef { text: string; source: { id: string; revision?: number | null } | null; verdict: 'accept' | 'reject' | null; note: string; by?: string | null; at?: string | null; }
 export interface LogEntry { at: string; text: string; refs?: string[]; by?: { kind: string; id: string } | null; }
