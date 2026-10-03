@@ -250,6 +250,15 @@ New Operator role. Agent-checked: server 88/89 (1 pre-existing), all browser sui
 
 ## Latest handoff
 
+2026-10-03: **JOURNEYS-01 follow-ups (owner chat).**
+- Installing Code into a repository that already has `.aludel/` reads its files in; a conflicting version of Code's own code is refused.
+- Code's docs sidecar and the setup choices moved into `.aludel/`. Images exclude `.aludel/`, so every preview build proves the app builds without it.
+- Every server test passes (templates off and on), and every remaining browser check passes.
+- Two real bugs found behind stale checks are fixed: legacy routes returned 500 after the project database split, and the work item page overflowed at 400px.
+- Superseded browser scripts are retired (`lat03`–`06`, `layers`, `onboarding`, the last pending the onboarding redesign).
+- **Waiting on the owner:** a go to push Code template `08d26c9` to `layer-base`.
+- [Run log](design/journeys/work-record.md#j3-follow-ups-aludel-adoption-seams-failing-tests-2026-10-03-claude-cloud-session).
+
 2026-10-03: **JOURNEYS-01 J3 done (cloud session; Biome's steps move to J8).**
 - Review steps now come from journeys (`<journey>.<step>`), and the v2 recipe maps personas to fixtures. The host runs each journey's step tests black-box, in a Playwright runner container whose only network is the candidate, and records a result and screenshot per step.
 - Generated apps no longer read or copy `.aludel/` at runtime, and they declare their seams. Review warns about undeclared ones.

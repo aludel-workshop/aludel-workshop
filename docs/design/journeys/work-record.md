@@ -402,3 +402,35 @@ The import check shows the same plan (Aludel adds, keeps, or can't import until 
   - `lat03`–`lat06`: hand-run LAT proofs on fixed candidate ports, with repo-root paths and since-changed record APIs.
   - `layers`: the LAY-02/03 sweep of compiled views, now covered by each layer's own template journey.
   - `onboarding`: the flow already changed (a Layers step, no Features step), and the owner is redesigning it.
+
+**Results (2026-10-03; Docker running; repository-review run as a non-root user, as explained above).**
+
+| Check | Result |
+|---|---|
+| `npm run test:server` (without `previews-docker`, whose app build needs npm inside Docker) | 280 passed, **0 failed**, 30 mode-specific skips |
+| `npm run test:server:templates` | 303 passed, **0 failed**, 7 skips |
+| `tests/review-previews.test.mjs` (Docker) | 2 passed |
+| Code template tests at `08d26c9`; `typecheck-layer-ui.mjs` at `08d26c9` | 13 passed; passed |
+| `npm run typecheck`, `npm run build` | Passed |
+| `tools/browser-checks.sh` over every remaining browser script, templates on | **All 22 pass**: bindings, brand, branding, code-layer, data-layer, design (templates off, as declared), design-layer, github, kit, knowledge, layer-bar, layer-scope, library, loopback, markdown-editor, pages, product, roles, vision-layer, work-item, workflow, browser |
+| `tests/repository-review-browser.mjs` | Passed, with the app's journeys read in at install |
+
+**Not yet done:** pushing Code template commit `08d26c9` to `aludel-workshop/layer-base`. It needs the owner's go, and until then this branch's pin resolves only in this session's clone.
+
+**Retrospective (follow-ups).**
+1. *Harder than necessary:*
+   - Most of the "failing tests" weren't caused by the code under test. They came from untracked drift: a test reading old git history, browser scripts written for one-off candidate portals, a shell that renamed its navigation, a moved dependency list, and a retired action used as a fixture.
+   - Nothing ran the whole browser set, so the drift accumulated unseen.
+2. *Would help next time:*
+   - Run `tools/browser-checks.sh` over every script (not a hand-picked list) at each slice's closeout. This run is the baseline: all green.
+   - A script that needs a non-default mode declares it in its header.
+3. *What the task revealed:*
+   - Two real product bugs hid behind "known failing" checks: the legacy workspace returned 500s after the project database split, and the work item page overflowed on phones.
+   - A known-failing check is a bug report that stopped being read.
+4. *Questions:*
+   - Should the Pages bridge script be injected by the preview proxy, so apps don't ship it?
+   - Should seeded app docs drop their mentions of Aludel?
+   - The onboarding redesign needs its own browser check.
+5. *Process change:*
+   - **Applied:** the closeout runs the full browser set. The "templates off" marker is honoured by the runner. **Tested:** this run.
+   - **Hypothesis:** that the next slice keeps it green.
