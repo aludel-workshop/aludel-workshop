@@ -7,7 +7,13 @@ import { ProjectContext, RunChange, WorkRun } from './context';
 import { AvatarComponent, RefChipComponent } from './work-shared';
 import { reviewFocus, runTitle } from './work-run';
 
-type ReviewPreview = { status: string; error?: string | null; reason?: string | null; url: string; scenarios?: { id: string; criterion: number; label: string; expected: string }[] };
+// JOURNEYS-01 J3: review steps come from the candidate's journeys, each with the result its step test had on this build.
+type StepResult = { status: 'passed' | 'failed' | 'skipped' | 'uncovered' | 'no-fixture'; detail?: string | null; screenshot?: boolean };
+type ReviewStep = { id: string; journey: string; step: string; label: string; expected: string; persona: string | null; available: boolean; reason: string | null; result: StepResult | null };
+type ReviewPreview = { status: string; error?: string | null; reason?: string | null; url: string; journeys?: { id: string; title: string; revision: number; origin: string }[]; steps?: ReviewStep[];
+  separability?: { seamsFile: boolean; declared: number; undeclared: string[] } | null };
+const stepResult: Record<StepResult['status'] | 'none', [string, string]> = { passed: ['check_circle', 'Test passed'], failed: ['cancel', 'Test failed'], skipped: ['radio_button_unchecked', 'Not run'],
+  uncovered: ['remove', 'No test'], 'no-fixture': ['person_off', 'No fixture'], none: ['radio_button_unchecked', 'Not run yet'] };
 type Evidence = { type: 'change' | 'test' | 'try' | 'check' | 'note'; label: string; detail: string; look: string; result?: string; missing?: boolean };
 const evidenceType: Record<Evidence['type'], [string, string]> = { change: ['difference', 'Change'], test: ['science', 'Test'], try: ['touch_app', 'Try it'], check: ['verified', 'Aludel check'], note: ['person', 'Performer evidence'] };
 
@@ -96,6 +102,23 @@ const evidenceType: Record<Evidence['type'], [string, string]> = { change: ['dif
                     @if (preview()?.status === 'running') { <iframe [src]="previewUrl()" title="Candidate preview"></iframe><a [href]="preview()?.url" target="_blank" rel="noopener noreferrer">Open in a new tab</a> }
                     @else if (r.state === 'review') { <button type="button" class="lay-button" [disabled]="preparing()" (click)="buildPreview()">Open the isolated preview</button> }
                     @if (r.integration && preview()?.status === 'running') { <button type="button" class="lay-button ghost small" (click)="closePreview()">Stop preview</button> }
+                    @if (r.integration?.appRepository && preview()) {
+                      <section class="wr-journeys" aria-labelledby="wr-journeys-h"><h2 id="wr-journeys-h" class="lay-eyebrow">Journey steps</h2>
+                        @for (journey of journeyGroups(); track journey.id) {
+                          <h3>{{ journey.title }} <small class="lay-muted">revision {{ journey.revision }} · {{ journey.origin }}</small></h3>
+                          <ol class="wr-steps">@for (step of journey.steps; track step.id) {
+                            <li><div class="lay-row lay-wrap"><button type="button" class="lay-button small" [disabled]="preparing() || !r.integration.current || preview()?.status !== 'running' || !step.available" (click)="openStep(step.id)"><mat-icon aria-hidden="true">touch_app</mat-icon>{{ step.label }}</button>
+                              <span class="small"><mat-icon aria-hidden="true" [class]="'wr-t-' + (step.result?.status || 'skipped')">{{ stepResult[step.result?.status || 'none'][0] }}</mat-icon>{{ stepResult[step.result?.status || 'none'][1] }}</span>
+                              @if (step.result?.screenshot) { <a class="small" [href]="screenshotUrl(step.id)" target="_blank" rel="noopener">Test screenshot</a> }</div>
+                              <p class="small">{{ step.expected }}@if (step.persona) { <span class="lay-muted"> · as {{ step.persona }}</span> }</p>
+                              @if (!step.available) { <p class="small lay-muted">{{ step.reason }}</p> }
+                              @if (step.result?.detail) { <p class="small lay-muted">{{ step.result.detail }}</p> }</li>
+                          }</ol>
+                        } @empty { <p class="lay-muted small">This app declares no journeys in .aludel/outputs/journeys.json, so its preview has no guided steps.</p> }
+                      </section>
+                      @if (preview()?.separability; as seams) { @if (seams.undeclared.length) {
+                        <p class="wi-warn small"><mat-icon aria-hidden="true">link</mat-icon>@if (!seams.seamsFile) { This app has no .aludel/seams.json. } These files name Aludel outside .aludel/ without a declared seam: {{ seams.undeclared.join(', ') }}</p> } }
+                    }
                   </div>
                 }
                 @case ('tests') {
@@ -114,11 +137,8 @@ const evidenceType: Record<Evidence['type'], [string, string]> = { change: ['dif
                 <div class="wr-step">
                   <p class="lay-eyebrow">Criterion {{ c.index + 1 }} of {{ r.task.criteria.length }}</p>
                   <h2>{{ c.text }}</h2>
-                  @if (r.integration?.appRepository) {
-                    @for (scenario of scenarios(); track scenario.id) {
-                      <button type="button" class="lay-button" [disabled]="preparing() || !r.integration?.current || preview()?.status !== 'running'" (click)="openScenario(scenario.id)"><mat-icon aria-hidden="true">touch_app</mat-icon>{{ scenario.label }}<mat-icon aria-hidden="true">web</mat-icon></button>
-                      <p class="small">{{ scenario.expected }}</p>
-                    } @empty { <p class="lay-muted small">No guided scenario is declared for this criterion.</p> }
+                  @if (r.integration?.appRepository && preview()?.steps?.length) {
+                    <button type="button" class="lay-button ghost small" (click)="view.set('preview')"><mat-icon aria-hidden="true">route</mat-icon>Walk {{ preview()?.steps?.length }} journey steps in Preview</button>
                   }
                   <div><p class="lay-eyebrow">To verify, check</p>
                     <div class="wr-evs">@for (entry of evidence(); track $index) {
@@ -193,7 +213,10 @@ export class WorkReviewComponent {
   readonly preparing = signal(false);
   readonly preview = signal<ReviewPreview | null>(null);
   readonly previewDestination = signal<string | null>(null);
-  readonly scenarios = computed(() => (this.preview()?.scenarios || []).filter(scenario => scenario.criterion === this.step()));
+  readonly stepResult = stepResult;
+  // Grouped by journey, in journey order; criteria no longer index steps (claims-based stepping is J4).
+  readonly journeyGroups = computed(() => { const preview = this.preview();
+    return (preview?.journeys || []).map(journey => ({ ...journey, steps: (preview?.steps || []).filter(step => step.journey === journey.id) })); });
   comment = ''; noteDraft = '';
   private loadedFor = '';
   readonly onEnd = computed(() => this.step() >= (this.run()?.task.criteria.length ?? 0));
@@ -289,9 +312,10 @@ export class WorkReviewComponent {
       this.preview.set({ ...value.preview, url: value.url });
     }).finally(() => this.preparing.set(false));
   }
-  openScenario(id: string) { const r = this.run(); if (!r?.integration) return;
+  screenshotUrl(step: string) { const r = this.run(); return r?.integration ? `${this.runPath(r)}/step-screenshot?integrationId=${encodeURIComponent(r.integration.id)}&step=${encodeURIComponent(step)}` : ''; }
+  openStep(id: string) { const r = this.run(); if (!r?.integration) return;
     void this.ctx.write(async () => {
-      const value = await this.ctx.api<{ url: string }>(`${this.runPath(r)}/scenario`, 'POST', { integrationId: r.integration!.id, scenario: id });
+      const value = await this.ctx.api<{ url: string }>(`${this.runPath(r)}/scenario`, 'POST', { integrationId: r.integration!.id, step: id });
       this.previewDestination.set(value.url); this.view.set('preview');
     });
   }

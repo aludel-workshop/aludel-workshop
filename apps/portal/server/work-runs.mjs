@@ -1,5 +1,6 @@
 import { initLayerSource, layerReview, layerBinding, layerBranch, submitLayerBranch, prepareLayerReview, assertLayerReviewCurrent, mergeLayerBranch, settleLayerCheckout, undoLayerMerge } from './layer-source.mjs';
 import { packageAt } from './layer-package.mjs';
+import { reviewInputPath } from './journeys.mjs';
 import { layerInstanceId } from './layer-contract.mjs';
 import { randomUUID } from 'node:crypto';
 import { followUpsForAttempt, requireElevated } from './layer-scope.mjs';
@@ -113,7 +114,7 @@ export function workRuns({ db, know, candidates = null }) {
     if (candidate) for (const file of candidate.files || []) changes.push({ id: `${candidate.id}:${file}`, kind: 'file', icon: 'code', name: file, op: 'modified', size: '', candidateId: candidate.id });
     // LAYER-BASE-01 B5: the run's work branch of the layer repository and the tests the agent ran on it in its sandbox.
     const layerSource = proposal ? parse(proposal.content_json, {}).source || null : null;
-    return { changes, integration: integration && { ...integration, appRepository: Boolean(bundle.layerPackage?.root), appChanged: Boolean(bundle.layerPackage?.root) && integration.files.some(file => (file.path === '.aludel/review.json' || !file.path.startsWith(bundle.layerPackage.root)) && !/^(?:docs\/|README\.md$|AGENTS\.md$|ARCHITECTURE\.md$)/.test(file.path)), current: layerBinding(db, projectId, bundle.guidance.layerScope.key).commit === integration.base }, layerSource: layerSource && { branch: layerSource.branch, commit: layerSource.commit, base: layerSource.base,
+    return { changes, integration: integration && { ...integration, appRepository: Boolean(bundle.layerPackage?.root), appChanged: Boolean(bundle.layerPackage?.root) && integration.files.some(file => (reviewInputPath(file.path) || !file.path.startsWith(bundle.layerPackage.root)) && !/^(?:docs\/|README\.md$|AGENTS\.md$|ARCHITECTURE\.md$)/.test(file.path)), current: layerBinding(db, projectId, bundle.guidance.layerScope.key).commit === integration.base }, layerSource: layerSource && { branch: layerSource.branch, commit: layerSource.commit, base: layerSource.base,
         tests: (layerSource.tests || []).map(test => ({ ...test, source: 'agent-report' })) }, followUps: proposal ? followUpsForAttempt(db, row.id).map(entry => ({ ...entry, layerName: layerName(projectId, entry.layer),
         createdRef: entry.createdWorkId ? know.workById(projectId, entry.createdWorkId)?.ref || null : null })) : [], summary: proposal ? parse(proposal.content_json, {}).summary || null : null,
       candidate: candidate ? { id: candidate.id, state: candidate.state, commit: candidate.commit, base: candidate.base, checks: candidate.checks } : null,
@@ -361,7 +362,7 @@ export function workRuns({ db, know, candidates = null }) {
     return runFor(projectId, workId, runId);
   }
 
-  const appChanged = (review, root) => Boolean(root) && review.files.some(file => (file.path === '.aludel/review.json' || !file.path.startsWith(root)) && !/^(?:docs\/|README\.md$|AGENTS\.md$|ARCHITECTURE\.md$)/.test(file.path));
+  const appChanged = (review, root) => Boolean(root) && review.files.some(file => (reviewInputPath(file.path) || !file.path.startsWith(root)) && !/^(?:docs\/|README\.md$|AGENTS\.md$|ARCHITECTURE\.md$)/.test(file.path));
   function personRepository(user, projectId, workId, runId) {
     const row = personRun(projectId, workId, runId), item = know.workById(projectId, workId);
     if (!row || row.state !== 'review' || item?.state !== 'review' || item.context?.personRun !== runId) fail('This person run is not waiting for review.', 409);

@@ -12,13 +12,13 @@ const text = (value, max) => typeof value === 'string' && value.trim().length > 
 const optional = (value, check) => value === undefined || value === null || check(value);
 const plain = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 export const localPath = value => typeof value === 'string' && value.startsWith('/') && !value.startsWith('//') && !/[\\\x00-\x20\x7f]/.test(value) && !/%(?:2f|5c|0[ad])/i.test(value) && value.length <= 1000;
-// A step's proof: one test in `.aludel/journeys/tests/`, named `<file>.spec.mjs#<test id>`.
+// A step's proof: one test in `.aludel/journeys/<file>.spec.mjs`, named `<file>.spec.mjs#<test id>`.
 const testRef = value => typeof value === 'string' && /^[a-z][a-z0-9-]{0,63}\.spec\.mjs#[a-z][a-z0-9-]{0,63}$/.test(value);
 
 export const origins = Object.freeze(['authored', 'observed', 'replica']);
 export const claimKinds = Object.freeze(['journey', 'record', 'invariant', 'note']);
 
-// A journey: the facet entry Code keeps at `.aludel/journeys/<id>.json`. Step IDs are stable across revisions, so a test,
+// A journey: an entry of the facet Code keeps at `.aludel/outputs/journeys.json` (`{ journeys: [...] }`). Step IDs are stable across revisions, so a test,
 // a review note or a claim that names a step keeps meaning the same step when others are inserted or reordered.
 export function validateJourney(journey) {
   if (!plain(journey) || journey.version !== 1) fail('A journey needs version 1.');
@@ -66,7 +66,7 @@ export function journeyChange(previous, next) {
 // with. It holds no scenarios; review steps come from journeys. A v1 recipe (scenarios keyed by criterion index) is refused.
 export function validateReviewRecipe(recipe) {
   if (!plain(recipe)) fail('The review recipe is a JSON object.');
-  if (recipe.version === 1 || own(recipe, 'scenarios')) fail('Review recipe v1 scenarios are retired: review steps come from journeys in .aludel/journeys/, and the recipe maps personas to fixtures (version 2).');
+  if (recipe.version === 1 || own(recipe, 'scenarios')) fail('Review recipe v1 scenarios are retired: review steps come from journeys in .aludel/outputs/journeys.json, and the recipe maps personas to fixtures (version 2).');
   if (recipe.version !== 2) fail('Review recipes need version 2.');
   if (!optional(recipe.buildTarget, value => idPattern.test(value))) fail('Invalid review check build target.');
   if (!Array.isArray(recipe.checks) || !recipe.checks.length || recipe.checks.length > 10) fail('A review recipe needs one to ten checks.');
@@ -174,6 +174,8 @@ export function validateSeams(seams) {
 // The static half of the separability check: files outside `.aludel/` that name Aludel but aren't declared seams. The other
 // half runs the app's own build and tests with `.aludel/` removed and the seams taken out (J3).
 const mentionsAludel = /aludel/i;
+// The `.aludel/` files that change what a review builds, runs or walks. A change to only these still needs the combined build.
+export const reviewInputPath = path => /^\.aludel\/(?:review\.json|seams\.json|outputs\/journeys\.json|journeys\/[a-z][a-z0-9-]{0,63}\.spec\.mjs)$/.test(path);
 export function undeclaredSeams(files, seams) {
   validateSeams(seams);
   const declared = new Set(seams.seams.map(seam => seam.path));

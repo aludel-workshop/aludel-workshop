@@ -107,8 +107,10 @@ export const matchesGlob = (glob, path) => globPattern(glob).test(path);
 // The package's own files a run may change, relative to its root, and the ones review marks because they run on the host
 // or define what the layer may do.
 const ownWritable = [/^knowledge\/[a-z0-9][a-z0-9-]*\.md$/, /^docs\/[a-z0-9][a-z0-9-]*\.md$/, /^(?:README|AGENTS)\.md$/, /^fixtures\/[a-z0-9][a-z0-9-]*\.(?:md|json)$/,
-  /^api\/[a-z0-9][a-z0-9-]*\.json$/, /^outputs\/[a-z0-9][a-z0-9-]*(?:\/[a-z0-9][a-z0-9-]*)*\.(?:json|md|ya?ml)$/, /^server\/[a-z0-9][a-z0-9-]*\.mjs$/, /^ui\/[a-z0-9][a-z0-9-]*\.(?:ts|scss)$/, /^tests\/[a-z0-9][a-z0-9-]*\.test\.mjs$/, /^(?:layer|review)\.json$/, /^\.gitignore$/];
-export const ownWritablePatterns = ['knowledge/*.md', 'docs/*.md', 'README.md', 'AGENTS.md', 'fixtures/*.md|json', 'api/*.json', 'outputs/**/*.json|md|yaml', 'server/*.mjs', 'ui/*.ts|scss', 'tests/*.test.mjs', 'layer.json', 'review.json', '.gitignore'];
+  /^api\/[a-z0-9][a-z0-9-]*\.json$/, /^outputs\/[a-z0-9][a-z0-9-]*(?:\/[a-z0-9][a-z0-9-]*)*\.(?:json|md|ya?ml)$/, /^server\/[a-z0-9][a-z0-9-]*\.mjs$/, /^ui\/[a-z0-9][a-z0-9-]*\.(?:ts|scss)$/, /^tests\/[a-z0-9][a-z0-9-]*\.test\.mjs$/,
+  // JOURNEYS-01 J3: journey step tests run black-box against a preview, never on the host, so they aren't authority.
+  /^journeys\/[a-z][a-z0-9-]{0,63}\.spec\.mjs$/, /^(?:layer|review|seams)\.json$/, /^\.gitignore$/];
+export const ownWritablePatterns = ['knowledge/*.md', 'docs/*.md', 'README.md', 'AGENTS.md', 'fixtures/*.md|json', 'api/*.json', 'outputs/**/*.json|md|yaml', 'server/*.mjs', 'ui/*.ts|scss', 'tests/*.test.mjs', 'journeys/*.spec.mjs', 'layer.json', 'review.json', 'seams.json', '.gitignore'];
 const ownAuthority = path => /^(?:server|ui|api|tests)\//.test(path) || path === 'layer.json';
 // Never a layer's output, whatever a manifest says: environment files (secrets), Git's own files, and CI workflows.
 const neverWritable = path => path.split('/').some(part => /^\.env(?:\..*)?$/.test(part)) || /^\.git(?:\/|$)/.test(path) || /^\.github\/workflows\//.test(path);

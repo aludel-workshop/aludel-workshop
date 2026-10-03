@@ -1,8 +1,8 @@
 ---
 id: JOURNEYS-01
 kind: work-record
-status: proposed
-updated: 2026-10-02
+status: active
+updated: 2026-10-03
 depends_on: [T03-CODE, LAT-08A, LAYER-BINDINGS-01, EXISTING-PROJECTS-01, DEC-050, DEC-057]
 ---
 
@@ -15,6 +15,8 @@ depends_on: [T03-CODE, LAT-08A, LAYER-BINDINGS-01, EXISTING-PROJECTS-01, DEC-050
 - **2026-10-02, owner chat (J0–J1):** "yeah, go for it." Authorized: J0 (re-run checks; commit Codex's uncommitted LAT-08A integration and Biome work as one commit; remove the rejected standalone trial tool; condense status and procedure text) and J1 (pure contract modules and tests). Both are local and committed to `main`. The proposed defaults stand. Not authorized: template pins (J2+), the live Biome item, pushes, restarts of the owner's portal, and the untracked candidate checkouts or `notes.txt`. Same message: "the code editor tabs need to be re-evaluated. the general structure of code is enough to work from." Recorded as an input to J2: the Journeys view joins Code's current structure without redesigning its tabs, and re-evaluating the tabs is a separate UX pass.
 - **2026-10-02, owner chat (J2):** "t03-code is fine for now. go j2". This waives waiting for T03-CODE's owner look before J2. Authorized: a journeys facet on `layer-base` `code` (declared output, Journeys view, Knowledge), a new template commit and its pin in this repository, local checks, and commits to both repositories. Not authorized: pushes, restarting the owner's portal, the live Biome item, and J3+ wiring. A pin change makes existing projects adopt on their next restart; the owner is told what changes first.
 - **2026-10-02, owner chat (tracing removal, before J3):** "we're pulling the tracing. box it up, lets revisit at a later phase. don't need it mvp". Asked how far, the owner chose "remove entirely. truth is, those links were not following our new binding approach anyways." Authorized: record the tracing design in a deferred record ([code-tracing/deferred.md](../code-tracing/deferred.md)). Then remove story ↔ code tracing from the host and templates: trace links, suspect and untraced states, Reconcile items, commit-trailer and test-name links, generation-manifest links, `builtBy` and everything it drives (Pages Built status, Data status from links, Vision "Built by" chips, release Ships stories, the page-delete guard). Code units, Explorer and reachability stay. Includes template commits and pins, local checks and commits. No compatibility shims are needed (owner: early stage). Planned J3b (observed traces) is dropped from this packet.
+
+- **2026-10-03, owner chat (J3, cloud session):** "hey, can you pick up the task as specified in docs/design/journeys/handoff.md". Authorized, per the [handoff](handoff.md): J3 in the same local scope as J0–J2. That covers host code, tests, template commits and pins, local checks, and commits plus a push to this session's designated branch (`claude/brave-pascal-br7h4i`), which the cloud session requires. Not authorized: pushes to `main` or `layer-base`, deployment, spending, live owner data (Biome, the owner's portal), and owner-impersonating actions. Recorded before execution.
 
 ## Owner direction (2026-10-02 chat)
 
@@ -136,7 +138,7 @@ J1 can start before T03-CODE closes. J2 onward changes the Code template that T0
 1. A failing claimed step test blocks agent submission. A person may submit with a stated reason, and the reviewer sees the failure first.
 2. One *Implement* item per journey, grouped under the publish or *Specify* item that raised it.
 3. The diff stays reachable under Under the hood. A reviewing-agent signature on code is a later packet.
-4. Journey tests use Playwright in the check image. It costs nothing, but it adds image size, which J3 measures.
+4. ~~Journey tests use Playwright in the check image.~~ **Changed in J3:** journey tests run in a host-owned runner image (Playwright's own, about 920 MB, pulled once per machine), not the app's check image. That keeps Playwright out of the app, so `.aludel/` stays separable and non-Node apps work. See the J3 run log.
 
 ## Open decisions
 
@@ -158,7 +160,7 @@ J1 can start before T03-CODE closes. J2 onward changes the Code template that T0
 
 ## Readiness
 
-J0–J2 are done (below). J3–J8 and depend on each other as listed. J6 needs a prototype round before building. No external effect, spending or live-data change is planned before J8, and in J8 the owner performs the live actions.
+J0–J2 are done, and J3 is built pending a local run (below). J3–J8 depend on each other as listed. J6 needs a prototype round before building. No external effect, spending or live-data change is planned before J8, and in J8 the owner performs the live actions.
 
 ## Run log
 
@@ -288,3 +290,54 @@ Owner direction and scope: see the authorization above, [DEC-063](../../decision
 3. *What the task revealed:* Pages' "built → change request" routing was a stand-in for the spec-first binding. Without tracing, the honest interim is explicit requests, which makes LAYER-BINDINGS step 4 (user journeys) more urgent for Pages users.
 4. *Questions:* when the SDK shims can go (after template updates); whether Pages wants a cruder "in the running app" signal before the binding. Not blocking J3.
 5. *Process change:* none beyond the shim note; the existing checklist (digest, typecheck, suites, browser journeys) caught every break. **Tested:** the typecheck caught the leftover `r.stories` before pinning.
+
+### J3 journey proof (2026-10-03, Claude, cloud session)
+
+Authorization: see 2026-10-03 above. Host-side only; no template commit was needed (J2's Journeys view already shows test references).
+
+**Built.**
+- **Writable step tests.** `journeys/<file>.spec.mjs` and `seams.json` are package-own writable files, not authority ([layer-package.mjs](../../../apps/portal/server/layer-package.mjs)). A change to only the review inputs (`review.json`, `seams.json`, `outputs/journeys.json`, step tests) still counts as an app change that needs the combined build (`reviewInputPath` in [journeys.mjs](../../../apps/portal/server/journeys.mjs), used by Work runs and the worker).
+- **Recipe v2 in review.** `reviewRecipe` (v1) is gone. `reviewInputs` reads the commit's `.aludel/review.json` (validated as v2), `.aludel/outputs/journeys.json` and `.aludel/seams.json`, and derives review steps with `reviewSteps`. Step IDs are `<journey>.<step>`. A step that can't be opened (no route, persona or fixture) says why, and opening it is refused ([review-previews.mjs](../../../apps/portal/server/review-previews.mjs)).
+- **Setup call.** The host sends `{ journey, step, persona, fixture, session, reset }`. The generated app's setup handler uses only that and no longer reads `.aludel/review.json`. Its Dockerfile no longer copies it, so the "nothing here depends on Aludel" comment is now true. Generated apps emit `review.json` v2 (a `visitor` persona, plus `member` with auth) and `.aludel/seams.json` ([scaffold.mjs](../../../apps/portal/server/scaffold.mjs) `generatedSeams`, equal to the J1 fixture). **Deferred:** generating journeys from Pages flows. A newly generated app has no journeys, so its preview offers no guided steps until Code's Journeys holds one. The old per-page scenarios all claimed `criterion: 0`.
+- **Step runner** ([journey-runner.mjs](../../../apps/portal/server/journey-runner.mjs), [runner script](../../../apps/portal/server/journey-runner/run.mjs), [image](../../../apps/portal/server/journey-runner/Dockerfile)). **Design point decided:** check containers keep `--network none`. Step tests run in a separate runner container on a per-run `docker network create --internal` network. The preview joins that network as `candidate` for the run only, so the runner reaches the candidate and nothing else, not even the internet (tested, and a mutation that drops `--internal` is caught). The setup token never enters the runner. The host makes each journey's setup call itself and hands over only the session cookies. Inside, a local forwarder serves the candidate as `http://localhost:<port>`, a secure context, so the preview's `Secure; Partitioned` session cookies work as they do for a reviewer (over `http://candidate` Chromium dropped them, even with `--unsafely-treat-insecure-origin-as-secure`). A journey is walked from its first step as that step's persona. Each step reports passed, failed, skipped (after an earlier failure), uncovered (no test) or no-fixture, with a JPEG screenshot after each run step. Results are kept per build (`layer_review_journeys`) and screenshots under `review-steps/<id>/`. The runner's report is treated as untrusted: only planned step IDs and bounded fields count.
+  - **Step test contract:** `.aludel/journeys/<file>.spec.mjs` default-exports `{ '<test id>': async ({ page, assert, step, baseURL }) => … }`. It is black box and imports nothing. It is written into the agent guidance ([task-manifest.mjs](../../../apps/portal/server/task-manifest.mjs)).
+  - **Gate:** step results are evidence next to the checks, not a check, so a failing step doesn't block acceptance yet. That is J4's submit gate (proposed default 1).
+- **Review UI.** The Preview tab lists steps grouped by journey, each with its open button, expected result, persona, test status, failure detail and a screenshot link. A criterion now links to "Walk N journey steps in Preview" instead of index-matched buttons ([work-review.ts](../../../apps/portal/src/layers/work-review.ts)). Claims-based stepping stays J4.
+- **Separability.** Review preparation runs the static scan on the candidate commit (`git grep` plus file names, against `.aludel/seams.json`). Undeclared files are shown as a warning, not a failing check. **Follow-up:** the build-without-`.aludel/` half isn't cheap. It is a second full image build per review, and edit seams' removal is prose, so they can't be reverted mechanically. It stays a follow-up for J5's reviewable-app prerequisite or a later packet.
+
+**Environment (this session).** `layer-base` couldn't be cloned: the session's GitHub access doesn't cover that private repository. Node 24 came from npm (`node@24`, v24.21.0). Docker was started by hand. Docker builds here can't reach npm, so the runner image was built once out of band, through the session proxy and with the same Dockerfile content, under the tag the host computes. That is a sandbox workaround, not product behaviour.
+
+| Check | Result |
+|---|---|
+| `node --test tests/review-previews.test.mjs` (Docker) | 2 passed. It covers a passing step, an uncovered step, a failing step with its reason and screenshot, a later step skipped after the failure, a journey whose persona has no fixture, a step persona without a fixture mid-journey, no internet from the runner, `Secure; Partitioned` session cookies, v1 refused, offsite routes refused, and an undeclared coupling found. Repeated 6×, all passed; no step networks left behind |
+| Mutation: runner network without `--internal` | The test failed (`read.view`), then passed once restored |
+| First harness design (cookies via a route-fulfilled 303) | Flaky: 3 of 6 navigations timed out in a probe, against 0 of 6 for direct navigation. Replaced by `addCookies` plus a direct visit before the suite runs above |
+| `tests/journeys.test.mjs`, `tests/layer-package-root.test.mjs` | Journeys 9 passed (the generated app emits v2, its seams equal the fixture, and its Dockerfile and server don't read `.aludel/`); 1 skipped (no `layer-base`). Layer-package: J3's writable and authority test passes; its 4 failures are template-dependent and fail identically on the baseline |
+| `npm run test:server` without `previews-docker` (Docker builds can't reach npm here), baseline `80d5bc5` vs J3 | Baseline 231 passed, 47 failed, 31 skipped; J3 231, 47, 31. **Identical failure sets**, all needing `layer-base` |
+| `npm run test:server:templates`, same comparison | Baseline 98 passed, 43 failed; J3 98 and 43. **Identical failure sets.** Only 141 tests register, because several files abort at load without `layer-base` |
+| Typecheck (`ngc`, with the git-ignored Pages UI stubbed because `sync:layers` needs `layer-base`) | No errors; J3 adds no warnings and removes one |
+| `vite build` (same stub; the stub also needs an empty `pages.scss`) | Passed |
+| **Not run here** (need `layer-base` or the owner's machine) | `typecheck-layer-ui.mjs` (no template pin changed), the layer browser journeys, and `tests/repository-review-browser.mjs` (updated to v2 and journeys, unverified) |
+
+**Exit evidence status.** The `review-previews.test.mjs` part is met. "Biome's three steps open from journeys" isn't: Biome's candidate is owner data and out of reach, as the handoff expected. It moves to J8, and it needs Biome's `.aludel/` regenerated as v2 plus journeys and the template update path. J3 is therefore **built and agent-checked in the cloud, pending a local run** of the template suite, the layer journeys and the repository-review browser check with `layer-base` present.
+
+**Retrospective (J3).**
+1. *Harder than necessary:*
+   - The private `layer-base` wasn't reachable from the cloud session, so every template-dependent check became a before/after comparison instead of a pass count.
+   - Docker builds here can't reach npm.
+   - The obvious way to hand cookies to the browser (a route-fulfilled redirect) was flaky. A loop probe found that in minutes, before it reached the suite.
+2. *Would help next time:*
+   - Give cloud sessions access to `layer-base`, or vendor a pinned snapshot for tests, so the handoff's prerequisite 1 holds anywhere.
+   - Probe a browser mechanism in a loop before building on it: one passing run proved nothing here.
+3. *What the task revealed:*
+   - Running step tests in the app's check image (proposed default 4) would have put Playwright into the app and broken separability, so the runner is host-owned.
+   - Preview cookies are `Secure`, which forces a secure-context origin for automated walks.
+   - Newly generated apps lose guided steps until journeys are generated from Pages flows. That makes the Pages → journeys generation, or the user-journeys binding, more pressing.
+4. *Questions:*
+   - Should a failing step block acceptance before J4's claims exist? Not here: J4 decides.
+   - Should undeclared seams fail review? Warned only, for now.
+   - The runner image is about 920 MB, pulled once per machine. That is acceptable at zero cost, but the owner may prefer a slimmer one.
+5. *Process change:*
+   - **Applied:** the [handoff](handoff.md)'s environment prerequisites now name the cloud access gap and the Docker-build workaround.
+   - **Tested:** the before/after failure-set comparison is how this run separated environment failures from regressions.
+   - **Hypothesis:** whether the step-test contract is easy for agents to follow, until an agent writes one in J5.

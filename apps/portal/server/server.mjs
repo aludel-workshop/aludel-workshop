@@ -1038,7 +1038,7 @@ async function api(request, response, url) {
     return json(response, result.status, result.body, { 'cache-control': 'no-store' });
   }
   // WORK-ITEM-UX-01: an item's runs, each with its own task snapshot, outputs, review and signature.
-  const runRoute = /^\/api\/projects\/([^/]+)\/work\/([^/]+)\/runs(?:\/([^/]+)\/(review|sign|submit|stop|prepare|preview|scenario|close-preview))?$/.exec(url.pathname);
+  const runRoute = /^\/api\/projects\/([^/]+)\/work\/([^/]+)\/runs(?:\/([^/]+)\/(review|sign|submit|stop|prepare|preview|scenario|close-preview|step-screenshot))?$/.exec(url.pathname);
   if (runRoute) {
     const [, rawProject, rawWork, rawAttempt, operation] = runRoute;
     const projectId = decodeURIComponent(rawProject), workId = decodeURIComponent(rawWork), attemptId = rawAttempt ? decodeURIComponent(rawAttempt) : null;
@@ -1058,6 +1058,16 @@ async function api(request, response, url) {
       }
       return run;
     };
+    // JOURNEYS-01 J3: the screenshot a journey step's test left on the reviewed build.
+    if (operation === 'step-screenshot' && request.method === 'GET') {
+      const item = know.workById(projectId, workId);
+      requireElevated(db, user, projectId, item.layer, 'review this run');
+      const run = runHistory.runFor(projectId, workId, attemptId);
+      if (!run.integration || url.searchParams.get('integrationId') !== run.integration.id) return json(response, 409, { error: 'This review revision changed.' });
+      const file = integrationPreviews.stepScreenshot(run.integration.id, String(url.searchParams.get('step') || ''));
+      response.writeHead(200, { 'content-type': 'image/jpeg', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
+      return response.end(readFileSync(file));
+    }
     if (['prepare', 'preview', 'scenario', 'close-preview'].includes(operation) && request.method === 'POST') {
       const item = know.workById(projectId, workId);
       requireElevated(db, user, projectId, item.layer, 'prepare this review');
@@ -1083,7 +1093,7 @@ async function api(request, response, url) {
         await integrationPreviews.close(run.integration.id); return json(response, 200, { preview: integrationPreviews.status(run.integration.id) });
       }
       const reviewed = reviewInputCurrent(input);
-      if (operation === 'scenario') return json(response, 200, await integrationPreviews.openStep(reviewed.integration.id, String(input.scenario || '')), { 'cache-control': 'no-store' });
+      if (operation === 'scenario') return json(response, 200, await integrationPreviews.openStep(reviewed.integration.id, String(input.step || '')), { 'cache-control': 'no-store' });
       return json(response, 200, { preview: await integrationPreviews.build(reviewed.integration.id) }, { 'cache-control': 'no-store' });
     }
     if (operation === 'review' && request.method === 'PUT') { const input = await readJson(request); if (know.workById(projectId, workId)?.scope === 'layer') requireElevated(db, user, projectId, know.workById(projectId, workId).layer, 'review this run'); reviewInputCurrent(input, (!input.verdict || input.verdict.value === 'reject') && Boolean(input.flag || input.verdict)); return json(response, 200, runHistory.saveReview(projectId, workId, attemptId, input), { 'cache-control': 'no-store' }); }

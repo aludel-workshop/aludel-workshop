@@ -148,7 +148,10 @@ export function skeletonFiles(setup, catalogs, gitProfile, appUrl, assets, sourc
   };
   const files = {
     ...initialFiles(setup, catalogs, gitProfile, appUrl),
-    '.aludel/review.json': json({ version: 1, buildTarget: 'build', checks: [{ name: 'Server syntax', command: ['node', '--check', 'server/server.mjs'] }], scenarios: pages.map((page, index) => ({ id: `page-${index + 1}`, criterion: 0, label: `Review ${page.label || page.path}`, expected: 'The page loads with the starter demo session and renders its declared content.', path: page.path, fixture: 'starter', role: options.auth ? 'member' : 'anonymous' })) }),
+    // JOURNEYS-01: review steps come from journeys; the recipe says how to check the app and enter each persona.
+    '.aludel/review.json': json({ version: 2, buildTarget: 'build', checks: [{ name: 'Server syntax', command: ['node', '--check', 'server/server.mjs'] }],
+      personas: { visitor: { fixture: 'starter', session: null }, ...(options.auth ? { member: { fixture: 'starter', session: 'member' } } : {}) } }),
+    '.aludel/seams.json': json({ version: 1, seams: generatedSeams }),
     'aludel.json': json(manifest(setup, catalogs, media)),
     'docs/product.md': productDoc(setup, media, catalogs),
     'package.json': json({ name: setup.project.slug, version: '0.1.0', private: true, type: 'module', engines: { node: '^24.14.0' },
@@ -467,6 +470,25 @@ jobs:
   };
 }
 
+// JOURNEYS-01: every place a generated app names Aludel outside .aludel/, written to .aludel/seams.json so the app can leave
+// Aludel. Review's separability scan flags any file that names Aludel without a seam here.
+export const generatedSeams = Object.freeze([
+  { path: 'aludel.json', kind: 'file', purpose: 'Setup choices Aludel generated the app from', remove: 'Delete the file' },
+  { path: 'src/aludel-bridge.ts', kind: 'file', purpose: 'Lets the Pages layer point at page sections in the preview', remove: 'Delete the file and its import in src/main.ts' },
+  { path: 'src/main.ts', kind: 'edit', purpose: 'Imports the Pages bridge', remove: 'Delete the aludel-bridge import' },
+  { path: 'src/app.html', kind: 'edit', purpose: 'data-aludel-page marks each page for the Pages layer', remove: 'Delete the data-aludel-page attributes' },
+  { path: 'src/site.ts', kind: 'edit', purpose: 'Generated from the Pages layer', remove: 'Keep the file; delete the generated-by comment' },
+  { path: 'src/page-blocks.ts', kind: 'edit', purpose: 'Shared page block layouts copied from Aludel', remove: 'Keep the file; delete the Aludel comments' },
+  { path: 'src/styles.scss', kind: 'edit', purpose: "Feel and theme comment from Aludel's Look & feel step", remove: 'Delete the comment' },
+  { path: 'server/server.mjs', kind: 'edit', purpose: 'The preview-only review setup route (/api/__aludel/review)', remove: 'Delete the review setup handler' },
+  { path: 'Dockerfile', kind: 'edit', purpose: "A comment noting Aludel's previews build from this file", remove: 'Delete the comment' },
+  { path: '.github/workflows/ci.yml', kind: 'edit', purpose: 'Publishes the test-results artifact Aludel reads', remove: 'Keep the step; delete the comment' },
+  { path: 'README.md', kind: 'edit', purpose: 'Attribution and pointers into Aludel', remove: 'Delete the Aludel paragraph' },
+  { path: 'AGENTS.md', kind: 'edit', purpose: 'Pointers to Aludel-generated docs', remove: 'Delete the Aludel lines' },
+  { path: 'docs/agents.md', kind: 'file', purpose: 'Agent guidance exported from Aludel', remove: 'Delete the file' },
+  { path: 'docs/product.md', kind: 'file', purpose: "Product intent exported from Aludel's Vision", remove: 'Delete the file' }
+]);
+
 function containerFiles() {
   return {
     'Dockerfile': `# syntax=docker/dockerfile:1
@@ -484,7 +506,6 @@ ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000 DATA_DIR=/data NODE_NO_WARNINGS=1
 WORKDIR /app
 COPY --from=build /app/package.json ./
 COPY --from=build /app/server ./server
-COPY --from=build /app/.aludel/review.json ./.aludel/review.json
 COPY --from=build /app/dist ./dist
 RUN mkdir -p /data && chown node:node /data
 USER node
@@ -569,14 +590,14 @@ async function api(request, response, pathname) {
     const received = Buffer.from(request.headers.authorization || '');
     const expected = Buffer.from('Bearer ' + (process.env.ALUDEL_REVIEW_TOKEN || ''));
     if (!enabled || received.length !== expected.length || !timingSafeEqual(received, expected)) return send(response, 404, { error: 'Not found.' });
-    const { scenario: id, reset = true } = await readJson(request);
-    const recipe = JSON.parse(readFileSync(join(root, '.aludel/review.json'), 'utf8'));
-    const scenario = recipe.scenarios.find(step => step.id === id);
-    if (!scenario || scenario.fixture !== 'starter') return send(response, 409, { error: 'This scenario needs an app-specific fixture adapter.' });
+    // Aludel names the journey step, its persona, and the fixture and session its review recipe maps that persona to.
+    const { fixture, session = null, reset = true } = await readJson(request);
+    if (fixture !== 'starter') return send(response, 409, { error: 'This step needs an app-specific fixture adapter.' });
     let cookie = clearSession;
-    if (scenario.role !== 'anonymous') {
-      if (!db) return send(response, 409, { error: 'This app does not support signed-in scenarios.' });
-      const email = scenario.role + '@demo.invalid', name = 'Demo ' + scenario.role;
+    if (session !== null) {
+      if (!db) return send(response, 409, { error: 'This app does not support signed-in steps.' });
+      if (!/^[a-z][a-z0-9-]{0,63}$/.test(String(session))) return send(response, 400, { error: 'Invalid session.' });
+      const email = session + '@demo.invalid', name = 'Demo ' + session;
       if (reset) db.prepare('DELETE FROM sessions WHERE email = ?').run(email);
       if (!db.prepare('SELECT 1 FROM accounts WHERE email = ?').get(email)) {
         const salt = randomBytes(16).toString('hex');

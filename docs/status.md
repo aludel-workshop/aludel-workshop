@@ -2,7 +2,7 @@
 id: status-001
 kind: project-status
 status: active
-updated: 2026-10-02
+updated: 2026-10-03
 current_phase: M1
 phase_state: in-progress
 next_action: JOURNEYS-01
@@ -16,7 +16,7 @@ Convert Code onto its template with GitHub sync, now on `main`: the layer-templa
 
 ## Next action
 
-**JOURNEYS-01 J3: journey proof** (J0–J2 and the code-tracing removal are done, 2026-10-02). Start from the [handoff](design/journeys/handoff.md): environment prerequisites (the local-only `layer-base` repository), the template checklist, J3 scope and its open design point, and gotchas. The owner moved on from T03-CODE ("t03-code is fine for now"); its owner items below stay open.
+**JOURNEYS-01: verify J3 locally, then J4.** J3 (journey proof) was built in a cloud session on 2026-10-03, on branch `claude/brave-pascal-br7h4i`. The session had no `layer-base`, so the template suite, typecheck/build and browser journeys must be re-run locally first; the [handoff](design/journeys/handoff.md) lists them. The owner moved on from T03-CODE ("t03-code is fine for now"); its owner items below stay open.
 
 **T03-CODE: the app repository as the Code layer, with GitHub sync (run 1 built and agent-checked 2026-10-02).** [Evidence and retrospective](evidence/t03-code/README.md) · [brief and run log](design/layer-app-transition/t03-code-brief.md).
 - **Done:**
@@ -51,7 +51,7 @@ LAT-01–07 and the LAT-08 prototype established the isolated candidate, layer s
 
 ## Ready queue
 
-1. **JOURNEYS-01** (active; J3 next, [handoff](design/journeys/handoff.md)): journey-driven Work and review. Spec, then implement; claims replace hand-written criteria; journeys, tests and review seams live in `.aludel/`; includes cleanup of Codex's guided-preview work ([plan](design/journeys/work-record.md)). J0–J2 done 2026-10-02 (Code template `cc30be2`: journeys facet and Journeys tab); code tracing removed by DEC-063; J3 next. The owner waived waiting for T03-CODE's look.
+1. **JOURNEYS-01** (active; J3 next, [handoff](design/journeys/handoff.md)): journey-driven Work and review. Spec, then implement; claims replace hand-written criteria; journeys, tests and review seams live in `.aludel/`; includes cleanup of Codex's guided-preview work ([plan](design/journeys/work-record.md)). J0–J2 done 2026-10-02 (Code template `cc30be2`: journeys facet and Journeys tab); code tracing removed by DEC-063; J3 built 2026-10-03, pending a local run; then J4. The owner waived waiting for T03-CODE's look.
 2. **T03-CODE**: run 1 built and agent-checked ([evidence](evidence/t03-code/README.md)). Waits on the owner's browser look, the live GitHub round trip and the candidate-preview question; then the compiled modules retire. F1 is done.
 3. **LAYER-GITHUB-01**: publish Vision, Design, Pages and Data repositories (and possibly `layer-base`) to the owner's GitHub with T03-CODE's sync (DEC-062).
 4. **LAYER-BINDINGS-01 step 4 (F10)**: Code ⇄ Pages binding, migrating `layer_connections` and the hard-coded Pages reconciliation, after T03-CODE.
@@ -249,6 +249,15 @@ New Operator role. Agent-checked: server 88/89 (1 pre-existing), all browser sui
 | M0 research/design | Product loop, local agent path, runner choice, recovery model, product workflow, knowledge boundary, experience architecture, and design-system strategy | [Execution plan](execution-plan.md), [decision register](decisions.md) |
 
 ## Latest handoff
+
+2026-10-03: **JOURNEYS-01 J3 built in a cloud session (pending a local run).**
+- Review steps now come from journeys (`<journey>.<step>`), and the v2 recipe maps personas to fixtures. The host runs each journey's step tests black-box, in a Playwright runner container whose only network is the candidate, and records a result and screenshot per step.
+- Generated apps no longer read or copy `.aludel/` at runtime, and they declare their seams. Review warns about undeclared ones.
+- Step results don't block acceptance yet (J4).
+- The Docker review test covers a passing, uncovered, failing and skipped step and a missing persona fixture.
+- Server suites match the baseline failure for failure without `layer-base`.
+- **Restart effect:** a review whose app still has a v1 recipe stops opening until the recipe is v2. Only Biome's unmerged candidate has one.
+- [Run log](design/journeys/work-record.md#j3-journey-proof-2026-10-03-claude-cloud-session).
 
 2026-10-02: **Code tracing removed (DEC-063), before J3.** Story ↔ code links, link-based unit states, Reconcile items, trailer, test-name and manifest links, and `builtBy` are gone from the host and the Code (`aaef4cf`), Pages (`ceeb9d4`), Data (`d2e11ec`) and Vision (`a912d44`) templates. Pages show planned, skeleton or specified from their own record. Spec edits are direct and code changes are requested explicitly until the user-journeys binding. The design is boxed up in [code-tracing/deferred.md](design/code-tracing/deferred.md). Inert SDK shims keep existing installs' old views compiling. **Restart effect:** the `trace_links` table is dropped, and existing projects' Pages, Data, Vision and Code views stop showing links, Built status and Reconcile context. Their templates stay on their old forks. [Run log](design/journeys/work-record.md#code-tracing-removed-2026-10-02-claude-vs-code-chat).
 

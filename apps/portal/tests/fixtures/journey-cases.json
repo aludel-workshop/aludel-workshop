@@ -56,7 +56,7 @@
       { "path": "src/page-blocks.ts", "kind": "edit", "purpose": "Shared page block layouts copied from Aludel", "remove": "Keep the file; delete the Aludel comments" },
       { "path": "src/styles.scss", "kind": "edit", "purpose": "Feel and theme comment from Aludel's Look & feel step", "remove": "Delete the comment" },
       { "path": "server/server.mjs", "kind": "edit", "purpose": "The preview-only review setup route (/api/__aludel/review)", "remove": "Delete the review setup handler" },
-      { "path": "Dockerfile", "kind": "edit", "purpose": "Copies .aludel/review.json into the runtime image for the setup route", "remove": "Delete the COPY of .aludel/review.json" },
+      { "path": "Dockerfile", "kind": "edit", "purpose": "A comment noting Aludel's previews build from this file", "remove": "Delete the comment" },
       { "path": ".github/workflows/ci.yml", "kind": "edit", "purpose": "Publishes the test-results artifact Aludel reads", "remove": "Keep the step; delete the comment" },
       { "path": "README.md", "kind": "edit", "purpose": "Attribution and pointers into Aludel", "remove": "Delete the Aludel paragraph" },
       { "path": "AGENTS.md", "kind": "edit", "purpose": "Pointers to Aludel-generated docs", "remove": "Delete the Aludel lines" },

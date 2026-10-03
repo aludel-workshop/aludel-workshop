@@ -122,6 +122,9 @@ test('G-CODE: a nested package declares which repository files are its output; s
     assert.ok(!nested.writable(path), `${path} is not writable`);
   assert.deepEqual(['.aludel/layer.json', '.aludel/server/rules.mjs', '.aludel/ui/view.ts', 'src/server/x.mjs', 'server/x.mjs'].map(nested.authority), [true, true, true, false, false],
     'authority paths are the package\'s own, never the app\'s similarly named folders');
+  // JOURNEYS-01 J3: journey step tests and the seams list are the package's own files, but not authority: they never run on the host.
+  for (const path of ['.aludel/journeys/onboarding.spec.mjs', '.aludel/seams.json', '.aludel/review.json']) assert.ok(nested.writable(path) && !nested.authority(path), `${path} is writable, not authority`);
+  for (const path of ['.aludel/journeys/a/b.spec.mjs', '.aludel/journeys/onboarding.test.mjs', '.aludel/journeys/Onboarding.spec.mjs']) assert.ok(!nested.writable(path), `${path} is not writable`);
   assert.equal(nested.own('.aludel/knowledge/charter.md'), 'knowledge/charter.md');
   assert.equal(nested.own('src/app.ts'), null);
   // A package at the root owns its repository; `repository` adds nothing there.

@@ -290,6 +290,8 @@ export function previewManager({ db, portalRoot, workspaceRoot, logRoot, runtime
     },
 
     runtime,
+    // The running container's name and app port, for review tooling that joins it to a private network (JOURNEYS-01 J3).
+    container(projectId) { return processes.get(projectId)?.container ? { name: processes.get(projectId).container, port: containerPort } : null; },
     stopAll() { for (const projectId of [...processes.keys()]) stop(projectId); }
   };
   return api;

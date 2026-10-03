@@ -2,14 +2,24 @@
 id: JOURNEYS-01-HANDOFF
 kind: handoff
 status: active
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
-# JOURNEYS-01 handoff: continue at J3
+# JOURNEYS-01 handoff: verify J3 locally, then J4
 
 For a fresh agent (Claude in the cloud) picking up JOURNEYS-01. Read this, then [AGENTS.md](../../../AGENTS.md), [status](../../status.md), the [JOURNEYS-01 work record](work-record.md) (plan, authorizations, run log, retrospectives), [DEC-063](../../decisions.md) and the [deferred code-tracing record](../code-tracing/deferred.md).
 
-## Where things stand
+## Update 2026-10-03: J3 built in a cloud session
+
+J3 is built host-side on branch `claude/brave-pascal-br7h4i` and agent-checked there. The [J3 run log](work-record.md#j3-journey-proof-2026-10-03-claude-cloud-session) covers the design, checks and retrospective. The cloud session couldn't reach `layer-base`, so before J4 someone with `layer-base` must run, on that branch:
+1. `npm run test:server` and `npm run test:server:templates`. The cloud run matched the baseline failure for failure, and every failure needed `layer-base`.
+2. `npm run typecheck` and `npm run build`. Both ran with the Pages UI stubbed.
+3. The browser journeys `code-layer`, `pages`, `roles`, `bindings`, and `tests/repository-review-browser.mjs`. That last one was moved to v2 and journeys but never run.
+4. The Docker review test pulls `mcr.microsoft.com/playwright:v1.56.1-noble` (about 920 MB) and builds `aludel-journey-runner:<digest>` on first use.
+
+No template pin changed in J3.
+
+## Where things stand (2026-10-02, before J3)
 
 | Repository | Commit | What |
 |---|---|---|
@@ -28,7 +38,12 @@ All pins are in `apps/portal/config/layer-templates.json`. Last full run, 2026-1
 1. **`layer-base` must exist at `./layer-base`**, the repository root's sibling of `apps/`, with its branches at the pinned commits. It is git-ignored here and lives in the private repository [aludel-workshop/layer-base](https://github.com/aludel-workshop/layer-base) (pushed 2026-10-02; each branch head matches its pin). Restore it with: `git clone https://github.com/aludel-workshop/layer-base.git layer-base && cd layer-base && for b in main code pages data vision design markdown; do git show-ref -q refs/heads/$b || git branch $b origin/$b; done`. Without it, template mode (the default since DEC-062) can't load layers, and the templates suite fails. Template commits made in later slices are pushed to it as part of the slice; a push needs the owner's say-so.
 2. **Node.** Local runs used `v24.14.0`; `package.json` asks for `^24.15.0`. Run `npm ci` in `apps/portal`.
 3. **Docker** is needed for `tests/review-previews.test.mjs`, `previews-docker` and the repository-review browser check. Without Docker they skip or fail. Say which.
-4. **Playwright** for browser journeys: set `PLAYWRIGHT_MODULE` to a Playwright `index.mjs` whose Chromium headless shell is installed. The local run used Playwright 1.61.1 with `chromium_headless_shell-1228`, and version mismatches fail at launch. Run journeys with `MACHINE_LAYER_TEMPLATES_ENABLED=1 PLAYWRIGHT_MODULE=… tools/browser-checks.sh <names>` from `apps/portal`.
+4. **Cloud sessions** (learned in J3):
+   - The session's GitHub access may not include the private `layer-base`. Add it to the session's repositories, or the template suite and journeys can't run.
+   - Docker may need starting (`dockerd`).
+   - Docker builds there can't reach npm without the session proxy, so prebuild the journey runner image or set `MACHINE_JOURNEY_RUNNER_IMAGE`.
+   - Node 24 is available as the npm package `node@24`.
+5. **Playwright** for browser journeys: set `PLAYWRIGHT_MODULE` to a Playwright `index.mjs` whose Chromium headless shell is installed. The local run used Playwright 1.61.1 with `chromium_headless_shell-1228`, and version mismatches fail at launch. Run journeys with `MACHINE_LAYER_TEMPLATES_ENABLED=1 PLAYWRIGHT_MODULE=… tools/browser-checks.sh <names>` from `apps/portal`.
 
 ## Checklist for any template or layer change
 
@@ -41,7 +56,7 @@ From AGENTS.md "Current focus", refined during this packet:
 
 Steps 2 and 4 each caught a real break in this packet that the suites didn't.
 
-## Next: J3, journey proof
+## J3, journey proof (built 2026-10-03; the scope it was given)
 
 **Authorization.**
 - The owner authorized J0–J2 and the tracing removal in chat.

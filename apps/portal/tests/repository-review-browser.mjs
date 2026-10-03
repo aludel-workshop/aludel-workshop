@@ -60,10 +60,13 @@ writeFileSync(join(workspace, 'Dockerfile'), 'FROM node:24-bookworm-slim\nWORKDI
 const html = label => `<!doctype html><html><head><title>Review demo</title></head><body><h1>${label}</h1><p id="route"></p><p id="role"></p><script>document.querySelector('#route').textContent=location.pathname; fetch('/api/session').then(r=>r.json()).then(v=>document.querySelector('#role').textContent=v.account?.email||'anonymous');</script></body></html>`;
 writeFileSync(join(workspace, 'src/review-page.html'), html('Before'));
 writeFileSync(join(workspace, 'tests/app.test.mjs'), `import test from 'node:test'; import assert from 'node:assert/strict'; import {readFileSync} from 'node:fs'; test('the demo obtains identity through the real session API',()=>assert.ok(readFileSync('src/review-page.html','utf8').includes("fetch('/api/session')")));\n`);
-writeFileSync(join(workspace, '.aludel/review.json'), JSON.stringify({ version: 1, checks: [{ name: 'App session integration', command: ['node', '--test', 'tests/app.test.mjs'] }], scenarios: [
-  { id: 'author', criterion: 0, label: 'Review the post editor', expected: 'The editor opens as the demo author.', path: '/posts/demo/edit', fixture: 'starter', role: 'author' },
-  { id: 'viewer', criterion: 1, label: 'Review the viewer page', expected: 'The post opens as the demo viewer.', path: '/posts/demo', fixture: 'starter', role: 'viewer' }
-] }));
+// JOURNEYS-01 J3: the v2 recipe maps personas to the starter fixture; review steps come from journeys.
+writeFileSync(join(workspace, '.aludel/review.json'), JSON.stringify({ version: 2, checks: [{ name: 'App session integration', command: ['node', '--test', 'tests/app.test.mjs'] }],
+  personas: { author: { fixture: 'starter', session: 'author' }, viewer: { fixture: 'starter', session: 'viewer' } } }));
+mkdirSync(join(workspace, '.aludel/outputs'));
+writeFileSync(join(workspace, '.aludel/outputs/journeys.json'), JSON.stringify({ journeys: [
+  { version: 1, id: 'edit-post', title: 'Edit a post', origin: 'authored', revision: 1, persona: 'author', steps: [{ id: 'editor', name: 'Review the post editor', route: '/posts/demo/edit', trigger: 'Opens the post', expected: 'The editor opens as the demo author.' }] },
+  { version: 1, id: 'read-post', title: 'Read a post', origin: 'authored', revision: 1, persona: 'viewer', steps: [{ id: 'page', name: 'Review the viewer page', route: '/posts/demo', trigger: 'Opens the post', expected: 'The post opens as the demo viewer.' }] }] }));
 git(workspace, 'add', '.');
 git(workspace, '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'initial');
 initLayerContract(db); initCodeUnits(db); initCodeLayer(db); initCodeRepository(db);
@@ -145,7 +148,7 @@ try {
   const page = await context.newPage(); page.on('pageerror', error=>errors.push(error.message));
   await page.goto(`${portal}/p/${project.slug}/work/item/${work.id}/review/1`);
   await page.getByRole('heading', {name:/Review W-\d+ · Run 1/}).waitFor();
-  await page.getByRole('button',{name:'Criterion 1',exact:true}).click();
+  await page.getByRole('button',{name:/Walk 2 journey steps in Preview/}).click({timeout:120000});
   const authorButton = page.getByRole('button',{name:'Review the post editor'});
   try { await authorButton.waitFor({timeout:30000}); } catch (error) { await page.screenshot({path:`${out}/failure.png`,fullPage:true}); console.error((await page.locator('body').innerText()).slice(-7000)); console.error('RUN', JSON.stringify((await (await context.request.get(`${portal}/api/projects/${projectId}/work/${work.id}/runs`)).json()).runs[0])); console.error('SERVER', serverLog.slice(-3000)); throw error; }
   await page.waitForFunction(()=>[...document.querySelectorAll('button')].some(b=>b.textContent.includes('Review the post editor')&&!b.disabled),null,{timeout:120000});
@@ -155,7 +158,6 @@ try {
   await previewFrame.locator('#route').getByText('/posts/demo/edit', {exact:true}).waitFor();
   await previewFrame.getByText('author@demo.invalid', {exact:true}).waitFor();
   await page.screenshot({path:`${out}/author-step.png`,fullPage:true});
-  await page.getByRole('button',{name:'Criterion 2',exact:true}).click();
   await page.getByRole('button',{name:'Review the viewer page'}).click();
   await previewFrame.locator('#route').getByText('/posts/demo', {exact:true}).waitFor();
   await previewFrame.getByText('viewer@demo.invalid', {exact:true}).waitFor();
@@ -188,7 +190,7 @@ try {
   const secondBuildResponse = await context.request.post(`${secondBase}/preview`, {data:{integrationId:combined.integration.id}}); assert.ok(secondBuildResponse.ok(), await secondBuildResponse.text());
   const secondBuild = (await secondBuildResponse.json()).preview; assert.ok(secondBuild.checks.every(check => check.status === 'passed'));
   assert.equal((await (await context.request.get(`${secondBuild.url}/api/session`)).json()).account, null, 'a second candidate never inherits the first candidate session');
-  const secondStep = await context.request.post(`${secondBase}/scenario`, {data:{integrationId:combined.integration.id,scenario:'author'}}); assert.ok(secondStep.ok());
+  const secondStep = await context.request.post(`${secondBase}/scenario`, {data:{integrationId:combined.integration.id,step:'edit-post.editor'}}); assert.ok(secondStep.ok());
   const secondPage = await context.newPage(); await secondPage.goto((await secondStep.json()).url); await secondPage.getByText('author@demo.invalid', {exact:true}).waitFor(); await secondPage.close();
   assert.ok((await context.request.put(`${secondBase}/review`, {data:{integrationId:combined.integration.id,verdict:{index:0,value:'accept'}}})).ok());
   const secondAccept = await context.request.post(`${secondBase}/sign`, {data:{integrationId:combined.integration.id,outcome:'accept'}}); assert.ok(secondAccept.ok(), await secondAccept.text());
@@ -236,12 +238,11 @@ try {
   await page.locator('[role=tabpanel][aria-labelledby=sub-done]').getByRole('link',{name:personWork.title,exact:true}).click();
   await page.getByRole('link',{name:/Review/}).filter({hasText:'Review'}).first().click();
   await page.getByRole('heading',{name:/Review W-\d+ · Run 1/}).waitFor();
-  await page.getByRole('button',{name:'Criterion 1',exact:true}).click();
+  await page.getByRole('button',{name:/Walk 2 journey steps in Preview/}).click({timeout:120000});
   await page.getByRole('button',{name:'Review the post editor'}).waitFor();
   await page.waitForFunction(()=>[...document.querySelectorAll('button')].some(b=>b.textContent.includes('Review the post editor')&&!b.disabled),null,{timeout:120000});
   await page.getByRole('button',{name:'Review the post editor'}).click();
   await page.frameLocator('iframe[title="Candidate preview"]').getByText('author@demo.invalid',{exact:true}).waitFor();
-  await page.getByRole('button',{name:'Criterion 2',exact:true}).click();
   await page.getByRole('button',{name:'Review the viewer page'}).click();
   await page.frameLocator('iframe[title="Candidate preview"]').getByText('viewer@demo.invalid',{exact:true}).waitFor();
   await page.screenshot({path:`${out}/person-review.png`,fullPage:true});

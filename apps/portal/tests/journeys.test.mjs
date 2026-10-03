@@ -140,6 +140,12 @@ test('separability: every place a generated app names Aludel outside .aludel/ is
   // An agent adds an Aludel coupling without declaring it.
   assert.deepEqual(undeclaredSeams([...files, { path: 'src/aludel-telemetry.ts', text: 'export {}' }, { path: 'src/feature.ts', text: "fetch('/api/__aludel/review')" }], seams),
     ['src/aludel-telemetry.ts', 'src/feature.ts']);
+  // J3: the generated app declares those seams itself, carries a v2 recipe, and nothing it runs reads .aludel/.
+  const file = path => files.find(entry => entry.path === path).text;
+  assert.deepEqual(JSON.parse(file('.aludel/seams.json')), cases.generatedSeams);
+  assert.equal(validateReviewRecipe(JSON.parse(file('.aludel/review.json'))).version, 2);
+  assert.doesNotMatch(file('Dockerfile'), /\.aludel/, 'the runtime image copies nothing from .aludel/');
+  assert.doesNotMatch(file('server/server.mjs'), /\.aludel\//, 'the app reads no recipe at runtime');
   refuses(() => validateSeams({ version: 1, seams: [{ path: '.aludel/review.json', kind: 'file', purpose: 'x', remove: 'y' }] }), /inside \.aludel/);
   refuses(() => validateSeams({ version: 1, seams: [{ path: '../outside', kind: 'file', purpose: 'x', remove: 'y' }] }), /relative path/);
 });

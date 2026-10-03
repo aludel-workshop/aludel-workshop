@@ -8,6 +8,7 @@ import { basename, dirname } from 'node:path';
 import { symphonyIssue } from './symphony-readiness.mjs';
 import { compileTaskManifest } from './task-manifest.mjs';
 import { layerPackageTaskContext, layerPackageForProject } from './layer-package.mjs';
+import { reviewInputPath } from './journeys.mjs';
 import { briefSections } from './knowledge.mjs';
 import { compiledLocalActions } from './lat07-actions.mjs';
 import { actionForProject, projectLayerDefinition } from './layer-registry.mjs';
@@ -752,7 +753,7 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     if (reviewedSource && options.integrationId !== reviewedSource.id) fail('The review revision changed. Refresh before accepting.', 409);
     if (reviewedSource) {
       const pkg = layerPackageForProject(db, projectId, entry.layer);
-      const runnable = pkg.root && reviewedSource.files.some(file => (file.path === '.aludel/review.json' || !file.path.startsWith(pkg.root)) && !/^(?:docs\/|README\.md$|AGENTS\.md$|ARCHITECTURE\.md$)/.test(file.path));
+      const runnable = pkg.root && reviewedSource.files.some(file => (reviewInputPath(file.path) || !file.path.startsWith(pkg.root)) && !/^(?:docs\/|README\.md$|AGENTS\.md$|ARCHITECTURE\.md$)/.test(file.path));
       if (runnable) {
         if (!reviewBuildCheck) fail('The combined app build/check capability is unavailable.', 409);
         reviewBuildCheck(reviewedSource.id);
