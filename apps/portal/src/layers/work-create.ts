@@ -112,7 +112,8 @@ export class WorkCreateComponent {
   changeRole(layer: string) { this.role.set(layer); this.changeAction(this.actions()[0]?.id || ''); }
   layerName(layer: string) { return this.ctx.layerInstances().find(entry => entry.key === layer)?.name || layerLabel[layer] || layer; }
   changeAction(id: string) { this.action.set(id); this.checks = this.scope() ? '' : this.selectedAction()?.checks.join('\n') || ''; }
-  scopeText(changes: Record<string, string[]>) { return Object.entries(changes).map(([kind, ops]) => `${kind}s (${ops.join(', ')})`).join(' and '); }
+  // A layer that keeps its outputs as files (Code) has no API changes; its declared repository files bound it instead.
+  scopeText(changes: Record<string, string[]>) { return Object.entries(changes).map(([kind, ops]) => `${kind}s (${ops.join(', ')})`).join(' and ') || 'declared repository files'; }
   assignedAgent() {
     if (this.assignee) return this.assignee.startsWith('agent:');
     if (this.scope()) return false;

@@ -28,6 +28,7 @@ depends_on: [T03-CODE, LAT-08A, LAYER-BINDINGS-01, EXISTING-PROJECTS-01, DEC-050
 - **2026-10-03, owner chat (J4, new cloud session):** "can you grab j4?". The J3 handoff said J4 needs the owner's go; this is it. Authorized: J4 in the same local scope as J3: host code, tests, template commits and pins if needed, local checks, and commits plus a push to this session's designated branch (`claude/nice-cray-zn7gfg`, started from J3's `claude/brave-pascal-br7h4i` at `6f89df0`, which isn't on `main` yet). Not authorized: pushes to `main` or `layer-base`, deployment, spending, live owner data (the owner's portal), owner-impersonating actions, and restarting the owner's portal. The claims migration runs on the owner's next restart, so the owner is told before it. Recorded before execution.
 
 - **2026-10-03, owner chat (J5, new cloud session):** "pick up j5 please". The J4 handoff said J5 needs the owner's go; this is it. Authorized: J5 in the same local scope as J4: host code, tests, template commits and pins if needed, local checks, and commits plus a push to this session's designated branch (`claude/compassionate-hamilton-wz7nwz`, fast-forwarded to J4's `claude/nice-cray-zn7gfg` at `55b52a0`, which isn't on `main` yet). Not authorized: pushes to `main` or `layer-base`, deployment, spending, live owner data, owner-impersonating actions, and restarting the owner's portal. Recorded before execution.
+- **2026-10-03, owner chat (J5 environment):** "youre good to go for layer-base and docker." Authorized: adding `aludel-workshop/layer-base` to this session (read; cloned to `./layer-base`) and starting `dockerd`, to run J5's template-mode checks, Docker review checks and browser journey. Same scope otherwise; no push to `layer-base`.
 
 ## Owner direction (2026-10-02 chat)
 
@@ -590,7 +591,7 @@ Authorization: see the 2026-10-03 "J5" entry above.
 - **The tool that finds unmerged handoffs lives on an unmerged branch.** J4 added `tools/branch-handoffs.sh` and its AGENTS.md line on its own branch. A session that starts from `main` sees neither: this one found J3 and J4 by listing remote branches by hand. Until the owner merges, `main` keeps pointing at J3.
 - **Proof needs the build, again.** A Specify run's record claim, like a journey claim, reads as not run until the review preview has been built and walked. An agent can't learn before submitting whether its journey file passes; that is J7's *Check my branch*, as J4 found.
 
-**Exit evidence status.** Not met: the browser journey on a disposable imported app wasn't run, because this session had neither `layer-base` nor Docker. The server-level test drives the same chain without the browser or the review build, and it passes. The handoff makes the browser journey the next session's first task, with `layer-base` and Docker approved at session start. J5 is **built and server-tested, not closed**.
+**Exit evidence status.** Not met: the browser journey on a disposable imported app wasn't run, because this session had neither `layer-base` nor Docker. The server-level test drives the same chain without the browser or the review build, and it passes. The handoff makes the browser journey the next session's first task, with `layer-base` and Docker approved at session start. J5 is **built and server-tested, not closed**. *Superseded by the follow-up run below, which ran the browser journey.*
 
 **Retrospective (J5).**
 1. *Harder than necessary:*
@@ -610,3 +611,20 @@ Authorization: see the 2026-10-03 "J5" entry above.
    - **Applied:** the handoff's cloud-session prerequisites now say to ask for `layer-base` and `dockerd` approval first. Its gotchas name Code's key. **Hypothesis:** that the next session gets both approved before starting.
    - **Applied:** a before/after failure-set comparison in both modes, as J3 did, to separate environment failures from regressions. **Tested:** identical sets in both modes.
    - **Not done:** nothing changes the fact that `main` can't point at branch work without a merge. That needs the owner.
+
+**Follow-up run with `layer-base` and Docker (same session, after the owner's go).** `layer-base` was cloned to `./layer-base` with every pinned commit present. `dockerd` was started from a shell with the session proxy, and the journey runner image was built with the handoff's commands. The browser journey ran as uid 1000 (`sudo -u ubuntu -g docker`) on a copy of the repository, as in J4.
+
+- **The browser journey** ([journey-work-browser.mjs](../../../apps/portal/tests/journey-work-browser.mjs)), on a disposable imported app with two routes and no journeys:
+  1. In Code's Tasks, the person types a request about /settings and is offered *Specify first*.
+  2. The Specify item has its two claims, and no prerequisite: the app has a recipe, a fixture and the setup route.
+  3. The person stages and starts it, and commits on a real branch: a characterization test for the settings step, plus a new invite step without a test. They submit through the visible form.
+  4. Review prepares, builds and walks the journey. The settings step passes, and the record claim reads "The journey in this build: Passed".
+  5. Accepting merges the exact reviewed commit. Implement is raised claiming only `invite`, and the Specify log says `open-settings` already passes.
+  6. axe passes on the offer, the review and the Implement item. The offer fits 390px.
+
+  Screenshots: [offer](../../evidence/journeys/j5-offer.png), [Specify review](../../evidence/journeys/j5-specify-review.png), [Implement raised](../../evidence/journeys/j5-implement-raised.png).
+- **What the browser journey caught, and fixed in this slice:**
+  - Review diffs (`pre.wr-diff`) scroll but couldn't take keyboard focus. axe flagged this on the long journeys file: `scrollable-region-focusable`. They now have `tabindex="0"`. This was a pre-existing bug, exposed by the first long JSON diff.
+  - The next-run editor said "0 criteria" and "No criteria yet" under an item's backed claims. It now counts backed claims, and shows the empty message only when there are none (left over from J4).
+  - An item Specify raised showed its source as "A gap the Code layer found". It now shows its own first log line ("Raised by accepting W-n").
+  - The create form read "an agent may change only this layer's , and…" for a layer whose outputs are files. It now says "declared repository files". This was a pre-existing bug since T03-CODE.

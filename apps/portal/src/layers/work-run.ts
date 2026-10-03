@@ -328,7 +328,7 @@ export class RunCardComponent {
             from here and the change counts for {{ work.ref }}.</p>
         }
       </div></details>
-    <details class="wi-sec" [open]="editable()"><summary><mat-icon aria-hidden="true">fact_check</mat-icon><span>Criteria</span><small>{{ criteria.length }} {{ criteria.length === 1 ? 'criterion' : 'criteria' }}{{ editable() ? ' · editable' : '' }}</small><mat-icon aria-hidden="true" class="wi-chev">expand_more</mat-icon></summary>
+    <details class="wi-sec" [open]="editable()"><summary><mat-icon aria-hidden="true">fact_check</mat-icon><span>Criteria</span><small>{{ backed().length + criteria.length }} {{ backed().length + criteria.length === 1 ? 'criterion' : 'criteria' }}{{ editable() ? ' · editable' : '' }}</small><mat-icon aria-hidden="true" class="wi-chev">expand_more</mat-icon></summary>
       <div class="wi-sec-body">
         @if (backed().length) { <ol class="wi-crits">@for (claim of backed(); track claim.id) {
           <li><span class="wi-num wi-v-none"><mat-icon aria-hidden="true">{{ claim.kind === 'journey' ? 'route' : claim.kind === 'record' ? 'link' : 'rule' }}</mat-icon></span><span>{{ claim.text }} <small class="lay-muted">{{ claim.kind }} · edited in its layer</small></span></li> }</ol> }
@@ -338,7 +338,7 @@ export class RunCardComponent {
               <input class="wi-crit-input" [id]="'criterion-' + index" [(ngModel)]="criteria[index]" (ngModelChange)="dirty.set(true)">
               <button type="button" class="lay-xbutton" (click)="removeCriterion(index)" [attr.aria-label]="'Remove criterion ' + (index + 1)"><mat-icon aria-hidden="true">close</mat-icon></button> }
             @else { <span>{{ criterion }}</span> }</li>
-        } @empty { <li class="lay-muted small">No criteria yet. Add what must be true for this work to be accepted.</li> }</ol>
+        } @empty { @if (!backed().length) { <li class="lay-muted small">No criteria yet. Add what must be true for this work to be accepted.</li> } }</ol>
         @if (editable()) { <button type="button" class="lay-link-button small" (click)="addCriterion()"><mat-icon aria-hidden="true">add</mat-icon>Add a criterion</button> }
         <p class="small lay-muted">Criteria are fixed for a run when you press Go. A run can add or question a criterion, but not remove or weaken one.</p>
       </div></details>

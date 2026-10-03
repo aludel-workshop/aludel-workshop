@@ -95,7 +95,9 @@ export interface WorkItem { id: string; number: number; ref: string; layer: stri
   assignee: Assignee | null; targets: WorkTarget[]; blocks: string[]; blockedBy: string[]; checks: WorkCheck[];
   question: { text: string; options: string[]; answer?: string; rationale?: string; answeredBy?: string; applied?: string[]; recommendation?: string; reasoning?: string } | null; documents: string[]; log: LogEntry[]; createdAt: string; updatedAt: string;
   profileId: string | null; instructions: InstructionPins | null; migration?: { actionId: string | null; actionRevision: number | null; disposition: 'mapped' | 'blocked'; reason: string | null } | null; project: string | null; checkpoint: string | null;
-  context: { reconcile?: { recordId: string; fromRevision: number; toRevision: number }; routine?: string; suggestion?: string; batch?: string; staged?: boolean; skip?: boolean;
+  context: { reconcile?: { recordId: string; fromRevision: number; toRevision: number }; routine?: string; suggestion?: string;
+    // JOURNEYS-01 J5: a Specify, Implement or reviewable-app item and the journey it is about.
+    journeyWork?: { kind: 'reviewable' | 'specify' | 'implement'; journey?: string; revision?: number; specify?: string; request?: { title: string; brief: string } }; batch?: string; staged?: boolean; skip?: boolean;
     feedback?: { claim?: string; check: string; note: string; by: string; at: string }[]; reviewComment?: string | null; run?: RunState; personRun?: string; executionBlock?: ExecutionBlock;
     visionProposal?: { id: string; section: string; text: string; note: string; basis: string; targetId: string | null;
       expectedRevision: number | null; beforeText: string | null; briefRevision: number; acceptedClaimId?: string };

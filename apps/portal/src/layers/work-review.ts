@@ -66,18 +66,18 @@ const evidenceType: Record<Evidence['type'], [string, string]> = { change: ['dif
                         @case ('claim') { <dl class="wr-text">@if (change.before) { <dt>Was</dt><dd class="wr-was">{{ change.before }}</dd> }<dt>{{ change.before ? 'Now' : 'New' }}</dt><dd class="wr-now">{{ change.after }}</dd>
                           @if (change.note) { <dt>Note</dt><dd class="small">{{ change.note }}</dd> }@if (change.basis) { <dt>Basis</dt><dd class="small">{{ change.basis }}</dd> }</dl> }
                         @case ('source') { @if (change.ownerReview) { <p class="wi-warn wr-owner"><mat-icon aria-hidden="true">shield_person</mat-icon>Changes what this layer runs or may do. Accepting runs this code on the host.</p> }
-                          <pre class="wr-diff" [class.wr-diff-wrap]="!change.ownerReview">@for (line of (change.diff || '').split('\n'); track $index) {<span [class]="line[0] === '+' && !line.startsWith('+++') ? 'a' : line[0] === '-' && !line.startsWith('---') ? 'd' : line.startsWith('@@') ? 'h' : ''">{{ line }}</span>}</pre> }
+                          <pre class="wr-diff" tabindex="0" [class.wr-diff-wrap]="!change.ownerReview">@for (line of (change.diff || '').split('\n'); track $index) {<span [class]="line[0] === '+' && !line.startsWith('+++') ? 'a' : line[0] === '-' && !line.startsWith('---') ? 'd' : line.startsWith('@@') ? 'h' : ''">{{ line }}</span>}</pre> }
                         @case ('record') { <table class="wr-fields"><thead><tr><th scope="col">Field</th>@if (change.op !== 'created') { <th scope="col">Previous</th> }<th scope="col">{{ change.op === 'created' ? 'Value' : 'Proposed' }}</th></tr></thead>
                           <tbody>@for (field of change.fields || []; track field.name) { <tr><th scope="row">{{ field.name }}</th>@if (change.op !== 'created') { <td><pre>{{ field.before }}</pre></td> }<td><pre>{{ field.after }}</pre></td></tr> }
                           @empty { <tr><td colspan="3" class="lay-muted small">No field changes.</td></tr> }</tbody></table> }
-                        @case ('flow') { <section class="wr-flow-new"><h3>New flow</h3><pre class="wr-diff">{{ change.after }}</pre></section> }
-                        @case ('flow-revision') { <div class="wr-flow-revision"><section><h3>Previous</h3><pre class="wr-diff">{{ change.before }}</pre></section><section><h3>Proposed</h3><pre class="wr-diff">{{ change.after }}</pre></section></div> }
+                        @case ('flow') { <section class="wr-flow-new"><h3>New flow</h3><pre class="wr-diff" tabindex="0">{{ change.after }}</pre></section> }
+                        @case ('flow-revision') { <div class="wr-flow-revision"><section><h3>Previous</h3><pre class="wr-diff" tabindex="0">{{ change.before }}</pre></section><section><h3>Proposed</h3><pre class="wr-diff" tabindex="0">{{ change.after }}</pre></section></div> }
                         @case ('proposal') { <p class="lay-prose">{{ change.after }}</p><dl class="lay-fieldiff">@for (field of fields(change); track field[0]) { <dt>{{ field[0] }}</dt><dd>{{ field[1] }}</dd> }</dl> }
                         @case ('report') { <p class="lay-prose">{{ change.after }}</p>
                           @if (change.findings) { @for (finding of change.findings; track $index) { <div class="wr-finding"><strong>{{ finding.title }}</strong> <span class="lay-chip lay-info">{{ finding.severity }}</span><p class="small"><strong>Affected:</strong> {{ finding.affected }}</p><p class="small"><strong>Evidence:</strong> {{ finding.evidence }}</p><p class="small"><strong>Suggested:</strong> {{ finding.recommendation }}</p></div> }
                           @empty { <p class="lay-muted small">No findings reported.</p> } } }
                         @case ('file') { @if (diffLines().length && change.id === r.changes.find(entry => entry.kind === 'file')?.id) {
-                          <pre class="wr-diff">@for (line of diffLines(); track $index) {<span [class]="line[0] === '+' && !line.startsWith('+++') ? 'a' : line[0] === '-' && !line.startsWith('---') ? 'd' : line.startsWith('@@') ? 'h' : ''">{{ line }}</span>}</pre> } }
+                          <pre class="wr-diff" tabindex="0">@for (line of diffLines(); track $index) {<span [class]="line[0] === '+' && !line.startsWith('+++') ? 'a' : line[0] === '-' && !line.startsWith('---') ? 'd' : line.startsWith('@@') ? 'h' : ''">{{ line }}</span>}</pre> } }
                       }
                     </article>
                   } @empty { <p class="lay-muted">Run {{ r.number }} submitted no changes.</p> }

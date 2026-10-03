@@ -178,7 +178,8 @@ export class WorkItemComponent {
   source() {
     const work = this.item(); if (!work) return '';
     if (work.context?.routine) return 'A routine';
-    if (work.log[0]?.text?.startsWith('Created by')) return work.log[0].text;
+    // JOURNEYS-01 J5: an item Specify raised says so ("Raised by accepting W-n").
+    if (work.log[0]?.text?.startsWith('Created by') || work.context?.journeyWork) return work.log[0]?.text || 'Added by hand';
     return work.context?.suggestion && work.type !== 'reconcile' && !work.log[0]?.by ? `A gap the ${layerLabel[work.layer]} layer found` : work.log[0]?.text || 'Added by hand';
   }
   milestone(key: string) { return this.ctx.data()?.phases.find(phase => phase.key === key)?.label || key; }
