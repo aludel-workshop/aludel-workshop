@@ -25,11 +25,7 @@ All pins are in `apps/portal/config/layer-templates.json`. Last full run, 2026-1
 
 ## Environment prerequisites
 
-1. **`layer-base` must exist at `./layer-base`**, the repository root's sibling of `apps/`, with its branches at the pinned commits. It is git-ignored and was local-only at handoff. Restore it one of these ways, depending on what the owner chose:
-   - a remote: `git clone <url> layer-base` and check out each branch;
-   - `handoff/layer-base.bundle`: `git clone handoff/layer-base.bundle layer-base && cd layer-base && for b in main code pages data vision design markdown; do git show-ref -q refs/heads/$b || git branch $b origin/$b; done` (tested 2026-10-02: every pinned commit is present).
-
-   Without it, template mode (the default since DEC-062) can't load layers, and the templates suite fails.
+1. **`layer-base` must exist at `./layer-base`**, the repository root's sibling of `apps/`, with its branches at the pinned commits. It is git-ignored here and lives in the private repository [aludel-workshop/layer-base](https://github.com/aludel-workshop/layer-base) (pushed 2026-10-02; each branch head matches its pin). Restore it with: `git clone https://github.com/aludel-workshop/layer-base.git layer-base && cd layer-base && for b in main code pages data vision design markdown; do git show-ref -q refs/heads/$b || git branch $b origin/$b; done`. Without it, template mode (the default since DEC-062) can't load layers, and the templates suite fails. Template commits made in later slices are pushed to it as part of the slice; a push needs the owner's say-so.
 2. **Node.** Local runs used `v24.14.0`; `package.json` asks for `^24.15.0`. Run `npm ci` in `apps/portal`.
 3. **Docker** is needed for `tests/review-previews.test.mjs`, `previews-docker` and the repository-review browser check. Without Docker they skip or fail. Say which.
 4. **Playwright** for browser journeys: set `PLAYWRIGHT_MODULE` to a Playwright `index.mjs` whose Chromium headless shell is installed. The local run used Playwright 1.61.1 with `chromium_headless_shell-1228`, and version mismatches fail at launch. Run journeys with `MACHINE_LAYER_TEMPLATES_ENABLED=1 PLAYWRIGHT_MODULE=… tools/browser-checks.sh <names>` from `apps/portal`.
