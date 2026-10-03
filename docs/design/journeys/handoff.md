@@ -5,19 +5,15 @@ status: active
 updated: 2026-10-03
 ---
 
-# JOURNEYS-01 handoff: verify J3 locally, then J4
+# JOURNEYS-01 handoff: continue at J4
 
 For a fresh agent (Claude in the cloud) picking up JOURNEYS-01. Read this, then [AGENTS.md](../../../AGENTS.md), [status](../../status.md), the [JOURNEYS-01 work record](work-record.md) (plan, authorizations, run log, retrospectives), [DEC-063](../../decisions.md) and the [deferred code-tracing record](../code-tracing/deferred.md).
 
-## Update 2026-10-03: J3 built in a cloud session
+## Update 2026-10-03: J3 done, J4 next
 
-J3 is built host-side on branch `claude/brave-pascal-br7h4i` and agent-checked there. The [J3 run log](work-record.md#j3-journey-proof-2026-10-03-claude-cloud-session) covers the design, checks and retrospective. The cloud session couldn't reach `layer-base`, so before J4 someone with `layer-base` must run, on that branch:
-1. `npm run test:server` and `npm run test:server:templates`. The cloud run matched the baseline failure for failure, and every failure needed `layer-base`.
-2. `npm run typecheck` and `npm run build`. Both ran with the Pages UI stubbed.
-3. The browser journeys `code-layer`, `pages`, `roles`, `bindings`, and `tests/repository-review-browser.mjs`. That last one was moved to v2 and journeys but never run.
-4. The Docker review test pulls `mcr.microsoft.com/playwright:v1.56.1-noble` (about 920 MB) and builds `aludel-journey-runner:<digest>` on first use.
+J3 is done on branch `claude/brave-pascal-br7h4i`, apart from Biome's steps, which move to J8. The [J3 run log](work-record.md#j3-journey-proof-2026-10-03-claude-cloud-session) has the design, both check runs, findings and retrospective. J4 (claims) needs the owner's go before it starts.
 
-No template pin changed in J3.
+On first use, the Docker review test pulls `mcr.microsoft.com/playwright:v1.56.1-noble` (about 920 MB) and builds `aludel-journey-runner:<digest>`. No template pin changed in J3.
 
 ## Where things stand (2026-10-02, before J3)
 
@@ -43,6 +39,7 @@ All pins are in `apps/portal/config/layer-templates.json`. Last full run, 2026-1
    - Docker may need starting (`dockerd`).
    - Docker builds there can't reach npm without the session proxy, so prebuild the journey runner image or set `MACHINE_JOURNEY_RUNNER_IMAGE`.
    - Node 24 is available as the npm package `node@24`.
+   - The portal runs as root there. Previews then mount a root-owned `/data` that the app's `node` user can't write, so run Docker-preview browser checks as a uid-1000 user.
 5. **Playwright** for browser journeys: set `PLAYWRIGHT_MODULE` to a Playwright `index.mjs` whose Chromium headless shell is installed. The local run used Playwright 1.61.1 with `chromium_headless_shell-1228`, and version mismatches fail at launch. Run journeys with `MACHINE_LAYER_TEMPLATES_ENABLED=1 PLAYWRIGHT_MODULE=… tools/browser-checks.sh <names>` from `apps/portal`.
 
 ## Checklist for any template or layer change

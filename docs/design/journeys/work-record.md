@@ -160,7 +160,7 @@ J1 can start before T03-CODE closes. J2 onward changes the Code template that T0
 
 ## Readiness
 
-J0–J2 are done, and J3 is built pending a local run (below). J3–J8 depend on each other as listed. J6 needs a prototype round before building. No external effect, spending or live-data change is planned before J8, and in J8 the owner performs the live actions.
+J0–J3 are done (below; J3's Biome evidence moves to J8). J3–J8 depend on each other as listed. J6 needs a prototype round before building. No external effect, spending or live-data change is planned before J8, and in J8 the owner performs the live actions.
 
 ## Run log
 
@@ -319,7 +319,22 @@ Authorization: see 2026-10-03 above. Host-side only; no template commit was need
 | `vite build` (same stub; the stub also needs an empty `pages.scss`) | Passed |
 | **Not run here** (need `layer-base` or the owner's machine) | `typecheck-layer-ui.mjs` (no template pin changed), the layer browser journeys, and `tests/repository-review-browser.mjs` (updated to v2 and journeys, unverified) |
 
-**Exit evidence status.** The `review-previews.test.mjs` part is met. "Biome's three steps open from journeys" isn't: Biome's candidate is owner data and out of reach, as the handoff expected. It moves to J8, and it needs Biome's `.aludel/` regenerated as v2 plus journeys and the template update path. J3 is therefore **built and agent-checked in the cloud, pending a local run** of the template suite, the layer journeys and the repository-review browser check with `layer-base` present.
+**Follow-up run with `layer-base` (same session, after GitHub access was fixed).** Pins verified present, at `layer-base` `main` cloned from GitHub.
+
+| Check | Result |
+|---|---|
+| `npm run typecheck`, `npm run build` (real template sync) | Passed; no warnings in `work-review` |
+| `npm run test:server` (without `previews-docker`) | 275 passed, 3 failed, 31 skipped. The 3 failures (`symphony-worker` and `symphony-proposals`: a run reports `failed` where `running` is expected) fail identically at baseline `80d5bc5` in this sandbox, so they're environmental |
+| `npm run test:server:templates` (same files) | 297 passed, 4 failed, 8 skipped: the same 3, plus "Work staging…", which timed out under load and passes on its own (66 passed) |
+| Browser `code-layer`, `roles`, `bindings` (templates on) | Passed |
+| Browser `pages` | Fails with a portal `ECONNRESET`, **also at baseline** in this sandbox. Pre-existing here; not J3 |
+| `tests/repository-review-browser.mjs` | **Passed**: steps open from journeys as author and viewer, axe, 390px, serial integration and person review. Run as a non-root user: as root, the preview's root-owned `/data` mount stops the app user writing its database, which is a sandbox artifact. [Screenshot](../../evidence/journeys/j3-review-journey-steps.png) |
+
+**Findings from the follow-up.**
+- **Installing Code into a repository that already has `.aludel/outputs/journeys.json` fails.** The template ships `{ "journeys": [] }`, and `read-tree --prefix` refuses the overlap. The browser check now commits its journeys after Code installs, as Work would. An imported app that already carries Aludel files (one that left and came back, say) can't adopt Code until install merges or skips existing output files. This is new and not scheduled; it belongs with EXISTING-PROJECTS-01 or the template update path.
+- **The separability scan found a real undeclared seam in Code itself.** Code's Knowledge writes `docs/.aludel/sources.json` (`sidecarPath` in [code-layer.mjs](../../../apps/portal/server/code-layer.mjs)) outside the top-level `.aludel/`. It's evidence for the open question on generated apps' root files: move it under `.aludel/`, or have Code declare it in `seams.json`.
+
+**Exit evidence status.** The `review-previews.test.mjs` part is met. "Biome's three steps open from journeys" isn't: Biome's candidate is owner data and out of reach, as the handoff expected. It moves to J8, and it needs Biome's `.aludel/` regenerated as v2 plus journeys and the template update path. With the follow-up run, J3's checks pass apart from failures that also occur at baseline in this sandbox. The Biome part moves to J8. J3 is **done, apart from Biome**. The retrospective below covers both runs.
 
 **Retrospective (J3).**
 1. *Harder than necessary:*

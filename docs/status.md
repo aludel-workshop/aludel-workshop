@@ -16,7 +16,7 @@ Convert Code onto its template with GitHub sync, now on `main`: the layer-templa
 
 ## Next action
 
-**JOURNEYS-01: verify J3 locally, then J4.** J3 (journey proof) was built in a cloud session on 2026-10-03, on branch `claude/brave-pascal-br7h4i`. The session had no `layer-base`, so the template suite, typecheck/build and browser journeys must be re-run locally first; the [handoff](design/journeys/handoff.md) lists them. The owner moved on from T03-CODE ("t03-code is fine for now"); its owner items below stay open.
+**JOURNEYS-01 J4: claims** (needs the owner's go). J3 (journey proof) is done on branch `claude/brave-pascal-br7h4i` (2026-10-03), apart from Biome's steps, which move to J8. Start from the [handoff](design/journeys/handoff.md). The owner moved on from T03-CODE ("t03-code is fine for now"); its owner items below stay open.
 
 **T03-CODE: the app repository as the Code layer, with GitHub sync (run 1 built and agent-checked 2026-10-02).** [Evidence and retrospective](evidence/t03-code/README.md) · [brief and run log](design/layer-app-transition/t03-code-brief.md).
 - **Done:**
@@ -51,7 +51,7 @@ LAT-01–07 and the LAT-08 prototype established the isolated candidate, layer s
 
 ## Ready queue
 
-1. **JOURNEYS-01** (active; J3 next, [handoff](design/journeys/handoff.md)): journey-driven Work and review. Spec, then implement; claims replace hand-written criteria; journeys, tests and review seams live in `.aludel/`; includes cleanup of Codex's guided-preview work ([plan](design/journeys/work-record.md)). J0–J2 done 2026-10-02 (Code template `cc30be2`: journeys facet and Journeys tab); code tracing removed by DEC-063; J3 built 2026-10-03, pending a local run; then J4. The owner waived waiting for T03-CODE's look.
+1. **JOURNEYS-01** (active; J3 next, [handoff](design/journeys/handoff.md)): journey-driven Work and review. Spec, then implement; claims replace hand-written criteria; journeys, tests and review seams live in `.aludel/`; includes cleanup of Codex's guided-preview work ([plan](design/journeys/work-record.md)). J0–J2 done 2026-10-02 (Code template `cc30be2`: journeys facet and Journeys tab); code tracing removed by DEC-063; J3 done 2026-10-03 (Biome's steps move to J8); J4 next. The owner waived waiting for T03-CODE's look.
 2. **T03-CODE**: run 1 built and agent-checked ([evidence](evidence/t03-code/README.md)). Waits on the owner's browser look, the live GitHub round trip and the candidate-preview question; then the compiled modules retire. F1 is done.
 3. **LAYER-GITHUB-01**: publish Vision, Design, Pages and Data repositories (and possibly `layer-base`) to the owner's GitHub with T03-CODE's sync (DEC-062).
 4. **LAYER-BINDINGS-01 step 4 (F10)**: Code ⇄ Pages binding, migrating `layer_connections` and the hard-coded Pages reconciliation, after T03-CODE.
@@ -250,12 +250,13 @@ New Operator role. Agent-checked: server 88/89 (1 pre-existing), all browser sui
 
 ## Latest handoff
 
-2026-10-03: **JOURNEYS-01 J3 built in a cloud session (pending a local run).**
+2026-10-03: **JOURNEYS-01 J3 done (cloud session; Biome's steps move to J8).**
 - Review steps now come from journeys (`<journey>.<step>`), and the v2 recipe maps personas to fixtures. The host runs each journey's step tests black-box, in a Playwright runner container whose only network is the candidate, and records a result and screenshot per step.
 - Generated apps no longer read or copy `.aludel/` at runtime, and they declare their seams. Review warns about undeclared ones.
 - Step results don't block acceptance yet (J4).
 - The Docker review test covers a passing, uncovered, failing and skipped step and a missing persona fixture.
-- Server suites match the baseline failure for failure without `layer-base`.
+- With `layer-base`: typecheck, build, both server suites, and the browser journeys `code-layer`, `roles`, `bindings` and repository-review all pass. The exceptions also fail at the baseline commit in that sandbox: 3 worker tests and the `pages` journey.
+- **New findings:** Code can't install into a repository that already has `.aludel/outputs/journeys.json`. Code's own `docs/.aludel/sources.json` is an undeclared seam.
 - **Restart effect:** a review whose app still has a v1 recipe stops opening until the recipe is v2. Only Biome's unmerged candidate has one.
 - [Run log](design/journeys/work-record.md#j3-journey-proof-2026-10-03-claude-cloud-session).
 
