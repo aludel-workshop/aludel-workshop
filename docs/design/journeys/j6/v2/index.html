@@ -1,0 +1,635 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aludel walk review</title>
+<!-- JOURNEYS-01 J6 prototype v2 (round-1 rows R1-R14 and questions in ../../work-record.md, J6 section). Static; illustrative
+     Team Notes data; nothing is saved or sent except the reviewer's own answers, which stay in this browser. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block">
+<style>
+/* Layout: the built portal shell; the review fills the main area as two panels, preview left and the claim panel right,
+   each with a matching header bar and a bottom bar (preview: Under the hood; claim panel: the review actions). */
+:root{color-scheme:light;
+  --bg:#fbfbfd;--surface:#fff;--rail:#f3f5f9;--panel:#f4f6fa;--hover:#e9edf5;--line:#dfe3ec;--line-strong:#c8cfdc;--ink:#1b1f2a;--muted:#5d6679;--faint:#636c80;
+  --accent:#3047b9;--accent-bg:#e3e8ff;--cover:#f3f1fc;--cover-line:#d9d2f7;
+  --ok:#146446;--ok-bg:#d9f3e7;--bad:#a1231f;--bad-bg:#fce1e0;--warn:#7a4f00;--warn-bg:#fff0cc;--info:#1a5fb4;--info-bg:#e2ecfb;
+  --new:#5b3cc4;--new-bg:#ece7fd;--shadow:0 18px 50px #1c2a5a2e;--bar:52px;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:Roboto,system-ui,sans-serif;font-size:14.5px;line-height:1.45;color:var(--ink);background:var(--bg)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:var(--accent)}
+.icon{font-family:'Material Symbols Rounded';font-weight:normal;font-style:normal;font-size:20px;line-height:1;letter-spacing:normal;text-transform:none;white-space:nowrap;display:inline-block;vertical-align:middle;font-feature-settings:'liga';-webkit-font-smoothing:antialiased;flex:none}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.mono,code{font-family:"Roboto Mono",ui-monospace,monospace;font-size:.88em}
+.muted{color:var(--muted)}.small{font-size:13px}.tiny{font-size:12px}
+.row{display:flex;align-items:center;gap:8px}.push{margin-left:auto}.wrap{flex-wrap:wrap}
+.vh{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+h1,h2,h3{margin:0}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* Shell, as the built portal */
+.shell{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:100vh}
+.rail{background:var(--rail);border-right:1px solid var(--line);padding:14px 10px;display:flex;flex-direction:column;gap:2px;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:18px;padding:2px 8px 12px}
+.brand .icon{color:var(--accent);font-size:26px}
+.proj{display:flex;align-items:center;gap:9px;padding:8px;border-radius:12px;background:var(--surface);border:1px solid var(--line);margin-bottom:10px}
+.proj .mk{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:#3047b9;color:#fff;font-weight:700;font-size:12px}
+.proj small{display:block;color:var(--muted);font-size:11.5px}
+.nav a{display:flex;align-items:center;gap:10px;padding:5px 10px 5px 6px;border-radius:12px;color:var(--ink);text-decoration:none;font-weight:500}
+.nav a.active{background:var(--nb);font-weight:700}
+.tile{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:var(--nb);color:var(--nc)}
+.tile .icon{font-size:19px}
+.nav a.active .tile{background:var(--nc);color:#fff}
+.n-home{--nc:#c62828;--nb:#fde8e8}.n-vision{--nc:#b93c0a;--nb:#ffeddc}.n-design{--nc:#8a6100;--nb:#fff3cc}.n-pages{--nc:#2a7230;--nb:#e2f4e3}.n-data{--nc:#00766c;--nb:#d6f3ee}.n-code{--nc:#1a5fb4;--nb:#e2ecfb}.n-deploy{--nc:#2f3a9e;--nb:#e4e7f8}.n-work{--nc:#5b3cc4;--nb:#ece7fd}
+.main{padding:10px 14px 14px;min-width:0;display:flex;flex-direction:column;gap:8px}
+
+.btn{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:var(--surface);font-weight:500;font-size:13.5px;white-space:nowrap;text-decoration:none;color:var(--ink)}
+.btn:hover{background:var(--hover)}.btn .icon{font-size:18px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}.btn.primary:hover{background:#2539a0}
+.btn.go{background:var(--ok);border-color:var(--ok);color:#fff}.btn.go:hover{background:#0f4f37}
+.btn.flag{border-color:var(--warn);color:var(--warn)}
+.btn.flagfill{background:var(--warn);border-color:var(--warn);color:#fff}
+.btn.ghost{border-color:transparent;background:none}.btn.ghost:hover{background:var(--hover)}
+.btn.sm{padding:3px 9px;font-size:12.5px}.btn.sm .icon{font-size:16px}
+.btn:disabled{opacity:.5;cursor:default}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:500;background:var(--panel);color:var(--muted);white-space:nowrap}
+.chip .icon{font-size:15px}
+.chip.new{background:var(--new-bg);color:var(--new)}.chip.ok{background:var(--ok-bg);color:var(--ok)}.chip.bad{background:var(--bad-bg);color:var(--bad)}.chip.warn{background:var(--warn-bg);color:var(--warn)}.chip.info{background:var(--info-bg);color:var(--info)}
+.t-passed{color:var(--ok)}.t-failed{color:var(--bad)}.t-uncovered,.t-no-fixture{color:var(--warn)}
+.eyebrow{font-size:11.5px;letter-spacing:.8px;text-transform:uppercase;color:var(--faint);font-weight:700}
+
+/* prototype strip (not part of the design) */
+.proto{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);padding:2px 2px}
+
+/* review frame */
+.rv{flex:1;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden;min-height:640px}
+.rv-top{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.rv-top h1{font-size:16px}
+.who{display:inline-flex;align-items:center;gap:6px;font-size:13.5px}
+.av{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#ece7fd;color:#5b3cc4}
+.av .icon{font-size:14px}
+.banner{display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid var(--line);background:var(--panel);font-size:13px;flex-wrap:wrap}
+.banner.warn{background:var(--warn-bg)}
+.banner .icon{font-size:18px}
+.panes{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 410px;min-height:0}
+
+/* left: preview panel (borrowed: Claude's artifact pane, a preview with its own control bar) */
+.pv{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--panel);border-right:1px solid var(--line);position:relative}
+.bar{display:flex;align-items:center;gap:8px;min-height:var(--bar);padding:8px 12px;background:var(--surface);flex-wrap:wrap}
+.bar.top{border-bottom:1px solid var(--line)}
+.bar.bottom{border-top:1px solid var(--line)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.seg button{border:0;background:var(--surface);padding:4px 11px;font-size:12.5px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+.persona{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:999px;background:var(--warn-bg);color:#5a3b00;font-size:12.5px;font-weight:500}
+.persona .icon{font-size:16px}
+.frames{flex:1;display:grid;gap:10px;padding:10px;grid-template-columns:1fr;align-content:stretch;min-height:0}
+.frames.two{grid-template-columns:1fr 1fr}
+.frame{border:1px solid var(--line-strong);border-radius:12px;background:#fff;overflow:hidden;display:flex;flex-direction:column;min-height:420px;min-width:0}
+.fhead{display:flex;align-items:center;gap:6px;padding:6px 8px;background:#eef0f5;border-bottom:1px solid var(--line);font-size:12px}
+.fhead .addr{flex:1;min-width:0;background:#fff;border:1px solid var(--line);border-radius:999px;padding:2px 10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fhead .lbl{font-weight:700;font-size:11px;letter-spacing:.6px;text-transform:uppercase}
+.fhead .lbl.prev{color:var(--muted)}.fhead .lbl.prop{color:var(--accent)}
+.fbody{flex:1;position:relative;min-height:0}
+.hood-toggle{border:0;background:none;display:flex;align-items:center;gap:8px;padding:0;font-weight:500;flex-wrap:wrap;text-align:left}
+.hood-toggle .icon.chev{transition:transform .15s}
+.hood-toggle[aria-expanded="true"] .icon.chev{transform:rotate(180deg)}
+.hood{position:absolute;left:0;right:0;bottom:var(--bar);max-height:62%;overflow:auto;background:var(--surface);border-top:1px solid var(--line-strong);box-shadow:0 -12px 30px #1c2a5a22;padding:12px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:14px}
+.files{list-style:none;margin:0;padding:0;font-size:13px}
+.files li{display:flex;gap:8px;padding:4px 0;border-bottom:1px solid var(--line);min-width:0}
+.files .mono{overflow-wrap:anywhere;min-width:0}
+.files .a{color:var(--ok)}.files .d{color:var(--bad)}
+pre.diff{margin:0;background:#1b1f2a;color:#e7e9ef;border-radius:10px;padding:10px;font-size:12px;overflow:auto;max-height:240px}
+pre.diff .a{background:#1f4d36;display:block}pre.diff .d{background:#5a2020;display:block}pre.diff .h{color:#9fb2ff;display:block}
+
+/* the mock app: Team Notes */
+.app{font-family:system-ui,sans-serif;font-size:13.5px;color:#222;height:100%;display:flex;flex-direction:column}
+.app .ah{display:flex;align-items:center;gap:14px;padding:10px 14px;background:#20323f;color:#fff;flex-wrap:wrap}
+.app .ah b{font-size:14.5px}
+.app .ah button{background:none;border:0;color:#cfe0ea;padding:3px 6px;border-radius:6px}
+.app .ah button.on{background:#ffffff22;color:#fff}
+.app .ah .me{margin-left:auto;font-size:12px;color:#cfe0ea}
+.app .am{padding:14px 16px}
+.app .h{margin:0 0 10px;font-size:17px}
+.app .card{border:1px solid #e3e3e3;border-radius:8px;padding:9px 11px;margin-bottom:7px}
+.app .abtn{background:#1f7a5c;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-weight:600}
+.app .abtn.sec{background:#eef3f1;color:#1f5a46}
+.app label{display:block;font-size:12px;color:#555;margin:8px 0 3px}
+.app input,.app select{width:100%;max-width:300px;padding:6px 8px;border:1px solid #bbb;border-radius:6px}
+.app table{border-collapse:collapse;width:100%;max-width:420px}
+.app td{padding:6px 4px;border-bottom:1px solid #eee}
+.app .pend{color:#7a4f00;background:#fff0cc;border-radius:4px;padding:0 6px;font-size:12px}
+.app .ok{background:#e3f4ec;border-radius:6px;padding:7px 10px;margin:10px 0}
+.app .mail{border:1px solid #ddd;border-radius:8px;max-width:440px}
+.app .mail .mh{padding:8px 10px;border-bottom:1px solid #eee;font-size:12.5px;color:#555}
+.app .mail .mb{padding:10px}
+.app .stub{font-size:11px;color:#595959;margin-bottom:8px}
+.app .sub{color:#595959;font-size:12px}
+.app.nf{align-items:center;justify-content:center;color:#595959;gap:6px;padding:16px;text-align:center}
+.app.nf b{font-size:30px;color:#767676}
+.hint .hot{outline:2px dashed #e08a00;outline-offset:2px}
+.state{display:grid;place-items:center;height:100%;padding:24px;text-align:center;color:var(--muted)}
+.state .icon{font-size:34px}
+.state ol{text-align:left;margin:10px 0 0;padding-left:20px}
+
+/* right: claim panel */
+.cp{display:flex;flex-direction:column;min-width:0;min-height:0}
+.cp.cover .body{background:var(--cover)}
+.claimpick{position:relative;flex:1;min-width:0}
+.claimbtn{display:flex;align-items:center;gap:8px;width:100%;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:5px 10px;text-align:left}
+.claimbtn .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700;font-size:13.5px}
+.claimbtn .n{font-size:12px;color:var(--muted);white-space:nowrap}
+.menu{position:absolute;left:0;right:0;top:calc(100% + 4px);background:var(--surface);border:1px solid var(--line-strong);border-radius:12px;box-shadow:var(--shadow);z-index:30;padding:6px;list-style:none;margin:0}
+.menu button{display:flex;align-items:center;gap:8px;width:100%;border:0;background:none;border-radius:8px;padding:7px 8px;text-align:left}
+.menu button:hover,.menu button[aria-current="true"]{background:var(--hover)}
+.menu .k{font-size:12px;color:var(--muted);width:70px;flex:none}
+.menu .t{flex:1;min-width:0}
+.body{flex:1;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:14px;min-height:0}
+.body h2{font-size:20px;line-height:1.25;text-wrap:balance}
+.lead{margin:0;color:var(--muted);font-size:13.5px}
+.coverhead{display:grid;gap:4px;padding-bottom:12px;border-bottom:1px solid var(--cover-line)}
+.kind{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--new);letter-spacing:.6px;text-transform:uppercase}
+.kind .icon{font-size:17px}
+.slist{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.srow{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:2px 10px;align-items:center;width:100%;text-align:left;border:1px solid var(--cover-line);background:var(--surface);border-radius:12px;padding:8px 10px}
+.srow:hover{background:var(--hover)}
+.srow .num{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;border:1.5px solid var(--line-strong);font-size:11.5px;font-weight:700}
+.srow .num.walked{background:var(--ok);border-color:var(--ok);color:#fff}
+.srow .num.flagged{background:var(--warn);border-color:var(--warn);color:#fff}
+.srow .num .icon{font-size:14px}
+.srow .nm{font-weight:500}
+.srow .sub{grid-column:2/4;display:flex;gap:5px;flex-wrap:wrap;align-items:center;font-size:12.5px;color:var(--muted)}
+.srow .fl{grid-column:2/4;font-size:13px;color:var(--warn)}
+.spec{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;margin:0;font-size:14px}
+.spec dt{color:var(--muted);font-weight:500}
+.spec dd{margin:0}
+.doit{display:flex;gap:8px;align-items:flex-start;background:var(--info-bg);color:#123f79;border-radius:10px;padding:8px 10px;font-size:13.5px}
+.doit .icon{font-size:18px}
+details.proof{border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+details.proof summary{display:flex;align-items:center;gap:8px;padding:9px 10px;cursor:pointer;list-style:none;font-weight:500}
+details.proof summary::-webkit-details-marker{display:none}
+details.proof summary .chev{margin-left:auto;color:var(--muted)}
+details.proof[open] summary .chev{transform:rotate(180deg)}
+.proofbody{padding:0 10px 10px;display:grid;gap:8px;font-size:13px}
+.thumb{display:block;width:100%;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff;position:relative;height:150px}
+.thumb .scale{transform:scale(.5);transform-origin:0 0;width:200%;height:300px;pointer-events:none}
+.thumb .cap{position:absolute;right:6px;bottom:6px;background:#1b1f2aE6;color:#fff;border:0;font-size:12px;padding:3px 8px;border-radius:8px;display:inline-flex;gap:4px;align-items:center}
+.thumb .cap .icon{font-size:16px}
+.flagbox{border:1px solid var(--warn);background:var(--warn-bg);border-radius:12px;padding:10px;display:grid;gap:6px}
+.flagbox label{font-weight:700;font-size:13px;color:var(--warn)}
+textarea{width:100%;min-height:70px;border:1px solid var(--line-strong);border-radius:8px;padding:6px 8px;resize:vertical;background:var(--surface)}
+.flagnote{display:flex;gap:8px;align-items:flex-start;background:var(--warn-bg);color:var(--warn);border-radius:10px;padding:8px 10px;font-size:13.5px}
+.flagnote .x{margin-left:auto;border:0;background:none;padding:0;color:var(--warn)}
+.blocker{display:flex;gap:6px;align-items:flex-start;background:var(--bad-bg);color:var(--bad);border-radius:10px;padding:8px 10px;font-size:13px}
+.caution{display:flex;gap:6px;align-items:flex-start;background:var(--warn-bg);color:var(--warn);border-radius:10px;padding:8px 10px;font-size:13px}
+.done{display:flex;gap:6px;align-items:flex-start;background:var(--ok-bg);color:var(--ok);border-radius:10px;padding:8px 10px;font-size:13.5px}
+.blocker .icon,.caution .icon,.done .icon,.flagnote .icon{font-size:18px}
+.decision{border-top:1px solid var(--cover-line);padding-top:12px;display:grid;gap:8px}
+.decision h3{font-size:14px}
+table.reg{border-collapse:collapse;width:100%;font-size:13.5px}
+table.reg th,table.reg td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+table.reg th{font-size:12px;color:var(--muted);font-weight:500}
+.prog{display:flex;gap:3px;align-items:center;flex:1;min-width:60px;max-width:180px}
+.prog span{flex:1;height:6px;border-radius:3px;background:var(--line)}
+.prog span.walked{background:var(--ok)}.prog span.flagged{background:var(--warn)}.prog span.cur{outline:2px solid var(--accent);outline-offset:1px}
+.acts{display:flex;gap:6px;align-items:center;margin-left:auto;flex-wrap:wrap;justify-content:flex-end}
+
+/* prototype-only drawers */
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(420px,100vw);background:var(--surface);box-shadow:var(--shadow);z-index:60;padding:16px;overflow:auto;display:none}
+.drawer.open{display:block}
+.drawer h2{font-size:16px;margin-bottom:8px}
+.drawer fieldset{border:1px solid var(--line);border-radius:10px;margin:0 0 10px;padding:8px 10px}
+.drawer legend{font-weight:700;font-size:13px;padding:0 4px}
+.drawer label{display:flex;gap:6px;align-items:center;font-size:13.5px;padding:2px 0}
+.drawer .q{margin-bottom:12px}
+.drawer .q p{margin:0 0 4px;font-size:13.5px}
+.lightbox{position:fixed;inset:0;background:#0009;z-index:70;display:none;place-items:center;padding:20px}
+.lightbox.open{display:grid}
+.lightbox .lb{background:#fff;border-radius:12px;width:min(760px,100%);overflow:hidden}
+.lightbox .lbh{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line)}
+.lightbox .lbb{height:440px}
+.toast{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);background:#1b1f2a;color:#fff;padding:8px 14px;border-radius:10px;z-index:80;font-size:13.5px;max-width:90vw}
+
+@media (max-width:1100px){ .panes{grid-template-columns:minmax(0,1fr) 360px} .frames.two{grid-template-columns:1fr} .side-only{display:none} }
+@media (max-width:860px){
+  .shell{grid-template-columns:1fr} .rail{display:none} .main{padding:8px}
+  .panes{grid-template-columns:1fr}
+  .pv{border-right:0;border-bottom:1px solid var(--line)}
+  .frame{min-height:400px}
+  .hood{grid-template-columns:1fr}
+  .cp .bar.bottom{position:sticky;bottom:0;z-index:20;box-shadow:0 -8px 20px #1c2a5a1a}
+  .body{overflow:visible}
+}
+</style>
+<body>
+<div class="shell">
+  <nav class="rail" aria-label="Project">
+    <div class="brand"><span class="icon" aria-hidden="true">deployed_code</span>Aludel</div>
+    <div class="proj"><span class="mk" aria-hidden="true">TN</span><div><b>Team Notes</b><small>Imported app</small></div></div>
+    <div class="nav">
+      <a href="#" class="n-home"><span class="tile"><span class="icon" aria-hidden="true">home</span></span>Home</a>
+      <a href="#" class="n-vision"><span class="tile"><span class="icon" aria-hidden="true">lightbulb</span></span>Vision</a>
+      <a href="#" class="n-design"><span class="tile"><span class="icon" aria-hidden="true">palette</span></span>Design</a>
+      <a href="#" class="n-pages"><span class="tile"><span class="icon" aria-hidden="true">web</span></span>Pages</a>
+      <a href="#" class="n-data"><span class="tile"><span class="icon" aria-hidden="true">schema</span></span>Data</a>
+      <a href="#" class="n-code"><span class="tile"><span class="icon" aria-hidden="true">code</span></span>Code</a>
+      <a href="#" class="n-deploy"><span class="tile"><span class="icon" aria-hidden="true">rocket_launch</span></span>Deploy</a>
+      <a href="#" class="n-work active" aria-current="page"><span class="tile"><span class="icon" aria-hidden="true">checklist</span></span>Work</a>
+    </div>
+  </nav>
+  <main class="main" id="main">
+    <div class="proto"><span class="icon" aria-hidden="true">science</span>Prototype v2 · illustrative data, nothing is sent
+      <button class="btn sm" type="button" data-act="scenarios"><span class="icon" aria-hidden="true">tune</span>Scenarios</button>
+      <button class="btn sm primary" type="button" data-act="questions"><span class="icon" aria-hidden="true">rate_review</span>Review questions</button></div>
+    <div class="rv" id="rv"></div>
+  </main>
+</div>
+<aside class="drawer" id="scenarios" aria-label="Prototype scenarios"></aside>
+<aside class="drawer" id="questions" aria-label="Review questions"></aside>
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Test screenshot"></div>
+<script>
+// ---------- illustrative data ----------
+// One persona per journey (a journey never mixes roles). The invitee's fixture seeds a pending invite, so the second
+// journey doesn't depend on walking the first.
+const PERSONAS = {
+  owner: { label: 'owner', fixture: 'seeded-team', session: 'ana@team.invalid' },
+  member: { label: 'member', fixture: 'seeded-team', session: 'lee@team.invalid' },
+  invitee: { label: 'invitee', fixture: 'invited', session: null, holds: 'an invite for sam@team.invalid' },
+};
+const JOURNEYS = {
+  invite: { id: 'invite-teammate', title: 'Invite a teammate', persona: 'owner', revision: 2, was: 1, steps: [
+    { id: 'open-team', name: 'Open the team', change: 'unchanged', claimed: false, start: 'notes', end: 'settings',
+      trigger: 'Click Settings in the top bar.', expected: 'Settings lists the team.' },
+    { id: 'open-invite', name: 'Open the invite form', change: 'new', claimed: true, start: 'settings', end: 'invite-form',
+      trigger: 'Click Invite teammate.', expected: 'A form asks for an email address and a role.' },
+    { id: 'send-invite', name: 'Send the invite', change: 'new', claimed: true, start: 'invite-form', end: 'settings-pending',
+      trigger: 'Enter an email, pick Member, press Send invite.', expected: 'The teammate shows in the team as Pending, and an invite email is sent.' },
+  ] },
+  accept: { id: 'accept-invite', title: 'Accept an invite', persona: 'invitee', revision: 1, was: null, steps: [
+    { id: 'open-email', name: 'Open the invite email', change: 'new', claimed: true, start: 'inbox', end: 'accept',
+      trigger: 'In the preview inbox, click Join Team Notes.', expected: 'A join page says who invited them, and as what.' },
+    { id: 'join', name: 'Join the team', change: 'new', claimed: true, start: 'accept', end: 'notes-welcome',
+      trigger: 'Enter a name and press Join.', expected: 'They land on Notes as a member, with a welcome line.' },
+  ] },
+};
+const CLAIMS = [
+  { id: 'c1', kind: 'journey', journey: 'invite', title: 'Invite a teammate' },
+  { id: 'c2', kind: 'journey', journey: 'accept', title: 'Accept an invite' },
+  { id: 'c3', kind: 'invariant', title: 'Existing journeys still work', persona: 'member', screen: 'notes' },
+  { id: 'c4', kind: 'note', title: 'Invite emails name the team in the subject', persona: 'invitee', screen: 'inbox' },
+];
+const SCN_DEFAULT = { sendTest: 'passed', inviteTest: 'passed', fixture: 'present', preview: 'running', stale: false, hint: false };
+const store = { get(k, d) { try { const v = localStorage.getItem('j6v2:' + k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('j6v2:' + k, JSON.stringify(v)); } catch {} } };
+const fresh = () => ({ claim: 'c1', mode: 'card', view: 'proposed', screen: {}, walked: {}, flags: {}, decision: {}, claimFlag: {}, composing: null, menu: false, hood: false, finished: null });
+const S = { ...fresh(), scn: { ...SCN_DEFAULT } };
+
+// ---------- helpers ----------
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const icon = (n, cls = '') => `<span class="icon ${cls}" aria-hidden="true">${n}</span>`;
+function toast(t) { document.querySelectorAll('.toast').forEach(x => x.remove()); const el = document.createElement('div'); el.className = 'toast'; el.setAttribute('role', 'status'); el.textContent = t; document.body.append(el); setTimeout(() => el.remove(), 2600); }
+const claim = () => S.claim === 'finish' ? null : CLAIMS.find(c => c.id === S.claim);
+const J = () => claim()?.kind === 'journey' ? JOURNEYS[claim().journey] : null;
+const sk = (j, s) => `${j}:${s.id}`;
+const personaOf = () => J() ? J().persona : claim()?.persona;
+
+function testOf(jk, s) {
+  if (jk === 'invite' && s.id === 'send-invite' && S.scn.sendTest === 'failed') return { status: 'failed', ms: 5000, detail: 'Expected “Pending” next to sam@team.invalid. The team list still shows two people after 5 s.' };
+  if (jk === 'invite' && s.id === 'open-invite' && S.scn.inviteTest === 'uncovered') return { status: 'uncovered', detail: 'The run wrote no test for this step.' };
+  if (jk === 'accept' && S.scn.fixture === 'missing') return { status: 'no-fixture', detail: 'review.json has no “invited” fixture, so the test had no pending invite to open.' };
+  return { status: 'passed', ms: { 'open-team': 820, 'open-invite': 640, 'send-invite': 1310, 'open-email': 900, join: 1150 }[s.id] };
+}
+const TEST = { passed: ['check_circle', 'Test passed'], failed: ['cancel', 'Test failed'], uncovered: ['remove', 'No test'], 'no-fixture': ['person_off', 'No fixture'] };
+function blockersOf(c) {
+  if (!c || c.kind !== 'journey') return [];
+  return JOURNEYS[c.journey].steps.filter(s => s.claimed).map(s => [s, testOf(c.journey, s)]).filter(([, t]) => t.status !== 'passed')
+    .map(([s, t]) => `“${s.name}”: ${TEST[t.status][1].toLowerCase()}.`);
+}
+function statusOf(c) {
+  if (S.decision[c.id] === 'signed') return ['ok', 'check_circle', 'Signed off'];
+  if (S.decision[c.id] === 'flagged') return ['warn', 'flag', 'Flagged'];
+  if (c.kind === 'journey') { const j = JOURNEYS[c.journey]; const n = j.steps.filter(s => S.walked[sk(c.journey, s)] || S.flags[sk(c.journey, s)]).length;
+    if (n) return ['info', 'directions_walk', `${n} of ${j.steps.length} walked`]; }
+  return ['', 'radio_button_unchecked', 'Not started'];
+}
+const badge = c => { const [cls, ic, l] = statusOf(c); return `<span class="chip ${cls}">${icon(ic)}${l}</span>`; };
+
+// ---------- the mock app (Team Notes) ----------
+function app(screen, side, persona) {
+  const prev = side === 'previous';
+  const p = persona && PERSONAS[persona];
+  const who = p?.session || (screen === 'notes-welcome' ? 'sam@team.invalid' : 'Signed out');
+  const nav = on => `<div class="ah"><b>Team Notes</b>${p?.session || screen === 'notes-welcome' ? `<button type="button" class="${on === 'notes' ? 'on' : ''}" data-go="notes">Notes</button>` : ''}${persona === 'owner' ? `<button type="button" class="${on === 'settings' ? 'on' : ''} hot" data-go="settings">Settings</button>` : ''}<span class="me">${esc(who)}</span></div>`;
+  const team = pending => `<table><tbody><tr><td>Ana Ruiz</td><td>Owner</td></tr><tr><td>Lee Park</td><td>Member</td></tr>${pending ? '<tr><td>sam@team.invalid</td><td><span class="pend">Pending</span></td></tr>' : ''}</tbody></table>`;
+  const notes = extra => `${extra || ''}<h2 class="h">Notes</h2><div class="card"><b>Sprint 14 plan</b><div class="sub">Yesterday · Ana</div></div><div class="card"><b>Onboarding checklist</b><div class="sub">Mon · Lee</div></div>`;
+  const nf = route => `<div class="app nf"><b>404</b><div>Not found: <code>${route}</code></div><div style="font-size:12px">The accepted build has no page here.</div></div>`;
+  switch (screen) {
+    case 'notes': return `<div class="app">${nav('notes')}<div class="am">${notes()}</div></div>`;
+    case 'settings': case 'settings-pending': case 'settings-error':
+      return `<div class="app">${nav('settings')}<div class="am"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;max-width:420px"><h2 class="h" style="margin:0">Team</h2>${prev ? '' : '<button type="button" class="abtn hot" data-go="invite-form">Invite teammate</button>'}</div>
+        ${team(screen === 'settings-pending')}${screen !== 'settings' ? '<div class="ok">Invite sent.</div>' : ''}</div></div>`;
+    case 'invite-form': if (prev) return nf('/settings/invite');
+      return `<div class="app">${nav('settings')}<div class="am"><h2 class="h">Invite a teammate</h2><label for="ie-${side}">Email</label><input id="ie-${side}" value="sam@team.invalid"><label for="ir-${side}">Role</label><select id="ir-${side}"><option>Member</option><option>Owner</option></select>
+        <p style="display:flex;gap:6px"><button type="button" class="abtn hot" data-go="${S.scn.sendTest === 'failed' ? 'settings-error' : 'settings-pending'}">Send invite</button><button type="button" class="abtn sec" data-go="settings">Cancel</button></p></div></div>`;
+    case 'inbox': if (prev) return nf('/__aludel/inbox');
+      return `<div class="app"><div class="ah"><b>Preview inbox</b><span class="me">a stub, not the app</span></div><div class="am"><div class="stub">Mail the reviewed build sent to ${esc(p?.holds?.replace('an invite for ', '') || 'this persona')}. It never leaves the preview.</div>
+        <div class="mail"><div class="mh">To sam@team.invalid · From Team Notes<br><b>Ana invited you to Team Notes</b></div><div class="mb">Ana Ruiz added you as a member.<p><button type="button" class="abtn hot" data-go="accept">Join Team Notes</button></p></div></div></div></div>`;
+    case 'accept': if (prev) return nf('/invite/k29f…');
+      return `<div class="app">${nav('')}<div class="am"><h2 class="h">Join Team Notes</h2><p style="margin:0 0 6px;color:#555">Ana Ruiz invited you as a member.</p><label for="an-${side}">Your name</label><input id="an-${side}" value="Sam Osei"><p><button type="button" class="abtn hot" data-go="notes-welcome">Join</button></p></div></div>`;
+    case 'notes-welcome': return `<div class="app">${nav('notes')}<div class="am">${notes('<div class="ok" style="margin-top:0">Welcome to Team Notes, Sam.</div>')}</div></div>`;
+  }
+  return '';
+}
+const ROUTE = { notes: '/', settings: '/settings', 'settings-pending': '/settings', 'settings-error': '/settings', 'invite-form': '/settings/invite', inbox: '/__aludel/inbox', accept: '/invite/k29f…', 'notes-welcome': '/' };
+const COMMIT = { proposed: '7c1e9a42d0b3', previous: '3fa8d10e66c2' };
+
+// ---------- left: preview panel ----------
+function startScreen() {
+  const j = J();
+  if (!j) return claim()?.screen || 'notes';
+  return S.mode === 'card' ? j.steps[0].start : j.steps[S.mode].start;
+}
+function frame(side) {
+  const persona = personaOf(); const scr = S.screen[side] ?? startScreen();
+  let body;
+  if (S.scn.preview === 'building') body = `<div class="state">${icon('progress_activity')}<div><b>Building the reviewed commit</b><ol class="small"><li>Integrated onto accepted ${COMMIT.previous.slice(0, 7)} ✓</li><li>Image built ✓</li><li>Checks: 3 of 5…</li><li>Step tests</li></ol><p class="small">Claims and their step tests fill in on the right as they finish.</p></div></div>`;
+  else if (S.scn.preview === 'stopped') body = `<div class="state">${icon('pause_circle')}<div><b>Preview stopped after 15 minutes idle</b><p class="small">Your progress and flags are kept.</p><button type="button" class="btn primary" data-act="restart">Start it again</button></div></div>`;
+  else if (persona === 'invitee' && S.scn.fixture === 'missing') body = `<div class="state">${icon('person_off')}<div><b>Can't enter as the invitee</b><p class="small">The app's <code>.aludel/review.json</code> has no “invited” fixture, so the preview has no pending invite to open.</p></div></div>`;
+  else body = app(scr, side, persona);
+  return `<section class="frame" aria-label="${side === 'previous' ? 'Previous: accepted build' : 'Proposed: this run'}">
+    <div class="fhead"><span class="lbl ${side === 'previous' ? 'prev' : 'prop'}">${side === 'previous' ? 'Previous' : 'Proposed'}</span><span class="mono tiny">${COMMIT[side].slice(0, 7)}</span><span class="addr mono">${ROUTE[scr] || '/'}</span>
+      <button type="button" class="btn ghost sm" data-act="restart-step" data-side="${side}" title="Start again with a new one-use link">${icon('restart_alt')}<span class="vh">Start again</span></button></div>
+    <div class="fbody ${S.scn.hint ? 'hint' : ''}" data-side="${side}">${body}</div></section>`;
+}
+function previewPanel() {
+  const persona = personaOf(); const p = persona && PERSONAS[persona];
+  const two = S.view === 'side';
+  const failing = S.scn.sendTest === 'failed';
+  return `<section class="pv" aria-label="Preview">
+    <div class="bar top">
+      <div class="seg" role="group" aria-label="Which build"><button type="button" data-view="proposed" aria-pressed="${S.view === 'proposed'}">Proposed</button><button type="button" data-view="previous" aria-pressed="${S.view === 'previous'}">Previous</button><button type="button" class="side-only" data-view="side" aria-pressed="${S.view === 'side'}">Side by side</button></div>
+      ${p ? `<span class="persona">${icon(p.session ? 'badge' : 'mail')}as ${p.label}</span><span class="tiny muted">fixture <span class="mono">${p.fixture}</span>${p.session ? ` · <span class="mono">${p.session}</span>` : ` · ${esc(p.holds)}`}</span>` : ''}
+      <a class="btn ghost sm push" href="#" data-act="newtab">${icon('open_in_new')}New tab</a>
+    </div>
+    <div class="frames ${two ? 'two' : ''}">${two ? frame('previous') + frame('proposed') : frame(S.view === 'side' ? 'proposed' : S.view)}</div>
+    ${S.hood ? `<div class="hood" id="hood" role="region" aria-label="Under the hood"><div><div class="eyebrow" style="margin-bottom:6px">Changed files</div><ul class="files">
+      ${[['src/settings.ts', 41, 3], ['src/invite.ts', 58, 0], ['server/routes/invites.mjs', 64, 0], ['server/mail.mjs', 12, 2], ['.aludel/journeys/invite-teammate.spec.mjs', 38, 6], ['.aludel/journeys/accept-invite.spec.mjs', 31, 0], ['.aludel/review.json', 6, 0]].map(([f, a, d]) => `<li><span class="mono">${f}</span><span class="push a">+${a}</span><span class="d">−${d}</span></li>`).join('')}</ul>
+      <div class="eyebrow" style="margin:10px 0 6px">Checks on ${COMMIT.proposed.slice(0, 7)}</div><ul class="files">${['Build', 'Unit tests · 24', 'Lint', 'Separability · 1 seam declared', `Step tests · ${failing ? '4 of 5' : '5 of 5'}`].map((c, i) => `<li>${icon(i === 4 && failing ? 'cancel' : 'check_circle', i === 4 && failing ? 't-failed' : 't-passed')}${c}</li>`).join('')}</ul></div>
+      <div><div class="eyebrow" style="margin-bottom:6px">src/settings.ts</div><pre class="diff" tabindex="0"><span class="h">@@ -12,7 +12,11 @@ export function settingsPage(team) {</span>   return html\`
+     &lt;h4&gt;Team&lt;/h4&gt;
+<span class="a">+    \${team.canInvite ? html\`&lt;button data-go="invite"&gt;Invite teammate&lt;/button&gt;\` : ''}</span>     &lt;table&gt;\${team.members.map(memberRow)}&lt;/table&gt;
+<span class="d">-  \`;</span><span class="a">+    \${team.pending.map(pendingRow)}</span><span class="a">+  \`;</span></pre></div></div>` : ''}
+    <div class="bar bottom"><button type="button" class="hood-toggle" data-act="hood" aria-expanded="${S.hood}" aria-controls="hood">${icon('expand_less', 'chev')}Under the hood <span class="muted small">· 7 files changed · checks ${failing ? '4 of 5' : '5 of 5'} · diff</span></button></div>
+  </section>`;
+}
+
+// ---------- right: claim panel ----------
+function header() {
+  const c = claim(); const i = CLAIMS.indexOf(c);
+  return `<div class="bar top"><div class="claimpick">
+    <button type="button" class="claimbtn" data-act="menu" aria-haspopup="true" aria-expanded="${S.menu}" aria-controls="claimmenu">
+      <span class="n">${c ? `Claim ${i + 1} of ${CLAIMS.length}` : 'Finish'}</span><span class="t">${c ? esc(c.title) : 'Sign the review'}</span>${c ? badge(c) : ''}${icon('expand_more')}</button>
+    ${S.menu ? `<ul class="menu" id="claimmenu" aria-label="Claims">${CLAIMS.map((x, k) => `<li><button type="button" data-claim="${x.id}" ${x.id === S.claim ? 'aria-current="true"' : ''}><span class="k">${k + 1} · ${x.kind === 'journey' ? 'Journey' : x.kind === 'invariant' ? 'Regression' : 'Note'}</span><span class="t">${esc(x.title)}</span>${badge(x)}</button></li>`).join('')}
+      <li><button type="button" data-claim="finish" ${S.claim === 'finish' ? 'aria-current="true"' : ''}><span class="k">Finish</span><span class="t">Accept or send back</span></button></li></ul>` : ''}
+  </div></div>`;
+}
+
+function proofDetails(jk, s, open) {
+  const t = testOf(jk, s); const shot = t.status === 'failed' ? 'settings-error' : s.end;
+  return `<details class="proof" ${open || t.status !== 'passed' ? 'open' : ''}><summary>${icon(TEST[t.status][0], 't-' + t.status)}${TEST[t.status][1]}${t.ms ? ` <span class="tiny muted">· ${(t.ms / 1000).toFixed(1)} s</span>` : ''}${icon('expand_more', 'chev')}</summary>
+    <div class="proofbody">${t.detail ? `<p style="margin:0">${esc(t.detail)}</p>` : ''}<div class="tiny muted">Step test <span class="mono">${s.id}</span> on ${COMMIT.proposed.slice(0, 7)}</div>
+      ${t.status === 'passed' || t.status === 'failed' ? `<div class="thumb"><div class="scale" inert aria-hidden="true">${app(shot, 'thumb', JOURNEYS[jk].persona)}</div><button type="button" class="cap" data-act="shot">${icon('zoom_in')}Test screenshot<span class="vh"> of ${esc(s.name)}, enlarge</span></button></div>` : ''}</div></details>`;
+}
+
+function journeyCard(c) {
+  const jk = c.journey, j = JOURNEYS[jk]; const blk = blockersOf(c);
+  const touched = j.steps.some(s => S.walked[sk(jk, s)] || S.flags[sk(jk, s)]);
+  const flagged = j.steps.filter(s => S.flags[sk(jk, s)]);
+  const notWalked = j.steps.filter(s => !S.walked[sk(jk, s)] && !S.flags[sk(jk, s)]);
+  const passed = j.steps.filter(s => testOf(jk, s).status === 'passed').length;
+  return `<div class="coverhead"><span class="kind">${icon('route')}Claim ${CLAIMS.indexOf(c) + 1} · Journey</span><h2 tabindex="-1" id="ph">${esc(j.title)}</h2>
+      <p class="lead">As the ${PERSONAS[j.persona].label}, revision ${j.revision}${j.was ? ` (accepted: ${j.was})` : ', a new journey'}. The claim: this journey works as written, on this build.</p></div>
+    <ol class="slist" aria-label="Steps">${j.steps.map((s, i) => { const k = sk(jk, s); const t = testOf(jk, s); const st = S.flags[k] ? 'flagged' : S.walked[k] ? 'walked' : '';
+      return `<li><button type="button" class="srow" data-step="${i}"><span class="num ${st}">${st === 'flagged' ? icon('flag') : st === 'walked' ? icon('check') : i + 1}</span><span class="nm">${esc(s.name)}</span>${icon(TEST[t.status][0], 't-' + t.status)}<span class="vh">${TEST[t.status][1]}</span>
+        <span class="sub">${s.change === 'new' ? '<span class="chip new">New</span>' : '<span class="chip">Unchanged</span>'}${st === 'walked' ? 'Looks good' : st === 'flagged' ? 'Flagged' : touched ? 'Not walked' : ''}</span>
+        ${S.flags[k] ? `<span class="fl">${icon('flag')} ${esc(S.flags[k])}</span>` : ''}</button></li>`; }).join('')}</ol>
+    <p class="tiny muted" style="margin:0">${passed} of ${j.steps.length} step tests passed on ${COMMIT.proposed.slice(0, 7)}.</p>
+    ${blk.map(b => `<div class="blocker">${icon('block')}<span>${esc(b)} This claim can't be signed off; flag it to send it back.</span></div>`).join('')}
+    ${!touched && !S.decision[c.id] ? `<div class="doit">${icon('directions_walk')}<span>Walk it in the preview as the ${PERSONAS[j.persona].label}. Doing each step's action takes you to the next one; the last lands back here to decide.</span></div>` : ''}
+    ${touched || S.decision[c.id] ? `<div class="decision"><h3>Your decision on this journey</h3>
+      ${flagged.length ? `<div class="caution">${icon('flag')}<span>You flagged ${flagged.length} step${flagged.length > 1 ? 's' : ''}. This journey goes back to the agent with your note${flagged.length > 1 ? 's' : ''}; it can't be signed off.</span></div>` : ''}
+      ${!flagged.length && notWalked.length ? `<div class="caution">${icon('info')}<span>${notWalked.length} step${notWalked.length > 1 ? 's' : ''} not walked: ${notWalked.map(s => esc(s.name)).join(', ')}. Their tests ${notWalked.every(s => testOf(jk, s).status === 'passed') ? 'passed' : 'did not all pass'}.</span></div>` : ''}
+      ${S.decision[c.id] === 'signed' ? `<div class="done">${icon('verified')}<span>Signed off: “${esc(j.title)}” works as specified.</span></div>` : ''}
+      ${S.decision[c.id] === 'flagged' ? `<div class="caution">${icon('flag')}<span>Flagged. ${S.claimFlag[c.id] ? esc(S.claimFlag[c.id]) : 'Your step flags go back with it.'}</span></div>` : ''}</div>` : ''}
+    ${S.composing === 'claim' ? flagComposer('What is wrong with this journey?') : ''}`;
+}
+function invariantCard(c) {
+  return `<div class="coverhead"><span class="kind">${icon('shield')}Claim ${CLAIMS.indexOf(c) + 1} · Regression</span><h2 tabindex="-1" id="ph">${esc(c.title)}</h2>
+      <p class="lead">Every journey this run didn't change, re-run on this build. Nothing here changed on purpose; the preview is open as a member if you want to look around.</p></div>
+    <table class="reg"><thead><tr><th scope="col">Journey</th><th scope="col">As</th><th scope="col">Step tests</th></tr></thead><tbody>
+      ${[['Write a note', 'member', 3], ['Sign in', 'member', 2], ['Search notes', 'member', 2]].map(([t, p, n]) => `<tr><td>${t}</td><td>${p}</td><td>${icon('check_circle', 't-passed')} ${n} of ${n} passed</td></tr>`).join('')}</tbody></table>
+    ${decisionNote(c)}${S.composing === 'claim' ? flagComposer('What is wrong?') : ''}`;
+}
+function noteCard(c) {
+  return `<div class="coverhead"><span class="kind">${icon('sticky_note_2')}Claim ${CLAIMS.indexOf(c) + 1} · Note</span><h2 tabindex="-1" id="ph">${esc(c.title)}</h2>
+      <p class="lead">Written as free text on the item. No layer describes it and no test proves it, so it rests on your judgment. The preview shows the invite email in the inbox.</p></div>
+    <div class="chip warn" style="justify-self:start">${icon('edit_off')}Unbacked: no automated proof</div>
+    ${decisionNote(c)}${S.composing === 'claim' ? flagComposer('What is wrong?') : ''}`;
+}
+function decisionNote(c) {
+  if (S.decision[c.id] === 'signed') return `<div class="done">${icon('verified')}<span>Signed off.</span></div>`;
+  if (S.decision[c.id] === 'flagged') return `<div class="caution">${icon('flag')}<span>Flagged: ${esc(S.claimFlag[c.id])}</span></div>`;
+  return '';
+}
+function flagComposer(q) {
+  return `<div class="flagbox"><label for="flagtext">${icon('flag')} ${q}</label><textarea id="flagtext" placeholder="Your note goes back to the agent with this flag."></textarea>
+    <div class="row"><button type="button" class="btn sm flagfill" data-act="saveflag">Save flag</button><button type="button" class="btn sm ghost" data-act="cancelflag">Cancel</button></div></div>`;
+}
+
+function stepPage() {
+  const c = claim(), jk = c.journey, j = JOURNEYS[jk], i = S.mode, s = j.steps[i], k = sk(jk, s);
+  return `<div class="row small"><button type="button" class="btn ghost sm" data-act="card">${icon('arrow_back')}${esc(j.title)}</button><span class="muted">Step ${i + 1} of ${j.steps.length}</span></div>
+    <div><h2 tabindex="-1" id="ph">${esc(s.name)}</h2><div class="row wrap" style="margin-top:4px">${s.change === 'new' ? '<span class="chip new">New in this run</span>' : '<span class="chip">Unchanged, shown for context</span>'}<span class="chip">${icon('badge')}as ${PERSONAS[j.persona].label}</span></div></div>
+    <dl class="spec"><dt>Do</dt><dd>${esc(s.trigger)}</dd><dt>Expect</dt><dd>${esc(s.expected)}</dd>${s.change === 'new' && j.was ? `<dt>Was</dt><dd class="muted">Not in revision ${j.was}</dd>` : ''}</dl>
+    ${S.walked[k] ? `<div class="done">${icon('check')}<span>Walked: looks good.</span></div>` : `<div class="doit">${icon('touch_app')}<span>Do it in the preview. When you do, you move on to the next step.</span></div>`}
+    ${proofDetails(jk, s)}
+    ${S.flags[k] ? `<div class="flagnote">${icon('flag')}<span><b>Flagged:</b> ${esc(S.flags[k])}</span><button type="button" class="x" data-act="unflag" aria-label="Remove the flag">${icon('close')}</button></div>` : ''}
+    ${S.composing === 'step' ? flagComposer('What is wrong with this step?') : ''}`;
+}
+
+function finishPage() {
+  const flagged = CLAIMS.filter(c => S.decision[c.id] === 'flagged');
+  const open = CLAIMS.filter(c => !S.decision[c.id]);
+  const reasons = [];
+  if (S.scn.stale) reasons.push('The accepted head moved. Refresh against latest, then finish.');
+  if (S.scn.preview === 'building') reasons.push('The build is still running its checks.');
+  return `<div class="coverhead"><span class="kind">${icon('draw')}Finish</span><h2 tabindex="-1" id="ph">Run 1 of W-9 · Implement: Invite teammates</h2>
+      <p class="lead">Your decision on each claim. Accepting merges commit <span class="mono">${COMMIT.proposed.slice(0, 7)}</span> exactly as reviewed.</p></div>
+    <table class="reg"><thead><tr><th scope="col">Claim</th><th scope="col">Your decision</th></tr></thead><tbody>${CLAIMS.map((c, i) => `<tr><td><button type="button" class="btn ghost sm" data-claim="${c.id}">${i + 1} · ${esc(c.title)}</button></td><td>${badge(c)}</td></tr>`).join('')}</tbody></table>
+    ${open.length ? `<div class="caution">${icon('info')}<span>${open.length} claim${open.length > 1 ? 's' : ''} still need${open.length > 1 ? '' : 's'} your decision.</span></div>` : ''}
+    ${flagged.length ? `<div class="caution">${icon('flag')}<span>${flagged.length} flagged claim${flagged.length > 1 ? 's' : ''}: the run goes back to the agent with your notes.</span></div>` : ''}
+    ${reasons.map(r => `<div class="blocker">${icon('block')}<span>${esc(r)}</span></div>`).join('')}
+    ${S.finished ? `<div class="done">${icon('verified')}<span>${S.finished === 'accept' ? `Accepted. ${COMMIT.proposed.slice(0, 7)} merges as reviewed.` : `Sent back with ${flagged.length} flag${flagged.length > 1 ? 's' : ''}. The agent gets your notes for its next run.`} (Prototype: nothing was sent.)</span></div>` : ''}`;
+}
+
+function bottomBar() {
+  const c = claim();
+  if (!c) { const flagged = CLAIMS.some(x => S.decision[x.id] === 'flagged'); const open = CLAIMS.some(x => !S.decision[x.id]);
+    const blocked = S.scn.stale || S.scn.preview === 'building';
+    return `<div class="bar bottom"><button type="button" class="btn sm" data-claim="c4">${icon('arrow_back')}Back</button><div class="acts">
+      ${flagged ? `<button type="button" class="btn flagfill" data-act="sendback" ${open || blocked ? 'disabled' : ''}>${icon('undo')}Send back to the agent</button>` : `<button type="button" class="btn go" data-act="accept" ${open || blocked ? 'disabled' : ''}>${icon('check')}Accept the run</button>`}</div></div>`; }
+  const idx = CLAIMS.indexOf(c);
+  const back = `<button type="button" class="btn sm" data-act="back" ${idx === 0 && S.mode === 'card' ? 'disabled' : ''}>${icon('arrow_back')}Back</button>`;
+  if (c.kind === 'journey' && S.mode !== 'card') {
+    const j = JOURNEYS[c.journey], s = j.steps[S.mode], k = sk(c.journey, s);
+    const prog = `<div class="prog" role="img" aria-label="Step ${S.mode + 1} of ${j.steps.length}">${j.steps.map((x, i) => `<span class="${S.flags[sk(c.journey, x)] ? 'flagged' : S.walked[sk(c.journey, x)] ? 'walked' : ''} ${i === S.mode ? 'cur' : ''}"></span>`).join('')}</div>`;
+    const last = S.mode === j.steps.length - 1;
+    return `<div class="bar bottom">${back}${prog}<div class="acts">${S.flags[k] ? '' : `<button type="button" class="btn flag" data-act="flagstep" ${S.composing ? 'disabled' : ''}>${icon('flag')}Flag</button>`}
+      <button type="button" class="btn primary" data-act="next" ${S.composing ? 'disabled' : ''}>${S.flags[k] ? 'Next' : 'Looks good'}${icon(last ? 'flag_circle' : 'arrow_forward')}<span class="vh">${last ? ', back to the journey to decide' : ''}</span></button></div></div>`;
+  }
+  // a claim card
+  const decided = S.decision[c.id];
+  let acts;
+  if (c.kind === 'journey') {
+    const j = JOURNEYS[c.journey]; const touched = j.steps.some(s => S.walked[sk(c.journey, s)] || S.flags[sk(c.journey, s)]);
+    const anyFlag = j.steps.some(s => S.flags[sk(c.journey, s)]); const blk = blockersOf(c).length;
+    if (decided) acts = `<button type="button" class="btn sm ghost" data-act="undecide">Change my decision</button><button type="button" class="btn primary" data-act="nextclaim">Next claim${icon('arrow_forward')}</button>`;
+    else if (!touched && !blk) acts = `<button type="button" class="btn flag" data-act="flagclaim" ${S.composing ? 'disabled' : ''}>${icon('flag')}Flag</button><button type="button" class="btn primary" data-act="walk">${icon('directions_walk')}Walk the journey</button>`;
+    else if (anyFlag || blk) acts = `${touched ? `<button type="button" class="btn sm ghost" data-act="walk">Walk again</button>` : ''}<button type="button" class="btn flagfill" data-act="${anyFlag ? 'confirmflag' : 'flagclaim'}" ${S.composing ? 'disabled' : ''}>${icon('flag')}${anyFlag ? 'Flag this journey' : 'Flag it'}</button>`;
+    else acts = `<button type="button" class="btn sm ghost" data-act="walk">Walk again</button><button type="button" class="btn flag" data-act="flagclaim" ${S.composing ? 'disabled' : ''}>${icon('flag')}Flag</button><button type="button" class="btn go" data-act="sign">${icon('verified')}Sign off: it works</button>`;
+  } else {
+    if (decided) acts = `<button type="button" class="btn sm ghost" data-act="undecide">Change my decision</button><button type="button" class="btn primary" data-act="nextclaim">${idx === CLAIMS.length - 1 ? 'Finish' : 'Next claim'}${icon('arrow_forward')}</button>`;
+    else acts = `<button type="button" class="btn flag" data-act="flagclaim" ${S.composing ? 'disabled' : ''}>${icon('flag')}Flag</button><button type="button" class="btn go" data-act="sign">${icon('verified')}Sign off${c.kind === 'invariant' ? ': nothing broke' : ': it holds'}</button>`;
+  }
+  return `<div class="bar bottom">${back}<div class="acts">${acts}</div></div>`;
+}
+
+function claimPanel() {
+  const c = claim(); const cover = !c || S.mode === 'card';
+  const body = !c ? finishPage() : S.mode !== 'card' ? stepPage() : c.kind === 'journey' ? journeyCard(c) : c.kind === 'invariant' ? invariantCard(c) : noteCard(c);
+  return `<section class="cp ${cover ? 'cover' : 'step'}" aria-label="${cover ? 'Claim' : 'Step'}">${header()}<div class="body">${body}</div>${bottomBar()}</section>`;
+}
+
+function render(focus) {
+  $('#rv').innerHTML = `<header class="rv-top"><a class="btn ghost sm" href="#" aria-label="Close review">${icon('close')}</a><h1>Review W-9 · Run 1</h1>
+      <span class="who"><span class="av">${icon('smart_toy')}</span>Builder agent</span><span class="muted small">Implement: Invite teammates</span></header>
+    ${S.scn.stale ? `<div class="banner warn" role="status">${icon('history')}The accepted head moved 2 commits since this build. Your progress stays.<button type="button" class="btn sm push" data-act="refresh">Refresh against latest</button></div>`
+      : `<div class="banner">${icon('difference')}Reviewing <span class="mono">${COMMIT.proposed.slice(0, 7)}</span> against accepted <span class="mono">${COMMIT.previous.slice(0, 7)}</span>. Raised by W-8 (Specify).</div>`}
+    <div class="panes">${previewPanel()}${claimPanel()}</div>`;
+  renderScenarios();
+  if (focus) (focus === true ? $('#ph') : $(focus))?.focus();
+}
+
+// ---------- behaviour ----------
+function enterStep(i, keepPreview) { S.mode = i; S.composing = null; if (!keepPreview) S.screen = {}; render('#ph'); }
+function toCard(msg) { S.mode = 'card'; S.composing = null; render('#ph'); if (msg) toast(msg); }
+function advanceFrom(i, viaPreview) {
+  const j = J(); if (i < j.steps.length - 1) { const nxt = j.steps[i + 1]; const keep = viaPreview && (S.screen.proposed === nxt.start); enterStep(i + 1, keep); }
+  else toCard(`That was the last step. Decide on “${j.title}”.`);
+}
+function navigate(side, from, to) {
+  S.screen[side] = to;
+  const j = J();
+  if (side === 'proposed' && j && S.scn.preview === 'running') {
+    // Walking moves the review: doing a step's action marks it walked and goes on to the next step.
+    const i = j.steps.findIndex((s, n) => s.start === from && s.end === to && (S.mode === 'card' || n >= S.mode));
+    if (i >= 0 && !S.decision[claim().id]) { const k = sk(claim().journey, j.steps[i]); if (!S.flags[k]) S.walked[k] = true;
+      toast(`Step ${i + 1} walked: ${j.steps[i].name}`); return advanceFrom(i, true); }
+  }
+  render();
+}
+function claimAt(d) { const i = CLAIMS.findIndex(c => c.id === S.claim); return i + d; }
+function goClaim(id) { S.claim = id; S.mode = 'card'; S.screen = {}; S.menu = false; S.composing = null; render(true); }
+
+document.addEventListener('click', e => {
+  const t = e.target.closest('button,a'); if (!t) { if (S.menu && !e.target.closest('.claimpick')) { S.menu = false; render(); } return; }
+  const d = t.dataset;
+  if (t.tagName === 'A' && t.getAttribute('href') === '#') e.preventDefault();
+  if (d.go) { const fb = t.closest('.fbody'); if (!fb) return; const side = fb.dataset.side; return navigate(side, S.screen[side] ?? startScreen(), d.go); }
+  if (d.step !== undefined) return enterStep(+d.step);
+  if (d.view) { S.view = d.view; return render(); }
+  if (d.claim) return goClaim(d.claim);
+  const c = claim(); const j = J();
+  switch (d.act) {
+    case 'menu': S.menu = !S.menu; render(); return S.menu && $('#claimmenu button')?.focus();
+    case 'walk': return enterStep(0);
+    case 'card': return toCard();
+    case 'next': { const k = sk(c.journey, j.steps[S.mode]); if (!S.flags[k]) S.walked[k] = true; return advanceFrom(S.mode, false); }
+    case 'back':
+      if (S.mode !== 'card') return S.mode === 0 ? toCard() : enterStep(S.mode - 1);
+      return goClaim(CLAIMS[Math.max(0, claimAt(-1))].id);
+    case 'flagstep': S.composing = 'step'; render('#flagtext'); return;
+    case 'flagclaim': case 'confirmflag':
+      if (d.act === 'confirmflag') { S.decision[c.id] = 'flagged'; S.claimFlag[c.id] = 'Flagged steps go back with their notes.'; render(true); return toast('Journey flagged'); }
+      S.composing = 'claim'; render('#flagtext'); return;
+    case 'cancelflag': S.composing = null; return render();
+    case 'saveflag': { const text = $('#flagtext').value.trim(); if (!text) { toast('A flag needs a note: say what is wrong.'); return $('#flagtext').focus(); }
+      if (S.composing === 'step') { const k = sk(c.journey, j.steps[S.mode]); S.flags[k] = text; delete S.walked[k]; S.composing = null; render('#ph'); return toast('Step flagged'); }
+      S.decision[c.id] = 'flagged'; S.claimFlag[c.id] = text; S.composing = null; render(true); return toast('Claim flagged'); }
+    case 'unflag': delete S.flags[sk(c.journey, j.steps[S.mode])]; return render();
+    case 'sign': S.decision[c.id] = 'signed'; render(true); return toast(`Signed off: ${c.title}`);
+    case 'undecide': delete S.decision[c.id]; delete S.claimFlag[c.id]; return render(true);
+    case 'nextclaim': return goClaim(claimAt(1) < CLAIMS.length ? CLAIMS[claimAt(1)].id : 'finish');
+    case 'restart-step': delete S.screen[d.side]; render(); return toast('New one-use link: back at the start of this step');
+    case 'restart': S.scn.preview = 'running'; return render();
+    case 'hood': S.hood = !S.hood; return render('[data-act="hood"]');
+    case 'shot': return openShot();
+    case 'newtab': return toast('Opens the same one-use link in a new tab');
+    case 'refresh': S.scn.stale = false; render(); return toast('Rebuilt against the latest accepted head; tests passed again');
+    case 'accept': S.finished = 'accept'; return render();
+    case 'sendback': S.finished = 'sendback'; return render();
+    case 'scenarios': $('#questions').classList.remove('open'); $('#scenarios').classList.add('open'); return $('#scenarios input')?.focus();
+    case 'questions': renderQuestions(); $('#scenarios').classList.remove('open'); $('#questions').classList.add('open'); return $('#questions textarea')?.focus();
+    case 'close-drawer': return document.querySelectorAll('.drawer').forEach(x => x.classList.remove('open'));
+    case 'reset': Object.assign(S, fresh()); render(); return toast('Review reset; your answers to the questions are kept');
+    case 'copy': { const a = store.get('answers', {}); const txt = QUESTIONS.map(([id]) => `${id}: ${a[id] || ''}`).join('\n'); navigator.clipboard?.writeText(txt).then(() => toast('Copied'), () => toast('Copy failed; select the text instead')); return; }
+    case 'close-lb': $('#lightbox').classList.remove('open'); return document.querySelector('[data-act="shot"]')?.focus();
+  }
+});
+document.addEventListener('change', e => { const t = e.target; if (t.closest('#scenarios')) { S.scn[t.name] = t.type === 'checkbox' ? t.checked : t.value; S.finished = null; render(); } });
+document.addEventListener('input', e => { if (e.target.dataset.ans) { const a = store.get('answers', {}); a[e.target.dataset.ans] = e.target.value; store.set('answers', a); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { $('#lightbox').classList.remove('open'); document.querySelectorAll('.drawer').forEach(x => x.classList.remove('open')); if (S.menu) { S.menu = false; render('[data-act="menu"]'); } } });
+function openShot() {
+  const c = claim(), j = J(), s = j.steps[S.mode], t = testOf(c.journey, s);
+  $('#lightbox').innerHTML = `<div class="lb"><div class="lbh"><b>${esc(s.name)}</b><span class="tiny muted">test screenshot · ${TEST[t.status][1].toLowerCase()} · ${COMMIT.proposed.slice(0, 7)}</span><button type="button" class="btn ghost sm push" data-act="close-lb">${icon('close')}Close</button></div><div class="lbb" inert>${app(t.status === 'failed' ? 'settings-error' : s.end, 'lightbox', j.persona)}</div></div>`;
+  $('#lightbox').classList.add('open'); $('#lightbox [data-act="close-lb"]').focus();
+}
+
+// ---------- prototype-only: scenarios and review questions ----------
+const QUESTIONS = [
+  ['Q1', 'Two panels: the preview with its own bars (Under the hood at its bottom) and the claim panel with the review actions at its bottom. Does it read like the review is about walking the app?'],
+  ['Q2', 'One claim card does both jobs: before walking it introduces the journey, after the last step it is where you decide. Is the switch between the claim card (tinted) and its step pages clear enough?'],
+  ['Q3', 'Walking moves the review on: doing a step’s action in the preview marks it walked (looks good) and opens the next step. Should a walked step still need your confirming click, or is the action enough?'],
+  ['Q4', 'Flag always asks for a note. One flagged step means the journey can only be flagged, not signed off. Right?'],
+  ['Q5', 'The final Finish card: Accept the run, or Send back if anything is flagged. Needed as its own page, or should deciding the last claim finish the review?'],
+  ['Q6', 'An unchanged step at the start of a journey (“Open the team”) is walked for context but isn’t claimed. Keep it in the walk, or start at the first changed step?'],
+  ['Q7', 'Non-journey claims are a single card with Flag and Sign off, and the preview opens somewhere useful (as a member, or at the inbox). Enough?'],
+];
+function renderScenarios() {
+  const sc = S.scn; const r = (name, val, label) => `<label><input type="radio" name="${name}" value="${val}" ${sc[name] === val ? 'checked' : ''}>${label}</label>`;
+  $('#scenarios').innerHTML = `<div class="row"><h2>Scenarios</h2><button type="button" class="btn ghost sm push" data-act="close-drawer">${icon('close')}Close</button></div>
+    <p class="small muted">Prototype controls for the exceptional states. The real review has none of these.</p>
+    <fieldset><legend>“Send the invite” test</legend>${r('sendTest', 'passed', 'Passed')}${r('sendTest', 'failed', 'Failed (the invite never shows as Pending)')}</fieldset>
+    <fieldset><legend>“Open the invite form” test</legend>${r('inviteTest', 'passed', 'Written and passing')}${r('inviteTest', 'uncovered', 'Missing: the run wrote none')}</fieldset>
+    <fieldset><legend>Invitee fixture</legend>${r('fixture', 'present', 'In review.json (seeds a pending invite)')}${r('fixture', 'missing', 'Missing')}</fieldset>
+    <fieldset><legend>Preview</legend>${r('preview', 'running', 'Running')}${r('preview', 'building', 'Still building')}${r('preview', 'stopped', 'Stopped after idle')}</fieldset>
+    <fieldset><legend>Other</legend><label><input type="checkbox" name="stale" ${sc.stale ? 'checked' : ''}>Accepted head moved since this build</label><label><input type="checkbox" name="hint" ${sc.hint ? 'checked' : ''}>Outline what each step clicks</label></fieldset>
+    <button type="button" class="btn" data-act="reset">${icon('restart_alt')}Reset the review (keeps your answers)</button>`;
+}
+function renderQuestions() {
+  const a = store.get('answers', {});
+  $('#questions').innerHTML = `<div class="row"><h2>Review questions</h2><button type="button" class="btn ghost sm push" data-act="close-drawer">${icon('close')}Close</button></div>
+    <p class="small muted">Answer in your own words; they stay in this browser. Copy them into the thread when you're done.</p>
+    ${QUESTIONS.map(([id, q]) => `<div class="q"><p><b>${id}.</b> ${q}</p><label class="vh" for="a-${id}">Answer to ${id}</label><textarea id="a-${id}" data-ans="${id}">${esc(a[id] || '')}</textarea></div>`).join('')}
+    <button type="button" class="btn primary" data-act="copy">${icon('content_copy')}Copy answers</button>`;
+}
+render();
+</script>
+</body>
+</html>

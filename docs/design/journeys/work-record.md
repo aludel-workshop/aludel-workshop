@@ -71,6 +71,7 @@ journey: { id, title, persona, origin: authored | observed | replica, revision, 
   steps: [{ id, name, page?, route?, persona?, story?, trigger, expected, test?: "<spec>#<step-id>" }] }
 ```
 
+- **One persona per journey** (owner, J6 round 1): steps don't carry their own `persona`; a flow that crosses roles is two journeys, each with its own fixture. The validator change lands with the J6 build.
 - Step IDs are stable across revisions. An inserted step gets a new ID, and existing steps keep theirs.
 - **Observed** journeys are reconstructed from the code. A **characterization test** that passes on the accepted head proves an observed journey describes real behavior. Without one it is a hypothesis.
 - **Authored** journeys are signed by a person through a *Specify* item, or arrive from an authority through a binding.
@@ -174,7 +175,7 @@ J1 can start before T03-CODE closes. J2 onward changes the Code template that T0
 
 ## Readiness
 
-J0–J4 are done (below; J3's Biome evidence moves to J8). J4's gate sits at acceptance, not at the agent's submit call (see the J4 run log). J5 is done (see the J5 run log). J6's prototype round v1 is with the owner; its build waits for their answers. J6–J8 depend on each other as listed. No external effect, spending or live-data change is planned before J8, and in J8 the owner performs the live actions.
+J0–J4 are done (below; J3's Biome evidence moves to J8). J4's gate sits at acceptance, not at the agent's submit call (see the J4 run log). J5 is done (see the J5 run log). J6's prototype v2 (after round 1) is with the owner; its build waits for their answers. J6–J8 depend on each other as listed. No external effect, spending or live-data change is planned before J8, and in J8 the owner performs the live actions.
 
 ## Run log
 
@@ -703,3 +704,46 @@ Authorization: see the 2026-10-03 "J6 prototype" entry above. This round builds 
 5. *Process change:* applied and tested as above (font route, procedure line). Hypothesis: that reference screens captured from a session with web access would change W1, W4 or W6; they weren't captured.
 
 **Status:** prototype round open, waiting on the owner's answers. J6's build is not authorized yet.
+
+#### Round 1 feedback and prototype v2 (2026-10-03)
+
+**Owner feedback on v1** (project thread, two messages; the first came with a screenshot of v1 open in Claude's artifact pane). Condensed per ask; the owner's final position is recorded where the second message revised the first.
+
+| # | Ask | Position | Where in v2 |
+|---|---|---|---|
+| R1 | Borrow the split from Claude's own review surface: a preview panel left with a small control bar on top; the main interaction panel right with a matching header bar. Not a chat thread | Required | Two panels with the same bar height; the claim panel replaces the step panel and the rail |
+| R2 | The right header shows the current claim, with a dropdown listing every claim and its status badge (signed off, flagged, not started) | Required | Claim picker; *In progress* (n of m walked) added between not started and decided |
+| R3 | The bottom of the right panel holds the review actions: Back on the left, Looks good / Flag; a small progress bar | Required | Step pages: Back, progress segments, Flag, Looks good |
+| R4 | No left step list | Required | Removed. Steps are listed on the claim card instead |
+| R5 | The right panel scrolls through the step's details; test results collapsed ("passed", expand for more) | Required | *Test passed · 1.3 s* collapsed; a failing or missing test opens by default |
+| R6 | Chapter feel: click through, sign off, then on to the next claim. First asked for a claim overview before the steps, then: "maybe we don't need a claim title card if we have the clear division from this claim confirm card" | Final: one claim card per claim, no separate title card | The claim card introduces the journey before walking (*Walk the journey*) and is where the last step lands to decide. Tinted, so it reads differently from the white step pages |
+| R7 | Make the confirm moment explicit: you are saying the journey works. It can't be *accept* if you flagged anything | Required | *Sign off: it works*. Any flagged step replaces it with *Flag this journey*; a failing claimed test removes sign-off too |
+| R8 | Claims without steps (existing journeys, notes) are a single card with confirm or flag | Required | Regression and note cards with *Flag* / *Sign off* |
+| R9 | Under the hood is a bar at the bottom of the preview panel, in the preview's space | Required | Preview bottom bar; expands upward over the preview |
+| R10 | Keep side-by-side previews | Kept | Unchanged from v1; hidden below 1100 px |
+| R11 | Notes stay simple: Flag always adds a note | Required | Flag opens a note box; saving without a note is refused. The four FlowNote types are gone |
+| R12 | Walking the journey in the preview progresses the review: pressing Send moves to the next step | Required | Doing a step's action in the Proposed preview marks it walked and opens the next step; the last step's action lands on the claim card |
+| R13 | A journey never mixes roles. v1's invite journey switched from owner to newcomer | Correction | Two journeys: *Invite a teammate* (owner) and *Accept an invite* (invitee). The invitee's fixture seeds a pending invite, so the second journey doesn't depend on the first |
+| R14 | Non-journey claims stay simple; the end of a journey's walk is the same kind of card | Required | One card shape for every claim kind; a separate *Finish* card accepts the run or sends it back |
+
+**Process first (this round).**
+- *What it revealed.* R13 is a contract gap, not only a prototype slip: J1's journey schema lets each step carry its own `persona` (§2 above), and v1 used that to mix roles. **Applied now:** §2's model is the authority for the J6 build, so it records the rule below; the validator change in `journeys.mjs` (reject a step persona that differs from the journey's) goes with the J6 build, because changing it now would be code outside this round's authorization.
+- *Reference evidence.* The owner supplied the reference screen this time (Claude's artifact review pane). It is the first captured reference for this pass, and R1–R3 borrow from it directly.
+
+**Model amendment (§2, journeys facet):** a journey has exactly one persona. Steps don't carry their own. A flow that crosses roles (send an invite, then accept it) is two journeys, each entered through its own fixture.
+
+**Prototype v2:** [j6/v2/index.html](j6/v2/index.html) · [walkthrough](j6/v2/walkthrough.mjs) · [screenshots](j6/v2/shots/). Same illustrative app and states as v1. The prototype's own controls moved into a strip above the review, so the sticky action bar on phones doesn't collide with them.
+
+**Readiness (v2).** Same frame as v1. New named variables: walking counting as *looks good* (Q3), the shared claim card (Q2), and whether *Finish* is its own page (Q5). Still excluded: person runs (J7), the Specify review, follow-up work from flags (v1's Change notes created follow-ups; v2 drops that with the note types, open below).
+
+**Checks (agent-checked).** The walkthrough walks claim 1 only through the preview's own buttons and asserts each action opens the next step. It refuses a flag without a note, checks that sign-off is absent once a step is flagged and while a claimed test fails, walks claim 2 as the invitee, decides claims 3 and 4, sends back, changes decisions through the claims menu, accepts, and drives the exceptional states through Scenarios. axe ran on 9 states at 1440 px and 2 at 390 px. **Result: no errors, 24 screenshots, no axe findings, no horizontal scroll or clipped buttons at 390.** The first run found one axe issue (the mock app's `h3` came before the panel's `h2`), now fixed.
+
+**Questions for round 2.**
+- **Q1** Two panels with bars: does it read like the review is about walking the app?
+- **Q2** One claim card that both introduces and decides: is the switch between the card (tinted) and its step pages clear?
+- **Q3** Doing a step's action counts as *looks good* and moves on. Should a walked step still need a confirming click?
+- **Q4** Flag always takes a note; one flagged step means the journey can only be flagged. Right?
+- **Q5** A separate *Finish* card to accept or send back, or should deciding the last claim finish the review?
+- **Q6** Keep the unchanged first step (*Open the team*) in the walk for context, or start at the first changed step?
+- **Q7** Non-journey claims as a single card, with the preview opened somewhere useful: enough?
+- **Open (not asked):** v1 turned *Change* notes into follow-up work in a chosen layer. With flags only, a flag goes back to the agent with the run. Follow-up work for something outside the run's scope has no path in v2.

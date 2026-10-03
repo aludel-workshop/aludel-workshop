@@ -5,9 +5,13 @@ status: active
 updated: 2026-10-03
 ---
 
-# JOURNEYS-01 handoff: J6 prototype v1 with the owner
+# JOURNEYS-01 handoff: J6 prototype v2 with the owner
 
 For a fresh agent (Claude in the cloud) picking up JOURNEYS-01. Run `tools/branch-handoffs.sh` first: this packet's slices have been landing on cloud-session branches that the owner hasn't merged into `main`, so the newest handoff may be on a branch. Then read this, [AGENTS.md](../../../AGENTS.md), [status](../../status.md), the [JOURNEYS-01 work record](work-record.md) (plan, authorizations, run log, retrospectives), [DEC-063](../../decisions.md) and the [deferred code-tracing record](../code-tracing/deferred.md).
+
+## Update 2026-10-03: J6 prototype v2
+
+Round 1 feedback is recorded as R1–R14 in the [J6 section](work-record.md#round-1-feedback-and-prototype-v2-2026-10-03); [v2](j6/v2/index.html) applies it and asks round-2 questions. The J6 build must also make `journeys.mjs` reject step personas (one persona per journey, §2). Both walkthroughs reuse the same font route.
 
 ## Update 2026-10-03: J6 prototype v1
 
