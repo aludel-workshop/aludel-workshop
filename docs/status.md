@@ -256,7 +256,7 @@ New Operator role. Agent-checked: server 88/89 (1 pre-existing), all browser sui
 - Every server test passes (templates off and on), and every remaining browser check passes.
 - Two real bugs found behind stale checks are fixed: legacy routes returned 500 after the project database split, and the work item page overflowed at 400px.
 - Superseded browser scripts are retired (`lat03`–`06`, `layers`, `onboarding`, the last pending the onboarding redesign).
-- **Waiting on the owner:** a go to push Code template `08d26c9` to `layer-base`.
+- Code template `08d26c9` is pushed to `layer-base` `code` (owner's go, 2026-10-03).
 - [Run log](design/journeys/work-record.md#j3-follow-ups-aludel-adoption-seams-failing-tests-2026-10-03-claude-cloud-session).
 
 2026-10-03: **JOURNEYS-01 J3 done (cloud session; Biome's steps move to J8).**

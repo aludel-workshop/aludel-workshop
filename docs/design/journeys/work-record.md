@@ -415,7 +415,7 @@ The import check shows the same plan (Aludel adds, keeps, or can't import until 
 | `tools/browser-checks.sh` over every remaining browser script, templates on | **All 22 pass**: bindings, brand, branding, code-layer, data-layer, design (templates off, as declared), design-layer, github, kit, knowledge, layer-bar, layer-scope, library, loopback, markdown-editor, pages, product, roles, vision-layer, work-item, workflow, browser |
 | `tests/repository-review-browser.mjs` | Passed, with the app's journeys read in at install |
 
-**Not yet done:** pushing Code template commit `08d26c9` to `aludel-workshop/layer-base`. It needs the owner's go, and until then this branch's pin resolves only in this session's clone.
+**Pushed:** on the owner's go ("push", 2026-10-03), Code template commit `08d26c9` was pushed to `aludel-workshop/layer-base` `code` as a fast-forward from `aaef4cf`.
 
 **Retrospective (follow-ups).**
 1. *Harder than necessary:*
