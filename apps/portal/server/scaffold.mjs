@@ -16,13 +16,6 @@ const devDependencies = {
   sass: '1.104.1', typescript: '6.0.3', vite: '8.3.0'
 };
 const reservedPaths = new Set(['', 'sign-in', 'api', 'media', 'assets']);
-// What aludel-web-v1 builds for the Accounts contract (LAY-07): Data records to the handlers and tables that realise them.
-// The Platform binding and the generation manifest both read this, so they cannot disagree.
-export const accountsBinding = {
-  objects: { Account: 'table accounts', Session: 'table sessions' },
-  operations: { getSession: '/api/session', signUp: 'POST /api/sign-up', signIn: 'POST /api/sign-in', signOut: 'POST /api/sign-out', health: '/api/health' }
-};
-
 const html = value => String(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
 const json = value => `${JSON.stringify(value, null, 2)}\n`;
 
@@ -102,28 +95,6 @@ export function agentsGuide(setup, catalogs) {
   return `# Agent guide for ${setup.project.name}\n\nRead [product.md](product.md) for the product intent and [aludel.json](../aludel.json) for the setup choices before changing anything.\n\nWork is assigned per action in Aludel (Work › Roles). Do not pick up work assigned to a person.\n${agentSections}\n## Stack\n\n${Object.entries(preset?.layers || {}).map(([layer, value]) => `- ${layer}: ${value}`).join('\n')}\n\nCommands: \`npm install\`, \`npm run build\`, \`npm start\` (serves on \`PORT\`, default 3000), or \`docker compose up --build\` to run it in its container. \`Dockerfile\` and \`.env.example\` declare how the app runs and every variable it reads; keep them current when that changes.\n\n## Rules\n\n- This app is independent of Aludel. Do not import Aludel code or call Aludel services at runtime.\n- Never commit secrets, \`.env\` files or the \`.data/\` directory.\n- Keep the pages in \`src/site.ts\` in step with the Pages section of \`docs/product.md\`. \`src/page-blocks.ts\` holds the placeholder layouts; replace a page's blocks with real UI as it is built.\n- Pages are specified in Aludel's Pages layer. When you build a page section, keep its \`data-aludel-section\` attribute (drop \`data-aludel-skeleton\`), keep \`data-aludel-page\` on the page, and read its text from the section's content in \`src/site.ts\`, so Aludel can show and edit it. Leave \`src/aludel-bridge.ts\` in place.\n`;
 }
 
-// The generation manifest (LAY-07D): every unit the template wrote and the records it realises. Pages are derived:
-// their skeleton is regenerated from the page record, so a rebuild makes their links current again.
-function generationManifest(setup, pages) {
-  const manifest = pages.map(page => page.id ? { path: 'src/site.ts', symbol: `route ${page.path}`, recordIds: [page.id], derived: true } : null).filter(Boolean);
-  const data = setup.data || { objects: [], operations: [] };
-  const operation = operationId => data.operations.find(item => item.operationId === operationId);
-  const health = operation('health');
-  if (health) manifest.push({ path: 'server/server.mjs', symbol: accountsBinding.operations.health, recordIds: [health.id, ...health.stories] });
-  if (!setup.stack.options?.auth) return manifest;
-  const templateStories = (setup.features?.stories || []).filter(story => story.template).map(story => story.id);
-  if (templateStories.length) manifest.push({ path: 'src/app.ts', symbol: 'App', recordIds: templateStories });
-  for (const [operationId, symbol] of Object.entries(accountsBinding.operations)) {
-    const record = operation(operationId);
-    if (record && operationId !== 'health') manifest.push({ path: 'server/server.mjs', symbol, recordIds: [record.id, ...(record.objectId ? [record.objectId] : []), ...record.stories] });
-  }
-  for (const [name, symbol] of Object.entries(accountsBinding.objects)) {
-    const record = data.objects.find(item => item.name === name);
-    if (record) manifest.push({ path: 'server/server.mjs', symbol, recordIds: [record.id] });
-  }
-  return manifest;
-}
-
 // Every page's address in the generated app. The first navigation page is home at '/'; the rest get stable paths from
 // their names. PAGES-UX-01: pages outside the navigation (sub-pages, pages planned on the Map) come after it.
 // Pages › Built uses the same function to open a page in the preview.
@@ -201,7 +172,7 @@ export function skeletonFiles(setup, catalogs, gitProfile, appUrl, assets, sourc
     ...workflowFiles(),
     'licenses/Material-Symbols-LICENSE': sources.iconLicense
   };
-  return { files, media, binaries: { 'public/fonts/icons.ttf': sources.iconFont }, manifest: generationManifest(setup, pages) };
+  return { files, media, binaries: { 'public/fonts/icons.ttf': sources.iconFont } };
 }
 
 function styles({ feel, theme, accent, surface, tokens = null }) {

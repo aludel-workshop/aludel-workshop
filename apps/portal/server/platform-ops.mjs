@@ -153,13 +153,13 @@ export function platformOps({ db, backupRoot }) {
   function commits(workspace) {
     if (!existsSync(join(workspace, '.git'))) return { branches: [], commits: [] };
     const run = args => spawnSync('git', args, { cwd: workspace, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-    const log = run(['log', '-n', '20', '--format=%h%x1f%s%x1f%cI%x1f%(trailers:key=Aludel-Work,valueonly,separator=%x2C)%x1f%(trailers:key=Implements,valueonly,separator=%x2C)%x1e']);
+    const log = run(['log', '-n', '20', '--format=%h%x1f%s%x1f%cI%x1f%(trailers:key=Aludel-Work,valueonly,separator=%x2C)%x1e']);
     const branches = run(['branch', '--format=%(refname:short)']);
     return {
       branches: branches.status === 0 ? branches.stdout.split('\n').map(item => item.trim()).filter(Boolean) : [],
       commits: log.status === 0 ? log.stdout.split('\x1e').map(item => item.trim()).filter(Boolean).map(item => {
-        const [hash, subject, at, work, implementsRefs] = item.split('\x1f');
-        return { hash, subject, at, work: work.trim() || null, implements: implementsRefs.trim() || null };
+        const [hash, subject, at, work] = item.split('\x1f');
+        return { hash, subject, at, work: work.trim() || null };
       }) : []
     };
   }

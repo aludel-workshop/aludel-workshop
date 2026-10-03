@@ -171,29 +171,27 @@ export function codeReleases({ db, releasesOf = null }) {
   const row = entry => entry && { id: entry.id, version: entry.version, commit: entry.commit_sha, notes: entry.notes, stories: parse(entry.stories_json, []), stack: parse(entry.stack_json, {}), changes: parse(entry.changes_json, []),
     migrations: parse(entry.migrations_json, []), createdBy: entry.created_by, createdAt: entry.created_at, publishedAt: entry.published_at, url: entry.url || null };
   const list = projectId => (releasesOf && releasesOf(projectId)) || db.prepare('SELECT * FROM code_releases WHERE project_id = ? ORDER BY created_at DESC').all(projectId).map(row);
-  // What the next release would hold: commits since the last release, the stories their trailers name, stack and migration changes.
-  // The first release has nothing to compare with: it ships what is built so far (code links), with no stack diff.
-  function draft(projectId, workspace, stories, built = []) {
+  // What the next release would hold: commits since the last release, stack and migration changes. The first release has
+  // nothing to compare with. `stories` stays empty: releases no longer name shipped stories (code tracing was removed).
+  function draft(projectId, workspace) {
     if (!existsSync(join(workspace, '.git'))) return null;
     const head = git(workspace, ['rev-parse', '--short', 'HEAD']).stdout.trim();
     if (!head) return null;
     const last = list(projectId)[0] || null;
     const range = last ? [`${last.commit}..HEAD`] : ['HEAD'];
     // Commits that only touch Aludel's own files (.aludel/: the Code layer's links, releases and definition) aren't app changes.
-    const log = git(workspace, ['log', ...range, '--format=%h%x1f%s%x1f%(trailers:key=Aludel-Work,valueonly,separator=%x2C)%x1f%(trailers:key=Implements,valueonly,separator=%x2C)%x1e', '--', '.', ':(exclude).aludel']);
-    const commits = log.status === 0 ? log.stdout.split('\x1e').map(item => item.trim()).filter(Boolean).map(item => { const [hash, subject, work, refs] = item.split('\x1f'); return { hash, subject, work: work.trim() || null, implements: refs.trim() || null }; }) : [];
-    const refs = new Set(commits.flatMap(commit => (commit.implements || '').split(',').map(ref => ref.trim()).filter(Boolean)));
-    const shipped = stories.filter(story => (last ? refs.has(story.ref) : refs.has(story.ref) || built.includes(story.id))).map(story => story.id);
+    const log = git(workspace, ['log', ...range, '--format=%h%x1f%s%x1f%(trailers:key=Aludel-Work,valueonly,separator=%x2C)%x1e', '--', '.', ':(exclude).aludel']);
+    const commits = log.status === 0 ? log.stdout.split('\x1e').map(item => item.trim()).filter(Boolean).map(item => { const [hash, subject, work] = item.split('\x1f'); return { hash, subject, work: work.trim() || null }; }) : [];
     const { stack: after, changes, migrations } = releaseChanges(workspace, last?.commit || null);
     const base = last?.version || '0.0.0';
     const [major, minor, patch] = semver.exec(base).slice(1).map(Number);
-    const suggested = !last ? '0.1.0' : shipped.length || migrations.length ? `${major}.${minor + 1}.0` : `${major}.${minor}.${patch + 1}`;
-    return { head, since: last ? { version: last.version, commit: last.commit } : null, commits, stories: shipped, changes, migrations, suggested, stack: after };
+    const suggested = !last ? '0.1.0' : migrations.length ? `${major}.${minor + 1}.0` : `${major}.${minor}.${patch + 1}`;
+    return { head, since: last ? { version: last.version, commit: last.commit } : null, commits, stories: [], changes, migrations, suggested, stack: after };
   }
-  function record(projectId, workspace, stories, { version, notes }, author, built = []) {
+  function record(projectId, workspace, { version, notes }, author) {
     const value = String(version || '').trim().replace(/^v/, '');
     if (!semver.test(value)) fail('Use a version like 1.2.3.');
-    const next = draft(projectId, workspace, stories, built);
+    const next = draft(projectId, workspace);
     if (!next) fail('There is no repository to release from yet.', 409);
     const last = list(projectId)[0];
     if (last && !newer(value, last.version)) fail(`The version must be newer than v${last.version}.`);

@@ -7,7 +7,7 @@
     },
     "pages": {
       "branch": "pages",
-      "commit": "1cbeb0325d5ba10ac7bca4191816f1f223ae3318"
+      "commit": "ceeb9d4f194695991d89fbc9306434b7969b6745"
     },
     "markdown": {
       "branch": "markdown",
@@ -15,11 +15,11 @@
     },
     "data": {
       "branch": "data",
-      "commit": "fc9a6f3ce3e433055d3fa079cd398364a08c5ef5"
+      "commit": "d2e11ec553d6cb9ff704b282f582a9091faaa4e4"
     },
     "vision": {
       "branch": "vision",
-      "commit": "e54c3f3d41f5ae34e24ae32f94e20f9c8c5f2656"
+      "commit": "a912d441ab43dcbeb74b9d7d9d764c888927c07e"
     },
     "design": {
       "branch": "design",
@@ -27,7 +27,7 @@
     },
     "code": {
       "branch": "code",
-      "commit": "cc30be22d10066f78bfe16fa8b307daf3ced3401"
+      "commit": "aaef4cf9bca642c482c155d7fd6d52f855434755"
     }
   },
   "builtIn": {

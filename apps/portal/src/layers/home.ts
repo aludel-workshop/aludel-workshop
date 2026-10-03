@@ -62,8 +62,7 @@ import { ProjectContext, layerLabel, statusLabel, statusOrder, workStatusLabel }
       @else { <p class="lay-muted">No changes yet.</p> }</section>
     @if (hasLayer('platform')) { <section class="lay-card" aria-labelledby="home-code"><h2 id="home-code">Code</h2>
       @if (ctx.data()?.code?.units?.length) {
-        <p class="lay-flat"><span class="lay-chip" [class.lay-warn]="ctx.suspectUnits().length" [class.lay-ok]="!ctx.suspectUnits().length">{{ ctx.suspectUnits().length ? ctx.suspectUnits().length + ' suspect' : 'All current' }}</span></p>
-        <p class="lay-muted small">{{ ctx.suspectUnits().length ? 'Records changed after their code was written. Each has a Reconcile item in Work.' : 'Every linked record matches the code built for it.' }}</p>
+        <p class="lay-muted small">{{ ctx.data()?.code?.units?.length }} code units read from the repository.</p>
         <a class="small" [href]="ctx.link('platform', 'explorer')" (click)="ctx.go(ctx.link('platform', 'explorer'), $event)">Code › Explorer</a>
       } @else { <p class="lay-muted">Read after the first build.</p> }
     </section> }

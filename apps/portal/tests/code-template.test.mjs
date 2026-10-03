@@ -1,5 +1,5 @@
-// T03-CODE: Code from its template. Its repository is the project's own; generation links and releases live in
-// .aludel/outputs/, units are parsed by the host at the pin, and the host's code-link tables are a cache of them.
+// T03-CODE: Code from its template. Its repository is the project's own; releases live in .aludel/outputs/, units are
+// parsed by the host at the pin, and the host's code-unit table is a cache of them.
 // Runs with templates on (npm run test:server:templates); the compiled Code layer is tested by lay-07 and code-layer.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { createUser, initAccounts } from '../server/accounts.mjs';
 import { codeReleases, initCodeLayer } from '../server/code-layer.mjs';
-import { codeLinks, initCodeLinks } from '../server/code-links.mjs';
+import { codeUnits, initCodeUnits } from '../server/code-units.mjs';
 import { codeRepository, initCodeRepository } from '../server/code-repository.mjs';
 import { commitWorkspace } from '../server/git-repository.mjs';
 import { initKnowledge, knowledge } from '../server/knowledge.mjs';
@@ -37,7 +37,7 @@ function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'aludel-code-template-'));
   process.env.MACHINE_DATA_DIR = root;
   const db = openDatabase(join(root, 'machine.sqlite'));
-  initWorkflow(db); ensureProductWorkspace(db); initAccounts(db); initOnboarding(db); initKnowledge(db); initPagesLayerApp(db); initCodeLinks(db); initCodeLayer(db);
+  initWorkflow(db); ensureProductWorkspace(db); initAccounts(db); initOnboarding(db); initKnowledge(db); initPagesLayerApp(db); initCodeUnits(db); initCodeLayer(db);
   const know = knowledge({ db, catalogs, packs: catalogs.packs });
   const flows = onboarding({ db, catalogs, secrets: openSecretStore(root), workspaceRoot: join(root, 'workspaces'), assetRoot: join(root, 'assets'), createWorkspace: () => {}, know });
   const ada = createUser(db, { email: 'ada@example.com', name: 'Ada', password: 'correct-horse-battery' });
@@ -46,20 +46,19 @@ function fixture() {
   const { project } = flows.claimDraft(token, ada, ada);
   flows.saveFeatures(ada, project.id, { picks: ['accounts'] });
   initLayerContract(db); initSourceReviews(db); initLayerSource(db); initLayerFiles(db); initCodeRepository(db);
-  const links = codeLinks({ db, know });
-  const code = codeRepository({ db, know, links });
-  know.onWorkDone(({ projectId, item }) => { const recordId = item.type === 'reconcile' && item.context?.reconcile?.recordId; if (recordId) code.relink(projectId, recordId); });
+  const units = codeUnits({ db });
+  const code = codeRepository({ db, units });
   const workspace = flows.projectSetup(ada, project.id).workspacePath;
-  return { root, db, know, flows, links, code, ada, id: project.id, workspace };
+  return { root, db, know, flows, units, code, ada, id: project.id, workspace };
 }
 // The aludel-web-v1 skeleton, committed as generateSkeleton does.
 function generate({ know, flows, ada, id, workspace }, message = 'feat: generate skeleton') {
   const setup = { ...flows.projectSetup(ada, id), data: { objects: know.list(id, 'data_object'), operations: know.list(id, 'data_operation') }, agents: know.agentExport(id) };
-  const { files, manifest } = skeletonFiles(setup, catalogs, gitProfile, { portal: 'http://aludel.localhost', app: 'http://tool-share.localhost' }, [], sources);
+  const { files } = skeletonFiles(setup, catalogs, gitProfile, { portal: 'http://aludel.localhost', app: 'http://tool-share.localhost' }, [], sources);
   writeFiles(workspace, files);
   const commit = commitWorkspace({ repository: workspace, profile: gitProfile, message, name: 'Ada', email: 'ada@example.com' });
   know.recordBuild(id, commit.commit, { auth: true });
-  return { manifest, commit };
+  return { commit };
 }
 // The repository a new project starts with, before its first build (createWorkspace).
 function start({ workspace }) {
@@ -68,24 +67,19 @@ function start({ workspace }) {
 }
 const pick = (rows, fields) => rows.map(row => Object.fromEntries(fields.map(field => [field, row[field]])));
 
-test('T03-CODE parity: an existing project adopts its Code links and releases into its repository unchanged', { skip: !templates }, () => {
+test('T03-CODE parity: an existing project adopts its releases into its repository unchanged, and its units match', { skip: !templates }, () => {
   const context = fixture();
-  const { db, know, links, code, ada, id, workspace } = context;
-  // Before the template: the compiled path, with links and a release in host tables.
-  const { manifest, commit } = generate(context);
-  links.index(id, workspace);
-  links.recordManifest(id, manifest, commit.commit);
-  const story = know.list(id, 'story').find(entry => entry.number === 1);
-  know.update(id, story.id, { why: 'Neighbours need to know who is borrowing' }, { rationale: 'From interviews' });
+  const { db, units: unitIndex, code, id, workspace } = context;
+  // Before the template: the compiled path, with units and a release in host tables.
+  const { commit } = generate(context);
+  unitIndex.index(id, workspace);
   const compiled = codeReleases({ db });
-  compiled.record(id, workspace, know.list(id, 'story').map(entry => ({ ...entry, ref: `S${entry.number}` })), { version: '0.1.0', notes: 'First' }, 'Ada', [...links.builtBy(id).keys()]);
+  compiled.record(id, workspace, { version: '0.1.0', notes: 'First' }, 'Ada');
   db.prepare("UPDATE code_releases SET published_at = '2026-10-01T00:00:00.000Z', url = 'https://github.com/octo/tool-share/releases/tag/v0.1.0' WHERE project_id = ?").run(id);
   const before = {
     units: pick(db.prepare('SELECT * FROM code_units WHERE project_id = ? ORDER BY id').all(id), ['id', 'unit_key', 'kind', 'hash', 'line', 'end_line', 'reachable']),
-    links: pick(db.prepare('SELECT * FROM trace_links WHERE project_id = ? ORDER BY id').all(id), ['id', 'record_id', 'record_revision', 'unit_id', 'kind', 'source', 'state', 'derived']),
-    releases: pick(db.prepare('SELECT * FROM code_releases WHERE project_id = ?').all(id), ['id', 'version', 'commit_sha', 'notes', 'stories_json', 'created_by'])
+    releases: pick(db.prepare('SELECT * FROM code_releases WHERE project_id = ?').all(id), ['id', 'version', 'commit_sha', 'notes', 'created_by'])
   };
-  assert.ok(before.links.some(link => link.source === 'manifest' && link.state === 'suspect'), 'the fixture has a suspect generation link');
 
   // The template: Code installs into the workspace as one commit, then adopts.
   assert.deepEqual(ensureProjectRepositoryLayers(db, id), ['platform']);
@@ -95,67 +89,34 @@ test('T03-CODE parity: an existing project adopts its Code links and releases in
   assert.equal(git(workspace, 'rev-parse', 'HEAD^'), commit.commit, 'one install commit on top of the build');
   code.adopt(id);
   const files = currentFileEntries(db, id, 'platform');
-  const fileLinks = files.filter(entry => entry.kind === 'trace_link');
-  assert.deepEqual(fileLinks.map(entry => [entry.id, entry.data.record.ref, entry.data.record.revision, entry.data.unit]).sort(),
-    before.links.filter(link => link.source === 'manifest').map(link => [link.id, link.record_id, link.record_revision, before.units.find(unit => unit.id === link.unit_id).unit_key]).sort(),
-    'every generation link keeps its ID, record and pinned revision');
+  assert.ok(!files.some(entry => entry.kind === 'trace_link'), 'no code links (code tracing was removed)');
   const fileReleases = files.filter(entry => entry.kind === 'code_release');
-  assert.deepEqual(fileReleases.map(entry => [entry.id, entry.data.version, entry.data.commit, entry.data.notes, JSON.stringify(entry.data.stories), entry.data.createdBy]),
-    before.releases.map(row => [row.id, row.version, row.commit_sha, row.notes, row.stories_json, row.created_by]), 'every release keeps its ID, version and commit');
-  assert.ok(git(workspace, 'show', 'HEAD:.aludel/outputs/trace-links.json').includes(fileLinks[0].id), 'the links are in the repository');
+  assert.deepEqual(fileReleases.map(entry => [entry.id, entry.data.version, entry.data.commit, entry.data.notes, entry.data.createdBy]),
+    before.releases.map(row => [row.id, row.version, row.commit_sha, row.notes, row.created_by]), 'every release keeps its ID, version and commit');
+  assert.ok(fileReleases.every(entry => !('stories' in entry.data)), 'releases name no stories');
   // Units derived at the same commit match today's, with the same IDs; the cache matches what it was.
   const units = files.filter(entry => entry.kind === 'code_unit').map(entry => ({ id: entry.id, unit_key: entry.data.key, kind: entry.data.kind, hash: entry.data.hash, line: entry.data.line, end_line: entry.data.end, reachable: entry.data.reachable ? 1 : 0 }));
   assert.deepEqual(units.sort((a, b) => a.id.localeCompare(b.id)), before.units);
-  assert.deepEqual(pick(db.prepare('SELECT * FROM trace_links WHERE project_id = ? ORDER BY id').all(id), ['id', 'record_id', 'record_revision', 'unit_id', 'kind', 'source', 'state', 'derived']), before.links);
+  assert.deepEqual(pick(db.prepare('SELECT * FROM code_units WHERE project_id = ? ORDER BY id').all(id), ['id', 'unit_key', 'kind', 'hash', 'line', 'end_line', 'reachable']), before.units);
   const release = code.releases(id)[0];
   assert.equal(release.url, 'https://github.com/octo/tool-share/releases/tag/v0.1.0', 'publication state carries over');
   assert.deepEqual(code.adopt(id), { adopted: 0 }, 'adoption runs once');
   assert.equal(git(workspace, 'status', '--porcelain'), '');
-}, );
-
-test('T03-CODE: a build writes Code\'s links into its repository; a changed story makes them suspect and Reconcile relinks them there', { skip: !templates }, () => {
-  const context = fixture();
-  const { db, know, code, ada, id, workspace } = context;
-  start(context);
-  ensureProjectRepositoryLayers(db, id);
-  const { manifest, commit } = generate(context);
-  assert.equal(code.settleLocal(id).moved, true, 'the pin follows the build');
-  assert.deepEqual(code.recordManifest(id, manifest, commit.commit, 'Ada').missing, []);
-  const fileLinks = () => currentFileEntries(db, id, 'platform').filter(entry => entry.kind === 'trace_link');
-  assert.ok(fileLinks().length >= 8);
-  assert.equal(git(workspace, 'log', '-1', '--format=%an %s'), 'Ada Code links from the build at ' + commit.commit.slice(0, 7));
-  const story = know.list(id, 'story').find(entry => entry.number === 1);
-  know.update(id, story.id, { why: 'Neighbours need to know who is borrowing' }, { rationale: 'From interviews' });
-  const suspect = context.links.snapshot(id).units.filter(unit => unit.links.some(item => item.recordId === story.id && item.state === 'suspect'));
-  assert.ok(suspect.some(unit => unit.symbol === 'POST /api/sign-up'));
-  const reconcile = know.workList(id).filter(item => item.type === 'reconcile' && item.state !== 'done');
-  assert.equal(reconcile.length, 1);
-  know.updateWork(ada, id, reconcile[0].id, { state: 'done' });
-  assert.ok(fileLinks().filter(entry => entry.data.record.ref === story.id).every(entry => entry.data.record.revision === 2), 'the file pins the new revision');
-  assert.ok(context.links.snapshot(id).units.flatMap(unit => unit.links).filter(item => item.recordId === story.id).every(item => item.state === 'current'));
-  // A second build keeps the pins, and adds nothing when nothing changed.
-  const head = git(workspace, 'rev-parse', 'HEAD');
-  const again = generate(context, 'feat: regenerate');
-  code.settleLocal(id);
-  code.recordManifest(id, again.manifest, again.commit.commit);
-  assert.ok(fileLinks().filter(entry => entry.data.record.ref === story.id).every(entry => entry.data.record.revision === 2));
-  assert.equal(git(workspace, 'rev-parse', 'HEAD'), head, 'an unchanged build makes no commit');
 });
 
 test('T03-CODE: releases are recorded in Code\'s repository with a tag, keeping the release rules', { skip: !templates }, () => {
   const context = fixture();
-  const { db, know, code, links, id, workspace } = context;
+  const { db, code, id, workspace } = context;
   start(context);
   ensureProjectRepositoryLayers(db, id);
-  const { manifest, commit } = generate(context);
-  code.settleLocal(id); code.recordManifest(id, manifest, commit.commit);
-  const stories = know.list(id, 'story').map(entry => ({ ...entry, ref: `S${entry.number}` }));
+  generate(context);
+  code.settleLocal(id);
   const drafts = codeReleases({ db, releasesOf: projectId => code.releases(projectId) });
-  const draft = () => drafts.draft(id, workspace, stories, [...links.builtBy(id).keys()]);
+  const draft = () => drafts.draft(id, workspace);
   assert.throws(() => code.recordRelease(id, draft(), { version: '1.2' }, 'Ada'), /^Error: Use a version like 1\.2\.3\.$/);
   const first = code.recordRelease(id, draft(), { version: 'v0.1.0', notes: 'First' }, 'Ada');
   assert.equal(first.version, '0.1.0');
-  assert.ok(first.stories.length, 'the first release ships what is built');
+  assert.deepEqual(first.stories, [], 'releases name no stories');
   assert.equal(git(workspace, 'rev-parse', 'v0.1.0^{commit}'), git(workspace, 'rev-parse', `${first.commit}^{commit}`), 'a local tag marks its commit');
   assert.match(git(workspace, 'show', 'HEAD:.aludel/outputs/releases.json'), /"version": "0.1.0"/);
   assert.throws(() => code.recordRelease(id, draft(), { version: '0.2.0' }, 'Ada'), /Nothing has changed since v0\.1\.0\./);
@@ -177,8 +138,8 @@ test('T03-CODE: starter docs come from the template\'s seed, once, matching what
   const { db, know, code, id, workspace, root } = context;
   start(context);
   ensureProjectRepositoryLayers(db, id);
-  const { manifest, commit } = generate(context);
-  code.settleLocal(id); code.recordManifest(id, manifest, commit.commit);
+  generate(context);
+  code.settleLocal(id);
   // The compiled layer's starter set for the same project, written into a copy of the workspace.
   const copy = join(root, 'compiled-copy');
   git(root, 'clone', '-q', workspace, copy);
@@ -203,8 +164,8 @@ test('T03-CODE: a coding run on Code\'s repository goes through the generic laye
   const { db, code, id, workspace, root } = context;
   start(context);
   ensureProjectRepositoryLayers(db, id);
-  const { manifest, commit } = generate(context);
-  code.settleLocal(id); code.recordManifest(id, manifest, commit.commit);
+  generate(context);
+  code.settleLocal(id);
   const base = git(workspace, 'rev-parse', 'main');
   // A local stand-in for the run's sandbox: the repository at the run's base, in layer/ of its workspace.
   const run = join(root, 'run');

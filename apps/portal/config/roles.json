@@ -560,7 +560,7 @@
           "type": "implement",
           "name": "Build stories",
           "description": "One story per build; the preview must pass its acceptance",
-          "instructions": "One story per build. Name tests after the scenario they check (\"S4/2 · …\"; \"S4 · …\" for the whole story). Commit with the Aludel-Work and Implements trailers.",
+          "instructions": "One story per build. Commit with the Aludel-Work trailer.",
           "tools": [
             "read",
             "code",

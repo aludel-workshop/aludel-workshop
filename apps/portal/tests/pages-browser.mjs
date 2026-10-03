@@ -1,6 +1,6 @@
 // PAGES-UX-01: the Pages layer in the browser. Sets Tool Share up through the onboarding APIs, builds it, then drives the Map
 // (page blanks, links drawn from a handle, group moves, flows edited on the canvas), a page (spec editing, a change request
-// that becomes Engineer work, content editing, Built through the preview bridge) and Flows (a review).
+// that becomes Engineer work, content editing, the running app through the preview bridge) and Flows (a review).
 // Usage: start a fresh portal, then MACHINE_PORT=<port> PLAYWRIGHT_MODULE=<…> node tests/pages-browser.mjs
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
@@ -110,7 +110,7 @@ try {
   await seen(new RegExp(`Tool detail is step \\d+ of ${flowTitle}`)).waitFor();
   await check('map-flow');
 
-  // ---- A built page: spec draft → change request → Engineer work ----
+  // ---- A spec draft sent as a code change request → Engineer work (code tracing removed: any page can ask) ----
   await page.getByRole('navigation', { name: 'Pages views' }).getByRole('link', { name: 'Pages' }).click();
   const tree = view.getByRole('navigation', { name: 'Page tree' });
   await tree.getByRole('link', { name: /^Messages/ }).click();
@@ -121,7 +121,7 @@ try {
   await view.getByLabel('Section name').fill('Start a conversation'); await view.locator('.lay-pg-addsec select').selectOption({ label: 'Button' }); await view.getByRole('button', { name: 'Add section' }).click();
   await seen('2 changes').waitFor();
   assert.ok(await view.locator('.lay-pg-app mat-list-item').count() >= 3, 'the List section renders the design system’s list');
-  await view.getByRole('button', { name: 'Request this change' }).click();
+  await view.getByRole('button', { name: 'Request as a code change' }).click();
   await view.getByRole('dialog').getByText('Work · Engineer · implement').waitFor();
   await view.getByLabel('What should change, and why').fill('People need their conversations and a way to start one.');
   await check('change-request');
@@ -157,12 +157,12 @@ try {
 
   await tree.getByRole('link', { name: /^Messages/ }).click();
   await view.locator('.lay-pg-right h2', { hasText: 'Messages' }).waitFor();
-  // Built: the running app, through its bridge, after the preview is rebuilt from the specs.
-  await view.getByRole('button', { name: 'Built' }).click();
+  // App: the running app, through its bridge, after the preview is rebuilt from the specs.
+  await view.getByRole('button', { name: 'App', exact: true }).click();
   await view.getByRole('button', { name: 'Update preview' }).click();
   await new Promise(resolve => setTimeout(resolve, 2000));
   for (let i = 0; i < 150 && !(await running()); i++) await new Promise(resolve => setTimeout(resolve, 1000));
-  await view.getByRole('button', { name: 'Spec', exact: true }).click(); await view.getByRole('button', { name: 'Built' }).click();
+  await view.getByRole('button', { name: 'Spec', exact: true }).click(); await view.getByRole('button', { name: 'App', exact: true }).click();
   await seen(/Every section in the spec is on the page \(2 still skeletons\)/).waitFor({ timeout: 20000 });
   const inFrame = await view.frameLocator('.lay-pg-frame iframe').locator('[data-aludel-section]').first().boundingBox();
   await page.mouse.move(inFrame.x + 20, inFrame.y + 10);

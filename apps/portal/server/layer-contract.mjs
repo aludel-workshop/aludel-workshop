@@ -18,12 +18,11 @@ const legacyDeclarations = [
   // LAYER-BINDINGS-01: Pages keeps a replica of the app kit (kit items), a kind its template's API defines.
   { key: 'pages', name: 'Pages', outputs: ['page_map', 'page', 'flow', 'kit_item'], authority: 'knowledge_records', path: '/pages', ownKinds: true },
   { key: 'data', name: 'Data', outputs: ['data_object', 'data_operation', 'access_rule'], authority: 'knowledge_records', path: '/data' },
-  { key: 'platform', name: 'Code', outputs: ['code_unit', 'trace_link', 'code_release', 'code_route_observation'], authority: 'code_projection', path: '/code' },
+  { key: 'platform', name: 'Code', outputs: ['code_unit', 'code_release', 'code_route_observation'], authority: 'code_projection', path: '/code' },
   { key: 'deploy', name: 'Deploy', outputs: ['release'], authority: 'runtime_projection', path: '/deploy' }
 ];
 const projections = {
   code_unit: { table: 'code_units', revision: 'hash' },
-  trace_link: { table: 'trace_links', revision: 'updated_at' },
   code_release: { table: 'code_releases', revision: 'commit_sha' },
   code_route_observation: { table: 'code_route_observations', revision: 'blob_sha' },
   release: { table: 'releases', revision: 'state' }

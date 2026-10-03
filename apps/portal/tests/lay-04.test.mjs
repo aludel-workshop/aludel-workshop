@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { createUser, initAccounts } from '../server/accounts.mjs';
-import { codeLinks, initCodeLinks } from '../server/code-links.mjs';
+import { initCodeUnits } from '../server/code-units.mjs';
 import { initKnowledge, knowledge } from '../server/knowledge.mjs';
 import { initOnboarding, loadCatalogs, onboarding } from '../server/onboarding.mjs';
 import { ensureProductWorkspace } from '../server/product-workspace.mjs';
@@ -24,16 +24,15 @@ const day = 86400000;
 function fixture({ profile = 'planner', picks = ['accounts', 'messaging'] } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'aludel-lay04-'));
   const db = openDatabase(join(root, 'machine.sqlite'));
-  initWorkflow(db); ensureProductWorkspace(db); initAccounts(db); initOnboarding(db); initKnowledge(db); initCodeLinks(db);
+  initWorkflow(db); ensureProductWorkspace(db); initAccounts(db); initOnboarding(db); initKnowledge(db); initCodeUnits(db);
   const know = knowledge({ db, catalogs, packs: catalogs.packs });
   const flows = onboarding({ db, catalogs, secrets: openSecretStore(root), workspaceRoot: join(root, 'workspaces'), assetRoot: join(root, 'assets'), createWorkspace: () => {}, know });
-  const links = codeLinks({ db, know });
   const ada = createUser(db, { email: 'ada@example.com', name: 'Ada', password: 'correct-horse-battery' });
   const { token } = flows.saveDraft(null, { profile });
   flows.saveDraft(token, { name: 'Tool Share', pitch: 'Neighbours lend and borrow tools they rarely use.' });
   const { project } = flows.claimDraft(token, ada, ada);
   flows.saveFeatures(ada, project.id, { picks });
-  return { db, know, flows, links, ada, id: project.id };
+  return { db, know, flows, ada, id: project.id };
 }
 const storyTitled = (know, id, start) => know.list(id, 'story').find(story => story.title.startsWith(start));
 
@@ -176,17 +175,11 @@ test('LAY-04C: routines run when due, before releases or by hand, never twice wh
   assert.throws(() => know.insert(id, 'routine', { title: 'Hourly', layer: 'product', type: 'audit', cadence: 'hourly' }), /how often/);
 });
 
-test('LAY-04B (as revised by WORK-UX-01): reconcile items created by code links go to the reconcile action\'s assignee', () => {
-  const { know, links, db, id } = fixture({ profile: 'planner' });
+test('code tracing removed: a changed story raises no code Reconcile item', () => {
+  const { know, id } = fixture({ profile: 'planner' });
   const story = storyTitled(know, id, 'Someone can sign up');
-  db.prepare("INSERT INTO code_units(id, project_id, unit_key, path, symbol, kind, hash, reachable, last_commit, line, calls_json, indexed_at) VALUES ('cu-1', ?, 'src/app.ts#App', 'src/app.ts', 'App', 'component', 'h', 1, NULL, 1, '[]', ?)").run(id, new Date().toISOString());
-  links.link(id, story.id, 'cu-1', { kind: 'generated', source: 'manifest' });
   know.update(id, story.id, { why: 'Changed' }, { rationale: 'Change' });
-  const reconcile = know.workList(id).find(item => item.type === 'reconcile');
-  assert.equal(reconcile.action, 'platform.reconcile');
-  assert.equal(reconcile.assignee.label, 'Default agent');
-  assert.equal(reconcile.priority, 'high');
-  assert.ok(reconcile.context.reconcile, 'the reconcile context is kept');
+  assert.equal(know.workList(id).filter(item => item.type === 'reconcile').length, 0);
 });
 
 

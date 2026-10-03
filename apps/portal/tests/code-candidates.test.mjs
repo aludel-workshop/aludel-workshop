@@ -30,12 +30,12 @@ test('candidate worktree keeps source unchanged and commits a reviewable, attrib
   assert.throws(() => manager.begin({ projectId: 'p-one', workId: 'W-8', repository, changes: ['Code › code'] }), /already running/);
   writeFileSync(join(candidate.path, 'app.js'), 'export const value = 2;\n');
   const ready = manager.finish({ projectId: 'p-one', id: candidate.id, repository, changes: ['Code › code'],
-    checks: [{ name: 'S4/1', status: 'passed', detail: 'Observed expected value' }], message: 'Implement S4', implementsRefs: ['S4'] });
+    checks: [{ name: 'S4/1', status: 'passed', detail: 'Observed expected value' }], message: 'Implement S4' });
   assert.equal(ready.state, 'review'); assert.deepEqual(ready.files, ['app.js']);
   assert.equal(ready.checks[0].status, 'passed');
   assert.equal(git(repository, 'rev-parse', 'HEAD'), base, 'shared project does not move before acceptance');
   assert.equal(readFileSync(join(repository, 'app.js'), 'utf8'), 'export const value = 1;\n');
-  assert.match(git(candidate.path, 'log', '-1', '--format=%B'), /Aludel-Work: W-7\nImplements: S4/);
+  assert.match(git(candidate.path, 'log', '-1', '--format=%B'), /Aludel-Work: W-7\n?$/);
   assert.match(manager.inspect('p-one', candidate.id, repository).diff, /\+export const value = 2;/);
   assert.equal(manager.inspect('p-one', candidate.id, repository).baseCurrent, true);
   assert.equal(manager.get('p-other', candidate.id), null, 'project scope is enforced');

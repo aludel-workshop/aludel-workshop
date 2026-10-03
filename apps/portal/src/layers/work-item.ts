@@ -7,8 +7,6 @@ import { ProjectContext, WorkChange, WorkRun, layerLabel, priorityLabel, priorit
 import { AvatarComponent, PriorityComponent, RefChipComponent, RoleChipComponent, agentRunnable, batchOf, isRunning } from './work-shared';
 import { NextRunComponent, RunCardComponent, runTitle } from './work-run';
 
-interface ReconcileContext { recordId: string; fromRevision: number; toRevision: number; changes: { field: string; before: unknown; after: unknown }[];
-  units: { id: string; symbol: string; path: string; kind: string; calls: string[]; calledBy: string[] }[]; tests: string[]; }
 
 // WORK-ITEM-UX-01: a work item is its task plus its runs. The header names it and offers the one item-level action; each started
 // run has its own tab with what it was given, did and produced; Next run holds the task until Go. Links, planning and the
@@ -53,13 +51,6 @@ interface ReconcileContext { recordId: string; fromRevision: number; toRevision:
         <div class="wi-card" role="tabpanel">
           @if (selectedRun(); as run) { <aludel-run-card [item]="work" [run]="run" [edits]="edits()" (changed)="refresh()" /> }
           @else { <aludel-next-run [item]="work" [edits]="edits()" (changed)="refresh()" /> }
-          @if (reconcile(); as change) {
-            <details class="wi-sec"><summary><mat-icon aria-hidden="true">sync_problem</mat-icon><span>Why this exists</span><small>A record changed after its code was written</small><mat-icon aria-hidden="true" class="wi-chev">expand_more</mat-icon></summary>
-              <div class="wi-sec-body"><p class="lay-muted small"><aludel-ref [id]="change.recordId" /> moved from revision {{ change.fromRevision }} to {{ change.toRevision }}.</p>
-                <dl class="lay-fieldiff">@for (entry of change.changes; track entry.field) { <dt>{{ entry.field }}</dt><dd><del>{{ show(entry.before) }}</del><ins>{{ show(entry.after) }}</ins></dd> }</dl>
-                <h3>Code it affects</h3><div class="lay-refs">@for (unit of change.units; track unit.id) { <aludel-ref [id]="unit.id" [fallback]="unit.symbol" /> } @empty { <span class="lay-muted small">None indexed.</span> }</div>
-                <p class="small">Tests: {{ change.tests.join('; ') || 'none reach this code yet' }}</p></div></details>
-          }
         </div>
 
         <section class="wi-activity" aria-labelledby="log-heading"><h2 id="log-heading"><mat-icon aria-hidden="true">history</mat-icon>Activity <span class="lay-count">{{ work.log.length }}</span></h2>
@@ -122,7 +113,6 @@ export class WorkItemComponent {
   readonly runs = signal<WorkRun[]>([]);
   readonly runsLoaded = signal(false);
   readonly edits = signal<WorkChange[]>([]);
-  readonly reconcile = signal<ReconcileContext | null>(null);
   readonly picked = signal<string | null>(null);
   // Next run is shown whenever the task is open for another run: before any work, and after a run is closed without acceptance.
   // A run still waiting on its reviewer (live, in review, or failed and not yet closed) keeps the task shut.
@@ -150,7 +140,7 @@ export class WorkItemComponent {
   private scrolledFor = '';
 
   constructor() {
-    // Runs, edits and reconcile context are read when the item opens and again whenever it changes.
+    // Runs and edits are read when the item opens and again whenever it changes.
     effect(() => {
       const work = this.item(); const key = work ? `${work.id}:${work.updatedAt}` : '';
       untracked(() => { if (!work || key === this.loadedFor) return; if (!this.loadedFor.startsWith(`${work.id}:`)) this.picked.set(null); this.loadedFor = key; this.load(); });
@@ -168,8 +158,6 @@ export class WorkItemComponent {
     this.runsLoaded.set(false);
     void this.ctx.api<{ runs: WorkRun[] }>(`${base}/work/${encodeURIComponent(work.id)}/runs`).then(value => { this.runs.set(value.runs); this.runsLoaded.set(true); }, () => { this.runs.set([]); this.runsLoaded.set(true); });
     void this.ctx.api<{ changes: WorkChange[] }>(`${base}/changes/${encodeURIComponent(work.id)}`).then(value => this.edits.set(value.changes), () => this.edits.set([]));
-    if (work.type === 'reconcile') void this.ctx.api<ReconcileContext>(`${base}/reconcile/${encodeURIComponent(work.id)}`).then(value => this.reconcile.set(value?.recordId ? value : null), () => this.reconcile.set(null));
-    else this.reconcile.set(null);
   }
   refresh() { this.loadedFor = ''; this.load(); }
   startPerson() { void this.ctx.write(async () => {
@@ -190,7 +178,6 @@ export class WorkItemComponent {
   source() {
     const work = this.item(); if (!work) return '';
     if (work.context?.routine) return 'A routine';
-    if (work.context?.reconcile) return 'Code links: a record changed after its code';
     if (work.log[0]?.text?.startsWith('Created by')) return work.log[0].text;
     return work.context?.suggestion && work.type !== 'reconcile' && !work.log[0]?.by ? `A gap the ${layerLabel[work.layer]} layer found` : work.log[0]?.text || 'Added by hand';
   }
@@ -198,10 +185,4 @@ export class WorkItemComponent {
   lowerFirst(text: string) { return /^[A-Z][a-z]/.test(text) ? text[0].toLowerCase() + text.slice(1) : text; }
   day(at: string) { return new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); }
   when(at: string) { const date = new Date(at); return `${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · ${date.toTimeString().slice(0, 5)}`; }
-  show(value: unknown): string {
-    if (value === null || value === undefined || value === '' || (Array.isArray(value) && !value.length)) return '—';
-    if (Array.isArray(value)) return value.map(entry => typeof entry === 'string' ? entry : Object.values(entry || {}).join(' / ')).join('; ');
-    if (typeof value === 'object') return Object.entries(value as Record<string, unknown>).map(([key, entry]) => `${key}: ${typeof entry === 'object' ? JSON.stringify(entry) : entry}`).join(', ');
-    return String(value);
-  }
 }

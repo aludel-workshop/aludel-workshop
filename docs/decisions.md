@@ -2,7 +2,7 @@
 id: decisions-001
 kind: decision-register
 status: active
-updated: 2026-10-01
+updated: 2026-10-02
 ---
 
 # Decision inbox
@@ -10,6 +10,11 @@ updated: 2026-10-01
 This is the seed of the portal's decision workflow. Confirmed owner answers and proposed defaults are distinct. No unanswered question silently becomes an owner decision.
 
 ## Confirmed
+
+2026-10-02 — **DEC-063: code tracing is removed and deferred to a later phase; journeys are the thread.** The owner, in chat during JOURNEYS-01: "we're pulling the tracing. box it up, lets revisit at a later phase. don't need it mvp, too much distraction without enough clarity to add value." Asked how far, they chose "remove entirely. truth is, those links were not following our new binding approach anyways." Earlier the same day: "happy to just axe the link to stories entirely and use journeys. i don't want to rely on too many primitives."
+(1) **Supersedes DEC-038's "code links to knowledge".** Trace links, link-based unit states, Reconcile items from links, commit-trailer and test-name links, generation-manifest links and `builtBy` are removed from the host and the Code, Pages, Data and Vision templates. Code units, Explorer and reachability stay.
+(2) **Interim consequences.** Pages derive status from their own record (planned, skeleton, specified); spec edits save directly and a code change is always requested explicitly. Data status is proposed or contracted. Releases name no stories. The host SDK keeps `built-by` and `ctx.builtBy()` inert so views forked before this still compile.
+(3) **Revisit.** The deferred design (observed traces from journey-step coverage, entry-point threads, gaps as Work) is in [code-tracing/deferred.md](design/code-tracing/deferred.md). Built status for Pages returns through the user-journeys binding.
 
 2026-10-01 — **DEC-062: the layer-template candidate becomes main; every layer's repository goes to the owner's GitHub.** The owner, in chat: "every layer for the app goes to the owners github. code first then follow up is fine. id say fuck it, lets make this 'candidate' our main. nothing too stable about the old version anyways."
 (1) **Promotion.** `feature/pages-layer-template` (the `pages-template-candidate` worktree) merges into `main`, and template mode becomes the default. **The owner waives LAT-09** (side-by-side comparison). **LAT-10** (original-data cutover and recovery) is satisfied by a backup of `apps/portal/.data` plus a rehearsal of the merged code on a copy of the live data before the owner restarts the portal. Rollback means restoring the backup and checking out the pre-merge `main` commit.

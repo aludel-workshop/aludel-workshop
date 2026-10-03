@@ -6,7 +6,7 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { dirname, posix } from 'node:path';
-import { extractUnits } from './code-links.mjs';
+import { extractUnits } from './code-units.mjs';
 import { matchesGlob } from './layer-package.mjs';
 
 const fileLimit = 256 * 1024, maxFiles = 2000;

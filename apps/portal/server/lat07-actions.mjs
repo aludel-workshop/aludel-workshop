@@ -34,13 +34,10 @@ export const lat07LayerActions = [
       [read('data', 'data_object'), read('data', 'data_operation')], ['Finding cites operation and object revisions', 'No contract is silently changed'],
       { layer: 'data', requiredInputs: ['operation'] })
   ] },
-  { key: 'platform', outputs: ['code_unit', 'trace_link', 'code_release', 'code_route_observation'], actions: [
+  { key: 'platform', outputs: ['code_unit', 'code_release', 'code_route_observation'], actions: [
     action('implement', 'Implement a code change', 'Prepare a reviewed candidate against a pinned project repository commit.', { kind: 'code_unit', operation: 'candidate' },
-      [read('platform', 'code_unit'), read('platform', 'trace_link')], ['Base commit and changed files are pinned', 'Tests are reported'],
+      [read('platform', 'code_unit')], ['Base commit and changed files are pinned', 'Tests are reported'],
       { layer: 'platform', fileReads: ['**'], fileWrites: ['src/**', 'app/**', 'apps/**', 'tests/**', 'server.mjs', 'README.md'], requiredInputs: ['repository-commit'] }),
-    action('reconcile', 'Reconcile code links', 'Report mismatches between pinned Code units and linked layer records.', { owner: 'work', kind: 'report', operation: 'report' },
-      [read('platform', 'code_unit'), read('platform', 'trace_link')], ['Each mismatch cites a source revision', 'No link is silently changed'],
-      { layer: 'platform', fileReads: ['**'], requiredInputs: ['repository-commit'] }),
     action('docs', 'Revise code documentation', 'Prepare a reviewed documentation candidate in the bound repository.', { kind: 'code_unit', operation: 'candidate' },
       [read('platform', 'code_unit')], ['Base commit and documentation files are pinned'],
       { layer: 'platform', fileReads: ['**'], fileWrites: ['docs/**', 'README.md'], requiredInputs: ['repository-commit'] }),
@@ -67,7 +64,7 @@ export const lat07LegacyInventory = Object.freeze({
   'data.access': { disposition: 'unavailable', action: 'data.access', reason: 'Access-rule adapter and elevated grant are not registered.' },
   'data.review': { disposition: 'retired', reason: 'Shared Work owns signed review.' },
   'platform.implement': { disposition: 'recreated', action: 'platform.implement' },
-  'platform.reconcile': { disposition: 'unavailable', action: 'platform.reconcile', reason: 'Pinned Code reconciliation report adapter is not registered.' },
+  'platform.reconcile': { disposition: 'retired', reason: 'Code tracing was removed (docs/design/code-tracing/deferred.md).' },
   'platform.docs': { disposition: 'unavailable', action: 'platform.docs', reason: 'Documentation candidate adapter is not registered.' },
   'platform.dependencies': { disposition: 'unavailable', action: 'platform.dependencies', reason: 'Dependency candidate adapter and elevated grant are not registered.' },
   'platform.security': { disposition: 'recreated', action: 'platform.security' },

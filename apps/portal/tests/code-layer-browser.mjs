@@ -43,7 +43,7 @@ try {
   assert.equal(git('rev-parse', 'main'), sync.commit, 'Code\'s pin is the repository\'s main');
   assert.ok(git('ls-tree', '--name-only', 'main', '.aludel/').includes('.aludel/layer.json'), 'Code\'s definition is in .aludel/');
   assert.ok(git('ls-tree', '-r', '--name-only', 'main').split('\n').includes('docs/product/stories.md'), 'starter docs from the template\'s seed');
-  assert.ok(git('show', 'main:.aludel/outputs/trace-links.json').includes('"kind": "generated"'), 'the build\'s links are in the repository');
+  assert.ok(!git('ls-tree', '-r', '--name-only', 'main').split('\n').includes('.aludel/outputs/trace-links.json'), 'no code links (code tracing was removed)');
 
   const base = `/p/${project.slug}`;
   const bar = page.locator('.lay-layer-outputs');
@@ -92,8 +92,8 @@ try {
 
   // ---- Tests ----
   await bar.getByRole('link', { name: 'Tests' }).click();
-  await view.getByText(/scenarios with a test/).waitFor();
-  await view.getByText(/Given/).first().waitFor();
+  await view.getByText(/^\d+ tests$/).waitFor();
+  assert.equal(await view.getByText(/scenarios with a test|Given/).count(), 0, 'no story-scenario coverage (code tracing was removed)');
 
   // ---- Releases: recorded in the repository, with a tag, and in the Library ----
   await bar.getByRole('link', { name: 'Releases' }).click();

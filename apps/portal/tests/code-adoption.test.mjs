@@ -1,6 +1,6 @@
 // T03-CODE: what the owner's portal does on its first start with Code as a template. A project built and released with the
 // compiled Code layer (templates off) is restarted with templates on: once the portal is listening, Code installs into the
-// project's own repository and adopts its generation links and release, with their IDs, revisions and commits unchanged.
+// project's own repository and adopts its release, with its ID and commit unchanged.
 // Disposable data only. Runs in the templates suite.
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
@@ -53,9 +53,8 @@ test('T03-CODE: on the first start with templates, an existing project\'s Code m
   const builtHead = git('rev-parse', 'HEAD');
   const projectDb = () => { const files = execFileSync('find', [root, '-name', '*.sqlite', '-path', `*${project.id}*`], { encoding: 'utf8' }).trim().split('\n').filter(Boolean); return files[0] || join(root, 'machine.sqlite'); };
   const read = sql => { const db = new DatabaseSync(projectDb(), { readOnly: true }); try { return db.prepare(sql).all(project.id); } finally { db.close(); } };
-  const links = read("SELECT id, record_id, record_revision FROM trace_links WHERE project_id = ? AND source = 'manifest' ORDER BY id");
   const releases = read('SELECT id, version, commit_sha FROM code_releases WHERE project_id = ?');
-  assert.ok(links.length >= 5 && releases.length === 1, 'the compiled layer kept links and a release in host tables');
+  assert.equal(releases.length, 1, 'the compiled layer kept a release in host tables');
 
   // ---- After: templates on ----
   const after = await portal(root, await freePort(), { MACHINE_LAYER_TEMPLATES_ENABLED: '1' });
@@ -68,9 +67,7 @@ test('T03-CODE: on the first start with templates, an existing project\'s Code m
     assert.ok(sync?.commit, 'Code is installed once the portal is listening');
     assert.equal(git('rev-parse', 'main'), sync.commit);
     assert.equal(git('merge-base', '--is-ancestor', builtHead, 'main') === '', true, 'the build is kept; Aludel only adds commits');
-    const fileLinks = JSON.parse(git('show', 'main:.aludel/outputs/trace-links.json')).links;
-    assert.deepEqual(fileLinks.map(link => [link['x-aludel-id'], link.record.ref, link.record.revision]).sort(), links.map(row => [row.id, row.record_id, row.record_revision]).sort(),
-      'every generation link keeps its ID, record and pinned revision');
+    assert.ok(!git('ls-tree', '-r', '--name-only', 'main').split('\n').includes('.aludel/outputs/trace-links.json'), 'no code links (code tracing was removed)');
     const fileReleases = JSON.parse(git('show', 'main:.aludel/outputs/releases.json')).releases;
     assert.deepEqual(fileReleases.map(release => [release['x-aludel-id'], release.version, release.commit]), releases.map(row => [row.id, row.version, row.commit_sha]));
     const library = await after.call('GET', `/api/projects/${project.id}/library?kind=code_release&source=output&data=1`);

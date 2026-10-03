@@ -14,6 +14,7 @@ depends_on: [T03-CODE, LAT-08A, LAYER-BINDINGS-01, EXISTING-PROJECTS-01, DEC-050
 - T03-CODE remains `next_action`. This packet is proposed for the ready queue after it.
 - **2026-10-02, owner chat (J0–J1):** "yeah, go for it." Authorized: J0 (re-run checks; commit Codex's uncommitted LAT-08A integration and Biome work as one commit; remove the rejected standalone trial tool; condense status and procedure text) and J1 (pure contract modules and tests). Both are local and committed to `main`. The proposed defaults stand. Not authorized: template pins (J2+), the live Biome item, pushes, restarts of the owner's portal, and the untracked candidate checkouts or `notes.txt`. Same message: "the code editor tabs need to be re-evaluated. the general structure of code is enough to work from." Recorded as an input to J2: the Journeys view joins Code's current structure without redesigning its tabs, and re-evaluating the tabs is a separate UX pass.
 - **2026-10-02, owner chat (J2):** "t03-code is fine for now. go j2". This waives waiting for T03-CODE's owner look before J2. Authorized: a journeys facet on `layer-base` `code` (declared output, Journeys view, Knowledge), a new template commit and its pin in this repository, local checks, and commits to both repositories. Not authorized: pushes, restarting the owner's portal, the live Biome item, and J3+ wiring. A pin change makes existing projects adopt on their next restart; the owner is told what changes first.
+- **2026-10-02, owner chat (tracing removal, before J3):** "we're pulling the tracing. box it up, lets revisit at a later phase. don't need it mvp". Asked how far, the owner chose "remove entirely. truth is, those links were not following our new binding approach anyways." Authorized: record the tracing design in a deferred record ([code-tracing/deferred.md](../code-tracing/deferred.md)). Then remove story ↔ code tracing from the host and templates: trace links, suspect and untraced states, Reconcile items, commit-trailer and test-name links, generation-manifest links, `builtBy` and everything it drives (Pages Built status, Data status from links, Vision "Built by" chips, release Ships stories, the page-delete guard). Code units, Explorer and reachability stay. Includes template commits and pins, local checks and commits. No compatibility shims are needed (owner: early stage). Planned J3b (observed traces) is dropped from this packet.
 
 ## Owner direction (2026-10-02 chat)
 
@@ -243,3 +244,43 @@ Template `layer-base` `code`: `9fac012` (the journeys facet), then `cc30be2` (st
 3. *What the task revealed:* the missing template update path, which affects J8 and any future template change for existing projects.
 4. *Questions:* how existing instances take a template update (merge as reviewed Work, or a fresh fork). This blocks the Biome part of J8, not J3–J7.
 5. *Process change:* **applied:** the digest step on the checklist. **Tested:** only in the sense that the browser journey passes once it's done; that the checklist line prevents the miss next time is a hypothesis. **Applied:** the general file-kind rule, tested by the Code journey and both suites.
+
+### Code tracing removed (2026-10-02, Claude, VS Code chat)
+
+Owner direction and scope: see the authorization above, [DEC-063](../../decisions.md) and the [deferred record](../code-tracing/deferred.md).
+
+- **Host.**
+  - `code-links.mjs` became `code-units.mjs`: units, references and reachability only, and `trace_links` is dropped.
+  - Removed from `server.mjs`: manifest links on build, the Reconcile route and relink, `builtBy` (the knowledge view, release stories, the page-delete guard) and Ships on GitHub release bodies.
+  - `code-repository.mjs` keeps units and releases.
+  - Release drafts read only `Aludel-Work` trailers, suggest a minor version for new migrations, and name no stories.
+  - Candidates stop writing `Implements:`.
+  - The scaffold's generation manifest and `accountsBinding` are gone.
+  - `trace_link` is out of the legacy declaration, projections and discovery.
+  - LAT-07's `platform.reconcile` is retired. The Engineer role's trailer conventions are removed, and its historical "Reconcile changed code" record stays, because projects copied it and the legacy inventory must account for it.
+  - Data status is proposed or contracted.
+  - The Work item view drops the Reconcile panel, and Home's Code card drops "suspect".
+- **SDK compatibility (deliberate).** `built-by` renders nothing and `ctx.builtBy()` is always empty. Units keep `state` (current or unused) and an empty `links`. Existing installs keep their old template forks, because template updates don't reach them, and those forks' views import these. Removing them would break their frames on restart.
+- **Templates (`layer-base`).**
+  - Code `aaef4cf`: no trace links. Units are used or unused, the lens and "Why it exists" are gone, Tests lists the repository's tests with CI, and releases name no stories. Knowledge and the migration ledger are updated, and the indexer digest is registered.
+  - Pages `ceeb9d4`: status from the page record (planned, skeleton, specified); spec edits are direct and a code change can always be requested; the running-app view is always offered as "App"; no Built by.
+  - Data `d2e11ec` and Vision `a912d44`: no Built by.
+  - Every view type-checks, and only views, manifests and docs changed in Pages, Data and Vision (no handler digests).
+- **Docs.** DEC-063; the model docs mark code links removed (dated work records keep their history).
+
+| Check | Result |
+|---|---|
+| Template tests: Code, Pages, Data, Vision | 13, 16, 6, 9 passed |
+| `typecheck-layer-ui.mjs` at each new pin | Passed. The first Code pin failed on a leftover `r.stories` and was amended before pinning |
+| `npm run typecheck`, `npm run build` | Passed |
+| `npm run test:server` | First run: 1 failure. The legacy inventory must match the historical role records, so the Engineer's "Reconcile changed code" record was restored. It is still marked retired. Rerun: 283 passed, 30 mode-specific skips, 0 failed |
+| `npm run test:server:templates` | 306 passed, 7 skips, 0 failed |
+| Browser `code-layer`, `data-layer`, `vision-layer`, `roles`, `bindings` | Passed |
+| Browser `pages` | First run failed on the removed built-only "Request this change". The script now uses "Request as a code change" and "App" (exact), and it passes |
+
+**Retrospective (tracing removal).**
+1. *Harder than necessary:* tracing reached into five places that don't say "trace": Pages' Built gating, Data status, release Ships, the page-delete guard, and SDK types compiled into older forks. A grep for the feature's name found under half of it. The rest surfaced by following `builtBy` and checking each consumer.
+2. *Would help next time:* the missing template update path made a removal a compatibility exercise. Until it exists, any host SDK removal needs an inert shim and a note, as done here. That's now recorded in the deferred record and DEC-063.
+3. *What the task revealed:* Pages' "built → change request" routing was a stand-in for the spec-first binding. Without tracing, the honest interim is explicit requests, which makes LAYER-BINDINGS step 4 (user journeys) more urgent for Pages users.
+4. *Questions:* when the SDK shims can go (after template updates); whether Pages wants a cruder "in the running app" signal before the binding. Not blocking J3.
+5. *Process change:* none beyond the shim note; the existing checklist (digest, typecheck, suites, browser journeys) caught every break. **Tested:** the typecheck caught the leftover `r.stories` before pinning.

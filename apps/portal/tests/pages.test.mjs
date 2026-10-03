@@ -151,7 +151,7 @@ test('the scaffold routes every page, renders spec sections marked for Pages, an
     designSystem: { tokens: know.list(id, 'design_tokens')[0], components: know.list(id, 'component').map(entry => ({ ...entry, status: componentStatus(entry) })), brand: know.list(id, 'brand_asset') },
     pageRecords: know.list(id, 'page') };
   const sources = { pageBlocks: '', iconFont: Buffer.from(''), iconLicense: '' };
-  const { files, manifest } = skeletonFiles(setup, catalogs, gitProfile, { portal: 'http://aludel.localhost:4310', app: 'http://tool-share.localhost:4310' }, [], sources);
+  const { files } = skeletonFiles(setup, catalogs, gitProfile, { portal: 'http://aludel.localhost:4310', app: 'http://tool-share.localhost:4310' }, [], sources);
   const site = JSON.parse(files['src/site.ts'].match(/export const site: Site = ([\s\S]*);\n$/)[1]);
   const extra = site.pages.find(page => page.id === detail.id);
   assert.equal(extra.nav, false, 'pages outside the navigation get routes too');
@@ -167,6 +167,5 @@ test('the scaffold routes every page, renders spec sections marked for Pages, an
   assert.match(files['src/main.ts'], /import '\.\/aludel-bridge';/);
   assert.match(files['src/app.html'], /\[attr\.data-aludel-page\]="current\.id"/);
   assert.match(files['src/app.html'], /@for \(item of navPages; track item\.path\)/, 'navigation lists navigation pages only');
-  assert.ok(manifest.some(entry => entry.symbol === 'route /tool-detail' && entry.recordIds[0] === detail.id), 'the generated route links to its page record');
   assert.deepEqual(sitePages([{ id: 'a', label: 'Home' }], [{ id: 'a', label: 'Home' }, { id: 'b', label: 'Sign in' }]).map(page => page.path), ['/', '/sign-in-page'], 'reserved paths are avoided');
 });

@@ -135,7 +135,7 @@ References to Library sources and findings (`evidence_link` with direction `refe
   - `notes` is the page blank's planning note.
   - `flow` records: activity, persona, ordered `steps[]` (page, persona, story, name, trigger; a step without a page is a gap), and `review` (state, verdict, the work item, notes of type looks right, content fix, change request or question). One flow per activity is seeded once.
   - `page_map` holds grid places, so moving pages adds no page revisions.
-  - Page status shown: **built** comes from code links; **specified** is the stored `designed` (spec accepted); anything else is **planned**.
+  - Page status shown: **specified** is the stored `designed` (spec accepted), **skeleton** a page a build generated, anything else **planned**. (Until DEC-063, **built** came from code links.)
   - Deleting a story, persona, page, component, data record, brand asset or activity lets go of it in pages and flows.
   - **Routing:** a spec gap goes to the Experience designer (`pages.design`, `pages.review`); a build that differs from its spec goes to the Engineer (`platform.implement`, through `POST /pages/change`).
   - The scaffold routes every page, renders Ready sections as marked skeletons (`data-aludel-section`, `data-aludel-skeleton`), and ships `src/aludel-bridge.ts`.
@@ -176,6 +176,8 @@ References to Library sources and findings (`evidence_link` with direction `refe
 Integrations sit where they are used (DEC-038): GitHub in Repository, hosting in Environments, DNS in Domains, runtime services in Architecture, agent accounts in Work › Agents. Settings keeps a read-only list of every connection for audit.
 
 ### Code links
+
+> **Removed 2026-10-02 (DEC-063).** Code tracing below no longer exists: no trace links, link-based unit states, Reconcile items or `builtBy`. Page status is planned, skeleton or specified from the page record. Kept as history; the deferred design is in [code-tracing/deferred.md](../code-tracing/deferred.md).
 
 | Record | Fields |
 |---|---|

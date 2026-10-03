@@ -458,7 +458,7 @@ try {
   await toast('New “Shape project briefs” items go to You. Existing items keep their assignee.');
   await page.locator('#action-platform\\.implement').getByRole('button', { name: 'Setup' }).click();
   const setup = page.getByRole('form', { name: 'Build stories setup' });
-  await setup.getByLabel('Instructions for Build stories').fill('One story per build. Commit with Aludel-Work and Implements trailers.');
+  await setup.getByLabel('Instructions for Build stories').fill('One story per build. Commit with the Aludel-Work trailer.');
   await setup.getByRole('checkbox', { name: 'Run tests' }).uncheck();
   await setup.getByLabel('Why this change').fill('Shorter, same rules');
   await page.getByRole('button', { name: 'Save Build stories' }).click();
@@ -538,40 +538,6 @@ try {
   await page.goto(`${portal}/projects/${project.id}`);
   await page.waitForURL(`${portal}/p/tool-share`);
 
-  // Code links (LAY-07D): changing a template story makes its code suspect and opens one Reconcile item.
-  await page.goto(`${portal}/p/tool-share/product/map`);
-  await page.getByRole('region', { name: 'Story map' }).getByRole('link', { name: /Someone can sign up with email and password/ }).click();
-  const signUpDrawer = page.getByRole('dialog');
-  await signUpDrawer.getByText(/code units? · /).waitFor();
-  await signUpDrawer.getByLabel('Edge cases (one per line)').fill('The email already has an account');
-  await signUpDrawer.getByLabel('Why this change (saved with the revision)').fill('Found in testing');
-  await signUpDrawer.getByRole('button', { name: 'Save story' }).click();
-  await signUpDrawer.getByText('Suspect').waitFor();
-  await layerNav().getByRole('link', { name: 'Home' }).click();
-  const codeCard = page.getByRole('heading', { name: 'Code' }).locator('..');
-  await codeCard.getByText(/\d+ suspect/).waitFor();
-  const suspectBefore = Number(/(\d+) suspect/.exec(await codeCard.innerText())[1]);
-  await page.goto(`${portal}/p/tool-share/work`);
-  await subtab('Queue').click();
-  await card('Reconcile S1 Someone can sign up').getByRole('link', { name: /Reconcile S1 Someone can sign up/ }).click();
-  await page.getByRole('heading', { name: 'What changed in the record' }).waitFor();
-  await page.locator('.lay-fieldiff').getByText('edges').waitFor();
-  await page.getByRole('link', { name: 'POST /api/sign-up' }).first().waitFor();
-  assert.match(await page.locator('.lay-item-meta').innerText(), /Default agent/, 'reconcile work goes to the reconcile action\'s assignee');
-  await page.getByText(/Agents can't run “Reconcile changed code” yet \(coding agents/).waitFor();
-  await check('work-reconcile');
-  await page.locator('.lay-item-meta').getByRole('button', { name: 'Change assignee' }).click();
-  await page.getByRole('menuitem', { name: /You \(Ada Lovelace\)/ }).click();
-  await toast(/now goes to You/);
-  await page.getByRole('button', { name: /^Stage in your batch/ }).click();
-  await toast(/staged\./);
-  await page.getByRole('button', { name: 'Mark done' }).click();
-  await toast(/ done\./);
-  await layerNav().getByRole('link', { name: 'Home' }).click();
-  await page.getByRole('heading', { name: 'Tool Share', level: 1 }).waitFor();
-  // The Messages page's own Reconcile item is still open, so fewer suspect units rather than none.
-  await until(async () => { const found = /(\d+) suspect/.exec(await page.getByRole('heading', { name: 'Code', exact: true }).locator('..').innerText()); return !found || Number(found[1]) < suspectBefore; }, 'closing the Reconcile item makes its code current again');
-
   // Search, isolation, sign out
   await page.getByLabel('Search every layer').fill('conversation');
   await page.locator('.lay-results').getByText('Story map').waitFor();
@@ -598,5 +564,5 @@ try {
   await page.waitForURL(`${portal}/`);
 
   assert.deepEqual(errors, []);
-  console.log(`PASS: layers ${checked.join(' → ')}; pack stories and template work; Brief claims, personas and riskiest assumptions; Library source, finding, insight, tag, comment; evidence contradicting a claim; story why linked to a claim; generated PR/FAQ going stale and regenerated; story edits with rationale; projects timeline, dates, stories and brief; items list and side panel; Next; the elevated shield; People and agents on Team; page canvas, linking and designed status; Data objects, fields, relations, contracts, OpenAPI export and access; Code structure, file → chunk explorer with a story lens, tests by scenario, starter docs with sources, a recorded release; Deploy preview health and builds, variables, integrations, database backup/restore, masked browse and guarded query; agent profiles (robot, model, effort, limits), your avatar, AGENTS.md export; roles and action setup; suspect code to a Reconcile item and back; per-assignee batches (stage, Go, review checklist, accept, send back), reassigning between batches, priority and blocking, applied answers, verified closing, routines; backlog to done work; search; member isolation; 390px; sign out.`);
+  console.log(`PASS: layers ${checked.join(' → ')}; pack stories and template work; Brief claims, personas and riskiest assumptions; Library source, finding, insight, tag, comment; evidence contradicting a claim; story why linked to a claim; generated PR/FAQ going stale and regenerated; story edits with rationale; projects timeline, dates, stories and brief; items list and side panel; Next; the elevated shield; People and agents on Team; page canvas, linking and designed status; Data objects, fields, relations, contracts, OpenAPI export and access; Code structure, file → chunk explorer with a story lens, tests by scenario, starter docs with sources, a recorded release; Deploy preview health and builds, variables, integrations, database backup/restore, masked browse and guarded query; agent profiles (robot, model, effort, limits), your avatar, AGENTS.md export; roles and action setup; per-assignee batches (stage, Go, review checklist, accept, send back), reassigning between batches, priority and blocking, applied answers, verified closing, routines; backlog to done work; search; member isolation; 390px; sign out.`);
 } finally { await browser.close(); }

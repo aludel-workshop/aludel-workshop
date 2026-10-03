@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 import { createUser, initAccounts } from '../server/accounts.mjs';
-import { codeLinks, extractUnits, indexWorkspace, initCodeLinks } from '../server/code-links.mjs';
+import { codeUnits, extractUnits, indexWorkspace, initCodeUnits } from '../server/code-units.mjs';
 import { commitWorkspace } from '../server/git-repository.mjs';
 import { initKnowledge, knowledge } from '../server/knowledge.mjs';
 import { initOnboarding, loadCatalogs, onboarding } from '../server/onboarding.mjs';
@@ -27,29 +27,29 @@ const git = (cwd, ...args) => spawnSync('git', args, { cwd, encoding: 'utf8' });
 function fixture({ picks = ['accounts', 'messaging'] } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'aludel-lay07-'));
   const db = openDatabase(join(root, 'machine.sqlite'));
-  initWorkflow(db); ensureProductWorkspace(db); initAccounts(db); initOnboarding(db); initKnowledge(db); initCodeLinks(db); initPlatformOps(db);
+  initWorkflow(db); ensureProductWorkspace(db); initAccounts(db); initOnboarding(db); initKnowledge(db); initCodeUnits(db); initPlatformOps(db);
   const know = knowledge({ db, catalogs, packs: catalogs.packs });
   const flows = onboarding({ db, catalogs, secrets: openSecretStore(root), workspaceRoot: join(root, 'workspaces'), assetRoot: join(root, 'assets'), createWorkspace: () => {}, know });
-  const links = codeLinks({ db, know });
+  const units = codeUnits({ db });
   const ops = platformOps({ db, backupRoot: join(root, 'backups') });
   const ada = createUser(db, { email: 'ada@example.com', name: 'Ada', password: 'correct-horse-battery' });
   const { token } = flows.saveDraft(null, { profile: 'planner' });
   flows.saveDraft(token, { name: 'Tool Share', pitch: 'Neighbours lend and borrow tools they rarely use.' });
   const { project } = flows.claimDraft(token, ada, ada);
   flows.saveFeatures(ada, project.id, { picks });
-  return { root, db, know, flows, links, ops, ada, id: project.id };
+  return { root, db, know, flows, units, ops, ada, id: project.id };
 }
 
 // Generates the aludel-web-v1 skeleton for the project into a real git workspace, as generateSkeleton does.
-function build({ know, flows, links, ada, id, root }) {
+function build({ know, flows, units, ada, id, root }) {
   const setup = { ...flows.projectSetup(ada, id), data: { objects: know.list(id, 'data_object'), operations: know.list(id, 'data_operation') }, agents: know.agentExport(id) };
   const workspace = join(root, 'workspaces', id);
-  const { files, manifest } = skeletonFiles(setup, catalogs, gitProfile, { portal: 'http://aludel.localhost', app: 'http://tool-share.localhost' }, [], sources);
+  const { files } = skeletonFiles(setup, catalogs, gitProfile, { portal: 'http://aludel.localhost', app: 'http://tool-share.localhost' }, [], sources);
   writeFiles(workspace, files);
   const commit = commitWorkspace({ repository: workspace, profile: gitProfile, message: 'feat: generate skeleton', name: 'Ada', email: 'ada@example.com' });
   know.recordBuild(id, commit.commit, { auth: true });
-  links.index(id, workspace);
-  return { workspace, manifest, commit, result: links.recordManifest(id, manifest, commit.commit) };
+  units.index(id, workspace);
+  return { workspace, commit };
 }
 
 test('LAY-07A: the Accounts pack seeds exactly the contract aludel-web-v1 generates, accepted', () => {
@@ -152,19 +152,15 @@ test('LAY-07C (as revised by WORK-UX-01): one default agent; profiles hold model
   assert.doesNotMatch(guide, /Working style/);
 });
 
-test('LAY-07D: the index reads units, references and reachability from a generated skeleton', () => {
+test('LAY-07D: the index reads units, references and reachability from a generated skeleton; units carry no links', () => {
   const context = fixture();
-  const { workspace, result, manifest } = build(context);
-  assert.deepEqual(result.missing, [], 'every manifest entry matches a unit the index found');
-  assert.deepEqual(manifest.filter(entry => !entry.derived).map(entry => entry.symbol).sort(),
-    ['/api/health', '/api/session', 'App', 'POST /api/sign-in', 'POST /api/sign-out', 'POST /api/sign-up', 'table accounts', 'table sessions'], 'the template declares what it generated for the Accounts contract');
-  assert.ok(manifest.filter(entry => entry.derived).length >= 1 && manifest.filter(entry => entry.derived).every(entry => entry.symbol.startsWith('route /')), 'each generated page is declared as a route');
-  // A dead export and a test named after a story, added by hand.
+  const { workspace } = build(context);
+  // A dead export and a test, added by hand.
   writeFileSync(join(workspace, 'src', 'unused.ts'), 'export function forgotten() { return 1; }\n');
   mkdirSync(join(workspace, 'tests'), { recursive: true });
   writeFileSync(join(workspace, 'tests', 'accounts.test.mjs'), "import test from 'node:test';\ntest('S1 · Given a visitor, when they sign up, then they are signed in', () => {});\n");
-  context.links.index(context.id, workspace);
-  const { units } = context.links.snapshot(context.id);
+  context.units.index(context.id, workspace);
+  const { units } = context.units.snapshot(context.id);
   const unit = key => units.find(entry => `${entry.path}#${entry.symbol}` === key);
   assert.equal(unit('server/server.mjs#POST /api/sign-up').kind, 'handler');
   assert.equal(unit('server/server.mjs#table accounts').kind, 'table');
@@ -173,67 +169,13 @@ test('LAY-07D: the index reads units, references and reachability from a generat
   assert.ok(unit('server/server.mjs#api').calls.includes(unit('server/server.mjs#POST /api/sign-up').id), 'a handler belongs to the function that routes to it');
   assert.equal(unit('src/unused.ts#forgotten').reachable, false);
   assert.equal(unit('src/unused.ts#forgotten').state, 'dead');
-  assert.equal(unit('src/app.ts#App').reachable, true);
-  assert.equal(unit('server/server.mjs#send').state, 'untraced', 'glue is reachable but has no story');
-  assert.equal(unit('server/server.mjs#POST /api/sign-up').state, 'healthy');
-  const signUpStory = context.know.list(context.id, 'story').find(story => story.number === 1);
-  assert.ok(unit('tests/accounts.test.mjs#S1 · Given a visitor, when they sign up, then they are signed in').links.some(item => item.recordId === signUpStory.id && item.kind === 'tests'));
-  const view = context.know.view(context.ada, context.id, { builtBy: context.links.builtBy(context.id) });
-  assert.equal(view.objects.find(object => object.name === 'Account').status, 'built', 'a generated table makes its object built');
-  assert.equal(view.operations.find(op => op.operationId === 'signUp').status, 'built');
+  assert.equal(unit('server/server.mjs#send').state, 'healthy', 'reachable code is used');
+  // Code tracing was removed (docs/design/code-tracing/deferred.md): no unit links to a record, and Data status ignores code.
+  assert.ok(units.every(entry => Array.isArray(entry.links) && !entry.links.length));
+  assert.ok(!context.db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'trace_links'").get(), 'the trace_links table is dropped');
+  const view = context.know.view(context.ada, context.id);
+  assert.equal(view.objects.find(object => object.name === 'Account').status, 'contracted');
   assert.equal(view.objects.find(object => object.name === 'Message').status, 'proposed');
-});
-
-test('LAY-07D: a new revision makes links suspect and opens exactly one Reconcile item; closing it relinks', () => {
-  const context = fixture();
-  build(context);
-  const { know, links, ada, id } = context;
-  const story = know.list(id, 'story').find(entry => entry.number === 1);
-  know.update(id, story.id, { why: 'Neighbours need to know who is borrowing' }, { rationale: 'From interviews' });
-  const suspect = links.snapshot(id).units.filter(unit => unit.links.some(item => item.recordId === story.id && item.state === 'suspect'));
-  assert.ok(suspect.some(unit => unit.symbol === 'POST /api/sign-up') && suspect.some(unit => unit.symbol === 'App'));
-  know.update(id, story.id, { edges: ['Email already used'] }, { rationale: 'Edge case' });
-  const reconcile = know.workList(id).filter(item => item.type === 'reconcile' && item.state !== 'done');
-  assert.equal(reconcile.length, 1, 'one open Reconcile item per record, however many revisions');
-  assert.deepEqual(reconcile[0].context.reconcile, { recordId: story.id, fromRevision: 1, toRevision: 3 });
-  const detail = links.reconcileContext(id, reconcile[0]);
-  assert.deepEqual(detail.changes.map(change => change.field).sort(), ['edges', 'why']);
-  assert.ok(detail.units.find(unit => unit.symbol === 'POST /api/sign-up').calls.some(name => name.startsWith('table accounts')));
-  // Moving a page (position only) is not a content change and suspects nothing.
-  const page = know.list(id, 'page').find(entry => entry.inNav);
-  know.update(id, page.id, {}, { position: 3 });
-  assert.equal(know.workList(id).filter(item => item.type === 'reconcile' && item.state !== 'done').length, 1);
-  const done = know.updateWork(ada, id, reconcile[0].id, { state: 'done' });
-  assert.equal(done.state, 'done');
-  assert.ok(links.snapshot(id).units.flatMap(unit => unit.links).filter(item => item.recordId === story.id).every(item => item.state === 'current' && item.revision === 3));
-});
-
-test('LAY-07D: a rebuild regenerates pages from their records and resolves their Reconcile items', () => {
-  const context = fixture();
-  build(context);
-  const { know, links, id } = context;
-  const page = know.list(id, 'page').find(entry => entry.inNav);
-  know.update(id, page.id, { description: 'Everything you lent and borrowed' }, { rationale: 'Clearer' });
-  assert.equal(know.workList(id).filter(item => item.type === 'reconcile' && item.state !== 'done').length, 1);
-  build(context);
-  assert.equal(know.workList(id).filter(item => item.type === 'reconcile' && item.state !== 'done').length, 0, 'the regenerated page is current again');
-  assert.ok(links.snapshot(id).units.flatMap(unit => unit.links).filter(item => item.recordId === page.id).every(item => item.state === 'current'));
-});
-
-test('LAY-07D: commit trailers link the units a commit changed, at the revision current when it was made', () => {
-  const context = fixture();
-  const { workspace } = build(context);
-  const { know, links, id } = context;
-  const story = know.list(id, 'story').find(entry => entry.title.startsWith('Someone can start a conversation'));
-  const server = readFileSync(join(workspace, 'server', 'server.mjs'), 'utf8');
-  writeFileSync(join(workspace, 'server', 'server.mjs'), server.replace("  if (pathname === '/api/health') return send(response, 200, { ok: true });",
-    "  if (pathname === '/api/health') return send(response, 200, { ok: true });\n  if (pathname === '/api/conversations' && request.method === 'POST') {\n    return send(response, 201, { conversation: { startedAt: new Date().toISOString() } });\n  }"));
-  commitWorkspace({ repository: workspace, profile: gitProfile, message: 'feat: start a conversation', name: 'Ada', email: 'ada@example.com', trailers: { 'Aludel-Work': 'W-7', Implements: `S${story.number}` } });
-  assert.match(git(workspace, 'log', '-1', '--format=%B').stdout, new RegExp(`Aludel-Work: W-7\\nImplements: S${story.number}`));
-  links.index(id, workspace);
-  const unit = links.snapshot(id).units.find(entry => entry.symbol === 'POST /api/conversations');
-  assert.deepEqual(unit.links.map(item => [item.recordId, item.kind, item.source, item.workRef, item.state]), [[story.id, 'implements', 'trailer', 'W-7', 'current']]);
-  assert.ok(!links.snapshot(id).units.find(entry => entry.symbol === 'api').links.some(item => item.source === 'trailer'), 'the innermost changed unit is linked, not the router around it');
 });
 
 test('LAY-07D: extractUnits keeps sibling tables from one SQL string at the same level', () => {

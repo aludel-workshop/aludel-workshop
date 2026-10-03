@@ -7,7 +7,7 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { createUser, initAccounts } from '../server/accounts.mjs';
 import { codeReleases, initCodeLayer, readDocs, readSource, readStack, readVariables, sidecarPath, starterDocs } from '../server/code-layer.mjs';
-import { initCodeLinks } from '../server/code-links.mjs';
+import { initCodeUnits } from '../server/code-units.mjs';
 import { initKnowledge, knowledge } from '../server/knowledge.mjs';
 import { initOnboarding, loadCatalogs, onboarding } from '../server/onboarding.mjs';
 import { ensureProductWorkspace } from '../server/product-workspace.mjs';
@@ -30,7 +30,7 @@ function commit(root, files, message) {
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'aludel-code-db-'));
   const db = openDatabase(join(root, 'machine.sqlite'));
-  initWorkflow(db); ensureProductWorkspace(db); initAccounts(db); initOnboarding(db); initKnowledge(db); initCodeLinks(db); initCodeLayer(db);
+  initWorkflow(db); ensureProductWorkspace(db); initAccounts(db); initOnboarding(db); initKnowledge(db); initCodeUnits(db); initCodeLayer(db);
   const know = knowledge({ db, catalogs, packs: catalogs.packs });
   const flows = onboarding({ db, catalogs, secrets: openSecretStore(root), workspaceRoot: join(root, 'workspaces'), assetRoot: join(root, 'assets'), createWorkspace: () => {}, know });
   const ada = createUser(db, { email: 'ada@example.com', name: 'Ada', password: 'correct-horse-battery' });
@@ -86,28 +86,29 @@ test('starter docs never overwrite a developer\'s file; the sidecar marks sectio
   assert.deepEqual(view.checks.broken, ['docs/extra.md → nowhere.md']);
 });
 
-test('releases are explicit: the draft names commits, stories from trailers, stack changes and new migrations', () => {
-  const { db, know, id } = fixture();
+test('releases are explicit: the draft names commits, stack changes and new migrations, and no stories', () => {
+  const { db, id } = fixture();
   const releases = codeReleases({ db });
-  const stories = know.list(id, 'story').map(story => ({ ...story, ref: `S${story.number}` }));
   const root = repo({ 'package.json': pkg({ rxjs: '7.8.1' }) });
-  let draft = releases.draft(id, root, stories, [stories[1].id]);
+  let draft = releases.draft(id, root);
   assert.equal(draft.suggested, '0.1.0');
-  assert.deepEqual(draft.stories, [stories[1].id], 'the first release ships what is built so far');
+  assert.deepEqual(draft.stories, [], 'releases name no stories (code tracing was removed)');
   assert.deepEqual(draft.changes, [], 'and has no stack to compare with');
-  const first = releases.record(id, root, stories, { version: 'v0.1.0', notes: 'First.' }, 'Ada');
+  const first = releases.record(id, root, { version: 'v0.1.0', notes: 'First.' }, 'Ada');
   assert.equal(first.version, '0.1.0');
-  assert.throws(() => releases.record(id, root, stories, { version: '0.2.0' }, 'Ada'), /Nothing has changed/);
-  commit(root, { 'package.json': pkg({ rxjs: '7.8.2' }), 'db/migrations/0002_tools.sql': 'CREATE TABLE tools (id TEXT);\n' }, `feat: tools\n\nAludel-Work: W-3\nImplements: ${stories[0].ref}`);
-  draft = releases.draft(id, root, stories);
+  assert.throws(() => releases.record(id, root, { version: '0.2.0' }, 'Ada'), /Nothing has changed/);
+  commit(root, { 'package.json': pkg({ rxjs: '7.8.2' }) }, 'chore: rxjs');
+  assert.equal(releases.draft(id, root).suggested, '0.1.1', 'a release without migrations is a patch');
+  commit(root, { 'db/migrations/0002_tools.sql': 'CREATE TABLE tools (id TEXT);\n' }, 'feat: tools\n\nAludel-Work: W-3');
+  draft = releases.draft(id, root);
   assert.deepEqual(draft.since, { version: '0.1.0', commit: first.commit });
-  assert.deepEqual(draft.stories, [stories[0].id]);
+  assert.deepEqual(draft.commits.map(entry => entry.work), ['W-3', null]);
   assert.deepEqual(draft.changes, [{ name: 'rxjs', from: '7.8.1', to: '7.8.2' }]);
   assert.deepEqual(draft.migrations, ['db/migrations/0002_tools.sql']);
-  assert.equal(draft.suggested, '0.2.0', 'a new story raises the minor version');
-  assert.throws(() => releases.record(id, root, stories, { version: '0.1.0' }, 'Ada'), /newer than v0.1.0/);
-  assert.throws(() => releases.record(id, root, stories, { version: 'next' }, 'Ada'), /like 1.2.3/);
-  const second = releases.record(id, root, stories, { version: '0.2.0', notes: 'Tools.' }, 'Ada');
+  assert.equal(draft.suggested, '0.2.0', 'a new migration raises the minor version');
+  assert.throws(() => releases.record(id, root, { version: '0.1.0' }, 'Ada'), /newer than v0.1.0/);
+  assert.throws(() => releases.record(id, root, { version: 'next' }, 'Ada'), /like 1.2.3/);
+  const second = releases.record(id, root, { version: '0.2.0', notes: 'Tools.' }, 'Ada');
   assert.equal(second.publishedAt, null, 'recording is local; publishing to GitHub is a separate, authorized step');
   assert.deepEqual(releases.list(id).map(release => release.version), ['0.2.0', '0.1.0']);
 });

@@ -1723,10 +1723,10 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     return 'proposed';
   }
 
-  // proposed (named) → contracted (accepted) → built (linked code) → shipped (in a production release; none locally yet).
-  const dataStatus = (record, built) => built?.shipped ? 'shipped' : built?.units ? 'built' : record.contract === 'accepted' ? 'contracted' : 'proposed';
+  // proposed (named) → contracted (accepted). Built and shipped came from code links, removed on 2026-10-02.
+  const dataStatus = record => record.contract === 'accepted' ? 'contracted' : 'proposed';
 
-  function view(user, projectId, { builtBy = new Map() } = {}) {
+  function view(user, projectId) {
     requireMember(db, user, projectId);
     const work = workList(projectId);
     const pages = pageList(projectId);
@@ -1756,8 +1756,8 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
       flows: list(projectId, 'flow').map(flow => ({ ...flow, history: history(flow.id) })),
       packs: Object.fromEntries(Object.entries(packs).map(([id, pack]) => [id, { label: pack.label, summary: pack.summary, icon: pack.icon, stories: pack.stories.length, template: pack.stories.filter(story => story.template).length }])),
       selectedPacks: parse(db.prepare('SELECT story_packs_json FROM project_setup WHERE project_id = ?').get(projectId)?.story_packs_json, []),
-      objects: list(projectId, 'data_object').map(object => ({ ...object, status: dataStatus(object, builtBy.get(object.id)), history: history(object.id) })),
-      operations: list(projectId, 'data_operation').map(operation => ({ ...operation, status: dataStatus(operation, builtBy.get(operation.id)), history: history(operation.id) })),
+      objects: list(projectId, 'data_object').map(object => ({ ...object, status: dataStatus(object), history: history(object.id) })),
+      operations: list(projectId, 'data_operation').map(operation => ({ ...operation, status: dataStatus(operation), history: history(operation.id) })),
       access: list(projectId, 'access_rule'),
       profiles: profiles(projectId).map(({ workTypes: legacyTypes, writes, approvalRequired, budget, icon, role, accountId, ...profile }) => ({ ...profile, history: history(profile.id) })),
       projectInstructions: list(projectId, 'project_instructions')[0] || null,

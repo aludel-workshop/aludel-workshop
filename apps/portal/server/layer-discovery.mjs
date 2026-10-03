@@ -58,7 +58,7 @@ export function layerDiscoveryStatus(db,userId,projectId,receivingKey) {
   return rows.map(row => ({ sourceKeys: JSON.parse(row.sourceKeysJson), workId: row.workId, createdAt: row.createdAt }));
 }
 
-const projectionTables = { code_unit:'code_units', trace_link:'trace_links', code_release:'code_releases', code_route_observation:'code_route_observations', release:'releases' };
+const projectionTables = { code_unit:'code_units', code_release:'code_releases', code_route_observation:'code_route_observations', release:'releases' };
 // Identity/revision manifest for each source output. The fingerprint covers every
 // row, including records beyond the short task preview, so a changed source
 // withdraws the Go snapshot before submission or acceptance.

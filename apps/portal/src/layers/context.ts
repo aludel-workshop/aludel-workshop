@@ -265,7 +265,8 @@ export class ProjectContext {
     if (assignee.kind === 'agent') return this.profileById().get(assignee.id || '')?.name || assignee.label || 'Agent';
     return assignee.label || 'Aludel template';
   }
-  // "Built by" for any record: code units and tests linked to it, and whether any link is suspect (LAY-07D).
+  // Code tracing was removed on 2026-10-02 (docs/design/code-tracing/deferred.md): units carry no links, so this is always
+  // empty, and `suspectUnits` too. Both stay only so layer views forked before then still compile; new views don't use them.
   readonly builtBy = computed(() => {
     const summary = new Map<string, { units: number; tests: number; suspect: boolean }>();
     for (const unit of this.data()?.code.units || []) for (const link of unit.links) {

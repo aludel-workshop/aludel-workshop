@@ -12,7 +12,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { createUser, initAccounts } from '../server/accounts.mjs';
 import { initCodeLayer } from '../server/code-layer.mjs';
-import { codeLinks, initCodeLinks } from '../server/code-links.mjs';
+import { codeUnits, initCodeUnits } from '../server/code-units.mjs';
 import { codeImport } from '../server/code-import.mjs';
 import { codeRepository, codeSync, githubTokenFor, initCodeRepository } from '../server/code-repository.mjs';
 import { commitWorkspace } from '../server/git-repository.mjs';
@@ -68,7 +68,7 @@ test('T03-CODE github-sync: import, push, pick-up, divergence and unavailable st
     git(root, 'clone', '-q', '--bare', made, bare);
 
     const db = openDatabase(join(root, 'machine.sqlite'));
-    initWorkflow(db); ensureProductWorkspace(db); initAccounts(db); initGithubIdentities(db); initOnboarding(db); initKnowledge(db); initPagesLayerApp(db); initCodeLinks(db); initCodeLayer(db);
+    initWorkflow(db); ensureProductWorkspace(db); initAccounts(db); initGithubIdentities(db); initOnboarding(db); initKnowledge(db); initPagesLayerApp(db); initCodeUnits(db); initCodeLayer(db);
     const know = knowledge({ db, catalogs, packs: catalogs.packs });
     const flows = onboarding({ db, catalogs, secrets: openSecretStore(root), workspaceRoot: join(root, 'workspaces'), assetRoot: join(root, 'assets'), createWorkspace: () => {}, know });
     const ada = createUser(db, { email: 'ada@example.com', name: 'Ada', password: 'correct-horse-battery' });
@@ -97,8 +97,8 @@ test('T03-CODE github-sync: import, push, pick-up, divergence and unavailable st
     const authorization = new URL(integration.startAuthorization(ada.id));
     await integration.callback({ code: 'code', state: authorization.searchParams.get('state') });
 
-    const links = codeLinks({ db, know });
-    const code = codeRepository({ db, know, links });
+    const units = codeUnits({ db });
+    const code = codeRepository({ db, units });
     const pool = library({ db, know });
     const work = [];
     const remotes = layerRemotes({ db, tokenFor: githubTokenFor(integration), onAdvance: projectId => code.refresh(projectId),
@@ -122,7 +122,7 @@ test('T03-CODE github-sync: import, push, pick-up, divergence and unavailable st
     assert.equal(git(bare, 'rev-parse', 'main'), git(workspace, 'rev-parse', 'main'), 'GitHub has .aludel/ and the starter docs');
     assert.ok(git(bare, 'ls-tree', '-r', '--name-only', 'main').split('\n').includes('.aludel/layer.json'));
     assert.ok(git(bare, 'ls-tree', '-r', '--name-only', 'main').split('\n').includes('docs/product/index.md'));
-    assert.ok(links.snapshot(id).units.some(unit => unit.symbol === 'lend'), 'Code indexes code the scaffold never made');
+    assert.ok(units.snapshot(id).units.some(unit => unit.symbol === 'lend'), 'Code indexes code the scaffold never made');
 
     // ---- A Knowledge save, then pushed ----
     const docs = layerDocs({ db });
@@ -138,7 +138,7 @@ test('T03-CODE github-sync: import, push, pick-up, divergence and unavailable st
     git(other, 'add', '-A'); git(other, 'commit', '-q', '-m', 'Borrowing'); git(other, 'push', '-q', 'origin', 'main');
     assert.equal((await syncing.sync(id)).remote.state, 'in-sync');
     assert.equal(git(workspace, 'rev-parse', 'main'), git(other, 'rev-parse', 'HEAD'));
-    assert.ok(links.snapshot(id).units.some(unit => unit.symbol === 'borrow'), 'the new code is read');
+    assert.ok(units.snapshot(id).units.some(unit => unit.symbol === 'borrow'), 'the new code is read');
 
     // ---- Both sides move: held as Work, nothing pushed ----
     const mine = docs.read(id, ada.id, 'platform', '/README.md');

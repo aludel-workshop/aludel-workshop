@@ -18,7 +18,7 @@ import { commitOutputFile, fileEntry, initLayerFiles, readOutputFile } from './l
 import { previewManager, previewRuntime } from './previews.mjs';
 import { agentsGuide, copyMedia, initialFiles, loadScaffoldSources, sitePages, skeletonFiles, workflowPaths, writeBinaries, writeFiles } from './scaffold.mjs';
 import { brandUsage, componentStatus } from './design.mjs';
-import { codeLinks, initCodeLinks, workspaceIsIndexable } from './code-links.mjs';
+import { codeUnits, initCodeUnits, workspaceIsIndexable } from './code-units.mjs';
 import { initPlatformOps, platformOps } from './platform-ops.mjs';
 import { codeReleases, initCodeLayer, readDocs, readSource, readStack, readVariables, starterDocs, trackedFiles } from './code-layer.mjs';
 import { agentRuns, initAgentRuns } from './agent-runs.mjs';
@@ -76,7 +76,7 @@ initAccounts(db);
 initGithubIdentities(db);
 initOnboarding(db);
 initKnowledge(db);
-initCodeLinks(db);
+initCodeUnits(db);
 initPlatformOps(db);
 initCodeLayer(db);
 initAgentRuns(db);
@@ -154,7 +154,7 @@ for (const project of db.prepare(`SELECT p.id, p.description, s.feel FROM projec
   know.ensureProject(project.id, { pitch: project.description });
   know.seedPages(project.id, project.feel);
 }
-// LAY-07: projects from before the Data layer and agent profiles get them (idempotent), before code links start listening.
+// LAY-07: projects from before the Data layer and agent profiles get them (idempotent).
 const layerProjects = () => db.prepare("SELECT p.id FROM projects p JOIN project_setup s ON s.project_id = p.id WHERE p.id <> 'the-machine'").all().map(row => row.id);
 for (const projectId of layerProjects().filter(id => !db.prepare('SELECT layer_onboarding_version FROM project_setup WHERE project_id = ?').get(id)?.layer_onboarding_version)) {
   know.ensureAgents(projectId);
@@ -176,11 +176,11 @@ for (const projectId of layerProjects()) for (const layer of projectLayerDefinit
 const markdown = markdownOutputs({ db, know, dataDirectory });
 // Build every installed layer's views at its pinned commit; instances on the same template commit share one build.
 for (const projectId of layerProjects()) for (const layer of projectLayerDefinitions(db, projectId)) try { views.status(db, projectId, layer.key); } catch { /* shown on the layer */ }
-const links = codeLinks({ db, know });
+const units = codeUnits({ db });
 const ops = platformOps({ db, backupRoot: join(dataDirectory, 'backups') });
 // T03-CODE: when Code is installed from its template, its repository is the project's own and its outputs live there.
 initCodeRepository(db); initLayerRemotes(db);
-const codeRepo = codeRepository({ db, know, links });
+const codeRepo = codeRepository({ db, units });
 const codeRelease = codeReleases({ db, releasesOf: projectId => codeRepo.releases(projectId) });
 // The Code repository stays in sync with the project's GitHub repository (the existing repository binding, not a second one).
 // Git talks to GitHub with a fresh installation token only; what goes wrong is shown on the layer, never thrown at the person.
@@ -201,16 +201,14 @@ let importing = null;
 const importer = () => importing ||= codeImport({ db, github, importRoot: join(dataDirectory, 'imports'),
   afterInstall: projectId => { codeRepo.seed(projectId, pool.outputEntries); codeRepo.refresh(projectId); },
   sync: async projectId => { const code = codeRemote(projectId); return code ? remotes.sync(projectId, code.key) : null; } });
-// Existing projects: Code installs into each project's repository, then its generation links and releases move there once
-// and its starter docs are seeded (all idempotent). It runs once the portal is listening, so a restart isn't held up.
+// Existing projects: Code installs into each project's repository, then its releases move there once and its starter docs
+// are seeded (all idempotent). It runs once the portal is listening, so a restart isn't held up.
 function adoptCodeRepositories() {
   for (const projectId of layerProjects()) try {
     ensureProjectRepositoryLayers(db, projectId);
     if (codeRepo.layer(projectId)) { codeRepo.adopt(projectId); codeRepo.seed(projectId, pool.outputEntries); }
   } catch (error) { console.error(`Could not move Code into ${projectId}'s repository: ${error.message}`); }
 }
-// Closing a Reconcile item relinks the record's generation links in Code's repository too.
-know.onWorkDone(({ projectId, item }) => { const recordId = item.type === 'reconcile' && item.context?.reconcile?.recordId; if (recordId) try { codeRepo.relink(projectId, recordId); } catch (error) { console.error(`Relink in Code's repository failed: ${error.message}`); } });
 const storyRefs = projectId => know.list(projectId, 'story').map(story => ({ ...story, ref: `S${story.number}` }));
 const symphonyWorkspaceRoot = resolve(process.env.MACHINE_SYMPHONY_WORKSPACE_ROOT || join(dataDirectory, 'symphony-workspaces'));
 const candidates = codeCandidates({ db, candidateRoot: join(dataDirectory, 'code-candidates'), externalRoot: symphonyWorkspaceRoot });
@@ -376,7 +374,7 @@ function scaffoldSetup(user, projectId) {
 
 async function generateSkeleton(user, projectId) {
   const setup = scaffoldSetup(user, projectId);
-  const { files, media, binaries, manifest } = skeletonFiles(setup, catalogs, projectGitProfile, appUrls(setup.project.slug), flows.projectAssets(projectId), scaffoldSources);
+  const { files, media, binaries } = skeletonFiles(setup, catalogs, projectGitProfile, appUrls(setup.project.slug), flows.projectAssets(projectId), scaffoldSources);
   // PLATFORM-UX-01: AGENTS.md belongs to the developers once it exists. Workflow files are left out while the GitHub
   // App lacks the Workflows permission, because GitHub refuses the whole push otherwise.
   // The old generated guide (it starts "# Agent guide for") is Aludel's own file: it becomes the map once; its content lives on in docs/agents.md.
@@ -389,14 +387,12 @@ async function generateSkeleton(user, projectId) {
   writeBinaries(setup.workspacePath, binaries);
   copyMedia(setup.workspacePath, media);
   const result = commitWorkspace({ repository: setup.workspacePath, profile: projectGitProfile, message: `feat: generate ${setup.project.name} skeleton from ${setup.stack.preset}`, ...commitIdentity(user) });
-  // LAY-07D: read the code and attach the manifest, so template-built records have code links from the start.
-  // T03-CODE: with Code from its template, this repository is Code's. It is installed once, its pin follows the build, and
-  // the links go into its file, all before the push so GitHub gets one main.
-  let manifestResult = { missing: [] };
+  // LAY-07D: read the code. T03-CODE: with Code from its template, this repository is Code's: it is installed once and its
+  // pin follows the build, before the push so GitHub gets one main.
   try {
     ensureProjectRepositoryLayers(db, projectId);
-    if (codeRepo.layer(projectId)) { codeRepo.settleLocal(projectId); manifestResult = codeRepo.recordManifest(projectId, manifest, result.commit, user?.name || 'Aludel') || manifestResult; codeRepo.seed(projectId, pool.outputEntries); }
-    else { links.index(projectId, setup.workspacePath); manifestResult = links.recordManifest(projectId, manifest, result.commit); }
+    if (codeRepo.layer(projectId)) { codeRepo.settleLocal(projectId); codeRepo.refresh(projectId); codeRepo.seed(projectId, pool.outputEntries); }
+    else units.index(projectId, setup.workspacePath);
   } catch (error) { console.error(`Code index failed for ${projectId}: ${error.message}`); }
   const binding = github.status(user.id, projectId, null).repository;
   let pushed = false; let pushError = null;
@@ -411,11 +407,10 @@ async function generateSkeleton(user, projectId) {
   know.recordBuild(projectId, result.commit, { auth: Boolean(setup.stack.options?.auth) });
   // LAY-07B: every preview build is a release; the preview database is backed up before the app restarts.
   const backup = await ops.backup(projectId, setup.workspacePath, 'before release').catch(() => null);
-  const built = links.builtBy(projectId);
-  const release = ops.releases.start(projectId, { commit: result.commit, backup: backup?.name || null, stories: know.list(projectId, 'story').filter(story => built.has(story.id)).map(story => story.id) });
+  const release = ops.releases.start(projectId, { commit: result.commit, backup: backup?.name || null });
   void previews.build(projectId, setup.workspacePath, result.commit).then(status => ops.releases.finish(release.id, status));
   know.runRoutines(projectId, { trigger: 'release' });
-  return { commit: result.commit, trackedFiles: result.trackedFiles, pushed, pushError, release: release.number, unmatchedManifest: manifestResult.missing };
+  return { commit: result.commit, trackedFiles: result.trackedFiles, pushed, pushError, release: release.number };
 }
 
 function overview() {
@@ -1211,7 +1206,7 @@ async function api(request, response, url) {
       if (active.has('design')) know.ensureDesign(projectId);
       if (active.has('pages') && active.has('product')) know.ensureFlows(projectId);
       stageLayerDiscovery(db, know, projectId);
-      const view = know.view(user, projectId, { builtBy: links.builtBy(projectId) });
+      const view = know.view(user, projectId);
       const batchView = runs.view(projectId);
       const poolView = workerPoolView(projectId);
       const workView = runtimeBlockedWork(view, batchView, poolView);
@@ -1219,7 +1214,7 @@ async function api(request, response, url) {
       const pagePaths = Object.fromEntries(sitePages(know.navRoutes(projectId), know.list(projectId, 'page')).filter(page => page.id).map(page => [page.id, page.path]));
       const workspace = flows.projectSetup(user, projectId).workspacePath;
       const codexModels = await modelCatalog.list('codex');
-      return json(response, 200, { setup: projectView(user, projectId), knowledge: { ...view, work: workView, pagePaths, code: links.snapshot(projectId), batches: batchView,
+      return json(response, 200, { setup: projectView(user, projectId), knowledge: { ...view, work: workView, pagePaths, code: units.snapshot(projectId), batches: batchView,
         uploads: flows.uploads(projectId), symphonyProfiles: symphonyDispatchEnabled ? know.list(projectId, 'agent_profile').filter(profile => profile.active && (!profile.provider || profile.provider === 'codex')).map(profile => profile.id) : [], workerPool: poolView, brandUsage: workspaceIsIndexable(workspace) ? brandUsage(workspace, view.brand) : {} },
         catalog: { pageTypes: catalogs.pageTypes, routeIcons: catalogs.routeIcons, feels: catalogs.feels, stacks: catalogs.stacks, tools: catalogs.roles.tools, botColors, efforts,
           providers: { codex: codexModels, 'openai-api': { models: [], fetchedAt: null, error: 'Runtime adapter unavailable.' }, anthropic: { models: [], fetchedAt: null, error: 'Runtime adapter unavailable.' } },
@@ -1274,12 +1269,12 @@ async function api(request, response, url) {
         return json(response, 201, know.createWork(projectId, { action: 'platform.docs', title: `Refresh ${input.path} › ${input.heading}`.slice(0, 160),
           targets: changed.map(source => ({ id: source.id, label: `${source.kind} revision ${source.revision} → ${source.current}` })) }, user.name));
       }
-      if (item === 'releases' && method === 'GET') return json(response, 200, { releases: codeRelease.list(projectId), draft: codeRelease.draft(projectId, workspace, storyRefs(projectId), [...links.builtBy(projectId).keys()]) });
+      if (item === 'releases' && method === 'GET') return json(response, 200, { releases: codeRelease.list(projectId), draft: codeRelease.draft(projectId, workspace) });
       if (item === 'releases' && method === 'POST') {
         const input = await readJson(request);
         // T03-CODE: a release is recorded in Code's repository when Code is installed from its template.
-        if (codeRepo.layer(projectId)) return json(response, 201, codeRepo.recordRelease(projectId, codeRelease.draft(projectId, workspace, storyRefs(projectId), [...links.builtBy(projectId).keys()]), input, user.name));
-        return json(response, 201, codeRelease.record(projectId, workspace, storyRefs(projectId), input, user.name, [...links.builtBy(projectId).keys()]));
+        if (codeRepo.layer(projectId)) return json(response, 201, codeRepo.recordRelease(projectId, codeRelease.draft(projectId, workspace), input, user.name));
+        return json(response, 201, codeRelease.record(projectId, workspace, input, user.name));
       }
       // Round 3 (owner-authorized): publish a recorded release to the project's own GitHub repository as a tag and a GitHub Release.
       // The repository's release workflow then builds the image into GitHub Packages.
@@ -1289,24 +1284,19 @@ async function api(request, response, url) {
         if (!release) return json(response, 404, { error: 'That release is not recorded.' });
         if (release.publishedAt) return json(response, 409, { error: `v${release.version} is already published.` });
         const sha = codeRelease.fullSha(workspace, release.commit);
-        const titles = new Map(storyRefs(projectId).map(story => [story.id, `${story.ref} ${story.title}`]));
-        const body = [release.notes, release.stories.length ? `Ships:\n${release.stories.map(id => `- ${titles.get(id) || id}`).join('\n')}` : '', release.changes.length ? `Stack changes:\n${release.changes.map(change => `- ${change.name} ${change.from || 'added'} → ${change.to || 'removed'}`).join('\n')}` : ''].filter(Boolean).join('\n\n');
+        const body = [release.notes, release.changes.length ? `Stack changes:\n${release.changes.map(change => `- ${change.name} ${change.from || 'added'} → ${change.to || 'removed'}`).join('\n')}` : ''].filter(Boolean).join('\n\n');
         const published = await github.createRelease(projectId, { tag: `v${release.version}`, sha, name: `v${release.version}`, body });
         return json(response, 200, codeRepo.layer(projectId) ? codeRepo.markPublished(projectId, release.version, published.url) : codeRelease.markPublished(projectId, release.version, published.url));
       }
       if (item === 'ci' && method === 'GET') return json(response, 200, await github.ciResults(projectId, codeRelease.fullSha(workspace, url.searchParams.get('sha') || 'HEAD')));
     }
-    // LAY-07D: re-read the workspace; and the context a Reconcile item needs.
+    // LAY-07D: re-read the workspace.
     if (section === 'code' && item === 'index' && method === 'POST') {
       const workspace = flows.projectSetup(user, projectId).workspacePath;
       if (!workspaceIsIndexable(workspace)) return json(response, 409, { error: 'Build the app first; there is no code to read yet.' });
       // T03-CODE: the code is read at Code's pin, which follows the repository (and GitHub, when connected).
       if (codeRepo.layer(projectId)) { await syncCode(projectId); return json(response, 200, codeRepo.refresh(projectId)); }
-      return json(response, 200, links.index(projectId, workspace));
-    }
-    if (section === 'reconcile' && item && method === 'GET') {
-      const work = know.workList(projectId).find(entry => entry.id === item);
-      return work ? json(response, 200, links.reconcileContext(projectId, work) || {}) : json(response, 404, { error: 'Work item not found.' });
+      return json(response, 200, units.index(projectId, workspace));
     }
     // WORK-UX-01: what an item changed, as revision diffs.
     if (section === 'changes' && item && method === 'GET') return json(response, 200, { changes: know.workChanges(projectId, item) });
@@ -1357,7 +1347,7 @@ async function api(request, response, url) {
       const record = ['story', 'spec', 'doc', 'research', 'persona', 'activity', 'step', 'data_object', 'data_operation', 'access_rule', 'brief_claim', 'source', 'finding', 'insight', 'evidence_link', 'project', 'component', 'brand_asset', 'flow', 'page'].flatMap(kind => know.list(projectId, kind)).find(entry => entry.id === item);
       if (!record) return json(response, 409, { error: 'That record cannot be deleted here.' });
       // PAGES-UX-01: only page blanks go from the Map. Pages in the navigation change in the navigation editor; built pages change through a change request.
-      if (record.kind === 'page' && (record.inNav || record.status !== 'planned' || links.builtBy(projectId).get(record.id)?.units)) return json(response, 409, { error: `“${record.label}” has a build or is in the navigation, so it can't be deleted from the Map.` });
+      if (record.kind === 'page' && (record.inNav || record.status !== 'planned')) return json(response, 409, { error: `“${record.label}” has a build or is in the navigation, so it can't be deleted from the Map.` });
       const users = know.referrers(projectId, item);
       if (users.length) return json(response, 409, { error: `Still used by ${users.slice(0, 3).join(', ')}${users.length > 3 ? ` and ${users.length - 3} more` : ''}. Change those first.` });
       know.remove(projectId, item);

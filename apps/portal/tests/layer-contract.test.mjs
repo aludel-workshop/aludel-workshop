@@ -20,7 +20,6 @@ db.exec(`
   CREATE TABLE layer_work_items (project_id TEXT);
   CREATE TABLE routine_runs (project_id TEXT);
   CREATE TABLE code_units (id TEXT, project_id TEXT, hash TEXT);
-  CREATE TABLE trace_links (id TEXT, project_id TEXT, updated_at TEXT);
   CREATE TABLE code_releases (id TEXT, project_id TEXT, commit_sha TEXT);
   CREATE TABLE releases (id TEXT, project_id TEXT, state TEXT);
   INSERT INTO projects VALUES ('a'), ('b');

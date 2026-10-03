@@ -83,7 +83,7 @@ export function codeCandidates({ db, candidateRoot, externalRoot = join(candidat
     return get(projectId, id);
   }
 
-  function finish({ projectId, id, repository, checks = [], message, implementsRefs = [] }) {
+  function finish({ projectId, id, repository, checks = [], message }) {
     const candidate = get(projectId, id);
     if (!candidate || candidate.state !== 'running') fail('Candidate is not running.');
     const source = root(repository);
@@ -102,7 +102,7 @@ export function codeCandidates({ db, candidateRoot, externalRoot = join(candidat
     if (staged.some(file => !allowedPath(file, candidate.changes))) fail('Staged changes exceed the action permission.');
     if (!staged.length) fail('Coding run made no committable file changes.');
     git(path, '-c', 'user.name=Aludel Agent', '-c', 'user.email=agent@aludel.local', 'commit', '-m', String(message || 'Implement work item').slice(0, 160), '-m',
-      `Aludel-Work: ${candidate.workId}${implementsRefs.length ? `\nImplements: ${implementsRefs.join(', ')}` : ''}`);
+      `Aludel-Work: ${candidate.workId}`);
     const commit = git(path, 'rev-parse', 'HEAD');
     const evidence = (Array.isArray(checks) ? checks : []).slice(0, 30).map(check => ({ name: String(check.name || '').slice(0, 120),
       status: ['passed', 'failed', 'skipped'].includes(check.status) ? check.status : 'skipped', detail: String(check.detail || '').slice(0, 500) }));
