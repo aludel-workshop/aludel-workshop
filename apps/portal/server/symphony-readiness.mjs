@@ -6,7 +6,7 @@ const safe = value => String(value || '').replace(/[^A-Za-z0-9_-]/g, '-').replac
 // LAYER-TOOLS-02: a layer task makes its changes, staged for review. The read-only proposal wording is only for actions;
 // given to a layer task it led a live agent to describe the changes instead of making them.
 const layerBrief = key => `Open the task card. This is a ${key} layer task: make the requested changes. Change ${key} data only with aludel_layer_call, ` +
-  'and the layer itself only in layer/, committed with aludel_layer_commit after its tests. Everything is staged for review; submit with aludel_submit_proposal and evidence for each criterion. ' +
+  'and the layer itself only in layer/, committed with aludel_layer_commit after its tests. Everything is staged for review; submit with aludel_submit_proposal and evidence for each claim, by its ID. ' +
   'Do not change other project records or the project repository.';
 export function symphonyIssue({ project, item, batch, action, bundle, repositoryCommit }) {
   // DEC-057: a layer-scoped item is pinned to its layer's change scope instead of an action.

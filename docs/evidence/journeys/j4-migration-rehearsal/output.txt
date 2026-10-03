@@ -1,0 +1,108 @@
+{
+ "agent": {
+  "checks": [
+   [
+    "note-1",
+    "note",
+    false,
+    "It is one sentence",
+    null
+   ],
+   [
+    "note-2",
+    "note",
+    false,
+    "It names the user",
+    null
+   ]
+  ],
+  "log": "Its 2 criteria are now note claims: unbacked until they reference a layer entry"
+ },
+ "person": {
+  "checks": [
+   [
+    "note-1",
+    "note",
+    false,
+    "It names the owner",
+    null
+   ],
+   [
+    "note-2",
+    "note",
+    false,
+    "It has a date",
+    null
+   ]
+  ],
+  "log": "Its 2 criteria are now note claims: unbacked until they reference a layer entry"
+ },
+ "ready": {
+  "checks": [
+   [
+    "note-1",
+    "note",
+    false,
+    "First",
+    null
+   ],
+   [
+    "note-2",
+    "note",
+    false,
+    "Second",
+    null
+   ],
+   [
+    "note-3",
+    "note",
+    false,
+    "Third",
+    null
+   ]
+  ],
+  "log": "Its 3 criteria are now note claims: unbacked until they reference a layer entry"
+ },
+ "agentRun": {
+  "criteria": [
+   "note-1",
+   "note-2"
+  ],
+  "verdicts": {
+   "note-1": {
+    "value": "accept",
+    "note": ""
+   },
+   "note-2": {
+    "value": "reject",
+    "note": "Which user?"
+   }
+  },
+  "evidence": [
+   [
+    "note-2",
+    "change",
+    true
+   ]
+  ]
+ },
+ "personRun": {
+  "criteria": [
+   "note-1",
+   "note-2"
+  ],
+  "verdicts": {
+   "note-2": {
+    "value": "accept",
+    "note": ""
+   }
+  },
+  "evidence": [
+   [
+    "note-2",
+    "The date is in the header."
+   ]
+  ]
+ }
+}
+rehearsal passed

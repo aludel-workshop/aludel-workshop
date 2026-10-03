@@ -16,7 +16,7 @@ Convert Code onto its template with GitHub sync, now on `main`: the layer-templa
 
 ## Next action
 
-**JOURNEYS-01 J4: claims** (needs the owner's go). J3 (journey proof) is done on branch `claude/brave-pascal-br7h4i` (2026-10-03), apart from Biome's steps, which move to J8. Start from the [handoff](design/journeys/handoff.md). The owner moved on from T03-CODE ("t03-code is fine for now"); its owner items below stay open.
+**JOURNEYS-01 J5: Specify → Implement** (needs the owner's go). J4 (claims) is done on branch `claude/nice-cray-zn7gfg` (2026-10-03), stacked on J3's `claude/brave-pascal-br7h4i`; neither is on `main` yet. Run `tools/branch-handoffs.sh`, then start from the [handoff](design/journeys/handoff.md). **Before the owner's next restart:** the claims migration rewrites item criteria and saved run verdicts (rehearsed on data written by the pre-J4 code). The owner moved on from T03-CODE ("t03-code is fine for now"); its owner items below stay open.
 
 **T03-CODE: the app repository as the Code layer, with GitHub sync (run 1 built and agent-checked 2026-10-02).** [Evidence and retrospective](evidence/t03-code/README.md) · [brief and run log](design/layer-app-transition/t03-code-brief.md).
 - **Done:**
@@ -51,7 +51,7 @@ LAT-01–07 and the LAT-08 prototype established the isolated candidate, layer s
 
 ## Ready queue
 
-1. **JOURNEYS-01** (active; J3 next, [handoff](design/journeys/handoff.md)): journey-driven Work and review. Spec, then implement; claims replace hand-written criteria; journeys, tests and review seams live in `.aludel/`; includes cleanup of Codex's guided-preview work ([plan](design/journeys/work-record.md)). J0–J2 done 2026-10-02 (Code template `cc30be2`: journeys facet and Journeys tab); code tracing removed by DEC-063; J3 done 2026-10-03 (Biome's steps move to J8); J4 next. The owner waived waiting for T03-CODE's look.
+1. **JOURNEYS-01** (active; J5 next, [handoff](design/journeys/handoff.md)): journey-driven Work and review. Spec, then implement; claims replace hand-written criteria; journeys, tests and review seams live in `.aludel/`; includes cleanup of Codex's guided-preview work ([plan](design/journeys/work-record.md)). J0–J2 done 2026-10-02 (Code template `cc30be2`: journeys facet and Journeys tab); code tracing removed by DEC-063; J3 done 2026-10-03 (Biome's steps move to J8); J4 done 2026-10-03 (claims, with the gate at acceptance); J5 next. The owner waived waiting for T03-CODE's look.
 2. **T03-CODE**: run 1 built and agent-checked ([evidence](evidence/t03-code/README.md)). Waits on the owner's browser look, the live GitHub round trip and the candidate-preview question; then the compiled modules retire. F1 is done.
 3. **LAYER-GITHUB-01**: publish Vision, Design, Pages and Data repositories (and possibly `layer-base`) to the owner's GitHub with T03-CODE's sync (DEC-062).
 4. **LAYER-BINDINGS-01 step 4 (F10)**: Code ⇄ Pages binding, migrating `layer_connections` and the hard-coded Pages reconciliation, after T03-CODE.
@@ -249,6 +249,15 @@ New Operator role. Agent-checked: server 88/89 (1 pre-existing), all browser sui
 | M0 research/design | Product loop, local agent path, runner choice, recovery model, product workflow, knowledge boundary, experience architecture, and design-system strategy | [Execution plan](execution-plan.md), [decision register](decisions.md) |
 
 ## Latest handoff
+
+2026-10-03: **JOURNEYS-01 J4 done (cloud session, branch `claude/nice-cray-zn7gfg` on top of J3's branch).**
+- A Work item's criteria are claims with stable IDs: `journey`, `record`, `invariant`, or an unbacked `note`. Verdicts, evidence and send-back feedback name claims, not positions.
+- A journey claim is proven by its steps' results on the reviewed build. A claim that isn't proven stops acceptance: an agent run goes back with its failing steps; a person run may be accepted only if the person said why when submitting.
+- **Deviation from the plan:** the gate sits at acceptance, not at the agent's submit call, because results exist only after the host builds the review. A pre-submit check joins J7.
+- **Restart effect:** item criteria become `note-<n>` claims and saved run verdicts move to claim IDs. This was rehearsed on data written by the pre-J4 code; tell the owner before they restart.
+- Both server suites pass (286/0, and templates 309/0). The final templates rerun had one load-timing failure, a portal startup over 60 s, which passes alone. Typecheck, build, all 22 browser scripts, and the repository-review check (extended for claims) pass.
+- **Process:** `tools/branch-handoffs.sh` lists branches ahead of `main` (AGENTS.md now says to run it first). The handoff records the exact runner-image commands.
+- [Run log](design/journeys/work-record.md#j4-claims-2026-10-03-claude-cloud-session).
 
 2026-10-03: **JOURNEYS-01 follow-ups (owner chat).**
 - Installing Code into a repository that already has `.aludel/` reads its files in; a conflicting version of Code's own code is refused.

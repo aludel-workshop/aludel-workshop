@@ -89,9 +89,13 @@ export function objectivesOf(run: WorkRun, nowMs: number): { list: Objective[]; 
             <label for="person-commit">Exact commit</label><input id="person-commit" name="personCommit" [(ngModel)]="commitDraft" placeholder="Full commit SHA">
           }
           <label for="person-summary">What is ready for review</label><textarea id="person-summary" name="personSummary" rows="3" [(ngModel)]="summaryDraft" required></textarea>
-          @for (criterion of r.task.criteria; track criterion.index) {
-            <label [for]="'person-evidence-' + criterion.index">Evidence for {{ criterion.index + 1 }}. {{ criterion.text }}</label>
-            <textarea [id]="'person-evidence-' + criterion.index" [name]="'personEvidence' + criterion.index" rows="2" [(ngModel)]="evidenceDraft[criterion.index]" placeholder="What should the reviewer inspect?"></textarea>
+          @for (criterion of r.task.criteria; track criterion.id) {
+            <label [for]="'person-evidence-' + criterion.id">Evidence for {{ criterion.index + 1 }}. {{ criterion.text }}</label>
+            <textarea [id]="'person-evidence-' + criterion.id" [name]="'personEvidence-' + criterion.id" rows="2" [(ngModel)]="evidenceDraft[criterion.id]" placeholder="What should the reviewer inspect?"></textarea>
+            @if (criterion.kind === 'journey' || criterion.covers === 'journeys') {
+              <label [for]="'person-reason-' + criterion.id">If its step tests won't pass yet, say why (optional)</label>
+              <textarea [id]="'person-reason-' + criterion.id" [name]="'personReason-' + criterion.id" rows="2" [(ngModel)]="reasonDraft[criterion.id]" placeholder="Without a reason, review can't accept this run while a claimed step fails."></textarea>
+            }
           }
           <div class="lay-row lay-wrap"><button type="submit" class="lay-button" [disabled]="!summaryDraft.trim()">Submit for review</button><button type="button" class="lay-button ghost" (click)="submitOpen.set(false)">Cancel</button></div>
         </form>
@@ -100,7 +104,7 @@ export function objectivesOf(run: WorkRun, nowMs: number): { list: Objective[]; 
         <div class="wi-signoff" role="group" [attr.aria-label]="signTitle()">
           <h3><mat-icon aria-hidden="true">draw</mat-icon>{{ signTitle() }}</h3>
           @if (kind === 'accept' && (flagCount() || unchecked())) { <p class="wi-warn"><mat-icon aria-hidden="true">warning</mat-icon>
-            {{ flagCount() ? flagCount() + (flagCount() === 1 ? ' flag' : ' flags') + ' will be dropped. ' : '' }}{{ unchecked() ? 'You haven\\'t checked ' + unchecked() + ' of ' + r.task.criteria.length + ' criteria yourself. ' : '' }}Accept anyway?</p> }
+            {{ flagCount() ? flagCount() + (flagCount() === 1 ? ' flag' : ' flags') + ' will be dropped. ' : '' }}{{ unchecked() ? 'You haven\\'t checked ' + unchecked() + ' of ' + r.task.criteria.length + ' claims yourself. ' : '' }}Accept anyway?</p> }
           @if (flags().length) { <ul class="wi-flaglist">@for (flag of flags(); track flag.label) { <li><mat-icon aria-hidden="true">flag</mat-icon><span><strong>{{ flag.label }}</strong>@if (flag.note) { : {{ flag.note }} }</span></li> }</ul> }
           <p class="small lay-muted">{{ signHelp() }}</p>
           <label for="sign-comment">Overall comment (optional)</label>
@@ -146,11 +150,11 @@ export function objectivesOf(run: WorkRun, nowMs: number): { list: Objective[]; 
         }
       </div></details>
     <details class="wi-sec"><summary><mat-icon aria-hidden="true">fact_check</mat-icon><span>Criteria</span><small>{{ criteriaSummary() }}</small><mat-icon aria-hidden="true" class="wi-chev">expand_more</mat-icon></summary>
-      <div class="wi-sec-body"><ol class="wi-crits">@for (criterion of r.task.criteria; track criterion.index) {
-        <li><span [class]="'wi-num wi-v-' + (r.review.verdicts[criterion.index]?.value || 'none')">@switch (r.review.verdicts[criterion.index]?.value) { @case ('accept') { <mat-icon aria-label="Accepted">check</mat-icon> } @case ('reject') { <mat-icon aria-label="Flagged">flag</mat-icon> } @default { {{ criterion.index + 1 }} } }</span>
-          <div><span>{{ criterion.text }}</span>@if (criterion.source) { <div class="lay-refs"><aludel-ref [id]="criterion.source.id" /></div> }
-            @if (r.review.verdicts[criterion.index]?.value === 'reject' && r.review.verdicts[criterion.index]?.note) { <p class="wi-flagnote"><mat-icon aria-hidden="true">subdirectory_arrow_right</mat-icon>{{ r.review.verdicts[criterion.index]?.note }}</p> }</div></li>
-      } @empty { <li class="lay-muted">Run {{ r.number }} was given no criteria.</li> }</ol></div></details>
+      <div class="wi-sec-body"><ol class="wi-crits">@for (criterion of r.task.criteria; track criterion.id) {
+        <li><span [class]="'wi-num wi-v-' + (r.review.verdicts[criterion.id]?.value || 'none')">@switch (r.review.verdicts[criterion.id]?.value) { @case ('accept') { <mat-icon aria-label="Accepted">check</mat-icon> } @case ('reject') { <mat-icon aria-label="Flagged">flag</mat-icon> } @default { {{ criterion.index + 1 }} } }</span>
+          <div><span>{{ criterion.text }}</span> <small class="lay-muted">{{ criterion.backed ? criterion.kind : 'note · unbacked' }}@if (r.proofs[criterion.id]; as proof) { · step tests {{ proof.status === 'passed' ? 'passed' : proof.status.replace('-', ' ') }} }</small>@if (criterion.source) { <div class="lay-refs"><aludel-ref [id]="criterion.source.id" /></div> }
+            @if (r.review.verdicts[criterion.id]?.value === 'reject' && r.review.verdicts[criterion.id]?.note) { <p class="wi-flagnote"><mat-icon aria-hidden="true">subdirectory_arrow_right</mat-icon>{{ r.review.verdicts[criterion.id]?.note }}</p> }</div></li>
+      } @empty { <li class="lay-muted">Run {{ r.number }} was given no claims.</li> }</ol></div></details>
     <details class="wi-sec"><summary><mat-icon aria-hidden="true">difference</mat-icon><span>Changes</span><small>{{ changeSummary() }}</small><mat-icon aria-hidden="true" class="wi-chev">expand_more</mat-icon></summary>
       <div class="wi-sec-body">
         <ul class="wi-changes">@for (change of r.changes; track change.id) {
@@ -182,7 +186,7 @@ export class RunCardComponent {
   readonly logOpen = signal(false);
   readonly signing = signal<'accept' | 'reject' | 'close' | null>(null);
   readonly submitOpen = signal(false);
-  comment = ''; answerDraft = ''; whyDraft = ''; answerCriteria = ''; summaryDraft = ''; branchDraft = ''; commitDraft = ''; evidenceDraft: string[] = [];
+  comment = ''; answerDraft = ''; whyDraft = ''; answerCriteria = ''; summaryDraft = ''; branchDraft = ''; commitDraft = ''; evidenceDraft: Record<string, string> = {}; reasonDraft: Record<string, string> = {};
   readonly tone = computed(() => runTone[this.run().state]);
   readonly title = computed(() => runTitle[this.run().state]);
   readonly objectives = computed(() => objectivesOf(this.run(), this.ctx.now()));
@@ -206,21 +210,21 @@ export class RunCardComponent {
       case 'needs': return `${r.performer.label} paused on a question. Your answer can amend the next run's criteria.`;
       case 'review': return r.performer.kind === 'person' && !r.layerSource
         ? `${r.performer.label} submitted a review packet with ${r.changes.length} linked ${r.changes.length === 1 ? 'change' : 'changes'}. The revisions are already recorded; acceptance signs off the run.`
-        : `${r.performer.label} submitted ${r.changes.length} ${r.changes.length === 1 ? 'change' : 'changes'} for ${r.task.criteria.length} ${r.task.criteria.length === 1 ? 'criterion' : 'criteria'}. Nothing is applied until you accept.`;
+        : `${r.performer.label} submitted ${r.changes.length} ${r.changes.length === 1 ? 'change' : 'changes'} for ${r.task.criteria.length} ${r.task.criteria.length === 1 ? 'claim' : 'claims'}. Nothing is applied until you accept.`;
       case 'failed': return r.blockReason ? `${r.blockReason} Close the run to reopen the task.` : 'The run could not finish. Close it to reopen the task.';
       case 'stopped': return 'The run stopped before it submitted. Close it to reopen the task.';
       default: return r.review.signedBy ? `Signed by ${r.review.signedBy} · ${this.when(r.review.signedAt || '')}` : r.state === 'accepted' ? 'Accepted before run signatures were recorded.' : 'Sent back before run signatures were recorded.';
     }
   });
   readonly flags = computed(() => { const r = this.run();
-    const criteria = Object.entries(r.review.verdicts).filter(([, verdict]) => verdict.value === 'reject').map(([index, verdict]) => ({ label: r.task.criteria[Number(index)]?.text || 'Criterion', note: verdict.note }));
+    const criteria = Object.entries(r.review.verdicts).filter(([, verdict]) => verdict.value === 'reject').map(([id, verdict]) => ({ label: r.task.criteria.find(claim => claim.id === id)?.text || id, note: verdict.note }));
     const changes = Object.entries(r.review.flags).map(([id, note]) => ({ label: r.changes.find(change => change.id === id)?.name || id, note }));
     return [...criteria, ...changes]; });
   readonly flagCount = computed(() => this.flags().length);
-  readonly unchecked = computed(() => { const r = this.run(); return r.task.criteria.filter(criterion => !r.review.verdicts[criterion.index] || r.review.verdicts[criterion.index].value === 'skip').length; });
+  readonly unchecked = computed(() => { const r = this.run(); return r.task.criteria.filter(criterion => !r.review.verdicts[criterion.id] || r.review.verdicts[criterion.id].value === 'skip').length; });
   readonly criteriaSummary = computed(() => { const r = this.run(); const values = Object.values(r.review.verdicts);
     const accepted = values.filter(value => value.value === 'accept').length, flagged = values.filter(value => value.value === 'reject').length;
-    return `${r.task.criteria.length} ${r.task.criteria.length === 1 ? 'criterion' : 'criteria'}${accepted ? ` · ${accepted} accepted` : ''}${flagged ? ` · ${flagged} flagged` : ''}`; });
+    return `${r.task.criteria.length} ${r.task.criteria.length === 1 ? 'claim' : 'claims'}${accepted ? ` · ${accepted} accepted` : ''}${flagged ? ` · ${flagged} flagged` : ''}`; });
   readonly changeSummary = computed(() => { const r = this.run(); if (!r.changes.length) return 'No changes';
     const count = (op: string) => r.changes.filter(change => change.op === op).length;
     const flagged = Object.keys(r.review.flags).length;
@@ -240,7 +244,7 @@ export class RunCardComponent {
     effect(() => { const r = this.run(); untracked(() => {
       if (r.state !== 'review') this.signing.set(null);
       if (!this.answerDraft) this.answerDraft = this.item().question?.recommendation || '';
-      if (!this.answerCriteria) this.answerCriteria = this.item().checks.map(check => check.text).join('\n');
+      if (!this.answerCriteria) this.answerCriteria = this.item().checks.filter(check => !check.backed).map(check => check.text).join('\n');
     }); });
   }
 
@@ -265,8 +269,9 @@ export class RunCardComponent {
     else await this.ctx.updateWork(this.item().id, { stop: true });
     this.changed.emit();
   }, `Stopping ${this.item().ref}.`); }
-  submitPerson() { const evidence = this.evidenceDraft.map((note, criterion) => ({ criterion, note: note?.trim() })).filter(entry => entry.note);
-    void this.ctx.write(async () => { await this.ctx.api(this.base() + '/submit', 'POST', { summary: this.summaryDraft, evidence, ...(this.branchDraft.trim() ? { source: { branch: this.branchDraft.trim(), commit: this.commitDraft.trim() } } : {}) }); this.submitOpen.set(false); this.changed.emit(); }, 'Ready for review.'); }
+  submitPerson() { const evidence = Object.entries(this.evidenceDraft).map(([claim, note]) => ({ claim, note: note?.trim() })).filter(entry => entry.note);
+    const reasons = Object.fromEntries(Object.entries(this.reasonDraft).map(([claim, reason]) => [claim, reason?.trim()]).filter(([, reason]) => reason));
+    void this.ctx.write(async () => { await this.ctx.api(this.base() + '/submit', 'POST', { summary: this.summaryDraft, evidence, reasons, ...(this.branchDraft.trim() ? { source: { branch: this.branchDraft.trim(), commit: this.commitDraft.trim() } } : {}) }); this.submitOpen.set(false); this.changed.emit(); }, 'Ready for review.'); }
   answer() { const criteriaAmendment = this.answerCriteria.split('\n').map(value => value.trim()).filter(Boolean);
     void this.ctx.write(async () => { await this.ctx.updateWork(this.item().id, { answer: this.answerDraft, rationale: this.whyDraft, criteriaAmendment }); this.changed.emit(); }, 'Answered and updated the next run.'); }
   when(at: string) { const date = new Date(at); return `${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · ${date.toTimeString().slice(0, 5)}`; }
@@ -325,6 +330,8 @@ export class RunCardComponent {
       </div></details>
     <details class="wi-sec" [open]="editable()"><summary><mat-icon aria-hidden="true">fact_check</mat-icon><span>Criteria</span><small>{{ criteria.length }} {{ criteria.length === 1 ? 'criterion' : 'criteria' }}{{ editable() ? ' · editable' : '' }}</small><mat-icon aria-hidden="true" class="wi-chev">expand_more</mat-icon></summary>
       <div class="wi-sec-body">
+        @if (backed().length) { <ol class="wi-crits">@for (claim of backed(); track claim.id) {
+          <li><span class="wi-num wi-v-none"><mat-icon aria-hidden="true">{{ claim.kind === 'journey' ? 'route' : claim.kind === 'record' ? 'link' : 'rule' }}</mat-icon></span><span>{{ claim.text }} <small class="lay-muted">{{ claim.kind }} · edited in its layer</small></span></li> }</ol> }
         <ol class="wi-crits">@for (criterion of criteria; track $index; let index = $index) {
           <li><span class="wi-num wi-v-none">{{ index + 1 }}</span>
             @if (editable()) { <label class="visually-hidden" [for]="'criterion-' + index">Criterion {{ index + 1 }}</label>
@@ -380,7 +387,9 @@ export class NextRunComponent {
       untracked(() => { if (key === this.loadedFor || this.dirty()) return; this.loadedFor = key; this.reset(); this.answerDraft = work.question?.recommendation || ''; }); });
   }
 
-  reset() { const work = this.item(); this.request = work.context?.suggestion || ''; this.criteria = work.checks.map(check => check.text); this.dirty.set(false); }
+  // JOURNEYS-01 J4: backed claims come from the layer entries they reference; only free-text notes are edited here.
+  readonly backed = computed(() => this.item().checks.filter(check => check.backed));
+  reset() { const work = this.item(); this.request = work.context?.suggestion || ''; this.criteria = work.checks.filter(check => !check.backed).map(check => check.text); this.dirty.set(false); }
   addCriterion() { this.criteria = [...this.criteria, '']; this.dirty.set(true); setTimeout(() => document.getElementById(`criterion-${this.criteria.length - 1}`)?.focus()); }
   removeCriterion(index: number) { this.criteria = this.criteria.filter((_, position) => position !== index); this.dirty.set(true); }
   save() {

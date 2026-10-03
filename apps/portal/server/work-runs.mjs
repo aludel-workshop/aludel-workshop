@@ -1,6 +1,7 @@
 import { initLayerSource, layerReview, layerBinding, layerBranch, submitLayerBranch, prepareLayerReview, assertLayerReviewCurrent, mergeLayerBranch, settleLayerCheckout, undoLayerMerge } from './layer-source.mjs';
 import { packageAt } from './layer-package.mjs';
-import { reviewInputPath } from './journeys.mjs';
+import { claimGate, claimProof, reviewInputPath, taskClaims } from './journeys.mjs';
+import { reviewInputs } from './review-previews.mjs';
 import { layerInstanceId } from './layer-contract.mjs';
 import { randomUUID } from 'node:crypto';
 import { followUpsForAttempt, requireElevated } from './layer-scope.mjs';
@@ -39,7 +40,20 @@ export function initWorkRuns(db) {
     verdicts_json TEXT NOT NULL DEFAULT '{}', flags_json TEXT NOT NULL DEFAULT '{}',
     outcome TEXT, comment TEXT, signed_by TEXT, signed_at TEXT, updated_at TEXT NOT NULL
   );`);
+  // JOURNEYS-01 J4: a person states why a claim isn't proven yet when submitting over it; the reviewer reads it first.
+  if (!db.prepare('PRAGMA table_info(work_person_runs)').all().some(column => column.name === 'reasons_json')) db.exec("ALTER TABLE work_person_runs ADD COLUMN reasons_json TEXT NOT NULL DEFAULT '{}'");
+  // JOURNEYS-01 J4: saved verdicts are keyed by claim ID. Runs reviewed before J4 kept them by criterion position, and their
+  // pinned criteria read as `note-<position + 1>` (claimAt), so a position key moves to that ID. Runs once per review.
+  for (const [table, key] of [['work_run_reviews', 'attempt_id'], ['work_person_run_reviews', 'run_id']]) {
+    for (const row of db.prepare(`SELECT ${key} AS id, verdicts_json FROM ${table}`).all()) {
+      const verdicts = parse(row.verdicts_json, {});
+      if (!Object.keys(verdicts).some(name => /^\d+$/.test(name))) continue;
+      const keyed = Object.fromEntries(Object.entries(verdicts).map(([name, verdict]) => [/^\d+$/.test(name) ? `note-${Number(name) + 1}` : name, verdict]));
+      db.prepare(`UPDATE ${table} SET verdicts_json = ? WHERE ${key} = ?`).run(JSON.stringify(keyed), row.id);
+    }
+  }
 }
+
 
 // Outcomes a reviewer can sign. Accepting applies the run; the others leave its changes unapplied and reopen the task.
 export const signOutcomes = { accept: 'accepted', reject: 'sent', close: 'closed' };
@@ -165,14 +179,15 @@ export function workRuns({ db, know, candidates = null }) {
         startedAt, finishedAt, turns: { used: row.runs_started, limit: row.run_limit },
         task: {
           title: work.title || item.title, request: work.context?.suggestion || '', action: work.action || item.action,
-          criteria: (work.checks || []).map((check, position) => ({ index: position, text: check.text, source: check.source || null })),
+          criteria: taskClaims(work.checks),
           targets: (work.targets || []).map(target => ({ id: target.id, label: target.label, kind: target.kind })),
-          carried: (work.context?.feedback || []).map(note => ({ check: note.check, note: note.note, by: note.by })),
+          carried: (work.context?.feedback || []).map(note => ({ ...(note.claim ? { claim: note.claim } : {}), check: note.check, note: note.note, by: note.by })),
           carriedComment: work.context?.reviewComment || null,
         },
         live: live ? { phases: live.phases || [], phase: live.phase ?? null, activity: live.activity || '', model: live.model || null, usage: live.usage || null } : null,
         steps: planned.filter(step => step.kind !== 'evidence'),
         evidence: resolveEvidence(planned, outputs.changes, outputs.candidate, outputs.layerSource),
+        reasons: {},
         blockReason: state === 'failed' ? item.context?.executionBlock?.reason || progress.find(step => step.status === 'stuck')?.note
           || item.log.filter(entry => /^Blocked: /.test(entry.text)).pop()?.text.slice(9) || null : null,
         ...outputs,
@@ -184,6 +199,7 @@ export function workRuns({ db, know, candidates = null }) {
     });
     const people = db.prepare('SELECT * FROM work_person_runs WHERE project_id = ? AND work_id = ? ORDER BY started_at').all(projectId, workId).map(row => {
       const task = parse(row.task_json, {});
+      task.criteria = taskClaims(task.criteria);
       const review = reviewRow(row.id);
       const source = layerBranch(db, row.id), integrated = layerReview(db, projectId, row.id);
       if (integrated && db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'layer_review_builds'").get()) { const build = db.prepare('SELECT checks_json FROM layer_review_builds WHERE integration_id = ?').get(integrated.id); if (build) integrated.tests.push(...JSON.parse(build.checks_json)); }
@@ -193,7 +209,7 @@ export function workRuns({ db, know, candidates = null }) {
         id: row.id, batchId: null, state: review?.outcome || row.state,
         performer: { kind: 'person', id: row.performer_id, label: row.performer_name, model: null, effort: null },
         startedAt: row.started_at, finishedAt: row.submitted_at, turns: { used: 0, limit: 0 }, task,
-        live: null, steps: steps(row.id), evidence: parse(row.evidence_json, []), blockReason: null,
+        live: null, steps: steps(row.id), evidence: parse(row.evidence_json, []).map(legacyEvidence), reasons: parse(row.reasons_json, {}), blockReason: null,
         layerSource: source && { ...source, tests: source.tests.map(check => ({ ...check, source: 'person-report' })) },
         integration: integrated && { ...integrated, appRepository: Boolean(repository?.root), appChanged: appChanged(integrated, repository?.root), current: layerBinding(db, projectId, repository.key).commit === integrated.base },
         changes: [...parse(row.changes_json, []), ...sourceChanges], candidate: null, proposalId: null, reportId: null, summary: row.summary || null,
@@ -201,7 +217,28 @@ export function workRuns({ db, know, candidates = null }) {
           outcome: review?.outcome || null, comment: review?.comment || null, signedBy: review?.signed_by || null, signedAt: review?.signed_at || null },
       };
     });
-    return [...agentRuns, ...people].sort((a, b) => a.startedAt.localeCompare(b.startedAt)).map((run, index) => ({ ...run, number: index + 1 }));
+    return [...agentRuns, ...people].sort((a, b) => a.startedAt.localeCompare(b.startedAt)).map((run, index) => ({ ...run, number: index + 1, ...proven(projectId, run) }));
+  }
+
+  // JOURNEYS-01 J4: each claim's automated proof on the run's reviewed build, and the claims that stop acceptance. Journey
+  // results are the step tests J3 ran on that exact build; the journeys are read from the same commit.
+  function proven(projectId, run) {
+    const claims = run.task.criteria || [];
+    if (!claims.some(claim => claim.kind === 'journey' || claim.covers === 'journeys')) return { proofs: {}, gate: [] };
+    let built = {};
+    const integration = run.integration;
+    if (integration && db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'layer_review_journeys'").get()) {
+      const walked = db.prepare('SELECT steps_json FROM layer_review_journeys WHERE integration_id = ? AND commit_sha = ?').get(integration.id, integration.commit);
+      if (walked) {
+        let journeys = null, unreadable = null;
+        const key = db.prepare('SELECT layer_key FROM layer_review_integrations WHERE id = ?').get(integration.id)?.layer_key;
+        try { journeys = reviewInputs(layerBinding(db, projectId, key).repo, integration.commit)?.journeys || null; } catch (error) { unreadable = error.message; }
+        built = { journeys, results: parse(walked.steps_json, []), unreadable };
+      }
+    }
+    const proofs = Object.fromEntries(claims.map(claim => [claim.id, claimProof(claim, built, claims)]).filter(([, proof]) => proof)
+      .map(([id, proof]) => [id, built.unreadable && proof.status === 'not-run' ? { ...proof, detail: `The reviewed build's journeys can't be read: ${built.unreadable}` } : proof]));
+    return { proofs, gate: claimGate(claims, proofs, run.performer.kind === 'person' ? run.reasons : {}) };
   }
 
   const runFor = (projectId, workId, attemptId) => {
@@ -217,11 +254,13 @@ export function workRuns({ db, know, candidates = null }) {
     const verdicts = { ...run.review.verdicts };
     const flags = { ...run.review.flags };
     if (input.verdict) {
-      const index = Number(input.verdict.index);
-      if (!Number.isInteger(index) || !run.task.criteria[index]) fail('Unknown criterion.');
+      // A claim by ID; a position is resolved to the claim it names now, and the verdict is kept by claim ID.
+      const claim = input.verdict.claim !== undefined ? run.task.criteria.find(entry => entry.id === input.verdict.claim)
+        : Number.isInteger(input.verdict.index) ? run.task.criteria[input.verdict.index] : null;
+      if (!claim) fail('Unknown claim.');
       const value = input.verdict.value ?? null;
-      if (![null, 'accept', 'reject', 'skip'].includes(value)) fail('A criterion is accepted, rejected or skipped.');
-      if (value === null) delete verdicts[index]; else verdicts[index] = { value, note: clip(input.verdict.note ?? verdicts[index]?.note, 1000) };
+      if (![null, 'accept', 'reject', 'skip'].includes(value)) fail('A claim is accepted, rejected or skipped.');
+      if (value === null) delete verdicts[claim.id]; else verdicts[claim.id] = { value, note: clip(input.verdict.note ?? verdicts[claim.id]?.note, 1000) };
     }
     if (input.flag) {
       const id = String(input.flag.id || '');
@@ -246,9 +285,12 @@ export function workRuns({ db, know, candidates = null }) {
   // The reviewer's notes, for the send-back feedback the next run receives.
   function reviewNotes(run) {
     const criteria = Object.entries(run.review.verdicts).filter(([, verdict]) => verdict.value === 'reject')
-      .map(([index, verdict]) => ({ check: run.task.criteria[index]?.text || `Criterion ${Number(index) + 1}`, note: verdict.note }));
+      .map(([id, verdict]) => ({ claim: id, check: run.task.criteria.find(claim => claim.id === id)?.text || id, note: verdict.note }));
     const changes = Object.entries(run.review.flags).map(([id, note]) => ({ check: `Change: ${run.changes.find(change => change.id === id)?.name || id}`, note }));
-    return [...criteria, ...changes];
+    // A claimed step that isn't proven goes back as feedback too, with what the test reported, unless the reviewer flagged it.
+    const steps = (run.gate || []).filter(entry => !run.review.verdicts[entry.claim] || run.review.verdicts[entry.claim].value !== 'reject').map(entry => ({ claim: entry.claim, check: entry.text,
+      note: `Not proven on the reviewed build (${entry.status}): ${(run.proofs[entry.claim]?.steps || []).filter(step => step.status !== 'passed').map(step => `${step.id} ${step.status}${step.detail ? ` (${step.detail})` : ''}`).join('; ') || run.proofs[entry.claim]?.detail || 'no step results'}`.slice(0, 1000) }));
+    return [...criteria, ...steps, ...changes];
   }
 
   function recordSignature(user, projectId, workId, attemptId, outcome, comment) {
@@ -274,9 +316,13 @@ export function workRuns({ db, know, candidates = null }) {
     assertSignable(run, outcome);
     if (outcome === 'accept') {
       if (!handlers.accept) fail('This run has no acceptance path.', 409);
-      // The signature stands for every criterion; the action boundaries still require each check to read as accepted.
+      // JOURNEYS-01 J4: a claim whose automated proof isn't passing stops acceptance. An agent run goes back; a person who
+      // stated why when submitting may be accepted over it.
+      const blocking = run.gate.filter(entry => run.performer.kind !== 'person' || !entry.reason);
+      if (blocking.length) fail(`${blocking.map(entry => `“${entry.text}” is ${entry.status === 'not-run' ? 'not proven yet: build the review to run its step tests' : `not proven (${entry.status})`}`).join('; ')}. ${run.performer.kind === 'person' ? 'Send it back, or ask the person to state why when they submit.' : 'Send it back.'}`, 409);
+      // The signature stands for every claim; the action boundaries still require each check to read as accepted.
       const item = know.workById(projectId, workId);
-      item.checks.forEach((check, index) => { if (check.verdict !== 'accept') know.updateWork(user, projectId, workId, { verdict: { index, value: 'accept' } }); });
+      item.checks.forEach(check => { if (check.verdict !== 'accept') know.updateWork(user, projectId, workId, { verdict: { claim: check.id, value: 'accept' } }); });
       await handlers.accept(run);
     } else {
       if (outcome === 'reject' && handlers.reject) await handlers.reject(run);
@@ -287,9 +333,9 @@ export function workRuns({ db, know, candidates = null }) {
 
   const taskSnapshot = item => ({
     title: item.title, request: item.context?.suggestion || '', action: item.action,
-    criteria: item.checks.map((check, index) => ({ index, text: check.text, source: check.source || null })),
+    criteria: taskClaims(item.checks),
     targets: item.targets.map(target => ({ id: target.id, label: target.label, kind: target.kind })),
-    carried: (item.context?.feedback || []).map(note => ({ check: note.check, note: note.note, by: note.by })),
+    carried: (item.context?.feedback || []).map(note => ({ ...(note.claim ? { claim: note.claim } : {}), check: note.check, note: note.note, by: note.by })),
     carriedComment: item.context?.reviewComment || null,
   });
   const personRun = (projectId, workId, runId) => db.prepare('SELECT * FROM work_person_runs WHERE id = ? AND project_id = ? AND work_id = ?').get(runId, projectId, workId);
@@ -329,24 +375,32 @@ export function workRuns({ db, know, candidates = null }) {
     if (!summary) fail('Summarize what is ready for review.');
     const task = parse(row.task_json, {});
     const changes = personChanges(projectId, workId, row.started_at, input.changes);
+    const claims = taskClaims(task.criteria);
     const evidence = (Array.isArray(input.evidence) ? input.evidence : []).map(entry => {
-      const criterion = Number(entry?.criterion);
-      if (!Number.isInteger(criterion) || !task.criteria?.[criterion]) fail('Evidence names a criterion this run was given.');
+      const claim = evidenceClaim(claims, entry, 'Evidence names a claim this run was given.');
       const note = clip(entry?.note, 500);
       if (!note) fail('Say what the reviewer should check for each evidence item.');
       const ref = clip(entry?.ref, 300), change = ref && changes.find(value => value.id === ref);
-      if (ref && !change) fail('Criterion evidence refers to a change outside this review packet.');
-      return { criterion, type: change ? 'change' : 'note', ref: ref || `criterion-${criterion}`, note,
+      if (ref && !change) fail('Claim evidence refers to a change outside this review packet.');
+      return { claim: claim.id, ...stepOf(claim, entry), type: change ? 'change' : 'note', ref: ref || claim.id, note,
         found: true, target: change ? `change:${change.id}` : null, label: change?.name || 'Performer note' };
     });
+    // Why a claim may go to review unproven, said up front; the reviewer sees it with the failure.
+    const reasons = {};
+    for (const [id, value] of Object.entries(input.reasons && typeof input.reasons === 'object' && !Array.isArray(input.reasons) ? input.reasons : {})) {
+      const claim = claims.find(entry => entry.id === id);
+      if (!claim || !(claim.kind === 'journey' || claim.covers === 'journeys')) fail('A reason names a claim with step tests that this run was given.');
+      const reason = clip(value, 500);
+      if (reason) reasons[id] = reason;
+    }
     if (input.source) {
       if (!task.layerRepository) fail('This run did not pin a layer repository.', 409);
       if (changes.length) fail('Submit repository changes separately from already-applied record changes.', 409);
       submitLayerBranch(db, { projectId, key: task.layerRepository.key, attemptId: runId, base: task.layerRepository.base, workRef: know.workById(projectId, workId).ref, branch: input.source.branch, commit: input.source.commit, tests: input.source.tests || [] });
     }
     const at = now();
-    db.prepare("UPDATE work_person_runs SET changes_json = ?, evidence_json = ?, summary = ?, state = 'review', submitted_at = ?, updated_at = ? WHERE id = ?")
-      .run(JSON.stringify(changes), JSON.stringify(evidence), summary, at, at, runId);
+    db.prepare("UPDATE work_person_runs SET changes_json = ?, evidence_json = ?, reasons_json = ?, summary = ?, state = 'review', submitted_at = ?, updated_at = ? WHERE id = ?")
+      .run(JSON.stringify(changes), JSON.stringify(evidence), JSON.stringify(reasons), summary, at, at, runId);
     const item = know.workById(projectId, workId);
     know.appendLog(workId, `Submitted person run for review: ${summary}`, { state: 'review', context: { ...(item.context || {}), personRun: runId } }, { by: { kind: 'person', id: user.id } });
     return runFor(projectId, workId, runId);
@@ -452,21 +506,37 @@ export function workRuns({ db, know, candidates = null }) {
     if (!Array.isArray(evidence) || evidence.length > 40) fail('Evidence is a list of at most forty items.');
     const row = db.prepare('SELECT bundle_digest FROM symphony_attempts WHERE id = ? AND project_id = ?').get(attemptId, projectId);
     if (!row) fail('Attempt not found.', 404);
-    const criteria = parse(db.prepare('SELECT content_json FROM symphony_bundles WHERE digest = ?').get(row.bundle_digest)?.content_json, {})?.work?.checks || [];
+    const checks = parse(db.prepare('SELECT content_json FROM symphony_bundles WHERE digest = ?').get(row.bundle_digest)?.content_json, {})?.work?.checks || [];
+    // A run pinned before J4 has no claim IDs in its task; its agent was told to name criteria by position.
+    const pinnedBefore = checks.length > 0 && !checks.some(check => check?.id);
+    const claims = taskClaims(checks);
     return evidence.map(entry => {
-      const criterion = Number(entry?.criterion);
-      if (!Number.isInteger(criterion) || !criteria[criterion]) fail('Evidence names a criterion this run was given, by index.');
+      if (!pinnedBefore && entry?.claim === undefined) fail('Evidence names a claim this run was given, by its ID.');
+      const claim = evidenceClaim(claims, entry, 'Evidence names a claim this run was given, by its ID.');
       if (!['change', 'test', 'try'].includes(entry?.type)) fail('Evidence is a change, a test or a thing to try. Aludel adds its own checks.');
       const ref = clip(entry?.ref, 300);
       if (!ref) fail('Evidence needs a reference.');
-      return { criterion, type: entry.type, ref, note: clip(entry?.note, 300) };
+      return { claim: claim.id, ...stepOf(claim, entry), type: entry.type, ref, note: clip(entry?.note, 300) };
     });
+  }
+  // The claim an evidence item names: by ID, or for a run pinned before J4 by criterion position. A step names one of the
+  // steps a journey claim makes true.
+  function evidenceClaim(claims, entry, message) {
+    const claim = entry?.claim !== undefined ? claims.find(value => value.id === entry.claim)
+      : Number.isInteger(Number(entry?.criterion)) && entry?.criterion !== null ? claims[Number(entry.criterion)] : null;
+    if (!claim) fail(message);
+    return claim;
+  }
+  function stepOf(claim, entry) {
+    if (entry?.step === undefined || entry?.step === null) return {};
+    if (claim.kind !== 'journey' || !claim.steps.includes(entry.step)) fail(`Evidence for ${claim.id} names a step the claim makes true.`);
+    return { step: entry.step };
   }
   function recordEvidence(attemptId, evidence) { if (evidence.length) addStep(attemptId, 'evidence', { items: evidence }); }
   // A layer run's evidence names a record by its ID or title, a repository file by its path, and a test by the name it
   // reported to aludel_layer_commit; tests are the candidate's checks, or else the layer branch's reported tests.
   function resolveEvidence(steps, changes, candidate, layerSource = null) {
-    const items = [...steps].reverse().find(step => step.kind === 'evidence')?.items || [];
+    const items = ([...steps].reverse().find(step => step.kind === 'evidence')?.items || []).map(legacyEvidence);
     const tests = candidate?.checks?.length ? candidate.checks : layerSource?.tests || [];
     return items.map(item => {
       if (item.type === 'change') {
@@ -480,6 +550,13 @@ export function workRuns({ db, know, candidates = null }) {
       }
       return { ...item, found: Boolean(candidate), target: candidate ? 'preview' : null, label: item.ref };
     });
+  }
+
+  // Evidence recorded before J4 named its criterion by position; that position is the claim `note-<position + 1>`.
+  function legacyEvidence(item) {
+    if (item.claim || !Number.isInteger(item.criterion)) return item;
+    const { criterion, ...rest } = item;
+    return { claim: `note-${criterion + 1}`, ...rest };
   }
 
   // Numbered steps on a run.

@@ -1,4 +1,5 @@
 import { writablePatterns } from './layer-source.mjs';
+import { taskClaims } from './journeys.mjs';
 // Compact, model-facing view of a Go-pinned bundle. Effects come from explicit adapters,
 // never from free-form role/action text or the task brief.
 const fail = message => { throw Object.assign(new Error(message), { status: 409 }); };
@@ -27,7 +28,8 @@ function compileLayerTask(bundle) {
     identity: { projectId: project.id, workId: work.id, workRef: work.ref, batchId: bundle.batch.id },
     task: { performer: { kind: 'agent', id: guidance.profile.id }, title: work.title, brief: work.context?.suggestion || '', layer: scope.key,
       answeredQuestion: work.question?.answer ? { question: work.question.text, answer: work.question.answer } : null,
-      criteria: (work.checks || []).map(check => check.text),
+      // JOURNEYS-01 J4: what the run must make true, as claims with stable IDs. A journey claim names the steps whose tests must pass.
+      claims: taskClaims(work.checks).map(({ index, source, ...claim }) => claim),
       profile: { id: guidance.profile.id, revision: guidance.profile.revision, name: guidance.profile.name, provider: guidance.profile.provider || 'codex', model: guidance.profile.model || '', effort: guidance.profile.effort || 'medium' } },
     guidance: { project: guidance.project, profile: guidance.profile.instructions,
       method: `Do this task as the ${scope.key} layer. Its charter and Knowledge below are your method. Read whatever project records help (reads are project-wide). ` +
@@ -38,7 +40,8 @@ function compileLayerTask(bundle) {
         `layer/${layerPackage.root || ''}.aludel/outputs/ holds a copy of the current outputs: run \`node --test tests/*.test.mjs\` in layer/${layerPackage.root || ''}, then call aludel_layer_commit with a message and each test result. ` +
         'An elevated reviewer sees the diff and your results and accepting merges the branch into the layer. Changes to api/, server/, ui/, tests/ or layer.json change what the layer runs: say so in your summary. ' +
         'If something outside this layer should change, or a separate task would help, propose it as a follow-up with a clear reason instead of doing it. ' +
-        'When you submit, give evidence for every criterion (see outputs[0].evidence); the reviewer judges each criterion against it. ' +
+        'When you submit, give evidence for every claim, by its ID (see outputs[0].evidence); the reviewer judges each claim against it. ' +
+        'A journey claim is proven only by its steps\' tests passing on the combined build: write or update each claimed step\'s test (see reviewPreparation), because a run whose claimed step is failing or untested cannot be accepted. A note claim is unbacked free text; the reviewer judges it. ' +
         'Ask a question when a decision blocks the result. Do not change accepted project records or the host repository directly; use the layer/ checkout and submit its committed branch.' },
     layerSource: { key: layerPackage.key, instanceId: layerPackage.instanceId, commit: layerPackage.commit, charter: layerPackage.charter,
       documents: layerPackage.documents.map(doc => ({ path: doc.path, markdown: doc.markdown })) },
@@ -51,8 +54,8 @@ function compileLayerTask(bundle) {
       .slice(0, 12).map(record => ({ id: record.id, kind: record.kind, revision: record.revision, summary: summary(record) })),
     layerApi: spec,
     outputs: [{ key: 'changes', kind: 'layer_api_draft', operation: 'submit_for_review', reviewer: `elevated ${scope.key} reviewer`, operations,
-      shape: 'Stage changes with aludel_layer_call, then aludel_submit_proposal { proposal: { summary; content: { notes? }; followUps[0..5]: { layer, title, brief, why }; usedInputs? }; evidence[]: { criterion, type: change|test, ref, note } }',
-      evidence: 'For each criterion (by index from 0), name what shows it is met: type change with ref = a record ID or title you staged, or a repository file path you committed; type test with ref = a test name exactly as reported to aludel_layer_commit. note says what the reviewer should check. Review shows each criterion with this evidence.',
+      shape: 'Stage changes with aludel_layer_call, then aludel_submit_proposal { proposal: { summary; content: { notes? }; followUps[0..5]: { layer, title, brief, why }; usedInputs? }; evidence[]: { claim, step?, type: change|test, ref, note } }',
+      evidence: 'For each claim (by its id in task.claims; for a journey claim, step may name one of its steps), name what shows it is met: type change with ref = a record ID or title you staged, or a repository file path you committed; type test with ref = a test name exactly as reported to aludel_layer_commit. note says what the reviewer should check. Review shows each claim with this evidence.',
       followUpLayers: guidance.followUpLayers || [], checks: (work.checks || []).map(check => check.text) }],
     library: 'Other layers are read only through the Library (DEC-059): knowledge search covers every installed layer\'s outputs and Knowledge (charters, methods, policies; ids like k:<layer>:<doc>) and research. Cite what you relied on in usedInputs with its revision.',
     capabilities: { knowledge: ['map', 'search', 'read'], layerApi: spec ? scope.key : null, layerRepository: { checkout: 'layer/', base: layerPackage.commit, commitTool: 'aludel_layer_commit', writable: layerPackage.writable || writablePatterns },

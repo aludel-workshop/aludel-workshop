@@ -693,7 +693,8 @@ test('a layer-scoped Pages task changes Pages only through its API; review shows
   assert.equal(card.layerApi.openapi, '3.1.0');
   assert.ok(card.outputs[0].operations.some(op => op.operationId === 'updateFlow' && op.writes === 'flow'));
   assert.ok(card.outputs[0].followUpLayers.some(layer => layer.key === 'platform'));
-  assert.match(card.outputs[0].evidence, /For each criterion/, "a layer card asks for evidence per criterion");
+  assert.match(card.outputs[0].evidence, /For each claim \(by its id in task.claims/, "a layer card asks for evidence per claim, by ID");
+  assert.deepEqual(card.task.claims.map(claim => [claim.id, claim.kind]), work.checks.map(check => [check.id, 'note']), 'the card names each claim by its stable ID');
   assert.match(issue.description, /make the requested changes.*aludel_layer_call.*aludel_layer_commit/, "a layer task is told to make its changes, not to describe them");
   assert.doesNotMatch(issue.description, /do not change project records or files/);
   const attemptId = issue.native_ref.attempt_id;
@@ -906,9 +907,9 @@ test('a run edits its layer on a work branch in its sandbox, tests it against th
   // LAYER-TOOLS-02: the submission's evidence names a committed file and a reported test; review shows each against its criterion.
   const history = workRuns({ db: f.db, know: f.know });
   history.recordEvidence(run.attemptId, history.checkEvidence(f.projectId, run.attemptId, [
-    { criterion: 0, type: 'change', ref: 'knowledge/flow-method.md', note: 'The goal rule is the last paragraph.' },
-    { criterion: 0, type: 'test', ref: tests[0].name, note: 'Layer tests on the branch.' },
-    { criterion: 0, type: 'test', ref: 'a test never reported', note: 'Shown as missing.' }]));
+    { claim: 'note-1', type: 'change', ref: 'knowledge/flow-method.md', note: 'The goal rule is the last paragraph.' },
+    { claim: 'note-1', type: 'test', ref: tests[0].name, note: 'Layer tests on the branch.' },
+    { claim: 'note-1', type: 'test', ref: 'a test never reported', note: 'Shown as missing.' }]));
   const reviewed = history.list(f.projectId, run.work.id)[0];
   assert.deepEqual(reviewed.evidence.map(item => [item.type, item.found, item.target?.split(':')[0] || null]), [['change', true, 'change'], ['test', true, 'test'], ['test', false, null]]);
   assert.equal(reviewed.evidence[1].result, 'passed');
@@ -1145,7 +1146,7 @@ test('a real person run submits an immutable repository branch and uses shared i
   git(checkout, '-c', 'user.name=Person', '-c', 'user.email=person@example.invalid', 'commit', '-qm', 'Person changes');
   const commit = git(checkout, 'rev-parse', 'HEAD');
   git(before.repo, 'fetch', '--quiet', checkout, 'person-submission:person-submission');
-  const input = { summary: 'Submit a real local branch for owner review.', source: { branch: 'person-submission', commit }, evidence: [{ criterion: 0, note: 'Review the flow-method change.' }] };
+  const input = { summary: 'Submit a real local branch for owner review.', source: { branch: 'person-submission', commit }, evidence: [{ claim: 'note-1', note: 'Review the flow-method change.' }] };
   assert.throws(() => history.submitPerson({ id: 'foreign' }, f.projectId, work.id, started.id, input), /Only the person/);
   assert.throws(() => history.submitPerson(f.owner, f.projectId, work.id, started.id, { ...input, source: { ...input.source, commit: before.commit } }), /branch changed/);
   const submitted = history.submitPerson(f.owner, f.projectId, work.id, started.id, input);
@@ -1163,7 +1164,7 @@ test('a real person run submits an immutable repository branch and uses shared i
   history.saveReview(f.projectId, work.id, started.id, { verdict: { index: 0, value: 'accept' } });
   const fresh = history.preparePersonReview(f.owner, f.projectId, work.id, started.id, true);
   assert.notEqual(fresh.id, review.id);assert.deepEqual(history.runFor(f.projectId, work.id, started.id).review.verdicts, {});
-  assert.ok(history.steps(started.id).some(step => step.previousReview.verdicts[0]?.value === 'accept'));
+  assert.ok(history.steps(started.id).some(step => step.previousReview.verdicts['note-1']?.value === 'accept'));
   assert.throws(() => history.acceptPersonRepository(f.owner, f.projectId, work.id, started.id, review.id), /revision changed/);
   await history.sign(f.owner, f.projectId, work.id, started.id, { outcome: 'accept' }, { accept: () => history.acceptPersonRepository(f.owner, f.projectId, work.id, started.id, fresh.id) });
   assert.equal(pinOf(f).commit, fresh.commit);assert.equal(git(before.repo,'show',fresh.commit+':knowledge/parallel-note.md'),'# Parallel accepted note');assert.equal(f.know.workById(f.projectId, work.id).state, 'done');assert.equal(history.runFor(f.projectId, work.id, started.id).state, 'accepted');

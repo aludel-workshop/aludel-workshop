@@ -25,6 +25,8 @@ depends_on: [T03-CODE, LAT-08A, LAYER-BINDINGS-01, EXISTING-PROJECTS-01, DEC-050
   4. Move the Aludel files outside `.aludel/` in where possible, and say what really has to stay outside.
   5. Fix the failing tests, or remove those that test outdated assumptions.
 
+- **2026-10-03, owner chat (J4, new cloud session):** "can you grab j4?". The J3 handoff said J4 needs the owner's go; this is it. Authorized: J4 in the same local scope as J3: host code, tests, template commits and pins if needed, local checks, and commits plus a push to this session's designated branch (`claude/nice-cray-zn7gfg`, started from J3's `claude/brave-pascal-br7h4i` at `6f89df0`, which isn't on `main` yet). Not authorized: pushes to `main` or `layer-base`, deployment, spending, live owner data (the owner's portal), owner-impersonating actions, and restarting the owner's portal. The claims migration runs on the owner's next restart, so the owner is told before it. Recorded before execution.
+
 ## Owner direction (2026-10-02 chat)
 
 1. **The reviewer deals with interaction and feel, not diffs.** For user-facing work the review is walking the journey in a live preview, with automated proof alongside.
@@ -142,7 +144,7 @@ J1 can start before T03-CODE closes. J2 onward changes the Code template that T0
 
 ## Proposed defaults (owner may change)
 
-1. A failing claimed step test blocks agent submission. A person may submit with a stated reason, and the reviewer sees the failure first.
+1. ~~A failing claimed step test blocks agent submission.~~ **Changed in J4:** a claimed step that isn't passing on the reviewed build blocks **acceptance** of an agent run, because step results exist only once the host builds the review. A person may submit with a stated reason, and the reviewer sees the failure and the reason first and may accept. A pre-submit check is J7's *Check my branch*, for agents as well as people.
 2. One *Implement* item per journey, grouped under the publish or *Specify* item that raised it.
 3. The diff stays reachable under Under the hood. A reviewing-agent signature on code is a later packet.
 4. ~~Journey tests use Playwright in the check image.~~ **Changed in J3:** journey tests run in a host-owned runner image (Playwright's own, about 920 MB, pulled once per machine), not the app's check image. That keeps Playwright out of the app, so `.aludel/` stays separable and non-Node apps work. See the J3 run log.
@@ -167,7 +169,7 @@ J1 can start before T03-CODE closes. J2 onward changes the Code template that T0
 
 ## Readiness
 
-J0–J3 are done (below; J3's Biome evidence moves to J8). J3–J8 depend on each other as listed. J6 needs a prototype round before building. No external effect, spending or live-data change is planned before J8, and in J8 the owner performs the live actions.
+J0–J4 are done (below; J3's Biome evidence moves to J8). J4's gate sits at acceptance, not at the agent's submit call (see the J4 run log). J5–J8 depend on each other as listed. J6 needs a prototype round before building. No external effect, spending or live-data change is planned before J8, and in J8 the owner performs the live actions.
 
 ## Run log
 
@@ -434,3 +436,108 @@ The import check shows the same plan (Aludel adds, keeps, or can't import until 
 5. *Process change:*
    - **Applied:** the closeout runs the full browser set. The "templates off" marker is honoured by the runner. **Tested:** this run.
    - **Hypothesis:** that the next slice keeps it green.
+
+### J4 claims (2026-10-03, Claude, cloud session)
+
+Authorization: see the 2026-10-03 "J4" entry above.
+
+**Design, decided before building.**
+- **Claims live where criteria lived.** A Work item's `checks` entries become claims: each keeps its text and verdict fields and gains a stable `id`, a `kind` (`journey`, `record`, `invariant`, `note`) and `backed`. Keeping the stored field avoids renaming every action boundary that reads `checks`; the contract is J1's `validateClaims`.
+- **IDs.** Free-text claims are `note-<n>`: the lowest number the item isn't using and didn't use before this edit. A note keeps its ID while its text is unchanged, so carried-in feedback that names an ID never points at different words. Editing a task's criteria changes only its `note` claims; backed claims are edited in their layer, never in the item.
+- **Verdicts and evidence are keyed by claim ID.** A request may still name a criterion by position (`verdict.index`); it is resolved to the claim ID when the request arrives, so nothing is stored by position. Agent and person evidence name `claim` (and `step` for a journey claim). A run pinned before the migration has no claim IDs in its bundle, so its claims read as `note-<position + 1>` and its evidence may still use `criterion`. These are the same IDs the migration gives the item.
+- **Journey evidence is per claim and step.** A journey claim's proof comes from the J3 step results on the run's reviewed build: passed, failed, uncovered, no fixture, or not run. The `journeys-unchanged` invariant that `implementClaims` emits gets the same treatment over every unclaimed step.
+- **The gate sits at acceptance, not at the agent's submit call. This deviates from the plan.** Step results exist only after the host builds the review, which happens after the agent submits; running a Docker build and walk inside the agent's submit call would hold its tool call for minutes. So an agent run can't be **accepted** while a claimed step isn't passing on the reviewed build; the reviewer sends it back, and the failing steps go back to the agent as feedback. A person run may be accepted over a failing claimed step only when the person stated a reason for that claim when submitting; the reviewer sees the failure and reason first (proposed default 1). A pre-submit check for agents reuses J7's *Check my branch* path, and is recorded as a J7 input.
+- **Migration on restart.** Item claims get IDs, and saved run verdicts move from positions to claim IDs. Bundles and step history stay as they were and are read through the rule above. The migration is idempotent and leaves a log entry on each item it changes.
+
+**Built.**
+- **Contract** ([journeys.mjs](../../../apps/portal/server/journeys.mjs), [tests](../../../apps/portal/tests/journeys.test.mjs)):
+  - `claimAt` reads a stored criterion or claim as a claim, and `taskClaims` gives a run's pinned claims in order.
+  - `nextNoteId` numbers new notes. `claimText` gives a backed claim its words.
+  - `claimProof` proves a claim from a build's journeys and step results. `claimGate` lists what stops acceptance.
+  - `claimsFromCriteria` now numbers `note-<n>`. `implementClaims` marks `journeys-unchanged` as `covers: 'journeys'`, so it is proven by every unclaimed step.
+- **Items** ([knowledge.mjs](../../../apps/portal/server/knowledge.mjs)):
+  - `createWork` takes `claims` (backed, validated) beside free-text `checks`, up to forty in all.
+  - Editing a task or amending it after a question changes only its notes. Each unchanged note keeps its ID, and a new note never takes the ID of one the edit removed. Review of the diff caught that reuse; the first draft had it.
+  - Verdicts name a claim (`verdict.claim`, or a position resolved on arrival). Send-back feedback carries the claim ID.
+  - The restart migration runs once.
+- **Runs** ([work-runs.mjs](../../../apps/portal/server/work-runs.mjs)):
+  - A run's task lists claims, and saved verdicts are keyed by claim ID.
+  - Agent evidence must name `claim` (and may name `step`); a pre-J4 bundle may still name `criterion`. Person evidence names `claim`, and a person may give a reason per claim that has step tests (`reasons_json`).
+  - Each run carries `proofs` and `gate`, from `layer_review_journeys` on its reviewed integration and the journeys at that commit.
+  - `sign` refuses acceptance while the gate holds. Send-back notes include each unproven claim's failing steps and their test details.
+  - If the build's journeys can't be read, the proof says why instead of "not run".
+- **Agent card** ([task-manifest.mjs](../../../apps/portal/server/task-manifest.mjs)): `task.claims` with IDs replaces `task.criteria`. Evidence is asked per claim ID, and the card says that a claimed step failing or untested blocks acceptance.
+- **Review UI**:
+  - [work-review.ts](../../../apps/portal/src/layers/work-review.ts) steps through claims. Each shows its kind; a note is marked unbacked. A claim with step tests shows its proof per step, with screenshot links and the person's reason. Sign-off lists the claims that block acceptance and disables *Sign and accept*, offering *Sign and send back*, or says which unproven claims a person's reasons cover.
+  - [work-run.ts](../../../apps/portal/src/layers/work-run.ts): the person's submit form has evidence per claim, plus an optional reason for each claim with step tests. The next-run editor shows backed claims read-only and edits notes only.
+  - [Claim with its proof and reason](../../evidence/journeys/j4-review-journey-claim.png) · [sign-off over a stated reason](../../evidence/journeys/j4-review-signoff.png).
+
+**Migration rehearsal** (exit evidence; [scripts and output](../../evidence/journeys/j4-migration-rehearsal/README.md)). Phase A ran the pre-J4 code (`6f89df0`, in a separate worktree) and wrote a fresh data directory with three items:
+- an agent run, submitted, with evidence naming criterion 1 and verdicts by position;
+- a person run in review, with evidence and a verdict by position;
+- a ready item with three criteria.
+
+Phase B started the J4 code on a copy of that directory:
+- **Items:** every criterion became `note-<n>`, keeping its text, with one log line each.
+- **Runs:** verdicts moved to the claims they named (`{1: reject}` → `note-2`), and both runs' evidence read as `note-2`.
+- **Send-back:** the migrated agent run was sent back, and its feedback carried `note-2`.
+- **Restart:** a second start changed nothing; log lengths and verdicts were equal.
+
+This is a rehearsal on data the old code wrote, not on the owner's live data, which is out of scope. The owner restarts after reading the notice in the handoff. The rehearsal was rerun on the final code and passed.
+
+**Findings.**
+- **The plan's submit gate wasn't buildable as written.** Step results exist only after the host builds the review. Running a Docker build and walk inside the agent's submit call would hold its tool call for minutes, so the gate is at acceptance (see Design). An agent that wants to know before submitting needs the J7 *Check my branch* path.
+- **A recipe the host can't read made every journey claim look "not run".** The J4 test fixture had an invalid recipe (no checks) and showed nothing else wrong. The proof now names the error.
+- **The newest handoff wasn't on `main`.** `main`'s status and handoff said "J3 next", while J3 and its follow-ups were done on another session's unmerged branch. That branch turned up only by listing sessions. Starting from `main` would have redone J3.
+- **The repository-review browser check hid its own failures.** When the portal died at startup, the check's `finally` waited for an exit that had already happened, and Node reported only "unsettled top-level await". It now prints the portal log and doesn't wait on a finished process.
+- **Startup and handler time limits are load-sensitive.** Two tests failed once each under suite load and passed alone: `symphony-worker`'s portal startup (60 s) in the final J4 run, and a Vision template test at baseline. Neither failed twice. If either recurs, it's a real limit to raise or a slowdown to find.
+- **A Vision template test failed once at baseline under load** ("The layer API handler did not finish within its limits", 63 s). It passed alone at baseline and in the J4 run. It's a load-sensitive limit, recorded here in case it recurs.
+
+**Environment (this session).**
+- J3 and its follow-ups were on `claude/brave-pascal-br7h4i`, not `main`. This branch was reset to that branch's head (`6f89df0`) before any change.
+- `layer-base` was cloned from GitHub after adding it to the session. Node 24.21.0 came from the npm package `node@24`. `dockerd` was started by hand.
+- The journey runner image was built out of band through the session proxy, under the tag the host computes. The [handoff](handoff.md) now has the exact commands; J3's note didn't, so they had to be reconstructed.
+- The Docker-preview browser check ran as uid 1000 on a copy of the repository.
+- The baseline ran from a separate worktree at `6f89df0`.
+
+| Check | Baseline `6f89df0` | J4 |
+|---|---|---|
+| `tests/journeys.test.mjs` | 10 passed | 12 passed (adds claim IDs by position, and proof and gate) |
+| `tests/work-runs.test.mjs` | 10 passed | 14 passed: the restart migration (once, keeping text and verdicts), IDs through task edits, the agent gate, and person proofs from a build's step results (passed, failed, stale, and excused by a reason) |
+| Mutation: the gate in `sign` disabled | | Both gate tests failed, then passed once restored |
+| Mutation: the item migration skipped | | The migration test failed, then passed once restored |
+| `npm run test:server` (without `previews-docker`) | 279 passed, 1 failed, 30 skipped. The failure was the Docker review test: the runner image can't be built in this sandbox | **286 passed, 0 failed, 30 skipped**, with the runner image prebuilt. The Docker review test passes |
+| `npm run test:server:templates` (same files) | 301 passed, 2 failed, 7 skipped: the Docker review test, and the Vision template test under load, which passes alone | **309 passed, 0 failed, 7 skipped** |
+| `npm run typecheck`, `npm run build` | | Passed; no new warnings |
+| `tests/repository-review-browser.mjs` (uid 1000, Docker) | | **Passed**, extended for J4. The person's item claims a journey step without a test. The person states why in the visible submit form. Review shows the claim's proof ("No test") and the reason, and sign-off says it signs over one unproven claim with a reason. Acceptance then goes through |
+| `tools/browser-checks.sh`, all 22 remaining scripts, templates on | | 19 passed first time. `layer-scope` and `work-item` failed on J4's changes: their fixtures named evidence by position, and they expected the old "Criterion N" labels. Updated, both pass. `browser` timed out once on an unrelated decision page and passed on rerun. **All 22 pass** |
+| Migration rehearsal (above) | | Passed, and again on the final code |
+| **Final rerun** after the note-ID fix found in review (`knowledge.mjs`) | | Server suite 286 passed, 0 failed, 30 skipped. Templates 308 passed, 1 failed, 7 skipped: `symphony-worker`'s "portal restored the submitted attempt: startup exceeded 60s" (load average about 16). That file passes alone (2 of 2), and it passed in the first full templates run. `work-item` and `layer-scope` browser scripts pass after a fresh build |
+
+**Not done here.**
+- The agent's blocked state (*Sign and accept* disabled) is server-tested only. No browser script drives an agent run with a journey claim.
+- The owner's live data wasn't touched.
+- The template-update path that the Biome part of J8 needs is still open.
+
+**Retrospective (J4).**
+1. *Harder than necessary:*
+   - Finding where J3 was cost the first part of the session. `main`'s handoff said "J3 next", and the work was on another session's branch.
+   - J3's runner-image workaround was described but not recorded as commands.
+   - The repository-review browser check hid its own failures behind "unsettled top-level await".
+   - The plan specified the gate at agent submission, where no step results exist yet.
+2. *Would help next time:*
+   - `tools/branch-handoffs.sh`, referenced from AGENTS.md, lists remote branches ahead of `main` with their `next_action`.
+   - The handoff has exact environment commands.
+   - The browser check prints the portal log when the portal dies.
+3. *What the task revealed:*
+   - Proof only exists after the host build. Any "before submit" gate is the J7 *Check my branch* path, for agents as well as people. J7's scope grows by the agent side.
+   - Reading an unreadable recipe as "not run" would have hidden a broken app setup from the reviewer.
+   - Each J slice so far has landed on a different session branch. The owner's merge to `main` is now the step that keeps handoffs findable.
+4. *Questions:*
+   - **Created, for the owner:** merge `claude/brave-pascal-br7h4i` and this branch to `main`? They stack, so merging this branch carries both. This doesn't block J5, which can build on this branch.
+   - **Resolved:** where the gate sits (acceptance), and how pre-J4 runs read (by position, as the IDs the migration gives).
+   - **Still open:** whether people use references instead of notes (J8).
+5. *Process change:*
+   - **Applied:** `tools/branch-handoffs.sh` and its AGENTS.md line. **Tested:** run in this repository, it lists exactly the J3 branch that had to be found by hand (`+5`, `next_action: JOURNEYS-01`). **Hypothesis:** that the next agent runs it before starting.
+   - **Applied:** the exact runner-image commands in the handoff. **Tested:** they built the image this session.
+   - **Applied:** the full browser set at closeout, as J3 set. It caught two scripts that J4's changes broke, which the server suites didn't.

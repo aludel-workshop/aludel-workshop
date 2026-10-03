@@ -16,6 +16,7 @@ import { kindOwners, layerApi, layerApiForKind, normalizeRecord, seedLayer } fro
 import { currentFileEntries, fileEntry, fileEntryExists, fileEntryHistory, fileLayerFor, writeFileEntries } from './layer-files.mjs';
 import { compiledLocalActions } from './lat07-actions.mjs';
 import { actionForProject, actionsForDefinition, projectLayerDefinition, projectLayerDefinitions } from './layer-registry.mjs';
+import { claimAt, claimsOf, claimText, nextNoteId, validateClaims } from './journeys.mjs';
 import { cleanBrandAsset, cleanComponent, cleanTokens, componentStatus, ensureDesign as seedDesign, syncTokensFromLook } from './design.mjs';
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
@@ -196,6 +197,14 @@ export function initKnowledge(db) {
   if (!workColumns.has('layer_instance_id')) db.exec('ALTER TABLE layer_work_items ADD COLUMN layer_instance_id TEXT');
   // Archived work leaves normal planning views without losing its task, runs, review or activity trail.
   for (const column of ['archived_at', 'archived_by']) if (!workColumns.has(column)) db.exec(`ALTER TABLE layer_work_items ADD COLUMN ${column} TEXT`);
+  // JOURNEYS-01 J4: an item's hand-written criteria become claims with stable IDs: unbacked notes, numbered by position
+  // (`note-<position + 1>`, the same IDs runs pinned before J4 read them as), with their text and verdicts kept. Runs once.
+  for (const row of db.prepare("SELECT id, checks_json, log_json FROM layer_work_items WHERE checks_json IS NOT NULL AND checks_json <> '[]'").all()) {
+    const checks = parse(row.checks_json, []);
+    if (!Array.isArray(checks) || checks.every(check => check?.id)) continue;
+    const log = [...parse(row.log_json, []), { at: now(), text: `Its ${checks.length} ${checks.length === 1 ? 'criterion is' : 'criteria are'} now ${checks.length === 1 ? 'a note claim' : 'note claims'}: unbacked until ${checks.length === 1 ? 'it references' : 'they reference'} a layer entry` }];
+    db.prepare('UPDATE layer_work_items SET checks_json = ?, log_json = ? WHERE id = ?').run(JSON.stringify(checks.map(claimAt)), JSON.stringify(log), row.id);
+  }
 }
 
 // ---- Validators: one per kind, fields per knowledge-structures.md ----
@@ -1197,7 +1206,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
       assignee: item.assignee_kind ? { kind: item.assignee_kind, id: item.assignee_id || (item.assignee_kind === 'agent' ? item.profile_id : null), label: item.assignee_label } : null,
       targets: workTargets, question: parse(item.question_json, null), documents: parse(item.documents_json, []), log: parse(item.log_json, []),
       createdAt: item.created_at, updatedAt: item.updated_at, profileId: item.profile_id || null, instructions: parse(item.instructions_json, null), context,
-      blocks: parse(item.blocks_json, []), checks: parse(item.checks_json, []), project: item.plan_project_id || null, checkpoint: item.checkpoint || null };
+      blocks: parse(item.blocks_json, []), checks: claimsOf(parse(item.checks_json, [])), project: item.plan_project_id || null, checkpoint: item.checkpoint || null };
   };
   const workById = (projectId, id) => workRow(db.prepare('SELECT * FROM layer_work_items WHERE id = ? AND project_id = ? AND archived_at IS NULL').get(id, projectId));
   function workList(projectId) {
@@ -1207,7 +1216,37 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     return rows;
   }
   const blockersOf = (projectId, id) => workList(projectId).find(item => item.id === id)?.blockedBy || [];
-  const checkList = (texts, targets) => (texts || []).map(entry => ({ text: text(entry, 300, 'Check'), source: targets[0] ? { id: targets[0].id } : null, verdict: null, note: '' })).filter(check => check.text);
+  // JOURNEYS-01 J4: an item's checks are its claims. Free text becomes `note` claims with the lowest unused note IDs;
+  // backed claims (journey, record, invariant) arrive whole and are edited in the layer they reference, never here.
+  const noteClaims = (texts, kept = [], source = null) => {
+    const taken = new Set(kept.map(claim => claim.id));
+    return texts.map(entry => {
+      const wording = typeof entry === 'string' ? entry : entry?.text;
+      const id = nextNoteId(taken); taken.add(id);
+      return { id, kind: 'note', backed: false, text: wording, source, verdict: null, note: '' };
+    });
+  };
+  const checkList = (texts, targets, backed = []) => [...backed, ...noteClaims((texts || []).map(entry => text(entry, 300, 'Check')).filter(Boolean), backed, targets[0] ? { id: targets[0].id } : null)];
+  const backedClaims = claims => validateClaims(claims).filter(claim => claim.backed)
+    .map(claim => ({ ...claim, text: text(claimText(claim), 1000, 'Claim'), source: null, verdict: null, note: '' }));
+  // A request names a claim by ID; `index` (a position in the item's current list) is resolved on arrival, never stored.
+  const claimIndex = (checks, ref) => ref?.claim !== undefined ? checks.findIndex(check => check.id === ref.claim) : Number.isInteger(Number(ref?.index)) && ref?.index !== null ? Number(ref.index) : -1;
+  // Edits to a task's free text replace its notes and keep its backed claims. A note keeps its ID while its words are unchanged;
+  // a new note never takes the ID of one this edit removed, so feedback carried in by ID can't point at different words.
+  function editNotes(checks, list, label) {
+    const backed = checks.filter(check => check.backed), notes = checks.filter(check => !check.backed), taken = new Set(backed.map(check => check.id));
+    const held = new Set(checks.map(check => check.id));
+    const kept = list.map(value => {
+      const wording = text(typeof value === 'string' ? value : value?.text, 300, label, true);
+      const same = notes.find(note => note.text === wording && !taken.has(note.id));
+      if (same) taken.add(same.id);
+      return { wording, same };
+    });
+    return [...backed, ...kept.map(({ wording, same }) => {
+      const id = same?.id || nextNoteId(new Set([...taken, ...held])); taken.add(id);
+      return { id, kind: 'note', backed: false, text: wording, source: same?.source || null, verdict: null, note: '' };
+    })];
+  }
 
   // A starting priority: work on the current phase's stories comes first, later phases last (people change it freely).
   function priorityLevel(projectId, type, targets) {
@@ -1257,7 +1296,9 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     const id = `wrk-${randomBytes(4).toString('hex')}`;
     const created = now();
     const assignee = input.assignee ? resolveAssignee(projectId, input.assignee) : layerScoped ? layerAssignee(projectId, layer) : defaultAssignee(projectId, actionId);
-    const checks = checkList(input.checks?.length ? input.checks : (!layerScoped && actionRecord(projectId, actionId)?.checks) || definition.checks, targets);
+    const claims = Array.isArray(input.claims) && input.claims.length ? backedClaims(input.claims) : [];
+    const checks = checkList(input.checks?.length ? input.checks : claims.length ? [] : (!layerScoped && actionRecord(projectId, actionId)?.checks) || definition.checks, targets, claims);
+    if (checks.length > 40) fail('A Work item has up to forty claims.');
     const projectRecord = input.project !== undefined ? (input.project ? get(projectId, input.project) : null) : projectFor(projectId, targets);
     if (input.project && projectRecord?.kind !== 'project') fail('Project not found.', 404);
     db.prepare(`INSERT INTO layer_work_items(id, project_id, number, layer, type, title, state, assignee_kind, assignee_label, targets_json, question_json, documents_json, log_json, created_at, updated_at,
@@ -1405,7 +1446,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
         if (input.criteriaAmendment !== undefined) {
           const amended = Array.isArray(input.criteriaAmendment) ? input.criteriaAmendment : [];
           if (!amended.length || amended.length > 12) fail('An amended task has one to twelve criteria.');
-          checks = amended.map(value => ({ text: text(value, 300, 'Criterion', true), source: null, verdict: null, note: '' }));
+          checks = editNotes(checks, amended, 'Criterion');
           entry(`Amended the next run to ${checks.length} ${checks.length === 1 ? 'criterion' : 'criteria'}`);
         }
         nextState = 'ready';
@@ -1423,8 +1464,8 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     }
     if (verdict !== undefined) {
       if (item.state !== 'review') fail(`${item.ref} isn't waiting for review.`, 409);
-      const index = Number(verdict?.index);
-      if (!Number.isInteger(index) || !checks[index]) fail('Unknown check.');
+      const index = claimIndex(checks, verdict);
+      if (!checks[index]) fail('Unknown claim.');
       if (![null, 'accept', 'reject'].includes(verdict.value ?? null)) fail('A check is accepted or rejected.');
       checks = checks.map((check, position) => position === index ? { ...check, verdict: verdict.value ?? null, note: text(verdict.note ?? check.note, 1000, 'Note'), by: verdict.value ? user.name : null, at: verdict.value ? now() : null } : check);
     }
@@ -1434,7 +1475,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
       if (!rejected.length) fail('Reject at least one check, with a note, to send it back.', 409);
       if (rejected.some(check => !check.note)) fail('Say what is wrong with each rejected check.', 409);
       const { batch, staged, ...rest } = context || {};
-      context = { ...rest, feedback: rejected.map(check => ({ check: check.text, note: check.note, by: user.name, at: now() })) };
+      context = { ...rest, feedback: rejected.map(check => ({ claim: check.id, check: check.text, note: check.note, by: user.name, at: now() })) };
       entry(`Sent back: ${rejected.map(check => `“${check.text}”: ${check.note}`).join('; ')}`.slice(0, 1000));
       checks = checks.map(check => ({ ...check, verdict: null, note: '', by: null, at: null }));
       nextState = 'ready';
@@ -1443,7 +1484,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     if (input.reopen) {
       if (!['review', 'ready', 'needs-input'].includes(item.state)) fail(`${item.ref} can't be reopened while it is ${item.state === 'claimed' ? 'being worked on' : item.state}.`, 409);
       const notes = (Array.isArray(input.reopen.feedback) ? input.reopen.feedback : []).slice(0, 40)
-        .map(note => ({ check: text(note?.check, 300, 'Feedback'), note: text(note?.note, 1000, 'Feedback note'), by: user.name, at: now() }));
+        .map(note => ({ ...(typeof note?.claim === 'string' && checks.some(check => check.id === note.claim) ? { claim: note.claim } : {}), check: text(note?.check, 300, 'Feedback'), note: text(note?.note, 1000, 'Feedback note'), by: user.name, at: now() }));
       const comment = text(input.reopen.comment, 2000, 'Comment');
       const { batch, staged, run, visionProposal, workProposal, auditReport, executionBlock, ...rest } = context || {};
       context = { ...rest, feedback: notes, reviewComment: comment || null };
@@ -1460,11 +1501,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
       if (input.task.criteria !== undefined) {
         const list = Array.isArray(input.task.criteria) ? input.task.criteria : [];
         if (list.length > 12) fail('Keep a task to twelve criteria or fewer.');
-        checks = list.map(value => {
-          const wording = text(typeof value === 'string' ? value : value?.text, 300, 'Criterion', true);
-          const kept = checks.find(check => check.text === wording);
-          return { text: wording, source: kept?.source || null, verdict: null, note: '' };
-        });
+        checks = editNotes(checks, list, 'Criterion');
       }
       entry('Edited the task for the next run');
     }

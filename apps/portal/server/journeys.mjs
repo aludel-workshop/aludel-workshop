@@ -138,8 +138,71 @@ export function validateClaims(claims) {
       fail(`Record claim ${claim.id} names a layer, an entry and its revision.`);
     if (['invariant', 'note'].includes(claim.kind) && !text(claim.text, 1000)) fail(`Claim ${claim.id} says what must hold.`);
     if (!optional(claim.text, value => text(value, 1000))) fail(`Claim ${claim.id}: text is up to 1000 characters.`);
+    // An invariant that covers the journeys is proven by every step test no journey claim names.
+    if (!optional(claim.covers, value => value === 'journeys' && claim.kind === 'invariant')) fail(`Claim ${claim.id}: only an invariant covers the journeys.`);
     return { ...claim, backed: claim.kind !== 'note' };
   });
+}
+
+// JOURNEYS-01 J4: a stored criterion or claim, read as a claim. Items and runs pinned before J4 kept criteria without IDs;
+// a criterion's position gives the ID the migration gave its item (`note-<position + 1>`), so a run pinned before the
+// migration and its item name the same claim. Nothing is stored by position.
+export function claimAt(check, index) {
+  const kind = claimKinds.includes(check?.kind) ? check.kind : 'note';
+  return { ...check, id: idPattern.test(check?.id || '') ? check.id : `note-${index + 1}`, kind, backed: kind !== 'note' };
+}
+export const claimsOf = checks => (Array.isArray(checks) ? checks : []).map(claimAt);
+// A new free-text claim takes the lowest unused note number, so the others keep theirs.
+export function nextNoteId(taken) {
+  let number = 1;
+  while (taken.has(`note-${number}`)) number++;
+  return `note-${number}`;
+}
+// What a claim says, for the item and the reviewer. A backed claim's words come from the layer entry it references.
+export function claimText(claim) {
+  if (claim.text) return claim.text;
+  if (claim.kind === 'journey') return `Journey ${claim.journey} at revision ${claim.revision}: ${claim.steps.length === 1 ? 'step' : 'steps'} ${claim.steps.join(', ')}`;
+  if (claim.kind === 'record') return `${claim.layer} ${claim.entry} at revision ${claim.revision}`;
+  return claim.id;
+}
+
+// What a run was asked to make true: its pinned criteria as claims, in order, without their review state. `index` is for display.
+export const taskClaims = checks => claimsOf(checks).map((claim, index) => ({ index, id: claim.id, kind: claim.kind, backed: claim.backed, text: claimText(claim), source: claim.source || null,
+  ...Object.fromEntries(['journey', 'revision', 'steps', 'layer', 'entry', 'covers'].filter(field => claim[field] !== undefined).map(field => [field, claim[field]])) }));
+
+// The automated proof of a claim at a reviewed build, from its journeys and the step results J3 recorded there (`<journey>.<step>`
+// with passed, failed, skipped, uncovered or no-fixture). A journey claim is proven when every step it names passed on a build
+// whose journey is at the claimed revision. The journeys invariant holds when no step outside the journey claims failed.
+// Record and note claims have no automated proof; the reviewer judges them. `journeys` is null when nothing was built.
+const proofOrder = ['failed', 'no-fixture', 'uncovered', 'skipped', 'missing', 'stale', 'not-run'];
+export function claimProof(claim, { journeys = null, results = [] } = {}, claims = []) {
+  const byId = new Map(results.map(result => [result.id, result]));
+  const stepOf = (id, fallback) => { const result = byId.get(id); return { id, status: result?.status || fallback, detail: result?.detail || null, screenshot: Boolean(result?.screenshot) }; };
+  if (claim.kind === 'journey') {
+    const journey = journeys?.find(entry => entry.id === claim.journey) || null;
+    const known = new Set(journey?.steps.map(step => step.id) || []);
+    const steps = claim.steps.map(step => journeys && !known.has(step) ? { id: `${claim.journey}.${step}`, status: 'missing', detail: `The reviewed build's journey has no step ${step}.`, screenshot: false }
+      : stepOf(`${claim.journey}.${step}`, 'not-run'));
+    const status = !journeys || !results.length ? 'not-run' : !journey ? 'missing' : journey.revision !== claim.revision ? 'stale'
+      : steps.every(step => step.status === 'passed') ? 'passed' : proofOrder.find(value => steps.some(step => step.status === value)) || 'failed';
+    const detail = status === 'missing' && !journey ? `The reviewed build has no journey ${claim.journey}.`
+      : status === 'stale' ? `The reviewed build has ${claim.journey} at revision ${journey.revision}; this claim is for revision ${claim.revision}.` : null;
+    return { status, detail, steps };
+  }
+  if (claim.kind === 'invariant' && claim.covers === 'journeys') {
+    const claimed = new Set(claims.filter(entry => entry.kind === 'journey').flatMap(entry => entry.steps.map(step => `${entry.journey}.${step}`)));
+    const steps = results.filter(result => !claimed.has(result.id)).map(result => stepOf(result.id));
+    const status = !journeys || !results.length ? 'not-run' : steps.some(step => step.status === 'failed') ? 'failed' : 'passed';
+    return { status, detail: null, steps };
+  }
+  return null;
+}
+
+// Which claims stop acceptance: those with an automated proof that isn't passing. A person who submitted with a stated reason
+// for a claim is excused; the reviewer sees the failure and the reason first. An agent run is never excused.
+export function claimGate(claims, proofs, reasons = {}) {
+  return claims.filter(claim => proofs[claim.id] && proofs[claim.id].status !== 'passed')
+    .map(claim => ({ claim: claim.id, text: claimText(claim), status: proofs[claim.id].status, reason: reasons[claim.id] || null }));
 }
 
 // Accepting a Specify item leaves a journey's revision ahead of what the code builds. The implement item it raises claims
@@ -150,12 +213,12 @@ export function implementClaims(previous, next) {
   const claims = [];
   if (steps.length) claims.push({ id: `${next.id}-steps`, kind: 'journey', journey: next.id, revision: next.revision, steps });
   if (change.removed.length) claims.push({ id: `${next.id}-removed`, kind: 'invariant', text: `Steps ${change.removed.join(', ')} of ${next.title} are no longer part of the journey.` });
-  claims.push({ id: 'journeys-unchanged', kind: 'invariant', text: `Every other journey still passes its tests${change.unchanged.length ? `, as do unchanged steps ${change.unchanged.join(', ')} of ${next.title}` : ''}.` });
+  claims.push({ id: 'journeys-unchanged', kind: 'invariant', covers: 'journeys', text: `Every other journey still passes its tests${change.unchanged.length ? `, as do unchanged steps ${change.unchanged.join(', ')} of ${next.title}` : ''}.` });
   return { change, claims: validateClaims(claims) };
 }
 
 // Existing items' hand-written criteria become note claims, nothing lost; each is unbacked until someone references a layer.
-export const claimsFromCriteria = criteria => validateClaims(criteria.map((value, index) => ({ id: `criterion-${index + 1}`, kind: 'note', text: String(value).slice(0, 1000) })));
+export const claimsFromCriteria = criteria => validateClaims(criteria.map((value, index) => ({ id: `note-${index + 1}`, kind: 'note', text: String(value).slice(0, 1000) })));
 
 // `.aludel/seams.json`: every place Aludel touches the app outside `.aludel/`. A file seam is Aludel's whole file; an edit
 // seam is Aludel's lines in an app file. `remove` says how to take it out, so the app can leave Aludel.

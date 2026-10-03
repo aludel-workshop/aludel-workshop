@@ -88,13 +88,14 @@ worker.submitProposal(scope, { attemptId: attempt, proposal: {
   followUps: [
     { layer: 'platform', title: 'Build the tool detail route', brief: 'Implement Tool detail with its borrow button.', why: 'The Find a tool flow ends on a page Code has not built.' },
     { layer: 'product', title: 'Write the borrow story', brief: 'Capture who borrows and why.', why: 'No Vision story explains borrowing, so the flow cites none.' }] } });
-// LAYER-TOOLS-02: the submission names evidence per criterion, as the agent does through aludel_submit_proposal.
+// LAYER-TOOLS-02: the submission names evidence per claim, by ID, as the agent does through aludel_submit_proposal.
 const history = workRuns({ db, know });
+const claimIds = know.workById(projectId, task.id).checks.map(check => check.id);
 history.recordEvidence(attempt, history.checkEvidence(projectId, attempt, [
-  { criterion: 0, type: 'change', ref: 'Find a tool', note: 'Two steps, Browse tools then Tool detail.' },
-  { criterion: 1, type: 'change', ref: 'knowledge/flow-method.md', note: 'The last paragraph is the new rule.' },
-  { criterion: 1, type: 'test', ref: 'node --test tests/', note: 'Layer tests on the branch.' },
-  { criterion: 1, type: 'test', ref: 'phone walkthrough', note: 'Not reported, so shown as missing.' }]));
+  { claim: claimIds[0], type: 'change', ref: 'Find a tool', note: 'Two steps, Browse tools then Tool detail.' },
+  { claim: claimIds[1], type: 'change', ref: 'knowledge/flow-method.md', note: 'The last paragraph is the new rule.' },
+  { claim: claimIds[1], type: 'test', ref: 'node --test tests/', note: 'Layer tests on the branch.' },
+  { claim: claimIds[1], type: 'test', ref: 'phone walkthrough', note: 'Not reported, so shown as missing.' }]));
 db.close();
 
 const port = await new Promise(resolve => { const probe = createServer().listen(0, '127.0.0.1', () => { const { port: free } = probe.address(); probe.close(() => resolve(free)); }); });
@@ -159,16 +160,16 @@ try {
   // Review: Changes show the new flow and notes; Follow-ups show each reason.
   await page.goto(`${base}/work/item/${task.id}/review/1`);
   await page.getByRole('heading', { name: /Review W-\d+ · Run 1/ }).waitFor();
-  // Each criterion shows the evidence the run named for it; a reference to nothing it produced is marked, not hidden.
-  await page.getByRole('button', { name: 'Criterion 1', exact: true }).click();
+  // Each claim shows the evidence the run named for it; a reference to nothing it produced is marked, not hidden.
+  await page.getByRole('button', { name: 'Claim 1', exact: true }).click();
   await page.locator('.wr-ev', { hasText: 'Find a tool' }).waitFor();
-  await page.getByRole('button', { name: 'Criterion 2', exact: true }).click();
+  await page.getByRole('button', { name: 'Claim 2', exact: true }).click();
   await page.locator('.wr-ev', { hasText: 'knowledge/flow-method.md' }).waitFor();
   assert.match(await page.locator('.wr-ev-test', { hasText: 'node --test tests/' }).innerText(), /passed/);
   await page.locator('.wr-ev.missing', { hasText: 'phone walkthrough' }).waitFor();
   assert.deepEqual(await axe(), [], 'Evidence axe');
   await shot('evidence');
-  await page.getByRole('button', { name: 'Criterion 1', exact: true }).click();
+  await page.getByRole('button', { name: 'Claim 1', exact: true }).click();
   const fields = page.locator('table.wr-fields');
   await fields.first().waitFor();
   assert.equal(await fields.count(), 2, 'one field table per changed record');

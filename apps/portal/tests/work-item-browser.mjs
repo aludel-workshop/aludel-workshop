@@ -94,12 +94,14 @@ know.updateWork(owner, projectId, review.id, { task: { criteria: ['Each claim is
 const second = go(know.workById(projectId, review.id));
 plan(second, ['Read why run 1 was sent back', 'Re-read the current value claim and the request', 'Look for guidance on what a value claim should say', 'Revise the claim', 'Check the draft against the criteria', 'Submit for review'], 6);
 worker.submitProposal(scope, { attemptId: second, proposal: claim('A small interactive pet that lives in a browser window in the corner of your screen.') });
+// JOURNEYS-01 J4: evidence names each claim by its ID, as the agent's card lists them.
+const claimIds = know.workById(projectId, review.id).checks.map(check => check.id);
 history.recordEvidence(second, history.checkEvidence(projectId, second, [
-  { criterion: 0, type: 'change', ref: 'Vision › Brief › Value', note: 'One sentence, 17 words' },
-  { criterion: 1, type: 'change', ref: 'Vision › Brief › Value', note: 'Names the pet, a window and the corner' },
-  { criterion: 1, type: 'try', ref: 'Read the claim next to the request' },
-  { criterion: 2, type: 'change', ref: 'Vision › Brief › Value', note: 'No mood, focus or productivity words' },
-  { criterion: 3, type: 'change', ref: 'Vision › Brief › Value', note: 'Revises the existing claim' }]));
+  { claim: claimIds[0], type: 'change', ref: 'Vision › Brief › Value', note: 'One sentence, 17 words' },
+  { claim: claimIds[1], type: 'change', ref: 'Vision › Brief › Value', note: 'Names the pet, a window and the corner' },
+  { claim: claimIds[1], type: 'try', ref: 'Read the claim next to the request' },
+  { claim: claimIds[2], type: 'change', ref: 'Vision › Brief › Value', note: 'No mood, focus or productivity words' },
+  { claim: claimIds[3], type: 'change', ref: 'Vision › Brief › Value', note: 'Revises the existing claim' }]));
 
 const failing = create('describe who it is for', ['Names one audience']);
 const failed = go(failing);
@@ -173,7 +175,7 @@ try {
   await shot('review-signoff');
   await page.getByRole('button', { name: 'Cancel' }).click();
 
-  // Review mode: one criterion at a time, with the claim as a was/now card; A, R, Skip, then the sign-off summary.
+  // Review mode: one claim at a time, with the claim as a was/now card; A, R, Skip, then the sign-off summary.
   await page.getByRole('link', { name: 'Review', exact: true }).click();
   await page.getByRole('heading', { name: /Review W-1 · Run 2/ }).waitFor();
   await page.locator('.wr-change .wr-now', { hasText: 'A small interactive pet' }).waitFor();
@@ -182,14 +184,14 @@ try {
   await page.getByText(/Named by the run when it submitted/).waitFor();
   await shot('review-mode');
   await page.keyboard.press('a');
-  await page.getByText('Criterion 2 of 4').waitFor();
+  await page.getByText('Claim 2 of 4').waitFor();
   await page.getByText('Named by the performer, but not in the review packet').waitFor();
   await page.keyboard.press('r');
   await page.getByPlaceholder('What should change?').fill('Say it is a desktop companion');
   await page.getByRole('button', { name: 'Next', exact: true }).click();
-  await page.getByText('Criterion 3 of 4').waitFor();
+  await page.getByText('Claim 3 of 4').waitFor();
   await page.getByRole('button', { name: 'Skip' }).click();
-  await page.getByText('Criterion 4 of 4').waitFor();
+  await page.getByText('Claim 4 of 4').waitFor();
   await page.getByRole('button', { name: /Accept/ }).click();
   await page.getByRole('heading', { name: 'Send back with 2 flags', level: 2 }).waitFor();
   await page.getByText('Say it is a desktop companion').waitFor();
@@ -266,7 +268,7 @@ try {
   await page.getByText('Performer evidence').first().waitFor();
   await page.getByText('Read the checkpoint outcome in the planning notes.').waitFor();
   await page.keyboard.press('a');
-  await page.getByText('Criterion 2 of 2').waitFor();
+  await page.getByText('Claim 2 of 2').waitFor();
   await page.keyboard.press('a');
   await page.getByRole('heading', { name: 'Everything checks out', level: 2 }).waitFor();
   await page.getByRole('button', { name: 'Sign and accept' }).click();
@@ -286,7 +288,7 @@ try {
   await page.locator('.wr-diff').waitFor();
   assert.match(await page.locator('.wr-diff').innerText(), /Candidate review is visible/, 'review shows the candidate diff');
   await page.keyboard.press('a');
-  await page.getByText('Criterion 2 of 2').waitFor();
+  await page.getByText('Claim 2 of 2').waitFor();
   await page.keyboard.press('a');
   await page.getByRole('heading', { name: 'Everything checks out', level: 2 }).waitFor();
   await page.getByRole('button', { name: 'Sign and accept' }).click();

@@ -63,6 +63,8 @@ Do not reread every document by default. Follow links when a work packet or disc
 
 ## How to choose and execute work
 
+Before starting, run `tools/branch-handoffs.sh`. Cloud sessions push to their own branches, so the newest handoff may not be on `main` yet; build on the newest branch that carries the packet, and say which in the work record.
+
 Work on one packet at a time unless the owner explicitly requests parallel work. A packet is ready only when all prerequisites are satisfied and no blocking decision applies. If the named next packet is not ready:
 
 1. Complete any safe prerequisite that is already authorized.

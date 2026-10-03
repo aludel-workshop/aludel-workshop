@@ -124,7 +124,9 @@ writeFileSync(join(conflictCheckout, '../.git/info/exclude'), '/layer/\n', { fla
 writeFileSync(join(conflictCheckout, 'src/review-page.html'), html('Conflicting page change'));
 worker.commitLayer(scope, { attemptId: conflictAttempt, message: 'Change the same page independently', tests: [] });
 worker.submitProposal(scope, { attemptId: conflictAttempt, proposal: { summary: 'A conflicting branch to send back without applying.', content: {} } });
-const personWork = know.createWork(projectId, { layer: 'platform', title: 'Person submits a real repository candidate', assignee: {kind:'person', id:owner.id}, checks: ['The editor opens directly as the author', 'The viewer opens directly as the viewer'] }, owner.name);
+// JOURNEYS-01 J4: the person's item claims the viewer step of its journey; the step has no test yet, so the person says why.
+const personWork = know.createWork(projectId, { layer: 'platform', title: 'Person submits a real repository candidate', assignee: {kind:'person', id:owner.id},
+  claims: [{ id: 'read-post-steps', kind: 'journey', journey: 'read-post', revision: 1, steps: ['page'] }], checks: ['The editor opens directly as the author', 'The viewer opens directly as the viewer'] }, owner.name);
 if (personWork.state === 'suggested') know.updateWork(owner, projectId, personWork.id, {state:'ready'});
 // The generated adapter must remain unavailable in an ordinary app process.
 const normalPort = await freePort();
@@ -172,10 +174,10 @@ try {
   const detail = (await (await context.request.get(`${portal}/api/projects/${projectId}/work/${work.id}/runs`)).json()).runs[0];
   const wrong = await context.request.put(`${apiBase}/review`,{data:{integrationId:'old',verdict:{index:0,value:'accept'}}}); assert.equal(wrong.status(),409);
   const correct = await context.request.put(`${apiBase}/review`,{data:{integrationId:detail.integration.id,verdict:{index:0,value:'reject',note:'Keep this durable note'}}}); assert.ok(correct.ok());
-  const refreshed = await context.request.post(`${apiBase}/prepare`,{data:{}}); assert.ok(refreshed.ok()); assert.equal((await refreshed.json()).run.review.verdicts[0].note,'Keep this durable note','unchanged refresh preserves notes');
+  const refreshed = await context.request.post(`${apiBase}/prepare`,{data:{}}); assert.ok(refreshed.ok()); assert.equal((await refreshed.json()).run.review.verdicts['note-1'].note,'Keep this durable note','unchanged refresh preserves notes, kept by claim ID');
   const rebuilt = await context.request.post(`${apiBase}/prepare`, {data:{rebuild:true}}); assert.ok(rebuilt.ok());
   const revised = (await rebuilt.json()).run; assert.notEqual(revised.integration.id, detail.integration.id); assert.deepEqual(revised.review.verdicts, {});
-  assert.equal(revised.steps.at(-1).previousReview.verdicts[0].note, 'Keep this durable note', 'new evidence preserves prior observations in history');
+  assert.equal(revised.steps.at(-1).previousReview.verdicts['note-1'].note, 'Keep this durable note', 'new evidence preserves prior observations in history');
   const built = await context.request.post(`${apiBase}/preview`, {data:{integrationId:revised.integration.id}}); assert.ok(built.ok(), await built.text());
   for (const index of [0, 1]) assert.ok((await context.request.put(`${apiBase}/review`, {data:{integrationId:revised.integration.id,verdict:{index,value:'accept'}}})).ok());
   const accepted = await context.request.post(`${apiBase}/sign`, {data:{integrationId:revised.integration.id,outcome:'accept'}}); assert.ok(accepted.ok(), await accepted.text());
@@ -224,8 +226,9 @@ try {
   await page.getByLabel('Local branch',{exact:true}).fill('person-review');
   await page.getByLabel('Exact commit',{exact:true}).fill(personCommit);
   await page.getByLabel('What is ready for review',{exact:true}).fill('A genuine person-performed repository submission.');
-  await page.locator('#person-evidence-0').fill('Open the author editor without a manual login.');
-  await page.locator('#person-evidence-1').fill('Open the viewer page without navigating.');
+  await page.locator('#person-evidence-note-1').fill('Open the author editor without a manual login.');
+  await page.locator('#person-evidence-note-2').fill('Open the viewer page without navigating.');
+  await page.getByLabel("If its step tests won't pass yet, say why (optional)").fill('The viewer step has no test yet; the next slice writes one.');
   await page.getByRole('button',{name:'Submit for review',exact:true}).click();
   await page.getByRole('link',{name:/Review/}).filter({hasText:'Review'}).first().waitFor();
   const personRuns = (await (await context.request.get(`${portal}/api/projects/${projectId}/work/${personWork.id}/runs`)).json()).runs;
@@ -239,7 +242,11 @@ try {
   await page.locator('[role=tabpanel][aria-labelledby=sub-done]').getByRole('link',{name:personWork.title,exact:true}).click();
   await page.getByRole('link',{name:/Review/}).filter({hasText:'Review'}).first().click();
   await page.getByRole('heading',{name:/Review W-\d+ · Run 1/}).waitFor();
-  await page.getByRole('button',{name:/Walk 2 journey steps in Preview/}).click({timeout:120000});
+  // The journey claim comes first, with its step's proof on this build and the person's reason beside it.
+  await page.getByText('Step tests on this build: No test').waitFor({timeout:120000});
+  await page.getByText('The viewer step has no test yet; the next slice writes one.').waitFor();
+  await page.screenshot({path:`${out}/person-review-claim.png`,fullPage:true});
+  await page.getByRole('button',{name:/Walk 1 step in Preview/}).click();
   await page.getByRole('button',{name:'Review the post editor'}).waitFor();
   await page.waitForFunction(()=>[...document.querySelectorAll('button')].some(b=>b.textContent.includes('Review the post editor')&&!b.disabled),null,{timeout:120000});
   await page.getByRole('button',{name:'Review the post editor'}).click();
@@ -249,15 +256,21 @@ try {
   await page.screenshot({path:`${out}/person-review.png`,fullPage:true});
   const personBase = `${portal}/api/projects/${projectId}/work/${personWork.id}/runs/${personRuns[0].id}`;
   const personReview = (await (await context.request.get(`${portal}/api/projects/${projectId}/work/${personWork.id}/runs`)).json()).runs[0];
-  for(const index of [0,1]) assert.ok((await context.request.put(`${personBase}/review`,{data:{integrationId:personReview.integration.id,verdict:{index,value:'accept'}}})).ok());
+  assert.deepEqual(personReview.task.criteria.map(claim=>claim.id),['read-post-steps','note-1','note-2']);
+  assert.deepEqual([personReview.proofs['read-post-steps'].status, personReview.gate.map(entry=>entry.reason)],['uncovered',['The viewer step has no test yet; the next slice writes one.']]);
+  await page.getByRole('button',{name:'Sign off'}).click();
+  await page.getByText(/Accepting signs over 1 unproven claim that Charles gave a reason for/).waitFor();
+  await page.screenshot({path:`${out}/person-review-signoff.png`,fullPage:true});
+  for(const claim of ['read-post-steps','note-1','note-2']) assert.ok((await context.request.put(`${personBase}/review`,{data:{integrationId:personReview.integration.id,verdict:{claim,value:'accept'}}})).ok());
   const personAccepted = await context.request.post(`${personBase}/sign`,{data:{integrationId:personReview.integration.id,outcome:'accept'}});
   assert.ok(personAccepted.ok(),await personAccepted.text());
   assert.equal(git(workspace,'rev-parse','main'),personReview.integration.commit);
 
   assert.equal(errors.length,0,errors.join('\n'));
   console.log('PASS: generic Code review prepares/builds on open; author/viewer steps require no manual login/navigation; stale generation refused; notes survive unchanged refresh and remain in rebuild history; two Code branches integrate serially; person work stages, starts, submits an exact branch, appears in Done, previews both roles and accepts through the same guards; wide/narrow and axe pass.');
-} finally {
-  await browser.close(); server.kill(); await new Promise(resolve=>server.once('exit',resolve));
+} catch (error) { console.error('SERVER', serverLog.slice(-4000)); throw error; } finally {
+  // A portal that already exited (say, failing at startup) has no exit left to wait for; its log is printed above.
+  await browser.close(); server.kill(); if (server.exitCode === null && server.signalCode === null) await new Promise(resolve=>server.once('exit',resolve));
   for(const row of db.prepare('SELECT id FROM layer_review_integrations').all()) {
     try { execFileSync('docker',['image','rm',previewImageName(join(root,'review-workspaces'),'review',row.id)],{stdio:'ignore'}); } catch {}
   }

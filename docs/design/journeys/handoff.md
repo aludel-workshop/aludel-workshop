@@ -5,13 +5,22 @@ status: active
 updated: 2026-10-03
 ---
 
-# JOURNEYS-01 handoff: continue at J4
+# JOURNEYS-01 handoff: continue at J5
 
-For a fresh agent (Claude in the cloud) picking up JOURNEYS-01. Read this, then [AGENTS.md](../../../AGENTS.md), [status](../../status.md), the [JOURNEYS-01 work record](work-record.md) (plan, authorizations, run log, retrospectives), [DEC-063](../../decisions.md) and the [deferred code-tracing record](../code-tracing/deferred.md).
+For a fresh agent (Claude in the cloud) picking up JOURNEYS-01. Run `tools/branch-handoffs.sh` first: this packet's slices have been landing on cloud-session branches that the owner hasn't merged into `main`, so the newest handoff may be on a branch. Then read this, [AGENTS.md](../../../AGENTS.md), [status](../../status.md), the [JOURNEYS-01 work record](work-record.md) (plan, authorizations, run log, retrospectives), [DEC-063](../../decisions.md) and the [deferred code-tracing record](../code-tracing/deferred.md).
 
-## Update 2026-10-03: J3 done, J4 next
+## Update 2026-10-03: J4 done, J5 next
 
-J3 is done on branch `claude/brave-pascal-br7h4i`, apart from Biome's steps, which move to J8. The [J3 run log](work-record.md#j3-journey-proof-2026-10-03-claude-cloud-session) has the design, both check runs, findings and retrospective. J4 (claims) needs the owner's go before it starts.
+J4 (claims) is done on branch `claude/nice-cray-zn7gfg`, which builds on J3's `claude/brave-pascal-br7h4i`. Neither is on `main` yet. The [J4 run log](work-record.md#j4-claims-2026-10-03-claude-cloud-session) has the design, the checks, the migration rehearsal and the retrospective. J5 (Specify → Implement) needs the owner's go before it starts.
+
+What J5 can use from J4:
+- `createWork` takes `claims` (backed claims, validated by `validateClaims`) next to free-text `checks`. `implementClaims(previous, next)` in `server/journeys.mjs` produces the claims an *Implement* item makes; pass them as `claims`.
+- A journey claim is proven by its steps' results on the run's reviewed build (`claimProof`), and an unproven claim stops acceptance (`claimGate`, enforced in `workRuns().sign`). An agent run can't be accepted over it; a person run can, if the person gave a reason when submitting.
+- **Owner restart notice.** The claims migration runs on the owner's next portal restart (item criteria → `note-<n>` claims; saved run verdicts → claim IDs). It was rehearsed on data written by the pre-J4 code; say so to the owner before they restart.
+
+## Update 2026-10-03: J3 done
+
+J3 is done on branch `claude/brave-pascal-br7h4i`, apart from Biome's steps, which move to J8. The [J3 run log](work-record.md#j3-journey-proof-2026-10-03-claude-cloud-session) has the design, both check runs, findings and retrospective.
 
 On first use, the Docker review test pulls `mcr.microsoft.com/playwright:v1.56.1-noble` (about 920 MB) and builds `aludel-journey-runner:<digest>`. No template pin changed in J3.
 
@@ -37,10 +46,10 @@ All pins are in `apps/portal/config/layer-templates.json`. Last full run, 2026-1
 4. **Cloud sessions** (learned in J3):
    - The session's GitHub access may not include the private `layer-base`. Add it to the session's repositories, or the template suite and journeys can't run.
    - Docker may need starting (`dockerd`).
-   - Docker builds there can't reach npm without the session proxy, so prebuild the journey runner image or set `MACHINE_JOURNEY_RUNNER_IMAGE`.
+   - Docker builds there can't reach npm without the session proxy, so prebuild the journey runner image or set `MACHINE_JOURNEY_RUNNER_IMAGE`. J4 built it under the tag the host computes, with a copy of `server/journey-runner/Dockerfile` that adds the proxy CA (`COPY ca.crt /tmp/proxy-ca.crt`, then `NODE_EXTRA_CA_CERTS=/tmp/proxy-ca.crt` on both npm commands), `/root/.ccr/ca-bundle.crt` copied in as `ca.crt`, and `docker build --network host --build-arg HTTPS_PROXY=$HTTPS_PROXY --build-arg https_proxy=$HTTPS_PROXY --tag aludel-journey-runner:<first 12 hex of the real Dockerfile's sha256> .`. Start `dockerd` from a shell that has `HTTPS_PROXY` set, so image pulls use the proxy.
    - Node 24 is available as the npm package `node@24`.
    - The portal runs as root there. Previews then mount a root-owned `/data` that the app's `node` user can't write, so run Docker-preview browser checks as a uid-1000 user.
-5. **Playwright** for browser journeys: set `PLAYWRIGHT_MODULE` to a Playwright `index.mjs` whose Chromium headless shell is installed. The local run used Playwright 1.61.1 with `chromium_headless_shell-1228`, and version mismatches fail at launch. Run journeys with `MACHINE_LAYER_TEMPLATES_ENABLED=1 PLAYWRIGHT_MODULE=… tools/browser-checks.sh <names>` from `apps/portal`.
+5. **Playwright** for browser journeys: set `PLAYWRIGHT_MODULE` to a Playwright `index.mjs` whose Chromium headless shell is installed. The local run used Playwright 1.61.1 with `chromium_headless_shell-1228`, and version mismatches fail at launch. Cloud sessions have Playwright 1.56.1 at `/opt/node-tools/node_modules/playwright/index.mjs`, with its browsers in `/opt/pw-browsers`. Run journeys with `MACHINE_LAYER_TEMPLATES_ENABLED=1 PLAYWRIGHT_MODULE=… tools/browser-checks.sh <names>` from `apps/portal`.
 
 ## Checklist for any template or layer change
 

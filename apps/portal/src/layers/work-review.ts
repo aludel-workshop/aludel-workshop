@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { DomSanitizer } from '@angular/platform-browser';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { ProjectContext, RunChange, WorkRun } from './context';
+import { ClaimKind, ProjectContext, ProofStatus, RunChange, WorkRun } from './context';
 import { AvatarComponent, RefChipComponent } from './work-shared';
 import { reviewFocus, runTitle } from './work-run';
 
@@ -14,11 +14,15 @@ type ReviewPreview = { status: string; error?: string | null; reason?: string | 
   separability?: { seamsFile: boolean; declared: number; undeclared: string[] } | null };
 const stepResult: Record<StepResult['status'] | 'none', [string, string]> = { passed: ['check_circle', 'Test passed'], failed: ['cancel', 'Test failed'], skipped: ['radio_button_unchecked', 'Not run'],
   uncovered: ['remove', 'No test'], 'no-fixture': ['person_off', 'No fixture'], none: ['radio_button_unchecked', 'Not run yet'] };
+// JOURNEYS-01 J4: what each kind of claim is, and how a claim's automated proof reads.
+const claimKind: Record<ClaimKind, string> = { journey: 'Journey', record: 'Layer record', invariant: 'Invariant', note: 'Note · unbacked' };
+const proofStatus: Record<ProofStatus, [string, string]> = { passed: ['check_circle', 'Passed'], failed: ['cancel', 'Failed'], 'no-fixture': ['person_off', 'No fixture'], uncovered: ['remove', 'No test'],
+  skipped: ['radio_button_unchecked', 'Not run after a failure'], missing: ['help', 'Not in the build'], stale: ['history', 'Older revision built'], 'not-run': ['radio_button_unchecked', 'Not run yet'] };
 type Evidence = { type: 'change' | 'test' | 'try' | 'check' | 'note'; label: string; detail: string; look: string; result?: string; missing?: boolean };
 const evidenceType: Record<Evidence['type'], [string, string]> = { change: ['difference', 'Change'], test: ['science', 'Test'], try: ['touch_app', 'Try it'], check: ['verified', 'Aludel check'], note: ['person', 'Performer evidence'] };
 
-// WORK-ITEM-UX-01 WI-4: reviewing one run, a criterion at a time. The left shows what the run produced (only the kinds it
-// produced: Changes, Preview, Tests); the right steps through its criteria and ends at the signature.
+// WORK-ITEM-UX-01 WI-4: reviewing one run, a claim at a time. The left shows what the run produced (only the kinds it
+// produced: Changes, Preview, Tests); the right steps through its claims and ends at the signature.
 @Component({
   selector: 'aludel-work-review', standalone: true, imports: [FormsModule, MatIconModule, MatTooltipModule, AvatarComponent, RefChipComponent],
   template: `
@@ -31,7 +35,7 @@ const evidenceType: Record<Evidence['type'], [string, string]> = { change: ['dif
           <span class="wr-who"><aludel-avatar [who]="{ kind: r.performer.kind, id: r.performer.id }" />{{ r.performer.label }}</span>
           <span class="lay-muted small wr-title">{{ work.title }}</span>
           <div class="wr-pips" role="group" aria-label="Progress">
-            @for (criterion of r.task.criteria; track criterion.index) { <button type="button" [class]="'wr-pip wr-pip-' + (r.review.verdicts[criterion.index]?.value || 'none')" [class.cur]="step() === criterion.index" (click)="goTo(criterion.index)" [attr.aria-label]="'Criterion ' + (criterion.index + 1)"></button> }
+            @for (criterion of r.task.criteria; track criterion.id) { <button type="button" [class]="'wr-pip wr-pip-' + (r.review.verdicts[criterion.id]?.value || 'none')" [class.cur]="step() === criterion.index" (click)="goTo(criterion.index)" [attr.aria-label]="'Claim ' + (criterion.index + 1)"></button> }
             <button type="button" class="wr-pip wr-pip-end" [class.cur]="onEnd()" (click)="goTo(r.task.criteria.length)" aria-label="Sign off"></button></div>
         </header>
         @if (r.state !== 'review') { <p class="wr-note"><mat-icon aria-hidden="true">{{ r.state === 'failed' ? 'error' : 'info' }}</mat-icon>@if (r.state === 'failed') { This run failed and cannot be accepted. Review its report, objectives and evidence to diagnose the blocker, then close it from the work item. } @else { Run {{ r.number }} is {{ runTitle[r.state].toLowerCase() }}. You can read it here; verdicts and signatures are closed. }</p> }
@@ -131,13 +135,23 @@ const evidenceType: Record<Evidence['type'], [string, string]> = { change: ['dif
             </div>
           </section>
 
-          <section class="wr-stepper" aria-label="Criteria">
+          <section class="wr-stepper" aria-label="Claims">
             @if (!onEnd()) {
               @if (criterion(); as c) {
                 <div class="wr-step">
-                  <p class="lay-eyebrow">Criterion {{ c.index + 1 }} of {{ r.task.criteria.length }}</p>
+                  <p class="lay-eyebrow">Claim {{ c.index + 1 }} of {{ r.task.criteria.length }} · {{ claimKind[c.kind] }}</p>
                   <h2>{{ c.text }}</h2>
-                  @if (r.integration?.appRepository && preview()?.steps?.length) {
+                  @if (r.proofs[c.id]; as proof) {
+                    <div class="wr-proof" [class.bad]="proof.status !== 'passed'"><p class="small"><mat-icon aria-hidden="true" [class]="'wr-t-' + (proof.status === 'passed' ? 'passed' : proof.status === 'failed' ? 'failed' : 'skipped')">{{ proofStatus[proof.status][0] }}</mat-icon>
+                      <strong>{{ c.covers === 'journeys' ? 'Every other journey step on this build' : 'Step tests on this build' }}: {{ proofStatus[proof.status][1] }}</strong>@if (proof.detail) { · {{ proof.detail }} }</p>
+                      @if (proof.steps.length) { <ul class="wr-proof-steps">@for (stepProof of proof.steps; track stepProof.id) { @if (c.covers !== 'journeys' || stepProof.status === 'failed') {
+                        <li class="small"><mat-icon aria-hidden="true" [class]="'wr-t-' + (stepProof.status === 'passed' ? 'passed' : stepProof.status === 'failed' ? 'failed' : 'skipped')">{{ proofStatus[stepProof.status][0] }}</mat-icon>{{ stepProof.id }}: {{ proofStatus[stepProof.status][1] }}
+                          @if (stepProof.screenshot) { · <a [href]="screenshotUrl(stepProof.id)" target="_blank" rel="noopener">screenshot</a> }@if (stepProof.detail) { <span class="lay-muted"> · {{ stepProof.detail }}</span> }</li> } }</ul> }
+                      @if (r.reasons[c.id]) { <p class="small"><strong>{{ r.performer.label }} says why:</strong> {{ r.reasons[c.id] }}</p> }
+                      @if (c.kind === 'journey' && r.integration?.appRepository) { <button type="button" class="lay-button ghost small" (click)="view.set('preview')"><mat-icon aria-hidden="true">route</mat-icon>Walk {{ c.steps?.length }} {{ c.steps?.length === 1 ? 'step' : 'steps' }} in Preview</button> }
+                    </div>
+                  } @else if (c.kind === 'note') { <p class="small lay-muted">Free text: no layer describes this yet, so you judge it from the evidence.</p> }
+                  @if (!r.proofs[c.id] && r.integration?.appRepository && preview()?.steps?.length) {
                     <button type="button" class="lay-button ghost small" (click)="view.set('preview')"><mat-icon aria-hidden="true">route</mat-icon>Walk {{ preview()?.steps?.length }} journey steps in Preview</button>
                   }
                   <div><p class="lay-eyebrow">To verify, check</p>
@@ -145,7 +159,7 @@ const evidenceType: Record<Evidence['type'], [string, string]> = { change: ['dif
                       <button type="button" [class]="'wr-ev wr-ev-' + entry.type" [class.missing]="entry.missing" [disabled]="!entry.look" (click)="look(entry.look)"><mat-icon aria-hidden="true">{{ evidenceType[entry.type][0] }}</mat-icon>
                         <span><small class="wr-ev-type">{{ evidenceType[entry.type][1] }}</small>{{ entry.label }}<small>{{ entry.detail }}</small></span>@if (entry.result) { <span class="small">{{ entry.result }}</span> }</button>
                     } @empty { <p class="lay-muted small">This run produced nothing to check against. Reject it or skip.</p> }</div>
-                    <p class="small lay-muted wr-legend"><mat-icon aria-hidden="true">info</mat-icon>{{ named() ? 'Named by the run when it submitted. Each item points at something it produced; Aludel re-runs tests where it can.' : 'This run named no evidence per criterion, so this lists everything it produced.' }}</p></div>
+                    <p class="small lay-muted wr-legend"><mat-icon aria-hidden="true">info</mat-icon>{{ named() ? 'Named by the run when it submitted. Each item points at something it produced; Aludel re-runs tests where it can.' : 'This run named no evidence per claim, so this lists everything it produced.' }}</p></div>
                   <details class="wr-ctx"><summary><mat-icon aria-hidden="true">bookmark</mat-icon>Context</summary>
                     <div>@if (c.source) { <p class="small">From <aludel-ref [id]="c.source.id" /></p> }<p class="small"><strong>The request:</strong> {{ r.task.request || r.task.title }}</p><p class="small lay-muted">Shown for reference. You're reviewing the result, not this.</p></div></details>
                   @switch (verdict()?.value) {
@@ -160,10 +174,12 @@ const evidenceType: Record<Evidence['type'], [string, string]> = { change: ['dif
               <div class="wr-step">
                 <p class="lay-eyebrow">Sign off · run {{ r.number }}</p>
                 <h2>{{ flagCount() ? 'Send back with ' + flagCount() + (flagCount() === 1 ? ' flag' : ' flags') : unchecked() ? unchecked() + ' not checked by you' : 'Everything checks out' }}</h2>
-                <ul class="wr-sum">@for (c of r.task.criteria; track c.index) { <li><mat-icon aria-hidden="true" [class]="'wr-sum-' + (r.review.verdicts[c.index]?.value || 'none')">{{ r.review.verdicts[c.index]?.value === 'accept' ? 'check_circle' : r.review.verdicts[c.index]?.value === 'reject' ? 'flag' : 'radio_button_unchecked' }}</mat-icon>
-                  <span>{{ c.text }}@if (r.review.verdicts[c.index]?.note) { <small>{{ r.review.verdicts[c.index]?.note }}</small> }@if (r.review.verdicts[c.index]?.value === 'skip') { <small>Skipped</small> }</span></li> }
+                <ul class="wr-sum">@for (c of r.task.criteria; track c.id) { <li><mat-icon aria-hidden="true" [class]="'wr-sum-' + (r.review.verdicts[c.id]?.value || 'none')">{{ r.review.verdicts[c.id]?.value === 'accept' ? 'check_circle' : r.review.verdicts[c.id]?.value === 'reject' ? 'flag' : 'radio_button_unchecked' }}</mat-icon>
+                  <span>{{ c.text }}@if (r.review.verdicts[c.id]?.note) { <small>{{ r.review.verdicts[c.id]?.note }}</small> }@if (r.review.verdicts[c.id]?.value === 'skip') { <small>Skipped</small> }@if (r.proofs[c.id] && r.proofs[c.id].status !== 'passed') { <small>Step tests: {{ proofStatus[r.proofs[c.id].status][1] }}</small> }</span></li> }
                   @for (change of flaggedChanges(); track change.id) { <li><mat-icon aria-hidden="true" class="wr-sum-reject">flag</mat-icon><span>{{ change.name }}<small>{{ r.review.flags[change.id] }}</small></span></li> }</ul>
-                @if (!flagCount() && unchecked()) { <p class="wi-warn"><mat-icon aria-hidden="true">warning</mat-icon>Accepting now signs for {{ unchecked() }} {{ unchecked() === 1 ? 'criterion' : 'criteria' }} you didn't check.</p> }
+                @if (!flagCount() && blocking().length) { <p class="wi-warn" role="status"><mat-icon aria-hidden="true">block</mat-icon>This run can't be accepted: {{ blockingText() }}. {{ r.performer.kind === 'person' ? 'Send it back, or ask ' + r.performer.label + ' to state why when they submit.' : 'Send it back; the failing steps go to the next run.' }}</p> }
+                @else if (!flagCount() && excused().length) { <p class="wi-warn"><mat-icon aria-hidden="true">info</mat-icon>Accepting signs over {{ excused().length }} unproven {{ excused().length === 1 ? 'claim' : 'claims' }} that {{ r.performer.label }} gave a reason for.</p> }
+                @if (!flagCount() && unchecked()) { <p class="wi-warn"><mat-icon aria-hidden="true">warning</mat-icon>Accepting now signs for {{ unchecked() }} {{ unchecked() === 1 ? 'claim' : 'claims' }} you didn't check.</p> }
                 <label for="wr-comment">Overall comment (optional)</label>
                 <textarea id="wr-comment" rows="3" [(ngModel)]="comment" [placeholder]="flagCount() ? 'What should the next run do differently?' : 'Anything to note for the record'"></textarea>
                 <p class="small lay-muted">{{ flagCount() ? 'Nothing is applied. The task opens again as Next run with your flags and comment carried in.'
@@ -183,7 +199,8 @@ const evidenceType: Record<Evidence['type'], [string, string]> = { change: ['dif
               } @else if (r.state === 'review' && !elevated()) {
                 <span class="lay-muted small">Elevated {{ layerName(work.layer) }} access is required to sign.</span>
               } @else if (r.state === 'review') {
-                <button type="button" [class]="'lay-button ' + (flagCount() ? 'danger' : 'lay-button-ok')" [disabled]="preparing() || (!flagCount() && !!r.layerSource && !r.integration?.current)" (click)="sign(flagCount() ? 'reject' : 'accept')"><mat-icon aria-hidden="true">draw</mat-icon>{{ flagCount() ? 'Sign and send back' : 'Sign and accept' }}</button>
+                <button type="button" [class]="'lay-button ' + (flagCount() ? 'danger' : 'lay-button-ok')" [disabled]="preparing() || (!flagCount() && ((!!r.layerSource && !r.integration?.current) || blocking().length > 0))" (click)="sign(flagCount() ? 'reject' : 'accept')"><mat-icon aria-hidden="true">draw</mat-icon>{{ flagCount() ? 'Sign and send back' : 'Sign and accept' }}</button>
+                @if (!flagCount() && blocking().length) { <button type="button" class="lay-button danger" [disabled]="preparing()" (click)="sign('reject')"><mat-icon aria-hidden="true">undo</mat-icon>Sign and send back</button> }
               }
             </footer>
           </section>
@@ -214,14 +231,20 @@ export class WorkReviewComponent {
   readonly preview = signal<ReviewPreview | null>(null);
   readonly previewDestination = signal<string | null>(null);
   readonly stepResult = stepResult;
-  // Grouped by journey, in journey order; criteria no longer index steps (claims-based stepping is J4).
+  readonly claimKind = claimKind;
+  readonly proofStatus = proofStatus;
+  // Grouped by journey, in journey order. A journey claim names its steps; the stepper shows their proof.
   readonly journeyGroups = computed(() => { const preview = this.preview();
     return (preview?.journeys || []).map(journey => ({ ...journey, steps: (preview?.steps || []).filter(step => step.journey === journey.id) })); });
   comment = ''; noteDraft = '';
   private loadedFor = '';
   readonly onEnd = computed(() => this.step() >= (this.run()?.task.criteria.length ?? 0));
   readonly criterion = computed(() => this.run()?.task.criteria[this.step()] || null);
-  readonly verdict = computed(() => this.run()?.review.verdicts[this.step()] || null);
+  readonly verdict = computed(() => { const claim = this.criterion(); return claim ? this.run()?.review.verdicts[claim.id] || null : null; });
+  // JOURNEYS-01 J4: claims whose step tests aren't passing on this build stop acceptance, unless a person gave a reason.
+  readonly blocking = computed(() => { const r = this.run(); return r ? r.gate.filter(entry => r.performer.kind !== 'person' || !entry.reason) : []; });
+  readonly excused = computed(() => { const r = this.run(); return r ? r.gate.filter(entry => r.performer.kind === 'person' && entry.reason) : []; });
+  readonly blockingText = computed(() => this.blocking().map(entry => `“${entry.text}” is ${entry.status === 'not-run' ? 'not proven yet (open the preview to run its step tests)' : proofStatus[entry.status][1].toLowerCase()}`).join('; '));
   readonly tabs = computed(() => { const r = this.run(); if (!r) return [];
     return [{ id: 'changes', label: 'Changes', icon: 'difference', count: r.changes.length },
       ...(r.followUps?.length ? [{ id: 'follow-ups', label: 'Follow-ups', icon: 'playlist_add', count: r.followUps.length }] : []),
@@ -230,15 +253,16 @@ export class WorkReviewComponent {
   // The evidence the run named for this criterion (WI-6). Runs that named none fall back to everything they produced.
   readonly named = computed(() => (this.run()?.evidence || []).length > 0);
   readonly evidence = computed<Evidence[]>(() => { const r = this.run(); if (!r) return [];
-    if (this.named()) return r.evidence.filter(item => item.criterion === this.step()).map(item => ({
-      type: item.type, label: item.label, look: item.target || '',
+    const claim = this.criterion();
+    if (this.named()) return r.evidence.filter(item => item.claim === claim?.id).map(item => ({
+      type: item.type, label: item.step ? `${item.label} · step ${item.step}` : item.label, look: item.target || '',
       detail: !item.found ? 'Named by the performer, but not in the review packet' : item.type === 'test' ? (item.independent ? 'Run by Aludel' : 'Reported by the agent; not re-run') : item.type === 'try' ? item.ref : item.note,
       result: item.type === 'test' ? item.result || undefined : undefined, missing: !item.found }));
     return [...r.changes.map(change => ({ type: 'change' as const, label: change.name, detail: `${this.opLabel[change.op]}${change.size ? ' · ' + change.size : ''}`, look: `change:${change.id}` })),
       ...this.testsOf(r).map((check, index) => ({ type: 'test' as const, label: check.name, detail: check.source === 'person-report' ? 'Reported by the performer' : check.source === 'agent-report' ? 'Reported by the agent' : 'Run by Aludel', look: `test:${index}`, result: check.status }))]; });
   readonly flaggedChanges = computed(() => { const r = this.run(); return r ? r.changes.filter(change => r.review.flags[change.id] !== undefined) : []; });
   readonly flagCount = computed(() => { const r = this.run(); return r ? Object.values(r.review.verdicts).filter(value => value.value === 'reject').length + this.flaggedChanges().length : 0; });
-  readonly unchecked = computed(() => { const r = this.run(); return r ? r.task.criteria.filter(c => !r.review.verdicts[c.index] || r.review.verdicts[c.index].value === 'skip').length : 0; });
+  readonly unchecked = computed(() => { const r = this.run(); return r ? r.task.criteria.filter(c => !r.review.verdicts[c.id] || r.review.verdicts[c.id].value === 'skip').length : 0; });
   readonly back = computed(() => this.ctx.link('work', 'item', this.id()));
   private readonly sanitizer = inject(DomSanitizer);
   // The candidate's own isolated preview, served by this portal; nothing else is framed.
@@ -258,7 +282,7 @@ export class WorkReviewComponent {
       if (first) {
         const r = this.run(); const focus = reviewFocus(); reviewFocus.set(null);
         if (focus && r?.changes.some(change => change.id === focus)) { this.view.set('changes'); this.focus.set(focus); }
-        const next = r ? r.task.criteria.findIndex(c => !r.review.verdicts[c.index]) : -1;
+        const next = r ? r.task.criteria.findIndex(c => !r.review.verdicts[c.id]) : -1;
         this.step.set(next < 0 ? r?.task.criteria.length || 0 : next);
         if (r?.layerSource && r.state === 'review' && this.elevated()) this.prepareReview();
         if (r?.candidate) void this.ctx.api<{ preview: { status: string; error?: string | null }; url: string }>(`${this.base()}/candidates/${encodeURIComponent(r.candidate.id)}/preview`)
@@ -275,11 +299,12 @@ export class WorkReviewComponent {
     return this.ctx.write(async () => { const updated = await this.ctx.api<WorkRun>(`${this.base()}/work/${encodeURIComponent(this.id())}/runs/${encodeURIComponent(r.id)}/review`, 'PUT', { ...(body as object), integrationId: r.integration?.id });
       this.runs.set(this.runs().map(run => run.id === updated.id ? updated : run)); }); }
   setVerdict(value: 'accept' | 'reject' | 'skip') {
-    const index = this.step(); const current = this.verdict()?.value;
-    if (value === 'reject') { void this.review({ verdict: { index, value: current === 'reject' ? null : 'reject', note: this.noteDraft } }).then(() => setTimeout(() => document.getElementById('wr-note')?.focus())); return; }
-    void this.review({ verdict: { index, value } }).then(() => this.goTo(index + 1));
+    const index = this.step(), claim = this.criterion()?.id; const current = this.verdict()?.value;
+    if (!claim) return;
+    if (value === 'reject') { void this.review({ verdict: { claim, value: current === 'reject' ? null : 'reject', note: this.noteDraft } }).then(() => setTimeout(() => document.getElementById('wr-note')?.focus())); return; }
+    void this.review({ verdict: { claim, value } }).then(() => this.goTo(index + 1));
   }
-  saveNote() { if (this.verdict()?.value === 'reject') void this.review({ verdict: { index: this.step(), value: 'reject', note: this.noteDraft } }); }
+  saveNote() { const claim = this.criterion()?.id; if (claim && this.verdict()?.value === 'reject') void this.review({ verdict: { claim, value: 'reject', note: this.noteDraft } }); }
   toggleFlag(id: string) { void this.review({ flag: { id, on: this.run()?.review.flags[id] === undefined, note: '' } }); }
   saveFlag(id: string, note: string) { void this.review({ flag: { id, note } }); }
   sign(outcome: 'accept' | 'reject') { const r = this.run(); if (!r) return;

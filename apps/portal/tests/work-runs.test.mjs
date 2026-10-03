@@ -7,6 +7,7 @@ import test from 'node:test';
 import { createUser, initAccounts } from '../server/accounts.mjs';
 import { agentRuns, initAgentRuns } from '../server/agent-runs.mjs';
 import { initKnowledge, knowledge } from '../server/knowledge.mjs';
+import { initLayerSource } from '../server/layer-source.mjs';
 import { initOnboarding, loadCatalogs, onboarding } from '../server/onboarding.mjs';
 import { ensureProductWorkspace } from '../server/product-workspace.mjs';
 import { openSecretStore } from '../server/secret-store.mjs';
@@ -42,9 +43,9 @@ function fixture() {
   const scope = worker.authenticate('Bearer ' + credential);
   const runs = agentRuns({ db, know, secrets: openSecretStore(root), providers: catalogs.agentProviders.providers, worker, symphonyDispatch: true,
     callModel: async () => { throw new Error('Legacy model caller must never run'); } });
-  const start = (action, targets = [], question = null) => {
+  const start = (action, targets = [], question = null, extra = {}) => {
     const work = know.createWork(projectId, { action, title: `Test ${action}`, assignee: { kind: 'agent', id: profile.id }, targets,
-      checks: ['The proposed output is accurate'], ...(question ? { question } : {}) }, owner.name);
+      checks: ['The proposed output is accurate'], ...(question ? { question } : {}), ...extra }, owner.name);
     if (work.state === 'suggested') know.updateWork(owner, projectId, work.id, { state: 'ready' });
     runs.stage(owner, projectId, work.id);
     const batch = runs.view(projectId).find(value => value.state === 'draft');
@@ -246,16 +247,22 @@ test('a working run reports its own plan and progress; the live run follows it',
   } finally { f.close(); }
 });
 
-test('evidence names a given criterion and a change, test or thing to try; unmatched references stay visible', () => {
+test('evidence names a given claim by ID and a change, test or thing to try; unmatched references stay visible', () => {
   const f = fixture();
   try {
     const { work, issue } = f.start('product.brief');
     const attemptId = issue.native_ref.attempt_id;
-    assert.throws(() => f.history.checkEvidence(f.projectId, attemptId, [{ criterion: 3, type: 'change', ref: 'x' }]), /criterion this run was given/);
-    assert.throws(() => f.history.checkEvidence(f.projectId, attemptId, [{ criterion: 0, type: 'check', ref: 'scope' }]), /Aludel adds its own checks/);
+    const [claim0] = f.know.workById(f.projectId, work.id).checks;
+    assert.equal(claim0.id, 'note-1');
+    assert.throws(() => f.history.checkEvidence(f.projectId, attemptId, [{ claim: 'note-9', type: 'change', ref: 'x' }]), /claim this run was given/);
+    // JOURNEYS-01 J4: a run pinned with claim IDs names them; a position is refused.
+    assert.throws(() => f.history.checkEvidence(f.projectId, attemptId, [{ criterion: 0, type: 'change', ref: 'x' }]), /by its ID/);
+    assert.throws(() => f.history.checkEvidence(f.projectId, attemptId, [{ claim: 'note-1', step: 'sign-up', type: 'change', ref: 'x' }]), /names a step the claim makes true/);
+    assert.throws(() => f.history.checkEvidence(f.projectId, attemptId, [{ claim: 'note-1', type: 'check', ref: 'scope' }]), /Aludel adds its own checks/);
     const evidence = f.history.checkEvidence(f.projectId, attemptId, [
-      { criterion: 0, type: 'change', ref: 'Vision › Brief › Value', note: 'One sentence' },
-      { criterion: 0, type: 'test', ref: 'claim is short' }]);
+      { claim: 'note-1', type: 'change', ref: 'Vision › Brief › Value', note: 'One sentence' },
+      { claim: 'note-1', type: 'test', ref: 'claim is short' }]);
+    assert.deepEqual(evidence.map(item => item.claim), ['note-1', 'note-1']);
     f.worker.submitProposal(f.scope, { attemptId, proposal: claim('A pet in the corner of your screen.') });
     f.history.recordEvidence(attemptId, evidence);
     const [run] = f.history.list(f.projectId, work.id);
@@ -263,6 +270,13 @@ test('evidence names a given criterion and a change, test or thing to try; unmat
     assert.equal(run.evidence[0].found, true);
     assert.equal(run.evidence[0].target, `change:${run.changes[0].id}`);
     assert.equal(run.evidence[1].found, false, 'a test the submission does not contain is shown as not found');
+    // A run pinned before J4 has no claim IDs; its agent was told positions, which read as the claim the migration named.
+    const digest = f.db.prepare('SELECT bundle_digest FROM symphony_attempts WHERE id = ?').get(attemptId).bundle_digest;
+    const bundle = JSON.parse(f.db.prepare('SELECT content_json FROM symphony_bundles WHERE digest = ?').get(digest).content_json);
+    bundle.work.checks = bundle.work.checks.map(({ id, kind, backed, ...check }) => check);
+    f.db.prepare('UPDATE symphony_bundles SET content_json = ? WHERE digest = ?').run(JSON.stringify(bundle), digest);
+    assert.deepEqual(f.history.checkEvidence(f.projectId, attemptId, [{ criterion: 0, type: 'change', ref: 'x' }]).map(item => item.claim), ['note-1']);
+    assert.deepEqual(f.history.list(f.projectId, work.id)[0].task.criteria.map(entry => entry.id), ['note-1']);
     assert.ok(run.steps.every(step => step.kind !== 'evidence'));
   } finally { f.close(); }
 });
@@ -306,7 +320,7 @@ test('the assigned person can start, submit and sign a run without synthetic age
     assert.equal(f.history.runFor(f.projectId, work.id, started.id).state, 'working');
     assert.throws(() => f.know.updateWork(f.owner, f.projectId, work.id, { task: { criteria: ['Changed too late'] } }), /locked/);
     const submitted = f.history.submitPerson(f.owner, f.projectId, work.id, started.id, {
-      summary: 'Defined a concrete checkpoint outcome.', evidence: [{ criterion: 0, note: 'Review the outcome named in the project plan.' }] });
+      summary: 'Defined a concrete checkpoint outcome.', evidence: [{ claim: 'note-1', note: 'Review the outcome named in the project plan.' }] });
     assert.equal(submitted.state, 'review');
     assert.equal(submitted.summary, 'Defined a concrete checkpoint outcome.');
     assert.equal(submitted.evidence[0].type, 'note');
@@ -318,12 +332,148 @@ test('the assigned person can start, submit and sign a run without synthetic age
     assert.equal(second.number, 2, 'a signed person run does not block the next one');
     assert.equal(second.task.carriedComment, 'One more pass.');
     f.history.submitPerson(f.owner, f.projectId, work.id, second.id, {
-      summary: 'Added the checkpoint date.', evidence: [{ criterion: 0, note: 'Review the dated checkpoint outcome.' }] });
+      summary: 'Added the checkpoint date.', evidence: [{ claim: 'note-1', note: 'Review the dated checkpoint outcome.' }] });
     f.history.saveReview(f.projectId, work.id, second.id, { verdict: { index: 0, value: 'accept' } });
     const signed = await f.history.sign(f.owner, f.projectId, work.id, second.id, { outcome: 'accept', comment: 'Clear.' }, {
       accept: () => f.know.updateWork(f.owner, f.projectId, work.id, { state: 'done' }),
     });
     assert.equal(signed.state, 'accepted');
     assert.equal(f.know.workById(f.projectId, work.id).state, 'done');
+  } finally { f.close(); }
+});
+
+// JOURNEYS-01 J4: claims with stable IDs replace positional criteria; a claimed journey step must pass to accept.
+const journeyClaim = { id: 'onboarding-steps', kind: 'journey', journey: 'onboarding', revision: 2, steps: ['sign-up', 'team'] };
+
+test('J4: the restart migration gives legacy criteria and run verdicts claim IDs, once, keeping their text and verdicts', async () => {
+  const f = fixture();
+  try {
+    const { work, issue } = f.start('product.brief');
+    f.worker.submitProposal(f.scope, { attemptId: issue.native_ref.attempt_id, proposal: claim('A pet in the corner of your screen.') });
+    const person = f.know.createWork(f.projectId, { action: 'platform.docs', title: 'Write the guide', assignee: { kind: 'person', id: f.owner.id }, checks: ['It names the owner', 'It has a date'] }, f.owner.name);
+    // Rows as they were before J4: criteria without IDs; a run's verdicts kept by position.
+    for (const id of [work.id, person.id]) {
+      const row = f.db.prepare('SELECT checks_json FROM layer_work_items WHERE id = ?').get(id);
+      const legacy = JSON.parse(row.checks_json).map(({ id: _id, kind, backed, ...check }) => check);
+      f.db.prepare('UPDATE layer_work_items SET checks_json = ? WHERE id = ?').run(JSON.stringify(legacy), id);
+    }
+    f.db.prepare("UPDATE layer_work_items SET checks_json = ? WHERE id = ?").run(JSON.stringify([{ text: 'It names the owner', source: null, verdict: 'accept', note: '', by: 'Owner' }, { text: 'It has a date', source: null, verdict: null, note: '' }]), person.id);
+    f.db.prepare("INSERT INTO work_run_reviews(attempt_id, project_id, work_id, verdicts_json, updated_at) VALUES (?, ?, ?, ?, ?)")
+      .run(issue.native_ref.attempt_id, f.projectId, work.id, JSON.stringify({ 0: { value: 'reject', note: 'Too long.' } }), new Date().toISOString());
+    initKnowledge(f.db); initWorkRuns(f.db);
+    const migrated = f.know.workById(f.projectId, person.id);
+    assert.deepEqual(migrated.checks.map(check => [check.id, check.kind, check.backed, check.text, check.verdict]), [['note-1', 'note', false, 'It names the owner', 'accept'], ['note-2', 'note', false, 'It has a date', null]]);
+    assert.match(migrated.log.at(-1).text, /2 criteria are now note claims/);
+    const [run] = f.history.list(f.projectId, work.id);
+    assert.deepEqual(run.review.verdicts, { 'note-1': { value: 'reject', note: 'Too long.' } }, 'a position verdict moves to the claim it named');
+    assert.equal(run.task.criteria[0].id, 'note-1', 'the bundle pinned before J4 reads by position as the same ID');
+    // Running it again changes nothing.
+    initKnowledge(f.db); initWorkRuns(f.db);
+    assert.equal(f.know.workById(f.projectId, person.id).log.length, migrated.log.length);
+    assert.deepEqual(f.history.list(f.projectId, work.id)[0].review.verdicts, run.review.verdicts);
+  } finally { f.close(); }
+});
+
+test('J4: claims keep their IDs through task edits; verdicts and send-back feedback name them', async () => {
+  const f = fixture();
+  try {
+    const work = f.know.createWork(f.projectId, { action: 'platform.docs', title: 'Write the guide', assignee: { kind: 'person', id: f.owner.id },
+      claims: [journeyClaim], checks: ['It names the owner', 'It has a date'] }, f.owner.name);
+    assert.deepEqual(work.checks.map(check => [check.id, check.kind, check.backed]), [['onboarding-steps', 'journey', true], ['note-1', 'note', false], ['note-2', 'note', false]]);
+    assert.equal(work.checks[0].text, 'Journey onboarding at revision 2: steps sign-up, team');
+    // Editing the free text keeps the backed claim and each unchanged note's ID; a new note never takes a removed note's ID.
+    const edited = f.know.updateWork(f.owner, f.projectId, work.id, { task: { criteria: ['It has a date', 'It links the FAQ'] } });
+    assert.deepEqual(edited.checks.map(check => [check.id, check.text]), [['onboarding-steps', work.checks[0].text], ['note-2', 'It has a date'], ['note-3', 'It links the FAQ']]);
+    assert.throws(() => f.know.createWork(f.projectId, { action: 'platform.docs', title: 'Bad', claims: [{ id: 'x', kind: 'journey', journey: 'onboarding', revision: 2, steps: [] }] }), /names a journey/);
+    f.runs.stage(f.owner, f.projectId, work.id);
+    const started = f.history.startPerson(f.owner, f.projectId, work.id);
+    assert.deepEqual(started.task.criteria.map(claim => claim.id), ['onboarding-steps', 'note-2', 'note-3']);
+    assert.throws(() => f.history.submitPerson(f.owner, f.projectId, work.id, started.id, { summary: 'Wrote the guide.', evidence: [{ claim: 'note-7', note: 'x' }] }), /claim this run was given/);
+    assert.throws(() => f.history.submitPerson(f.owner, f.projectId, work.id, started.id, { summary: 'Wrote the guide.', reasons: { 'note-3': 'x' } }), /claim with step tests/);
+    const submitted = f.history.submitPerson(f.owner, f.projectId, work.id, started.id, { summary: 'Wrote the guide.', evidence: [{ claim: 'onboarding-steps', step: 'team', note: 'The team page.' }] });
+    assert.deepEqual([submitted.evidence[0].claim, submitted.evidence[0].step], ['onboarding-steps', 'team']);
+    // A position names the claim it points at now and is stored by ID.
+    f.history.saveReview(f.projectId, work.id, started.id, { verdict: { index: 1, value: 'reject', note: 'The date is missing.' } });
+    assert.deepEqual(Object.keys(f.history.runFor(f.projectId, work.id, started.id).review.verdicts), ['note-2']);
+    f.history.saveReview(f.projectId, work.id, started.id, { verdict: { claim: 'note-3', value: 'accept' } });
+    assert.throws(() => f.history.saveReview(f.projectId, work.id, started.id, { verdict: { claim: 'note-1', value: 'accept' } }), /Unknown claim/, 'a removed note is no longer a claim');
+    await f.history.sign(f.owner, f.projectId, work.id, started.id, { outcome: 'reject' });
+    const feedback = f.know.workById(f.projectId, work.id).context.feedback;
+    assert.deepEqual(feedback.map(note => note.claim), ['note-2', 'onboarding-steps'], 'the flagged note, then the unproven journey claim, go back by ID');
+    assert.match(feedback[1].note, /Not proven on the reviewed build \(not-run\)/);
+  } finally { f.close(); }
+});
+
+test('J4: an agent run whose journey claim is not proven cannot be accepted', async () => {
+  const f = fixture();
+  try {
+    const { work, issue, card } = f.start('product.brief', [], null, { claims: [journeyClaim] });
+    assert.deepEqual(f.know.workById(f.projectId, work.id).checks.map(check => check.id), ['onboarding-steps', 'note-1']);
+    assert.ok(card, 'the run started with its claims pinned');
+    f.worker.submitProposal(f.scope, { attemptId: issue.native_ref.attempt_id, proposal: claim('A pet in the corner of your screen.') });
+    const [run] = f.history.list(f.projectId, work.id);
+    assert.deepEqual([run.proofs['onboarding-steps'].status, run.gate.map(entry => entry.claim)], ['not-run', ['onboarding-steps']]);
+    let applied = false;
+    await assert.rejects(f.history.sign(f.owner, f.projectId, work.id, run.id, { outcome: 'accept' }, { accept: () => { applied = true; } }), /not proven yet.*Send it back\./);
+    assert.equal(applied, false);
+    assert.equal(f.history.runFor(f.projectId, work.id, run.id).state, 'review');
+  } finally { f.close(); }
+});
+
+test('J4: a person run is proven by the step results of its reviewed build, or accepted over a failure only with a stated reason', async () => {
+  const f = fixture();
+  try {
+    initLayerSource(f.db);
+    // An app repository whose reviewed build has the onboarding journey at revision 2.
+    const repo = join(f.root, 'app'); mkdirSync(join(repo, '.aludel', 'outputs'), { recursive: true });
+    git(repo, 'init', '-q', '-b', 'main');
+    writeFileSync(join(repo, '.aludel', 'review.json'), JSON.stringify({ version: 2, checks: [{ name: 'App tests', command: ['npm', 'test'] }], personas: { newcomer: { fixture: 'fresh', session: null } } }));
+    const step = id => ({ id, name: `Do ${id}`, route: `/${id}`, trigger: 'Opens it', expected: `The ${id} page shows.`, test: `onboarding.spec.mjs#${id}` });
+    writeFileSync(join(repo, '.aludel', 'outputs', 'journeys.json'), JSON.stringify({ journeys: [{ version: 1, id: 'onboarding', title: 'Onboarding', origin: 'authored', revision: 2, persona: 'newcomer', steps: ['sign-up', 'team', 'dashboard'].map(step) }] }));
+    git(repo, 'add', '.'); git(repo, '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'app');
+    const commit = git(repo, 'rev-parse', 'HEAD');
+    f.db.prepare("INSERT INTO layer_instances(project_id, layer_key, instance_id, created_at) VALUES (?, 'j4app', 'inst-j4app', ?)").run(f.projectId, new Date().toISOString());
+    f.db.prepare("INSERT INTO layer_package_bindings(project_id, layer_key, layer_instance_id, repository_path, accepted_commit, installed_at) VALUES (?, 'j4app', 'inst-j4app', ?, ?, ?)").run(f.projectId, repo, commit, new Date().toISOString());
+    const passing = ['sign-up', 'team', 'dashboard'].map(id => ({ id: `onboarding.${id}`, status: 'passed', detail: null, screenshot: true }));
+    const prepare = (claims, results, reasons) => {
+      const work = f.know.createWork(f.projectId, { action: 'platform.docs', title: 'Add the team step', assignee: { kind: 'person', id: f.owner.id }, claims, checks: [] }, f.owner.name);
+      f.runs.stage(f.owner, f.projectId, work.id);
+      const started = f.history.startPerson(f.owner, f.projectId, work.id);
+      const task = JSON.parse(f.db.prepare('SELECT task_json FROM work_person_runs WHERE id = ?').get(started.id).task_json);
+      f.db.prepare('UPDATE work_person_runs SET task_json = ? WHERE id = ?').run(JSON.stringify({ ...task, layerRepository: { key: 'j4app', base: commit, root: '' } }), started.id);
+      f.history.submitPerson(f.owner, f.projectId, work.id, started.id, { summary: 'Added the team step.', ...(reasons ? { reasons } : {}) });
+      const integration = `rvi-${started.id.slice(-8)}`;
+      f.db.prepare('INSERT INTO layer_review_integrations VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(integration, started.id, f.projectId, 'j4app', commit, commit, commit,
+        JSON.stringify({ id: integration, branch: 'review/x', base: commit, commit, submittedCommit: commit, files: [], tests: [] }), new Date().toISOString());
+      // As the review previews module declares it at startup.
+      f.db.exec('CREATE TABLE IF NOT EXISTS layer_review_journeys (integration_id TEXT PRIMARY KEY, commit_sha TEXT NOT NULL, steps_json TEXT NOT NULL, separability_json TEXT NOT NULL, ran_at TEXT NOT NULL)');
+      f.db.withProject(f.projectId, () => {
+        f.db.prepare("INSERT INTO layer_review_journeys VALUES (?, ?, ?, '{}', ?)").run(integration, commit, JSON.stringify(results), new Date().toISOString());
+      });
+      return { work, run: f.history.runFor(f.projectId, work.id, started.id) };
+    };
+    const unchanged = { id: 'journeys-unchanged', kind: 'invariant', covers: 'journeys', text: 'Every other journey step still passes.' };
+    // All claimed steps pass: proven, and accepted.
+    const proven = prepare([journeyClaim, unchanged], passing);
+    assert.deepEqual([proven.run.proofs['onboarding-steps'].status, proven.run.proofs['journeys-unchanged'].status, proven.run.gate], ['passed', 'passed', []]);
+    await f.history.sign(f.owner, f.projectId, proven.work.id, proven.run.id, { outcome: 'accept' }, { accept: () => {} });
+    assert.equal(f.history.runFor(f.projectId, proven.work.id, proven.run.id).state, 'accepted');
+    // A failing claimed step blocks; an unclaimed step failing breaks the invariant instead.
+    const failing = passing.map(result => result.id === 'onboarding.team' ? { ...result, status: 'failed', detail: 'No team form.' } : result.id === 'onboarding.dashboard' ? { ...result, status: 'failed', detail: 'Blank.' } : result);
+    const blocked = prepare([journeyClaim, unchanged], failing);
+    assert.deepEqual(blocked.run.proofs['onboarding-steps'].steps.map(entry => [entry.id, entry.status]), [['onboarding.sign-up', 'passed'], ['onboarding.team', 'failed']]);
+    assert.deepEqual(blocked.run.gate.map(entry => [entry.claim, entry.status]), [['onboarding-steps', 'failed'], ['journeys-unchanged', 'failed']]);
+    await assert.rejects(f.history.sign(f.owner, f.projectId, blocked.work.id, blocked.run.id, { outcome: 'accept' }, { accept: () => {} }), /not proven \(failed\).*state why when they submit/);
+    await f.history.sign(f.owner, f.projectId, blocked.work.id, blocked.run.id, { outcome: 'reject' });
+    const feedback = f.know.workById(f.projectId, blocked.work.id).context.feedback;
+    assert.match(feedback.find(note => note.claim === 'onboarding-steps').note, /onboarding\.team failed \(No team form\.\)/);
+    // A build at an older journey revision doesn't prove the claim.
+    const stale = prepare([{ ...journeyClaim, id: 'later', revision: 3 }], passing);
+    assert.match(stale.run.proofs.later.detail, /revision 2; this claim is for revision 3/);
+    // The person said why up front: the reviewer may accept over the failure.
+    const excused = prepare([journeyClaim], failing, { 'onboarding-steps': 'The team form needs the design kit; tracked as W-9.' });
+    assert.deepEqual(excused.run.gate.map(entry => entry.reason), ['The team form needs the design kit; tracked as W-9.']);
+    await f.history.sign(f.owner, f.projectId, excused.work.id, excused.run.id, { outcome: 'accept' }, { accept: () => {} });
+    assert.equal(f.history.runFor(f.projectId, excused.work.id, excused.run.id).state, 'accepted');
   } finally { f.close(); }
 });
