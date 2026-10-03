@@ -5,9 +5,15 @@ status: active
 updated: 2026-10-03
 ---
 
-# JOURNEYS-01 handoff: J5 built; its browser journey and J6 next
+# JOURNEYS-01 handoff: J5 done; J6 (owner prototype round) next
 
 For a fresh agent (Claude in the cloud) picking up JOURNEYS-01. Run `tools/branch-handoffs.sh` first: this packet's slices have been landing on cloud-session branches that the owner hasn't merged into `main`, so the newest handoff may be on a branch. Then read this, [AGENTS.md](../../../AGENTS.md), [status](../../status.md), the [JOURNEYS-01 work record](work-record.md) (plan, authorizations, run log, retrospectives), [DEC-063](../../decisions.md) and the [deferred code-tracing record](../code-tracing/deferred.md).
+
+## Update 2026-10-03: J5 done
+
+The follow-up run had `layer-base` and Docker. The J5 browser journey (`tests/journey-work-browser.mjs`, run as uid 1000) passes, both server suites pass (the templates suite's two load timeouts pass alone), and 21 of 22 browser scripts pass. The exception is `browser`: its stale-decision step is intermittent and fails at J4's head too. Fixing it is a separate small task. See the [J5 run log](work-record.md#j5-specify--implement-2026-10-03-claude-cloud-session).
+
+**Next: J6, walk review.** It starts with a prototype round that the owner reviews before anything is built (UX pass method), so it needs the owner. J7 (person check) can be prepared meanwhile, but it builds on J6's review view.
 
 ## Update 2026-10-03: J5 built on `claude/compassionate-hamilton-wz7nwz`
 

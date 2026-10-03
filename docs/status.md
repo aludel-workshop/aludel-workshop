@@ -16,7 +16,7 @@ Convert Code onto its template with GitHub sync, now on `main`: the layer-templa
 
 ## Next action
 
-**JOURNEYS-01 J5: its browser journey** (J5 built and server-tested 2026-10-03 on branch `claude/compassionate-hamilton-wz7nwz`, stacked on J4's `claude/nice-cray-zn7gfg` and J3's `claude/brave-pascal-br7h4i`; none is on `main` yet). The next session needs `layer-base` access and Docker approved at its start, then runs the browser journey on a disposable imported app. J6 then needs the owner for its prototype round. Run `tools/branch-handoffs.sh`, then start from the [handoff](design/journeys/handoff.md). **Before the owner's next restart:** the claims migration rewrites item criteria and saved run verdicts (rehearsed on data written by the pre-J4 code). The owner moved on from T03-CODE ("t03-code is fine for now"); its owner items below stay open.
+**JOURNEYS-01 J6: walk review, starting with an owner prototype round** (J5 done 2026-10-03 on branch `claude/compassionate-hamilton-wz7nwz`, stacked on J4's `claude/nice-cray-zn7gfg` and J3's `claude/brave-pascal-br7h4i`; none is on `main` yet). Run `tools/branch-handoffs.sh`, then start from the [handoff](design/journeys/handoff.md). **Before the owner's next restart:** the claims migration rewrites item criteria and saved run verdicts (rehearsed on data written by the pre-J4 code). The owner moved on from T03-CODE ("t03-code is fine for now"); its owner items below stay open.
 
 **T03-CODE: the app repository as the Code layer, with GitHub sync (run 1 built and agent-checked 2026-10-02).** [Evidence and retrospective](evidence/t03-code/README.md) · [brief and run log](design/layer-app-transition/t03-code-brief.md).
 - **Done:**
@@ -51,7 +51,7 @@ LAT-01–07 and the LAT-08 prototype established the isolated candidate, layer s
 
 ## Ready queue
 
-1. **JOURNEYS-01** (active; J5's browser journey next, [handoff](design/journeys/handoff.md)): journey-driven Work and review. Spec, then implement; claims replace hand-written criteria; journeys, tests and review seams live in `.aludel/`; includes cleanup of Codex's guided-preview work ([plan](design/journeys/work-record.md)). J0–J2 done 2026-10-02 (Code template `cc30be2`: journeys facet and Journeys tab); code tracing removed by DEC-063; J3 done 2026-10-03 (Biome's steps move to J8); J4 done 2026-10-03 (claims, with the gate at acceptance); J5 built 2026-10-03 (Specify → Implement), its browser journey next. The owner waived waiting for T03-CODE's look.
+1. **JOURNEYS-01** (active; J6 next, [handoff](design/journeys/handoff.md)): journey-driven Work and review. Spec, then implement; claims replace hand-written criteria; journeys, tests and review seams live in `.aludel/`; includes cleanup of Codex's guided-preview work ([plan](design/journeys/work-record.md)). J0–J2 done 2026-10-02 (Code template `cc30be2`: journeys facet and Journeys tab); code tracing removed by DEC-063; J3 done 2026-10-03 (Biome's steps move to J8); J4 done 2026-10-03 (claims, with the gate at acceptance); J5 done 2026-10-03 (Specify → Implement, browser journey passing); J6 next (owner prototype round). The owner waived waiting for T03-CODE's look.
 2. **T03-CODE**: run 1 built and agent-checked ([evidence](evidence/t03-code/README.md)). Waits on the owner's browser look, the live GitHub round trip and the candidate-preview question; then the compiled modules retire. F1 is done.
 3. **LAYER-GITHUB-01**: publish Vision, Design, Pages and Data repositories (and possibly `layer-base`) to the owner's GitHub with T03-CODE's sync (DEC-062).
 4. **LAYER-BINDINGS-01 step 4 (F10)**: Code ⇄ Pages binding, migrating `layer_connections` and the hard-coded Pages reconciliation, after T03-CODE.
@@ -250,12 +250,12 @@ New Operator role. Agent-checked: server 88/89 (1 pre-existing), all browser sui
 
 ## Latest handoff
 
-2026-10-03: **JOURNEYS-01 J5 built, not closed (cloud session, branch `claude/compassionate-hamilton-wz7nwz` on top of J4's and J3's branches).**
+2026-10-03: **JOURNEYS-01 J5 done (cloud session, branch `claude/compassionate-hamilton-wz7nwz` on top of J4's and J3's branches).**
 - Creating a Code task asks Code whether the request reaches routes no journey covers. If it does, the form offers *Specify first*: draft the journey from the current app, or revise the journey that covers those routes.
 - Specify claims the journey at its next revision, written as authored. Accepting is blocked until the reviewed build holds it. When the app isn't reviewable yet (recipe, persona fixtures, setup route), a once-per-app prerequisite item blocks the Specify item.
 - Accepting a Specify run raises Implement. It claims only the steps the accepted build doesn't pass yet, and everything else is the unchanged-journeys invariant. The Pages binding trigger waits for LAYER-BINDINGS-01 step 4.
 - **Checks:** the new contract and host tests pass (journeys 15, work runs 16, with two mutations caught). Typecheck and build pass. Without `layer-base` and Docker, both server suites were compared with J4's head: identical failure sets in both modes, all of them reading `layer-base`.
-- **Open:** the exit evidence's browser journey. This session's permission checks declined `layer-base` access and starting `dockerd`.
+- **Exit evidence:** with `layer-base` and Docker approved, the browser journey on a disposable imported app passes. It runs create, Specify, review build, accept and Implement raised, and it caught four UI defects, now fixed. Both server suites pass; the templates suite's two load timeouts pass alone. 21 of 22 browser scripts pass. `browser`'s stale-decision step is intermittent and fails at J4's head too, so it is pre-existing.
 - **Restart effect:** none beyond J4's claims migration (still pending for the owner).
 - **Process:** the handoff now says to get `layer-base` and Docker approved at session start, and that Code's layer key is `platform`.
 - [Run log](design/journeys/work-record.md#j5-specify--implement-2026-10-03-claude-cloud-session).

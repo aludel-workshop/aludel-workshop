@@ -628,3 +628,19 @@ Authorization: see the 2026-10-03 "J5" entry above.
   - The next-run editor said "0 criteria" and "No criteria yet" under an item's backed claims. It now counts backed claims, and shows the empty message only when there are none (left over from J4).
   - An item Specify raised showed its source as "A gap the Code layer found". It now shows its own first log line ("Raised by accepting W-n").
   - The create form read "an agent may change only this layer's , and…" for a layer whose outputs are files. It now says "declared repository files". This was a pre-existing bug since T03-CODE.
+
+| Check (follow-up run) | Result |
+|---|---|
+| `tests/journey-work-browser.mjs` (uid 1000, Docker, templates on) | **Passed** (first run failed on the focusable-diff axe finding, fixed above) |
+| `npm run test:server` (without `previews-docker`) | **292 passed, 0 failed**, 30 skipped |
+| `npm run test:server:templates` (same files) | 313 passed, 2 failed, 7 skipped. The 2 (`symphony-proposals` "Work staging…" at 147 s, `symphony-worker` "worker token scopes…" at 190 s) ran while the browser journey was also running. Rerun alone: **37 passed, 0 failed**. These are the same load-sensitive tests J3 and J4 recorded |
+| `npm run typecheck`, `npm run build` (real template sync) | Passed |
+| `tools/browser-checks.sh`, all 22 scripts, templates on | **21 pass.** `browser` fails waiting for "This decision changed to revision 2" (the stale-decision 409 on the legacy decision page). It failed 2 of 2 on J5, failed at J4's head `55b52a0` too, and then passed once in a debug copy. So it is intermittent and pre-existing, not J5. J4 had seen it pass on a rerun. Not fixed here |
+| `tests/repository-review-browser.mjs` (uid 1000) | **Passed** |
+
+**Exit evidence: met.** The browser journey on a disposable imported app ran the whole chain: create a request, specify, accept, Implement raised with step claims. **J5 is done.**
+
+**Retrospective addendum (follow-up run).**
+- *Observed:* once `layer-base` and Docker were approved, the handoff's environment commands rebuilt everything (clone, runner image, uid-1000 run) without reconstruction. That is the J4 process change, now applied twice.
+- *Observed:* the browser journey found four UI defects the server tests couldn't see: one accessibility issue, two pieces of misleading copy, and a wrong source label. Server-level chain tests weren't a substitute for the browser journey; the exit evidence was right to ask for it.
+- *New question:* the `browser` script's stale-decision step is intermittent (3 of 4 runs failed here, on both J4 and J5 code). It is the last red check in the full set. It needs its own look (the 409 race between the external answer and the page's save), recorded in the handoff.
