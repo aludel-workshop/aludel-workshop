@@ -164,6 +164,8 @@ J0–J2 are done (below). J3–J8 and depend on each other as listed. J6 needs a
 
 **Handoff (2026-10-02):** the next agent starts at [handoff.md](handoff.md).
 
+**Push authorization (2026-10-02, owner chat):** "option 1. push please." Scope: push `aludel-workshop` `main` to its existing GitHub remote (a public repository), and create a private `aludel-workshop/layer-base` repository holding the template repository's seven branches. Before pushing, the added content was scanned for credentials (none found). Nothing else is authorized: no deployment, spending or other repositories.
+
 ### J0 baseline and J1 contract (2026-10-02, Claude, VS Code chat)
 
 **J0.**
