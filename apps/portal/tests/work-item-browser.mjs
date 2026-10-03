@@ -107,7 +107,7 @@ plan(failed, ['Open the task card', 'Read the Brief', 'Draft an audience claim']
 worker.appendEvent(scope, { attemptId: failed, eventId: 'runtime-error', kind: 'error', message: 'The preview could not start: port 5173 is in use.' });
 
 const draft = create('write the problem statement', ['States one problem in the user’s words']);
-const personal = know.createWork(projectId, { action: 'work.milestone', title: 'shape the next checkpoint',
+const personal = know.createWork(projectId, { action: 'product.brief', title: 'shape the next checkpoint',
   assignee: { kind: 'person', id: owner.id }, checks: ['The checkpoint has a clear outcome', 'The result is ready for the owner to inspect'] }, owner.name);
 if (personal.state === 'suggested') know.updateWork(owner, projectId, personal.id, { state: 'ready' });
 const story = know.list(projectId, 'story')[0] || know.insert(projectId, 'story', { title: 'Show a healthy preview', phase: 'demo' });

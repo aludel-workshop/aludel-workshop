@@ -250,6 +250,25 @@ export function ensureLayerPackage(db, projectId, key, { template = null, name =
 // (`refs/aludel/template`), not as the repository's history. A working tree with uncommitted changes is refused rather than
 // committing someone else's edits. A repository that already holds this layer's package is bound as it is.
 const installRoot = '.aludel/';
+// A tree's files under a prefix, as path (relative to the prefix) → { mode, sha }.
+function treeFiles(run, commit, prefix = '') {
+  const listed = run(['ls-tree', '-r', '-z', '--full-tree', commit, ...(prefix ? ['--', prefix] : [])]);
+  return new Map(listed.split('\0').filter(Boolean).map(line => { const [meta, path] = line.split('\t'); const [mode, , sha] = meta.split(' '); return [path.slice(prefix.length), { mode, sha }]; }));
+}
+// What installing a template's package into a repository's `.aludel/` does. A file the repository already keeps there is read
+// in as this layer's (its outputs, Knowledge, review recipe, journeys); the template adds only what is missing. The layer's
+// own code and manifest are the reviewed template's, so a different version of one already there is a conflict, never
+// overwritten. (A repository whose `.aludel/layer.json` exists holds a whole package and is bound as it is.)
+export function installPlan(template, repository) {
+  const adds = [], kept = [], conflicts = [];
+  for (const [path, entry] of template) {
+    const there = repository.get(path);
+    if (!there) adds.push(path);
+    else if (there.sha === entry.sha || !ownAuthority(path)) kept.push(path);
+    else conflicts.push(path);
+  }
+  return { adds, kept, conflicts };
+}
 export function installLayerPackageInto(db, projectId, key, repo, { template = null, name = null, path = null, author = 'Aludel', replace = false } = {}) {
   const pin = configured(key, template);
   if (!pin) throw Object.assign(new Error('Layer templates are not enabled for this layer.'), { status: 409 });
@@ -275,13 +294,17 @@ export function installLayerPackageInto(db, projectId, key, repo, { template = n
     const own = { ...manifest, key, name: name || manifest.name, path: path || (manifest.key === key ? manifest.path : `/${key.replace(/_/g, '-')}`) };
     const scratch = mkdtempSync(join(repo, '.git', 'aludel-install-'));
     const env = { ...process.env, GIT_INDEX_FILE: join(scratch, 'index'), GIT_AUTHOR_NAME: String(author).slice(0, 80), GIT_AUTHOR_EMAIL: 'person@aludel.invalid', GIT_COMMITTER_NAME: 'Aludel', GIT_COMMITTER_EMAIL: 'aludel@aludel.invalid' };
+    const plan = installPlan(treeFiles(run, pin.commit), treeFiles(run, head, installRoot));
+    if (plan.conflicts.length) throw Object.assign(new Error(`The repository's ${installRoot} already has its own version of ${plan.conflicts.slice(0, 5).map(path => installRoot + path).join(', ')}${plan.conflicts.length > 5 ? ' and more' : ''}. Aludel won't overwrite a layer's code; move or remove those files first.`), { status: 409 });
+    const templateFiles = treeFiles(run, pin.commit);
     try {
       run(['read-tree', head], { env });
-      run(['read-tree', `--prefix=${installRoot}`, pin.commit], { env });
+      if (plan.adds.length) run(['update-index', '--index-info'], { env, input: plan.adds.map(path => `${templateFiles.get(path).mode} ${templateFiles.get(path).sha}\t${installRoot}${path}`).join('\n') + '\n' });
       const blob = run(['hash-object', '-w', '--stdin'], { input: JSON.stringify(own, null, 2) + '\n' });
       run(['update-index', '--cacheinfo', `100644,${blob},${installRoot}layer.json`], { env });
       const tree = run(['write-tree'], { env });
-      commit = run(['commit-tree', tree, '-p', head, '-m', `Add the ${own.name} layer in ${installRoot} from the ${pin.template} template\n\nAludel-Template: ${pin.template} ${pin.commit}`], { env });
+      const keptNote = plan.kept.length ? `\n\nKept the repository's own ${plan.kept.length} file${plan.kept.length === 1 ? '' : 's'} already in ${installRoot}: ${plan.kept.slice(0, 10).join(', ')}${plan.kept.length > 10 ? ', …' : ''}.` : '';
+      commit = run(['commit-tree', tree, '-p', head, '-m', `Add the ${own.name} layer in ${installRoot} from the ${pin.template} template${keptNote}\n\nAludel-Template: ${pin.template} ${pin.commit}`], { env });
     } finally { rmSync(scratch, { recursive: true, force: true }); }
     packageAt(repo, commit, key);
     run(['merge', '--ff-only', '--quiet', commit]);
@@ -293,15 +316,22 @@ export function installLayerPackageInto(db, projectId, key, repo, { template = n
     .run(projectId, key, id, repo, commit, new Date().toISOString(), pin.template, pin.commit);
   return { ...pkg, installed: present === null };
 }
-// The files a built-in layer that lives in the project's repository would add (under .aludel/), for an import's check.
-export function projectRepositoryTemplateFiles() {
-  if (!enabled()) return [];
+// What installing the built-in layer that lives in the project's repository would do to `checkout` (an import's check): the
+// files it adds under .aludel/, the repository's own it keeps, and any conflict that would stop it.
+export function projectRepositoryInstallPlan(checkout) {
+  const none = { adds: [], kept: [], conflicts: [] };
+  if (!enabled()) return none;
   const config = catalog();
   for (const template of Object.values(config.builtIn)) {
     const pin = config.templates[template], repo = resolve(candidate, config.repo);
-    try { if (JSON.parse(git(repo, 'show', `${pin.commit}:layer.json`)).install === 'project-repository') return git(repo, 'ls-tree', '-r', '--name-only', pin.commit).split('\n').filter(Boolean); } catch { /* not this one */ }
+    try {
+      if (JSON.parse(git(repo, 'show', `${pin.commit}:layer.json`)).install !== 'project-repository') continue;
+      const run = (cwd, args) => execFileSync('git', ['-C', cwd, ...args], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] });
+      const plan = installPlan(treeFiles(args => run(repo, args), pin.commit), treeFiles(args => run(checkout, args), 'HEAD', installRoot));
+      return { adds: plan.adds.map(path => installRoot + path), kept: plan.kept.map(path => installRoot + path), conflicts: plan.conflicts.map(path => installRoot + path) };
+    } catch { /* not this one */ }
   }
-  return [];
+  return none;
 }
 // Built-in layers that live in the project's repository install once that repository exists (after the first build, say).
 export function ensureProjectRepositoryLayers(db, projectId) {

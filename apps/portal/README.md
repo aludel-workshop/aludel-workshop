@@ -29,7 +29,7 @@ Onboarding ([work record](../../docs/design/onboarding/work-record.md), DEC-032â
 - **Skeletons.** A skeleton is generated from the `aludel-web-v1` preset (no agent involved) into `$MACHINE_DATA_DIR/workspaces/<project-id>`, a git repository. It builds with this portal's installed toolchain and runs as its own process on a private loopback port, which the portal reverse-proxies. Builds and previews get only `PATH`/`HOME`, not the portal's secrets. Build logs are in `$MACHINE_DATA_DIR/preview-logs/`. Previews restart on demand after a portal restart.
 - **GitHub.** Identity and installations belong to the user (`github_identities`). Repository bindings belong to the project. When the operator has not configured the GitHub App, onboarding continues with the local repository.
 
-Browser checks for the flow: start a fresh portal, then `MACHINE_PORT=<port> PLAYWRIGHT_MODULE=<path to playwright/index.mjs> node tests/onboarding-browser.mjs`. Icons come from a subset font. After using a new icon name, run `python3 tools/subset-icons.py` (needs `pip install fonttools brotli`); `tests/icon-subset.test.mjs` fails until you do.
+Browser checks: `PLAYWRIGHT_MODULE=<path to playwright/index.mjs> tools/browser-checks.sh <names>` runs each `tests/<name>-browser.mjs` against its own fresh portal (build first). The onboarding flow has no browser check while it is redesigned; the retired one is in git history (2026-10-03). Icons come from a subset font. After using a new icon name, run `python3 tools/subset-icons.py` (needs `pip install fonttools brotli`); `tests/icon-subset.test.mjs` fails until you do.
 
 ## Project layers (`/p/<slug>`)
 

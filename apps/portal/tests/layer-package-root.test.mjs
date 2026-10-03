@@ -98,6 +98,29 @@ test('G-CODE: a layer installs into an existing repository under .aludel/ as one
   assert.ok(context.writable.includes('.aludel/knowledge/*.md'));
 }));
 
+// A repository that already keeps Aludel files in .aludel/ (an app that left Aludel and came back, or was prepared by hand):
+// installing reads them in as the layer's and adds only what's missing; a different version of the layer's code is refused.
+test('installing into a repository that already has .aludel/ files keeps them and adds only the rest', () => withPlainRepository(({ db, id, repo, appCommit }) => {
+  mkdirSync(join(repo, '.aludel/knowledge'), { recursive: true }); mkdirSync(join(repo, '.aludel/tests'));
+  writeFileSync(join(repo, '.aludel/knowledge/charter.md'), '# Our notes\n\nKept from before.\n');
+  writeFileSync(join(repo, '.aludel/review.json'), '{"version":2}\n');
+  writeFileSync(join(repo, '.aludel/tests/contract.test.mjs'), '// someone else\'s test\n');
+  git(repo, 'add', '-A'); git(repo, 'commit', '-q', '-m', 'Earlier Aludel files');
+  assert.throws(() => installLayerPackageInto(db, id, 'notes', repo, { template: 'base', replace: true }), error => error.status === 409 && /own version of \.aludel\/tests\/contract\.test\.mjs/.test(error.message),
+    'the layer\'s own code is never overwritten');
+  git(repo, 'rm', '-q', '.aludel/tests/contract.test.mjs'); git(repo, 'commit', '-q', '-m', 'Drop the old test');
+  const before = git(repo, 'rev-parse', 'HEAD');
+  const pkg = installLayerPackageInto(db, id, 'notes', repo, { template: 'base', replace: true });
+  assert.equal(pkg.installed, true);
+  assert.equal(readFileSync(join(repo, '.aludel/knowledge/charter.md'), 'utf8'), '# Our notes\n\nKept from before.\n', 'the repository\'s charter is read in');
+  assert.match(pkg.charter, /Kept from before/);
+  assert.equal(readFileSync(join(repo, '.aludel/review.json'), 'utf8'), '{"version":2}\n', 'files the template doesn\'t have stay');
+  assert.ok(existsSync(join(repo, '.aludel/tests/contract.test.mjs')) && existsSync(join(repo, '.aludel/docs/layer-contract.md')), 'what was missing is added');
+  assert.equal(git(repo, 'rev-parse', 'HEAD^'), before, 'still one commit');
+  assert.match(git(repo, 'log', '-1', '--format=%B'), /Kept the repository's own 1 file already in \.aludel\/: knowledge\/charter\.md/);
+  assert.notEqual(appCommit, before);
+}));
+
 test('G-CODE: Knowledge saves commit under the package root, and the package stays valid', () => withPlainRepository(({ db, ada, id, repo }) => {
   installLayerPackageInto(db, id, 'notes', repo, { template: 'base', replace: true });
   const docs = layerDocs({ db });

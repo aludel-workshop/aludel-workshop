@@ -46,7 +46,10 @@ try {
   assert.equal(await page.getByLabel('Continue using hand-edited Markdown').isChecked(), true);
   await page.getByRole('button', { name: 'Save decision revision' }).click();
   await page.getByText(/1 linked records need reassessment; unrelated work was unchanged/).waitFor();
+  // The dependency list lives on the milestone plan, in its Planning dependencies panel.
   await page.getByRole('link', { name: 'Work', exact: true }).click();
+  await page.getByRole('link', { name: /View milestone/ }).click();
+  await page.locator('summary').filter({ hasText: 'Planning dependencies' }).click();
   const linked = page.locator('.work-record').filter({ hasText: 'PLAN-B02' });
   const unrelated = page.locator('.work-record').filter({ hasText: 'PLAN-B03' });
   assert.match(await linked.innerText(), /stale/i);

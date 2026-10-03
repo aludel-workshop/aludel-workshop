@@ -253,10 +253,13 @@
                     <mat-icon aria-hidden="true">inventory_2</mat-icon>
                     <div><strong>{{ found.repository.owner }}/{{ found.repository.name }}</strong>
                       <span>{{ found.files }} files{{ found.repository.private ? ', private' : ', public' }}. {{ found.existing ? 'It already has Aludel\'s files; nothing will be added.' : 'Aludel will add ' + found.adds.length + ' files in .aludel/, plus starter docs where none exist, as its own commits, and push them.' }}</span>
-                      @if (found.adds.length) { <details><summary>Files Aludel adds</summary><ul class="pub-file-list">@for (path of found.adds; track path) { <li><code>{{ path }}</code></li> }</ul></details> }</div>
+                      @if (found.kept.length) { <span>It already keeps {{ found.kept.length }} of Aludel's files in .aludel/; Code reads those in as they are.</span> }
+                      @if (found.conflicts.length) { <span class="error-message" role="alert">It has its own version of Code's code in .aludel/, which Aludel won't overwrite: {{ found.conflicts.join(', ') }}. Move or remove those files, then check again.</span> }
+                      @if (found.adds.length) { <details><summary>Files Aludel adds</summary><ul class="pub-file-list">@for (path of found.adds; track path) { <li><code>{{ path }}</code></li> }</ul></details> }
+                      @if (found.kept.length) { <details><summary>Files Aludel keeps</summary><ul class="pub-file-list">@for (path of found.kept; track path) { <li><code>{{ path }}</code></li> }</ul></details> }</div>
                   </div>
                 }
-                <div class="pub-actions pub-footer-actions"><button mat-flat-button type="submit" [disabled]="busy() || !existingName.trim() || !installationId">{{ busy() ? 'Working…' : importCheck() ? 'Import and push' : 'Check repository' }}</button></div>
+                <div class="pub-actions pub-footer-actions"><button mat-flat-button type="submit" [disabled]="busy() || !existingName.trim() || !installationId || !!importCheck()?.conflicts?.length">{{ busy() ? 'Working…' : importCheck() ? 'Import and push' : 'Check repository' }}</button></div>
               </form>
             } @else {
             <form (ngSubmit)="createRepository()">

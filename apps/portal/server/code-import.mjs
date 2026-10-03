@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, renameSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { gitWithToken } from './git-repository.mjs';
-import { ensureProjectRepositoryLayers, projectRepositoryTemplateFiles } from './layer-package.mjs';
+import { ensureProjectRepositoryLayers, projectRepositoryInstallPlan } from './layer-package.mjs';
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const git = (repo, args) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] }).trim();
@@ -29,7 +29,7 @@ export function codeImport({ db, github, importRoot, afterInstall = () => {}, sy
     const files = (tryGit(target, ['ls-files']) || '').split('\n').filter(Boolean);
     const existing = files.some(path => path === '.aludel/layer.json');
     return { found, target, preview: { repository: { owner: found.remote.owner, name: found.remote.name, url: found.remote.html_url, private: found.remote.private },
-      files: files.length, adds: existing ? [] : projectRepositoryTemplateFiles().map(path => `.aludel/${path}`), existing } };
+      files: files.length, ...(existing ? { adds: [], kept: [], conflicts: [] } : projectRepositoryInstallPlan(target)), existing } };
   }
   // The check: what importing would do. Nothing is committed and the project's repository is untouched.
   async function preview(userId, projectId, input) { return (await check(userId, projectId, input)).preview; }

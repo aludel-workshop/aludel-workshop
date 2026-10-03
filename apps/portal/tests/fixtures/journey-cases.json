@@ -48,7 +48,6 @@
   "generatedSeams": {
     "version": 1,
     "seams": [
-      { "path": "aludel.json", "kind": "file", "purpose": "Setup choices Aludel generated the app from", "remove": "Delete the file" },
       { "path": "src/aludel-bridge.ts", "kind": "file", "purpose": "Lets the Pages layer point at page sections in the preview", "remove": "Delete the file and its import in src/main.ts" },
       { "path": "src/main.ts", "kind": "edit", "purpose": "Imports the Pages bridge", "remove": "Delete the aludel-bridge import" },
       { "path": "src/app.html", "kind": "edit", "purpose": "data-aludel-page marks each page for the Pages layer", "remove": "Delete the data-aludel-page attributes" },
@@ -56,6 +55,7 @@
       { "path": "src/page-blocks.ts", "kind": "edit", "purpose": "Shared page block layouts copied from Aludel", "remove": "Keep the file; delete the Aludel comments" },
       { "path": "src/styles.scss", "kind": "edit", "purpose": "Feel and theme comment from Aludel's Look & feel step", "remove": "Delete the comment" },
       { "path": "server/server.mjs", "kind": "edit", "purpose": "The preview-only review setup route (/api/__aludel/review)", "remove": "Delete the review setup handler" },
+      { "path": ".dockerignore", "kind": "edit", "purpose": "Keeps .aludel/ out of the image", "remove": "Delete the .aludel line" },
       { "path": "Dockerfile", "kind": "edit", "purpose": "A comment noting Aludel's previews build from this file", "remove": "Delete the comment" },
       { "path": ".github/workflows/ci.yml", "kind": "edit", "purpose": "Publishes the test-results artifact Aludel reads", "remove": "Keep the step; delete the comment" },
       { "path": "README.md", "kind": "edit", "purpose": "Attribution and pointers into Aludel", "remove": "Delete the Aludel paragraph" },

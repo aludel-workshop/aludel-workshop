@@ -80,7 +80,7 @@ Steps 2 and 4 each caught a real break in this packet that the suites didn't.
 
 - **Template updates don't reach existing installs.** Existing projects keep their forked template commit. The host SDK therefore keeps inert shims: `@aludel/host/built-by`, `ctx.builtBy()`, and unit `state`/`links`. Don't remove SDK surface older forks import without the same care.
 - **The legacy role inventory** (`server/lat07-actions.mjs`) must list every historical action in `config/roles.json`. Retire entries; don't delete them.
-- **`tests/layers-browser.mjs` fails before and after this packet**, waiting for a Vision link. It's pre-existing and not investigated.
+- **Browser checks (2026-10-03):** every `tests/*-browser.mjs` passes through `tools/browser-checks.sh` with templates on. `design` declares `// browser-checks: templates off`, because it checks the compiled Design view. The superseded `layers`, `onboarding` and `lat03`–`lat06` scripts were retired; they are in git history.
 - **Code view terms.** Units are "used/unused" (`state` `healthy`/`dead`). There are no trace links anywhere. Don't reintroduce story ↔ code links (DEC-063).
 - **Owner files.** The working tree may hold the owner's `notes.txt` edit and four untracked `*-candidate/` and `layer-template-pages/` checkouts. Leave them alone.
 

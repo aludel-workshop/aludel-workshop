@@ -317,7 +317,7 @@ test('the skeleton is deterministic, builds pages from the navigation and never 
   assert.match(product, /## Pages[\s\S]*\*\*Home\*\* \(Dashboard\) — What needs attention today\./);
   assert.match(product, /## Stories[\s\S]*Someone can search by keyword _\(Search pack\)_/);
   assert.match(product, /## Story packs[\s\S]*\*\*Search\*\*/);
-  assert.deepEqual(JSON.parse(files['aludel.json']).pages.map(page => page.label), ['Home', 'Sign in', 'Messages']);
+  assert.deepEqual(JSON.parse(files['.aludel/setup.json']).pages.map(page => page.label), ['Home', 'Sign in', 'Messages']);
   assert.ok(Object.keys(initialFiles(current, catalogs, gitProfile, urls)).every(path => !path.includes('node_modules')));
   assert.equal(Object.values(files).some(content => /MACHINE_GITHUB|machine_session/.test(content)), false);
 });

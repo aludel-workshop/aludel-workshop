@@ -127,7 +127,7 @@ export class PublicComponent implements OnDestroy {
   // T03-CODE: start from a new repository, or bring one the owner already has on GitHub.
   repositorySource: 'new' | 'existing' = 'new';
   existingName = '';
-  readonly importCheck = signal<{ repository: { owner: string; name: string; url: string; private: boolean }; files: number; adds: string[]; existing: boolean } | null>(null);
+  readonly importCheck = signal<{ repository: { owner: string; name: string; url: string; private: boolean }; files: number; adds: string[]; kept: string[]; conflicts: string[]; existing: boolean } | null>(null);
   installationId = '';
 
   constructor() {

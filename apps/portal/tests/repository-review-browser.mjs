@@ -63,16 +63,15 @@ writeFileSync(join(workspace, 'tests/app.test.mjs'), `import test from 'node:tes
 // JOURNEYS-01 J3: the v2 recipe maps personas to the starter fixture; review steps come from journeys.
 writeFileSync(join(workspace, '.aludel/review.json'), JSON.stringify({ version: 2, checks: [{ name: 'App session integration', command: ['node', '--test', 'tests/app.test.mjs'] }],
   personas: { author: { fixture: 'starter', session: 'author' }, viewer: { fixture: 'starter', session: 'viewer' } } }));
+// The app already keeps journeys in .aludel/; installing Code reads them in rather than replacing them with its empty file.
+mkdirSync(join(workspace, '.aludel/outputs'));
+writeFileSync(join(workspace, '.aludel/outputs/journeys.json'), JSON.stringify({ journeys: [
+  { version: 1, id: 'edit-post', title: 'Edit a post', origin: 'authored', revision: 1, persona: 'author', steps: [{ id: 'editor', name: 'Review the post editor', route: '/posts/demo/edit', trigger: 'Opens the post', expected: 'The editor opens as the demo author.' }] },
+  { version: 1, id: 'read-post', title: 'Read a post', origin: 'authored', revision: 1, persona: 'viewer', steps: [{ id: 'page', name: 'Review the viewer page', route: '/posts/demo', trigger: 'Opens the post', expected: 'The post opens as the demo viewer.' }] }] }));
 git(workspace, 'add', '.');
 git(workspace, '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'initial');
 initLayerContract(db); initCodeUnits(db); initCodeLayer(db); initCodeRepository(db);
 ensureProjectRepositoryLayers(db, projectId);
-// Code installs with an empty journeys file; the journeys arrive as accepted Code Work would commit them.
-writeFileSync(join(workspace, '.aludel/outputs/journeys.json'), JSON.stringify({ journeys: [
-  { version: 1, id: 'edit-post', title: 'Edit a post', origin: 'authored', revision: 1, persona: 'author', steps: [{ id: 'editor', name: 'Review the post editor', route: '/posts/demo/edit', trigger: 'Opens the post', expected: 'The editor opens as the demo author.' }] },
-  { version: 1, id: 'read-post', title: 'Read a post', origin: 'authored', revision: 1, persona: 'viewer', steps: [{ id: 'page', name: 'Review the viewer page', route: '/posts/demo', trigger: 'Opens the post', expected: 'The post opens as the demo viewer.' }] }] }));
-git(workspace, 'add', '.'); git(workspace, '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'Journeys');
-db.prepare("UPDATE layer_package_bindings SET accepted_commit = ? WHERE project_id = ? AND layer_key = 'platform'").run(git(workspace, 'rev-parse', 'HEAD'), projectId);
 assert.ok(layerWorkScope(db, projectId, 'platform'), JSON.stringify({ instances: db.prepare('SELECT layer_key, enabled FROM layer_instances WHERE project_id = ?').all(projectId), binding: db.prepare('SELECT layer_key, accepted_commit FROM layer_package_bindings WHERE project_id = ?').all(projectId) }));
 const codeRepo = codeRepository({ db, units: codeUnits({ db }) }); codeRepo.adopt(projectId); codeRepo.seed(projectId, () => []);
 const profile = know.defaultProfile(projectId);

@@ -18,6 +18,13 @@ depends_on: [T03-CODE, LAT-08A, LAYER-BINDINGS-01, EXISTING-PROJECTS-01, DEC-050
 
 - **2026-10-03, owner chat (J3, cloud session):** "hey, can you pick up the task as specified in docs/design/journeys/handoff.md". Authorized, per the [handoff](handoff.md): J3 in the same local scope as J0–J2. That covers host code, tests, template commits and pins, local checks, and commits plus a push to this session's designated branch (`claude/brave-pascal-br7h4i`), which the cloud session requires. Not authorized: pushes to `main` or `layer-base`, deployment, spending, live owner data (Biome, the owner's portal), and owner-impersonating actions. Recorded before execution.
 
+- **2026-10-03, owner chat (after J3):** "i honestly dont care about biome, its just a throw away test project, we coulduse any project to test. seperate playwright tester: like it. now the problems, worth addressing. if code is being installed into a repo with .aludel already, it needs to be attempt to read that in instead of just overwriting fresh. and for the docs outside of .aludel, any chance we can bring that in? are there cases where something reallly has to live outside of .aludel, or is that just legacy holdover? also, failing tests. can you either fix or remove (if they are testing outdated assumptions?)". Authorized, in the same local scope as J3 (host code, tests, template commits and pins if needed, commits, pushes to this session's branch):
+  1. Biome is no longer required evidence; any disposable project serves.
+  2. The separate Playwright runner is accepted.
+  3. Installing Code into a repository that already has `.aludel/` adopts what is there.
+  4. Move the Aludel files outside `.aludel/` in where possible, and say what really has to stay outside.
+  5. Fix the failing tests, or remove those that test outdated assumptions.
+
 ## Owner direction (2026-10-02 chat)
 
 1. **The reviewer deals with interaction and feel, not diffs.** For user-facing work the review is walking the journey in a live preview, with automated proof alongside.
@@ -356,3 +363,42 @@ Authorization: see 2026-10-03 above. Host-side only; no template commit was need
    - **Applied:** the [handoff](handoff.md)'s environment prerequisites now name the cloud access gap and the Docker-build workaround.
    - **Tested:** the before/after failure-set comparison is how this run separated environment failures from regressions.
    - **Hypothesis:** whether the step-test contract is easy for agents to follow, until an agent writes one in J5.
+
+### J3 follow-ups: `.aludel/` adoption, seams, failing tests (2026-10-03, Claude, cloud session)
+
+Authorization: see the 2026-10-03 "after J3" entry above. Biome stops being required evidence; any disposable project serves (the J3 exit evidence already uses disposable fixtures).
+
+**Installing into a repository that already has `.aludel/`.** Install now reads in what is there instead of failing on the first overlap. `installPlan` in [layer-package.mjs](../../../apps/portal/server/layer-package.mjs) sorts the template's files into three groups:
+- **Adds:** files missing from the repository.
+- **Kept:** files the repository already keeps in `.aludel/`, such as outputs, Knowledge, docs, `review.json`, `seams.json` and journeys. They are read in as the layer's own. The install commit lists them.
+- **Conflicts:** the repository holds a different version of the layer's own code or manifest (`server/`, `ui/`, `api/`, `tests/`, `layer.json`). Install refuses with 409 and names the files, because that code runs on the host and only the reviewed template's version may. A repository with a whole package (`.aludel/layer.json`) is still bound as it is.
+
+The import check shows the same plan (Aludel adds, keeps, or can't import until a conflict is moved), and Import is disabled while there is a conflict ([public.html](../../../apps/portal/src/public.html)).
+- **Tested:** a new `layer-package-root` test covers a conflicting test file, then keeping a charter and `review.json` while adding the rest, with the kept files named in the commit. The repository-review browser check now commits its journeys before Code installs, as the app's own, and passes.
+
+**What lives outside `.aludel/`, and why.** Each generated seam was checked against what reads it.
+
+| Seam | Verdict | Done now |
+|---|---|---|
+| Code's docs sidecar `docs/.aludel/sources.json` | Legacy: it's Aludel's provenance record, not an app doc | Moved to `.aludel/doc-sources.json` (Code template `08d26c9`, pinned; indexer digest registered, old digests kept). The legacy compiled module reads the old path and moves it on its next write. Forks pinned earlier keep their own `layer.json` path |
+| `aludel.json` (setup choices) | Legacy: nothing reads it, and only generated docs point at it | Moved to `.aludel/setup.json`; README, AGENTS map and agent guide updated |
+| Docker build context | `.aludel/` had no reason to enter the image | `.dockerignore` excludes `.aludel`, so **every preview build is now the "builds without `.aludel/`" half of the separability check** for generated apps (J3 had deferred it) |
+| Preview setup route in `server/server.mjs` | **Must stay.** It runs in the app's process to mint the app's own sessions and fixtures | Declared seam. It could move into its own file to shrink the edit; not done |
+| Pages bridge (`src/aludel-bridge.ts`, its import, `data-aludel-page`/`-section` attributes) | **A feature seam.** It is how Pages points at sections in the running app. The script could be injected by the preview proxy instead of shipped in the app, but the markup attributes would remain | Unchanged; proposal below |
+| README, AGENTS.md, `docs/agents.md`, `docs/product.md` | **The app's own docs**, seeded by Aludel. They belong outside; they are seams only because they mention Aludel | Unchanged; they could be made Aludel-neutral |
+| Comments in `site.ts`, `page-blocks.ts`, `styles.scss`, the Dockerfile and CI | **Attribution only** | Unchanged; they could be dropped |
+
+**Failing tests.**
+- **Server suites.** One test compared the task compiler against source loaded from commit `f6adc8e`. That was a one-time equivalence check from the move to layer sources, and it fails in any shallow clone. Removed; the rest of the test stays. The other worker and proposal tests that failed with it pass now.
+- **`pages` journey.** The portal used Node's 5-second keep-alive timeout, so a client reusing an idle connection could hit a socket the server had just closed (ECONNRESET). The portal now keeps idle sockets for 65 seconds, and the journey passes.
+- **Legacy B-01 workspace** (`brand`, `browser`, `github`). PROJECT-DB-01 moved Aludel's own records into its project database, but the unscoped legacy routes (`/api/overview`, `records`, `requests`, `proposals`, `decisions`, `dependents`, `imports`, `product-state`, `work`) still queried the whole store and got 500s. They now run as the `the-machine` project. Also:
+  - the dependency list moved to the milestone plan's panel, so `browser.mjs` navigates there;
+  - Reassess had no visible confirmation on that view, so it now shows one.
+- **`work-item`.**
+  - The side column could overflow 400px wide screens (a grid without a bounded column), now fixed.
+  - The fixture's personal item used the retired `work.milestone` action, so migration blocked it; it now uses a current action.
+- **`design`** checks the compiled Design view, which serves only while templates are off. It now declares `// browser-checks: templates off`, which `tools/browser-checks.sh` honours.
+- **Retired** (outdated assumptions; in git history):
+  - `lat03`–`lat06`: hand-run LAT proofs on fixed candidate ports, with repo-root paths and since-changed record APIs.
+  - `layers`: the LAY-02/03 sweep of compiled views, now covered by each layer's own template journey.
+  - `onboarding`: the flow already changed (a Layers step, no Features step), and the owner is redesigning it.

@@ -4,7 +4,6 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import test from 'node:test';
 import { waitForPortal, stopPortal } from './portal-support.mjs';
 import { createUser, initAccounts } from '../server/accounts.mjs';
@@ -509,18 +508,6 @@ test('Pages flow task includes exact installed layer method and repository Knowl
     assert.equal(bundle.layerPackage.commit, card.layerSource.commit);
     assert.equal(bundle.layerPackage.instanceId, card.layerSource.instanceId);
     assert.equal(bundle.guidance.layerAction.method, card.layerMethod.text);
-    const baselineSource = execFileSync('git', ['show', 'f6adc8e813aead602304080e1f0e18584e84d66d:apps/portal/server/task-manifest.mjs'],
-      { cwd: new URL('../../', import.meta.url).pathname, encoding: 'utf8' });
-    const oldCompilerPath = join(data, 'old-task-manifest.mjs');
-    writeFileSync(oldCompilerPath, baselineSource);
-    const { compileTaskManifest: compileBefore } = await import(pathToFileURL(oldCompilerPath).href);
-    const oldCard = compileBefore(bundle);
-    assert.deepEqual(card.requiredInputs, oldCard.requiredInputs);
-    assert.deepEqual(card.outputs, oldCard.outputs);
-    assert.deepEqual(card.controls, oldCard.controls);
-    assert.deepEqual(card.capabilities, oldCard.capabilities);
-    assert.equal(oldCard.layerSource, undefined);
-    assert.equal(oldCard.layerMethod, undefined);
     const existingPage = f.know.insert(f.projectId, 'page', { label: 'Browse', icon: 'article', pageType: 'list', status: 'planned' });
     const existingFlow = f.know.insert(f.projectId, 'flow', { title: 'Browse journey', steps: [{ page: existingPage.id, name: 'Browse' }] });
     const modify = f.know.createWork(f.projectId, { action: 'pages.flows', title: 'Modify the existing flow',

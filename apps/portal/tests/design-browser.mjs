@@ -1,3 +1,5 @@
+// browser-checks: templates off
+// It checks the compiled Design view, which serves while layer templates are off; the template's frame is design-layer-browser.mjs.
 // DESIGN-UX-01 (DEC-045): the Design layer in the browser. Sets a project up through the onboarding APIs, builds it, then
 // drives Tokens (tree, preview pages, hover, editing, save), Components (real Material previews, nested selection,
 // needed components, references), Brand and Docs, and checks that a saved token change reaches the generated app.
@@ -192,7 +194,7 @@ try {
   // ---- The generated app follows the Design layer ----
   await json('POST', `/api/projects/${project.id}/skeleton`, {});
   const workspace = join(process.env.MACHINE_DATA_DIR || '.data', 'workspaces');
-  const repo = existsSync(workspace) ? (await import('node:fs')).readdirSync(workspace).map(name => join(workspace, name)).find(path => existsSync(join(path, 'aludel.json'))) || null : null;
+  const repo = existsSync(workspace) ? (await import('node:fs')).readdirSync(workspace).map(name => join(workspace, name)).find(path => existsSync(join(path, '.aludel/setup.json'))) || null : null;
   if (repo) {
     const styles = readFileSync(join(repo, 'src/styles.scss'), 'utf8');
     assert.match(styles, /--mat-sys-title-medium-size: 18px;/, 'the saved type change is in the app');

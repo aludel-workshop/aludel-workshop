@@ -145,6 +145,7 @@ test('separability: every place a generated app names Aludel outside .aludel/ is
   assert.deepEqual(JSON.parse(file('.aludel/seams.json')), cases.generatedSeams);
   assert.equal(validateReviewRecipe(JSON.parse(file('.aludel/review.json'))).version, 2);
   assert.doesNotMatch(file('Dockerfile'), /\.aludel/, 'the runtime image copies nothing from .aludel/');
+  assert.match(file('.dockerignore'), /^\.aludel$/m, 'and the build never sees it, so every preview build is a build without .aludel/');
   assert.doesNotMatch(file('server/server.mjs'), /\.aludel\//, 'the app reads no recipe at runtime');
   refuses(() => validateSeams({ version: 1, seams: [{ path: '.aludel/review.json', kind: 'file', purpose: 'x', remove: 'y' }] }), /inside \.aludel/);
   refuses(() => validateSeams({ version: 1, seams: [{ path: '../outside', kind: 'file', purpose: 'x', remove: 'y' }] }), /relative path/);

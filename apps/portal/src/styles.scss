@@ -1384,7 +1384,7 @@ aludel-finding,aludel-evidence{display:contents}aludel-finding{display:block}.la
 .wi-request{width:100%;padding:8px 10px;border:1px solid var(--machine-line);border-radius:10px;font-size:15px;line-height:1.55;resize:vertical}
 .wi-savebar{position:sticky;bottom:12px;z-index:5;display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:12px;padding:10px 14px;border:1px solid var(--machine-line);border-radius:12px;background:#fff;box-shadow:0 12px 32px #1c2a5a26}.wi-savebar span{flex:1}
 .wi-activity{margin-top:30px}.lay-main .wi-activity h2,.wi-activity h2{display:flex;align-items:center;gap:8px;font-size:16px;margin:0 0 12px}
-.wi-side{position:sticky;top:76px;display:grid}.wi-side>section{padding:14px 0;border-bottom:1px solid var(--machine-line)}.wi-side>section:first-child{padding-top:0}.wi-side>section:last-child{border-bottom:0}
+.wi-side{position:sticky;top:76px;display:grid;grid-template-columns:minmax(0,1fr)}.wi-side>section{padding:14px 0;border-bottom:1px solid var(--machine-line)}.wi-side>section:first-child{padding-top:0}.wi-side>section:last-child{border-bottom:0}
 .lay-main .wi-side h2,.wi-side h2{margin:0 0 8px;font-size:12px;letter-spacing:.8px;text-transform:uppercase;color:var(--machine-muted)}
 .lay-main .wi-side h3,.wi-side h3{display:flex;align-items:center;gap:6px;margin:10px 0 6px;font-size:13px;font-weight:500}.wi-side h3 mat-icon{width:16px;height:16px;font-size:16px}
 .wi-side>section>p{margin:0 0 6px}

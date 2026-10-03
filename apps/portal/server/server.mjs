@@ -1691,6 +1691,8 @@ function requestProject(request, target) {
   const scoped = /^\/api\/projects\/([^/]+)/.exec(path);
   if (scoped) return known(decodeURIComponent(scoped[1]));
   if (path.startsWith('/api/worker/')) { try { return worker.authenticate(request.headers.authorization).projectId; } catch { return null; } }
+  // The B-01 workspace's routes (overview, records, requests, proposals, decisions) are Aludel's own project's.
+  if (/^\/api\/(?:overview|records|requests|proposals|decisions|dependents|imports|product-state|work)(?:\/|$)/.test(path)) return known('the-machine');
   return null;
 }
 async function handle(request, response, target) {
@@ -1704,6 +1706,9 @@ async function handle(request, response, target) {
   }
 }
 
+// Clients keep idle connections longer than Node's 5-second default. A request sent on a socket the server has just closed
+// fails with ECONNRESET, so the server keeps idle sockets longer than any client's idle gap.
+server.keepAliveTimeout = 65000; server.headersTimeout = 66000;
 server.listen(port, host, () => {
   setImmediate(adoptCodeRepositories);
   console.log(`Aludel is running at ${topology.portalOrigin} (also http://${host}:${port})`);

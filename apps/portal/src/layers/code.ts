@@ -207,7 +207,7 @@ export function markdownBlocks(text: string) {
       </div>
     }
     @case ('docs') {
-      <p class="lay-lead">What developers and agents read in the repository. <code>AGENTS.md</code> is the map and <code>docs/</code> holds the rest. Developers own them and assemble them from the layers; <code>docs/.aludel/sources.json</code> records where each section came from, so the docs stay plain Markdown.</p>
+      <p class="lay-lead">What developers and agents read in the repository. <code>AGENTS.md</code> is the map and <code>docs/</code> holds the rest. Developers own them and assemble them from the layers; <code>.aludel/doc-sources.json</code> records where each section came from, so the docs stay plain Markdown.</p>
       @if (docs(); as d) {
         <div class="lay-row lay-wrap lay-block">
           <span class="lay-chip" [class.lay-ok]="!d.checks.offMap.length" [class.lay-warn]="d.checks.offMap.length">{{ d.checks.offMap.length ? d.checks.offMap.length + ' not linked from AGENTS.md' : 'Every doc linked from AGENTS.md' }}</span>

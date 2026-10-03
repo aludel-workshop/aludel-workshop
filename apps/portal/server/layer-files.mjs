@@ -336,8 +336,8 @@ export function seedRepositoryDocs(db, { projectId, key, context = {} }) {
   const result = runPure(source, 'seed', ['install', { ...context, tree, existing }]);
   const files = result?.files && typeof result.files === 'object' ? result.files : {};
   const inDocs = path => docs.paths.some(entry => entry.endsWith('/') ? path.startsWith(entry) : path === entry) || extendable.includes(path);
-  const allowed = Object.entries(files).filter(([path, content]) => typeof content === 'string' && Buffer.byteLength(content) <= maxFileBytes && /^[A-Za-z0-9_][A-Za-z0-9_./-]*$/.test(path)
-    && !path.split('/').some(part => part === '..' || /^\.env/.test(part)) && !(pkg.root && path.startsWith(pkg.root)) && inDocs(path) && (extendable.includes(path) || !tree.includes(path)));
+  const allowed = Object.entries(files).filter(([path, content]) => typeof content === 'string' && Buffer.byteLength(content) <= maxFileBytes && (/^[A-Za-z0-9_][A-Za-z0-9_./-]*$/.test(path) || path === docs.sources && /^\.aludel\/[A-Za-z0-9_][A-Za-z0-9_./-]*$/.test(path))
+    && !path.split('/').some(part => part === '..' || /^\.env/.test(part)) && (!(pkg.root && path.startsWith(pkg.root)) || path === docs.sources) && inDocs(path) && (extendable.includes(path) || !tree.includes(path)));
   if (!allowed.length) { mark(); return { written: [] }; }
   refuseDirtySharedCheckout(bound.repo, pkg.root);
   const clean = !git(bound.repo, ['status', '--porcelain']).trim();

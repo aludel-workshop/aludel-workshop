@@ -151,8 +151,8 @@ test('T03-CODE: starter docs come from the template\'s seed, once, matching what
   assert.ok(seeded.written.includes('ARCHITECTURE.md') && seeded.written.includes('docs/product/stories.md'));
   for (const path of ['docs/product/stories.md', 'docs/product/index.md', 'docs/data/api.md'])
     assert.equal(git(workspace, 'show', `HEAD:${path}`), readFileSync(join(copy, path), 'utf8').trim(), `${path} matches the compiled starter set`);
-  const sidecar = JSON.parse(git(workspace, 'show', 'HEAD:docs/.aludel/sources.json'));
-  const compiled = JSON.parse(readFileSync(join(copy, 'docs/.aludel/sources.json'), 'utf8'));
+  const sidecar = JSON.parse(git(workspace, 'show', 'HEAD:.aludel/doc-sources.json'));
+  const compiled = JSON.parse(readFileSync(join(copy, '.aludel/doc-sources.json'), 'utf8'));
   assert.deepEqual(sidecar['docs/product/stories.md'], compiled['docs/product/stories.md'], 'sections cite the same entries at the same revisions');
   assert.equal(git(workspace, 'log', '-1', '--format=%an %s'), 'Aludel Starter docs for Code');
   assert.deepEqual(code.seed(id, pool.outputEntries).written, [], 'the install seed runs once');

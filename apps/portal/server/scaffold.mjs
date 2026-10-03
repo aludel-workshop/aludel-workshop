@@ -68,10 +68,10 @@ export function initialFiles(setup, catalogs, gitProfile, appUrl) {
   return {
     '.gitignore': `${[...gitProfile.gitignore, '', '# A linked dependency folder is a symlink, which a trailing-slash pattern does not match.', 'node_modules'].join('\n')}\n`,
     '.gitattributes': `${gitProfile.gitattributes.join('\n')}\n`,
-    'README.md': `# ${name}\n\n${setup.direction?.summary || setup.project.description}\n\nThis repository was started with [Aludel](${appUrl.portal}). The app skeleton is generated from the \`${setup.stack.preset}\` stack preset once setup is finished.\n\n- Product intent: [docs/product.md](docs/product.md)\n- Setup choices: [aludel.json](aludel.json)\n- Agent guide: [AGENTS.md](AGENTS.md)\n`,
+    'README.md': `# ${name}\n\n${setup.direction?.summary || setup.project.description}\n\nThis repository was started with [Aludel](${appUrl.portal}). The app skeleton is generated from the \`${setup.stack.preset}\` stack preset once setup is finished.\n\n- Product intent: [docs/product.md](docs/product.md)\n- Setup choices: [.aludel/setup.json](.aludel/setup.json)\n- Agent guide: [AGENTS.md](AGENTS.md)\n`,
     'AGENTS.md': agentsMap(setup),
     'docs/agents.md': agentsGuide(setup, catalogs),
-    'aludel.json': json(manifest(setup, catalogs, media)),
+    '.aludel/setup.json': json(manifest(setup, catalogs, media)),
     'docs/product.md': productDoc(setup, media, catalogs)
   };
 }
@@ -80,7 +80,7 @@ export function initialFiles(setup, catalogs, gitProfile, appUrl) {
 // written when the repository starts and never regenerated. The generated guide lives in docs/agents.md.
 export function agentsMap(setup) {
   return `# ${setup.project.name}\n\n${setup.direction?.summary || setup.project.description}\n\nThis file is the map. Read what the task needs, not everything.\n\n## Where to look\n\n` +
-    `- \`README.md\`: what it is and how to run it\n- \`docs/product.md\`: the product intent (from Aludel's Vision)\n- \`docs/agents.md\`: how work is done here: instructions, roles, conventions (from Aludel's Work)\n- \`aludel.json\`: the setup choices\n\n` +
+    `- \`README.md\`: what it is and how to run it\n- \`docs/product.md\`: the product intent (from Aludel's Vision)\n- \`docs/agents.md\`: how work is done here: instructions, roles, conventions (from Aludel's Work)\n- \`.aludel/setup.json\`: the setup choices\n\n` +
     `## Run it\n\n- \`docker compose up --build\`, then open http://localhost:3000\n- \`npm test\` runs the tests; CI runs them on every push (\`.github/workflows/ci.yml\`)\n\nAdd a line here for each doc you add under \`docs/\`.\n`;
 }
 
@@ -92,7 +92,7 @@ export function agentsGuide(setup, catalogs) {
   // WORK-UX-01: instructions are layered project → role → action; each action says what it may change and use.
   const roleSections = agents ? agents.roles.map(role => `### ${role.name} (${role.layer})\n\n${role.instructions || '_No role instructions yet._'}\n\n${role.actions.map(action => `#### ${action.name}\n\n${action.instructions ? `${action.instructions}\n\n` : ''}- May change: ${action.changes.join('; ') || 'nothing (suggestions only)'}\n- Tools: ${action.tools.join(', ') || 'none'}\n- Asks first: ${action.asks || 'nothing beyond the rules below'}\n`).join('\n')}`).join('\n') : '';
   const agentSections = agents ? `\n## Project instructions\n\n${agents.instructions || '_None yet._'}\n${agents.principles.length ? `\nProduct principles:\n\n${agents.principles.map(item => `- ${item}`).join('\n')}\n` : ''}\n## Roles and actions\n\nEvery layer has a role, and each role performs actions. Read the project instructions first, then the role's, then the action's.\n\n${roleSections}\n## Commits and tests\n\n- End each commit message with trailers: \`Aludel-Work: W-12\` and \`Implements: S4, SPEC-02/FR-001\`.\n- Start test names with the acceptance they check: \`S4 · Given …\`.\n- Do not put tags or IDs in the code; Aludel links code to stories from these.\n` : '';
-  return `# Agent guide for ${setup.project.name}\n\nRead [product.md](product.md) for the product intent and [aludel.json](../aludel.json) for the setup choices before changing anything.\n\nWork is assigned per action in Aludel (Work › Roles). Do not pick up work assigned to a person.\n${agentSections}\n## Stack\n\n${Object.entries(preset?.layers || {}).map(([layer, value]) => `- ${layer}: ${value}`).join('\n')}\n\nCommands: \`npm install\`, \`npm run build\`, \`npm start\` (serves on \`PORT\`, default 3000), or \`docker compose up --build\` to run it in its container. \`Dockerfile\` and \`.env.example\` declare how the app runs and every variable it reads; keep them current when that changes.\n\n## Rules\n\n- This app is independent of Aludel. Do not import Aludel code or call Aludel services at runtime.\n- Never commit secrets, \`.env\` files or the \`.data/\` directory.\n- Keep the pages in \`src/site.ts\` in step with the Pages section of \`docs/product.md\`. \`src/page-blocks.ts\` holds the placeholder layouts; replace a page's blocks with real UI as it is built.\n- Pages are specified in Aludel's Pages layer. When you build a page section, keep its \`data-aludel-section\` attribute (drop \`data-aludel-skeleton\`), keep \`data-aludel-page\` on the page, and read its text from the section's content in \`src/site.ts\`, so Aludel can show and edit it. Leave \`src/aludel-bridge.ts\` in place.\n`;
+  return `# Agent guide for ${setup.project.name}\n\nRead [product.md](product.md) for the product intent and [setup.json](../.aludel/setup.json) for the setup choices before changing anything.\n\nWork is assigned per action in Aludel (Work › Roles). Do not pick up work assigned to a person.\n${agentSections}\n## Stack\n\n${Object.entries(preset?.layers || {}).map(([layer, value]) => `- ${layer}: ${value}`).join('\n')}\n\nCommands: \`npm install\`, \`npm run build\`, \`npm start\` (serves on \`PORT\`, default 3000), or \`docker compose up --build\` to run it in its container. \`Dockerfile\` and \`.env.example\` declare how the app runs and every variable it reads; keep them current when that changes.\n\n## Rules\n\n- This app is independent of Aludel. Do not import Aludel code or call Aludel services at runtime.\n- Never commit secrets, \`.env\` files or the \`.data/\` directory.\n- Keep the pages in \`src/site.ts\` in step with the Pages section of \`docs/product.md\`. \`src/page-blocks.ts\` holds the placeholder layouts; replace a page's blocks with real UI as it is built.\n- Pages are specified in Aludel's Pages layer. When you build a page section, keep its \`data-aludel-section\` attribute (drop \`data-aludel-skeleton\`), keep \`data-aludel-page\` on the page, and read its text from the section's content in \`src/site.ts\`, so Aludel can show and edit it. Leave \`src/aludel-bridge.ts\` in place.\n`;
 }
 
 // Every page's address in the generated app. The first navigation page is home at '/'; the rest get stable paths from
@@ -152,7 +152,7 @@ export function skeletonFiles(setup, catalogs, gitProfile, appUrl, assets, sourc
     '.aludel/review.json': json({ version: 2, buildTarget: 'build', checks: [{ name: 'Server syntax', command: ['node', '--check', 'server/server.mjs'] }],
       personas: { visitor: { fixture: 'starter', session: null }, ...(options.auth ? { member: { fixture: 'starter', session: 'member' } } : {}) } }),
     '.aludel/seams.json': json({ version: 1, seams: generatedSeams }),
-    'aludel.json': json(manifest(setup, catalogs, media)),
+    '.aludel/setup.json': json(manifest(setup, catalogs, media)),
     'docs/product.md': productDoc(setup, media, catalogs),
     'package.json': json({ name: setup.project.slug, version: '0.1.0', private: true, type: 'module', engines: { node: '^24.14.0' },
       scripts: { dev: 'vite', build: 'vite build', start: 'npm run build && node server/server.mjs', serve: 'node server/server.mjs', test: 'node --test' }, dependencies, devDependencies }),
@@ -473,7 +473,6 @@ jobs:
 // JOURNEYS-01: every place a generated app names Aludel outside .aludel/, written to .aludel/seams.json so the app can leave
 // Aludel. Review's separability scan flags any file that names Aludel without a seam here.
 export const generatedSeams = Object.freeze([
-  { path: 'aludel.json', kind: 'file', purpose: 'Setup choices Aludel generated the app from', remove: 'Delete the file' },
   { path: 'src/aludel-bridge.ts', kind: 'file', purpose: 'Lets the Pages layer point at page sections in the preview', remove: 'Delete the file and its import in src/main.ts' },
   { path: 'src/main.ts', kind: 'edit', purpose: 'Imports the Pages bridge', remove: 'Delete the aludel-bridge import' },
   { path: 'src/app.html', kind: 'edit', purpose: 'data-aludel-page marks each page for the Pages layer', remove: 'Delete the data-aludel-page attributes' },
@@ -481,6 +480,7 @@ export const generatedSeams = Object.freeze([
   { path: 'src/page-blocks.ts', kind: 'edit', purpose: 'Shared page block layouts copied from Aludel', remove: 'Keep the file; delete the Aludel comments' },
   { path: 'src/styles.scss', kind: 'edit', purpose: "Feel and theme comment from Aludel's Look & feel step", remove: 'Delete the comment' },
   { path: 'server/server.mjs', kind: 'edit', purpose: 'The preview-only review setup route (/api/__aludel/review)', remove: 'Delete the review setup handler' },
+  { path: '.dockerignore', kind: 'edit', purpose: 'Keeps .aludel/ out of the image', remove: 'Delete the .aludel line' },
   { path: 'Dockerfile', kind: 'edit', purpose: "A comment noting Aludel's previews build from this file", remove: 'Delete the comment' },
   { path: '.github/workflows/ci.yml', kind: 'edit', purpose: 'Publishes the test-results artifact Aludel reads', remove: 'Keep the step; delete the comment' },
   { path: 'README.md', kind: 'edit', purpose: 'Attribution and pointers into Aludel', remove: 'Delete the Aludel paragraph' },
@@ -514,7 +514,8 @@ EXPOSE 3000
 HEALTHCHECK --interval=10s --timeout=2s --start-period=5s CMD ["node", "-e", "fetch('http://127.0.0.1:' + process.env.PORT + '/api/health').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
 CMD ["node", "server/server.mjs"]
 `,
-    '.dockerignore': 'node_modules\ndist\n.data\n.git\n.env\n.env.*\n*.sqlite\n',
+    // .aludel/ never enters the image, so every build proves the app builds without Aludel's files (JOURNEYS-01).
+    '.dockerignore': 'node_modules\ndist\n.data\n.git\n.env\n.env.*\n*.sqlite\n.aludel\n',
     'compose.yaml': `# Run this app on its own: docker compose up --build, then open http://localhost:3000
 services:
   app:

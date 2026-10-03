@@ -3,7 +3,7 @@
 // sidecar), explicit releases recorded against a commit, and the variables the app declares in .env.example.
 // Nothing here writes to GitHub. Starter docs are written into the workspace only where no file exists yet.
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, normalize, posix } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { docChecks } from './doc-checks.mjs';
@@ -14,7 +14,11 @@ const parse = (value, fallback) => { try { return value ? JSON.parse(value) : fa
 const git = (cwd, args) => spawnSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 16 * 1024 * 1024 });
 const fileLimit = 256 * 1024;
 const binary = /\.(png|jpe?g|gif|webp|ico|ttf|otf|woff2?|pdf|zip|gz|sqlite|db)$/i;
-export const sidecarPath = 'docs/.aludel/sources.json';
+// Aludel's record of which Library entries each doc section came from. It lives in .aludel/, not among the app's docs;
+// a repository from before keeps it at the old path until the next write moves it.
+export const sidecarPath = '.aludel/doc-sources.json';
+const oldSidecarPath = 'docs/.aludel/sources.json';
+const readSidecar = workspace => parse(readText(workspace, sidecarPath) ?? readText(workspace, oldSidecarPath), {});
 
 export function initCodeLayer(db) {
   db.exec(`CREATE TABLE IF NOT EXISTS code_releases (
@@ -93,12 +97,12 @@ function docsOnDisk(workspace, folder = 'docs') {
 export function readDocs(workspace, revisionOf, files = trackedFiles(workspace)) {
   const onDisk = path => existsSync(join(workspace, path));
   const paths = [...new Set([...files.map(file => file.path), ...docsOnDisk(workspace), ...['AGENTS.md', 'ARCHITECTURE.md', 'README.md'].filter(onDisk)].filter(docFile))].filter(onDisk).sort();
-  const sidecar = parse(readText(workspace, sidecarPath), {});
+  const sidecar = readSidecar(workspace);
   const agents = readText(workspace, 'AGENTS.md') || '';
   // The checks are the ones Knowledge runs on every layer's docs (doc-checks.mjs).
   const report = docChecks(paths.map(path => ({ path, text: readText(workspace, path) ?? '' })), { exists: onDisk, sidecar, mapPath: 'AGENTS.md', map: agents, revisionOf });
   const docs = report.docs.map(doc => { const text = readText(workspace, doc.path) ?? ''; return { path: doc.path, lines: text ? text.split('\n').length : 0, text: text.length > fileLimit ? text.slice(0, fileLimit) : text, sections: doc.sections, onMap: doc.onMap, broken: doc.broken }; });
-  return { docs, sidecar: existsSync(join(workspace, sidecarPath)), agentsLines: agents ? agents.split('\n').length : 0,
+  return { docs, sidecar: existsSync(join(workspace, sidecarPath)) || existsSync(join(workspace, oldSidecarPath)), agentsLines: agents ? agents.split('\n').length : 0,
     checks: report.checks };
 }
 
@@ -148,9 +152,10 @@ export function starterDocs(workspace, { project, stories, personas, objects, op
       written.push('AGENTS.md');
     }
   }
-  const sidecar = parse(readText(workspace, sidecarPath), {});
+  const sidecar = readSidecar(workspace);
   for (const path of written) if (sources[path]) sidecar[path] = sources[path];
   mkdirSync(dirname(join(workspace, sidecarPath)), { recursive: true }); writeFileSync(join(workspace, sidecarPath), `${JSON.stringify(sidecar, null, 2)}\n`);
+  rmSync(join(workspace, oldSidecarPath), { force: true });
   return { written };
 }
 
