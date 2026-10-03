@@ -50,7 +50,7 @@ LAT-01–07 and the LAT-08 prototype established the isolated candidate, layer s
 ## Ready queue
 
 1. **T03-CODE**: run 1 built and agent-checked ([evidence](evidence/t03-code/README.md)). Waits on the owner's browser look, the live GitHub round trip and the candidate-preview question; then the compiled modules retire. F1 is done.
-2. **JOURNEYS-01** (proposed 2026-10-02): journey-driven Work and review. Spec, then implement; claims replace hand-written criteria; journeys, tests and review seams live in `.aludel/`; includes cleanup of Codex's guided-preview work ([plan](design/journeys/work-record.md)). J0–J1 done 2026-10-02; J2 onward after T03-CODE's owner look.
+2. **JOURNEYS-01** (proposed 2026-10-02): journey-driven Work and review. Spec, then implement; claims replace hand-written criteria; journeys, tests and review seams live in `.aludel/`; includes cleanup of Codex's guided-preview work ([plan](design/journeys/work-record.md)). J0–J2 done 2026-10-02 (Code template `cc30be2`: journeys facet and Journeys tab); J3 next. The owner waived waiting for T03-CODE's look.
 3. **LAYER-GITHUB-01**: publish Vision, Design, Pages and Data repositories (and possibly `layer-base`) to the owner's GitHub with T03-CODE's sync (DEC-062).
 4. **LAYER-BINDINGS-01 step 4 (F10)**: Code ⇄ Pages binding, migrating `layer_connections` and the hard-coded Pages reconciliation, after T03-CODE.
 5. **LAT-08A**: build native-tab, layer-owned Work review on the template contract after LAT-T01–T03. Include LAYER-BINDINGS-01 follow-up F3: binding changes, refacets and drift assessments must be decidable from the Work board.
@@ -247,6 +247,8 @@ New Operator role. Agent-checked: server 88/89 (1 pre-existing), all browser sui
 | M0 research/design | Product loop, local agent path, runner choice, recovery model, product workflow, knowledge boundary, experience architecture, and design-system strategy | [Execution plan](execution-plan.md), [decision register](decisions.md) |
 
 ## Latest handoff
+
+2026-10-02: **JOURNEYS-01 J2 done.** Code template `cc30be2` adds journeys (`outputs/journeys.json`, a journeys facet, a Journeys tab, Knowledge). The host now treats a file-kept template kind as the template's own, and the new indexer digest is registered. Both suites and the code-layer, bindings and roles journeys pass. The `layers` browser journey fails on the J1 baseline too (pre-existing). **Restart effect:** none for existing projects. Template pins reach new installs only, so Biome needs a template update path before J8 (new gap). [Run log](design/journeys/work-record.md#j2-code-template-2026-10-02-claude-vs-code-chat).
 
 2026-10-02: **JOURNEYS-01 J0–J1 done.** Codex's repository integration and guided preview work is committed (both suites and typecheck/build pass). The rejected standalone trial tool is removed. J1's pure journey contract is in place: journeys, v2 recipe, claims, coverage, seams, and step IDs that survive reordering. Finding: a generated app has 14 Aludel seams, and its Dockerfile copies `.aludel/review.json` into the runtime image; J3 removes that. [Plan, run log and retrospective](design/journeys/work-record.md). T03-CODE remains the next action; J2 waits for its owner look.
 

@@ -1,9 +1,11 @@
 // T03-CODE disposable journey through the Code layer's own frame, on a template-enabled server. The build installs Code
-// into the app's repository; Overview, Explorer down to a unit, Tests, a change request as Code's Work, a release recorded in
+// into the app's repository; Overview, Explorer down to a unit, Journeys (JOURNEYS-01 J2: committed in the repository, read
+// back with steps and tests), Tests, a change request as Code's Work, a release recorded in
 // the repository and published to the Library, Knowledge showing the app's docs with their checks and a save, axe and
 // 390px. Run with MACHINE_LAYER_TEMPLATES_ENABLED=1 tools/browser-checks.sh code-layer.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import { chromium } from './browser-support.mjs';
@@ -48,7 +50,7 @@ try {
   const view = page.frameLocator('.lay-frame-view');
   await page.goto(origin + base + '/code');
   await bar.getByRole('link', { name: 'Releases' }).waitFor({ timeout: 30000 });
-  assert.deepEqual((await bar.getByRole('link').allInnerTexts()).map(text => text.trim()).filter(Boolean).slice(0, 4), ['Overview', 'Explorer', 'Tests', 'Releases'], 'Docs is now Knowledge');
+  assert.deepEqual((await bar.getByRole('link').allInnerTexts()).map(text => text.trim()).filter(Boolean).slice(0, 5), ['Overview', 'Explorer', 'Journeys', 'Tests', 'Releases'], 'Docs is now Knowledge');
 
   // ---- Overview → Explorer down to a unit, read only ----
   await view.getByRole('heading', { name: 'Structure' }).waitFor({ timeout: 60000 });
@@ -66,6 +68,27 @@ try {
   const knowledge = await request('GET', `/api/projects/${project.id}/knowledge`);
   const asked = knowledge.knowledge.work.find(item => /Ask for the name/.test(item.context?.suggestion || '') || /sign-up/.test(item.title));
   assert.equal(asked?.layer, 'platform', 'the request is Code\'s Work');
+
+  // ---- Journeys: none yet, then one committed in the repository as Work would, read back after a sync ----
+  await bar.getByRole('link', { name: 'Journeys' }).click();
+  await view.getByText(/No journeys yet/).waitFor();
+  const journey = { version: 1, id: 'sign-up', title: 'Sign up and borrow', origin: 'observed', revision: 1, persona: 'newcomer', proof: { commit: git('rev-parse', 'main'), status: 'passed' },
+    steps: [{ id: 'start', name: 'Open sign-up', route: '/sign-up', trigger: 'Chooses Join', expected: 'Sees the sign-up form', test: 'sign-up.spec.mjs#start' },
+      { id: 'borrow', name: 'Borrow a tool', route: '/tools', trigger: 'Signs up', expected: 'Asks to borrow a drill' }] };
+  writeFileSync(join(workspace, '.aludel/outputs/journeys.json'), `${JSON.stringify({ journeys: [journey] }, null, 2)}\n`);
+  git('add', '.aludel/outputs/journeys.json');
+  execFileSync('git', ['-C', workspace, '-c', 'user.name=Ada', '-c', 'user.email=ada@example.com', 'commit', '-q', '-m', 'Journeys: sign-up observed'], { encoding: 'utf8' });
+  await request('POST', `/api/projects/${project.id}/layers/platform/sync`, {});
+  const journeys = (await request('GET', `/api/projects/${project.id}/library?kind=journey&layer=platform&data=1`)).results;
+  assert.deepEqual(journeys.map(entry => [entry.ref, entry.data.steps.map(step => step.id)]), [['journey-sign-up', ['start', 'borrow']]], 'the journey is Code\'s output, with its step IDs');
+  await page.goto(origin + base + '/code/journeys/sign-up');
+  await view.getByRole('heading', { name: 'Sign up and borrow' }).waitFor({ timeout: 60000 });
+  await view.getByText('1 of 2 steps tested').waitFor();
+  await view.getByText('sign-up.spec.mjs#start').waitFor();
+  await view.getByText('No test yet').waitFor();
+  await view.getByText(/proven by a run that passed at/).waitFor();
+  await axe(page.frames().find(value => /\.layers\./.test(value.url())), 'Code frame (journeys)');
+  if (process.env.CODE_JOURNEYS_SHOT) await page.screenshot({ path: process.env.CODE_JOURNEYS_SHOT });
 
   // ---- Tests ----
   await bar.getByRole('link', { name: 'Tests' }).click();
@@ -110,7 +133,7 @@ try {
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), 'no sideways scroll at 390px');
   await axe(frame(), 'Code frame (releases, 390px)');
   assert.deepEqual(errors, [], 'no page errors');
-  console.log('PASS Code frame: installed in the app repository, Overview to a unit, change request as Code\'s Work, Tests, release in the repository and Library, app docs in Knowledge with checks and a save, axe and 390px');
+  console.log('PASS Code frame: installed in the app repository, Overview to a unit, change request as Code\'s Work, Journeys from the repository, Tests, release in the repository and Library, app docs in Knowledge with checks and a save, axe and 390px');
 } finally {
   await browser.close();
 }

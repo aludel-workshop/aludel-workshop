@@ -13,6 +13,7 @@ depends_on: [T03-CODE, LAT-08A, LAYER-BINDINGS-01, EXISTING-PROJECTS-01, DEC-050
 - **2026-10-02, owner chat (planning).** After a design discussion on Codex's guided Code previews, the owner wrote: "spec then implement makes sense. draw up the implementation plan, including cleaning up codex's work." Authorized: this plan and the pointers to it (LAT-08A, status ready queue). No code, template, commit or live-data change. Each slice below needs the owner's go.
 - T03-CODE remains `next_action`. This packet is proposed for the ready queue after it.
 - **2026-10-02, owner chat (J0–J1):** "yeah, go for it." Authorized: J0 (re-run checks; commit Codex's uncommitted LAT-08A integration and Biome work as one commit; remove the rejected standalone trial tool; condense status and procedure text) and J1 (pure contract modules and tests). Both are local and committed to `main`. The proposed defaults stand. Not authorized: template pins (J2+), the live Biome item, pushes, restarts of the owner's portal, and the untracked candidate checkouts or `notes.txt`. Same message: "the code editor tabs need to be re-evaluated. the general structure of code is enough to work from." Recorded as an input to J2: the Journeys view joins Code's current structure without redesigning its tabs, and re-evaluating the tabs is a separate UX pass.
+- **2026-10-02, owner chat (J2):** "t03-code is fine for now. go j2". This waives waiting for T03-CODE's owner look before J2. Authorized: a journeys facet on `layer-base` `code` (declared output, Journeys view, Knowledge), a new template commit and its pin in this repository, local checks, and commits to both repositories. Not authorized: pushes, restarting the owner's portal, the live Biome item, and J3+ wiring. A pin change makes existing projects adopt on their next restart; the owner is told what changes first.
 
 ## Owner direction (2026-10-02 chat)
 
@@ -36,10 +37,9 @@ depends_on: [T03-CODE, LAT-08A, LAYER-BINDINGS-01, EXISTING-PROJECTS-01, DEC-050
 ```
 .aludel/
   layer.json, outputs/ …            existing (T03-CODE)
+  outputs/journeys.json             the journeys facet (authored, observed or replica); J2
+  journeys/<file>.spec.mjs          black-box browser proof, one test per step; J3
   seams.json                        every place Aludel touches the app outside .aludel/
-  journeys/
-    <journey-id>.json               the journeys facet (authored, observed or replica)
-    tests/<journey-id>.spec.mjs     black-box browser proof, one test per step
   review.json  (v2)                 build target, checks, persona → fixture map
 ```
 
@@ -121,7 +121,7 @@ Every slice runs `npm run test:server` and `npm run test:server:templates`, plus
 | **J0 Baseline** | Re-run Codex's checks on the current tree. Commit its work as one LAT-08A integration commit, without unrelated changes. Remove the standalone trial tool. Condense the status and procedure text. | Both suites and typecheck/build pass; one reviewable commit; the owner agrees to commit |
 | **J1 Contract (pure)** | Schemas and validators for journeys, `seams.json`, `review.json` v2 and claims. Derive scenarios from journey steps. Separability check. Fixtures: a Biome-style flow replica (Pages authority), an observed onboarding journey (Code only), and a design-kit facet as the second instance of "opinion adopted into `.aludel/`" | Node tests; index-keyed recipes rejected; separability check passes on a generated app and fails when an undeclared seam exists |
 | **J2 Code template** | A journeys facet on `layer-base` `code`: declared output, a Journeys view (steps, coverage, origin), template pin | Template typecheck, both suites, the code-layer journey |
-| **J3 Journey proof** | The host runs `.aludel/journeys/tests` black-box against the candidate in the existing bounded check sandbox and records a result and screenshot per step. Review steps come from journeys. Scaffold and Biome move to v2. | `review-previews.test.mjs` extended to cover a failing step, an uncovered step and a missing persona fixture; Biome's three steps open from journeys |
+| **J3 Journey proof** | Make `journeys/*.spec.mjs` writable package files (not authority). The host runs them black-box against the candidate in the existing bounded check sandbox and records a result and screenshot per step. Review steps come from journeys. Scaffold and Biome move to v2. | `review-previews.test.mjs` extended to cover a failing step, an uncovered step and a missing persona fixture; Biome's three steps open from journeys |
 | **J4 Claims** | Claims with stable IDs on items and runs; evidence keyed by claim and step; a `note` migration for existing items; the submit gate for agent runs | A migration rehearsal on copied data; both suites; the owner warned before restart |
 | **J5 Specify → Implement** | The offer at item creation; the reviewable-app prerequisite; *Specify* with a characterization test; *Implement* raised on acceptance (and later by the binding) | A browser journey on a disposable imported app: create a request, specify, accept, implement raised with step claims |
 | **J6 Walk review** | **Prototype round first** (UX pass method), then build the steps rail, persona preview, spec and test evidence, Previous/Proposed, FlowNote notes, collapsed Under the hood | Owner accepts the prototype; the built view passes axe at 390px and wide, using visible controls only |
@@ -157,7 +157,7 @@ J1 can start before T03-CODE closes. J2 onward changes the Code template that T0
 
 ## Readiness
 
-J0 and J1 are done (below). J2–J8 follow T03-CODE's owner look and depend on each other as listed. J6 needs a prototype round before building. No external effect, spending or live-data change is planned before J8, and in J8 the owner performs the live actions.
+J0–J2 are done (below). J3–J8 and depend on each other as listed. J6 needs a prototype round before building. No external effect, spending or live-data change is planned before J8, and in J8 the owner performs the live actions.
 
 ## Run log
 
@@ -191,7 +191,7 @@ Nothing is wired into the live review path yet; that is J3 and J4.
 | `npm run test:server:templates -- --test-concurrency=2` (with J1) | 309 passed, 7 skips, 0 failed; includes the 9 journey tests |
 
 **Findings.**
-- **13 files in a generated app name Aludel outside `.aludel/`**, now pinned as the declared-seams fixture. Most are attribution. The real couplings are:
+- **14 files in a generated app name Aludel outside `.aludel/`**, now pinned as the declared-seams fixture. Most are attribution. The real couplings are:
   - the Pages bridge, with its import and `data-aludel-page` attributes;
   - the setup route;
   - CI's test-results artifact;
@@ -206,3 +206,40 @@ Nothing is wired into the live review path yet; that is J3 and J4.
 5. *Process change:*
    - **Applied:** the reference-first criteria rule, as a contract: v1 recipes are refused and step IDs survive reordering. **Hypothesis:** whether people use references in practice, until J8.
    - **Applied:** the separability check's static half, tested on a real generated app. **Pending:** the build-without-`.aludel/` half (J3).
+
+### J2 Code template (2026-10-02, Claude, VS Code chat)
+
+Template `layer-base` `code`: `9fac012` (the journeys facet), then `cc30be2` (step-list spacing). This repository pins `cc30be2`.
+
+- **Output.** `outputs/journeys.json` holds kind `journey`, following Code's existing `outputs/` convention. The host reads output files from a fixed list, so one file per journey wasn't available without a host change. An entry's ID is `journey-<id>`, so a journey written straight into the repository needs no Aludel ID. The indexer keeps a copy of the host's journey contract, since template code imports nothing. A new host test checks that both accept and refuse the same journeys at the pinned commit.
+- **Facet.** `journeys` (authority or replica, shape `aludel.code-journeys`), so the user-journeys binding can contract on it. No references to pages, stories or personas yet; the binding maps them.
+- **View.** A Journeys tab inside Code's current structure, as the owner asked. It lists journeys with origin and tested-step counts. A journey's detail shows provenance (observed with a proof commit, or a replica's source), its steps with routes, personas and test chips, and a change request that becomes Work. It uses the host's roles module, so a replica facet shows "Managed in …" and hides the request. [Screenshot](../../evidence/journeys/code-journeys-tab.png).
+- **Knowledge.** `knowledge/journeys.md` and two charter lines (journeys; Aludel stays separable).
+- **Host.** Two changes:
+  - A kind a template keeps as files with its own indexer is now the template's own, as an API kind already was. Before, Code's `journey` was refused as an unknown output kind. This is the general rule, not a journey exception.
+  - The new indexer's digest is registered in `config/layer-reviewed-sources.json`. The old digest is kept for existing installs.
+- **Tests.** The Code browser journey now also opens Journeys empty, commits a journey into the app repository as Work would, syncs, and checks the detail, coverage and test chips, with axe.
+
+| Check | Result |
+|---|---|
+| Template `node --test tests/*.test.mjs` | 14 passed, including the roles contract the first draft missed |
+| `typecheck-layer-ui.mjs` at `9fac012` and `cc30be2` | Passed |
+| `node --test tests/journeys.test.mjs` | 10 passed (adds host/template agreement) |
+| Code browser journey (`code-layer`) | Passed with Journeys |
+| typecheck, build | Passed (existing warnings) |
+| `npm run test:server -- --test-concurrency=4` | 284 passed, 33 mode-specific skips, 0 failed |
+| `npm run test:server:templates -- --test-concurrency=2` | 310 passed, 7 skips, 0 failed |
+| Browser `code-layer`, `bindings`, `roles` (templates on) | Passed. The new facet raised no unexpected binding proposals |
+| Browser `layers` (templates on) | **Failed** waiting for a Vision link in the layers nav. It **fails the same way on the J1 baseline** (old pin and host), so it isn't caused by J2. Pre-existing, not investigated here |
+
+**Findings.**
+- **Template updates don't reach existing installs.** A pin bump affects new installs only. Existing Code instances, Biome included, keep the template commit they were forked from, and there is no update path. So a portal restart changes no live project, but Biome gets no journeys until template updates exist. J8's Biome trial needs a template update path, done as reviewed Work on the instance's repository. That is a new prerequisite, and it isn't scheduled.
+- **The digest registry wasn't on the checklist.** The browser journey failed with "indexer … has not passed review" until the digest was registered. Neither the template's "Adding a file output" recipe nor the AGENTS checklist mentioned it.
+- **Code's Tests tab has its own naming convention.** It links Vision acceptance scenarios to tests by name (`S4/2 · …`), a convention-based match. Journey steps use explicit test references. Reconciling the two is follow-up (it touches the Tests tab the owner wants re-evaluated anyway).
+
+**Retrospective (J2).**
+1. *Harder than necessary:* three host constraints surfaced one at a time, each only at runtime: the output-kind registry, the reviewed-digest registry, and the roles contract for facet views. The first two were found by the browser journey, the third by the template's contract test.
+2. *Would help next time:* the checklist now says to register digests and run the layer's browser journey ([AGENTS.md](../../../AGENTS.md) current focus). A template contract test that fails when a declared file kind has no host acceptance would catch the first constraint earlier. It isn't built yet.
+3. *What the task revealed:* the missing template update path, which affects J8 and any future template change for existing projects.
+4. *Questions:* how existing instances take a template update (merge as reviewed Work, or a fresh fork). This blocks the Biome part of J8, not J3–J7.
+5. *Process change:* **applied:** the digest step on the checklist. **Tested:** only in the sense that the browser journey passes once it's done; that the checklist line prevents the miss next time is a hypothesis. **Applied:** the general file-kind rule, tested by the Code journey and both suites.

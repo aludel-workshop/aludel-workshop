@@ -51,7 +51,7 @@ const declarations = legacyDeclarations.map(layer => {
   if (!manifest) return layer;
   const hostHeld = layer.outputs.filter(kind => own(projections, kind) && !manifest.outputs.includes(kind));
   return { key: manifest.key, name: manifest.name, outputs: [...manifest.outputs, ...hostHeld], hostHeld,
-    authority: manifest.authority, path: manifest.path, ownKinds: Boolean(manifest.api) };
+    authority: manifest.authority, path: manifest.path, ownKinds: Boolean(manifest.api), fileKinds: [...(manifest.files?.kinds || [])] };
 });
 
 export function validateLayerDeclarations(input = declarations) {
@@ -61,11 +61,13 @@ export function validateLayerDeclarations(input = declarations) {
     if (!['knowledge_records', 'code_projection', 'runtime_projection'].includes(layer.authority)) fail('Unknown layer authority.');
     if (!Array.isArray(layer.outputs) || !layer.outputs.length) fail('A layer needs output kinds.');
     for (const kind of layer.outputs) {
-      // A template with its own API defines its own record kinds (LAYER-BINDINGS-01: Pages' kit items); the host's legacy
-      // kinds stay listed so a template cannot claim one another layer owns.
-      const ownKind = layer.ownKinds && /^[a-z][a-z0-9_]{1,40}$/.test(kind) && !sharedKinds.includes(kind) && !knowledgeKinds.includes(kind) && !own(projections, kind);
+      // A template with its own API defines its own record kinds (LAYER-BINDINGS-01: Pages' kit items), and so does one that
+      // keeps a kind as files with its own indexer (JOURNEYS-01: Code's journeys). The host's legacy kinds stay listed so a
+      // template cannot claim one another layer owns.
+      const ownKind = (layer.ownKinds || layer.fileKinds?.includes(kind)) && /^[a-z][a-z0-9_]{1,40}$/.test(kind) && !sharedKinds.includes(kind) && !knowledgeKinds.includes(kind) && !own(projections, kind);
       if ((!allowedKinds.has(kind) && !ownKind) || kinds.has(kind)) fail(`Unknown or duplicated output kind: ${kind}.`);
-      if ((own(projections, kind) ? (kind === 'release' ? layer.authority === 'runtime_projection' : layer.authority === 'code_projection') : layer.authority === 'knowledge_records') === false)
+      // The host's authority mapping covers its own kinds; a template's own kind is held as the template declares.
+      if (!ownKind && (own(projections, kind) ? (kind === 'release' ? layer.authority === 'runtime_projection' : layer.authority === 'code_projection') : layer.authority === 'knowledge_records') === false)
         fail(`Wrong authority for ${kind}.`);
       kinds.add(kind);
     }
@@ -95,7 +97,7 @@ export function catalogFromPins(config, baseDirectory) {
     const manifest = packageAt(resolve(baseDirectory, config.repo), pin.commit, key).manifest;
     if (manifest.key !== key || !manifest.outputs?.length || !manifest.category || !manifest.icon || !manifest.description)
       fail(`Invalid installable template: ${key}.`);
-    entries.push({ ...manifest, ownKinds: Boolean(manifest.api) });
+    entries.push({ ...manifest, ownKinds: Boolean(manifest.api), fileKinds: [...(manifest.files?.kinds || [])] });
   }
   validateLayerDeclarations(entries);
   return Object.freeze(entries.map(({ key, name, path, category, icon, description }) =>

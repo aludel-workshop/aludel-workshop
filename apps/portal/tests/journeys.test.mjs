@@ -1,7 +1,8 @@
 // JOURNEYS-01 J1: the journey contract's pure core, on a Pages-flow replica, an observed onboarding journey specified to a
 // second revision, a design-kit token and a real generated app.
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -141,4 +142,35 @@ test('separability: every place a generated app names Aludel outside .aludel/ is
     ['src/aludel-telemetry.ts', 'src/feature.ts']);
   refuses(() => validateSeams({ version: 1, seams: [{ path: '.aludel/review.json', kind: 'file', purpose: 'x', remove: 'y' }] }), /inside \.aludel/);
   refuses(() => validateSeams({ version: 1, seams: [{ path: '../outside', kind: 'file', purpose: 'x', remove: 'y' }] }), /relative path/);
+});
+
+// J2: the Code template keeps its own copy of the journey contract (template code imports nothing). Both must accept and
+// refuse the same journeys, so this checks the pinned template's indexer against the host's contract.
+const templates = JSON.parse(readFileSync(new URL('../config/layer-templates.json', import.meta.url), 'utf8'));
+const templateRepo = new URL(`../../../${templates.repo}`, import.meta.url).pathname;
+test('the pinned Code template accepts and refuses journeys as the host contract does', { skip: !existsSync(templateRepo) && 'no local layer-base' }, async () => {
+  const source = execFileSync('git', ['-C', templateRepo, 'show', `${templates.templates.code.commit}:server/code-index.mjs`], { encoding: 'utf8' });
+  const file = join(mkdtempSync(join(tmpdir(), 'aludel-code-index-')), 'code-index.mjs');
+  writeFileSync(file, source);
+  const { entries } = await import(file);
+  const index = journey => entries({ 'outputs/journeys.json': JSON.stringify({ journeys: [journey] }) })[0];
+  const valid = [cases.replica, cases.onboarding, cases.onboardingSpecified].map(copy);
+  for (const journey of valid) {
+    const entry = index(journey);
+    assert.equal(entry.id, `journey-${journey.id}`);
+    assert.equal(validateJourney(entry.data).id, journey.id, 'what the template stores is a valid host journey');
+  }
+  const variants = [
+    journey => { journey.steps[1].id = journey.steps[0].id; },
+    journey => { journey.source = { layer: 'pages', entry: 'x', revision: 1 }; },
+    journey => { journey.steps[0].route = '//evil.example'; },
+    journey => { journey.steps[0].test = 'tests/onboarding.js'; },
+    journey => { journey.revision = 0; },
+    journey => { journey.origin = 'imported'; },
+    journey => { journey.steps = []; }];
+  for (const change of variants) {
+    const journey = copy(cases.onboarding); change(journey);
+    assert.throws(() => validateJourney(copy(journey)), 'the host refuses');
+    assert.throws(() => index(journey), 'and so does the template');
+  }
 });
