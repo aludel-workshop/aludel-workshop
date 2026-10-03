@@ -747,3 +747,28 @@ Authorization: see the 2026-10-03 "J6 prototype" entry above. This round builds 
 - **Q6** Keep the unchanged first step (*Open the team*) in the walk for context, or start at the first changed step?
 - **Q7** Non-journey claims as a single card, with the preview opened somewhere useful: enough?
 - **Open (not asked):** v1 turned *Change* notes into follow-up work in a chosen layer. With flags only, a flag goes back to the agent with the run. Follow-up work for something outside the run's scope has no path in v2.
+
+#### Round 2 feedback and the suggested-work flow (2026-10-03)
+
+**Owner, on v2:** "looks much better." Round 2 asks (S1–S4) and the decision to skip another prototype: "skip the final prototype: i think you're close enough to go ahead and build, once you clarify the suggest work flow." The build waits for the owner to confirm the flow below.
+
+| # | Ask | Build decision |
+|---|---|---|
+| S1 | Journey progress along the top divider of the action bar, not between the buttons | The action bar's top border is the progress line, one segment per step |
+| S2 | Three header rows (review title, reviewing-commit banner, panel bars) become one line | One bar across both panels: close, *W-9 · Run 1*, agent, the commit chip (its tooltip names the accepted base), the build switch and persona over the preview, the claim picker over the claim panel. The stale-head notice appears in that line only when it applies |
+| S3 | "Sign off: it works" is goofy | **Approve**, the claim kind in the button where it helps: *Approve journey*. **Flag** stays |
+| S4 | For claims without a journey, the left area supports the claim directly, not always a live preview | The left area shows the claim's evidence: a regression claim shows its test run (journeys, steps, screenshots); a note claim shows the artifact it names when the run attached one (the sent email) or the preview; a record claim shows the layer's Previous/Proposed view (LAT-08A). A live preview is one kind of evidence |
+| S5 | Agents get tools to suggest spec changes: from the original task, or from review comments that ask for out-of-spec changes. They suggest work items for the right layer (the authority that gave the spec), and ask whether to merge the current changes or keep them as a draft branch. That goes into the next review packet, which may have no code changes at all | The flow below |
+
+**What exists today.** An agent run can already submit up to five follow-ups (layer, title, brief, why), with or without changes ([layer-scope.mjs](../../../apps/portal/server/layer-scope.mjs) `checkFollowUps`). The review shows them, and someone with elevated access creates or dismisses each one (`decideFollowUp`); created items start as *suggested* in that layer's backlog. What's missing is the link to the spec, a question the agent can ask, and a review packet built from them.
+
+**Proposed flow.**
+1. **Flags go back as they are.** The reviewer flags with a note, as in v2. They don't classify scope.
+2. **The agent sorts each flag.** In its next run, the agent answers every flag either as *fixed* (the build didn't do what the spec says: a code change, re-proven by the step tests) or as *out of scope* (the reviewer wants the spec itself to change).
+3. **Out of scope becomes a suggested spec change.** A follow-up gains an optional **target**: the spec entry it would change, at its revision (for example journey `invite-teammate` r2). The host resolves the authority through the binding: Code's journeys facet, or the Pages flow when Pages is bound. Creating it raises a *Specify* item on that entry (J5), not a generic task. Follow-ups without a target stay as they are today.
+4. **The agent asks about the work in hand.** A run may carry one **question** with fixed options. For this case: *Merge the reviewed changes now* (they meet the current spec) or *Keep them as a draft branch* (for the spec change to build on).
+5. **The next review packet.** Its claims are whatever the run produced: re-proven journey claims for fixed flags, one card per suggested spec change (*Create* / *Dismiss*, the existing decision), and the question card. With no code changes, the packet is only suggestions and the question.
+6. **Finishing.** *Merge now* accepts the commit the reviewer already reviewed, so nothing is merged that wasn't reviewed, and only if the accepted head hasn't moved. *Keep as draft* parks the item as **Waiting on spec** with its branch kept and linked to the new Specify items. When they're accepted, Implement is raised on top of that branch instead of starting fresh.
+7. **During the original task,** the same two tools are available: an agent that finds the spec wrong mid-task submits its build plus suggested spec changes, and asks the same question.
+
+**Defaults picked (owner may change):** the agent, not the reviewer, decides in or out of scope, and the reviewer can dismiss a suggestion; one question per run, with options the host knows how to act on (merge now, keep as draft), not free text.
