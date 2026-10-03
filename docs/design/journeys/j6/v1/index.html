@@ -1,0 +1,584 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aludel walk review</title>
+<!-- JOURNEYS-01 J6 prototype v1 (questions Q1-Q7 in ../../work-record.md#j6-walk-review-prototype-round). Static; illustrative
+     Team Notes data; nothing is saved or sent except the reviewer's own notes, which stay in this browser. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block">
+<style>
+:root{color-scheme:light;
+  --bg:#fbfbfd;--surface:#fff;--rail:#f3f5f9;--panel:#f4f6fa;--hover:#e9edf5;--line:#dfe3ec;--line-strong:#c8cfdc;--ink:#1b1f2a;--muted:#5d6679;--faint:#636c80;
+  --accent:#3047b9;--accent-bg:#e3e8ff;
+  --ok:#146446;--ok-bg:#d9f3e7;--bad:#a1231f;--bad-bg:#fce1e0;--warn:#7a4f00;--warn-bg:#fff0cc;--info:#1a5fb4;--info-bg:#e2ecfb;
+  --new:#5b3cc4;--new-bg:#ece7fd;
+  --shadow:0 18px 50px #1c2a5a2e;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:Roboto,system-ui,sans-serif;font-size:14.5px;line-height:1.45;color:var(--ink);background:var(--bg)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:var(--accent)}
+.icon{font-family:'Material Symbols Rounded';font-weight:normal;font-style:normal;font-size:20px;line-height:1;letter-spacing:normal;text-transform:none;white-space:nowrap;display:inline-block;vertical-align:middle;font-feature-settings:'liga';-webkit-font-smoothing:antialiased;flex:none}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.mono,code{font-family:"Roboto Mono",ui-monospace,monospace;font-size:.88em}
+.muted{color:var(--muted)}.small{font-size:13px}.tiny{font-size:12px}
+.row{display:flex;align-items:center;gap:8px}.push{margin-left:auto}.wrap{flex-wrap:wrap}
+.vh{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+h1,h2,h3{margin:0}
+
+/* Shell, as the built portal */
+.shell{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:100vh}
+.rail{background:var(--rail);border-right:1px solid var(--line);padding:14px 10px;display:flex;flex-direction:column;gap:2px;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:18px;padding:2px 8px 12px}
+.brand .icon{color:var(--accent);font-size:26px}
+.proj{display:flex;align-items:center;gap:9px;padding:8px;border-radius:12px;background:var(--surface);border:1px solid var(--line);margin-bottom:10px}
+.proj .mk{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:#3047b9;color:#fff;font-weight:700;font-size:12px}
+.proj small{display:block;color:var(--muted);font-size:11.5px}
+.nav a{display:flex;align-items:center;gap:10px;padding:5px 10px 5px 6px;border-radius:12px;color:var(--ink);text-decoration:none;font-weight:500}
+.nav a.active{background:var(--nb);font-weight:700}
+.tile{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:var(--nb);color:var(--nc)}
+.tile .icon{font-size:19px}
+.nav a.active .tile{background:var(--nc);color:#fff}
+.n-home{--nc:#c62828;--nb:#fde8e8}.n-vision{--nc:#b93c0a;--nb:#ffeddc}.n-design{--nc:#8a6100;--nb:#fff3cc}.n-pages{--nc:#2a7230;--nb:#e2f4e3}.n-data{--nc:#00766c;--nb:#d6f3ee}.n-code{--nc:#1a5fb4;--nb:#e2ecfb}.n-deploy{--nc:#2f3a9e;--nb:#e4e7f8}.n-work{--nc:#5b3cc4;--nb:#ece7fd}
+.main{padding:14px 18px 80px;min-width:0}
+
+.btn{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:var(--surface);font-weight:500;font-size:13.5px;white-space:nowrap;text-decoration:none;color:var(--ink)}
+.btn:hover{background:var(--hover)}.btn .icon{font-size:18px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}.btn.primary:hover{background:#2539a0}
+.btn.danger{border-color:var(--bad);color:var(--bad)}
+.btn.ghost{border-color:transparent;background:none}.btn.ghost:hover{background:var(--hover)}
+.btn.sm{padding:3px 9px;font-size:12.5px}.btn.sm .icon{font-size:16px}
+.btn:disabled{opacity:.5;cursor:default}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:500;background:var(--panel);color:var(--muted);white-space:nowrap}
+.chip .icon{font-size:15px}
+.chip.new{background:var(--new-bg);color:var(--new)}.chip.changed{background:var(--info-bg);color:var(--info)}
+.chip.ok{background:var(--ok-bg);color:var(--ok)}.chip.bad{background:var(--bad-bg);color:var(--bad)}.chip.warn{background:var(--warn-bg);color:var(--warn)}
+.t-passed{color:var(--ok)}.t-failed{color:var(--bad)}.t-uncovered,.t-no-fixture{color:var(--warn)}
+.eyebrow{font-size:11.5px;letter-spacing:.8px;text-transform:uppercase;color:var(--faint);font-weight:700}
+
+/* Review frame (borrowed: the built review, work-review.ts) */
+.wr{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.wr-top{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.wr-top h1{font-size:16px}
+.who{display:inline-flex;align-items:center;gap:6px;font-size:13.5px}
+.av{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#ece7fd;color:#5b3cc4;font-size:13px}
+.claims{display:flex;gap:4px;margin-left:auto;overflow-x:auto;max-width:100%}
+.claims button{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 10px;font-size:12.5px;white-space:nowrap}
+.claims button[aria-current="true"]{background:var(--accent-bg);border-color:var(--accent);font-weight:700}
+.claims .n{display:grid;place-items:center;width:18px;height:18px;border-radius:50%;background:var(--panel);font-size:11px;font-weight:700}
+.claims .done .n{background:var(--ok);color:#fff}
+.banner{display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--line);background:var(--panel);font-size:13.5px;flex-wrap:wrap}
+.banner.warn{background:var(--warn-bg)}
+.banner .icon{font-size:18px}
+
+/* Walk: rail | preview | step (invented arrangement; parts borrowed, see the work record) */
+.walk{display:grid;grid-template-columns:250px minmax(0,1fr) 340px;min-height:620px}
+.walk>*{min-width:0}
+.steps{border-right:1px solid var(--line);padding:12px 10px;background:#fcfcfe}
+.jhead{padding:2px 6px 10px}
+.jhead h2{font-size:15px}
+.steps ol{list-style:none;margin:0;padding:0;display:grid;gap:3px}
+.stepbtn{position:relative;display:grid;grid-template-columns:24px 1fr auto;gap:2px 8px;align-items:start;width:100%;text-align:left;border:1px solid transparent;background:none;border-radius:12px;padding:7px 8px}
+.stepbtn:hover{background:var(--hover)}
+.stepbtn[aria-current="step"]{background:var(--accent-bg);border-color:#b9c4f5}
+.stepbtn .num{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;border:1.5px solid var(--line-strong);font-size:11.5px;font-weight:700;background:var(--surface)}
+.stepbtn.walked .num{background:var(--ok);border-color:var(--ok);color:#fff}
+.stepbtn.noted .num{background:var(--warn);border-color:var(--warn);color:#fff}
+.stepbtn.unclaimed .num{border-style:dashed}
+.stepbtn .nm{font-weight:500;font-size:13.5px}
+.stepbtn .meta{grid-column:2/4;display:flex;gap:4px;flex-wrap:wrap}
+.stepbtn .tm{font-size:18px}
+.legend{margin:12px 6px 0;font-size:12px;color:var(--muted)}
+
+.pv{display:flex;flex-direction:column;min-width:0;border-right:1px solid var(--line);background:var(--panel)}
+.pvbar{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line);background:var(--surface);flex-wrap:wrap}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.seg button{border:0;background:var(--surface);padding:4px 11px;font-size:12.5px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+.persona{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:999px;background:#fff3cc;color:#6b4b00;font-size:12.5px;font-weight:500}
+.persona .icon{font-size:16px}
+.frames{flex:1;display:grid;gap:10px;padding:10px;grid-template-columns:1fr;align-content:start}
+.frames.two{grid-template-columns:1fr 1fr}
+.frame{border:1px solid var(--line-strong);border-radius:12px;background:#fff;overflow:hidden;display:flex;flex-direction:column;min-height:440px}
+.fhead{display:flex;align-items:center;gap:6px;padding:6px 8px;background:#eef0f5;border-bottom:1px solid var(--line);font-size:12px}
+.fhead .addr{flex:1;min-width:0;background:#fff;border:1px solid var(--line);border-radius:999px;padding:2px 10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fhead .lbl{font-weight:700;font-size:11px;letter-spacing:.6px;text-transform:uppercase}
+.fhead .lbl.prev{color:var(--muted)}.fhead .lbl.prop{color:var(--accent)}
+.fbody{flex:1;position:relative}
+.reached{display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--ok-bg);color:var(--ok);font-size:12.5px;border-top:1px solid var(--line)}
+
+/* the mock app: Team Notes */
+.app{font-family:system-ui,sans-serif;font-size:13.5px;color:#222;height:100%;display:flex;flex-direction:column}
+.app .ah{display:flex;align-items:center;gap:14px;padding:10px 14px;background:#20323f;color:#fff}
+.app .ah b{font-size:14.5px}
+.app .ah button{background:none;border:0;color:#cfe0ea;padding:3px 6px;border-radius:6px}
+.app .ah button.on{background:#ffffff22;color:#fff}
+.app .ah .me{margin-left:auto;font-size:12px;color:#cfe0ea}
+.app .am{padding:14px 16px}
+.app .h{margin:0 0 10px;font-size:17px}
+.app .card{border:1px solid #e3e3e3;border-radius:8px;padding:9px 11px;margin-bottom:7px}
+.app .abtn{background:#1f7a5c;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-weight:600}
+.app .abtn.sec{background:#eef3f1;color:#1f5a46}
+.app label{display:block;font-size:12px;color:#555;margin:8px 0 3px}
+.app input,.app select{width:100%;max-width:300px;padding:6px 8px;border:1px solid #bbb;border-radius:6px}
+.app table{border-collapse:collapse;width:100%;max-width:420px}
+.app td{padding:6px 4px;border-bottom:1px solid #eee}
+.app .pend{color:#8a5a00;background:#fff0cc;border-radius:4px;padding:0 6px;font-size:12px}
+.app .err{color:#a1231f;background:#fce1e0;border-radius:6px;padding:7px 10px;margin-top:10px}
+.app .welcome{background:#e3f4ec;border-radius:6px;padding:7px 10px;margin-bottom:10px}
+.app .mail{border:1px solid #ddd;border-radius:8px;max-width:440px}
+.app .mail .mh{padding:8px 10px;border-bottom:1px solid #eee;font-size:12.5px;color:#555}
+.app .mail .mb{padding:10px}
+.app .stub{font-size:11px;color:#595959;margin-bottom:8px}
+.app.nf{align-items:center;justify-content:center;color:#666;gap:6px}
+.app.nf b{font-size:30px;color:#999}
+.hint .hot{outline:2px dashed #e08a00;outline-offset:2px}
+.state{display:grid;place-items:center;height:100%;padding:24px;text-align:center;color:var(--muted)}
+.state .icon{font-size:34px}
+.state ol{text-align:left;margin:10px 0 0;padding-left:20px}
+
+/* step panel */
+.sp{padding:14px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.sp h2{font-size:17px;line-height:1.25}
+.spec{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;margin:0;font-size:13.5px}
+.spec dt{color:var(--muted);font-weight:500}
+.spec dd{margin:0}
+.box{border:1px solid var(--line);border-radius:12px;padding:10px}
+.box h3{font-size:11.5px;letter-spacing:.8px;text-transform:uppercase;color:var(--faint);margin-bottom:6px}
+.proof{display:flex;align-items:center;gap:6px;font-weight:500}
+.thumb{display:block;width:100%;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff;padding:0;margin-top:8px;position:relative;height:150px}
+.thumb .scale{transform:scale(.5);transform-origin:0 0;width:200%;height:300px;pointer-events:none}
+.thumb .cap{position:absolute;right:6px;bottom:6px;background:#1b1f2aE6;color:#fff;border:0;font-size:12px;padding:3px 8px;border-radius:8px;display:inline-flex;gap:4px;align-items:center}.thumb .cap .icon{font-size:16px}
+.pages-thumb{background:#f2f8f2;border:1px dashed #9cc59f;border-radius:8px;padding:8px;font-size:12.5px;color:#2a7230;margin-top:6px}
+.ntypes{display:flex;gap:4px;flex-wrap:wrap}
+.ntypes button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 10px;font-size:12.5px;display:inline-flex;align-items:center;gap:4px}
+.ntypes button .icon{font-size:16px}
+.ntypes button[aria-pressed="true"]{background:var(--accent-bg);border-color:var(--accent)}
+textarea{width:100%;min-height:62px;border:1px solid var(--line-strong);border-radius:8px;padding:6px 8px;resize:vertical}
+select.inp{border:1px solid var(--line-strong);border-radius:8px;padding:4px 6px;background:#fff}
+.notes{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:6px}
+.notes li{display:flex;gap:6px;font-size:13px;background:var(--panel);border-radius:8px;padding:6px 8px;align-items:flex-start}
+.notes li .icon{font-size:17px}
+.notes li .x{margin-left:auto;border:0;background:none;padding:0;color:var(--muted)}
+.blocker{display:flex;gap:6px;align-items:flex-start;background:var(--bad-bg);color:var(--bad);border-radius:10px;padding:8px 10px;font-size:13px}
+.caution{display:flex;gap:6px;align-items:flex-start;background:var(--warn-bg);color:var(--warn);border-radius:10px;padding:8px 10px;font-size:13px}
+.blocker .icon,.caution .icon{font-size:18px}
+.spfoot{margin-top:auto;display:flex;gap:6px;justify-content:space-between}
+
+/* under the hood (borrowed: GitHub's collapsed file list) */
+details.hood{border-top:1px solid var(--line)}
+details.hood summary{padding:10px 14px;cursor:pointer;font-weight:500;display:flex;gap:8px;align-items:center;list-style:none}
+details.hood summary::-webkit-details-marker{display:none}
+details.hood[open] summary .icon.chev{transform:rotate(90deg)}
+.hoodbody{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:14px;padding:0 14px 14px}
+.files{list-style:none;margin:0;padding:0;font-size:13px}
+.files li{display:flex;gap:8px;padding:4px 0;border-bottom:1px solid var(--line)}
+.hoodbody>*{min-width:0}.files .mono{overflow-wrap:anywhere;min-width:0}
+.files .a{color:var(--ok)}.files .d{color:var(--bad)}
+pre.diff{margin:0;background:#1b1f2a;color:#e7e9ef;border-radius:10px;padding:10px;font-size:12px;overflow:auto;max-height:260px}
+pre.diff .a{background:#1f4d36;display:block}pre.diff .d{background:#5a2020;display:block}pre.diff .h{color:#9fb2ff;display:block}
+
+/* other claims and sign-off */
+.claimview{padding:18px;display:grid;gap:14px;max-width:900px}
+.claimview h2{font-size:18px}
+table.reg{border-collapse:collapse;width:100%;font-size:13.5px}
+table.reg th,table.reg td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+table.reg th{font-size:12px;color:var(--muted);font-weight:500}
+.verdict{display:flex;gap:6px;flex-wrap:wrap}
+.verdict button[aria-pressed="true"]{background:var(--accent-bg);border-color:var(--accent);font-weight:700}
+.signbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding-top:6px}
+.fu{display:grid;gap:6px;list-style:none;padding:0;margin:0}
+.fu li{display:flex;gap:8px;align-items:center;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;padding:7px 10px;font-size:13.5px}
+
+/* prototype-only controls */
+.proto{position:fixed;right:14px;bottom:14px;z-index:50;display:flex;gap:6px}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(420px,100vw);background:var(--surface);box-shadow:var(--shadow);z-index:60;padding:16px;overflow:auto;display:none}
+.drawer.open{display:block}
+.drawer h2{font-size:16px;margin-bottom:8px}
+.drawer fieldset{border:1px solid var(--line);border-radius:10px;margin:0 0 10px;padding:8px 10px}
+.drawer legend{font-weight:700;font-size:13px;padding:0 4px}
+.drawer label{display:flex;gap:6px;align-items:center;font-size:13.5px;padding:2px 0}
+.drawer .q{margin-bottom:12px}
+.drawer .q p{margin:0 0 4px;font-size:13.5px}
+.lightbox{position:fixed;inset:0;background:#0009;z-index:70;display:none;place-items:center;padding:20px}
+.lightbox.open{display:grid}
+.lightbox .lb{background:#fff;border-radius:12px;width:min(760px,100%);overflow:hidden}
+.lightbox .lbh{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line)}
+.lightbox .lbb{height:440px}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#1b1f2a;color:#fff;padding:8px 14px;border-radius:10px;z-index:80;font-size:13.5px}
+
+/* narrow */
+@media (max-width:1180px){ .walk{grid-template-columns:220px minmax(0,1fr)} .sp{grid-column:1/-1;border-top:1px solid var(--line)} .pv{border-right:0} }
+@media (max-width:860px){
+  .shell{grid-template-columns:1fr} .rail{display:none} .main{padding:8px}
+  .walk{grid-template-columns:1fr}
+  .steps{border-right:0;border-bottom:1px solid var(--line);padding:8px}
+  .steps ol{display:flex;overflow-x:auto;gap:6px;padding-bottom:4px}
+  .steps li{flex:none;width:200px}
+  .legend{display:none}
+  .frames.two{grid-template-columns:1fr}
+  .frame{min-height:400px}
+  .hoodbody{grid-template-columns:1fr}
+  .claims{margin-left:0;width:100%}
+  .side-only{display:none}
+}
+</style>
+<body>
+<div class="shell">
+  <nav class="rail" aria-label="Project">
+    <div class="brand"><span class="icon" aria-hidden="true">deployed_code</span>Aludel</div>
+    <div class="proj"><span class="mk" aria-hidden="true">TN</span><div><b>Team Notes</b><small>Imported app</small></div></div>
+    <div class="nav">
+      <a href="#" class="n-home"><span class="tile"><span class="icon" aria-hidden="true">home</span></span>Home</a>
+      <a href="#" class="n-vision"><span class="tile"><span class="icon" aria-hidden="true">lightbulb</span></span>Vision</a>
+      <a href="#" class="n-design"><span class="tile"><span class="icon" aria-hidden="true">palette</span></span>Design</a>
+      <a href="#" class="n-pages"><span class="tile"><span class="icon" aria-hidden="true">web</span></span>Pages</a>
+      <a href="#" class="n-data"><span class="tile"><span class="icon" aria-hidden="true">schema</span></span>Data</a>
+      <a href="#" class="n-code"><span class="tile"><span class="icon" aria-hidden="true">code</span></span>Code</a>
+      <a href="#" class="n-deploy"><span class="tile"><span class="icon" aria-hidden="true">rocket_launch</span></span>Deploy</a>
+      <a href="#" class="n-work active" aria-current="page"><span class="tile"><span class="icon" aria-hidden="true">checklist</span></span>Work</a>
+    </div>
+  </nav>
+  <main class="main" id="main"></main>
+</div>
+<div class="proto">
+  <button class="btn" type="button" data-act="scenarios"><span class="icon" aria-hidden="true">tune</span>Scenarios</button>
+  <button class="btn primary" type="button" data-act="questions"><span class="icon" aria-hidden="true">rate_review</span>Review questions</button>
+</div>
+<aside class="drawer" id="scenarios" aria-label="Prototype scenarios"></aside>
+<aside class="drawer" id="questions" aria-label="Review questions"></aside>
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Test screenshot"></div>
+<script>
+// ---------- illustrative data ----------
+const PERSONAS = {
+  owner: { label: 'owner', fixture: 'seeded-team', session: 'ana@team.invalid' },
+  member: { label: 'member', fixture: 'seeded-team', session: 'lee@team.invalid' },
+  newcomer: { label: 'newcomer', fixture: 'fresh', session: null },
+};
+const JOURNEYS = {
+  invite: { id: 'invite-teammates', title: 'Invite teammates', revision: 2, origin: 'authored', steps: [
+    { id: 'open-settings', name: 'Settings open', persona: 'owner', route: '/settings', start: 'notes', end: 'settings', change: 'unchanged', claimed: false,
+      trigger: 'Clicks Settings in the top bar', expected: 'Settings lists the team.' },
+    { id: 'open-invite', name: 'Invite form opens', persona: 'owner', route: '/settings', start: 'settings', end: 'invite-form', change: 'new', claimed: true,
+      trigger: 'Clicks Invite teammate', expected: 'A form asks for an email address and a role.' },
+    { id: 'send-invite', name: 'Invite sent', persona: 'owner', route: '/settings/invite', start: 'invite-form', end: 'settings-pending', change: 'new', claimed: true,
+      trigger: 'Enters an email, picks Member, presses Send invite', expected: 'The teammate shows in the team as Pending, and an invite email reaches the inbox.' },
+    { id: 'accept-invite', name: 'Newcomer joins', persona: 'newcomer', route: '/inbox (preview stub)', start: 'inbox', end: 'notes-welcome', change: 'new', claimed: true,
+      trigger: 'Opens the invite email, follows Join Team Notes, enters a name, presses Join', expected: 'They land on Notes as a member, with a welcome line.' },
+  ] },
+  note: { id: 'write-note', title: 'Write a note', revision: 3, origin: 'authored', steps: [
+    { id: 'open-notes', name: 'Notes open', persona: 'member', route: '/', start: 'notes', end: 'notes', change: 'unchanged', claimed: false, trigger: 'Signs in and lands on Notes', expected: 'The team’s notes are listed, newest first.' },
+    { id: 'new-note', name: 'New note', persona: 'member', route: '/', start: 'notes', end: 'note-new', change: 'unchanged', claimed: false, trigger: 'Clicks New note', expected: 'An empty note opens for writing.' },
+    { id: 'save-note', name: 'Note saved', persona: 'member', route: '/notes/new', start: 'note-new', end: 'note-saved', change: 'unchanged', claimed: false, trigger: 'Types a title and presses Save', expected: 'The note shows at the top of Notes.' },
+  ] },
+};
+const SCN_DEFAULT = { sendTest: 'passed', inviteTest: 'passed', fixture: 'present', preview: 'running', source: 'code', stale: false, follow: true, hint: false };
+const store = { get(k, d) { try { const v = localStorage.getItem('j6v1:' + k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('j6v1:' + k, JSON.stringify(v)); } catch {} } };
+
+const S = { claim: 'c1', journey: 'invite', step: 1, view: 'proposed', screen: {}, walked: {}, notes: {}, noteType: null, anon: false,
+  claimVerdict: { c3: null }, followups: {}, accepted: null, scn: { ...SCN_DEFAULT } };
+
+// ---------- helpers ----------
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const icon = (n, cls = '') => `<span class="icon ${cls}" aria-hidden="true">${n}</span>`;
+function toast(t) { const el = document.createElement('div'); el.className = 'toast'; el.setAttribute('role', 'status'); el.textContent = t; document.body.append(el); setTimeout(() => el.remove(), 2200); }
+const J = () => JOURNEYS[S.journey];
+const step = () => J().steps[S.step];
+const key = (j, i) => `${j}:${JOURNEYS[j].steps[i].id}`;
+
+function testOf(j, s) {
+  if (j !== 'invite') return { status: 'passed', ms: 400 + s.id.length * 20 };
+  if (s.id === 'send-invite' && S.scn.sendTest === 'failed') return { status: 'failed', ms: 5000, detail: 'Expected “Pending” next to sam@team.invalid. The team list still shows two people after 5 s.' };
+  if (s.id === 'open-invite' && S.scn.inviteTest === 'uncovered') return { status: 'uncovered' };
+  if (s.id === 'accept-invite' && S.scn.fixture === 'missing') return { status: 'no-fixture', detail: 'review.json has no fixture for the newcomer persona, so the test could not enter as them.' };
+  return { status: 'passed', ms: { 'open-settings': 820, 'open-invite': 640, 'send-invite': 1310, 'accept-invite': 1720 }[s.id] };
+}
+const TEST = { passed: ['check_circle', 'Test passed'], failed: ['cancel', 'Test failed'], uncovered: ['remove', 'No test'], 'no-fixture': ['person_off', 'No fixture'] };
+const CHANGE = { new: ['new', 'New'], changed: ['changed', 'Changed'], unchanged: ['', 'Unchanged'] };
+const NOTE = { 'looks-right': ['thumb_up', 'Looks right'], content: ['edit_note', 'Content'], change: ['swap_horiz', 'Change'], question: ['help', 'Question'] };
+
+// ---------- the mock app (Team Notes) ----------
+function app(screen, side, persona) {
+  const prev = side === 'previous';
+  const who = persona && PERSONAS[persona].session;
+  const nav = (on) => `<div class="ah"><b>Team Notes</b><button type="button" class="${on === 'notes' ? 'on' : ''} hot-notes" data-go="notes">Notes</button>${persona !== 'newcomer' ? `<button type="button" class="${on === 'settings' ? 'on' : ''} hot-settings" data-go="settings">Settings</button>` : ''}<span class="me">${who ? esc(who) : (screen === 'notes-welcome' ? 'sam@team.invalid' : 'Signed out')}</span></div>`;
+  const team = (pending) => `<table><tbody><tr><td>Ana Ruiz</td><td>Owner</td></tr><tr><td>Lee Park</td><td>Member</td></tr>${pending ? '<tr><td>sam@team.invalid</td><td><span class="pend">Pending</span></td></tr>' : ''}</tbody></table>`;
+  const notes = (extra) => `${extra || ''}<div class="row" style="justify-content:space-between;margin-bottom:8px"><h3 class="h" style="margin:0">Notes</h3>${persona === 'member' || persona === 'owner' ? '<button type="button" class="abtn hot-new" data-go="note-new">New note</button>' : ''}</div>
+    ${S._saved ? '<div class="card"><b>Retro actions</b><div style="color:#595959;font-size:12px">Just now · Lee</div></div>' : ''}<div class="card"><b>Sprint 14 plan</b><div style="color:#595959;font-size:12px">Yesterday · Ana</div></div><div class="card"><b>Onboarding checklist</b><div style="color:#595959;font-size:12px">Mon · Lee</div></div>`;
+  const nf = route => `<div class="app nf"><b>404</b><div>Not found: <code>${route}</code></div><div style="font-size:12px">The accepted build has no page here.</div></div>`;
+  switch (screen) {
+    case 'notes': return `<div class="app">${nav('notes')}<div class="am">${notes()}</div></div>`;
+    case 'note-new': return `<div class="app">${nav('notes')}<div class="am"><h3 class="h">New note</h3><label for="nt-${side}">Title</label><input id="nt-${side}" value="Retro actions"><label for="nb-${side}">Body</label><input id="nb-${side}" value="Ship invites, fix the flaky sync"><p><button type="button" class="abtn hot-save" data-go="note-saved">Save</button></p></div></div>`;
+    case 'note-saved': S._saved = true; { const h = `<div class="app">${nav('notes')}<div class="am">${notes()}</div></div>`; S._saved = false; return h; }
+    case 'settings': case 'settings-pending': case 'settings-error':
+      return `<div class="app">${nav('settings')}<div class="am"><div class="row" style="justify-content:space-between;margin-bottom:8px;max-width:420px"><h3 class="h" style="margin:0">Team</h3>${prev ? '' : '<button type="button" class="abtn hot-invite" data-go="invite-form">Invite teammate</button>'}</div>
+        ${team(screen === 'settings-pending')}${screen === 'settings-error' ? '<div class="welcome" style="margin-top:10px">Invite sent.</div>' : ''}</div></div>`;
+    case 'invite-form': if (prev) return nf('/settings/invite');
+      return `<div class="app">${nav('settings')}<div class="am"><h3 class="h">Invite a teammate</h3><label for="ie-${side}">Email</label><input id="ie-${side}" value="sam@team.invalid"><label for="ir-${side}">Role</label><select id="ir-${side}"><option>Member</option><option>Owner</option></select>
+        <p style="display:flex;gap:6px"><button type="button" class="abtn hot-send" data-go="${S.scn.sendTest === 'failed' ? 'settings-error' : 'settings-pending'}">Send invite</button><button type="button" class="abtn sec" data-go="settings">Cancel</button></p></div></div>`;
+    case 'inbox': if (prev) return nf('/__aludel/inbox');
+      return `<div class="app"><div class="ah"><b>Preview inbox</b><span class="me">stub · not the app</span></div><div class="am"><div class="stub">Mail the reviewed build sent. It never leaves the preview.</div>
+        ${S.scn.sendTest === 'failed' ? '<p style="color:#595959">No mail yet.</p>' : `<div class="mail"><div class="mh">To sam@team.invalid · From Team Notes<br><b>Ana invited you to Team Notes</b></div><div class="mb">Ana Ruiz added you as a member.<p><button type="button" class="abtn hot-join" data-go="accept">Join Team Notes</button></p></div></div>`}</div></div>`;
+    case 'accept': return `<div class="app">${nav('')}<div class="am"><h3 class="h">Join Team Notes</h3><p style="margin:0 0 6px;color:#555">Invited by Ana Ruiz as a member.</p><label for="an-${side}">Your name</label><input id="an-${side}" value="Sam Osei"><p><button type="button" class="abtn hot-accept" data-go="notes-welcome">Join</button></p></div></div>`;
+    case 'notes-welcome': return `<div class="app">${nav('notes')}<div class="am">${notes('<div class="welcome">Welcome to Team Notes, Sam.</div>')}</div></div>`;
+  }
+  return '';
+}
+const ROUTE = { notes: '/', 'note-new': '/notes/new', 'note-saved': '/', settings: '/settings', 'settings-pending': '/settings', 'settings-error': '/settings', 'invite-form': '/settings/invite', inbox: '/__aludel/inbox', accept: '/invite/k29f…', 'notes-welcome': '/' };
+const COMMIT = { proposed: '7c1e9a42d0b3', previous: '3fa8d10e66c2' };
+
+// ---------- rendering ----------
+function stepsRail() {
+  const j = J();
+  return `<nav class="steps" aria-label="Journey steps">
+    <div class="jhead"><div class="eyebrow">${S.claim === 'c1' ? 'Claim 1 · journey' : 'Claim 2 · regression'}</div><h2>${esc(j.title)}</h2>
+      <div class="tiny muted">Revision ${j.revision} · ${j.origin}${j.id === 'invite-teammates' ? ' · 3 steps claimed' : ' · unchanged'}</div></div>
+    <ol>${j.steps.map((s, i) => { const t = testOf(S.journey, s); const k = key(S.journey, i); const ns = S.notes[k] || [];
+      const noted = ns.some(n => n.type !== 'looks-right'); const walked = S.walked[k];
+      return `<li><button type="button" class="stepbtn ${noted ? 'noted' : walked ? 'walked' : ''} ${s.claimed ? '' : 'unclaimed'}" data-step="${i}" ${i === S.step ? 'aria-current="step"' : ''}>
+        <span class="num">${noted ? icon('flag', '') .replace('class="icon ', 'style="font-size:14px" class="icon ') : walked ? icon('check').replace('class="icon ', 'style="font-size:14px" class="icon ') : i + 1}</span>
+        <span class="nm">${esc(s.name)}</span>${icon(TEST[t.status][0], 'tm t-' + t.status)}<span class="vh">${TEST[t.status][1]}</span>
+        <span class="meta">${s.change !== 'unchanged' ? `<span class="chip ${CHANGE[s.change][0]}">${CHANGE[s.change][1]}</span>` : '<span class="chip">Unchanged</span>'}${s.persona !== j.steps[0].persona ? `<span class="chip">${icon('person')}${s.persona}</span>` : ''}${ns.length ? `<span class="chip">${icon('sticky_note_2')}${ns.length}</span>` : ''}</span>
+      </button></li>`; }).join('')}</ol>
+    <p class="legend">${icon('check_circle', 't-passed')} test result on build <span class="mono">${COMMIT.proposed.slice(0, 7)}</span>. Green number: you walked it. Flag: you left a note to act on.</p>
+  </nav>`;
+}
+
+function frame(side) {
+  const s = step(); const persona = S.anon ? null : s.persona;
+  const scr = S.screen[side] ?? s.start;
+  let body;
+  if (S.scn.preview === 'building') body = `<div class="state">${icon('progress_activity')}<div><b>Building the reviewed commit</b><ol class="small"><li>Integrated onto accepted ${COMMIT.previous.slice(0, 7)} ✓</li><li>Image built ✓</li><li>Checks: 3 of 5…</li><li>Step tests</li></ol><p class="small">The step evidence on the right fills in as tests finish.</p></div></div>`;
+  else if (S.scn.preview === 'stopped') body = `<div class="state">${icon('pause_circle')}<div><b>Preview stopped after 15 minutes idle</b><p class="small">Your notes and walked steps are kept.</p><button type="button" class="btn primary" data-act="restart">Start it again</button></div></div>`;
+  else if (s.persona === 'newcomer' && S.scn.fixture === 'missing' && !S.anon) body = `<div class="state">${icon('person_off')}<div><b>Can't enter as newcomer</b><p class="small">The app's <code>.aludel/review.json</code> has no fixture for this persona, so there's no one-use link for it.</p><button type="button" class="btn" data-act="anon">Walk signed out instead</button></div></div>`;
+  else body = app(scr, side, persona);
+  const atEnd = scr === s.end && S.scn.preview === 'running';
+  return `<section class="frame" aria-label="${side === 'previous' ? 'Previous: accepted build' : 'Proposed: this run'}">
+    <div class="fhead"><span class="lbl ${side === 'previous' ? 'prev' : 'prop'}">${side === 'previous' ? 'Previous' : 'Proposed'}</span><span class="mono tiny">${COMMIT[side].slice(0, 7)}</span><span class="addr mono">${ROUTE[scr] || s.route}</span>
+      <button type="button" class="btn ghost sm" data-act="restart-step" data-side="${side}" title="Start this step again as ${persona || 'signed out'}">${icon('restart_alt')}<span class="vh">Start the step again</span></button></div>
+    <div class="fbody ${S.scn.hint ? 'hint' : ''}" data-side="${side}">${body}</div>
+    ${atEnd && side === 'proposed' ? `<div class="reached" role="status">${icon('flag_circle')}This is where step ${S.step + 1} should leave you. Does it match what's expected?</div>` : ''}
+  </section>`;
+}
+
+function preview() {
+  const s = step(); const persona = S.anon ? null : s.persona; const p = persona && PERSONAS[persona];
+  const two = S.view === 'side';
+  return `<section class="pv" aria-label="Preview">
+    <div class="pvbar">
+      <div class="seg" role="group" aria-label="Which build">
+        <button type="button" data-view="proposed" aria-pressed="${S.view === 'proposed'}">Proposed</button><button type="button" data-view="previous" aria-pressed="${S.view === 'previous'}">Previous</button><button type="button" class="side-only" data-view="side" aria-pressed="${S.view === 'side'}">Side by side</button></div>
+      <span class="persona">${icon(persona ? 'badge' : 'no_accounts')}${persona ? `as ${p.label}` : 'signed out'}</span>
+      ${p ? `<span class="tiny muted">fixture <span class="mono">${p.fixture}</span>${p.session ? ` · <span class="mono">${p.session}</span>` : ''}</span>` : ''}
+      <a class="btn ghost sm push" href="#" data-act="newtab">${icon('open_in_new')}New tab</a>
+    </div>
+    <div class="frames ${two ? 'two' : ''}">${two ? frame('previous') + frame('proposed') : frame(S.view)}</div>
+  </section>`;
+}
+
+function stepPanel() {
+  const j = J(); const s = step(); const t = testOf(S.journey, s); const k = key(S.journey, S.step); const ns = S.notes[k] || [];
+  const blockers = [];
+  if (s.claimed && t.status === 'failed') blockers.push('This claimed step failed its test, so the run can’t be accepted until a new run fixes it.');
+  if (s.claimed && t.status === 'uncovered') blockers.push('This claimed step has no test. A claim with no automated proof can’t pass; reject with a note, or the agent adds one.');
+  if (s.claimed && t.status === 'no-fixture') blockers.push('No fixture for the newcomer, so the test couldn’t run. Walking signed out is possible but doesn’t prove the claim.');
+  const shot = t.status === 'failed' ? 'settings-error' : s.end;
+  return `<section class="sp" aria-label="Step ${S.step + 1}">
+    <div><div class="eyebrow">Step ${S.step + 1} of ${j.steps.length} · ${s.claimed ? 'claimed' : 'unchanged, under the regression claim'}</div><h2 tabindex="-1" id="steph">${esc(s.name)}</h2></div>
+    <dl class="spec"><dt>As</dt><dd>${s.persona}${S.anon && s.persona === 'newcomer' ? ' (walking signed out)' : ''}</dd><dt>When</dt><dd>${esc(s.trigger)}</dd><dt>Expect</dt><dd>${esc(s.expected)}</dd>${s.change === 'new' ? '<dt>Was</dt><dd class="muted">Not in revision 1</dd>' : ''}</dl>
+    ${S.scn.source === 'pages' ? `<div class="pages-thumb">${icon('web')} Pages flow “Invite teammates” · frame ${S.step + 1}: <b>${esc(s.name)}</b><br><span class="tiny">From Pages, the authority for this journey. Opens the frame in Pages.</span></div>` : ''}
+    ${blockers.map(b => `<div class="blocker" role="note">${icon('block')}<span>${b}</span></div>`).join('')}
+    <div class="box"><h3>Automated proof</h3>
+      <div class="proof">${icon(TEST[t.status][0], 't-' + t.status)}${TEST[t.status][1]}${t.ms ? ` <span class="tiny muted">· ${(t.ms / 1000).toFixed(1)} s</span>` : ''}<span class="tiny muted push mono">${s.id}</span></div>
+      ${t.detail ? `<p class="small" style="margin:6px 0 0">${esc(t.detail)}</p>` : ''}
+      ${t.status === 'passed' || t.status === 'failed' ? `<div class="thumb"><div class="scale" inert aria-hidden="true">${app(shot, 'thumb', s.persona)}</div><button type="button" class="cap" data-act="shot">${icon('zoom_in')}Test screenshot<span class="vh"> of ${esc(s.name)}, enlarge</span></button></div>` : ''}
+    </div>
+    <div class="box"><h3>Your notes on this step</h3>
+      <div class="ntypes" role="group" aria-label="Note type">${Object.entries(NOTE).map(([id, [ic, l]]) => `<button type="button" data-note="${id}" aria-pressed="${S.noteType === id}">${icon(ic)}${l}</button>`).join('')}</div>
+      ${S.noteType && S.noteType !== 'looks-right' ? `<div style="margin-top:8px"><label class="vh" for="ntext">Note</label><textarea id="ntext" placeholder="${S.noteType === 'content' ? 'What should the words say?' : S.noteType === 'change' ? 'What should be different?' : 'What do you want to know?'}"></textarea>
+        ${S.noteType === 'change' ? `<div class="row small" style="margin-top:4px"><label for="nlayer">Follow-up in</label><select id="nlayer" class="inp"><option>Code</option><option>Pages</option><option>Design</option><option>Vision</option></select></div>` : ''}
+        <div class="row" style="margin-top:6px"><button type="button" class="btn sm primary" data-act="addnote">Add note</button><button type="button" class="btn sm ghost" data-act="cancelnote">Cancel</button></div></div>` : ''}
+      ${ns.length ? `<ul class="notes">${ns.map((n, i) => `<li>${icon(NOTE[n.type][0])}<span><b>${NOTE[n.type][1]}</b>${n.text ? ': ' + esc(n.text) : ''}${n.layer ? ` <span class="chip">${icon('playlist_add')}follow-up in ${n.layer}</span>` : ''}</span><button type="button" class="x" data-del="${i}" aria-label="Remove note">${icon('close')}</button></li>`).join('')}</ul>` : '<p class="tiny muted" style="margin:6px 0 0">“Looks right” marks the step walked. Any other note flags it for sign-off.</p>'}
+    </div>
+    <div class="spfoot"><button type="button" class="btn sm" data-act="prev" ${S.step === 0 ? 'disabled' : ''}>${icon('arrow_back')}Previous step</button>
+      ${S.step < j.steps.length - 1 ? `<button type="button" class="btn sm primary" data-act="next">Next step${icon('arrow_forward')}</button>` : `<button type="button" class="btn sm primary" data-act="nextclaim">${S.claim === 'c1' ? 'Next claim' : 'Back to the claim'}${icon('arrow_forward')}</button>`}</div>
+  </section>`;
+}
+
+function hood() {
+  return `<details class="hood" ${S.hood ? 'open' : ''}><summary>${icon('chevron_right', 'chev')}Under the hood <span class="muted small">· 6 files changed · checks 5 of 5 · diff</span></summary>
+    <div class="hoodbody"><div><h3 class="eyebrow" style="margin-bottom:6px">Changed files</h3><ul class="files">
+      ${[['src/settings.ts', 41, 3], ['src/invite.ts', 58, 0], ['server/routes/invites.mjs', 64, 0], ['server/mail.mjs', 12, 2], ['.aludel/journeys/invite-teammates.spec.mjs', 38, 6], ['.aludel/review.json', 4, 0]].map(([f, a, d]) => `<li><span class="mono">${f}</span><span class="push a">+${a}</span><span class="d">−${d}</span></li>`).join('')}</ul>
+      <h3 class="eyebrow" style="margin:10px 0 6px">Checks on ${COMMIT.proposed.slice(0, 7)}</h3><ul class="files">${['Build', 'Unit tests · 24', 'Lint', 'Separability · 1 seam declared', 'Step tests · ' + (S.scn.sendTest === 'failed' ? '2 of 3' : '3 of 3')].map((c, i) => `<li>${icon(i === 4 && S.scn.sendTest === 'failed' ? 'cancel' : 'check_circle', i === 4 && S.scn.sendTest === 'failed' ? 't-failed' : 't-passed')}${c}</li>`).join('')}</ul></div>
+      <div><h3 class="eyebrow" style="margin-bottom:6px">src/settings.ts</h3><pre class="diff" tabindex="0"><span class="h">@@ -12,7 +12,11 @@ export function settingsPage(team) {</span>   return html\`
+     &lt;h4&gt;Team&lt;/h4&gt;
+<span class="a">+    \${team.canInvite ? html\`&lt;button data-go="invite"&gt;Invite teammate&lt;/button&gt;\` : ''}</span>     &lt;table&gt;\${team.members.map(memberRow)}&lt;/table&gt;
+<span class="d">-  \`;</span><span class="a">+    \${team.pending.map(pendingRow)}</span><span class="a">+  \`;</span></pre></div></div></details>`;
+}
+
+function regression() {
+  const rows = [['note', 'Write a note', 3], ['signin', 'Sign in', 2], ['invite', 'Invite teammates · unclaimed step', 1]];
+  return `<div class="claimview"><div><div class="eyebrow">Claim 2 of 3 · invariant</div><h2>Existing journeys still work</h2>
+    <p class="muted small" style="margin:4px 0 0">Every journey test ran on this build. Nothing here was changed on purpose; walk one if you want to see it.</p></div>
+    <table class="reg"><thead><tr><th scope="col">Journey</th><th scope="col">Steps</th><th scope="col">Result</th><th scope="col"><span class="vh">Walk</span></th></tr></thead><tbody>
+    ${rows.map(([id, t, n]) => `<tr><td>${t}</td><td>${n}</td><td>${icon('check_circle', 't-passed')} ${n} of ${n} passed</td><td>${id === 'note' ? '<button type="button" class="btn sm" data-act="walk-note">Walk it</button>' : id === 'invite' ? '<button type="button" class="btn sm" data-act="walk-invite0">Walk it</button>' : '<span class="tiny muted">Same as accepted</span>'}</td></tr>`).join('')}</tbody></table>
+    <div class="verdict" role="group" aria-label="Your verdict on claim 2"><button type="button" class="btn" data-cv="c2:holds" aria-pressed="${S.claimVerdict.c2 === 'holds'}">${icon('check')}Holds</button><button type="button" class="btn" data-cv="c2:no" aria-pressed="${S.claimVerdict.c2 === 'no'}">${icon('flag')}Doesn’t hold</button></div>
+    <div class="row"><button type="button" class="btn sm" data-claim="c1">${icon('arrow_back')}Claim 1</button><button type="button" class="btn sm primary" data-claim="c3">Claim 3${icon('arrow_forward')}</button></div></div>`;
+}
+function noteClaim() {
+  return `<div class="claimview"><div><div class="eyebrow">Claim 3 of 3 · note · unbacked</div><h2>Invite emails name the team in the subject.</h2>
+    <p class="muted small" style="margin:4px 0 0">Written as free text on the item. No layer describes it and no test proves it, so it rests on your judgment.</p></div>
+    <div class="row wrap"><button type="button" class="btn" data-act="see-inbox">${icon('mail')}See it in the preview inbox</button></div>
+    <div class="verdict" role="group" aria-label="Your verdict on claim 3"><button type="button" class="btn" data-cv="c3:holds" aria-pressed="${S.claimVerdict.c3 === 'holds'}">${icon('check')}Holds</button><button type="button" class="btn" data-cv="c3:no" aria-pressed="${S.claimVerdict.c3 === 'no'}">${icon('flag')}Doesn’t hold</button></div>
+    <div class="row"><button type="button" class="btn sm" data-claim="c2">${icon('arrow_back')}Claim 2</button><button type="button" class="btn sm primary" data-claim="end">Sign off${icon('arrow_forward')}</button></div></div>`;
+}
+
+function signoff() {
+  const inv = JOURNEYS.invite.steps; const claimed = inv.map((s, i) => [s, i]).filter(([s]) => s.claimed);
+  const walked = claimed.filter(([, i]) => S.walked[key('invite', i)]).length;
+  const failing = claimed.filter(([s]) => testOf('invite', s).status !== 'passed');
+  const allNotes = Object.entries(S.notes).flatMap(([k, ns]) => ns.map(n => ({ k, ...n })));
+  const changes = allNotes.filter(n => n.type === 'change');
+  const other = allNotes.filter(n => n.type === 'content' || n.type === 'question');
+  const reasons = [];
+  if (S.scn.stale) reasons.push('The accepted head moved. Refresh against latest, then sign.');
+  failing.forEach(([s]) => reasons.push(`Step “${s.name}”: ${TEST[testOf('invite', s).status][1].toLowerCase()}.`));
+  if (S.scn.preview !== 'running' && S.scn.preview !== 'stopped') reasons.push('The build is still running its checks.');
+  return `<div class="claimview"><div><div class="eyebrow">Sign off</div><h2>Run 1 of W-9 · Implement: Invite teammates</h2></div>
+    <table class="reg"><thead><tr><th scope="col">Claim</th><th scope="col">Automated proof</th><th scope="col">Your review</th></tr></thead><tbody>
+      <tr><td>1 · Invite teammates, 3 steps</td><td>${failing.length ? `${icon('cancel', 't-failed')} ${3 - failing.length} of 3 passed` : `${icon('check_circle', 't-passed')} 3 of 3 passed`}</td><td>${walked} of 3 steps walked${allNotes.length ? ` · ${allNotes.length} note${allNotes.length > 1 ? 's' : ''}` : ''}</td></tr>
+      <tr><td>2 · Existing journeys still work</td><td>${icon('check_circle', 't-passed')} 6 of 6 passed</td><td>${S.claimVerdict.c2 === 'holds' ? 'Holds' : S.claimVerdict.c2 === 'no' ? 'Doesn’t hold' : '<span class="muted">Not looked at</span>'}</td></tr>
+      <tr><td>3 · Invite emails name the team</td><td><span class="muted">None (unbacked)</span></td><td>${S.claimVerdict.c3 === 'holds' ? 'Holds' : S.claimVerdict.c3 === 'no' ? 'Doesn’t hold' : '<span class="muted">No verdict</span>'}</td></tr>
+    </tbody></table>
+    ${changes.length ? `<div><h3 class="eyebrow" style="margin-bottom:6px">Change notes become follow-up work</h3><ul class="fu">${changes.map((n, i) => `<li>${icon('playlist_add')}<span>${esc(n.text || '(no text)')}</span><span class="chip">${n.layer}</span><span class="tiny muted push">from step ${esc(n.k.split(':')[1])}</span><label class="row small"><input type="checkbox" checked data-fu="${i}">Create</label></li>`).join('')}</ul>
+      <p class="tiny muted" style="margin:6px 0 0">Created when you sign, in each layer's backlog, linked to this run. Accepting doesn't wait for them.</p></div>` : ''}
+    ${other.length ? `<p class="small" style="margin:0">${icon('sticky_note_2')} ${other.length} content or question note${other.length > 1 ? 's' : ''} go to the performer with your signature.</p>` : ''}
+    ${reasons.map(r => `<div class="blocker">${icon('block')}<span>${esc(r)}</span></div>`).join('')}
+    ${!reasons.length && walked < 3 ? `<div class="caution">${icon('info')}<span>You walked ${walked} of 3 claimed steps. Their tests passed; you can still accept.</span></div>` : ''}
+    ${S.accepted ? `<div class="caution" style="background:var(--ok-bg);color:var(--ok)">${icon('verified')}<span>${S.accepted === 'accept' ? `Accepted. Commit ${COMMIT.proposed.slice(0, 7)} merges as reviewed${changes.length ? `, and ${changes.length} follow-up${changes.length > 1 ? 's were' : ' was'} created` : ''}.` : 'Rejected with your notes. The agent gets them for its next run.'} (Prototype: nothing was sent.)</span></div>` : ''}
+    <div class="signbar"><button type="button" class="btn sm" data-claim="c3">${icon('arrow_back')}Claim 3</button><span class="push"></span>
+      <button type="button" class="btn danger" data-act="reject">${icon('flag')}Reject</button><button type="button" class="btn primary" data-act="accept" ${reasons.length ? 'disabled aria-describedby="why"' : ''}>${icon('check')}Accept</button></div>
+    ${reasons.length ? '<p id="why" class="tiny muted" style="margin:0;text-align:right">Accept unlocks when the red items above are resolved.</p>' : ''}</div>`;
+}
+
+function render() {
+  const claims = [['c1', 'Invite teammates', '3 steps'], ['c2', 'Existing journeys', ''], ['c3', 'Note', ''], ['end', 'Sign off', '']];
+  const done = { c1: JOURNEYS.invite.steps.every((s, i) => !s.claimed || S.walked[key('invite', i)]), c2: !!S.claimVerdict.c2, c3: !!S.claimVerdict.c3 };
+  const walkView = S.claim === 'c1' || (S.claim === 'c2' && S.walkingReg);
+  $('#main').innerHTML = `<div class="wr">
+    <header class="wr-top"><a class="btn ghost sm" href="#" aria-label="Close review">${icon('close')}</a><h1>Review W-9 · Run 1</h1>
+      <span class="who"><span class="av">${icon('smart_toy').replace('class="icon ', 'style="font-size:14px" class="icon ')}</span>Builder agent</span><span class="muted small">Implement: Invite teammates</span>
+      <nav class="claims" aria-label="Claims">${claims.map(([id, l, sub], i) => `<button type="button" data-claim="${id}" ${S.claim === id ? 'aria-current="true"' : ''} class="${done[id] ? 'done' : ''}">${id === 'end' ? icon('draw') : `<span class="n">${done[id] ? '✓' : i + 1}</span>`}${l}${sub ? ` <span class="muted">· ${sub}</span>` : ''}</button>`).join('')}</nav></header>
+    ${S.scn.stale ? `<div class="banner warn" role="status">${icon('history')}The accepted head moved 2 commits since this build. Your notes stay.<button type="button" class="btn sm push" data-act="refresh">Refresh against latest</button></div>`
+      : `<div class="banner">${icon('difference')}Reviewing <span class="mono">${COMMIT.proposed.slice(0, 7)}</span> against accepted <span class="mono">${COMMIT.previous.slice(0, 7)}</span>. Raised by W-8 (Specify), which made this journey revision 2.</div>`}
+    ${walkView ? `<div class="walk">${stepsRail()}${preview()}${stepPanel()}</div>${hood()}` : S.claim === 'c2' ? regression() : S.claim === 'c3' ? noteClaim() : signoff()}
+  </div>`;
+  renderScenarios();
+}
+
+// ---------- scenarios and review questions (prototype only) ----------
+const QUESTIONS = [
+  ['Q1', 'Walk view: steps on the left, the live preview in the middle, the step’s spec, test proof and your notes on the right. Is that the right reading order, and is the preview big enough?'],
+  ['Q2', 'Claims along the top (journey, regression, note, sign-off) replace the old one-claim-at-a-time panel. Clear enough, or should every step be its own pip?'],
+  ['Q3', 'Notes: “Looks right” marks a step walked; Content, Change and Question flag it. A Change note becomes follow-up work in a layer you pick at sign-off. Right?'],
+  ['Q4', 'Previous/Proposed: a toggle plus side by side on wide screens, each frame walked on its own. Would you rather the two stay in step (click once, both move)?'],
+  ['Q5', 'The rail follows the preview: reaching a step’s end screen marks it reached and offers the next step (Scenarios › “Rail follows the preview”). Helpful, or should walking stay fully manual?'],
+  ['Q6', 'Blocked states (failed test, no test, no fixture, stale head, still building): is each one clear about why Accept is locked and what happens next?'],
+  ['Q7', 'Under the hood is collapsed below the walk: files, checks, diff. Is that enough reach to the code, or is it in the way?'],
+];
+function renderScenarios() {
+  const sc = S.scn; const r = (name, val, label) => `<label><input type="radio" name="${name}" value="${val}" ${sc[name] === val ? 'checked' : ''}>${label}</label>`;
+  $('#scenarios').innerHTML = `<div class="row"><h2>Scenarios</h2><button type="button" class="btn ghost sm push" data-act="close-drawer">${icon('close')}Close</button></div>
+    <p class="small muted">Prototype controls for the exceptional states. The real review has none of these.</p>
+    <fieldset><legend>“Invite sent” test</legend>${r('sendTest', 'passed', 'Passed')}${r('sendTest', 'failed', 'Failed (the invite never shows as Pending)')}</fieldset>
+    <fieldset><legend>“Invite form opens” test</legend>${r('inviteTest', 'passed', 'Written and passing')}${r('inviteTest', 'uncovered', 'Missing: the run wrote none')}</fieldset>
+    <fieldset><legend>Newcomer fixture</legend>${r('fixture', 'present', 'In review.json')}${r('fixture', 'missing', 'Missing')}</fieldset>
+    <fieldset><legend>Preview</legend>${r('preview', 'running', 'Running')}${r('preview', 'building', 'Still building')}${r('preview', 'stopped', 'Stopped after idle')}</fieldset>
+    <fieldset><legend>Journey authority</legend>${r('source', 'code', 'Code only')}${r('source', 'pages', 'Pages flow (replica in Code)')}</fieldset>
+    <fieldset><legend>Other</legend><label><input type="checkbox" name="stale" ${sc.stale ? 'checked' : ''}>Accepted head moved since this build</label>
+      <label><input type="checkbox" name="follow" ${sc.follow ? 'checked' : ''}>Rail follows the preview (Q5)</label><label><input type="checkbox" name="hint" ${sc.hint ? 'checked' : ''}>Outline what each step clicks</label></fieldset>
+    <button type="button" class="btn" data-act="reset">${icon('restart_alt')}Reset the walk (keeps your review answers)</button>`;
+}
+function renderQuestions() {
+  const a = store.get('answers', {});
+  $('#questions').innerHTML = `<div class="row"><h2>Review questions</h2><button type="button" class="btn ghost sm push" data-act="close-drawer">${icon('close')}Close</button></div>
+    <p class="small muted">Answer in your own words; they stay in this browser. Copy them into the thread when you're done.</p>
+    ${QUESTIONS.map(([id, q]) => `<div class="q"><p><b>${id}.</b> ${q}</p><label class="vh" for="a-${id}">Answer to ${id}</label><textarea id="a-${id}" data-ans="${id}">${esc(a[id] || '')}</textarea></div>`).join('')}
+    <button type="button" class="btn primary" data-act="copy">${icon('content_copy')}Copy answers</button>`;
+}
+
+// ---------- behaviour ----------
+function selectStep(i, opts = {}) {
+  S.step = i; S.noteType = null; S.anon = false; S.screen = {};
+  render(); if (opts.focus !== false) $('#steph')?.focus();
+}
+function navigate(side, to) {
+  const s = step(); S.screen[side] = to;
+  if (side === 'proposed' && to === s.end) {
+    if (S.scn.follow && S.step < J().steps.length - 1 && J().steps[S.step + 1].start === to && J().steps[S.step + 1].persona === s.persona) {
+      render(); toast(`Reached the end of step ${S.step + 1}. Leave a note, or go on to step ${S.step + 2}.`); return;
+    }
+  }
+  render();
+}
+document.addEventListener('click', e => {
+  const t = e.target.closest('button,a'); if (!t) return;
+  const d = t.dataset;
+  if (t.tagName === 'A' && t.getAttribute('href') === '#') e.preventDefault();
+  if (d.go) { const side = t.closest('.fbody')?.dataset.side; if (side) navigate(side, d.go); return; }
+  if (d.step) return selectStep(+d.step);
+  if (d.view) { S.view = d.view; return render(); }
+  if (d.claim) { S.claim = d.claim; S.walkingReg = false; if (d.claim === 'c1') { S.journey = 'invite'; S.screen = {}; } return render(); }
+  if (d.note) { S.noteType = S.noteType === d.note ? null : d.note;
+    if (d.note === 'looks-right') { const k = key(S.journey, S.step); (S.notes[k] ||= []).push({ type: 'looks-right' }); S.walked[k] = true; S.noteType = null; toast('Marked walked: looks right'); }
+    render(); if (S.noteType) $('#ntext')?.focus(); return; }
+  if (d.del !== undefined) { const k = key(S.journey, S.step); S.notes[k].splice(+d.del, 1); if (!S.notes[k].some(n => n.type === 'looks-right')) delete S.walked[k]; return render(); }
+  if (d.cv) { const [c, v] = d.cv.split(':'); S.claimVerdict[c] = v; return render(); }
+  switch (d.act) {
+    case 'addnote': { const k = key(S.journey, S.step); const text = $('#ntext').value.trim(); if (!text) { $('#ntext').focus(); toast('Write the note first'); return; }
+      (S.notes[k] ||= []).push({ type: S.noteType, text, layer: S.noteType === 'change' ? $('#nlayer').value : null }); S.walked[k] = true; S.noteType = null; return render(); }
+    case 'cancelnote': S.noteType = null; return render();
+    case 'next': return selectStep(S.step + 1);
+    case 'prev': return selectStep(S.step - 1);
+    case 'nextclaim': S.claim = S.claim === 'c1' ? 'c2' : 'c2'; S.walkingReg = false; S.journey = 'invite'; S.step = 0; S.screen = {}; return render();
+    case 'restart-step': delete S.screen[d.side]; render(); return toast(`New one-use link: entered as ${S.anon ? 'signed out' : step().persona} at the step's start`);
+    case 'restart': S.scn.preview = 'running'; return render();
+    case 'anon': S.anon = true; return render();
+    case 'shot': return openShot();
+    case 'newtab': return toast('Opens the same one-use link in a new tab');
+    case 'walk-note': S.walkingReg = true; S.journey = 'note'; S.step = 0; S.screen = {}; return render();
+    case 'walk-invite0': S.walkingReg = true; S.journey = 'invite'; S.step = 0; S.screen = {}; return render();
+    case 'see-inbox': S.claim = 'c1'; S.journey = 'invite'; S.step = 3; S.screen = {}; render(); return toast('Step 4 starts in the preview inbox');
+    case 'refresh': S.scn.stale = false; render(); return toast('Rebuilt against the latest accepted head; tests passed again');
+    case 'accept': S.accepted = 'accept'; return render();
+    case 'reject': S.accepted = 'reject'; return render();
+    case 'scenarios': $('#questions').classList.remove('open'); $('#scenarios').classList.add('open'); return $('#scenarios input')?.focus();
+    case 'questions': renderQuestions(); $('#scenarios').classList.remove('open'); $('#questions').classList.add('open'); return $('#questions textarea')?.focus();
+    case 'close-drawer': return document.querySelectorAll('.drawer').forEach(x => x.classList.remove('open'));
+    case 'reset': Object.assign(S, { claim: 'c1', journey: 'invite', step: 1, view: 'proposed', screen: {}, walked: {}, notes: {}, noteType: null, anon: false, claimVerdict: {}, accepted: null, walkingReg: false }); render(); return toast('Walk reset; your review answers are kept');
+    case 'copy': { const a = store.get('answers', {}); const txt = QUESTIONS.map(([id]) => `${id}: ${a[id] || ''}`).join('\n'); navigator.clipboard?.writeText(txt).then(() => toast('Copied'), () => toast('Copy failed; select the text instead')); return; }
+    case 'close-lb': $('#lightbox').classList.remove('open'); return document.querySelector('[data-act="shot"]')?.focus();
+  }
+});
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.closest('#scenarios')) { S.scn[t.name] = t.type === 'checkbox' ? t.checked : t.value; S.accepted = null; render(); }
+});
+document.addEventListener('input', e => { if (e.target.dataset.ans) { const a = store.get('answers', {}); a[e.target.dataset.ans] = e.target.value; store.set('answers', a); } });
+document.addEventListener('toggle', e => { if (e.target.classList?.contains('hood')) S.hood = e.target.open; }, true);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { $('#lightbox').classList.remove('open'); document.querySelectorAll('.drawer').forEach(x => x.classList.remove('open')); } });
+function openShot() {
+  const s = step(); const t = testOf(S.journey, s);
+  $('#lightbox').innerHTML = `<div class="lb"><div class="lbh"><b>${esc(s.name)}</b><span class="tiny muted">test screenshot · ${TEST[t.status][1].toLowerCase()} · ${COMMIT.proposed.slice(0, 7)}</span><button type="button" class="btn ghost sm push" data-act="close-lb">${icon('close')}Close</button></div><div class="lbb" inert>${app(t.status === 'failed' ? 'settings-error' : s.end, 'lightbox', s.persona)}</div></div>`;
+  $('#lightbox').classList.add('open'); $('#lightbox [data-act="close-lb"]').focus();
+}
+render();
+</script>
+</body>
+</html>

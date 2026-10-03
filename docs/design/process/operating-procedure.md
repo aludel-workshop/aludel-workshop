@@ -2,7 +2,7 @@
 id: process-operation-001
 revision: 5
 status: trial
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # From request to the next justified action
@@ -102,7 +102,7 @@ These principles apply to other work too: substitute its relevant contracts, evi
 
 ## 6. Preserve acceptance and hand off
 
-For an executable demo, verify the exact owner-facing review URL from clean fixture state before handoff. Smoke-check every advertised top-level route before running deeper assertions, so a stopped server or route-parser failure is distinguished from an interaction failure. Walk the primary task using visible controls, without query editing, injected storage, or direct-route shortcuts. Use visible scenario controls for exceptional states. Verify reset preserves actual reviewer notes. Declare excluded transitions. When copying a prototype, mark inherited evidence and replace its output paths before checks. Update status at partial handoffs too. D-01E's [review-harness retrospective](../portal-visual/v1/review-harness-retrospective.md) records the owner-entry failure; D-04's [work record](../project-workspace/v5/work-record.md) records the route smoke-check application.
+For an executable demo, verify the exact owner-facing review URL from clean fixture state before handoff. Confirm web fonts and icon fonts actually loaded before trusting screenshots or accessibility results: in a proxied cloud session a missing icon font rendered icon names as text and produced a false contrast failure ([J6 prototype round](../journeys/work-record.md#j6-walk-review-prototype-round-2026-10-03-claude-cloud-session)). Smoke-check every advertised top-level route before running deeper assertions, so a stopped server or route-parser failure is distinguished from an interaction failure. Walk the primary task using visible controls, without query editing, injected storage, or direct-route shortcuts. Use visible scenario controls for exceptional states. Verify reset preserves actual reviewer notes. Declare excluded transitions. When copying a prototype, mark inherited evidence and replace its output paths before checks. Update status at partial handoffs too. D-01E's [review-harness retrospective](../portal-visual/v1/review-harness-retrospective.md) records the owner-entry failure; D-04's [work record](../project-workspace/v5/work-record.md) records the route smoke-check application.
 
 For repository review or preview-runtime changes, supplement module fixtures with a generic Work journey through the real project store, integration, app setup and acceptance. Verify separate submission, integration and build identities, current-head refusal, and session isolation across two candidates. Use [the disposable portal helper](../../../apps/portal/tests/portal-support.mjs) for bounded health waiting, startup logs and child-process teardown; distinguish a startup failure from a failed interaction. At narrow widths, inspect screenshots and the bounds of advertised controls as well as document overflow: clipped controls can pass an overflow assertion. First application: [repository-review evidence](../../evidence/repository-review/README.md). The Biome correction also applies this helper to the editor-bridge test after its fixed startup wait failed under the template suite; the focused rerun passed with bounded health waiting and captured startup evidence.
 

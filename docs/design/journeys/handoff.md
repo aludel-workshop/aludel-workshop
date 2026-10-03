@@ -5,9 +5,13 @@ status: active
 updated: 2026-10-03
 ---
 
-# JOURNEYS-01 handoff: J5 done; J6 (owner prototype round) next
+# JOURNEYS-01 handoff: J6 prototype v1 with the owner
 
 For a fresh agent (Claude in the cloud) picking up JOURNEYS-01. Run `tools/branch-handoffs.sh` first: this packet's slices have been landing on cloud-session branches that the owner hasn't merged into `main`, so the newest handoff may be on a branch. Then read this, [AGENTS.md](../../../AGENTS.md), [status](../../status.md), the [JOURNEYS-01 work record](work-record.md) (plan, authorizations, run log, retrospectives), [DEC-063](../../decisions.md) and the [deferred code-tracing record](../code-tracing/deferred.md).
+
+## Update 2026-10-03: J6 prototype v1
+
+[Prototype v1](j6/v1/index.html) is on branch `claude/j6-prototype-ptl3we` (from `main` at `ab37a3c`). The owner reviews it against Q1–Q7 in the [J6 section](work-record.md#j6-walk-review-prototype-round-2026-10-03-claude-cloud-session). Next: record their answers per question, then either a v2 round or, once they accept, the J6 build in `work-review.ts` (journey claims get the walk as their review body; record and note claims keep the claim panel). Re-run `j6/v1/walkthrough.mjs` (it needs `PLAYWRIGHT_MODULE` and `AXE_PATH`; it fetches fonts through `curl` because Chromium reaches Google Fonts unreliably through the session proxy).
 
 ## Update 2026-10-03: J5 done
 

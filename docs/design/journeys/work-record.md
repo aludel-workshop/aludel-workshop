@@ -30,6 +30,7 @@ depends_on: [T03-CODE, LAT-08A, LAYER-BINDINGS-01, EXISTING-PROJECTS-01, DEC-050
 - **2026-10-03, owner chat (J5, new cloud session):** "pick up j5 please". The J4 handoff said J5 needs the owner's go; this is it. Authorized: J5 in the same local scope as J4: host code, tests, template commits and pins if needed, local checks, and commits plus a push to this session's designated branch (`claude/compassionate-hamilton-wz7nwz`, fast-forwarded to J4's `claude/nice-cray-zn7gfg` at `55b52a0`, which isn't on `main` yet). Not authorized: pushes to `main` or `layer-base`, deployment, spending, live owner data, owner-impersonating actions, and restarting the owner's portal. Recorded before execution.
 - **2026-10-03, owner chat (J5 environment):** "youre good to go for layer-base and docker." Authorized: adding `aludel-workshop/layer-base` to this session (read; cloned to `./layer-base`) and starting `dockerd`, to run J5's template-mode checks, Docker review checks and browser journey. Same scope otherwise; no push to `layer-base`.
 - **2026-10-03, owner chat (merge):** "merge all three". Authorized: fast-forward `aludel-workshop` `main` to this branch's head, which carries J3 (`claude/brave-pascal-br7h4i`), J4 (`claude/nice-cray-zn7gfg`) and J5. Nothing else: no `layer-base` push, no deployment.
+- **2026-10-03, owner project thread (J6 prototype, cloud session):** "lets keep this the j task oriented. grab j6 and build me that prototype". Authorized: J6's prototype round only: a J6 section in this record (brief, readiness verdict, review questions), a static clickable prototype under `docs/design/journeys/j6/v1/` with illustrative data, its walkthrough script and screenshots, and a commit plus push to this session's branch (`claude/j6-prototype-ptl3we`, started from `main` at `ab37a3c`, which carries J3–J5) with a draft PR. Not authorized: building the walk review in the portal (that waits for the owner to accept the prototype), template pins, pushes to `main` or `layer-base`, deployment, spending and live owner data. Recorded before execution.
 
 ## Owner direction (2026-10-02 chat)
 
@@ -173,7 +174,7 @@ J1 can start before T03-CODE closes. J2 onward changes the Code template that T0
 
 ## Readiness
 
-J0–J4 are done (below; J3's Biome evidence moves to J8). J4's gate sits at acceptance, not at the agent's submit call (see the J4 run log). J5 is built and server-tested; its browser journey is open (see the J5 run log). J6–J8 depend on each other as listed. J6 needs a prototype round before building. No external effect, spending or live-data change is planned before J8, and in J8 the owner performs the live actions.
+J0–J4 are done (below; J3's Biome evidence moves to J8). J4's gate sits at acceptance, not at the agent's submit call (see the J4 run log). J5 is done (see the J5 run log). J6's prototype round v1 is with the owner; its build waits for their answers. J6–J8 depend on each other as listed. No external effect, spending or live-data change is planned before J8, and in J8 the owner performs the live actions.
 
 ## Run log
 
@@ -645,3 +646,60 @@ Authorization: see the 2026-10-03 "J5" entry above.
 - *Observed:* once `layer-base` and Docker were approved, the handoff's environment commands rebuilt everything (clone, runner image, uid-1000 run) without reconstruction. That is the J4 process change, now applied twice.
 - *Observed:* the browser journey found four UI defects the server tests couldn't see: one accessibility issue, two pieces of misleading copy, and a wrong source label. Server-level chain tests weren't a substitute for the browser journey; the exit evidence was right to ask for it.
 - *New question:* the `browser` script's stale-decision step is intermittent (3 of 4 runs failed here, on both J4 and J5 code). It is the last red check in the full set. It needs its own look (the 409 race between the external answer and the page's save), recorded in the handoff.
+
+### J6 walk review: prototype round (2026-10-03, Claude, cloud session)
+
+Authorization: see the 2026-10-03 "J6 prototype" entry above. This round builds nothing in the portal; the build waits for the owner's answers.
+
+**Process first.**
+- *What the task revealed.* Two process gaps showed up before any design work. (1) The session's starting memory said J3–J5 were unmerged; `main` and `tools/branch-handoffs.sh` said they were merged. The repository was right, so J6 starts from `main` (`ab37a3c`), not from J5's branch. (2) The UX pass method asks for reference screens, but this session's network policy refused the reference hosts (the proxy returned 403 for `playwright.dev`), so `tools/capture-refs.mjs` couldn't run. The references below are named from prior knowledge and **not captured**; their reading of each product is unverified here.
+- *Change applied now.* Prototype screenshots in a cloud session failed in a way that looked like a design defect: Chromium reached Google Fonts through the proxy only some of the time, icons rendered as their names, and axe then reported a colour-contrast failure on the active nav tile (the ligature text spilled onto the pale background). The walkthrough now fetches fonts with proxy-aware `curl` through a Playwright route and refuses to continue unless the icon font loaded. **Tested:** with the route, three consecutive runs gave 22 clean screenshots and no axe findings, and the contrast "failure" disappeared without any CSS change. The operating procedure's §6 now says to confirm fonts loaded before trusting screenshots or axe.
+- *Purpose test* (procedure §2) on the review's new parts: the **steps rail** is derived (from the journey record and the build's step results); the **step panel** is derived (spec from the journey, proof from the step test) plus the reviewer's notes, anchored to the run's review; **Previous/Proposed** is derived (the two builds); **change notes** are produced by the reviewer and consumed by sign-off, which turns them into follow-up items in a chosen layer; **Under the hood** is derived (the diff and checks the review already has). No new stored container except per-step notes, which replace the per-change flags for journey claims.
+
+**Owner brief ledger.** The brief is the plan's J6 row ("steps rail, persona preview, spec and test evidence, Previous/Proposed, FlowNote notes, collapsed Under the hood") plus "build me that prototype".
+
+| # | Ask | Where in v1 | Borrowed or invented |
+|---|---|---|---|
+| W1 | Steps rail, changed steps marked | Left column: number, name, New/Changed/Unchanged, persona when it differs, the step test's mark, walked or flagged | Borrowed: Playwright trace viewer's action list beside the snapshot (not captured) |
+| W2 | Persona preview | Middle: the running build in a frame, entered as the step's persona through a one-use link; fixture and session shown; *Start the step again* mints a new link | Borrowed: the built review's preview (J3); the frame chrome is invented |
+| W3 | Spec and test evidence | Right: As / When / Expect / Was, then *Automated proof* with the result, duration, step ID and the test's screenshot (enlargeable) | Invented arrangement; content is the J1 journey step and J3 step result |
+| W4 | Previous/Proposed | A toggle, plus *Side by side* on wide screens. Each frame is walked independently; a new step's route on Previous shows the accepted build's 404 | Borrowed: Chromatic's baseline-versus-new comparison (not captured) |
+| W5 | FlowNote notes | *Looks right*, *Content*, *Change*, *Question*, per step. Looks right marks the step walked; the others flag it. A Change note names a layer and becomes a follow-up item at sign-off | Types borrowed from Pages' `FlowNote`; the follow-up mechanism is the existing run follow-ups |
+| W6 | Under the hood, collapsed | A disclosure below the walk: changed files, checks on the reviewed commit, the diff | Borrowed: GitHub's collapsed file list |
+| W7 | Claims as the review's spine (J4) | Claims along the top: the journey claim, the unchanged-journeys invariant (a regression table, each journey walkable), the unbacked note claim, sign-off | Invented: replaces the one-claim-at-a-time panel for journey claims |
+
+**Readiness verdict (procedure §5), before construction: ready for a prototype.**
+1. *Questions:* Q1–Q7 below. Fidelity: static clickable HTML with illustrative data (Team Notes, Implement W-9 raised by Specify W-8). The mock app inside the frame is walkable with real buttons, because the question is whether walking is the review.
+2. *Included:* a reviewer reviewing an agent's Implement run with three claim kinds. *Excluded:* person runs and *Check my branch* (J7); the Specify review (its proof is the record claim J5 built); the agent's view; Pages-authority binding (shown only as the spec thumbnail scenario).
+3. *Parent structure:* the built review (WORK-ITEM-UX-01 WI-4, accepted earlier) and J4's acceptance gate stay. v1 changes only what the review body shows for journey and invariant claims.
+4. *States:* passed, failed, no test, no fixture (with a signed-out fallback that doesn't prove the claim), preview building, preview stopped after idle, accepted head moved, Pages as authority, accept and reject outcomes. Zero/one/many: one claimed journey with four steps, three unchanged journeys in the regression table.
+5. *Review frame:* the owner opens the page, walks claim 1 with visible controls, signs off, then uses *Scenarios* for the exceptional states and answers *Review questions* (kept in the browser; *Copy answers*).
+6. *Named experimental variables:* the claims bar (Q2), note semantics (Q3), Previous/Proposed independence (Q4), the rail following the preview (Q5). Not settled by this prototype: visual polish beyond the portal's tokens, and the narrow layout's step strip.
+
+**Prototype v1:** [j6/v1/index.html](j6/v1/index.html) (open the file in a browser). Walkthrough: [j6/v1/walkthrough.mjs](j6/v1/walkthrough.mjs). Screenshots: [j6/v1/shots/](j6/v1/shots/).
+
+**Review questions.**
+- **Q1** Walk view: steps left, live preview middle, spec, proof and notes right. Right reading order? Is the preview big enough?
+- **Q2** Claims along the top replace the one-claim panel. Clear enough, or should every step be its own pip?
+- **Q3** *Looks right* marks a step walked; Content, Change and Question flag it; a Change note becomes follow-up work in a chosen layer at sign-off. Right?
+- **Q4** Previous/Proposed: a toggle plus side by side, each frame walked separately. Or should the two stay in step?
+- **Q5** The rail follows the preview: reaching a step's end screen says so and offers the next step. Helpful, or keep walking manual?
+- **Q6** Blocked states (failed, no test, no fixture, stale head, building): is it clear why Accept is locked and what happens next?
+- **Q7** Under the hood collapsed below the walk: enough reach to the code?
+
+**Checks (agent-checked, not owner-accepted).** `walkthrough.mjs` walks claim 1 through the rail, the app's own buttons and the note buttons; adds a Change note; signs off and accepts; then drives every exceptional state through the visible *Scenarios* panel; confirms *Reset* keeps the review answers; and repeats at 390 px. axe ran at 1440 px (walk, regression, sign-off, failed step, questions) and 390 px (walk, sign-off).
+
+| Run | Result |
+|---|---|
+| First run | 5 axe rule groups, 361 px horizontal scroll at 390 |
+| Fixes | The mock app had its own `header`/`main` landmarks and `h4` headings inside the review (now plain blocks and `h3`); unclaimed steps used `opacity` (contrast; now a dashed number); visually hidden labels escaped the horizontal step strip (no positioned ancestor); a test thumbnail nested the app's buttons inside a button, which the parser split apart (now an inert thumbnail and a separate enlarge button) |
+| Final | **No errors, 22 screenshots, no axe findings, no horizontal scroll or clipped buttons at 390** |
+
+**Retrospective (prototype round).**
+1. *Harder than necessary:* stale starting memory about the branch stack; reference capture blocked by the network policy; fonts loading unreliably through the proxy, which produced a false axe failure.
+2. *Would help next time:* the font route is now in this walkthrough and the rule in the procedure; reusing the walkthrough's `load()` and font route in the next prototype saves the diagnosis.
+3. *What it revealed:* journey claims want a different review body from record claims. The claim-by-claim panel stays for record and note claims; the walk is the body for journey claims. The J6 build therefore touches `work-review.ts`'s layout, not just its Preview tab.
+4. *Questions created:* Q1–Q7 for the owner. Also: does a "walked" step need to be recorded with the signature (an audit of what the reviewer actually looked at), or is it only a reviewer aid? v1 shows it at sign-off but doesn't make it a requirement.
+5. *Process change:* applied and tested as above (font route, procedure line). Hypothesis: that reference screens captured from a session with web access would change W1, W4 or W6; they weren't captured.
+
+**Status:** prototype round open, waiting on the owner's answers. J6's build is not authorized yet.
