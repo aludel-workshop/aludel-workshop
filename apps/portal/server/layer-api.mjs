@@ -361,7 +361,7 @@ export function stageOperation({ db, catalogs, api, projectId, attemptId, operat
   const overlay = draftOverlay(db, projectId, attemptId);
   const called = callOperation({ db, catalogs, api, projectId, operationId, id, body, overlay });
   if (called.result !== undefined) return { operationId, result: called.result };
-  const seq = (db.prepare('SELECT MAX(seq) AS seq FROM layer_run_drafts WHERE attempt_id = ?').get(attemptId)?.seq ?? 0) + 1;
+  const seq = (db.prepare('SELECT MAX(seq) AS seq FROM layer_run_drafts WHERE attempt_id = ? AND project_id = ?').get(attemptId, projectId)?.seq ?? 0) + 1;
   if (seq > 200) fail('This run has staged the most changes one review can hold.');
   db.prepare('INSERT INTO layer_run_drafts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(attemptId, seq, projectId, api.key, operationId,
     JSON.stringify({ id, body }), JSON.stringify(called.writes), JSON.stringify(called.references), now());

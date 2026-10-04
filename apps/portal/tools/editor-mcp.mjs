@@ -1,4 +1,5 @@
-// A small stdio MCP adapter. It only calls Aludel's read-only editor API.
+// A small stdio MCP adapter for Aludel's editor API. It reads project context, and (AGENT-WORK-01) lets your local agent work a
+// goal item you have claimed: define it, add and move actions, talk in its thread, and stage changes through each layer's API.
 import { readFileSync, mkdirSync, writeFileSync, chmodSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
@@ -12,8 +13,41 @@ const names = {
   read_record: { description: 'Read a live or pinned project knowledge record.', schema: { type: 'object', properties: { recordId: { type: 'string' }, revision: { type: 'integer', minimum: 1 } }, required: ['recordId'] },
     path: a => '/records/' + encodeURIComponent(a.recordId) + (a.revision ? '?revision=' + encodeURIComponent(a.revision) : '') },
   search_knowledge: { description: 'Search this project’s live knowledge by text.', schema: { type: 'object', properties: { query: { type: 'string', minLength: 2 } }, required: ['query'] }, path: a => '/search?q=' + encodeURIComponent(a.query) },
-  environment_status: { description: 'Inspect the project preview and source commit.', schema: { type: 'object', properties: {} }, path: () => '/environment' }
+  environment_status: { description: 'Inspect the project preview and source commit.', schema: { type: 'object', properties: {} }, path: () => '/environment' },
+  work_list: { description: 'List the goal work items you have claimed, with their board column, action counts and open needs.', schema: { type: 'object', properties: {} }, path: () => '/goals' },
+  work_view: { description: 'Read a goal item: its brief, phases, actions (with what blocks each), open needs, recent thread and staged changeset.',
+    schema: { type: 'object', properties: { workId: { type: 'string' } }, required: ['workId'] }, path: a => goal(a) },
+  stack_map: { description: 'List the project\u2019s layers: what each owns, its charter and the operations its API offers.', schema: { type: 'object', properties: {} }, path: () => '/stack' },
+  read_layer: { description: 'Call a read operation of a layer\u2019s API. Reads include the item\u2019s own staged changes.',
+    schema: { type: 'object', properties: { workId: { type: 'string' }, layer: { type: 'string' }, operationId: { type: 'string' }, id: { type: 'string' } }, required: ['workId', 'layer', 'operationId'] },
+    path: a => goal(a, '/read?' + new URLSearchParams({ layer: a.layer, operationId: a.operationId, ...(a.id ? { id: a.id } : {}) })) },
+  define_work: { description: 'Define a Draft or Ready item: its brief, phases (a gated phase holds later phases until its actions are reviewed) and actions, each naming a layer.',
+    schema: { type: 'object', properties: { workId: { type: 'string' }, brief: { type: 'string' },
+      phases: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, gated: { type: 'boolean' } }, required: ['title'] } },
+      actions: { type: 'array', items: { type: 'object', properties: { phase: { type: 'integer', minimum: 1 }, layer: { type: 'string' }, goal: { type: 'string' }, after: { type: 'array', items: { type: 'integer' } } }, required: ['goal'] } } },
+      required: ['workId', 'brief', 'actions'] }, post: a => [goal(a, '/define'), { brief: a.brief, phases: a.phases, actions: a.actions }] },
+  add_action: { description: 'Add an action. Once work has started, a new action waits for your person\u2019s approval; say why.',
+    schema: { type: 'object', properties: { workId: { type: 'string' }, goal: { type: 'string' }, layer: { type: 'string' }, phase: { type: 'integer', minimum: 1 }, after: { type: 'array', items: { type: 'integer' } }, reason: { type: 'string' } }, required: ['workId', 'goal'] },
+    post: a => [goal(a, '/actions'), pick(a, ['goal', 'layer', 'phase', 'after', 'reason'])] },
+  update_action: { description: 'Move an action (todo, working, review) or change its goal, summary, layer or order. Only people mark actions done.',
+    schema: { type: 'object', properties: { workId: { type: 'string' }, number: { type: 'integer', minimum: 1 }, state: { type: 'string', enum: ['todo', 'working', 'review'] }, summary: { type: 'string' }, goal: { type: 'string' }, layer: { type: 'string' }, after: { type: 'array', items: { type: 'integer' } } }, required: ['workId', 'number'] },
+    post: a => [goal(a, '/actions/' + a.number), pick(a, ['state', 'summary', 'goal', 'layer', 'after'])] },
+  post_message: { description: 'Write in the item\u2019s thread: a message to your person, or a log line of what you did.',
+    schema: { type: 'object', properties: { workId: { type: 'string' }, text: { type: 'string' }, action: { type: 'integer', minimum: 1 }, log: { type: 'boolean' } }, required: ['workId', 'text'] },
+    post: a => [goal(a, '/events'), { kind: a.log ? 'log' : 'message', text: a.text, action: a.action ?? null }] },
+  ask: { description: 'Ask your person a question on an action. The item waits on them until it is answered; keep working on other actions meanwhile.',
+    schema: { type: 'object', properties: { workId: { type: 'string' }, action: { type: 'integer', minimum: 1 }, text: { type: 'string' }, options: { type: 'array', items: { type: 'string' } } }, required: ['workId', 'action', 'text'] },
+    post: a => [goal(a, '/events'), { kind: 'question', action: a.action, text: a.text, options: a.options }] },
+  request_allow: { description: 'Ask your person to allow something outside the action\u2019s scope (a command, a dependency, an external call) before doing it.',
+    schema: { type: 'object', properties: { workId: { type: 'string' }, action: { type: 'integer', minimum: 1 }, text: { type: 'string' } }, required: ['workId', 'action', 'text'] },
+    post: a => [goal(a, '/events'), { kind: 'allow', action: a.action, text: a.text }] },
+  stage_change: { description: 'Stage a write through a layer\u2019s API under a working action. The layer checks it now; nothing applies until your person closes the item.',
+    schema: { type: 'object', properties: { workId: { type: 'string' }, action: { type: 'integer', minimum: 1 }, layer: { type: 'string' }, operationId: { type: 'string' }, id: { type: 'string' }, body: { type: 'object' } }, required: ['workId', 'action', 'operationId'] },
+    post: a => [goal(a, '/stage'), pick(a, ['action', 'layer', 'operationId', 'id', 'body'])] },
+  changeset: { description: 'List the item\u2019s staged changes, grouped by layer.', schema: { type: 'object', properties: { workId: { type: 'string' } }, required: ['workId'] }, path: a => goal(a, '/changeset') }
 };
+function goal(args, rest = '') { return '/goals/' + encodeURIComponent(args.workId) + rest; }
+function pick(args, keys) { return Object.fromEntries(keys.filter(key => args[key] !== undefined).map(key => [key, args[key]])); }
 function validateUrl(value) {
   const url = new URL(value);
   if (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname))) throw new Error('Use HTTPS or a loopback SSH tunnel.');
@@ -40,8 +74,9 @@ async function readToken() {
     input.on('data', onData);
   });
 }
-async function request(config, path) {
-  const response = await fetch(config.url + '/api/editor' + path, { headers: { authorization: 'Bearer ' + config.token }, signal: AbortSignal.timeout(8000) });
+async function request(config, path, payload) {
+  const response = await fetch(config.url + '/api/editor' + path, { method: payload ? 'POST' : 'GET', body: payload ? JSON.stringify(payload) : undefined,
+    headers: { authorization: 'Bearer ' + config.token, ...(payload ? { 'content-type': 'application/json' } : {}) }, signal: AbortSignal.timeout(8000) });
   const body = await response.json();
   if (!response.ok) throw new Error(body.error || 'Aludel returned ' + response.status);
   return body;
@@ -66,7 +101,7 @@ if (process.argv[2] === 'pair') {
   const rpcError = (id, code, message) => respond({ jsonrpc: '2.0', id, error: { code, message } });
   const handle = async msg => {
     if (msg.id === undefined) return;
-    if (msg.method === 'initialize') return respond({ jsonrpc: '2.0', id: msg.id, result: { protocolVersion: msg.params?.protocolVersion || '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'aludel-editor', version: '0.1.0' }, instructions: 'Read your assigned task context before editing. Project records are live; saved task bundles are immutable. These tools are read only.' } });
+    if (msg.method === 'initialize') return respond({ jsonrpc: '2.0', id: msg.id, result: { protocolVersion: msg.params?.protocolVersion || '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'aludel-editor', version: '0.1.0' }, instructions: 'Read your assigned task context before editing. Project records are live; saved task bundles are immutable. For a goal item you have claimed: read work_view and stack_map first, move an action to working before staging its changes, ask on the action when you need your person, and hand actions to review; your person closes the item.' } });
     if (msg.method === 'ping') return respond({ jsonrpc: '2.0', id: msg.id, result: {} });
     if (msg.method === 'tools/list') return respond({ jsonrpc: '2.0', id: msg.id, result: { tools: Object.entries(names).map(([name, tool]) => ({ name, description: tool.description, inputSchema: tool.schema })) } });
     if (msg.method === 'tools/call') {
@@ -74,8 +109,8 @@ if (process.argv[2] === 'pair') {
       if (!tool) return rpcError(msg.id, -32602, 'Unknown tool.');
       try {
         const args = msg.params?.arguments || {};
-        for (const key of tool.schema.required || []) if (typeof args[key] !== 'string' || !args[key]) throw new Error('Missing ' + key + '.');
-        const result = await request(config, tool.path(args));
+        for (const key of tool.schema.required || []) if (args[key] === undefined || args[key] === null || args[key] === '') throw new Error('Missing ' + key + '.');
+        const result = tool.post ? await request(config, ...tool.post(args)) : await request(config, tool.path(args));
         return respond({ jsonrpc: '2.0', id: msg.id, result: { content: [{ type: 'text', text: JSON.stringify(result) }] } });
       } catch (error) { return respond({ jsonrpc: '2.0', id: msg.id, result: { isError: true, content: [{ type: 'text', text: error.message }] } }); }
     }

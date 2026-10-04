@@ -25,6 +25,7 @@ import { codeReleases, initCodeLayer, readDocs, readSource, readStack, readVaria
 import { agentRuns, initAgentRuns } from './agent-runs.mjs';
 import { codeCandidates, initCodeCandidates } from './code-candidates.mjs';
 import { editorBridge, initEditorBridge } from './editor-bridge.mjs';
+import { agentWork, initAgentWork } from './agent-work.mjs';
 import { symphonyWorker, initSymphonyWorker } from './symphony-worker.mjs';
 import { reviewPreviews, reviewHost } from './review-previews.mjs';
 import { workRuns, initWorkRuns } from './work-runs.mjs';
@@ -84,6 +85,7 @@ initCodeLayer(db);
 initAgentRuns(db);
 initCodeCandidates(db);
 initEditorBridge(db);
+initAgentWork(db);
 initSymphonyWorker(db);
 initWorkRuns(db);
 initLayerContract(db);
@@ -134,6 +136,7 @@ function createWorkspace(setup, user) {
   commitWorkspace({ repository: setup.workspacePath, profile: projectGitProfile, message: `chore: start ${setup.project.name} with Aludel`, ...commitIdentity(user) });
 }
 const know = knowledge({ db, catalogs, packs: catalogs.packs });
+const goals = agentWork({ db, know, catalogs });
 const pool = library({ db, know });
 const bindingStore = bindingRecords({ db });
 const bindings = bindingRoutines({ db, know, pool, store: bindingStore });
@@ -315,6 +318,16 @@ const json = (response, status, value, headers = {}) => {
   response.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'content-length': Buffer.byteLength(body), ...headers });
   response.end(body);
 };
+// AGENT-WORK-01: a goal item's live thread. Each change is a small notice; the page refetches the item.
+function streamGoal(request, response, projectId, workId) {
+  const write = (event, data) => response.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  const stop = goals.subscribe(projectId, workId, change => write('change', change));
+  response.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive', 'x-accel-buffering': 'no' });
+  write('ready', { workId });
+  const beat = setInterval(() => response.write(': keep-alive\n\n'), 20000);
+  const close = () => { clearInterval(beat); stop(); };
+  request.on('close', close); response.on('close', close);
+}
 const readJson = (request, maxBytes = 1024 * 1024) => new Promise((resolveBody, reject) => {
   let body = '';
   request.on('data', chunk => { body += chunk; if (body.length > maxBytes) reject(Object.assign(new Error('Request too large'), { status: 413 })); });
@@ -544,11 +557,34 @@ async function api(request, response, url) {
     response.writeHead(302, { location: result.returnTo || '/#/the-machine/overview?github=installed' });
     return response.end();
   }
-  // Editor tokens are accepted only on these read-only routes, never as portal sessions or write authority.
+  // Editor tokens are accepted only on these routes, never as portal sessions. They read; the one write authority they carry
+  // (AGENT-WORK-01) is the token person's local agent working a goal item that person has claimed.
   if (url.pathname.startsWith('/api/editor/')) {
-    if (request.method !== 'GET') return json(response, 405, { error: 'Read only.' });
     const { user: editorUser, projectId } = editor.authenticate(request.headers.authorization);
     const path = url.pathname.slice('/api/editor/'.length).split('/').map(decodeURIComponent);
+    if (path[0] === 'goals' || path[0] === 'stack') {
+      const done = (status, value) => json(response, status, value, { 'cache-control': 'no-store' });
+      const agent = { kind: 'agent', id: editorUser.id, name: `${editorUser.name}'s local agent` };
+      if (path[0] === 'stack' && path.length === 1 && request.method === 'GET') return done(200, { layers: goals.stackMap(projectId) });
+      if (path.length === 1 && request.method === 'GET') return done(200, { goals: goals.goals(projectId, { assignedTo: editorUser.id }) });
+      if (path[0] !== 'goals' || path.length < 2) return json(response, 404, { error: 'Not found.' });
+      const workId = path[1];
+      goals.assertPerformer(editorUser, projectId, workId);
+      const [operation, sub] = path.slice(2);
+      if (request.method === 'GET' && !operation) return done(200, goals.view(projectId, workId));
+      if (request.method === 'GET' && operation === 'changeset' && !sub) return done(200, { changeset: goals.changeset(projectId, workId) });
+      if (request.method === 'GET' && operation === 'read' && !sub)
+        return done(200, { result: goals.readLayer(projectId, workId, url.searchParams.get('layer'), { operationId: url.searchParams.get('operationId'), id: url.searchParams.get('id') }) });
+      if (request.method !== 'POST') return json(response, 405, { error: 'Method not allowed.' });
+      const input = await readJson(request);
+      if (operation === 'define' && !sub) return done(200, goals.define(agent, projectId, workId, input));
+      if (operation === 'actions' && !sub) return done(201, goals.addAction(agent, projectId, workId, input));
+      if (operation === 'actions' && sub) return done(200, goals.updateAction(agent, projectId, workId, Number(sub), input));
+      if (operation === 'events' && !sub) return done(201, goals.post(agent, projectId, workId, input));
+      if (operation === 'stage' && !sub) return done(201, goals.stage(agent, projectId, workId, input));
+      return json(response, 404, { error: 'Not found.' });
+    }
+    if (request.method !== 'GET') return json(response, 405, { error: 'Read only.' });
     if (path[0] === 'me' && path.length === 1) return json(response, 200, { projectId, user: editorUser, tools: editor.tools }, { 'cache-control': 'no-store' });
     if (path[0] === 'tasks' && path.length === 1) return json(response, 200, { tasks: editor.assigned(editorUser, projectId) }, { 'cache-control': 'no-store' });
     if (path[0] === 'tasks' && path.length === 2) return json(response, 200, editor.context(editorUser, projectId, path[1]), { 'cache-control': 'no-store' });
@@ -1043,6 +1079,31 @@ async function api(request, response, url) {
     const input = await readJson(request);
     const result = await acceptCandidate(user, projectId, candidateId, input.commit);
     return json(response, result.status, result.body, { 'cache-control': 'no-store' });
+  }
+  // AGENT-WORK-01 A1: goal items. People drive them here; their local agent works on them through /api/editor/goals.
+  const goalRoute = /^\/api\/projects\/([^/]+)\/goals(?:\/([^/]+)(?:\/(define|move|claim|actions|events|answer|stream|read)(?:\/([^/]+))?)?)?$/.exec(url.pathname);
+  if (goalRoute) {
+    const [, rawProject, rawWork, operation, rawSub] = goalRoute;
+    const projectId = decodeURIComponent(rawProject), workId = rawWork ? decodeURIComponent(rawWork) : null, sub = rawSub ? decodeURIComponent(rawSub) : null;
+    requireMember(db, user, projectId);
+    const person = { kind: 'person', id: user.id, name: user.name };
+    const method = request.method;
+    const done = (status, value) => json(response, status, value, { 'cache-control': 'no-store' });
+    if (!workId && method === 'GET') return done(200, { goals: goals.goals(projectId), stack: goals.stackMap(projectId) });
+    if (!workId && method === 'POST') return done(201, goals.createGoal(user, projectId, await readJson(request)));
+    if (!operation && method === 'GET') return done(200, goals.view(projectId, workId));
+    if (operation === 'stream' && method === 'GET') return streamGoal(request, response, projectId, workId);
+    if (operation === 'read' && method === 'GET') return done(200, { result: goals.readLayer(projectId, workId, url.searchParams.get('layer'), { operationId: url.searchParams.get('operationId'), id: url.searchParams.get('id') }) });
+    if (method !== 'POST' && !(operation === 'actions' && sub && method === 'PATCH')) return json(response, 405, { error: 'Method not allowed.' });
+    const input = await readJson(request);
+    if (operation === 'define' && !sub) return done(200, goals.define(person, projectId, workId, input));
+    if (operation === 'move' && !sub) return done(200, goals.move(user, projectId, workId, input.to));
+    if (operation === 'claim' && !sub) return done(200, goals.claim(user, projectId, workId));
+    if (operation === 'actions' && !sub) return done(201, goals.addAction(person, projectId, workId, input));
+    if (operation === 'actions' && sub) return done(200, goals.updateAction(person, projectId, workId, Number(sub), input));
+    if (operation === 'events' && !sub) return done(201, goals.post(person, projectId, workId, input));
+    if (operation === 'answer' && sub) return done(200, goals.answer(user, projectId, workId, sub, input));
+    return json(response, 404, { error: 'Not found.' });
   }
   // WORK-ITEM-UX-01: an item's runs, each with its own task snapshot, outputs, review and signature.
   const runRoute = /^\/api\/projects\/([^/]+)\/work\/([^/]+)\/runs(?:\/([^/]+)\/(review|sign|submit|check|stop|prepare|preview|scenario|close-preview|step-screenshot))?$/.exec(url.pathname);

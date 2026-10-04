@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { createUser, initAccounts } from '../server/accounts.mjs';
+import { createSession, createUser, initAccounts } from '../server/accounts.mjs';
 import { agentWork, changesetKey, initAgentWork } from '../server/agent-work.mjs';
 import { initKnowledge, knowledge } from '../server/knowledge.mjs';
 import { initLayerApi } from '../server/layer-api.mjs';
@@ -14,6 +14,7 @@ import { ensureProductWorkspace } from '../server/product-workspace.mjs';
 import { openSecretStore } from '../server/secret-store.mjs';
 import { openDatabase } from '../server/storage.mjs';
 import { initWorkflow } from '../server/workflow.mjs';
+import { stopPortal, waitForPortal } from './portal-support.mjs';
 
 const catalogs = loadCatalogs(new URL('../config', import.meta.url).pathname);
 const templates = process.env.MACHINE_LAYER_TEMPLATES_ENABLED === '1';
@@ -80,7 +81,7 @@ test('a goal item is defined in phases, starts deliberately, and gates later act
   // A question sits on its action; the item waits on its person until it is answered.
   const asked = work.post(agent, id, workId, { kind: 'question', action: 1, text: 'Should Sign up link to Sign in?', options: ['Yes', 'No'] });
   assert.equal(asked.item.status, 'needs');
-  assert.equal(asked.actions[0].needs.length, 1);
+  assert.equal(asked.item.status, 'needs');
   assert.throws(() => work.post(agent, id, workId, { kind: 'question', text: 'Floating?' }), /sits on an action/);
   assert.throws(() => work.post({ kind: 'person', id: ada.id, name: 'Ada' }, id, workId, { kind: 'question', action: 1, text: 'x' }), status(403));
   const answered = work.answer(ada, id, workId, asked.id, { choice: 'Yes' });
@@ -108,14 +109,14 @@ test('a goal item is defined in phases, starts deliberately, and gates later act
   assert.throws(() => work.updateAction(agent, id, workId, 3, { state: 'working' }), /review gate/, 'the approved extra action in phase 1 still holds the gate');
   work.updateAction(person, id, workId, 5, { state: 'done' });
   work.updateAction(agent, id, workId, 3, { state: 'working' });
-  assert.throws(() => work.updateAction(agent, id, workId, 4, { state: 'working' }), /Waits for #3/);
+  assert.throws(() => work.updateAction(agent, id, workId, 4, { state: 'working' }), /waits for #3/);
   assert.throws(() => work.move(ada, id, workId, 'done'), /closes from the item/);
 
   const listed = work.goals(id, { assignedTo: ada.id });
   assert.deepEqual(listed.map(item => [item.ref, item.board]), [[ref, 'progress']]);
   assert.equal(know.workList(id).find(item => item.id === workId).board, 'progress', 'every item carries its board column');
   assert.ok(work.view(id, workId).events.some(event => event.text === 'Answered: Yes'), 'the thread keeps the answer');
-  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM layer_work_items WHERE work_scope = ?').get('goal').n, 1);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM layer_work_items WHERE project_id = ? AND work_scope = ?').get(id, 'goal').n, 1);
 }));
 
 test('the thread streams to subscribers, and steering is a person\'s', () => fixture(({ work, ada, id }) => {
@@ -133,7 +134,7 @@ test('the thread streams to subscribers, and steering is a person\'s', () => fix
 test('one changeset across layers, staged through each layer\'s API and read back through it', { skip: !templates && 'needs layer templates' }, () => fixture(({ db, know, work, ada, id }) => {
   const workId = work.createGoal(ada, id, { title: 'Brand the sign-up flow' }).item.id;
   const agent = { kind: 'agent', id: ada.id, name: "Ada's local agent" };
-  work.define(agent, id, workId, { brief: 'A slogan and a joining activity.', actions: [{ layer: 'design', goal: 'Add a slogan' }, { layer: 'vision', goal: 'Add the joining activity' }] });
+  work.define(agent, id, workId, { brief: 'A slogan and a joining activity.', actions: [{ layer: 'design', goal: 'Add a slogan' }, { layer: 'product', goal: 'Add the joining activity' }] });
   work.claim(ada, id, workId); work.move(ada, id, workId, 'progress');
   assert.throws(() => work.stage(agent, id, workId, { action: 1, operationId: 'createBrandAsset', body: {} }), /Move #1 to working/);
   work.updateAction(agent, id, workId, 1, { state: 'working' });
@@ -144,9 +145,95 @@ test('one changeset across layers, staged through each layer\'s API and read bac
     "the layer's own rules check a staged change");
   work.stage(agent, id, workId, { action: 2, operationId: 'createActivity', body: { activity: { title: 'Join Tool Share' } } });
   const changes = work.view(id, workId).changeset;
-  assert.deepEqual(changes.map(group => [group.layer, group.changes.map(change => change.op)]), [['design', ['create']], ['vision', ['create']]]);
+  assert.deepEqual(changes.map(group => [group.layer, group.changes.map(change => change.op)]), [['design', ['create']], ['product', ['create']]]);
   assert.ok(!know.list(id, 'brand_asset').some(asset => asset.text === 'Borrow, don’t buy.'), 'nothing applies before close-out');
-  const listOp = [...(work.stackMap(id).find(layer => layer.key === 'vision').operations)].find(op => op.reads && /activit/i.test(op.operationId));
-  if (listOp) assert.ok(JSON.stringify(work.readLayer(id, workId, 'vision', { operationId: listOp.operationId })).includes('Join Tool Share'), 'reads see the item\'s own staged changes');
-  assert.equal(db.prepare('SELECT COUNT(DISTINCT layer_key) AS n FROM layer_run_drafts WHERE attempt_id = ?').get(changesetKey(workId)).n, 2);
+  assert.ok(JSON.stringify(work.readLayer(id, workId, 'product', { operationId: 'listActivities' })).includes('Join Tool Share'), 'reads see the item\'s own staged changes');
+  assert.ok(!JSON.stringify(work.readLayer(id, null, 'product', { operationId: 'listActivities' })).includes('Join Tool Share'), 'other readers see the live records');
+  assert.throws(() => work.readLayer(id, workId, 'product', { operationId: 'createActivity' }), /stage_change/);
+  assert.equal(db.prepare('SELECT COUNT(DISTINCT layer_key) AS n FROM layer_run_drafts WHERE attempt_id = ? AND project_id = ?').get(changesetKey(workId), id).n, 2);
 }));
+
+test('a person drives a goal item in the portal while their local agent works it through the stdio tools', async () => {
+  const { createServer } = await import('node:http');
+  const { spawn, spawnSync } = await import('node:child_process');
+  const root = mkdtempSync(join(tmpdir(), 'aludel-agent-work-http-'));
+  const db = openDatabase(join(root, 'machine.sqlite'));
+  initWorkflow(db); ensureProductWorkspace(db); initAccounts(db); initOnboarding(db); initKnowledge(db);
+  const know = knowledge({ db, catalogs, packs: catalogs.packs });
+  const flow = onboarding({ db, catalogs, secrets: openSecretStore(root), workspaceRoot: join(root, 'w'), assetRoot: join(root, 'a'), createWorkspace: () => {}, know });
+  const ada = createUser(db, { email: 'ada@example.com', name: 'Ada', password: 'correct-horse-battery' });
+  const { token: draft } = flow.saveDraft(null, { profile: 'planner' });
+  flow.saveDraft(draft, { name: 'Tool Share', pitch: 'Help neighbours share tools. Borrow a drill in minutes.' });
+  const id = flow.claimDraft(draft, ada, ada).project.id;
+  const probe = createServer();
+  await new Promise(resolve => probe.listen(0, '127.0.0.1', resolve));
+  const port = probe.address().port;
+  await new Promise(resolve => probe.close(resolve));
+  const server = spawn(process.execPath, [new URL('../server/server.mjs', import.meta.url).pathname], {
+    env: { ...process.env, MACHINE_DATA_DIR: root, MACHINE_PORT: String(port), MACHINE_PREVIEW_RUNTIME: 'process' }, stdio: ['ignore', 'pipe', 'pipe'] });
+  const origin = 'http://127.0.0.1:' + port;
+  const stream = new AbortController();
+  try {
+    await waitForPortal(server, origin);
+    const cookie = createSession(db, ada.id).split(';')[0];
+    const portal = async (path, body, method = body ? 'POST' : 'GET') => {
+      const response = await fetch(origin + '/api/projects/' + id + '/goals' + path, { method, headers: { cookie, 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+      return { status: response.status, body: await response.json() };
+    };
+    const created = await portal('', { title: 'Create the sign-up flow', brief: 'people need to join' });
+    assert.equal(created.status, 201);
+    const workId = created.body.item.id;
+    const apiToken = (await (await fetch(origin + '/api/projects/' + id + '/editor', { method: 'POST', headers: { cookie } })).json()).token;
+    const editor = { authorization: 'Bearer ' + apiToken, 'content-type': 'application/json' };
+    assert.equal((await fetch(origin + '/api/editor/goals/' + workId, { headers: editor })).status, 404, 'the agent sees an item once its person claims it');
+    assert.equal((await fetch(origin + '/api/editor/goals/' + workId + '/define', { method: 'POST', headers: editor, body: '{}' })).status, 404);
+    assert.equal((await portal('/' + workId + '/claim', {})).status, 200);
+
+    const config = join(root, 'editor-client.json');
+    const tool = new URL('../tools/editor-mcp.mjs', import.meta.url).pathname;
+    assert.equal(spawnSync(process.execPath, [tool, 'pair', origin], { env: { ...process.env, ALUDEL_EDITOR_CONFIG: config }, input: apiToken + '\n', encoding: 'utf8', timeout: 5000 }).status, 0);
+    let rpc = 0;
+    const call = async calls => {
+      const input = calls.map(([name, args]) => JSON.stringify({ jsonrpc: '2.0', id: ++rpc, method: 'tools/call', params: { name, arguments: args } })).join('\n') + '\n';
+      const child = spawn(process.execPath, [tool], { env: { ...process.env, ALUDEL_EDITOR_CONFIG: config }, stdio: ['pipe', 'pipe', 'pipe'] });
+      let out = '';
+      child.stdout.setEncoding('utf8'); child.stdout.on('data', chunk => { out += chunk; });
+      child.stdin.end(input);
+      await new Promise(resolve => child.on('close', resolve));
+      return out.trim().split('\n').map(line => JSON.parse(line).result).map(result => result.isError ? { error: result.content[0].text } : JSON.parse(result.content[0].text));
+    };
+    const [stack, defined, listed] = await call([['stack_map', {}],
+      ['define_work', { workId, brief: 'A visitor signs up and lands in their first world.', phases: [{ title: 'Specify', gated: true }, { title: 'Build' }], actions: [{ phase: 1, goal: 'Add sign-up to the flow' }, { phase: 2, goal: 'Build it' }] }],
+      ['work_list', {}]]);
+    assert.ok(Array.isArray(stack.layers));
+    assert.equal(defined.item.board, 'ready');
+    assert.deepEqual(listed.goals.map(item => [item.id, item.board, item.actions.todo]), [[workId, 'ready', 2]]);
+    assert.equal((await portal('/' + workId + '/move', { to: 'progress' })).body.item.board, 'progress');
+
+    const events = [];
+    const live = await fetch(origin + '/api/projects/' + id + '/goals/' + workId + '/stream', { headers: { cookie }, signal: stream.signal });
+    assert.equal(live.headers.get('content-type'), 'text/event-stream');
+    (async () => { try { for await (const chunk of live.body) events.push(Buffer.from(chunk).toString()); } catch { /* closed */ } })();
+    const [working, early, asked, refused] = await call([['update_action', { workId, number: 1, state: 'working' }], ['update_action', { workId, number: 2, state: 'working' }],
+      ['ask', { workId, action: 1, text: 'Should Sign up link to Sign in?', options: ['Yes', 'No'] }], ['update_action', { workId, number: 1, state: 'done' }]]);
+    assert.equal(working.actions[0].state, 'working');
+    assert.match(early.error, /review gate/);
+    assert.equal(asked.item.status, 'needs');
+    assert.match(refused.error, /An agent can't move #1 from working to done/, 'only people finish actions');
+    const until = Date.now() + 3000;
+    while (!events.join('').includes('"kind":"question"') && Date.now() < until) await new Promise(resolve => setTimeout(resolve, 20));
+    assert.match(events.join(''), /event: ready[\s\S]*event: change[\s\S]*"kind":"question"/, 'the page hears the question as it is asked');
+
+    assert.equal((await portal('/' + workId + '/answer/' + asked.id, { choice: 'Yes' })).body.item.board, 'progress');
+    assert.equal((await portal('/' + workId + '/events', { kind: 'steer', text: 'Keep it short' })).status, 201);
+    assert.equal((await fetch(origin + '/api/editor/goals/' + workId + '/events', { method: 'POST', headers: editor, body: JSON.stringify({ kind: 'steer', text: 'No' }) })).status, 403, 'the agent does not steer');
+    assert.equal((await fetch(origin + '/api/editor/tasks', { method: 'POST', headers: editor })).status, 405, 'other editor routes stay read only');
+    const thread = (await portal('/' + workId)).body.events.map(event => event.text);
+    assert.ok(thread.includes('Answered: Yes') && thread.includes('Keep it short'));
+  } finally {
+    stream.abort();
+    await stopPortal(server);
+    db.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});

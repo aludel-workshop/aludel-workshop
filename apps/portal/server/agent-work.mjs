@@ -5,6 +5,7 @@
 // Design: docs/design/agent-work/plan.md (A1) and the a0/v2 prototype.
 import { randomBytes } from 'node:crypto';
 import { EventEmitter } from 'node:events';
+import { requireMember } from './accounts.mjs';
 import { callOperation, draftChanges, draftOverlay, layerApi, stageOperation } from './layer-api.mjs';
 import { layerPackageForProject } from './layer-package.mjs';
 import { projectLayerDefinition } from './layer-registry.mjs';
@@ -70,15 +71,15 @@ export function agentWork({ db, know, catalogs = null }) {
   }
   const byOf = actor => ({ kind: actor.kind, id: actor.id });
 
-  const phasesOf = workId => db.prepare('SELECT number, title, gated FROM work_goal_phases WHERE work_id = ? ORDER BY number').all(workId)
+  const phasesOf = (projectId, workId) => db.prepare('SELECT number, title, gated FROM work_goal_phases WHERE project_id = ? AND work_id = ? ORDER BY number').all(projectId, workId)
     .map(row => ({ number: row.number, title: row.title, gated: Boolean(row.gated) }));
-  const actionRows = workId => db.prepare('SELECT * FROM work_goal_actions WHERE work_id = ? ORDER BY number').all(workId)
+  const actionRows = (projectId, workId) => db.prepare('SELECT * FROM work_goal_actions WHERE project_id = ? AND work_id = ? ORDER BY number').all(projectId, workId)
     .map(row => ({ id: row.id, number: row.number, phase: row.phase, layer: row.layer, goal: row.goal, after: parse(row.after_json, []), state: row.state,
       summary: row.summary || '', addedBy: parse(row.added_by_json, null), updatedAt: row.updated_at }));
   const eventRow = row => ({ id: row.id, action: row.action_number, kind: row.kind, author: parse(row.author_json, null), ...parse(row.body_json, {}),
     at: row.created_at, resolvedAt: row.resolved_at, resolution: parse(row.resolution_json, null) });
-  const openNeeds = workId => db.prepare(`SELECT * FROM work_goal_events WHERE work_id = ? AND resolved_at IS NULL AND kind IN (${needKinds.map(() => '?').join(',')}) ORDER BY id`)
-    .all(workId, ...needKinds).map(eventRow);
+  const openNeeds = (projectId, workId) => db.prepare(`SELECT * FROM work_goal_events WHERE project_id = ? AND work_id = ? AND resolved_at IS NULL AND kind IN (${needKinds.map(() => '?').join(',')}) ORDER BY id`)
+    .all(projectId, workId, ...needKinds).map(eventRow);
 
   // Why an action can't start yet: a review gate above it that isn't cleared, or an "after" action not yet handed over.
   function blockedReason(action, actions, phases) {
@@ -92,8 +93,8 @@ export function agentWork({ db, know, catalogs = null }) {
 
   function view(projectId, workId) {
     const item = goalItem(projectId, workId);
-    const phases = phasesOf(workId), actions = actionRows(workId), needs = openNeeds(workId);
-    const events = db.prepare('SELECT * FROM (SELECT * FROM work_goal_events WHERE work_id = ? ORDER BY id DESC LIMIT 300) ORDER BY id').all(workId).map(eventRow);
+    const phases = phasesOf(projectId, workId), actions = actionRows(projectId, workId), needs = openNeeds(projectId, workId);
+    const events = db.prepare('SELECT * FROM (SELECT * FROM work_goal_events WHERE project_id = ? AND work_id = ? ORDER BY id DESC LIMIT 300) ORDER BY id').all(projectId, workId).map(eventRow);
     return { item, brief: goalOf(item).brief, defined: Boolean(goalOf(item).defined), performer: goalOf(item).performer || null, phases,
       actions: actions.map(action => ({ ...action, needs: needs.filter(need => need.action === action.number), blocked: ['todo', 'proposed'].includes(action.state) ? blockedReason(action, actions, phases) : null })),
       needs, events, changeset: changeset(projectId, workId) };
@@ -140,8 +141,8 @@ export function agentWork({ db, know, catalogs = null }) {
     });
     const at = now();
     transaction(() => {
-      db.prepare('DELETE FROM work_goal_phases WHERE work_id = ?').run(workId);
-      db.prepare('DELETE FROM work_goal_actions WHERE work_id = ?').run(workId);
+      db.prepare('DELETE FROM work_goal_phases WHERE project_id = ? AND work_id = ?').run(projectId, workId);
+      db.prepare('DELETE FROM work_goal_actions WHERE project_id = ? AND work_id = ?').run(projectId, workId);
       phases.forEach((phase, index) => db.prepare('INSERT INTO work_goal_phases VALUES (?, ?, ?, ?, ?)')
         .run(projectId, workId, index + 1, clean(phase.title, 80, 'Phase title', true), phase.gated ? 1 : 0));
       for (const row of rows) db.prepare('INSERT INTO work_goal_actions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
@@ -174,10 +175,10 @@ export function agentWork({ db, know, catalogs = null }) {
       saveGoal(projectId, goalItem(projectId, workId), { startedAt: now() });
     } else if (to === 'review') {
       if (item.board !== 'progress') fail(`Only an item in progress can go to review.`, 409);
-      const actions = actionRows(workId).filter(action => action.state !== 'proposed');
+      const actions = actionRows(projectId, workId).filter(action => action.state !== 'proposed');
       const left = actions.filter(action => !['review', 'done'].includes(action.state));
       if (left.length) fail(`#${left.map(action => action.number).join(', #')} ${left.length === 1 ? 'is' : 'are'} not ready for review yet.`, 409);
-      if (openNeeds(workId).length) fail('Answer what the item is waiting on first.', 409);
+      if (openNeeds(projectId, workId).length) fail('Answer what the item is waiting on first.', 409);
       setState(projectId, item, 'review', 'Ready for review', by);
     } else if (to === 'done') fail(`${item.ref} closes from the item once its actions are reviewed.`, 409);
     else fail('Unknown column.');
@@ -188,6 +189,7 @@ export function agentWork({ db, know, catalogs = null }) {
 
   // Claiming: the person takes the item to work on locally with their own agent (A8), or defines it themselves.
   function claim(user, projectId, workId) {
+    requireMember(db, user, projectId);
     const item = goalItem(projectId, workId);
     if (item.assignee && !(item.assignee.kind === 'person' && item.assignee.id === user.id)) fail(`${item.ref} is assigned to ${item.assignee.label}.`, 409);
     db.prepare("UPDATE layer_work_items SET assignee_kind = 'person', assignee_id = ?, assignee_label = ?, profile_id = NULL, updated_at = ? WHERE id = ? AND project_id = ?")
@@ -207,7 +209,7 @@ export function agentWork({ db, know, catalogs = null }) {
   function addAction(actor, projectId, workId, input = {}) {
     const item = goalItem(projectId, workId);
     if (item.board === 'done') fail(`${item.ref} is closed.`, 409);
-    const actions = actionRows(workId), phases = phasesOf(workId);
+    const actions = actionRows(projectId, workId), phases = phasesOf(projectId, workId);
     if (actions.length >= 30) fail('Use up to thirty actions.');
     const number = (actions.at(-1)?.number || 0) + 1;
     const phase = Number(input.phase ?? (phases.at(-1)?.number || 1));
@@ -230,7 +232,7 @@ export function agentWork({ db, know, catalogs = null }) {
   const agentMoves = { todo: ['working'], working: ['review', 'todo'], review: ['working'], proposed: [] };
   function updateAction(actor, projectId, workId, number, input = {}) {
     const item = goalItem(projectId, workId);
-    const actions = actionRows(workId), phases = phasesOf(workId);
+    const actions = actionRows(projectId, workId), phases = phasesOf(projectId, workId);
     const action = actions.find(entry => entry.number === Number(number)) || fail('Action not found.', 404);
     const next = { ...action };
     if (input.goal !== undefined) next.goal = clean(input.goal, 1000, `#${action.number}'s goal`, true);
@@ -254,8 +256,8 @@ export function agentWork({ db, know, catalogs = null }) {
       }
       next.state = input.state;
     }
-    db.prepare('UPDATE work_goal_actions SET goal = ?, summary = ?, layer = ?, after_json = ?, phase = ?, state = ?, updated_at = ? WHERE id = ?')
-      .run(next.goal, next.summary || null, next.layer, JSON.stringify(next.after), next.phase, next.state, now(), action.id);
+    db.prepare('UPDATE work_goal_actions SET goal = ?, summary = ?, layer = ?, after_json = ?, phase = ?, state = ?, updated_at = ? WHERE id = ? AND project_id = ?')
+      .run(next.goal, next.summary || null, next.layer, JSON.stringify(next.after), next.phase, next.state, now(), action.id, projectId);
     const changed = ['goal', 'summary', 'layer', 'after', 'phase', 'state'].filter(key => JSON.stringify(next[key]) !== JSON.stringify(action[key]));
     if (changed.length) record(projectId, workId, { kind: 'log', action: action.number, author: actor,
       text: changed.includes('state') ? `#${action.number}: ${{ todo: 'to do', working: 'working', review: 'ready for review', done: 'done' }[next.state]}` : `Changed #${action.number}'s ${changed.join(', ')}` });
@@ -279,7 +281,7 @@ export function agentWork({ db, know, catalogs = null }) {
     if (kind === 'steer' && actor.kind !== 'person') fail('Only a person steers.', 403);
     if (['question', 'allow'].includes(kind) && actor.kind !== 'agent') fail('Only the working agent asks.', 403);
     const action = input.action === undefined || input.action === null ? null : Number(input.action);
-    if (action !== null && !actionRows(workId).some(entry => entry.number === action)) fail('Action not found.', 404);
+    if (action !== null && !actionRows(projectId, workId).some(entry => entry.number === action)) fail('Action not found.', 404);
     if (['question', 'allow'].includes(kind) && action === null) fail('A question or an allow request sits on an action.');
     const options = kind === 'question' && Array.isArray(input.options)
       ? input.options.slice(0, 6).map(option => clean(option, 200, 'Option', true)) : null;
@@ -301,18 +303,18 @@ export function agentWork({ db, know, catalogs = null }) {
       if (typeof input.allow !== 'boolean') fail('Allow or decline it.');
       resolution = { allow: input.allow, note: clean(input.note, 1000, 'Note') };
       if (need.kind === 'approval') {
-        const action = actionRows(workId).find(entry => entry.number === need.action);
+        const action = actionRows(projectId, workId).find(entry => entry.number === need.action);
         if (action?.state === 'proposed') {
-          if (input.allow) db.prepare("UPDATE work_goal_actions SET state = 'todo', updated_at = ? WHERE id = ?").run(now(), action.id);
-          else db.prepare('DELETE FROM work_goal_actions WHERE id = ?').run(action.id);
+          if (input.allow) db.prepare("UPDATE work_goal_actions SET state = 'todo', updated_at = ? WHERE id = ? AND project_id = ?").run(now(), action.id, projectId);
+          else db.prepare('DELETE FROM work_goal_actions WHERE id = ? AND project_id = ?').run(action.id, projectId);
         }
       }
     }
-    db.prepare('UPDATE work_goal_events SET resolved_at = ?, resolution_json = ? WHERE id = ?').run(now(), JSON.stringify({ ...resolution, by: { id: user.id, name: user.name } }), row.id);
+    db.prepare('UPDATE work_goal_events SET resolved_at = ?, resolution_json = ? WHERE id = ? AND project_id = ?').run(now(), JSON.stringify({ ...resolution, by: { id: user.id, name: user.name } }), row.id, projectId);
     const author = { kind: 'person', id: user.id, name: user.name };
     record(projectId, workId, { kind: 'log', action: need.action, author,
       text: need.kind === 'question' ? `Answered: ${resolution.text}` : need.kind === 'approval' ? (resolution.allow ? `Approved #${need.action}` : `Declined #${need.action}`) : resolution.allow ? 'Allowed' : 'Declined' });
-    if (item.state === 'needs-input' && !openNeeds(workId).length) setState(projectId, goalItem(projectId, workId), 'claimed', 'Answered; work continues', { kind: 'person', id: user.id });
+    if (item.state === 'needs-input' && !openNeeds(projectId, workId).length) setState(projectId, goalItem(projectId, workId), 'claimed', 'Answered; work continues', { kind: 'person', id: user.id });
     emit(projectId, workId, { type: 'item' });
     return view(projectId, workId);
   }
@@ -321,7 +323,7 @@ export function agentWork({ db, know, catalogs = null }) {
   function stage(actor, projectId, workId, input = {}) {
     const item = goalItem(projectId, workId);
     if (item.board !== 'progress') fail(`Start ${item.ref} before changing layers.`, 409);
-    const action = actionRows(workId).find(entry => entry.number === Number(input.action));
+    const action = actionRows(projectId, workId).find(entry => entry.number === Number(input.action));
     if (!action) fail('Stage a change under one of the item\'s actions.');
     if (action.state !== 'working') fail(`Move #${action.number} to working before it changes anything.`, 409);
     const layer = checkLayer(projectId, input.layer || action.layer) || fail('Name the layer to change.');
@@ -365,8 +367,8 @@ export function agentWork({ db, know, catalogs = null }) {
   function goals(projectId, { assignedTo = null } = {}) {
     return know.workList(projectId).filter(item => item.scope === 'goal' && (!assignedTo || (item.assignee?.kind === 'person' && item.assignee.id === assignedTo)))
       .map(item => ({ id: item.id, ref: item.ref, title: item.title, board: item.board, priority: item.priority, assignee: item.assignee, defined: Boolean(item.context?.goal?.defined),
-        actions: db.prepare("SELECT state, COUNT(*) AS n FROM work_goal_actions WHERE work_id = ? AND state != 'proposed' GROUP BY state").all(item.id)
-          .reduce((sum, row) => ({ ...sum, [row.state]: row.n }), {}), needs: openNeeds(item.id).length }));
+        actions: db.prepare("SELECT state, COUNT(*) AS n FROM work_goal_actions WHERE project_id = ? AND work_id = ? AND state != 'proposed' GROUP BY state").all(projectId, item.id)
+          .reduce((sum, row) => ({ ...sum, [row.state]: row.n }), {}), needs: openNeeds(projectId, item.id).length }));
   }
   function subscribe(projectId, workId, listener) {
     goalItem(projectId, workId);
