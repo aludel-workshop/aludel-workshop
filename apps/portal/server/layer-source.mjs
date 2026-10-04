@@ -41,16 +41,22 @@ export function layerBinding(db, projectId, key) {
 export const workBranchName = (workRef, attemptId) => `work/${String(workRef).toLowerCase().replace(/[^a-z0-9-]/g, '-')}-${attemptId.startsWith('person-run-') ? attemptId.slice(11, 19) : attemptId.slice(4, 12)}`;
 
 // A Git bundle of the instance repository at the run's base, for the sandbox to clone without reaching the host's files.
-export function layerBundle(db, { projectId, key, base, attemptId }) {
+// J6: an item kept as a draft also carries its draft commit, as refs/aludel/draft, for the run to build on.
+export function layerBundle(db, { projectId, key, base, attemptId, draft = null }) {
   const { repo, commit } = layerBinding(db, projectId, key);
   if (commit !== base) fail(`The ${key} layer source changed. Authorize a fresh run.`, 409);
   const scratch = mkdtempSync(join(tmpdir(), 'aludel-layer-bundle-'));
-  const ref = `refs/aludel/base/${attemptId}`;
+  const ref = `refs/aludel/base/${attemptId}`, draftRef = `refs/aludel/draft/${attemptId}`;
+  const drafted = typeof draft === 'string' && /^[a-f0-9]{40}$/.test(draft) && (() => { try { return git(repo, ['cat-file', '-t', draft]).trim() === 'commit'; } catch { return false; } })();
   try {
     git(repo, ['update-ref', ref, base]);
-    git(repo, ['bundle', 'create', '--quiet', join(scratch, 'layer.bundle'), ref], { stdio: 'pipe' });
+    if (drafted) git(repo, ['update-ref', draftRef, draft]);
+    git(repo, ['bundle', 'create', '--quiet', join(scratch, 'layer.bundle'), ref, ...(drafted ? [draftRef] : [])], { stdio: 'pipe' });
     return readFileSync(join(scratch, 'layer.bundle'));
-  } finally { try { git(repo, ['update-ref', '-d', ref]); } catch { /* already gone */ } rmSync(scratch, { recursive: true, force: true }); }
+  } finally {
+    for (const name of [ref, draftRef]) { try { git(repo, ['update-ref', '-d', name]); } catch { /* already gone */ } }
+    rmSync(scratch, { recursive: true, force: true });
+  }
 }
 
 // Commits the sandbox's layer checkout for the agent, fetches it into the instance repository as the run's work branch and

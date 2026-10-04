@@ -37,8 +37,8 @@ export function stepPlan(journeys, steps) {
     if (start) { for (const step of own) settled.push({ id: step.id, status: byId.get(step.step).test ? 'no-fixture' : 'uncovered', detail: start }); continue; }
     const planned = own.map(step => {
       const test = byId.get(step.step).test ?? null;
-      const status = !test ? 'uncovered' : step.persona && !step.fixture ? 'no-fixture' : null;
-      return { id: step.step, route: step.path, test, ...(status ? { status, detail: status === 'no-fixture' ? `No fixture is declared for persona ${step.persona}.` : null } : {}) };
+      // A journey keeps one persona (J6), so a step past an entered first step always has its fixture.
+      return { id: step.step, route: step.path, test, ...(test ? {} : { status: 'uncovered', detail: null }) };
     });
     // A journey with nothing to run is settled here, without entering it or starting the runner.
     if (planned.every(step => step.status)) settled.push(...planned.map(step => ({ id: `${journey.id}.${step.id}`, status: step.status, detail: step.detail })));

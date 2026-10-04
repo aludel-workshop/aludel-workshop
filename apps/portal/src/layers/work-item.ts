@@ -125,6 +125,8 @@ export class WorkItemComponent {
     return this.openRun()?.id || (this.showNext() ? 'next' : last?.id || 'next'); });
   readonly selectedRun = computed(() => this.runs().find(run => run.id === this.selected()) || null);
   readonly stageBlock = computed(() => { const work = this.item(); if (!work) return null;
+    // J6: a run kept as a draft waits on the spec changes it suggested; its draft comes back when they are accepted.
+    if (work.blockedBy.length && work.context?.draft?.kept) return `Waiting on spec: ${work.blockedBy.map(id => this.ctx.workById().get(id)?.ref).join(', ')}. The draft from ${work.context.draft.runRef || 'its last run'} comes back to the next run.`;
     if (work.blockedBy.length) return `Blocked by ${work.blockedBy.map(id => this.ctx.workById().get(id)?.ref).join(', ')}`;
     if (!work.assignee) return 'Assign it to someone first';
     if (work.assignee.kind === 'agent' && !agentRunnable(work, this.ctx)) return `Agents can't run “${this.action()?.name || work.type}” yet. Assign it to a person.`;

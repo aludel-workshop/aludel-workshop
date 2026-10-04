@@ -38,11 +38,17 @@ export function validateJourney(journey) {
     if (!text(step.name, 200) || !text(step.trigger, 500) || !text(step.expected, 1000)) fail(`Journey ${journey.id} step ${step.id} needs a name, a trigger and what is expected.`);
     if (!optional(step.route, localPath)) fail(`Journey ${journey.id} step ${step.id}: a route is a local path.`);
     if (!optional(step.persona, value => idPattern.test(value))) fail(`Journey ${journey.id} step ${step.id} names its persona by ID.`);
+    // One persona per journey (J6): a flow that crosses roles is two journeys, e.g. an owner sends an invite and a member accepts it.
+    const persona = journey.persona ?? journey.steps.find(other => other.persona)?.persona;
+    if (step.persona && step.persona !== persona) fail(`Journey ${journey.id} step ${step.id} is entered as ${step.persona}, but the journey is ${persona}'s. A journey keeps one persona; split a flow that crosses roles into one journey per persona.`);
     if (!optional(step.page, value => text(value, 200)) || !optional(step.story, value => text(value, 200))) fail(`Journey ${journey.id} step ${step.id}: page and story are references.`);
     if (!optional(step.test, testRef)) fail(`Journey ${journey.id} step ${step.id}: a test is named <file>.spec.mjs#<test id>.`);
   }
   return journey;
 }
+
+// The one persona a journey is walked as: its own, or the one its steps name.
+export const journeyPersona = journey => journey.persona ?? journey.steps.find(step => step.persona)?.persona ?? null;
 
 const stepFields = ['name', 'page', 'route', 'persona', 'story', 'trigger', 'expected'];
 // What a new revision changed, by step ID. A step's test reference is the proof, not the spec, so it isn't a change.
@@ -88,10 +94,10 @@ export function reviewSteps(recipe, journeys) {
     validateJourney(journey);
     let previous = null;
     for (const step of journey.steps) {
-      const persona = step.persona ?? journey.persona ?? null;
+      const persona = journeyPersona(journey);
       const entry = persona ? recipe.personas[persona] : null;
       const reason = !step.route ? 'This step has no route in the app yet.' : !persona ? 'This step names no persona.' : !entry ? `No fixture is declared for persona ${persona}.` : null;
-      steps.push({ id: `${journey.id}.${step.id}`, journey: journey.id, revision: journey.revision, step: step.id, label: step.name, expected: step.expected, persona,
+      steps.push({ id: `${journey.id}.${step.id}`, journey: journey.id, revision: journey.revision, step: step.id, label: step.name, trigger: step.trigger, expected: step.expected, persona,
         fixture: entry?.fixture ?? null, session: entry?.session ?? null, path: step.route ?? null, after: previous, reset: previous === null, available: !reason, reason });
       previous = `${journey.id}.${step.id}`;
     }
@@ -104,7 +110,7 @@ export function reviewSteps(recipe, journeys) {
 export function coverage(journey, results = {}, recipe = null) {
   validateJourney(journey);
   const steps = journey.steps.map(step => {
-    const persona = step.persona ?? journey.persona ?? null;
+    const persona = journeyPersona(journey);
     const status = !step.test ? 'uncovered' : results[step.test] === 'passed' ? 'passed' : results[step.test] === 'failed' ? 'failed' : 'untested';
     return { step: step.id, test: step.test ?? null, status, fixture: recipe ? Boolean(persona && recipe.personas?.[persona]) : null };
   });

@@ -10,6 +10,7 @@ import { initKnowledge, knowledge } from '../server/knowledge.mjs';
 import { initCodeUnits } from '../server/code-units.mjs';
 import { journeyWork } from '../server/journey-work.mjs';
 import { initLayerSource } from '../server/layer-source.mjs';
+import { checkFollowUps, decideFollowUp, initLayerScope, recordFollowUps } from '../server/layer-scope.mjs';
 import { initOnboarding, loadCatalogs, onboarding } from '../server/onboarding.mjs';
 import { ensureProductWorkspace } from '../server/product-workspace.mjs';
 import { openSecretStore } from '../server/secret-store.mjs';
@@ -592,5 +593,121 @@ test('J5: a Specify run whose build lacks the journey, or holds it unsigned, can
     await check({ ...spec, entry: 'journey-billing', revision: 2 }, 'stale', /not proven \(stale\)/);
     await check({ ...spec, entry: 'journey-billing', revision: 1 }, 'unsigned', /not proven \(unsigned\)/);
     await check({ ...spec, entry: 'journey-invite', revision: 1 }, 'missing', /not proven \(missing\)/);
+  } finally { f.close(); }
+});
+
+// J6: an app bound to Code with an authored journey and a replica of a Pages flow, for follow-ups that change a spec.
+function codeApp(f) {
+  initLayerSource(f.db); initLayerScope(f.db);
+  const at = new Date().toISOString(), repo = join(f.root, 'j6-app');
+  mkdirSync(join(repo, '.aludel', 'outputs'), { recursive: true }); git(repo, 'init', '-q', '-b', 'main');
+  const step = (id, route) => ({ id, name: `Step ${id}`, route, trigger: `Goes to ${route}`, expected: `${id} works` });
+  writeFileSync(join(repo, '.aludel', 'review.json'), JSON.stringify({ version: 2, checks: [{ name: 'App tests', command: ['npm', 'test'] }], personas: { owner: { fixture: 'team', session: 'owner' } } }));
+  writeFileSync(join(repo, '.aludel', 'layer.json'), JSON.stringify({ schemaVersion: 1, hostSdkVersion: 1, key: 'platform', name: 'Code', path: '/code', authority: 'code_projection',
+    outputProvider: 'files', editorAdapter: 'none', outputs: [], tabs: [], knowledge: { charter: 'knowledge/charter.md', documents: [] }, work: { scope: 'layer' } }));
+  mkdirSync(join(repo, '.aludel', 'knowledge')); writeFileSync(join(repo, '.aludel', 'knowledge', 'charter.md'), '# Code\n');
+  writeFileSync(join(repo, '.aludel', 'outputs', 'journeys.json'), JSON.stringify({ journeys: [
+    { version: 1, id: 'invite-teammate', title: 'Invite a teammate', origin: 'authored', revision: 2, persona: 'owner', steps: [step('open', '/team'), step('send', '/team/invite')] },
+    { version: 1, id: 'first-world', title: 'Start a first world', origin: 'replica', revision: 3, persona: 'newcomer', source: { layer: 'pages', entry: 'flw-first', revision: 3 }, steps: [step('signup', '/signup')] }] }));
+  git(repo, 'add', '.'); git(repo, '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'app');
+  const commit = git(repo, 'rev-parse', 'HEAD');
+  f.db.prepare("INSERT OR IGNORE INTO layer_instances(project_id, layer_key, instance_id, created_at) VALUES (?, 'platform', 'inst-code', ?)").run(f.projectId, at);
+  f.db.prepare("INSERT OR IGNORE INTO layer_instances(project_id, layer_key, instance_id, created_at) VALUES (?, 'pages', 'inst-pages', ?)").run(f.projectId, at);
+  const instance = f.db.prepare("SELECT instance_id FROM layer_instances WHERE project_id = ? AND layer_key = 'platform'").get(f.projectId).instance_id;
+  f.db.prepare("INSERT OR REPLACE INTO layer_package_bindings(project_id, layer_key, layer_instance_id, repository_path, accepted_commit, installed_at) VALUES (?, 'platform', ?, ?, ?, ?)").run(f.projectId, instance, repo, commit, at);
+  for (const key of ['platform', 'pages']) f.db.prepare('INSERT OR IGNORE INTO layer_elevated_grants VALUES (?, ?, ?, ?, ?)').run(f.projectId, f.owner.id, key, 'test', at);
+  return { repo, commit };
+}
+
+test('J6: a follow-up that changes a journey is raised where its spec is kept', () => {
+  const f = fixture();
+  try {
+    codeApp(f);
+    const ask = target => ({ title: 'Invite several people at once', brief: 'The reviewer wants to paste a list of emails.', why: 'Out of scope for this run: the journey invites one person.', ...(target ? { target } : {}) });
+    const [own] = checkFollowUps(f.db, f.projectId, [ask({ journey: 'invite-teammate' })]);
+    assert.deepEqual([own.layer, own.target], ['platform', { journey: 'invite-teammate', title: 'Invite a teammate', revision: 2, layer: 'platform', entry: 'journey-invite-teammate', entryRevision: 2 }]);
+    // A replica's spec is the Pages flow it was imported from; naming another layer is refused with where it is kept.
+    const [replica] = checkFollowUps(f.db, f.projectId, [ask({ journey: 'first-world' })]);
+    assert.deepEqual([replica.layer, replica.target.entry], ['pages', 'flw-first']);
+    assert.throws(() => checkFollowUps(f.db, f.projectId, [{ ...ask({ journey: 'first-world' }), layer: 'platform' }]), /kept in the pages layer \(flw-first\)/);
+    assert.throws(() => checkFollowUps(f.db, f.projectId, [ask({ journey: 'billing' })]), /isn't in Code's accepted app \(invite-teammate, first-world\)/);
+    assert.throws(() => checkFollowUps(f.db, f.projectId, [ask({ journey: 'invite-teammate', route: '/team' })]), /names a journey by ID/);
+
+    const work = f.know.createWork(f.projectId, { action: 'product.brief', title: 'Invite flow', checks: ['Works'] }, f.owner.name);
+    recordFollowUps(f.db, { projectId: f.projectId, workId: work.id, proposalId: 'spr-j6', attemptId: 'att-j6', sourceLayer: 'platform', profileId: f.profile.id, followUps: [own, replica] });
+    const [first, second] = f.db.prepare('SELECT id FROM work_follow_ups WHERE attempt_id = ? ORDER BY position').all('att-j6').map(row => row.id);
+    // Code's own journey: creating raises Specify (J5) on it, signed as the agent and parked in the backlog.
+    const specify = decideFollowUp(f.db, f.know, f.owner, f.projectId, work.id, first, 'create');
+    assert.deepEqual([specify.followUp.target.journey, specify.work.title, specify.work.state, specify.work.context.journeyWork.kind, specify.work.context.journeyWork.revision, specify.work.context.createdBy.kind],
+      ['invite-teammate', 'Specify: Invite several people at once', 'suggested', 'specify', 3, 'agent']);
+    // The replica: the change goes to Pages, naming the flow.
+    const pages = decideFollowUp(f.db, f.know, f.owner, f.projectId, work.id, second, 'create').work;
+    assert.deepEqual([pages.layer, pages.context.specTarget.entry], ['pages', 'flw-first']);
+    assert.match(pages.context.suggestion, /changes flw-first \(revision 3\), which Code's journey first-world is imported from/);
+  } finally { f.close(); }
+});
+
+test('J6: walked steps are flagged with a note; a merge-or-draft question parks the draft behind its spec', async () => {
+  const f = fixture();
+  try {
+    const app = codeApp(f);
+    const journeyClaim = { id: 'invite-steps', kind: 'journey', journey: 'invite-teammate', revision: 2, steps: ['open', 'send'] };
+    const { work, issue } = f.start('product.brief', [], null, { claims: [journeyClaim] });
+    f.worker.submitProposal(f.scope, { attemptId: issue.native_ref.attempt_id, proposal: claim('A pet in the corner of your screen.') });
+    let [run] = f.history.list(f.projectId, work.id);
+    const save = input => f.history.saveReview(f.projectId, work.id, run.id, input);
+    assert.throws(() => save({ step: { claim: 'invite-steps', step: 'Not a step', value: 'ok' } }), /Unknown journey step/);
+    assert.throws(() => save({ step: { claim: 'invite-steps', step: 'send', value: 'flag' } }), /Say what is wrong/);
+    assert.throws(() => save({ verdict: { claim: 'note-1', value: 'reject' } }), /Say what is wrong with this claim/);
+    save({ step: { claim: 'invite-steps', step: 'open', value: 'ok' } });
+    run = save({ step: { claim: 'invite-steps', step: 'send', value: 'flag', note: 'Send gives no confirmation.' } });
+    assert.deepEqual(run.review.steps, { 'invite-steps/open': { value: 'ok', note: '' }, 'invite-steps/send': { value: 'flag', note: 'Send gives no confirmation.' } });
+    assert.throws(() => save({ verdict: { claim: 'invite-steps', value: 'accept' } }), /flagged step can't be approved/);
+    await assert.rejects(f.history.sign(f.owner, f.projectId, work.id, run.id, { outcome: 'accept' }, { accept: () => {} }), /Something in this run is flagged/);
+    run = save({ step: { claim: 'invite-steps', step: 'send', value: null } });
+    assert.throws(() => save({ answer: 'merge' }), /asks no question/);
+
+    // The run asks merge-or-draft about its committed change, with a follow-up that targets the journey.
+    const source = { branch: 'work/j6-draft', commit: 'a'.repeat(40), base: 'b'.repeat(40), tests: [] };
+    const content = JSON.parse(f.db.prepare('SELECT content_json FROM symphony_proposals WHERE id = ?').get(run.proposalId).content_json);
+    f.db.prepare('UPDATE symphony_proposals SET content_json = ? WHERE id = ?').run(JSON.stringify({ ...content, source, question: { ask: 'merge-or-draft', why: 'Bulk invites need a revised journey first.' } }), run.proposalId);
+    const [target] = checkFollowUps(f.db, f.projectId, [{ title: 'Invite several people at once', brief: 'Paste a list of emails.', why: 'The reviewer asked for it; the journey invites one.', target: { journey: 'invite-teammate' } }]);
+    recordFollowUps(f.db, { projectId: f.projectId, workId: work.id, proposalId: run.proposalId, attemptId: run.id, sourceLayer: 'platform', profileId: f.profile.id, followUps: [target] });
+    [run] = f.history.list(f.projectId, work.id);
+    assert.deepEqual(run.question, { ask: 'merge-or-draft', why: 'Bulk invites need a revised journey first.' });
+    assert.throws(() => save({ answer: 'later' }), /Answer merge or draft/);
+    run = save({ answer: 'draft' });
+    await assert.rejects(f.history.sign(f.owner, f.projectId, work.id, run.id, { outcome: 'accept' }, { accept: () => {} }), /park it instead/);
+    await assert.rejects(f.history.sign(f.owner, f.projectId, work.id, run.id, { outcome: 'park' }, {}), /Create the suggested spec change first/);
+    const specify = decideFollowUp(f.db, f.know, f.owner, f.projectId, work.id, run.followUps[0].id, 'create').work;
+    let rejected = false;
+    const parked = await f.history.sign(f.owner, f.projectId, work.id, run.id, { outcome: 'park', comment: 'Keep it until bulk invites are specified.' }, { reject: () => { rejected = true; } });
+    assert.deepEqual([parked.state, rejected], ['parked', true]);
+    const item = f.know.workList(f.projectId).find(entry => entry.id === work.id);
+    assert.deepEqual([item.state, item.blockedBy, item.context.draft], ['ready', [specify.id], { commit: source.commit, branch: source.branch, runRef: 'Run 1', kept: true }]);
+    assert.equal(f.know.workById(f.projectId, specify.id).context.journeyWork.parked, work.id, 'accepting the spec continues in the parked item');
+
+    // The spec is accepted at revision 3 with a new step: its Implement claims join the parked item, which then builds on its draft.
+    const journeys = JSON.parse(execFileSync('git', ['-C', app.repo, 'show', `${app.commit}:.aludel/outputs/journeys.json`]).toString());
+    journeys.journeys[0] = { ...journeys.journeys[0], revision: 3, steps: [...journeys.journeys[0].steps, { id: 'bulk', name: 'Paste emails', route: '/team/invite', trigger: 'Pastes a list', expected: 'Each gets an invite' }] };
+    writeFileSync(join(app.repo, '.aludel', 'outputs', 'journeys.json'), JSON.stringify(journeys));
+    git(app.repo, 'add', '.'); git(app.repo, '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'Specify bulk invites');
+    const specified = git(app.repo, 'rev-parse', 'HEAD'), at = new Date().toISOString();
+    const prerequisite = f.know.workList(f.projectId).find(entry => entry.context?.journeyWork?.kind === 'reviewable');
+    f.know.updateWork(f.owner, f.projectId, prerequisite.id, { blocks: [] });
+    f.know.updateWork(f.owner, f.projectId, specify.id, { state: 'ready', assignee: { kind: 'person', id: f.owner.id } });
+    f.runs.stage(f.owner, f.projectId, specify.id);
+    const started = f.history.startPerson(f.owner, f.projectId, specify.id);
+    f.history.submitPerson(f.owner, f.projectId, specify.id, started.id, { summary: 'Specified bulk invites.' });
+    f.db.prepare('INSERT INTO layer_review_integrations VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run('rvi-j6', started.id, f.projectId, 'platform', specified, app.commit, specified,
+      JSON.stringify({ id: 'rvi-j6', branch: 'review/specify', base: app.commit, commit: specified, submittedCommit: specified, files: [], tests: [] }), at);
+    f.db.exec('CREATE TABLE IF NOT EXISTS layer_review_journeys (integration_id TEXT PRIMARY KEY, commit_sha TEXT NOT NULL, steps_json TEXT NOT NULL, separability_json TEXT NOT NULL, ran_at TEXT NOT NULL)');
+    f.db.withProject(f.projectId, () => f.db.prepare("INSERT INTO layer_review_journeys VALUES (?, ?, ?, '{}', ?)").run('rvi-j6', specified,
+      JSON.stringify(['open', 'send', 'bulk'].map(step => ({ id: `invite-teammate.${step}`, status: step === 'bulk' ? 'uncovered' : 'passed' }))), at));
+    const before = f.know.workList(f.projectId).length;
+    const continued = journeyWork({ db: f.db, know: f.know }).afterAccept(f.owner, f.projectId, specify.id, started.id);
+    assert.equal(continued.id, work.id);
+    assert.equal(f.know.workList(f.projectId).length, before, 'no separate Implement item');
+    assert.deepEqual(continued.checks.find(check => check.kind === 'journey' && check.journey === 'invite-teammate' && check.revision === 3)?.steps, ['bulk']);
   } finally { f.close(); }
 });

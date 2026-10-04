@@ -7,8 +7,9 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { previewManager, previewImageName } from './previews.mjs';
 import { layerBinding } from './layer-source.mjs';
-import { localPath, reviewSteps, undeclaredSeams, validateJourney, validateReviewRecipe, validateSeams } from './journeys.mjs';
+import { journeyPersona, localPath, reviewSteps, undeclaredSeams, validateJourney, validateReviewRecipe, validateSeams } from './journeys.mjs';
 import { journeyRunnerImage, runJourneySteps, stepPlan } from './journey-runner.mjs';
+import { injectWalk, walkPath, walkScript } from './review-walk.mjs';
 
 const fail = (message, status = 409) => { throw Object.assign(new Error(message), { status }); };
 const git = (repo, ...args) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8', timeout: 30000, stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 16 * 1024 * 1024 });
@@ -49,7 +50,7 @@ export function separability(repo, commit, seams) {
   return { seamsFile: true, declared: seams.seams.length, undeclared: undeclaredSeams(files, seams) };
 }
 
-export function reviewPreviews({ db, portalRoot, dataDirectory, appOrigin, docker = 'docker', journeyImage = () => journeyRunnerImage({ docker }), idleMs = 10 * 60 * 1000, maxRunning = 2, retentionMs = 7 * 24 * 60 * 60 * 1000 }) {
+export function reviewPreviews({ db, portalRoot, dataDirectory, appOrigin, portalOrigins = [], docker = 'docker', journeyImage = () => journeyRunnerImage({ docker }), idleMs = 10 * 60 * 1000, maxRunning = 2, retentionMs = 7 * 24 * 60 * 60 * 1000 }) {
   const root = join(dataDirectory, 'review-workspaces'), tokens = new Map(), activity = new Map(), tickets = new Map(), visits = new Map(), pending = new Map();
   let buildTail = Promise.resolve(), sweeping = false;
   mkdirSync(root, { recursive: true });
@@ -75,7 +76,7 @@ export function reviewPreviews({ db, portalRoot, dataDirectory, appOrigin, docke
     const walked = db.prepare('SELECT * FROM layer_review_journeys WHERE integration_id = ? AND commit_sha = ?').get(id, row.commit_sha);
     const results = new Map((walked ? JSON.parse(walked.steps_json) : []).map(result => [result.id, result]));
     return { ...runtime.status(id), url: appOrigin(reviewHost(id)), fixtureCommit: row.commit_sha,
-      journeys: (inputs?.journeys || []).map(journey => ({ id: journey.id, title: journey.title, revision: journey.revision, origin: journey.origin })),
+      journeys: (inputs?.journeys || []).map(journey => ({ id: journey.id, title: journey.title, revision: journey.revision, origin: journey.origin, persona: journeyPersona(journey) })),
       steps: (inputs?.steps || []).map(step => ({ ...step, result: results.get(step.id) || null })), stepsRanAt: walked?.ran_at || null,
       separability: walked ? JSON.parse(walked.separability_json) : null,
       checks: build ? JSON.parse(build.checks_json) : [], checkedAt: build?.checked_at || null, available: Boolean(inputs),
@@ -246,8 +247,13 @@ export function reviewPreviews({ db, portalRoot, dataDirectory, appOrigin, docke
     const row = record(id); current(row); await room(id);
     const match = /^\/__aludel\/review-step\/([a-zA-Z0-9_-]+)$/.exec(new URL(request.url, 'http://preview.local').pathname);
     if (match) { if (request.method !== 'GET') fail('Method not allowed.', 405); return enterStep(id, match[1], response); }
+    if (new URL(request.url, 'http://preview.local').pathname === walkPath) {
+      const body = walkScript(portalOrigins);
+      response.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'content-length': Buffer.byteLength(body), 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
+      return response.end(body);
+    }
     if (new URL(request.url, 'http://preview.local').pathname.startsWith('/api/__aludel/')) fail('Review setup is only available through a review step.', 403);
     const port = await runtime.ensureRunning(id, join(root, id)); if (!port) fail('Open this preview from its review first.');
-    activity.set(id, Date.now()); return runtime.proxy(request, response, port, id);
+    activity.set(id, Date.now()); return runtime.proxy(request, response, port, id, { html: injectWalk });
   }, stopAll() { clearInterval(timer); runtime.stopAll(); } };
 }

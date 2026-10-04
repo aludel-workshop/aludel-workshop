@@ -6,7 +6,7 @@
 // rules are J1's pure contract in journeys.mjs.
 import { execFileSync } from 'node:child_process';
 import { layerBinding, layerReview } from './layer-source.mjs';
-import { codeLayer, implementClaims, journeyEntry, journeyOffer, reviewableGaps, setupRoute, specifyClaims, validateJourney, validateReviewRecipe } from './journeys.mjs';
+import { codeLayer, implementClaims, journeyEntry, journeyOffer, journeyPersona, reviewableGaps, setupRoute, specifyClaims, validateJourney, validateReviewRecipe } from './journeys.mjs';
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const git = (repo, ...args) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8', maxBuffer: 4 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] });
@@ -33,6 +33,20 @@ function recipeAt(repo, commit) {
 // The app implements the setup route when its own code (outside `.aludel/`) names it.
 function hasSetupRoute(repo, commit) {
   try { return Boolean(git(repo, 'grep', '-l', '-F', setupRoute, commit, '--', '.', ':(exclude).aludel').trim()); } catch { return false; }
+}
+
+// J6: where a journey's spec is kept, for a follow-up that suggests changing it. A replica's authority is the layer entry it
+// was imported from (a Pages flow); any other journey is Code's own. The follow-up is raised there, never on the copy.
+export function journeyTarget(db, projectId, id) {
+  let bound;
+  try { bound = layerBinding(db, projectId, codeLayer); } catch { fail('Code has no app repository yet, so a follow-up can\'t target one of its journeys.'); }
+  const { journeys, error } = journeysAt(bound.repo, bound.commit);
+  if (error) fail(`Code's journeys can't be read at the accepted head: ${error}`, 409);
+  const journey = journeys.find(entry => entry.id === id);
+  if (!journey) fail(`A follow-up targets journey ${id}, which isn't in Code's accepted app (${journeys.map(entry => entry.id).join(', ') || 'no journeys'}).`);
+  return journey.origin === 'replica'
+    ? { journey: id, title: journey.title, revision: journey.revision, layer: journey.source.layer, entry: journey.source.entry, entryRevision: journey.source.revision }
+    : { journey: id, title: journey.title, revision: journey.revision, layer: codeLayer, entry: journeyEntry(id), entryRevision: journey.revision };
 }
 
 export function journeyWork({ db, know }) {
@@ -75,18 +89,20 @@ export function journeyWork({ db, know }) {
     const journey = { id, title: clip(input?.journey?.title, 200) || existing?.title || title, revision: existing ? existing.revision + 1 : 1 };
     const claims = specifyClaims(journey);
     if (openItem(projectId, 'specify', work => work.journey === id)) fail(`Journey ${id} is already being specified. Finish or archive that item first.`, 409);
-    const personas = existing ? [...new Set(existing.steps.map(step => step.persona ?? existing.persona).filter(Boolean))] : clip(input?.persona, 64) ? [clip(input.persona, 64)] : [];
+    const personas = existing ? [journeyPersona(existing)].filter(Boolean) : clip(input?.persona, 64) ? [clip(input.persona, 64)] : [];
     const { recipe, error: recipeError } = recipeAt(bound.repo, bound.commit);
     const gaps = reviewableGaps({ recipe, recipeError, personas, setup: hasSetupRoute(bound.repo, bound.commit) });
     const what = existing ? `revise the “${journey.title}” journey (${journeyEntry(id)}, now at revision ${existing.revision})` : `draft the “${journey.title}” journey (${journeyEntry(id)}) from the app as it works today`;
     const item = know.createWork(projectId, { layer: codeLayer, layerScoped: true, title: `Specify: ${title}`.slice(0, 160), claims, checks: [],
       state: ['ready', 'suggested'].includes(input?.state) ? input.state : 'ready', ...(input?.priority ? { priority: input.priority } : {}), ...(input?.assignee ? { assignee: input.assignee } : {}),
-      context: { journeyWork: { kind: 'specify', journey: id, title: journey.title, revision: journey.revision, request: { title, brief } },
+      context: { journeyWork: { kind: 'specify', journey: id, title: journey.title, revision: journey.revision, request: { title, brief }, ...(input?.parked ? { parked: input.parked } : {}) },
+        ...(input?.createdBy ? { createdBy: input.createdBy } : {}),
         suggestion: `Before “${title}” is built, ${what}. The request: ${brief || title}\n\n` +
           `1. Characterize: for each step as the app does it today, write a test in .aludel/journeys/${id}.spec.mjs that passes on the current app, and name it in the step's test.\n` +
           `2. Specify: write ${journeyEntry(id)} at revision ${journey.revision} in .aludel/outputs/journeys.json, origin authored, with the steps the request needs. Keep the IDs of steps you keep; a new step gets a new ID. A new or changed step has no test yet.\n` +
           '3. Leave the app code alone: accepting this raises the Implement item that builds it.' },
-      logText: `Created by ${user.name} to specify journey ${id} before implementing “${title}”` }, user.name);
+      logText: input?.createdBy ? `Created by ${input.createdBy.name} as a follow-up to ${input.createdBy.workRef || input.createdBy.workId}; accepted by ${user.name}`
+        : `Created by ${user.name} to specify journey ${id} before implementing “${title}”` }, input?.createdBy?.name || user.name);
     let prerequisite = null;
     if (gaps.length) {
       prerequisite = reviewable(user, projectId, gaps);
@@ -119,6 +135,13 @@ export function journeyWork({ db, know }) {
       return note(`No Implement raised: the accepted app already does every step of ${work.journey} at revision ${after.revision}.`);
     const request = work.request || { title: after.title, brief: '' };
     const steps = planned.claims.find(claim => claim.kind === 'journey')?.steps || [];
+    // J6: a run kept as a draft waits on this spec. It becomes the Implement item, built on its own draft branch.
+    const parked = work.parked ? know.workById(projectId, work.parked) : null;
+    if (parked && parked.state !== 'done' && parked.context?.draft) {
+      know.addWorkClaims(projectId, parked.id, planned.claims, `${item.ref} specified ${work.journey} at revision ${after.revision}; it adds ${steps.length ? `steps ${steps.join(', ')}` : 'the journey'} to what this item proves`);
+      know.appendLog(workId, `Continues in ${parked.ref}, which builds ${work.journey} at revision ${after.revision} on its draft branch`, {}, { refs: [parked.id] });
+      return know.workById(projectId, parked.id);
+    }
     const implement = know.createWork(projectId, { layer: codeLayer, layerScoped: true, title: `Implement: ${request.title}`.slice(0, 160), claims: planned.claims, checks: [],
       state: 'ready', priority: item.priority, project: item.project || null,
       context: { journeyWork: { kind: 'implement', journey: work.journey, revision: after.revision, specify: workId, request },

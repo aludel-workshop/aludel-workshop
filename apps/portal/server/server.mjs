@@ -215,7 +215,7 @@ const symphonyWorkspaceRoot = resolve(process.env.MACHINE_SYMPHONY_WORKSPACE_ROO
 const candidates = codeCandidates({ db, candidateRoot: join(dataDirectory, 'code-candidates'), externalRoot: symphonyWorkspaceRoot });
 const candidatePreviews = previewManager({ db, portalRoot, workspaceRoot: join(dataDirectory, 'candidate-preview-workspaces'),
   logRoot: join(dataDirectory, 'candidate-preview-logs'), dataRoot: join(dataDirectory, 'candidate-preview-data'), runtime: 'docker', kind: 'candidate' });
-const integrationPreviews = reviewPreviews({ db, portalRoot, dataDirectory, appOrigin: slug => topology.appOrigin(slug) });
+const integrationPreviews = reviewPreviews({ db, portalRoot, dataDirectory, appOrigin: slug => topology.appOrigin(slug), portalOrigins: topology.portalOrigins });
 const candidateHost = id => `candidate-${createHash('sha256').update(id).digest('hex').slice(0, 12)}`;
 function settleSymphonyBatch(projectId, batchId) {
   if (!batchId) return;

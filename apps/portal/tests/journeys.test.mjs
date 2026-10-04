@@ -24,6 +24,13 @@ test('journeys validate as authored, observed or replica, with unique stable ste
   for (const journey of [cases.replica, cases.onboarding, cases.onboardingSpecified]) assert.equal(validateJourney(copy(journey)).id, journey.id);
   const duplicate = copy(cases.onboarding); duplicate.steps[1].id = 'sign-up';
   refuses(() => validateJourney(duplicate), /unique lowercase ID/);
+  // J6: one persona per journey. A step may repeat the journey's persona, never name another; a flow that crosses roles is two journeys.
+  const restated = copy(cases.replica); restated.steps[0].persona = 'newcomer';
+  assert.equal(validateJourney(restated).id, 'first-world');
+  const crossing = copy(cases.replica); crossing.steps[3].persona = 'member';
+  refuses(() => validateJourney(crossing), /entered as member, but the journey is newcomer's/);
+  const stepsOnly = copy(cases.onboarding); delete stepsOnly.persona; stepsOnly.steps[0].persona = 'newcomer'; stepsOnly.steps[1].persona = 'member';
+  refuses(() => validateJourney(stepsOnly), /keeps one persona/);
   const orphan = copy(cases.replica); delete orphan.source;
   refuses(() => validateJourney(orphan), /only a replica names its source/);
   const claimed = copy(cases.onboarding); claimed.source = cases.replica.source;
@@ -56,10 +63,10 @@ test('the v2 recipe maps personas to fixtures; Codex\'s v1 criterion-indexed sce
 test('review steps come from journeys: personas, resets and ordering are derived, and unavailable steps say why', () => {
   const steps = reviewSteps(copy(cases.recipe), [copy(cases.replica), copy(cases.onboardingSpecified)]);
   assert.deepEqual(steps.map(step => [step.id, step.persona, step.fixture, step.session, step.reset, step.after]), [
-    ['first-world.marketing', 'visitor', 'empty', null, true, null],
+    ['first-world.marketing', 'newcomer', 'fresh', null, true, null],
     ['first-world.signup', 'newcomer', 'fresh', null, false, 'first-world.marketing'],
     ['first-world.setup', 'newcomer', 'fresh', null, false, 'first-world.signup'],
-    ['first-world.world', 'member', 'populated', 'member', false, 'first-world.setup'],
+    ['first-world.world', 'newcomer', 'fresh', null, false, 'first-world.setup'],
     ['onboarding.sign-up', 'newcomer', 'fresh', null, true, null],
     ['onboarding.verify', 'newcomer', 'fresh', null, false, 'onboarding.sign-up'],
     ['onboarding.team', 'newcomer', 'fresh', null, false, 'onboarding.verify'],
@@ -69,7 +76,7 @@ test('review steps come from journeys: personas, resets and ordering are derived
   const reordered = copy(cases.replica); reordered.steps.reverse();
   const byId = new Map(reviewSteps(copy(cases.recipe), [reordered]).map(step => [step.id, step.path]));
   assert.equal(byId.get('first-world.signup'), '/signup');
-  const unready = copy(cases.onboardingSpecified); delete unready.steps[2].route; unready.steps[3].persona = 'admin';
+  const unready = copy(cases.onboardingSpecified); delete unready.steps[2].route; unready.persona = 'admin';
   const [, , team, dashboard] = reviewSteps(copy(cases.recipe), [unready]);
   assert.deepEqual([team.available, team.reason], [false, 'This step has no route in the app yet.']);
   assert.deepEqual([dashboard.available, dashboard.reason], [false, 'No fixture is declared for persona admin.']);
@@ -264,7 +271,8 @@ test('the pinned Code template accepts and refuses journeys as the host contract
     journey => { journey.steps[0].test = 'tests/onboarding.js'; },
     journey => { journey.revision = 0; },
     journey => { journey.origin = 'imported'; },
-    journey => { journey.steps = []; }];
+    journey => { journey.steps = []; },
+    journey => { journey.steps[1].persona = 'member'; }];
   for (const change of variants) {
     const journey = copy(cases.onboarding); change(journey);
     assert.throws(() => validateJourney(copy(journey)), 'the host refuses');

@@ -14,10 +14,10 @@
     "version": 1, "id": "first-world", "title": "Start a first world", "origin": "replica", "revision": 3, "persona": "newcomer",
     "source": { "layer": "pages", "entry": "flow-first-world", "revision": 3 },
     "steps": [
-      { "id": "marketing", "name": "Arrive on the marketing page", "page": "page-home", "route": "/", "persona": "visitor", "trigger": "Opens the site", "expected": "Sees what a biome is and a Start button", "test": "first-world.spec.mjs#marketing" },
+      { "id": "marketing", "name": "Arrive on the marketing page", "page": "page-home", "route": "/", "trigger": "Opens the site", "expected": "Sees what a biome is and a Start button", "test": "first-world.spec.mjs#marketing" },
       { "id": "signup", "name": "Sign up", "page": "page-signup", "route": "/signup", "trigger": "Chooses Start", "expected": "Creates an account with email and password", "test": "first-world.spec.mjs#signup" },
       { "id": "setup", "name": "Initial setup", "page": "page-setup", "route": "/setup", "trigger": "Account created", "expected": "Names the world and picks a climate", "test": "first-world.spec.mjs#setup" },
-      { "id": "world", "name": "See the world", "page": "page-world", "route": "/world", "persona": "member", "trigger": "Finishes setup", "expected": "The world fills the screen", "story": "story-12" }
+      { "id": "world", "name": "See the world", "page": "page-world", "route": "/world", "trigger": "Finishes setup", "expected": "The world fills the screen", "story": "story-12" }
     ]
   },
   "onboarding": {

@@ -57,7 +57,7 @@ setup.stack = { ...setup.stack, options: { ...setup.stack.options, auth: true } 
 const generated = skeletonFiles(setup, catalogs, catalogs.sourceControlProfiles?.[catalogs.defaultSourceControlProfile] || { gitignore: ['node_modules/'], gitattributes: [] }, { portal: 'http://aludel.localhost', app: 'http://demo.localhost' }, [], loadScaffoldSources(new URL('..', import.meta.url).pathname));
 writeFileSync(join(workspace, 'server/server.mjs'), generated.files['server/server.mjs']);
 writeFileSync(join(workspace, 'Dockerfile'), 'FROM node:24-bookworm-slim\nWORKDIR /app\nCOPY . .\nRUN mkdir -p dist && cp src/review-page.html dist/index.html\nUSER node\nCMD ["node", "server/server.mjs"]\n');
-const html = label => `<!doctype html><html><head><title>Review demo</title></head><body><h1>${label}</h1><p id="route"></p><p id="role"></p><script>document.querySelector('#route').textContent=location.pathname; fetch('/api/session').then(r=>r.json()).then(v=>document.querySelector('#role').textContent=v.account?.email||'anonymous');</script></body></html>`;
+const html = label => `<!doctype html><html><head><title>Review demo</title></head><body><h1>${label}</h1><a href="/posts/demo/comments">Comments</a><p id="route"></p><p id="role"></p><script>document.querySelector('#route').textContent=location.pathname; fetch('/api/session').then(r=>r.json()).then(v=>document.querySelector('#role').textContent=v.account?.email||'anonymous');</script></body></html>`;
 writeFileSync(join(workspace, 'src/review-page.html'), html('Before'));
 writeFileSync(join(workspace, 'tests/app.test.mjs'), `import test from 'node:test'; import assert from 'node:assert/strict'; import {readFileSync} from 'node:fs'; test('the demo obtains identity through the real session API',()=>assert.ok(readFileSync('src/review-page.html','utf8').includes("fetch('/api/session')")));\n`);
 // JOURNEYS-01 J3: the v2 recipe maps personas to the starter fixture; review steps come from journeys.
@@ -67,7 +67,8 @@ writeFileSync(join(workspace, '.aludel/review.json'), JSON.stringify({ version: 
 mkdirSync(join(workspace, '.aludel/outputs'));
 writeFileSync(join(workspace, '.aludel/outputs/journeys.json'), JSON.stringify({ journeys: [
   { version: 1, id: 'edit-post', title: 'Edit a post', origin: 'authored', revision: 1, persona: 'author', steps: [{ id: 'editor', name: 'Review the post editor', route: '/posts/demo/edit', trigger: 'Opens the post', expected: 'The editor opens as the demo author.' }] },
-  { version: 1, id: 'read-post', title: 'Read a post', origin: 'authored', revision: 1, persona: 'viewer', steps: [{ id: 'page', name: 'Review the viewer page', route: '/posts/demo', trigger: 'Opens the post', expected: 'The post opens as the demo viewer.' }] }] }));
+  { version: 1, id: 'read-post', title: 'Read a post', origin: 'authored', revision: 1, persona: 'viewer', steps: [{ id: 'page', name: 'Review the viewer page', route: '/posts/demo', trigger: 'Opens the post', expected: 'The post opens as the demo viewer.' },
+    { id: 'comments', name: 'Read the comments', route: '/posts/demo/comments', trigger: 'Chooses Comments', expected: 'The comments open, still as the demo viewer.' }] }] }));
 git(workspace, 'add', '.');
 git(workspace, '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'initial');
 initLayerContract(db); initCodeUnits(db); initCodeLayer(db); initCodeRepository(db);
@@ -149,19 +150,21 @@ try {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   const signIn = await context.request.post(`${portal}/api/sign-in`, { data: { email: 'owner@example.com', password } }); assert.ok(signIn.ok(), await signIn.text());
   const page = await context.newPage(); page.on('pageerror', error=>errors.push(error.message));
+  // JOURNEYS-01 J6: the review prepares and builds on open. Runs whose claims are notes enter any journey from the Tests view.
   await page.goto(`${portal}/p/${project.slug}/work/item/${work.id}/review/1`);
-  await page.getByRole('heading', {name:/Review W-\d+ · Run 1/}).waitFor();
-  await page.getByRole('button',{name:/Walk 2 journey steps in Preview/}).click({timeout:120000});
-  const authorButton = page.getByRole('button',{name:'Review the post editor'});
-  try { await authorButton.waitFor({timeout:30000}); } catch (error) { await page.screenshot({path:`${out}/failure.png`,fullPage:true}); console.error((await page.locator('body').innerText()).slice(-7000)); console.error('RUN', JSON.stringify((await (await context.request.get(`${portal}/api/projects/${projectId}/work/${work.id}/runs`)).json()).runs[0])); console.error('SERVER', serverLog.slice(-3000)); throw error; }
-  await page.waitForFunction(()=>[...document.querySelectorAll('button')].some(b=>b.textContent.includes('Review the post editor')&&!b.disabled),null,{timeout:120000});
-  await page.screenshot({path:`${out}/guided-review-wide.png`,fullPage:true});
-  const previewFrame = page.frameLocator('iframe[title="Candidate preview"]');
-  await authorButton.click();
-  await previewFrame.locator('#route').getByText('/posts/demo/edit', {exact:true}).waitFor();
+  await page.getByRole('heading', {name:/W-\d+ · Run 1/, level:1}).waitFor();
+  const previewFrame = page.frameLocator('#wr-frame');
+  const openStep = async (name, persona) => {
+    await page.getByRole('button',{name:'Tests',exact:true}).click();
+    const open = page.getByRole('button',{name:`Open ${name} as ${persona}`});
+    try { await open.waitFor({timeout:180000}); } catch (error) { await page.screenshot({path:`${out}/failure.png`,fullPage:true}); console.error((await page.locator('body').innerText()).slice(-7000)); console.error('RUN', JSON.stringify((await (await context.request.get(`${portal}/api/projects/${projectId}/work/${work.id}/runs`)).json()).runs[0])); console.error('SERVER', serverLog.slice(-3000)); throw error; }
+    await open.click();
+  };
+  await openStep('Review the post editor', 'author');
+  try { await previewFrame.locator('#route').getByText('/posts/demo/edit', {exact:true}).waitFor({timeout:180000}); } catch (error) { await page.screenshot({path:`${out}/failure-open.png`,fullPage:true}); throw error; }
   await previewFrame.getByText('author@demo.invalid', {exact:true}).waitFor();
   await page.screenshot({path:`${out}/author-step.png`,fullPage:true});
-  await page.getByRole('button',{name:'Review the viewer page'}).click();
+  await openStep('Review the viewer page', 'viewer');
   await previewFrame.locator('#route').getByText('/posts/demo', {exact:true}).waitFor();
   await previewFrame.getByText('viewer@demo.invalid', {exact:true}).waitFor();
   await page.screenshot({path:`${out}/viewer-step.png`,fullPage:true});
@@ -169,7 +172,7 @@ try {
   const violations = await page.evaluate(async()=>(await window.axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}})).violations.map(v=>v.id)); assert.deepEqual(violations,[]);
   await page.setViewportSize({width:390,height:844}); await page.screenshot({path:`${out}/guided-review-narrow.png`,fullPage:true});
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'narrow viewport has no horizontal overflow');
-  for (const name of ['Refresh against latest', 'Rebuild checks']) { const box = await page.getByRole('button', {name,exact:true}).boundingBox(); assert.ok(box && box.x >= 0 && box.x + box.width <= 390, `${name} is fully visible at 390px`); }
+  for (const name of [/Under the hood/, /^Approve$/]) { const box = await page.getByRole('button', {name}).boundingBox(); assert.ok(box && box.x >= 0 && box.x + box.width <= 390, `${name} is fully visible at 390px`); }
   const apiBase = `${portal}/api/projects/${projectId}/work/${work.id}/runs/${attemptId}`;
   const detail = (await (await context.request.get(`${portal}/api/projects/${projectId}/work/${work.id}/runs`)).json()).runs[0];
   const wrong = await context.request.put(`${apiBase}/review`,{data:{integrationId:'old',verdict:{index:0,value:'accept'}}}); assert.equal(wrong.status(),409);
@@ -200,10 +203,11 @@ try {
   assert.equal(git(workspace, 'rev-parse', 'main'), combined.integration.commit);
   await page.goto(`${portal}/p/${project.slug}/work/item/${conflict.id}/review/1`);
   await page.getByText('The submission conflicts with the accepted repository. Send it back for resolution.', {exact:true}).waitFor();
-  await page.getByRole('button', {name:'Reject R',exact:true}).click();
-  await page.getByPlaceholder('What should change?').fill('Resolve this against the accepted page.');
-  await page.getByRole('button', {name:'Next',exact:true}).click();
-  await page.getByRole('button', {name:'Sign and send back',exact:true}).click();
+  await page.getByRole('button', {name:/^Flag( it)?$/}).click();
+  await page.getByLabel(/What is wrong/).fill('Resolve this against the accepted page.');
+  await page.getByRole('button', {name:'Save flag',exact:true}).click();
+  await page.locator('.wr-pickbtn').click(); await page.locator('.wr-menu').getByRole('button', {name:/^Finish/}).click();
+  await page.getByRole('button', {name:/Send back to/}).click();
   await page.waitForURL(new RegExp(`/work/item/${conflict.id}$`));
   assert.equal(git(workspace, 'rev-parse', 'main'), combined.integration.commit, 'rejecting an unprepared conflicting submission changes no accepted bytes');
 
@@ -241,24 +245,37 @@ try {
   await page.getByRole('tab',{name:/^Done/}).click();
   await page.locator('[role=tabpanel][aria-labelledby=sub-done]').getByRole('link',{name:personWork.title,exact:true}).click();
   await page.getByRole('link',{name:/Review/}).filter({hasText:'Review'}).first().click();
-  await page.getByRole('heading',{name:/Review W-\d+ · Run 1/}).waitFor();
+  await page.getByRole('heading',{name:/W-\d+ · Run 1/,level:1}).waitFor();
   // The journey claim comes first, with its step's proof on this build and the person's reason beside it.
   await page.getByText('Step tests on this build: No test').waitFor({timeout:120000});
   await page.getByText('The viewer step has no test yet; the next slice writes one.').waitFor();
   await page.screenshot({path:`${out}/person-review-claim.png`,fullPage:true});
-  await page.getByRole('button',{name:/Walk 1 step in Preview/}).click();
-  await page.getByRole('button',{name:'Review the post editor'}).waitFor();
-  await page.waitForFunction(()=>[...document.querySelectorAll('button')].some(b=>b.textContent.includes('Review the post editor')&&!b.disabled),null,{timeout:120000});
-  await page.getByRole('button',{name:'Review the post editor'}).click();
-  await page.frameLocator('iframe[title="Candidate preview"]').getByText('author@demo.invalid',{exact:true}).waitFor();
-  await page.getByRole('button',{name:'Review the viewer page'}).click();
-  await page.frameLocator('iframe[title="Candidate preview"]').getByText('viewer@demo.invalid',{exact:true}).waitFor();
+  // JOURNEYS-01 J6: walking the journey in the preview moves the review on. Following the link to the next step's page
+  // walks the first step; the last step is confirmed, and the review returns to the journey to decide.
+  const walk = page.getByRole('button',{name:'Walk the journey'});
+  await walk.click({timeout:180000});
+  await page.getByRole('heading',{name:'Review the viewer page',level:2}).waitFor();
+  const personFrame = page.frameLocator('#wr-frame');
+  await personFrame.getByText('viewer@demo.invalid',{exact:true}).waitFor({timeout:60000});
+  await page.screenshot({path:`${out}/person-walk-step-1.png`,fullPage:true});
+  await personFrame.getByRole('link',{name:'Comments'}).click();
+  await page.getByRole('heading',{name:'Read the comments',level:2}).waitFor();
+  await personFrame.locator('#route').getByText('/posts/demo/comments',{exact:true}).waitFor();
+  assert.equal(await page.locator('.wr-progress span.ok').count(), 1, 'the walked step shows on the progress line');
+  await page.screenshot({path:`${out}/person-walk-step-2.png`,fullPage:true});
+  await page.getByRole('button',{name:/^Looks good/}).click();
+  await page.getByRole('heading',{name:'Read a post',level:2}).waitFor();
+  assert.equal(await page.locator('.wr-progress span.ok').count(), 2);
+  await page.getByRole('button',{name:'Approve journey'}).click();
+  await page.getByText(/works as specified/).waitFor();
+  const walked = (await (await context.request.get(`${portal}/api/projects/${projectId}/work/${personWork.id}/runs`)).json()).runs[0].review;
+  assert.deepEqual(Object.keys(walked.steps).sort(), ['read-post-steps/comments','read-post-steps/page'], 'each walked step is recorded under its claim');
   await page.screenshot({path:`${out}/person-review.png`,fullPage:true});
   const personBase = `${portal}/api/projects/${projectId}/work/${personWork.id}/runs/${personRuns[0].id}`;
   const personReview = (await (await context.request.get(`${portal}/api/projects/${projectId}/work/${personWork.id}/runs`)).json()).runs[0];
   assert.deepEqual(personReview.task.criteria.map(claim=>claim.id),['read-post-steps','note-1','note-2']);
   assert.deepEqual([personReview.proofs['read-post-steps'].status, personReview.gate.map(entry=>entry.reason)],['uncovered',['The viewer step has no test yet; the next slice writes one.']]);
-  await page.getByRole('button',{name:'Sign off'}).click();
+  await page.locator('.wr-pickbtn').click(); await page.locator('.wr-menu').getByRole('button',{name:/^Finish/}).click();
   await page.getByText(/Accepting signs over 1 unproven claim that Charles gave a reason for/).waitFor();
   await page.screenshot({path:`${out}/person-review-signoff.png`,fullPage:true});
   for(const claim of ['read-post-steps','note-1','note-2']) assert.ok((await context.request.put(`${personBase}/review`,{data:{integrationId:personReview.integration.id,verdict:{claim,value:'accept'}}})).ok());

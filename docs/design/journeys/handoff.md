@@ -2,12 +2,24 @@
 id: JOURNEYS-01-HANDOFF
 kind: handoff
 status: active
-updated: 2026-10-03
+updated: 2026-10-04
 ---
 
-# JOURNEYS-01 handoff: J5 done; J6 (owner prototype round) next
+# JOURNEYS-01 handoff: J6 built and checked, owner look next
 
 For a fresh agent (Claude in the cloud) picking up JOURNEYS-01. Run `tools/branch-handoffs.sh` first: this packet's slices have been landing on cloud-session branches that the owner hasn't merged into `main`, so the newest handoff may be on a branch. Then read this, [AGENTS.md](../../../AGENTS.md), [status](../../status.md), the [JOURNEYS-01 work record](work-record.md) (plan, authorizations, run log, retrospectives), [DEC-063](../../decisions.md) and the [deferred code-tracing record](../code-tracing/deferred.md).
+
+## Update 2026-10-04: J6 built
+
+The J6 build is on `claude/j6-prototype-ptl3we` (draft PR #1): one persona per journey, targeted spec follow-ups, the merge-or-draft question and parked drafts, the walk script, and the rebuilt review screen. See the [J6 build run log](work-record.md#j6-build-2026-10-04-claude-cloud-session) for evidence and what's left. Later the same day, with `layer-base` and Docker: the Code template's persona rule is on `layer-base` branch `claude/j6-one-persona` (`82cb9ef`, a fast-forward of `code`, pinned here), and all four review browser journeys pass. **Next:** the owner looks at the screen, merges PR #1 and fast-forwards `code`. Then J7 (person check). Before any Docker check in a cloud session, follow step 4 below exactly (proxy for `dockerd`, prebuilt runner image, uid 1000).
+
+## Update 2026-10-03: J6 prototype v2
+
+Round 1 feedback is recorded as R1–R14 in the [J6 section](work-record.md#round-1-feedback-and-prototype-v2-2026-10-03); [v2](j6/v2/index.html) applies it and asks round-2 questions. The J6 build must also make `journeys.mjs` reject step personas (one persona per journey, §2). Both walkthroughs reuse the same font route.
+
+## Update 2026-10-03: J6 prototype v1
+
+[Prototype v1](j6/v1/index.html) is on branch `claude/j6-prototype-ptl3we` (from `main` at `ab37a3c`). The owner reviews it against Q1–Q7 in the [J6 section](work-record.md#j6-walk-review-prototype-round-2026-10-03-claude-cloud-session). Next: record their answers per question, then either a v2 round or, once they accept, the J6 build in `work-review.ts` (journey claims get the walk as their review body; record and note claims keep the claim panel). Re-run `j6/v1/walkthrough.mjs` (it needs `PLAYWRIGHT_MODULE` and `AXE_PATH`; it fetches fonts through `curl` because Chromium reaches Google Fonts unreliably through the session proxy).
 
 ## Update 2026-10-03: J5 done
 

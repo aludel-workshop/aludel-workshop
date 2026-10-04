@@ -1575,6 +1575,17 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
       .run(JSON.stringify([...item.log, entry]), changes.state || null, changes.context ? JSON.stringify(changes.context) : null, now(), workId);
     return workRow(db.prepare('SELECT * FROM layer_work_items WHERE id = ?').get(workId));
   }
+  // J6: a parked item takes the claims of the spec it waited on (journey-work afterAccept). Backed claims replace those with
+  // the same ID; notes stay as they were.
+  function addWorkClaims(projectId, workId, claims, logText) {
+    const item = workById(projectId, workId);
+    if (!item) fail('Work item not found.', 404);
+    const added = backedClaims(claims), ids = new Set(added.map(claim => claim.id));
+    const checks = [...item.checks.filter(check => !ids.has(check.id)), ...added];
+    if (checks.length > 40) fail('A Work item has up to forty claims.');
+    db.prepare('UPDATE layer_work_items SET checks_json = ? WHERE id = ?').run(JSON.stringify(checks), workId);
+    return appendLog(workId, logText);
+  }
   const setWorkContext = (workId, context) => db.prepare('UPDATE layer_work_items SET context_json = ?, updated_at = ? WHERE id = ?').run(context ? JSON.stringify(context) : null, now(), workId);
 
   // What an item changed: every revision made from it, as field differences against the revision before (WORK-UX-01).
@@ -1918,7 +1929,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
   }
 
   return { catalogs, ensureFlows, requestPageChange, reviewFlow, ensureDesign, syncDesignFromLook, addBrandTemplate, ensureProject, ensureAgents, ensureRoles, ensurePackData, ensureBrief, ensurePlan, ensureLibrary, addComment, generateDoc, briefRevision, mayDo, projectFor, insert, update, remove, list, get, view, navRoutes, seedPages, saveNavRoutes, applyPacks, createWork, updateWork, appendLog,
-    setWorkContext, workList, workById, blockersOf, workChanges, recordBuild, history, revisionData, revisionAt, kinds, openApi, referrers, openWorkItem, applyAnswer, suggestions, syncBacklog,
+    addWorkClaims, setWorkContext, workList, workById, blockersOf, workChanges, recordBuild, history, revisionData, revisionAt, kinds, openApi, referrers, openWorkItem, applyAnswer, suggestions, syncBacklog,
     migrateWork, ensureRoutines, runRoutines, instructionPins, actionRecord, actionIdFor, roleView, resolveAssignee, defaultProfile, members, agentExport,
     onRevision: listener => revisionListeners.push(listener), onWorkDone: listener => doneListeners.push(listener) };
 }

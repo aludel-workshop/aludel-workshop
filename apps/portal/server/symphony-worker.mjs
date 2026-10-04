@@ -684,12 +684,12 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
       const value = know.catalogs?.[name];
       return [name, Array.isArray(value) ? value : value && typeof value === 'object' ? Object.keys(value) : []];
     }));
-    return { layer: layer.key, base: bundle.layerPackage.commit, branch: workBranchName(bundle.work.ref, row.id), root: bundle.layerPackage.root || '', outputs, catalogs };
+    return { layer: layer.key, base: bundle.layerPackage.commit, branch: workBranchName(bundle.work.ref, row.id), root: bundle.layerPackage.root || '', outputs, catalogs, draft: bundle.work.context?.draft?.commit || null };
   }
   function layerSourceBundle(scope, attemptId) {
     const { row, bundle, layer } = layerRun(scope, attemptId);
     if (!layer) fail('This attempt has no layer repository.', 404);
-    return layerBundle(db, { projectId: scope.projectId, key: layer.key, base: bundle.layerPackage.commit, attemptId: row.id });
+    return layerBundle(db, { projectId: scope.projectId, key: layer.key, base: bundle.layerPackage.commit, attemptId: row.id, draft: bundle.work.context?.draft?.commit || null });
   }
   function commitLayer(scope, { attemptId, message, tests = [] }) {
     const { row, bundle, layer } = layerRun(scope, attemptId, { working: true });
@@ -706,13 +706,24 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     const changes = draftChanges(db, scope.projectId, row.id);
     if (changes.length) checkDraftCurrent(db, runLayerApi(scope, row, bundle), scope.projectId, row.id);
     const source = layerBranch(db, row.id);
+    // J6: one question per run, with options the host can act on. Merge-or-draft asks whether the reviewed repository change
+    // merges now or waits, as a draft, for the spec changes its follow-ups suggest.
+    let question = null;
+    if (proposal.question !== undefined && proposal.question !== null) {
+      const value = proposal.question;
+      if (!value || typeof value !== 'object' || value.ask !== 'merge-or-draft' || Object.keys(value).some(key => !['ask', 'why'].includes(key))) fail('A run question is { ask: "merge-or-draft", why }.', 400);
+      if (typeof value.why !== 'string' || value.why.trim().length < 10 || value.why.length > 1000) fail('Say why the reviewer should choose, in 10 to 1000 characters.', 400);
+      if (!source) fail('Merge-or-draft asks about a repository change; commit one with aludel_layer_commit first (a kept draft is at refs/aludel/draft in layer/).', 400);
+      if (!followUps.some(entry => entry.target)) fail('Merge-or-draft waits on a spec change: propose a follow-up that targets the journey it changes.', 400);
+      question = { ask: 'merge-or-draft', why: value.why.trim() };
+    }
     if (!changes.length && !source && !content.notes?.trim() && !followUps.length) fail('Stage at least one change, or submit a note or a follow-up.');
     const usedInputs = proposal.usedInputs || [];
     if (!Array.isArray(usedInputs) || usedInputs.length > 200 || !usedInputs.every(ref => ref && typeof ref.id === 'string' && Number.isInteger(ref.revision) && ref.revision > 0))
       fail('Invalid used inputs.');
     for (const ref of usedInputs) if (knowledgeRead(scope, row.bundle_digest, ref.id, ref.revision).currentRevision !== ref.revision)
       fail('A used record changed; reassess before submitting.', 409);
-    return { changes, source, notes: content.notes?.trim() || '', followUps, usedInputs };
+    return { changes, source, notes: content.notes?.trim() || '', followUps, usedInputs, question };
   }
   function prepareProposalReview(user, projectId, workId, proposalId, rebuild = false) {
     const entry = know.workById(projectId, workId);
@@ -798,7 +809,7 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
       readOnlyWorkspace(row, bundle);
       const id = `spr-${randomUUID()}`, layerKey = bundle.guidance.layerScope.key;
       const result = { id, action: `layer:${layerKey}`, scope: 'layer', layer: layerKey, summary: proposal.summary.trim(), changes: checked.changes, source: checked.source, notes: checked.notes,
-        followUps: checked.followUps, usedInputs: checked.usedInputs, repositoryCommit: bundle.repository.commit, submission: proposal };
+        followUps: checked.followUps, usedInputs: checked.usedInputs, question: checked.question, repositoryCommit: bundle.repository.commit, submission: proposal };
       atomic(() => {
         db.prepare("INSERT INTO symphony_proposals VALUES (?, ?, ?, ?, ?, ?, 'submitted', ?, NULL)")
           .run(id, attemptId, scope.projectId, row.work_id, result.action, JSON.stringify(result), now());

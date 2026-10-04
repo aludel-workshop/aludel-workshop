@@ -36,6 +36,8 @@ def used_names():
         # Quoted words inside {{ ... }} icon expressions may be icons or compared state values; keep only real glyphs.
         for dynamic in re.findall(r'<mat-icon[^>]*>\s*\{\{(.*?)\}\}\s*</mat-icon>', text):
             candidates.update(re.findall(r"'([a-z0-9_]+)'", dynamic))
+        # Icon tables such as { passed: ['check_circle', 'Passed'] } pair a glyph with its label; templates index into them.
+        candidates.update(re.findall(r"\[\s*'([a-z0-9_]+)',\s*'[A-Z]", text))
     for path in (root / 'config').glob('*.json'):
         names.update(re.findall(r'"icon":\s*"([a-z0-9_]+)"', path.read_text(encoding='utf8')))
     return sorted(names), candidates

@@ -77,6 +77,12 @@ if (layer?.layer) {
     git(checkout, 'init', '--quiet');
     git(checkout, 'fetch', '--quiet', bundleFile, `refs/aludel/base/${attemptId}:refs/aludel/base`);
     if (git(checkout, 'rev-parse', 'refs/aludel/base') !== layer.base) fail('The layer repository download does not match the run base.');
+    // J6: an item kept as a draft brings its draft commit, for the run to merge and build on.
+    if (layer.draft) {
+      if (!/^[a-f0-9]{40}$/.test(layer.draft)) fail('Aludel returned an invalid draft commit.');
+      git(checkout, 'fetch', '--quiet', bundleFile, `refs/aludel/draft/${attemptId}:refs/aludel/draft`);
+      if (git(checkout, 'rev-parse', 'refs/aludel/draft') !== layer.draft) fail('The draft download does not match the kept draft.');
+    }
     git(checkout, 'checkout', '--quiet', '-b', layer.branch, layer.base);
     appendFileSync(join(workspace, '.git', 'info', 'exclude'), '/layer/\n');
   } else {
