@@ -94,7 +94,8 @@ const routeOf = (path: string | null | undefined) => (path || '').split(/[?#]/)[
                         @for (step of preview()!.steps!; track step.id) { <tr [class.wr-claimed]="claimedStep(step)"><td>{{ journeyTitle(step.journey) }}</td><td>{{ step.label }}</td>
                           <td><mat-icon aria-hidden="true" [class]="'wr-t-' + (step.result?.status || 'skipped')">{{ stepResult[step.result?.status || 'none'][0] }}</mat-icon>{{ stepResult[step.result?.status || 'none'][1] }}
                             @if (step.result?.screenshot) { · <a [href]="screenshotUrl(step.id)" target="_blank" rel="noopener">screenshot<span class="visually-hidden"> of {{ step.label }}</span></a> }
-                            @if (step.result?.detail) { <small>{{ step.result!.detail }}</small> }</td></tr> }</tbody></table>
+                            @if (step.result?.detail) { <small>{{ step.result!.detail }}</small> }
+                            @if (r.state === 'review' && r.integration && step.available && preview()?.status === 'running' && firstStep(step)) { <button type="button" class="lay-button ghost small wr-open" (click)="openFromTests(step)">Open<span class="visually-hidden"> {{ step.label }}</span>@if (step.persona) { as {{ step.persona }}}</button> }</td></tr> }</tbody></table>
                     }
                     <h2 class="wr-eyebrow">Checks</h2>
                     <ng-container [ngTemplateOutlet]="testList" />
@@ -602,6 +603,9 @@ export class WorkReviewComponent implements OnDestroy {
       this.walkPath.set(null); this.previewDestination.set(value.url);
     });
   }
+  // Any journey can be entered from its first step as its persona, also when no claim names it.
+  firstStep(step: ReviewStep) { return (this.preview()?.steps || []).find(other => other.journey === step.journey)?.id === step.id; }
+  openFromTests(step: ReviewStep) { this.viewChoice.set('preview'); this.openStep(step.id); }
   closePreview() { const r = this.run(); if (!r?.integration) return;
     void this.ctx.write(async () => { const value = await this.ctx.api<{ preview: ReviewPreview }>(`${this.runPath(r)}/close-preview`, 'POST', { integrationId: r.integration!.id }); this.preview.set(value.preview); });
   }
