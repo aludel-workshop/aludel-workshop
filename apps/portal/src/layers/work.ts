@@ -17,7 +17,7 @@ import { pollLiveBatches } from './work-shared';
   selector: 'aludel-work-layer', standalone: true,
   imports: [FormsModule, MatIconModule, WorkBoardComponent, WorkCreateComponent, WorkItemComponent, WorkReviewComponent, WorkAgentsComponent, WorkItemsComponent, WorkProjectsComponent, WorkTeamComponent],
   template: `
-  @if (tab() === 'create') { <aludel-work-create /> }
+  @if (tab() === 'create') { <aludel-work-board /><aludel-work-create /> }
   @else if (tab() === 'item' && ctx.segments()[3] === 'review') { <aludel-work-review [id]="ctx.segments()[2] || ''" [number]="ctx.segments()[4] || ''" /> }
   @else if (tab() === 'item') { <aludel-work-item [id]="ctx.segments()[2] || ''" /> }
   @else if (tab() === 'agents' && ctx.segments()[2]) { <aludel-work-agents [id]="ctx.segments()[2]" /> }

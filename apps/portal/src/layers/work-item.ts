@@ -4,7 +4,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ProjectContext, WorkChange, WorkRun, layerLabel, priorityLabel, priorityOrder, workStatusLabel } from './context';
-import { AvatarComponent, PriorityComponent, RefChipComponent, RoleChipComponent, agentRunnable, batchOf, isRunning } from './work-shared';
+import { AvatarComponent, PriorityComponent, RefChipComponent, RoleChipComponent, agentRunnable, agentStageBlock, batchOf, isRunning } from './work-shared';
 import { NextRunComponent, RunCardComponent, runTitle } from './work-run';
 
 
@@ -129,7 +129,7 @@ export class WorkItemComponent {
     if (work.blockedBy.length && work.context?.draft?.kept) return `Waiting on spec: ${work.blockedBy.map(id => this.ctx.workById().get(id)?.ref).join(', ')}. The draft from ${work.context.draft.runRef || 'its last run'} comes back to the next run.`;
     if (work.blockedBy.length) return `Blocked by ${work.blockedBy.map(id => this.ctx.workById().get(id)?.ref).join(', ')}`;
     if (!work.assignee) return 'Assign it to someone first';
-    if (work.assignee.kind === 'agent' && !agentRunnable(work, this.ctx)) return `Agents can't run “${this.action()?.name || work.type}” yet. Assign it to a person.`;
+    if (work.assignee.kind === 'agent' && !agentRunnable(work, this.ctx)) return agentStageBlock(work, this.ctx);
     return null; });
   readonly planProject = computed(() => this.ctx.projectById().get(this.item()?.project || '') || null);
   readonly checkpoint = computed(() => this.planProject()?.checkpoints.find(point => point.id === this.item()?.checkpoint)?.title || null);

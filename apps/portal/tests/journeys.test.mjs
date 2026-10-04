@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { createUser, initAccounts } from '../server/accounts.mjs';
-import { claimAt, claimGate, claimProof, claimsFromCriteria, claimText, coverage, implementClaims, journeyChange, journeyOffer, matchRoutes, reviewableGaps, reviewSteps, specifyClaims, standing, undeclaredSeams, validateClaims, validateJourney, validateReviewRecipe, validateSeams, nextNoteId } from '../server/journeys.mjs';
+import { claimAt, claimGate, claimProof, claimsFromCriteria, claimText, coverage, implementClaims, journeyChange, journeyOffer, matchRoutes, reviewableGaps, repositoryAppChanged, reviewSteps, specifyClaims, standing, undeclaredSeams, validateClaims, validateJourney, validateReviewRecipe, validateSeams, nextNoteId } from '../server/journeys.mjs';
 import { initKnowledge, knowledge } from '../server/knowledge.mjs';
 import { initOnboarding, loadCatalogs, onboarding } from '../server/onboarding.mjs';
 import { ensureProductWorkspace } from '../server/product-workspace.mjs';
@@ -278,4 +278,19 @@ test('the pinned Code template accepts and refuses journeys as the host contract
     assert.throws(() => validateJourney(copy(journey)), 'the host refuses');
     assert.throws(() => index(journey), 'and so does the template');
   }
+});
+
+
+test('empty journey registry bootstrap needs no app recipe; substantive review and app changes still do', () => {
+  const seed = { path: '.aludel/outputs/journeys.json', status: 'added', diff: 'diff --git a/x b/x\n--- /dev/null\n+++ b/x\n@@ -0,0 +1,3 @@\n+{\n+  "journeys": []\n+}\n' };
+  const changed = (...files) => repositoryAppChanged({ files }, '.aludel/');
+  assert.equal(changed(seed, { path: '.aludel/ui/code.ts' }), false);
+  assert.equal(changed({ ...seed, diff: seed.diff.replace('[]', '[{"id":"signup"}]') }), true);
+  assert.equal(changed({ ...seed, status: 'modified' }), true);
+  assert.equal(changed({ ...seed, status: 'deleted' }), true);
+  assert.equal(changed({ ...seed, diff: undefined }), true);
+  assert.equal(changed({ ...seed, diff: '+{"journeys":[],"other":true}' }), true);
+  for (const path of ['.aludel/review.json', '.aludel/seams.json', '.aludel/journeys/signup.spec.mjs', 'src/app.ts'])
+    assert.equal(changed(seed, { path }), true, path);
+  assert.equal(changed({ path: 'docs/product.md' }), false);
 });

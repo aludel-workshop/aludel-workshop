@@ -16,9 +16,11 @@ The owner chose to keep **Biome** (2026-10-04). Biome was forked from an older C
 1. **Take Biome's Code template update.** Open the update item.
    - **No conflicts:** Aludel has already submitted the branch. Open **Review**, look at Changes and Under the hood, then accept. Biome's `.aludel/` now has the Journeys facet and the one-persona rule.
    - **Conflicts:** the item lists the conflicted files, and its branch keeps conflict markers in them. Check out that branch in Biome's repository, resolve the conflicts, commit, then submit it as your own run.
-2. **Make Biome reviewable, without writing criteria.** Under **Code › Tasks**, ask for the signup change Work #3 was about (a new member signs up and sets up their first world).
-   - Expected: either the *Make the app reviewable* prerequisite (because Biome's review recipe predates version 2), or *No journey covers … yet* with **Specify first**.
-   - Measured: whether you wanted to type free-text criteria anyway. This tests the reference-first rule.
+2. **Create the signup request without writing criteria.** Under **Code › Tasks › Create task**, enter a title and description for a new member signing up and setting up their first world. Set assignee/priority if useful, and save. Journeys and criteria are optional (DEC-064); Create must not interrupt with Specify or invent a charter criterion.
+   - Expected at creation: the task saves directly with exactly your selected criteria and references. W-8 is the original trial record; do not replace it automatically.
+   - At agent pickup: its first plan assesses affected journeys, preserves any owner attachments and adds uncovered steps with reasons. Multiple personas may require several journeys. No relevant journey is a valid conclusion for other kinds of tasks, with suitable review evidence.
+   - For this signup change, missing journey coverage should lead to a Specify proposal; Biome may first need *Make the app reviewable*. A person can also deliberately choose **Attach journey → Specify a new journey**.
+   - Measured: ease of creating the request, whether you wanted to add criteria, and whether the agent's journey assessment was correct. Code host/adapter checks demonstrate the contract locally; the real model-driven pickup remains part of this owner trial.
 3. **Specify.** Write the journey (one persona) and a characterization test for what Biome does today. Use **Check my branch** to see each step's result, then **Ready for review**. Review it, walk it, and accept it. This raises Implement, claiming only the steps Biome doesn't do yet.
 4. **Implement as a journey claim.** This is what Work #3 was for. Do it yourself (with *Check my branch*) or assign it to an agent. Review walks the claimed steps on the built candidate.
 5. **Tell Claude in the thread what felt wrong.** Each note becomes a line in the retrospective.

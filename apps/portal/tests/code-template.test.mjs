@@ -3,7 +3,7 @@
 // Runs with templates on (npm run test:server:templates); the compiled Code layer is tested by lay-07 and code-layer.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -25,6 +25,10 @@ import { loadScaffoldSources, skeletonFiles, writeFiles } from '../server/scaffo
 import { openSecretStore } from '../server/secret-store.mjs';
 import { openDatabase } from '../server/storage.mjs';
 import { initWorkflow } from '../server/workflow.mjs';
+import { initAgentRuns } from '../server/agent-runs.mjs';
+import { initSymphonyWorker } from '../server/symphony-worker.mjs';
+import { initWorkRuns, workRuns } from '../server/work-runs.mjs';
+import { initLayerScope } from '../server/layer-scope.mjs';
 
 const templates = process.env.MACHINE_LAYER_TEMPLATES_ENABLED === '1';
 const portalRoot = new URL('..', import.meta.url).pathname;
@@ -193,4 +197,52 @@ test('T03-CODE: a coding run on Code\'s repository goes through the generic laye
   assert.equal(git(workspace, 'rev-parse', 'main'), merged.commit);
   assert.match(readFileSync(join(workspace, 'src/app.ts'), 'utf8'), /a reviewed change/);
   assert.equal(db.prepare("SELECT accepted_commit AS c FROM layer_package_bindings WHERE project_id = ? AND layer_key = 'platform'").get(id).c, merged.commit);
+});
+
+test('restart keeps an older accepted Code package usable until its template update is reviewed', { skip: !templates }, () => {
+  const context = fixture();
+  const { root, db, id, workspace } = context;
+  try {
+    start(context);
+    ensureProjectRepositoryLayers(db, id);
+    const appHead = git(workspace, 'rev-parse', 'HEAD');
+    const templateRepo = join(portalRoot, '../../layer-base');
+    const older = git(templateRepo, 'rev-parse', '83ce28a^{commit}');
+    db.prepare('UPDATE layer_package_bindings SET repository_path = ?, accepted_commit = ?, template_commit = ? WHERE project_id = ? AND layer_key = ?')
+      .run(templateRepo, older, older, id, 'platform');
+    assert.equal(layerPackageForProject(db, id, 'platform').manifest.outputs.includes('journey'), false);
+    assert.doesNotThrow(() => initLayerContract(db), 'a newer catalog pin must not reject an older accepted package on restart');
+    assert.equal(layerPackageForProject(db, id, 'platform').commit, older, 'restart does not apply the template update');
+    assert.equal(git(workspace, 'rev-parse', 'HEAD'), appHead, 'restart keeps the app head');
+  } finally { db.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+
+test('Code can accept an empty journey registry bootstrap before the app has a review recipe', { skip: !templates }, async () => {
+  const context = fixture();
+  const { root, db, know, id, workspace, ada } = context;
+  try {
+    start(context); ensureProjectRepositoryLayers(db, id);
+    const seed = readFileSync(join(workspace, '.aludel/outputs/journeys.json'), 'utf8');
+    git(workspace, 'rm', '.aludel/outputs/journeys.json');
+    git(workspace, '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'Before journey registry');
+    const base = git(workspace, 'rev-parse', 'HEAD');
+    db.prepare("UPDATE layer_package_bindings SET accepted_commit = ? WHERE project_id = ? AND layer_key = 'platform'").run(base, id);
+    git(workspace, 'checkout', '-qb', 'template/bootstrap-journeys');
+    writeFileSync(join(workspace, '.aludel/outputs/journeys.json'), seed);
+    git(workspace, 'add', '.');
+    git(workspace, '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'Add empty registry');
+    const commit = git(workspace, 'rev-parse', 'HEAD');
+    git(workspace, 'checkout', '-q', 'main');
+    initAgentRuns(db); initSymphonyWorker(db); initWorkRuns(db); initLayerScope(db);
+    const history = workRuns({ db, know });
+    const item = know.createWork(id, { layer: 'platform', layerScoped: true, title: 'Bootstrap journeys', state: 'ready', checks: ['The layer is ready for journey specifications'] });
+    const run = history.hostRun(id, item.id, { branch: 'template/bootstrap-journeys', commit, summary: 'Add the empty registry.' });
+    const review = history.preparePersonReview(ada, id, item.id, run.id);
+    assert.equal(history.runFor(id, item.id, run.id).integration.appChanged, false);
+    let merged;
+    await history.sign(ada, id, item.id, run.id, { outcome: 'accept' }, { accept: () => { merged = history.acceptPersonRepository(ada, id, item.id, run.id, review.id, () => assert.fail('An empty registry must not require an app recipe')); } });
+    assert.equal(git(workspace, 'rev-parse', 'main'), merged.commit);
+    assert.equal(know.workById(id, item.id).state, 'done');
+  } finally { db.close(); rmSync(root, { recursive: true, force: true }); }
 });

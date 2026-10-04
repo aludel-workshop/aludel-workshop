@@ -185,6 +185,7 @@ defmodule SymphonyElixir.Aludel.Adapter do
           "required" => ["attemptId", "objectives"],
           "properties" => %{
             "attemptId" => %{"type" => "string", "pattern" => "^att-[0-9a-f-]{36}$"},
+            "journeyAssessment" => %{"type" => "object", "required" => ["reason", "journeys"], "properties" => %{"reason" => %{"type" => "string"}, "journeys" => %{"type" => "array", "items" => %{"type" => "object", "required" => ["journey", "revision", "steps", "why"], "properties" => %{"journey" => %{"type" => "string"}, "revision" => %{"type" => "integer"}, "steps" => %{"type" => "array", "items" => %{"type" => "string"}}, "why" => %{"type" => "string"}}}}}},
             "objectives" => %{"type" => "array", "minItems" => 1, "maxItems" => 12, "items" => %{"type" => "string", "minLength" => 3, "maxLength" => 160}}
           }
         }
@@ -435,10 +436,10 @@ defmodule SymphonyElixir.Aludel.Adapter do
     end
   end
 
-  def execute_agent_tool(@plan_tool, %{"attemptId" => attempt_id, "objectives" => objectives}, opts) do
+  def execute_agent_tool(@plan_tool, %{"attemptId" => attempt_id, "objectives" => _objectives} = args, opts) do
     settings = Keyword.get_lazy(opts, :tracker_settings, fn -> Config.settings!().tracker end)
 
-    case post_request("attempts/" <> attempt_id <> "/plan", %{"objectives" => objectives}, settings) do
+    case post_request("attempts/" <> attempt_id <> "/plan", Map.take(args, ["objectives", "journeyAssessment"]), settings) do
       {:ok, result} -> tool_result(true, result)
       {:error, reason} -> tool_result(false, %{"error" => inspect(reason)})
     end

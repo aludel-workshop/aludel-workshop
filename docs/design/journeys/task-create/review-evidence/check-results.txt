@@ -1,0 +1,23 @@
+2026-10-03 — Suggested-task review repair (JOURNEYS-01 J8)
+Typecheck: passed (existing optional-chain warnings). Build: passed.
+Suggested-task browser: passed with real disposable Go/registration/proposal, no provider turn. Two shared form drafts, no duplicate IDs, edited title/description/assignment/priority/Queue/criterion, multiple journey attachments, independent refresh persistence, simulated failed-save preservation, stale attachment 409, confirmation retry returns the same task, review stays open, original run remains review.
+1280x600: review fits available viewport; multiline error above review does not push its action bar below the viewport; form Create is reachable by scrolling.
+390px: editable form and Create visible after scrolling, no horizontal page overflow. Axe on active forms and finalized review: zero checked violations.
+Manual task composer browser regression: passed.
+Existing Work item/review browser: passed (preview, evidence, diff, under-hood and exact candidate review on disposable data).
+Affected server files after validator repair: 57 pass, 1 fail (test still expected original title after deliberately editing it). Corrected that expectation; final dependency/specification/review checks rerun: 6 pass, 0 fail, including the corrected test. Broader suites were not run in this follow-up.
+Five review screenshots inspected, including before, desktop stack, failed save with reachable Create, confirmed edited tasks, and phone editing.
+Local portal started with templates/dispatch on; HTTP 200 at :4310. Live W-9 and its proposed follow-up not created, accepted, dismissed or restaged.
+
+2026-10-03 — Empty-claim acceptance follow-up
+Real disposable zero-claim layer proposal: run-sign HTTP acceptance succeeds and closes the task; original creation/editing/review checks retained.
+Nonempty claims and elevated review guards: 2 focused tests pass.
+Empty task without an accepted durable output: final guard test passes.
+Local server restarted with no active/queued live batches. W-9 remains owner-controlled; no live acceptance performed.
+
+Missing Pages task repair — 2026-10-03
+Before fix: authored backlog preservation regression fails (task missing after sync).
+After fix: tests/lay-04.test.mjs 9 pass, 0 fail; historical generated gap cleanup still passes.
+Template mode authored backlog preservation: 1 pass, 0 fail.
+Suggested-task browser: pass, including two maintenance cycles, original zero-claim signature, actual Pages Backlog navigation and reload. Screenshot 05-pages-backlog.png visually inspected. Existing disposable fixture emits expected missing optional AGENTS.md/doc-sources git diagnostics.
+Live: restored W-10 (wrk-26ce2a3c), same ID/number, Pages instance 87a22cf5-ef04-42e4-86f1-d94bf1864ddb; state suggested/Backlog, unassigned, medium priority, no criteria. Existing follow-up decision unchanged. SQLite integrity ok. Survived actual startup sync; HTTP 200. No live Go, new owner decision or signature.

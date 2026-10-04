@@ -125,11 +125,11 @@ export interface RunStep { seq: number; kind: 'plan' | 'progress' | 'note' | 'ch
 export interface RunFollowUp { id: string; position: number; layer: string; layerName: string; sourceLayer: string; title: string; brief: string; why: string;
   // J6: the spec entry a follow-up would change, resolved by the host to the layer that keeps it.
   target?: { journey: string; title: string; revision: number; layer: string; entry: string; entryRevision: number } | null;
-  state: 'proposed' | 'created' | 'dismissed'; createdWorkId: string | null; createdRef: string | null; decidedBy: string | null; decidedAt: string | null; }
+  state: 'proposed' | 'created' | 'dismissed'; createdWorkId: string | null; createdRef: string | null; createdTitle?: string | null; createdBrief?: string | null; decidedBy: string | null; decidedAt: string | null; }
 export interface WorkRun { id: string; number: number; batchId: string | null; state: WorkRunState;
   performer: { kind: 'agent' | 'person'; id: string; label: string; model: string | null; effort: string | null };
   startedAt: string; finishedAt: string | null; turns: { used: number; limit: number };
-  task: { title: string; request: string; action: string | null; layerRepository?: { key: string; base: string; root: string }; criteria: (ClaimRef & { index: number; text: string; source: { id: string; revision?: number | null } | null })[];
+  task: { journeyAssessment?: { reason: string; journeys: { journey: string; revision: number; why: string }[] } | null; title: string; request: string; action: string | null; layerRepository?: { key: string; base: string; root: string }; criteria: (ClaimRef & { index: number; text: string; source: { id: string; revision?: number | null } | null })[];
     targets: { id: string; label: string; kind: string }[]; carried: { claim?: string; check: string; note: string; by: string }[]; carriedComment: string | null };
   live: { phases: string[]; phase: number | null; activity: string; model: string | null; usage: { input: number; output: number } | null } | null;
   steps: RunStep[]; blockReason: string | null; changes: RunChange[];

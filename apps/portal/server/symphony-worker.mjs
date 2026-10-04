@@ -1,3 +1,4 @@
+import { assessedRunClaims } from './run-journey-assessment.mjs';
 import { workActionMigration } from './lat08-migration.mjs';
 // Symphony worker boundary. A local pool credential is scoped to one project; each claimed attempt pins its own profile.
 // Polling reads only Go-snapshotted work and never grants authorization itself.
@@ -357,7 +358,7 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
   function taskOpen(scope, digest) {
     const bundle = activeBundle(scope, digest);
     const issue = current(scope, bundle.work.id);
-    return { digest, attemptId: issue.native_ref.attempt_id, ...compileTaskManifest(bundle) };
+    return { digest, attemptId: issue.native_ref.attempt_id, ...compileTaskManifest({ ...bundle, work: { ...bundle.work, checks: assessedRunClaims(db, issue.native_ref.attempt_id, bundle.work.checks) } }) };
   }
   // DEC-059: a layer-scoped run reads other layers through the Library: every installed layer's outputs and Knowledge,
   // and research. Kinds no layer publishes (project docs) keep the older record path.
@@ -956,7 +957,8 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     const layerScoped = row.action_id.startsWith('layer:');
     if (layerScoped) requireElevated(db, user, projectId, entry.layer, 'accept this review');
     else if (!know.mayDo(user, projectId, entry.action)) fail('The role lead must accept this proposal.', 403);
-    if (!entry.checks.length || entry.checks.some(check => check.verdict !== 'accept')) fail('Accept every Work check first.', 409);
+    // Layer tasks may intentionally have no authored claims (DEC-064); signing the run is still explicit.
+    if ((!layerScoped && !entry.checks.length) || entry.checks.some(check => check.verdict !== 'accept')) fail('Accept every Work check first.', 409);
     const attemptRow = db.prepare('SELECT * FROM symphony_attempts WHERE id = ?').get(row.attempt_id);
     const bundle = saved({ projectId, profileId: attemptRow.profile_id }, attemptRow.bundle_digest);
     for (const target of bundle.work.targets || []) {

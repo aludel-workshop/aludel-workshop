@@ -325,6 +325,18 @@ export function validateSeams(seams) {
 const mentionsAludel = /aludel/i;
 // The `.aludel/` files that change what a review builds, runs or walks. A change to only these still needs the combined build.
 export const reviewInputPath = path => /^\.aludel\/(?:review\.json|seams\.json|outputs\/journeys\.json|journeys\/[a-z][a-z0-9-]{0,63}\.spec\.mjs)$/.test(path);
+// Installing an empty registry bootstraps a layer; it adds no app behaviour or review steps.
+// Only a complete added-file diff proves this exception. Edits, deletions and unknown diffs remain review inputs.
+function emptyJourneyRegistry(file) {
+  if (file.path !== '.aludel/outputs/journeys.json' || file.status !== 'added' || typeof file.diff !== 'string') return false;
+  try {
+    const value = JSON.parse(file.diff.split('\n').filter(line => line.startsWith('+') && !line.startsWith('+++')).map(line => line.slice(1)).join('\n'));
+    return plain(value) && Object.keys(value).length === 1 && Array.isArray(value.journeys) && value.journeys.length === 0;
+  } catch { return false; }
+}
+export const repositoryAppChanged = (review, root) => Boolean(root) && review.files.some(file =>
+  !/^(?:docs\/|README\.md$|AGENTS\.md$|ARCHITECTURE\.md$)/.test(file.path) &&
+  ((reviewInputPath(file.path) && !emptyJourneyRegistry(file)) || !file.path.startsWith(root)));
 export function undeclaredSeams(files, seams) {
   validateSeams(seams);
   const declared = new Set(seams.seams.map(seam => seam.path));

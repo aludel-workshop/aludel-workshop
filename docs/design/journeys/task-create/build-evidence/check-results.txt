@@ -1,0 +1,34 @@
+2026-10-03 — JOURNEYS-01 task creation build
+Branch: main 440c2bd plus recorded local preparation repairs; fetched handoffs: no ahead remote branch.
+Typecheck: passed (existing optional-chain warnings).
+Build: passed.
+Task composer browser: passed; direct no-journey creation, metadata, optional criteria, sender/recipient attachments, persisted draft, failed save, dirty close, keyboard, stale revisions, 390px, composer axe; no script errors.
+Affected browser journeys: journey-work, code-layer, layer-bar, layer-scope: all passed.
+Focused final assessment / Work tests: 22 pass, 0 fail.
+Worker compatibility rerun: 2 pass, 0 fail (security-audit-worker and symphony-pool).
+Compiled Symphony adapter and disposable layer tool/review/sign harness: passed; no model turn.
+Initial complete server suite: 306 pass, 2 fail, 32 skips.
+Initial complete templates suite: 331 pass, 2 fail, 7 skips.
+Both initial failures were missing work_run_steps in historical worker fixtures; fixed by preserving original claims when run history is absent, then affected files rerun successfully. Full suites were not repeated after this compatibility correction; final focused tests include the added empty-assessment case.
+All six final composer screenshots inspected.
+Local portal startup: HTTP 200 at http://aludel.localhost:4310. W-8 left untouched.
+Unverified: real model-driven pickup/assessment and owner acceptance of the built form.
+
+2026-10-03 — Owner-reported modal overflow / agent staging follow-up
+Final typecheck and build: passed (existing warnings).
+Task composer browser: passed; 1280x600 with eight criteria, scrolling body and visible footer; existing 390px, drafts, errors, optional/multiple journeys and axe checks retained.
+Real disposable agent-assigned Code task: layer scope, action null, successful draft staging, zero Symphony attempts.
+Ineligible profile response fixture: staging remains disabled with accurate explanation.
+Short desktop and staged screenshots inspected.
+Portal HTTP 200; rebuilt frontend available on :4310. Live task left untouched.
+Existing Work item browser journey: passed.
+
+2026-10-03 — Biome W-9 worker-wait recovery
+Hook before identifier fix: 2 pass, 3 fail (short and maximum producer identifiers).
+Hook after identifier fix: 5 pass, 0 fail; exact Go checkout, reuse, fencing, turn reservation and layer preparation covered.
+local-hosts shell syntax: passed.
+Current Symphony adapter compile (warnings-as-errors) and escript: passed.
+Project-scoped recovery with --project biome --verify: passed, fresh heartbeat.
+Same existing W-9 attempt: authorized/0 turns/unregistered → working/1 of 3 turns/registered. Codex session and turn started 2026-10-04T06:01:56Z.
+Other two project workers retain original uptime. No new Go or acceptance.
+Remaining: portal pre-registration setup failures can remain labeled waiting; agent result and owner J8 retrospective still pending.

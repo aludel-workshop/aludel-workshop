@@ -1,0 +1,17 @@
+J8 accumulated fixes push verification — 2026-10-04
+Baseline: main 440c2bd. Branch: codex/j8-trial-task-review-fixes.
+
+Fresh checks:
+- npm run test:server: exit 0; 342 tests, 310 pass, 0 fail, 32 mode-specific skips; 484.975 seconds.
+- npm run test:server:templates: exit 0; 342 tests, 335 pass, 0 fail, 7 mode-specific skips; 540.644 seconds.
+- npm run typecheck: exit 0 (existing optional-chain diagnostics in pinned Pages UI).
+- npm run build: exit 0 (existing chunk-size and plugin-timing warnings).
+- node --test integrations/symphony/workspace-hook.test.mjs: 5 pass, 0 fail.
+- bash -n integrations/symphony/local-hosts: exit 0.
+- git diff --cached --check: exit 0.
+
+Browser evidence retained from the same implementation: manual task creation, agent create-to-stage without Go, suggested tasks edit/create/sign/maintenance/receiving-board reload, existing Work review; see build-evidence and review-evidence checks and captures. These browser checks were not all repeated during the push-only task.
+
+The full suites were slow while concurrent verification and other workspace jobs were active; a verification process was observed waiting for a filesystem journal commit. This is evidence of local contention, not a test failure. Prefer sequential full suites when the workstation is already busy.
+
+Live W-10 reconstruction was local operator recovery, not a source-code migration. The push excludes all live data, temporary recovery records, owner notes.txt and candidate checkouts. A fresh checkout does not recreate Biome W-10.

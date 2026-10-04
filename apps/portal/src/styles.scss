@@ -1865,3 +1865,18 @@ aludel-markdown-layer{display:block;--mde-line:var(--machine-line,#d9dce5);--mde
 .wr-owner{margin:0 14px 10px}
 .wr-diff.wr-diff-wrap span{white-space:pre-wrap;overflow-wrap:anywhere}
 .lay-frame-host{display:block}.lay-frame-view{display:block;width:100%;border:0;background:transparent}
+
+/* Review owns a bounded viewport on desktop; panels scroll and their action bars stay reachable. */
+@media(min-width:1001px){
+  .lay-body:has(aludel-work-review){height:100dvh;display:flex;flex-direction:column;min-height:0}
+  .lay-body:has(aludel-work-review)>.lay-topbar{flex-shrink:0}
+  .lay-main:has(aludel-work-review){flex:1;min-height:0;display:flex;flex-direction:column;padding-bottom:16px}
+  .lay-main:has(aludel-work-review)>.error-message,.lay-main:has(aludel-work-review)>.success-message,.lay-main:has(aludel-work-review)>.lay-working{flex-shrink:0}
+  .lay-main>aludel-work-layer:has(aludel-work-review){display:flex;flex-direction:column;flex:1;min-height:0}
+  aludel-work-review{display:block;flex:1;min-height:0}
+  .wr{height:100%;min-height:0}.wr-head,.wr-bar,.wr-actions{flex-shrink:0}.wr-body{min-height:0}.wr-frame{min-height:0}
+}
+.wr-suggestions{padding:16px;display:grid;gap:16px;align-content:start;min-width:0}
+.wr-suggestion-done{background:white;border:1px solid var(--machine-line);border-radius:8px;padding:20px;overflow-wrap:anywhere}
+.wr-agent-note p{white-space:pre-wrap;overflow-wrap:anywhere;margin:0 0 10px}
+@media(max-width:1000px){.wr{min-height:0;overflow:visible}.wr-right{min-height:0}.wr-suggestions{padding:12px}}

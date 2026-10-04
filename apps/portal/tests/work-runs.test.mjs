@@ -637,9 +637,11 @@ test('J6: a follow-up that changes a journey is raised where its spec is kept', 
     recordFollowUps(f.db, { projectId: f.projectId, workId: work.id, proposalId: 'spr-j6', attemptId: 'att-j6', sourceLayer: 'platform', profileId: f.profile.id, followUps: [own, replica] });
     const [first, second] = f.db.prepare('SELECT id FROM work_follow_ups WHERE attempt_id = ? ORDER BY position').all('att-j6').map(row => row.id);
     // Code's own journey: creating raises Specify (J5) on it, signed as the agent and parked in the backlog.
-    const specify = decideFollowUp(f.db, f.know, f.owner, f.projectId, work.id, first, 'create');
+    const specify = decideFollowUp(f.db, f.know, f.owner, f.projectId, work.id, first, 'create', { title: 'Clarify the invitation', suggestion: 'Keep the sender and recipient roles explicit.', assignee: null, priority: 'high', state: 'suggested', checks: ['Both roles are described.'], claims: [] });
+    assert.equal(specify.work.assignee, null); assert.equal(specify.work.priority, 'high');
+    assert.ok(specify.work.checks.some(check => check.text === 'Both roles are described.'));
     assert.deepEqual([specify.followUp.target.journey, specify.work.title, specify.work.state, specify.work.context.journeyWork.kind, specify.work.context.journeyWork.revision, specify.work.context.createdBy.kind],
-      ['invite-teammate', 'Specify: Invite several people at once', 'suggested', 'specify', 3, 'agent']);
+      ['invite-teammate', 'Specify: Clarify the invitation', 'suggested', 'specify', 3, 'agent']);
     // The replica: the change goes to Pages, naming the flow.
     const pages = decideFollowUp(f.db, f.know, f.owner, f.projectId, work.id, second, 'create').work;
     assert.deepEqual([pages.layer, pages.context.specTarget.entry], ['pages', 'flw-first']);
@@ -709,5 +711,50 @@ test('J6: walked steps are flagged with a note; a merge-or-draft question parks 
     assert.equal(continued.id, work.id);
     assert.equal(f.know.workList(f.projectId).length, before, 'no separate Implement item');
     assert.deepEqual(continued.checks.find(check => check.kind === 'journey' && check.journey === 'invite-teammate' && check.revision === 3)?.steps, ['bulk']);
+  } finally { f.close(); }
+});
+
+test('task creation preserves explicitly empty criteria and unassigned choice; omitted checks retain existing defaults', () => {
+  const f = fixture();
+  try {
+    const empty = f.know.createWork(f.projectId, { action: 'product.brief', title: 'A plain request', checks: [], assignee: null });
+    assert.deepEqual(empty.checks, []); assert.equal(empty.assignee, null);
+    assert.throws(() => f.know.updateWork(f.owner, f.projectId, empty.id, { state: 'done' }), /Name what this work checks or documents/, 'empty work without an accepted durable output still cannot close');
+    assert.ok(f.know.createWork(f.projectId, { action: 'product.brief', title: 'An automated default' }).checks.length);
+  } finally { f.close(); }
+});
+
+test('Code pickup assessment leaves Go immutable, exposes added claims to task/evidence/review, and freezes assessment', () => {
+  const f = fixture();
+  try {
+    codeApp(f);
+    const { work, issue } = f.start(null, [], null, { layer: 'platform', layerScoped: true, checks: ['Do not remove owner wording'], claims: [{ id: 'owner-step', kind: 'journey', journey: 'invite-teammate', revision: 2, steps: ['open'] }] });
+    const id = issue.native_ref.attempt_id, digest = issue.native_ref.bundle_digest;
+    const pinned = f.db.prepare('SELECT content_json FROM symphony_bundles WHERE digest = ?').get(digest).content_json;
+    const assessment = { reason: 'Sending affects invitation status too', journeys: [{ journey: 'invite-teammate', revision: 2, steps: ['open', 'send'], why: 'The sender sends and sees delivery status' }] };
+    assert.throws(() => f.history.reportPlan(f.projectId, id, ['Assess impact'], { reason: 'Affected', journeys: [{ journey: 'invite-teammate', revision: 1, steps: ['send'], why: 'Stale' }] }), /current revision/);
+    const result = f.history.reportPlan(f.projectId, id, ['Assess invitation impact', 'Update delivery'], assessment);
+    assert.deepEqual(result.claims.map(c => c.id), ['owner-step', 'note-1', 'impact-1']);
+    assert.deepEqual(f.worker.taskOpen(f.scope, digest).task.claims.find(c => c.id === 'impact-1').steps, ['send']);
+    assert.equal(f.history.checkEvidence(f.projectId, id, [{ claim: 'impact-1', step: 'send', type: 'test', ref: 'invite test' }])[0].claim, 'impact-1');
+    assert.equal(f.history.runFor(f.projectId, work.id, id).task.journeyAssessment.reason, assessment.reason);
+    assert.ok(f.history.runFor(f.projectId, work.id, id).gate.some(claim => claim.claim === 'impact-1'), 'Added journey claims participate in acceptance gating');
+    assert.equal(f.db.prepare('SELECT content_json FROM symphony_bundles WHERE digest = ?').get(digest).content_json, pinned);
+    assert.deepEqual(f.know.workById(f.projectId, work.id).checks.map(c => c.id), ['owner-step', 'note-1']);
+    assert.throws(() => f.history.reportPlan(f.projectId, id, ['Replace assessment'], assessment), /once/);
+  } finally { f.close(); }
+});
+
+test('Code pickup may conclude no journey applies and keep a plain task free of invented claims', () => {
+  const f = fixture();
+  try {
+    codeApp(f);
+    const { work, issue } = f.start(null, [], null, { layer: 'platform', layerScoped: true, checks: [] });
+    const id = issue.native_ref.attempt_id;
+    const result = f.history.reportPlan(f.projectId, id, ['Review documentation links'], { reason: 'Documentation only; review the changed text and checked links', journeys: [] });
+    assert.deepEqual(result.claims, []);
+    assert.deepEqual(f.worker.taskOpen(f.scope, issue.native_ref.bundle_digest).task.claims, []);
+    assert.deepEqual(f.know.workById(f.projectId, work.id).checks, []);
+    assert.equal(f.history.runFor(f.projectId, work.id, id).task.journeyAssessment.journeys.length, 0);
   } finally { f.close(); }
 });
