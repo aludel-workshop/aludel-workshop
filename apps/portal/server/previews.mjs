@@ -241,9 +241,24 @@ export function previewManager({ db, portalRoot, workspaceRoot, logRoot, runtime
     },
 
     // A failed connection forgets the preview, so the next request starts it again (a container can stop on its own).
-    proxy(request, response, port, projectId = null) {
+    // `html`, when given, rewrites HTML pages on their way to the browser (J6: review previews add their walk script). Those
+    // requests ask the app for an uncompressed body, so the rewrite sees text.
+    proxy(request, response, port, projectId = null, { html = null } = {}) {
+      const page = html && request.method === 'GET' && /text\/html/i.test(String(request.headers.accept || ''));
       const upstream = httpRequest({ host: '127.0.0.1', port, method: request.method, path: request.url,
-        headers: { ...request.headers, 'x-forwarded-host': request.headers.host, 'x-forwarded-proto': 'http' } }, upstreamResponse => {
+        headers: { ...request.headers, 'x-forwarded-host': request.headers.host, 'x-forwarded-proto': 'http', ...(page ? { 'accept-encoding': 'identity' } : {}) } }, upstreamResponse => {
+        const type = String(upstreamResponse.headers['content-type'] || '');
+        if (page && /^text\/html/i.test(type) && !upstreamResponse.headers['content-encoding']) {
+          const chunks = [];
+          upstreamResponse.on('data', chunk => chunks.push(chunk));
+          upstreamResponse.on('end', () => {
+            const body = Buffer.from(html(Buffer.concat(chunks).toString('utf8')), 'utf8');
+            const { 'content-length': _length, etag: _etag, ...headers } = upstreamResponse.headers;
+            response.writeHead(upstreamResponse.statusCode || 502, { ...headers, 'content-length': body.length, 'cache-control': 'no-store' });
+            response.end(body);
+          });
+          return;
+        }
         response.writeHead(upstreamResponse.statusCode || 502, upstreamResponse.headers);
         upstreamResponse.pipe(response);
       });
