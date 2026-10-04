@@ -1040,7 +1040,7 @@ async function api(request, response, url) {
     return json(response, result.status, result.body, { 'cache-control': 'no-store' });
   }
   // WORK-ITEM-UX-01: an item's runs, each with its own task snapshot, outputs, review and signature.
-  const runRoute = /^\/api\/projects\/([^/]+)\/work\/([^/]+)\/runs(?:\/([^/]+)\/(review|sign|submit|stop|prepare|preview|scenario|close-preview|step-screenshot))?$/.exec(url.pathname);
+  const runRoute = /^\/api\/projects\/([^/]+)\/work\/([^/]+)\/runs(?:\/([^/]+)\/(review|sign|submit|check|stop|prepare|preview|scenario|close-preview|step-screenshot))?$/.exec(url.pathname);
   if (runRoute) {
     const [, rawProject, rawWork, rawAttempt, operation] = runRoute;
     const projectId = decodeURIComponent(rawProject), workId = decodeURIComponent(rawWork), attemptId = rawAttempt ? decodeURIComponent(rawAttempt) : null;
@@ -1052,6 +1052,13 @@ async function api(request, response, url) {
       return json(response, 400, { error: 'Unknown run action.' });
     }
     if (operation === 'submit' && request.method === 'POST') return json(response, 200, runHistory.submitPerson(user, projectId, workId, attemptId, await readJson(request)), { 'cache-control': 'no-store' });
+    // JOURNEYS-01 J7: Check my branch builds and walks the person's branch as review will, then frees the preview slot.
+    if (operation === 'check' && request.method === 'POST') {
+      const integration = runHistory.checkPerson(user, projectId, workId, attemptId, await readJson(request));
+      await integrationPreviews.build(integration.id);
+      try { await integrationPreviews.close(integration.id); } catch { /* the idle sweep stops it */ }
+      return json(response, 200, { run: runHistory.runFor(projectId, workId, attemptId) }, { 'cache-control': 'no-store' });
+    }
     if (operation === 'stop' && request.method === 'POST') return json(response, 200, runHistory.stopPerson(user, projectId, workId, attemptId), { 'cache-control': 'no-store' });
     const reviewInputCurrent = (input, rejectionOnly = false) => {
       const run = runHistory.runFor(projectId, workId, attemptId);

@@ -1132,6 +1132,40 @@ test('an agent works on a Markdown layer through the same staged API, review and
   assert.equal(md.read(f.owner.id, f.projectId, research.key, doc.staged.id).content, '# Summary');
 }));
 
+// JOURNEYS-01 J7: Check my branch takes review's path on an integration of its own; review after submitting starts again.
+test('a person checks a branch before submitting, and review re-runs the submitted branch on its own integration', () => withPagesTemplate(async f => {
+  const history = workRuns({ db: f.db, know: f.know });
+  const work = layerTask(f, 'Person checks a branch', { assignee: { kind: 'person', id: f.owner.id } });
+  f.runs.stage(f.owner, f.projectId, work.id);
+  const started = history.startPerson(f.owner, f.projectId, work.id), before = pinOf(f);
+  assert.equal(started.check, null, 'nothing checked yet');
+  const checkout = join(f.root, 'person-check');
+  git(f.root, 'clone', '--quiet', before.repo, checkout);
+  git(checkout, 'switch', '-c', 'person-check');
+  edit(join(checkout, 'knowledge/flow-method.md'), text => text + '\nChecked before it is submitted.\n');
+  git(checkout, 'add', '.');
+  git(checkout, '-c', 'user.name=Person', '-c', 'user.email=person@example.invalid', 'commit', '-qm', 'Person changes');
+  const commit = git(checkout, 'rev-parse', 'HEAD');
+  git(before.repo, 'fetch', '--quiet', checkout, 'person-check:person-check');
+  assert.throws(() => history.checkPerson({ id: 'foreign' }, f.projectId, work.id, started.id, { branch: 'person-check', commit }), /Only the person/);
+  assert.throws(() => history.checkPerson(f.owner, f.projectId, work.id, started.id, { branch: 'person-check', commit: before.commit }), /branch changed/);
+  assert.throws(() => history.checkPerson(f.owner, f.projectId, work.id, started.id, { branch: 'missing-branch', commit }), /was not found/);
+  const checked = history.checkPerson(f.owner, f.projectId, work.id, started.id, { branch: 'person-check', commit });
+  assert.equal(checked.submittedCommit, commit);
+  const run = history.runFor(f.projectId, work.id, started.id);
+  assert.deepEqual([run.state, run.check.branch, run.check.commit, run.check.integration, run.check.current, run.check.ranAt], ['working', 'person-check', commit, checked.id, true, null]);
+  assert.ok(run.check.files.some(file => file.path === 'knowledge/flow-method.md'));
+  assert.equal(run.layerSource, null, 'a check submits nothing');
+  assert.equal(pinOf(f).commit, before.commit, 'a check changes no accepted bytes');
+  assert.equal(history.checkPerson(f.owner, f.projectId, work.id, started.id, { branch: 'person-check', commit }).id, checked.id, 'the same branch at the same base reuses the check');
+  history.submitPerson(f.owner, f.projectId, work.id, started.id, { summary: 'Submit the checked branch.', source: { branch: 'person-check', commit } });
+  assert.throws(() => history.checkPerson(f.owner, f.projectId, work.id, started.id, { branch: 'person-check', commit }), /Only active person work/);
+  const review = history.preparePersonReview(f.owner, f.projectId, work.id, started.id);
+  assert.notEqual(review.id, checked.id, 'review integrates the submission again');
+  assert.equal(review.submittedCommit, commit);
+  assert.equal(history.runFor(f.projectId, work.id, started.id).integration.id, review.id);
+}));
+
 test('a real person run submits an immutable repository branch and uses shared integration and checked acceptance', () => withPagesTemplate(async f => {
   const history = workRuns({ db: f.db, know: f.know });
   const work = layerTask(f, 'Person repository review', { assignee: { kind: 'person', id: f.owner.id } });

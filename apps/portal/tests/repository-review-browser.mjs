@@ -218,21 +218,63 @@ try {
   await page.getByRole('button', {name:'Stage in your batch',exact:true}).click();
   await page.getByRole('button', {name:"I'm working",exact:true}).click();
   await page.getByRole('button', {name:'Ready for review',exact:true}).waitFor();
+  // JOURNEYS-01 J7: the person's branch gives the viewer page a step test that fails; the comments step stays without one.
   const personCheckout = join(root, 'person-candidate');
   git(root, 'clone', '-q', workspace, personCheckout);
   git(personCheckout, 'checkout', '-q', '-b', 'person-review');
   writeFileSync(join(personCheckout,'src/person-review.mjs'),'export const personReview = true;\n');
+  mkdirSync(join(personCheckout,'.aludel/journeys'),{recursive:true});
+  writeFileSync(join(personCheckout,'.aludel/journeys/read-post.spec.mjs'),"export default {\n  page: async ({ page, assert, step }) => {\n    await page.goto(step.route);\n    assert.equal(await page.locator('h1').textContent(), 'The demo post');\n  }\n};\n");
+  const journeysFile = join(personCheckout,'.aludel/outputs/journeys.json'), journeys = JSON.parse(readFileSync(journeysFile,'utf8'));
+  journeys.journeys.find(journey=>journey.id==='read-post').steps[0].test = 'read-post.spec.mjs#page';
+  writeFileSync(journeysFile, JSON.stringify(journeys));
   git(personCheckout, 'add', '.');
   git(personCheckout, '-c','user.name=Test','-c','user.email=test@example.invalid','commit','-qm','A person candidate');
   const personCommit = git(personCheckout,'rev-parse','HEAD');
   git(workspace,'fetch','-q',personCheckout,'person-review:person-review');
-  await page.getByRole('button', {name:'Ready for review',exact:true}).click();
+  // Check my branch, before submitting: the same integration, build and step tests review will run.
   await page.getByLabel('Local branch',{exact:true}).fill('person-review');
   await page.getByLabel('Exact commit',{exact:true}).fill(personCommit);
+  await page.getByRole('button',{name:'Check my branch',exact:true}).click();
+  await page.getByRole('heading',{name:`Checked person-review at ${personCommit.slice(0,12)}`,exact:false}).waitFor({timeout:300000});
+  const checkReport = page.locator('.wi-checkreport');
+  await checkReport.getByRole('row').filter({hasText:'Review the viewer page'}).getByText('Test failed').waitFor();
+  await checkReport.getByRole('row').filter({hasText:'Read the comments'}).getByText('No test').waitFor();
+  await checkReport.getByRole('row').filter({hasText:'Review the post editor'}).getByText('No test').waitFor();
+  await checkReport.getByText(/: Failed$/).waitFor();
+  await page.screenshot({path:`${out}/person-check.png`,fullPage:true});
+  const checkedRun = (await (await context.request.get(`${portal}/api/projects/${projectId}/work/${personWork.id}/runs`)).json()).runs[0];
+  assert.deepEqual([checkedRun.state, checkedRun.layerSource, checkedRun.check.proofs['read-post-steps'].status], ['working', null, 'failed'], 'a check submits nothing');
+  assert.equal(git(workspace,'rev-parse','main'),combined.integration.commit,'a check changes no accepted code');
+  // Walk it on the dev server: the app runs with the preview flag and a local token; the console line signs in as the persona.
+  await checkReport.getByText('Walk it on your dev server').click();
+  const walkLine = await checkReport.getByLabel('Console line for Read a post').textContent();
+  mkdirSync(join(personCheckout,'dist'),{recursive:true}); writeFileSync(join(personCheckout,'dist/index.html'), readFileSync(join(personCheckout,'src/review-page.html')));
+  const devPort = await freePort(), devToken = 'local-walk-token';
+  const dev = spawn(process.execPath, [join(personCheckout, 'server/server.mjs')], { cwd: personCheckout, env: { ...process.env, PORT: String(devPort), HOST: '127.0.0.1', DATA_DIR: join(root, 'dev-app-data'), ALUDEL_REVIEW_PREVIEW: '1', ALUDEL_REVIEW_TOKEN: devToken }, stdio: 'ignore' });
+  try {
+    for (const deadline = Date.now() + 10000; ;) {
+      try { if ((await fetch(`http://127.0.0.1:${devPort}/api/health`)).ok) break; } catch {}
+      if (Date.now() > deadline) throw new Error('Dev app did not start');
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    const devPage = await context.newPage();
+    await devPage.goto(`http://127.0.0.1:${devPort}/`);
+    devPage.once('dialog', dialog => dialog.accept(devToken));
+    await devPage.evaluate(walkLine);
+    await devPage.waitForURL(`http://127.0.0.1:${devPort}/posts/demo`);
+    await devPage.locator('#role').getByText('viewer@demo.invalid',{exact:true}).waitFor();
+    await devPage.screenshot({path:`${out}/person-dev-walk.png`});
+    await devPage.close();
+  } finally { dev.kill(); }
+  await page.getByRole('button', {name:'Ready for review',exact:true}).click();
+  await page.getByText(`Submits person-review at ${personCommit.slice(0,12)}`,{exact:false}).waitFor();
+  await page.getByLabel(/^If its step tests won't pass yet, say why \(optional\)/).waitFor();
+  await page.getByText('Your check: Failed').waitFor();
   await page.getByLabel('What is ready for review',{exact:true}).fill('A genuine person-performed repository submission.');
   await page.locator('#person-evidence-note-1').fill('Open the author editor without a manual login.');
   await page.locator('#person-evidence-note-2').fill('Open the viewer page without navigating.');
-  await page.getByLabel("If its step tests won't pass yet, say why (optional)").fill('The viewer step has no test yet; the next slice writes one.');
+  await page.getByLabel(/^If its step tests won't pass yet, say why \(optional\)/).fill('The viewer page test expects the new heading; the next slice writes it.');
   await page.getByRole('button',{name:'Submit for review',exact:true}).click();
   await page.getByRole('link',{name:/Review/}).filter({hasText:'Review'}).first().waitFor();
   const personRuns = (await (await context.request.get(`${portal}/api/projects/${projectId}/work/${personWork.id}/runs`)).json()).runs;
@@ -247,8 +289,8 @@ try {
   await page.getByRole('link',{name:/Review/}).filter({hasText:'Review'}).first().click();
   await page.getByRole('heading',{name:/W-\d+ · Run 1/,level:1}).waitFor();
   // The journey claim comes first, with its step's proof on this build and the person's reason beside it.
-  await page.getByText('Step tests on this build: No test').waitFor({timeout:120000});
-  await page.getByText('The viewer step has no test yet; the next slice writes one.').waitFor();
+  await page.getByText('Step tests on this build: Failed').waitFor({timeout:300000});
+  await page.getByText('The viewer page test expects the new heading; the next slice writes it.').waitFor();
   await page.screenshot({path:`${out}/person-review-claim.png`,fullPage:true});
   // JOURNEYS-01 J6: walking the journey in the preview moves the review on. Following the link to the next step's page
   // walks the first step; the last step is confirmed, and the review returns to the journey to decide.
@@ -274,7 +316,13 @@ try {
   const personBase = `${portal}/api/projects/${projectId}/work/${personWork.id}/runs/${personRuns[0].id}`;
   const personReview = (await (await context.request.get(`${portal}/api/projects/${projectId}/work/${personWork.id}/runs`)).json()).runs[0];
   assert.deepEqual(personReview.task.criteria.map(claim=>claim.id),['read-post-steps','note-1','note-2']);
-  assert.deepEqual([personReview.proofs['read-post-steps'].status, personReview.gate.map(entry=>entry.reason)],['uncovered',['The viewer step has no test yet; the next slice writes one.']]);
+  assert.deepEqual([personReview.proofs['read-post-steps'].status, personReview.gate.map(entry=>entry.reason)],['failed',['The viewer page test expects the new heading; the next slice writes it.']]);
+  // The host's re-run on review's own integration matches what the person's check showed, step for step.
+  assert.notEqual(personReview.integration.id, personReview.check.integration, 'review integrated the submission again');
+  const stepsOf = id => JSON.parse(db.prepare('SELECT steps_json FROM layer_review_journeys WHERE integration_id = ?').get(id).steps_json).map(step=>[step.id,step.status]);
+  assert.deepEqual(stepsOf(personReview.integration.id), stepsOf(personReview.check.integration), 'the host re-run matches the check');
+  assert.deepEqual(stepsOf(personReview.integration.id).filter(([id])=>id.startsWith('read-post')), [['read-post.page','failed'],['read-post.comments','uncovered']]);
+  assert.deepEqual(personReview.proofs['read-post-steps'], personReview.check.proofs['read-post-steps']);
   await page.locator('.wr-pickbtn').click(); await page.locator('.wr-menu').getByRole('button',{name:/^Finish/}).click();
   await page.getByText(/Accepting signs over 1 unproven claim that Charles gave a reason for/).waitFor();
   await page.screenshot({path:`${out}/person-review-signoff.png`,fullPage:true});
