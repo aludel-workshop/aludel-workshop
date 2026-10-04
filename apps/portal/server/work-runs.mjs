@@ -42,6 +42,12 @@ export function initWorkRuns(db) {
   );`);
   // JOURNEYS-01 J4: a person states why a claim isn't proven yet when submitting over it; the reviewer reads it first.
   if (!db.prepare('PRAGMA table_info(work_person_runs)').all().some(column => column.name === 'reasons_json')) db.exec("ALTER TABLE work_person_runs ADD COLUMN reasons_json TEXT NOT NULL DEFAULT '{}'");
+  // J6: the reviewer walks a journey claim step by step (each looks good or is flagged with a note) and answers the run's question.
+  for (const table of ['work_run_reviews', 'work_person_run_reviews']) {
+    const columns = db.prepare(`PRAGMA table_info(${table})`).all().map(column => column.name);
+    if (!columns.includes('steps_json')) db.exec(`ALTER TABLE ${table} ADD COLUMN steps_json TEXT NOT NULL DEFAULT '{}'`);
+    if (!columns.includes('answer')) db.exec(`ALTER TABLE ${table} ADD COLUMN answer TEXT`);
+  }
   // JOURNEYS-01 J4: saved verdicts are keyed by claim ID. Runs reviewed before J4 kept them by criterion position, and their
   // pinned criteria read as `note-<position + 1>` (claimAt), so a position key moves to that ID. Runs once per review.
   for (const [table, key] of [['work_run_reviews', 'attempt_id'], ['work_person_run_reviews', 'run_id']]) {
@@ -56,7 +62,11 @@ export function initWorkRuns(db) {
 
 
 // Outcomes a reviewer can sign. Accepting applies the run; the others leave its changes unapplied and reopen the task.
-export const signOutcomes = { accept: 'accepted', reject: 'sent', close: 'closed' };
+// J6: parking keeps a reviewed repository change as a draft that waits on the spec changes the run suggested.
+export const signOutcomes = { accept: 'accepted', reject: 'sent', close: 'closed', park: 'parked' };
+// The answers a run's merge-or-draft question takes.
+export const questionAnswers = Object.freeze({ 'merge-or-draft': ['merge', 'draft'] });
+const stepKey = (claim, step) => `${claim}/${step}`;
 
 export function workRuns({ db, know, candidates = null }) {
   const personId = id => String(id || '').startsWith('person-run-');
@@ -131,6 +141,7 @@ export function workRuns({ db, know, candidates = null }) {
     return { changes, integration: integration && { ...integration, appRepository: Boolean(bundle.layerPackage?.root), appChanged: Boolean(bundle.layerPackage?.root) && integration.files.some(file => (reviewInputPath(file.path) || !file.path.startsWith(bundle.layerPackage.root)) && !/^(?:docs\/|README\.md$|AGENTS\.md$|ARCHITECTURE\.md$)/.test(file.path)), current: layerBinding(db, projectId, bundle.guidance.layerScope.key).commit === integration.base }, layerSource: layerSource && { branch: layerSource.branch, commit: layerSource.commit, base: layerSource.base,
         tests: (layerSource.tests || []).map(test => ({ ...test, source: 'agent-report' })) }, followUps: proposal ? followUpsForAttempt(db, row.id).map(entry => ({ ...entry, layerName: layerName(projectId, entry.layer),
         createdRef: entry.createdWorkId ? know.workById(projectId, entry.createdWorkId)?.ref || null : null })) : [], summary: proposal ? parse(proposal.content_json, {}).summary || null : null,
+      question: proposal ? parse(proposal.content_json, {}).question || null : null,
       candidate: candidate ? { id: candidate.id, state: candidate.state, commit: candidate.commit, base: candidate.base, checks: candidate.checks } : null,
       proposalId: proposal?.id || null, reportId: report?.id || null };
   }
@@ -192,7 +203,7 @@ export function workRuns({ db, know, candidates = null }) {
           || item.log.filter(entry => /^Blocked: /.test(entry.text)).pop()?.text.slice(9) || null : null,
         ...outputs,
         review: {
-          verdicts: parse(review?.verdicts_json, {}), flags: parse(review?.flags_json, {}),
+          verdicts: parse(review?.verdicts_json, {}), flags: parse(review?.flags_json, {}), steps: parse(review?.steps_json, {}), answer: review?.answer || null,
           outcome: review?.outcome || null, comment: review?.comment || null, signedBy: review?.signed_by || null, signedAt: review?.signed_at || null,
         },
       };
@@ -212,8 +223,8 @@ export function workRuns({ db, know, candidates = null }) {
         live: null, steps: steps(row.id), evidence: parse(row.evidence_json, []).map(legacyEvidence), reasons: parse(row.reasons_json, {}), blockReason: null,
         layerSource: source && { ...source, tests: source.tests.map(check => ({ ...check, source: 'person-report' })) },
         integration: integrated && { ...integrated, appRepository: Boolean(repository?.root), appChanged: appChanged(integrated, repository?.root), current: layerBinding(db, projectId, repository.key).commit === integrated.base },
-        changes: [...parse(row.changes_json, []), ...sourceChanges], candidate: null, proposalId: null, reportId: null, summary: row.summary || null,
-        review: { verdicts: parse(review?.verdicts_json, {}), flags: parse(review?.flags_json, {}),
+        changes: [...parse(row.changes_json, []), ...sourceChanges], candidate: null, proposalId: null, reportId: null, summary: row.summary || null, question: null,
+        review: { verdicts: parse(review?.verdicts_json, {}), flags: parse(review?.flags_json, {}), steps: parse(review?.steps_json, {}), answer: review?.answer || null,
           outcome: review?.outcome || null, comment: review?.comment || null, signedBy: review?.signed_by || null, signedAt: review?.signed_at || null },
       };
     });
@@ -253,6 +264,24 @@ export function workRuns({ db, know, candidates = null }) {
     if (run.state !== 'review') fail(`Run ${run.number} isn't waiting for review.`, 409);
     const verdicts = { ...run.review.verdicts };
     const flags = { ...run.review.flags };
+    const walked = { ...run.review.steps };
+    let answer = run.review.answer;
+    if (input.step) {
+      // J6: a journey claim's step, walked in the preview. Walking past it says it looks good; a flag always carries a note.
+      const claim = run.task.criteria.find(entry => entry.id === input.step.claim);
+      if (!claim || claim.kind !== 'journey' || !claim.steps?.includes(input.step.step)) fail('Unknown journey step.');
+      const value = input.step.value ?? null, key = stepKey(claim.id, input.step.step);
+      if (![null, 'ok', 'flag'].includes(value)) fail('A step looks good or is flagged.');
+      const note = clip(input.step.note, 1000);
+      if (value === 'flag' && !note) fail('Say what is wrong with this step.');
+      if (value === null) delete walked[key]; else walked[key] = { value, note: value === 'flag' ? note : '' };
+      if (value === 'flag' && verdicts[claim.id]?.value === 'accept') delete verdicts[claim.id];
+    }
+    if (input.answer !== undefined) {
+      if (!run.question) fail('This run asks no question.');
+      if (input.answer !== null && !questionAnswers[run.question.ask].includes(input.answer)) fail(`Answer ${questionAnswers[run.question.ask].join(' or ')}.`);
+      answer = input.answer;
+    }
     if (input.verdict) {
       // A claim by ID; a position is resolved to the claim it names now, and the verdict is kept by claim ID.
       const claim = input.verdict.claim !== undefined ? run.task.criteria.find(entry => entry.id === input.verdict.claim)
@@ -260,6 +289,8 @@ export function workRuns({ db, know, candidates = null }) {
       if (!claim) fail('Unknown claim.');
       const value = input.verdict.value ?? null;
       if (![null, 'accept', 'reject', 'skip'].includes(value)) fail('A claim is accepted, rejected or skipped.');
+      if (value === 'accept' && Object.entries(walked).some(([key, step]) => key.startsWith(`${claim.id}/`) && step.value === 'flag')) fail('A journey with a flagged step can\'t be approved. Send the run back with the flag, or clear it.', 409);
+      if (value === 'reject' && !clip(input.verdict.note ?? verdicts[claim.id]?.note, 1000)) fail('Say what is wrong with this claim.');
       if (value === null) delete verdicts[claim.id]; else verdicts[claim.id] = { value, note: clip(input.verdict.note ?? verdicts[claim.id]?.note, 1000) };
     }
     if (input.flag) {
@@ -268,18 +299,23 @@ export function workRuns({ db, know, candidates = null }) {
       if (input.flag.on === false) delete flags[id]; else flags[id] = clip(input.flag.note ?? flags[id], 1000);
     }
     const [table, key] = reviewTable(attemptId);
-    db.prepare(`INSERT INTO ${table}(${key}, project_id, work_id, verdicts_json, flags_json, updated_at) VALUES (?, ?, ?, ?, ?, ?)
-      ON CONFLICT(${key}) DO UPDATE SET verdicts_json = excluded.verdicts_json, flags_json = excluded.flags_json, updated_at = excluded.updated_at`)
-      .run(attemptId, projectId, workId, JSON.stringify(verdicts), JSON.stringify(flags), now());
+    db.prepare(`INSERT INTO ${table}(${key}, project_id, work_id, verdicts_json, flags_json, steps_json, answer, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(${key}) DO UPDATE SET verdicts_json = excluded.verdicts_json, flags_json = excluded.flags_json, steps_json = excluded.steps_json, answer = excluded.answer, updated_at = excluded.updated_at`)
+      .run(attemptId, projectId, workId, JSON.stringify(verdicts), JSON.stringify(flags), JSON.stringify(walked), answer, now());
     return runFor(projectId, workId, attemptId);
   }
 
   // Which signatures each run state allows (the run actions table in the work record).
   function assertSignable(run, outcome) {
-    if (!signOutcomes[outcome]) fail('Sign as accept, reject or close.');
+    if (!signOutcomes[outcome]) fail('Sign as accept, reject, park or close.');
     if (run.review.outcome) fail(`Run ${run.number} is already signed.`, 409);
     if (outcome === 'close' && !['failed', 'stopped'].includes(run.state)) fail(run.state === 'review' ? 'Accept or send back a run that is ready for review.' : 'Stop the run before closing it.', 409);
     if (outcome !== 'close' && run.state !== 'review') fail(`Run ${run.number} isn't waiting for review.`, 409);
+    // J6: approving means nothing is flagged; a run whose question was answered "keep as draft" is parked instead.
+    const flagged = Object.values(run.review.steps || {}).some(step => step.value === 'flag') || Object.values(run.review.verdicts).some(verdict => verdict.value === 'reject');
+    if (outcome === 'accept' && flagged) fail('Something in this run is flagged. Send it back with the flags, or clear them to approve.', 409);
+    if (outcome === 'accept' && run.question && run.review.answer !== 'merge') fail(run.review.answer === 'draft' ? 'You chose to keep this as a draft: park it instead of approving.' : 'Answer the run\'s question first.', 409);
+    if (outcome === 'park' && (run.question?.ask !== 'merge-or-draft' || run.review.answer !== 'draft')) fail('Only a run whose question was answered "keep as draft" is parked.', 409);
   }
 
   // The reviewer's notes, for the send-back feedback the next run receives.
@@ -287,10 +323,15 @@ export function workRuns({ db, know, candidates = null }) {
     const criteria = Object.entries(run.review.verdicts).filter(([, verdict]) => verdict.value === 'reject')
       .map(([id, verdict]) => ({ claim: id, check: run.task.criteria.find(claim => claim.id === id)?.text || id, note: verdict.note }));
     const changes = Object.entries(run.review.flags).map(([id, note]) => ({ check: `Change: ${run.changes.find(change => change.id === id)?.name || id}`, note }));
+    // J6: a flagged step goes back under its journey claim, naming the step.
+    const walked = Object.entries(run.review.steps || {}).filter(([, step]) => step.value === 'flag').map(([key, step]) => {
+      const [claimId, stepId] = key.split('/'); const claim = run.task.criteria.find(entry => entry.id === claimId);
+      return { claim: claimId, check: `${claim?.text || claimId} · step ${stepId}`, note: step.note };
+    });
     // A claimed step that isn't proven goes back as feedback too, with what the test reported, unless the reviewer flagged it.
     const steps = (run.gate || []).filter(entry => !run.review.verdicts[entry.claim] || run.review.verdicts[entry.claim].value !== 'reject').map(entry => ({ claim: entry.claim, check: entry.text,
       note: `Not proven on the reviewed build (${entry.status}): ${(run.proofs[entry.claim]?.steps || []).filter(step => step.status !== 'passed').map(step => `${step.id} ${step.status}${step.detail ? ` (${step.detail})` : ''}`).join('; ') || run.proofs[entry.claim]?.detail || 'no step results'}`.slice(0, 1000) }));
-    return [...criteria, ...steps, ...changes];
+    return [...criteria, ...walked, ...steps, ...changes];
   }
 
   function recordSignature(user, projectId, workId, attemptId, outcome, comment) {
@@ -309,6 +350,19 @@ export function workRuns({ db, know, candidates = null }) {
     return runFor(projectId, workId, attemptId);
   }
 
+  // J6: a parked item waits on the spec items its run's targeted follow-ups created. Each one names the item, so accepting
+  // a Code journey's Specify adds its Implement claims to this item instead of raising a separate Implement (journey-work).
+  const parkedOn = (projectId, run) => run.followUps.filter(entry => entry.target && entry.state === 'created' && entry.createdWorkId).map(entry => know.workById(projectId, entry.createdWorkId)).filter(Boolean);
+  function park(user, projectId, workId, run) {
+    const specs = parkedOn(projectId, run);
+    for (const spec of specs) {
+      know.updateWork(user, projectId, spec.id, { blocks: [...new Set([...spec.blocks, workId])] });
+      const fresh = know.workById(projectId, spec.id);
+      if (fresh.context?.journeyWork?.kind === 'specify') know.setWorkContext(spec.id, { ...fresh.context, journeyWork: { ...fresh.context.journeyWork, parked: workId } });
+    }
+    know.appendLog(workId, `Kept as a draft; waits on ${specs.map(spec => spec.ref).join(', ')}`, {}, { refs: specs.map(spec => spec.id), by: { kind: 'person', id: user.id } });
+  }
+
   // The reviewer's signature closes a run. Accepting applies it through the action's own checked boundary (handlers.accept);
   // rejecting or closing leaves its outputs unapplied, keeps them on this run, and reopens the task with the notes carried in.
   async function sign(user, projectId, workId, attemptId, { outcome, comment = '' }, handlers = {}) {
@@ -325,8 +379,15 @@ export function workRuns({ db, know, candidates = null }) {
       item.checks.forEach(check => { if (check.verdict !== 'accept') know.updateWork(user, projectId, workId, { verdict: { claim: check.id, value: 'accept' } }); });
       await handlers.accept(run);
     } else {
-      if (outcome === 'reject' && handlers.reject) await handlers.reject(run);
+      if (outcome === 'park' && !parkedOn(projectId, run).length) fail('Create the suggested spec change first: a parked draft waits on it.', 409);
+      if (['reject', 'park'].includes(outcome) && handlers.reject) await handlers.reject(run);
       know.updateWork(user, projectId, workId, { reopen: { feedback: reviewNotes(run), comment, outcome } });
+      // J6: the run's committed repository change comes back to the item as its draft: the next run merges it and builds on
+      // it, so a send-back never makes the agent start over. Parked, the item also waits on the spec changes it suggested.
+      const source = run.layerSource;
+      const item = know.workById(projectId, workId);
+      if (outcome !== 'close' && source?.commit) know.setWorkContext(workId, { ...item.context, draft: { commit: source.commit, branch: source.branch || null, runRef: `Run ${run.number}`, kept: outcome === 'park' } });
+      if (outcome === 'park') park(user, projectId, workId, run);
     }
     return recordSignature(user, projectId, workId, attemptId, outcome, comment);
   }

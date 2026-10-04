@@ -5,6 +5,8 @@
 import { randomUUID } from 'node:crypto';
 import { layerApi } from './layer-api.mjs';
 import { layerPackageForProject } from './layer-package.mjs';
+import { journeyTarget, journeyWork } from './journey-work.mjs';
+import { codeLayer } from './journeys.mjs';
 
 const fail = (message, status = 409) => { throw Object.assign(new Error(message), { status }); };
 const now = () => new Date().toISOString();
@@ -27,6 +29,8 @@ export function initLayerScope(db) {
     profile_id TEXT NOT NULL, state TEXT NOT NULL CHECK(state IN ('proposed','created','dismissed')), created_work_id TEXT,
     decided_by TEXT, decided_at TEXT, created_at TEXT NOT NULL, UNIQUE(proposal_id, position));
   CREATE INDEX IF NOT EXISTS work_follow_ups_work ON work_follow_ups(project_id, work_id);`);
+  // J6: a follow-up may target the spec entry it would change (a journey, resolved to the layer that keeps its spec).
+  if (!db.prepare('PRAGMA table_info(work_follow_ups)').all().some(column => column.name === 'target_json')) db.exec('ALTER TABLE work_follow_ups ADD COLUMN target_json TEXT');
   // Carry layer-wide elevated grants forward. Action-specific grants are not widened to the whole layer.
   if (hasTable(db, 'layer_action_grants')) db.exec(`INSERT OR IGNORE INTO layer_elevated_grants(project_id, user_id, layer_key, granted_by, created_at)
     SELECT project_id, user_id, layer_key, 'DEC-057 migration', created_at FROM layer_action_grants WHERE action_id = '' AND level = 'elevated'`);
@@ -112,6 +116,14 @@ export function checkFollowUps(db, projectId, followUps) {
   if (!Array.isArray(followUps) || followUps.length > followUpLimit) fail(`Propose at most ${followUpLimit} follow-ups.`);
   return followUps.map(entry => {
     const value = { layer: text(entry?.layer, 40), title: text(entry?.title, 161), brief: text(entry?.brief, 2001), why: text(entry?.why, 1001) };
+    // J6: a follow-up that changes a spec names the journey; the host decides which layer keeps that spec.
+    if (entry?.target !== undefined && entry?.target !== null) {
+      const id = text(entry.target?.journey, 65);
+      if (!/^[a-z][a-z0-9-]{0,63}$/.test(id) || Object.keys(entry.target).some(key => key !== 'journey')) fail('A follow-up target names a journey by ID: { "journey": "<id>" }.', 400);
+      value.target = journeyTarget(db, projectId, id);
+      if (value.layer && value.layer !== value.target.layer) fail(`Journey ${id}'s spec is kept in the ${value.target.layer} layer (${value.target.entry}), so its follow-up belongs there, not in ${value.layer}.`, 400);
+      value.layer = value.target.layer;
+    }
     if (!installed(db, projectId, value.layer)) fail(`A follow-up names a layer that is not installed: ${value.layer || 'none'}.`);
     if (value.title.length < 3 || value.title.length > 160 || value.brief.length > 2000 || value.why.length < 10 || value.why.length > 1000)
       fail('Each follow-up needs a title, a bounded brief, and why it is needed.');
@@ -120,14 +132,14 @@ export function checkFollowUps(db, projectId, followUps) {
 }
 
 export function recordFollowUps(db, { projectId, workId, proposalId, attemptId, sourceLayer, profileId, followUps }) {
-  const insert = db.prepare(`INSERT INTO work_follow_ups(id, project_id, work_id, proposal_id, attempt_id, position, source_layer, layer, title, brief, why, profile_id, state, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'proposed', ?)`);
+  const insert = db.prepare(`INSERT INTO work_follow_ups(id, project_id, work_id, proposal_id, attempt_id, position, source_layer, layer, title, brief, why, profile_id, state, created_at, target_json)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'proposed', ?, ?)`);
   followUps.forEach((entry, position) => insert.run(`fup-${randomUUID()}`, projectId, workId, proposalId, attemptId, position, sourceLayer,
-    entry.layer, entry.title, entry.brief, entry.why, profileId, now()));
+    entry.layer, entry.title, entry.brief, entry.why, profileId, now(), entry.target ? JSON.stringify(entry.target) : null));
 }
 
 const followUpRow = row => ({ id: row.id, position: row.position, layer: row.layer, sourceLayer: row.source_layer, title: row.title, brief: row.brief, why: row.why,
-  state: row.state, createdWorkId: row.created_work_id, decidedBy: row.decided_by, decidedAt: row.decided_at, attemptId: row.attempt_id, proposalId: row.proposal_id, profileId: row.profile_id });
+  target: row.target_json ? JSON.parse(row.target_json) : null, state: row.state, createdWorkId: row.created_work_id, decidedBy: row.decided_by, decidedAt: row.decided_at, attemptId: row.attempt_id, proposalId: row.proposal_id, profileId: row.profile_id });
 
 export function followUpsForAttempt(db, attemptId) {
   if (!hasTable(db, 'work_follow_ups')) return [];
@@ -149,8 +161,14 @@ export function decideFollowUp(db, know, user, projectId, workId, followUpId, de
     if (!installed(db, projectId, row.layer)) fail('The follow-up layer is no longer installed.');
     const createdBy = { kind: 'agent', profileId: row.profile_id, name: profile?.name || 'Agent', layer: row.source_layer,
       workId, workRef: source?.ref || null, attemptId: row.attempt_id, proposalId: row.proposal_id, followUpId: row.id, why: row.why, acceptedBy: user.name };
-    created = know.createWork(projectId, { layer: row.layer, layerScoped: true, title: row.title, state: 'suggested',
-      context: { suggestion: row.brief, createdBy },
+    const target = row.target_json ? JSON.parse(row.target_json) : null;
+    // J6: a spec change is raised where the spec is kept. Code's own journey gets a Specify item (J5); a replica's change goes
+    // to the layer entry it was imported from, which Code re-imports once it is accepted.
+    if (target?.layer === codeLayer) created = journeyWork({ db, know }).specify(user, projectId, { title: row.title, brief: row.brief, journey: { id: target.journey, title: target.title },
+      state: 'suggested', createdBy }).specify;
+    else created = know.createWork(projectId, { layer: row.layer, layerScoped: true, title: row.title, state: 'suggested',
+      context: { suggestion: target ? `${row.brief}\n\nThis changes ${target.entry} (revision ${target.entryRevision}), which Code's journey ${target.journey} is imported from.` : row.brief,
+        createdBy, ...(target ? { specTarget: target } : {}) },
       logText: `Created by ${createdBy.name} from the ${layerName(row.source_layer)} layer as a follow-up to ${source?.ref || workId}; accepted by ${user.name}` }, createdBy.name);
   }
   db.prepare('UPDATE work_follow_ups SET state = ?, created_work_id = ?, decided_by = ?, decided_at = ? WHERE id = ?')
