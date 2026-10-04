@@ -112,6 +112,8 @@ When intent is genuinely missing (W-9's case), the agent asks in the thread and 
 2. **Plan approval.** Every plan waits for the owner (recommended to start), or small plans auto-approve.
 3. **Review.** One reviewer signs the whole changeset, with elevated layers needing their own reviewer (recommended), or each layer is signed separately.
 
+**Owner decision, 2026-10-04:** runtime A, the Claude Agent SDK (decision card in the project thread). Decisions 2 and 3 are still open, with the recommendations above as defaults.
+
 ## Slices (each needs the owner's go)
 
 | Slice | Scope | Exit evidence |
