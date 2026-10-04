@@ -6,7 +6,7 @@
 // rules are J1's pure contract in journeys.mjs.
 import { execFileSync } from 'node:child_process';
 import { layerBinding, layerReview } from './layer-source.mjs';
-import { codeLayer, implementClaims, journeyEntry, journeyOffer, reviewableGaps, setupRoute, specifyClaims, validateJourney, validateReviewRecipe } from './journeys.mjs';
+import { codeLayer, implementClaims, journeyEntry, journeyOffer, journeyPersona, reviewableGaps, setupRoute, specifyClaims, validateJourney, validateReviewRecipe } from './journeys.mjs';
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const git = (repo, ...args) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8', maxBuffer: 4 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] });
@@ -75,7 +75,7 @@ export function journeyWork({ db, know }) {
     const journey = { id, title: clip(input?.journey?.title, 200) || existing?.title || title, revision: existing ? existing.revision + 1 : 1 };
     const claims = specifyClaims(journey);
     if (openItem(projectId, 'specify', work => work.journey === id)) fail(`Journey ${id} is already being specified. Finish or archive that item first.`, 409);
-    const personas = existing ? [...new Set(existing.steps.map(step => step.persona ?? existing.persona).filter(Boolean))] : clip(input?.persona, 64) ? [clip(input.persona, 64)] : [];
+    const personas = existing ? [journeyPersona(existing)].filter(Boolean) : clip(input?.persona, 64) ? [clip(input.persona, 64)] : [];
     const { recipe, error: recipeError } = recipeAt(bound.repo, bound.commit);
     const gaps = reviewableGaps({ recipe, recipeError, personas, setup: hasSetupRoute(bound.repo, bound.commit) });
     const what = existing ? `revise the “${journey.title}” journey (${journeyEntry(id)}, now at revision ${existing.revision})` : `draft the “${journey.title}” journey (${journeyEntry(id)}) from the app as it works today`;

@@ -15,7 +15,7 @@ const dockerReady = spawnSync('docker', ['info'], { stdio: 'ignore', timeout: 50
 const git = (repo, ...args) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8' }).trim();
 // JOURNEYS-01 J3: the v2 recipe maps personas to fixtures; review steps come from the journeys, whose step tests run
 // black-box against the combined build. One journey has a passing, an uncovered, a failing and a then-skipped step; one
-// can't be entered (its persona has no fixture); one continues past a step whose persona has none.
+// can't be entered (its persona has no fixture); one continues past a step no test covers yet.
 const recipe = { version: 2, checks: [{ name: 'Real app test', command: ['node', '--test', 'tests/app.test.mjs'] }],
   personas: { author: { fixture: 'post-v1', session: 'author' }, viewer: { fixture: 'post-v1', session: 'viewer' } } };
 const step = (id, route, test, extra = {}) => ({ id, name: `Review ${id}`, route, trigger: 'Opens it', expected: `The ${id} step works.`, ...(test ? { test } : {}), ...extra });
@@ -25,7 +25,7 @@ const journeys = { journeys: [
     step('save', '/posts/demo', 'edit-post.spec.mjs#save'), step('share', '/posts/demo/share', 'edit-post.spec.mjs#share')] },
   { version: 1, id: 'moderate', title: 'Moderate posts', origin: 'authored', revision: 1, persona: 'moderator', steps: [step('queue', '/queue', 'moderate.spec.mjs#queue')] },
   { version: 1, id: 'read', title: 'Read a post', origin: 'observed', revision: 1, persona: 'viewer', steps: [
-    step('view', '/posts/demo?mode=view', 'read.spec.mjs#view'), step('admin', '/admin', 'read.spec.mjs#admin', { persona: 'admin' }), step('again', '/posts/demo', 'read.spec.mjs#again')] }] };
+    step('view', '/posts/demo?mode=view', 'read.spec.mjs#view'), step('admin', '/admin'), step('again', '/posts/demo', 'read.spec.mjs#again')] }] };
 const specs = {
   'edit-post.spec.mjs': `export default {
   async edit({ page, assert, step }) { assert.equal(step.route, '/posts/demo/edit'); await page.getByText('/posts/demo/edit', { exact: true }).waitFor(); assert.match(await page.locator('p').textContent(), /demo_role=author/); },
@@ -85,11 +85,11 @@ test('review inputs come from the commit: a v2 recipe, journeys with local route
     const inputs = reviewInputs(f.repo, f.commit);
     assert.deepEqual(inputs.steps.map(step => step.id), ['edit-post.edit', 'edit-post.publish', 'edit-post.save', 'edit-post.share', 'moderate.queue', 'read.view', 'read.admin', 'read.again']);
     assert.deepEqual(inputs.steps.filter(step => !step.available).map(step => [step.id, step.reason]),
-      [['moderate.queue', 'No fixture is declared for persona moderator.'], ['read.admin', 'No fixture is declared for persona admin.']]);
+      [['moderate.queue', 'No fixture is declared for persona moderator.']]);
     // What runs: only journeys with a test to run are entered; the rest settle without starting the runner.
     const { plan, settled } = stepPlan(inputs.journeys, inputs.steps);
     assert.deepEqual(plan.map(journey => [journey.id, journey.first.id, journey.steps.map(step => step.status || 'run')]),
-      [['edit-post', 'edit-post.edit', ['run', 'uncovered', 'run', 'run']], ['read', 'read.view', ['run', 'no-fixture', 'run']]]);
+      [['edit-post', 'edit-post.edit', ['run', 'uncovered', 'run', 'run']], ['read', 'read.view', ['run', 'uncovered', 'run']]]);
     assert.deepEqual(settled.map(result => [result.id, result.status]), [['moderate.queue', 'no-fixture']]);
     const untested = structuredClone(journeys.journeys[0]); untested.steps.forEach(step => delete step.test);
     assert.deepEqual(stepPlan([untested], inputs.steps.filter(step => step.journey === 'edit-post')).plan, [], 'a journey without tests starts no runner');
@@ -116,7 +116,7 @@ test('combined previews walk journey step tests, retain image identity, isolate 
     // Every step's test ran black-box against this build, and each result says what it is.
     const results = Object.fromEntries(one.steps.map(step => [step.id, step.result?.status]));
     assert.deepEqual(results, { 'edit-post.edit': 'passed', 'edit-post.publish': 'uncovered', 'edit-post.save': 'failed', 'edit-post.share': 'skipped',
-      'moderate.queue': 'no-fixture', 'read.view': 'passed', 'read.admin': 'no-fixture', 'read.again': 'passed' }, JSON.stringify(one.steps.map(step => [step.id, step.result])));
+      'moderate.queue': 'no-fixture', 'read.view': 'passed', 'read.admin': 'uncovered', 'read.again': 'passed' }, JSON.stringify(one.steps.map(step => [step.id, step.result])));
     const byId = new Map(one.steps.map(step => [step.id, step]));
     assert.match(byId.get('edit-post.save').result.detail, /Saved/, 'a failing step says why');
     assert.match(byId.get('edit-post.share').result.detail, /step save failed/);
