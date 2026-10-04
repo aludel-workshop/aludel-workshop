@@ -583,7 +583,7 @@ async function api(request, response, url) {
         if (operation === 'layer-commit') return json(response, 200, worker.commitLayer(scope, { attemptId, message: input.message, tests: input.tests ?? [] }), { 'cache-control': 'no-store' });
         if (operation === 'layer') return json(response, 200, worker.callLayer(scope, { attemptId, operation: input.operation, id: input.id ?? null, body: input.body ?? {} }), { 'cache-control': 'no-store' });
         // WORK-ITEM-UX-01 WI-5: the agent's own plan and progress, shown as the run's objectives.
-        if (operation === 'plan') return json(response, 200, runHistory.reportPlan(workerAuth.projectId, attemptId, input.objectives), { 'cache-control': 'no-store' });
+        if (operation === 'plan') return json(response, 200, runHistory.reportPlan(workerAuth.projectId, attemptId, input.objectives, input.journeyAssessment), { 'cache-control': 'no-store' });
         if (operation === 'progress') {
           const result = runHistory.reportProgress(workerAuth.projectId, attemptId, { index: input.index, status: input.status, note: input.note });
           if (result.terminal) settleSymphonyBatch(workerAuth.projectId, worker.attemptStatus(scope, attemptId).batchId);
@@ -999,7 +999,8 @@ async function api(request, response, url) {
   if (followUpRoute && request.method === 'POST') {
     const [projectId, workId, followUpId] = followUpRoute.slice(1).map(decodeURIComponent);
     requireMember(db, user, projectId);
-    return json(response, 200, decideFollowUp(db, know, user, projectId, workId, followUpId, String((await readJson(request)).decision || '')), { 'cache-control': 'no-store' });
+    const input = await readJson(request);
+    return json(response, 200, decideFollowUp(db, know, user, projectId, workId, followUpId, String(input.decision || ''), input.task), { 'cache-control': 'no-store' });
   }
   const layerActionRoute = /^\/api\/projects\/([^/]+)\/layer-actions\/([^/]+)(?:\/([^/]+))?$/.exec(url.pathname);
   if (layerActionRoute) {
@@ -1379,12 +1380,15 @@ async function api(request, response, url) {
       return json(response, 200, { deleted: item });
     }
     // JOURNEYS-01 J5: what Code offers for a request (specify the journey first?), and creating Specify with its prerequisite.
+    if (section === 'work' && method === 'GET' && item === 'journeys') return json(response, 200, journeyItems.list(projectId), { 'cache-control': 'no-store' });
     if (section === 'work' && method === 'POST' && item === 'journey-offer') return json(response, 200, journeyItems.offer(projectId, await readJson(request)), { 'cache-control': 'no-store' });
     if (section === 'work' && method === 'POST' && item === 'specify') return json(response, 201, journeyItems.specify(user, projectId, await readJson(request)), { 'cache-control': 'no-store' });
     if (section === 'work' && method === 'POST' && !item) {
       // People stage suggestions; reconcile and routine contexts are only ever written by the server.
       const input = await readJson(request);
       delete input.layerScoped;
+      if (input.claims !== undefined && !Array.isArray(input.claims)) throw Object.assign(new Error('Claims must be a list.'), { status: 400 });
+      journeyItems.validateAttachments(projectId, input.claims || []);
       // T03-CODE: Work a layer's own view creates, with no action and no layer named, is that layer's (views never name it).
       const frame = request.headers['x-aludel-layer-frame'];
       if (frame !== undefined && !input.action && !input.layer) input.layer = String(frame);

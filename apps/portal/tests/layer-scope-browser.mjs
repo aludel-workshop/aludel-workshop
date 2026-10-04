@@ -148,13 +148,12 @@ try {
 
   // Create: no action picker; the task names the layer.
   await page.goto(`${base}/pages/tasks/create`);
-  await page.getByRole('heading', { name: /Create a Pages task/ }).waitFor();
+  await page.getByRole('dialog', { name: 'Create task', exact: true }).waitFor();
   assert.equal(await page.getByRole('combobox', { name: 'Action' }).count(), 0, 'no action picker');
-  await page.getByText(/proposes anything else as a follow-up/).waitFor();
   assert.deepEqual(await axe(), [], 'Create axe');
   await shot('create');
-  await page.getByRole('textbox', { name: 'Task title' }).fill('Tidy the browse flow');
-  await page.getByRole('button', { name: 'Create task' }).click();
+  await page.getByRole('textbox', { name: 'Title', exact: true }).fill('Tidy the browse flow');
+  await page.getByRole('button', { name: 'Create', exact: true }).click();
   await page.getByRole('heading', { name: 'Tidy the browse flow', level: 1 }).waitFor();
 
   // JOURNEYS-01 J6 review: each claim shows the evidence the run named for it; a reference to nothing it produced is marked,

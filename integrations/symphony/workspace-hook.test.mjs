@@ -8,10 +8,11 @@ import test from 'node:test';
 
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, stdio: 'pipe' }).toString().trim();
 
-test('workspace hook checks out the exact Go commit and preserves a reused workspace', async () => {
+for (const identifier of ['BUDDY-BOX-W-7', 'BIOME-W-9', 'A-W-1', 'X'.repeat(70) + '-' + 'W'.repeat(70)]) {
+test(`workspace hook checks out the exact Go commit and preserves a reused workspace (${identifier})`, async () => {
   const root = mkdtempSync(join(tmpdir(), 'aludel-symphony-hook-'));
   const source = join(root, 'source');
-  const workspace = join(root, 'BUDDY-BOX-W-7');
+  const workspace = join(root, identifier);
   mkdirSync(source); mkdirSync(workspace);
   git(source, 'init', '-q');
   writeFileSync(join(source, 'README.md'), 'base\n');
@@ -38,7 +39,7 @@ test('workspace hook checks out the exact Go commit and preserves a reused works
       reservations++; response.end(JSON.stringify({ runsStarted: reservations, runLimit: 2 })); return;
     }
     if (request.method === 'POST' && request.url === `/api/worker/attempts/${attemptId}/events`) { errorEvents++; response.end('{}'); return; }
-    response.end(JSON.stringify({ issues: [{ identifier: 'BUDDY-BOX-W-7', native_ref: { repository_commit: base, attempt_id: attemptId } }], nextCursor: null }));
+    response.end(JSON.stringify({ issues: [{ identifier, native_ref: { repository_commit: base, attempt_id: attemptId } }], nextCursor: null }));
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const hook = new URL('./workspace-hook.mjs', import.meta.url).pathname;
@@ -71,6 +72,8 @@ test('workspace hook checks out the exact Go commit and preserves a reused works
     assert.notEqual(rejected.status, 0, 'an unrelated workspace cannot borrow this issue');
   } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
 });
+
+}
 
 test('a layer run gets its layer repository on its work branch in layer/, hidden from the project checkout, with a copy of outputs', async () => {
   const root = mkdtempSync(join(tmpdir(), 'aludel-symphony-layer-hook-'));

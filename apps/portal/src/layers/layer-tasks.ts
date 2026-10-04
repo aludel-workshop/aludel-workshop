@@ -24,7 +24,7 @@ import { pollLiveBatches } from './work-shared';
     </nav>
     <div class="lay-mg-body lay-tk-body">
       @switch (section()) {
-        @case ('create') { <aludel-work-create [layer]="layerKey()" [preset]="ctx.segments()[3] || null" /> }
+        @case ('create') { <aludel-work-board [layer]="layerKey()" /><aludel-work-create [layer]="layerKey()" [preset]="ctx.segments()[3] || null" /> }
         @case ('access') { <aludel-layer-access [layerKey]="layerKey()" /> }
         @case ('actions') { <aludel-layer-actions [layerKey]="layerKey()" [focus]="ctx.segments()[3] || null" /> }
         @case ('routines') { <aludel-layer-routines [layerKey]="layerKey()" [routineId]="ctx.segments()[3] || null" /> }

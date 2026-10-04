@@ -1,6 +1,8 @@
+import { assessedRunClaims, augmentJourneyClaims } from './run-journey-assessment.mjs';
+import { journeysAt } from './journey-work.mjs';
 import { initLayerSource, layerReview, layerBinding, layerBranch, submitLayerBranch, prepareLayerReview, assertLayerReviewCurrent, mergeLayerBranch, settleLayerCheckout, undoLayerMerge } from './layer-source.mjs';
 import { packageAt } from './layer-package.mjs';
-import { claimGate, claimProof, journeyRecord, reviewInputPath, taskClaims } from './journeys.mjs';
+import { claimGate, claimProof, journeyRecord, repositoryAppChanged, taskClaims } from './journeys.mjs';
 import { reviewInputs } from './review-previews.mjs';
 import { layerInstanceId } from './layer-contract.mjs';
 import { randomUUID } from 'node:crypto';
@@ -138,9 +140,9 @@ export function workRuns({ db, know, candidates = null }) {
     if (candidate) for (const file of candidate.files || []) changes.push({ id: `${candidate.id}:${file}`, kind: 'file', icon: 'code', name: file, op: 'modified', size: '', candidateId: candidate.id });
     // LAYER-BASE-01 B5: the run's work branch of the layer repository and the tests the agent ran on it in its sandbox.
     const layerSource = proposal ? parse(proposal.content_json, {}).source || null : null;
-    return { changes, integration: integration && { ...integration, appRepository: Boolean(bundle.layerPackage?.root), appChanged: Boolean(bundle.layerPackage?.root) && integration.files.some(file => (reviewInputPath(file.path) || !file.path.startsWith(bundle.layerPackage.root)) && !/^(?:docs\/|README\.md$|AGENTS\.md$|ARCHITECTURE\.md$)/.test(file.path)), current: layerBinding(db, projectId, bundle.guidance.layerScope.key).commit === integration.base }, layerSource: layerSource && { branch: layerSource.branch, commit: layerSource.commit, base: layerSource.base,
-        tests: (layerSource.tests || []).map(test => ({ ...test, source: 'agent-report' })) }, followUps: proposal ? followUpsForAttempt(db, row.id).map(entry => ({ ...entry, layerName: layerName(projectId, entry.layer),
-        createdRef: entry.createdWorkId ? know.workById(projectId, entry.createdWorkId)?.ref || null : null })) : [], summary: proposal ? parse(proposal.content_json, {}).summary || null : null,
+    return { changes, integration: integration && { ...integration, appRepository: Boolean(bundle.layerPackage?.root), appChanged: repositoryAppChanged(integration, bundle.layerPackage?.root), current: layerBinding(db, projectId, bundle.guidance.layerScope.key).commit === integration.base }, layerSource: layerSource && { branch: layerSource.branch, commit: layerSource.commit, base: layerSource.base,
+        tests: (layerSource.tests || []).map(test => ({ ...test, source: 'agent-report' })) }, followUps: proposal ? followUpsForAttempt(db, row.id).map(entry => { const created = entry.createdWorkId ? know.workById(projectId, entry.createdWorkId) : null; return { ...entry, layerName: layerName(projectId, entry.layer),
+        createdRef: created?.ref || null, createdTitle: created?.title || null, createdBrief: created?.context?.suggestion || null }; }) : [], summary: proposal ? parse(proposal.content_json, {}).summary || null : null,
       question: proposal ? parse(proposal.content_json, {}).question || null : null,
       candidate: candidate ? { id: candidate.id, state: candidate.state, commit: candidate.commit, base: candidate.base, checks: candidate.checks } : null,
       proposalId: proposal?.id || null, reportId: report?.id || null };
@@ -190,7 +192,8 @@ export function workRuns({ db, know, candidates = null }) {
         startedAt, finishedAt, turns: { used: row.runs_started, limit: row.run_limit },
         task: {
           title: work.title || item.title, request: work.context?.suggestion || '', action: work.action || item.action,
-          criteria: taskClaims(work.checks),
+          criteria: taskClaims(assessedRunClaims(db, row.id, work.checks)),
+          journeyAssessment: planned.find(step => step.kind === 'journey-assessment') || null,
           targets: (work.targets || []).map(target => ({ id: target.id, label: target.label, kind: target.kind })),
           carried: (work.context?.feedback || []).map(note => ({ ...(note.claim ? { claim: note.claim } : {}), check: note.check, note: note.note, by: note.by })),
           carriedComment: work.context?.reviewComment || null,
@@ -222,7 +225,7 @@ export function workRuns({ db, know, candidates = null }) {
         startedAt: row.started_at, finishedAt: row.submitted_at, turns: { used: 0, limit: 0 }, task,
         live: null, steps: steps(row.id), evidence: parse(row.evidence_json, []).map(legacyEvidence), reasons: parse(row.reasons_json, {}), blockReason: null,
         layerSource: source && { ...source, tests: source.tests.map(check => ({ ...check, source: 'person-report' })) },
-        integration: integrated && { ...integrated, appRepository: Boolean(repository?.root), appChanged: appChanged(integrated, repository?.root), current: layerBinding(db, projectId, repository.key).commit === integrated.base },
+        integration: integrated && { ...integrated, appRepository: Boolean(repository?.root), appChanged: repositoryAppChanged(integrated, repository?.root), current: layerBinding(db, projectId, repository.key).commit === integrated.base },
         changes: [...parse(row.changes_json, []), ...sourceChanges], candidate: null, proposalId: null, reportId: null, summary: row.summary || null, question: null,
         review: { verdicts: parse(review?.verdicts_json, {}), flags: parse(review?.flags_json, {}), steps: parse(review?.steps_json, {}), answer: review?.answer || null,
           outcome: review?.outcome || null, comment: review?.comment || null, signedBy: review?.signed_by || null, signedAt: review?.signed_at || null },
@@ -524,7 +527,6 @@ export function workRuns({ db, know, candidates = null }) {
     return runFor(projectId, workId, runId);
   }
 
-  const appChanged = (review, root) => Boolean(root) && review.files.some(file => (reviewInputPath(file.path) || !file.path.startsWith(root)) && !/^(?:docs\/|README\.md$|AGENTS\.md$|ARCHITECTURE\.md$)/.test(file.path));
   function personRepository(user, projectId, workId, runId) {
     const row = personRun(projectId, workId, runId), item = know.workById(projectId, workId);
     if (!row || row.state !== 'review' || item?.state !== 'review' || item.context?.personRun !== runId) fail('This person run is not waiting for review.', 409);
@@ -549,7 +551,7 @@ export function workRuns({ db, know, candidates = null }) {
     const { item, task, source, recordsOf } = personRepository(user, projectId, workId, runId);
     const review = assertLayerReviewCurrent(db, projectId, item.layer, layerReview(db, projectId, runId), source);
     if (review.id !== integrationId) fail('The review revision changed. Refresh before accepting.', 409);
-    if (appChanged(review, task.layerRepository.root)) { if (!assertBuilt) fail('Combined build checks are required.', 409); assertBuilt(review.id); }
+    if (repositoryAppChanged(review, task.layerRepository.root)) { if (!assertBuilt) fail('Combined build checks are required.', 409); assertBuilt(review.id); }
     let merge;
     db.exec('BEGIN IMMEDIATE');
     try {
@@ -565,16 +567,28 @@ export function workRuns({ db, know, candidates = null }) {
 
   // WI-5: the agent reports its own plan and progress. `stuck` means a blocking objective, so it terminally fails the run;
   // a recoverable obstacle stays `active` with a note. This makes the first known prerequisite failure stop downstream work.
-  function reportPlan(projectId, attemptId, objectives) {
+  function reportPlan(projectId, attemptId, objectives, assessment) {
     const row = db.prepare('SELECT * FROM symphony_attempts WHERE id = ? AND project_id = ?').get(attemptId, projectId);
     if (!row) fail('Attempt not found.', 404);
     if (row.state !== 'working') fail('Only a working run can report its plan.', 409);
     if (!Array.isArray(objectives) || objectives.length < 1 || objectives.length > 12) fail('A plan has one to twelve objectives.');
     const clean = objectives.map(entry => clip(entry, 160)).filter(Boolean);
     if (clean.length !== objectives.length) fail('Each objective needs a short description.');
+    if (assessment !== undefined) {
+      if (layerBranch(db, attemptId) || steps(attemptId).some(step => ['journey-assessment', 'plan', 'progress', 'evidence'].includes(step.kind))) fail('Assess journeys once, with the first plan before implementation.', 409);
+      const bundle = parse(db.prepare('SELECT content_json FROM symphony_bundles WHERE digest = ?').get(row.bundle_digest)?.content_json, {});
+      if (bundle.guidance?.layerScope?.key !== 'platform') fail('Journey assessment belongs to a Code layer run.', 409);
+      const binding = layerBinding(db, projectId, 'platform');
+      if (binding.commit !== bundle.layerPackage?.commit) fail('Code changed since Go. Restage the task before assessing its journeys.', 409);
+      const { journeys, error } = journeysAt(binding.repo, bundle.layerPackage.commit);
+      if (error) fail(error, 409);
+      const added = augmentJourneyClaims(bundle.work.checks || [], assessment, journeys);
+      addStep(attemptId, 'journey-assessment', added);
+      know.appendLog(row.work_id, `Assessed affected journeys: ${added.reason}`, {}, { by: { kind: 'agent', id: row.profile_id } });
+    }
     const seq = addStep(attemptId, 'plan', { objectives: clean });
     live(projectId, row.work_id, run => ({ ...run, phases: clean, phase: 0, activity: clean[0] }));
-    return { attemptId, seq, objectives: clean };
+    return { attemptId, seq, objectives: clean, claims: runFor(projectId, row.work_id, attemptId)?.task.criteria || [] };
   }
   function reportProgress(projectId, attemptId, { index, status, note = '' }) {
     const row = db.prepare('SELECT * FROM symphony_attempts WHERE id = ? AND project_id = ?').get(attemptId, projectId);
@@ -616,7 +630,7 @@ export function workRuns({ db, know, candidates = null }) {
     if (!Array.isArray(evidence) || evidence.length > 40) fail('Evidence is a list of at most forty items.');
     const row = db.prepare('SELECT bundle_digest FROM symphony_attempts WHERE id = ? AND project_id = ?').get(attemptId, projectId);
     if (!row) fail('Attempt not found.', 404);
-    const checks = parse(db.prepare('SELECT content_json FROM symphony_bundles WHERE digest = ?').get(row.bundle_digest)?.content_json, {})?.work?.checks || [];
+    const checks = assessedRunClaims(db, attemptId, parse(db.prepare('SELECT content_json FROM symphony_bundles WHERE digest = ?').get(row.bundle_digest)?.content_json, {})?.work?.checks || []);
     // A run pinned before J4 has no claim IDs in its task; its agent was told to name criteria by position.
     const pinnedBefore = checks.length > 0 && !checks.some(check => check?.id);
     const claims = taskClaims(checks);

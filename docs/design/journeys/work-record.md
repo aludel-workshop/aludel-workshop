@@ -906,3 +906,78 @@ The owner chose to keep Biome for the J8 trial, so existing projects need a way 
 | Review screen with *Aludel* as performer | Not browser-checked. It is the person-run path, and the avatar falls back to a generated one |
 
 **Found on the way.** `dockerd` stopped once more mid-run (its log ends on buildkit "healthcheck failed fatally"). Started detached with `setsid`, it stayed up through both suites. The J7 suite numbers above came from runs during which Docker may have been down. These reruns had it up, and they pass.
+
+### J8 trial assistance authorization (2026-10-03, Codex, owner chat)
+
+The owner reports PR #2 merged at `440c2bd` and asks for help running the Biome trial. Authorized scope: pull `main`, inspect the merged J8 trial procedure, ensure Docker is available, restart the local portal (including its J4 claims migration and template-update proposal), and assist the owner's local Biome walkthrough while reporting friction in chat. Preserve `notes.txt` and unrelated candidate checkouts. Owner acceptance, external writes, deployment and spending remain outside this scope; the owner will write the run log and retrospective. Process readiness: verify actual local prerequisites and merged trial instructions before acting on live Biome; the existing template/trial checklist remains applicable.
+
+Trial preparation found a startup blocker after the requested restart: `seedBuiltInDefinitions` compares an existing layer's accepted package outputs with the newest template pin's outputs, rejecting older Code installs before template-update Work can be raised. Bounded local repair: preserve the installed package's output contract while retaining authority checks; add a regression for restart with an older accepted Code template and run both server suites. No owner review actions are taken.
+
+Preparation finished: portal responds at `http://aludel.localhost:4310`; Biome Code update Work #5 (`wrk-7168e573`) is in review, 12 files and no conflicts. Criteria migration is complete and the accepted Code template remains unchanged. Standard server suite: 304 pass / 0 fail / 31 skips; templates suite: 326 pass / 0 fail / 9 skips; Code browser journey, template UI typecheck and build pass. [Preparation evidence and retrospective](../../evidence/journeys/j8-preparation/README.md). Added the older-template restart check to the handoff and linked preparation from status. Repair remains local and uncommitted. Owner acceptance, signup request and the rest of J8 remain pending; the owner keeps the trial log and retrospective.
+
+### J8 acceptance blocker (2026-10-03, Codex, owner chat)
+
+The owner reports Work #5 acceptance failed with “This runnable change needs a review recipe before acceptance.” Continuing authorized local trial assistance includes repairing this gate and restarting the portal; the owner retries acceptance. Read-only inspection shows the Code template update only adds an empty `.aludel/outputs/journeys.json`, which the path-only runnable classifier treats as an app-review change. Process improvement: test empty registry bootstrap separately from substantive journey changes and use one classifier for the UI and acceptance. Scope: bounded classification fix, regression checks, local restart, evidence; no owner sign-off or acceptance action.
+
+Acceptance repair applied: a complete added-file diff proving an empty journey registry no longer counts as a runnable app change; all substantive or unknown review inputs retain the build gate. Shared classification covers run display and acceptance. Tests: journey/Work 35/35; templates-mode journey/Work/Code 41/41, including full disposable Code signing without a recipe. Read-only evaluation of Biome's actual review confirms no recipe is required. Portal restarted; owner notified to refresh Work #5 and retry. No live acceptance performed. [Updated preparation evidence](../../evidence/journeys/j8-preparation/README.md#owner-reported-acceptance-blocker).
+
+Repository-review browser journey also passed after the acceptance repair; ordinary runnable candidates still build on review open and stale reviews remain guarded.
+
+### J8 request routing blocker (2026-10-03, Codex, owner chat)
+
+The owner followed Code › Tasks › Create task with “A new member signs up and sets up their first world.” It created Biome W-8 (`wrk-7a7b78ed`) with the generic Code charter note instead of a journey offer. Read-only inspection confirms Code Work #5 was accepted and Biome has no indexed page routes. The pure offer contract equated no route match with a trivial change, returning no offer; task creation then silently used its generic checks fallback.
+
+Continuing authorized local trial assistance: remove that unsupported inference. An unmatched Code request offers an explicit Specify-first choice with honest route-unknown wording, while allowing the owner to create general Code work as written. Test route-less natural-language requests in the contract and browser journey, then build/restart. Preserve W-8 and let the owner decide its disposition. Process improvement: the trial fixture must include the owner's natural-language request without an explicit route and a project with no route inventory, not only a hand-written `/settings` hint. No owner actions, external writes or spending.
+
+### Task creation UX revision (2026-10-03, owner chat)
+
+The owner rejects the current many-field Create task page and requests a Jira-like create experience: title and description first, familiar assignee/priority settings, with optional specific criteria and journey attachments. This steering supersedes the proposed narrow no-route UI patch as the next deliverable. Authorized: local design research, disposable current-form capture, interactive prototype and checks; the owner explicitly approved local Playwright capture/checks. Keep the missing-route offer defect within the design contract; preserve W-8 and the live Biome data. Existing startup/acceptance repairs remain untouched. Prototype composition is open to owner review; no redesign acceptance or production implementation is inferred. The owner keeps the J8 trial log/retrospective.
+
+Process first: derive creation fields from the owner's authoring job rather than exposing the storage schema. Capture the existing form and a current primary Jira reference, then test title/description-only creation, optional criteria, optional journey steps and unmatched-request recovery at desktop and phone sizes. Keep title and description drafts across metadata/review interactions. No-match is uncertainty, not evidence that a task is trivial.
+
+
+### Owner clarification: optional journeys and agent assessment (2026-10-03)
+
+The owner likes the Jira-like composer. Not every task has a journey; the agent should assess relevant journeys when picking up work, augmenting owner attachments. One task may reference multiple persona journeys: invitation sender and recipient are separate journeys. This supersedes the earlier proposed unmatched-request Specify-first creation gate. Local prototype revision removes that gate, keeps Specify optional in Attach journey, and checks direct no-journey creation plus multiple attachments. Preserve owner criteria/references; additions should carry an impact rationale, and missing relevant journeys may justify Specify. No journey may be appropriate when other review evidence covers the work. Agent assessment/run-snapshot sequencing requires an implementation check before integration. [Updated contract and evidence](task-create/work-record.md#owner-feedback-and-revision-authorization--2026-10-03). No live W-8 changes or production behavior are authorized by this prototype check.
+
+
+### Task composer built locally (2026-10-03)
+
+Owner “build it” authorized implementing the accepted composer and DEC-064's optional/multiple-journey assessment contract. [Build record and verification](task-create/work-record.md#build-authorization-and-readiness--2026-10-03). Host Work owns this shared UI, so no template pin or handler digest changed. The Go bundle remains immutable; first-plan assessment adds validated journey steps to per-run review scope. The portal is running locally at `http://aludel.localhost:4310`; W-8 was preserved. J8's trial steps, status and handoff now distinguish direct creation from later agent assessment. The real model-driven pickup and owner review of the built form remain part of the live trial; no whole-packet completion is claimed.
+
+### J8 closeout (2026-10-04, Claude, cloud session)
+
+**Authorization.** The owner, in the project thread, 2026-10-04: "i dont care to finish the signup. id say give codexs work a quick look, see if you would make any improvements, then retrospective and merge." This covers reviewing and merging `codex/j8-trial-task-review-fixes` into `main` with this closeout. It does not cover signup, W-10, a new Go or any live project change.
+
+**Run log.** The owner ran J8 on their machine with Codex. Codex's [push handoff](handoff.md#j8-push-handoff--2026-10-04) and [task-create record](task-create/work-record.md) hold the details. In summary:
+
+| Trial step | What happened |
+|---|---|
+| 1. Biome's Code template update | Restart first failed on the older Code fork (seedBuiltInDefinitions compared the installed manifest to the newer catalog). Acceptance then asked for an app review recipe for an empty `journeys.json`. Both were repaired; the update was accepted. |
+| 2. Ask for signup without criteria | W-8 got the generic charter criterion silently. The owner asked for a Jira-like composer. DEC-064 then made journeys optional at creation, with the agent assessing affected journeys at pickup; this was built and checked. |
+| 3–4. Specify and implement | Not done as planned. The owner assigned W-9 (signup) to an agent. A worker-hook ID bug stalled it, and the fix let the same attempt start. W-9 returned a notes-only assessment and a Pages follow-up (W-10), and built nothing. Accepting it hit the zero-claim guard (repaired). Then W-10 vanished in backlog cleanup (repaired and restored). |
+| 5. Owner notes | The trial's real finding: a run limited to one layer can't carry a cross-stack goal. The owner chose to leave signup unfinished and open up agent work instead ([AGENT-WORK-01 proposal](../agent-work/proposal.md); runtime: Claude Agent SDK). |
+
+**Review of Codex's branch.** Server changes read in full; UI changes skimmed.
+- Sound and small: the installed-manifest guard, the empty-registry exception (only an added file whose whole content is `{"journeys": []}`), explicit `backlogGap` provenance with a narrow fallback for old items, the hook ID range, and server-side validation of edited follow-ups and journey attachments.
+- Accepted as is, though AGENT-WORK-01 replaces it: the additive journey assessment at pickup (`run-journey-assessment.mjs`) and zero-claim acceptance of layer proposals. They belong to the one-layer agent path, so improving them further would be throwaway work.
+- No changes made.
+
+**Checks on the merged branch** (cloud, Docker up): `test:server` 341 tests, 308 pass, 0 fail, 32 skipped; `test:server:templates` 341 tests, 333 pass, 0 fail, 7 skipped. `previews-docker.test.mjs` still times out at file level for the known reason: its sample app runs `npm install` inside Docker, which can't verify the session proxy's certificate.
+
+**Moved to AGENT-WORK-01:**
+- the agent-side check (J7);
+- the blocked/prerequisite outcome and continuing the original task;
+- clearer task status when a run fails before its workspace starts.
+
+**Left as is:**
+- Signup (Biome Work #3, W-9) is not implemented.
+- W-10 stays in Pages › Tasks › Backlog, unassigned.
+
+#### Retrospective
+
+1. **What made it harder?** Observed: every break was at a boundary our checks never crossed: an old installed template meeting a new host, the composer handing off to staging, worker admission, optional claims meeting signature and closeout, and creation meeting routine cleanup. Cloud checks used fresh projects, so the old-fork startup failure only showed on the owner's machine. Structurally, the agent was given a cross-stack goal inside a one-layer run.
+2. **What would make the next one easier?** Observed: Codex's new checks cross those boundaries on disposable data. Prediction: a fixture project forked from an older template, upgraded in tests, would have caught the startup failure here. Not added, since AGENT-WORK-01 changes the run path anyway.
+3. **What changed for the roadmap?** JOURNEYS-01 closes. AGENT-WORK-01 (open, cross-stack agent runs on the Claude Agent SDK) becomes the next action, ahead of T03-CODE. Its first slice is a clickable prototype.
+4. **Questions.** Created: should a goal-level run's plan approval replace Go entirely, or only for agent runs? What happens to the per-layer tasks already in backlogs (W-10) once runs are goal-level?
+5. **Process change applied now:** none to code. The proposal makes the trial's finding the next packet's motivating evidence, rather than patching one more one-layer guard.

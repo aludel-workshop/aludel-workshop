@@ -79,7 +79,7 @@ test('LAY-04A (as revised by WORK-UX-01): an answer lands in the record it chang
 });
 
 test('WORK-UX-01 (DEC-041): each layer\'s gaps become backlog items, assigned by their action; filled gaps close them', () => {
-  const { know, ada, id } = fixture({ profile: 'tinkerer' });
+  const { db, know, ada, id } = fixture({ profile: 'tinkerer' });
   const created = know.syncBacklog(id);
   const conversation = know.list(id, 'data_object').find(object => object.name === 'Conversation');
   assert.ok(created.length >= 5);
@@ -92,12 +92,28 @@ test('WORK-UX-01 (DEC-041): each layer\'s gaps become backlog items, assigned by
   assert.deepEqual(know.syncBacklog(id), [], 'one item per gap');
   // Filling a gap some other way removes its untouched backlog item.
   const acceptance = created.find(item => item.action === 'product.define');
+  // Historical generated gaps have only the original generator log and suggestion key.
+  db.prepare('UPDATE layer_work_items SET context_json = ? WHERE id = ?').run(JSON.stringify({ suggestion: acceptance.context.suggestion }), acceptance.id);
   know.update(id, acceptance.targets[0].id, { acceptance: [{ given: 'a neighbour', when: 'they look', then: 'they see it' }] }, { rationale: 'Written by hand' });
   know.syncBacklog(id);
   assert.ok(!know.workList(id).some(item => item.id === acceptance.id));
   // Priorities start from the phase: current-phase acceptance and contracts first.
   const demo = created.find(item => item.action === 'data.contract' && item.targets[0].id === conversation.id);
   assert.ok(['high', 'medium', 'low'].includes(demo.priority));
+});
+
+test('Backlog maintenance preserves authored descriptions and confirmed follow-ups', () => {
+  const { know, ada, id } = fixture();
+  const manual = know.createWork(id, { layer: 'pages', type: 'design', title: 'Author a new flow', state: 'suggested', context: { suggestion: 'Define member signup behavior.' } }, ada.name);
+  const followUp = know.createWork(id, { layer: 'pages', layerScoped: true, title: 'Specify signup', state: 'suggested', context: { suggestion: 'Define the member persona.', createdBy: { kind: 'agent-follow-up', followUpId: 'fup-fixture' } } }, ada.name);
+  know.appendLog(followUp.id, 'Owner supplied further context');
+  know.syncBacklog(id);
+  know.syncBacklog(id);
+  for (const item of [manual, followUp]) {
+    const saved = know.workList(id).find(entry => entry.id === item.id);
+    assert.ok(saved, 'Authored backlog tasks must survive maintenance');
+    assert.equal(saved.state, 'suggested', 'Maintenance must not close authored work');
+  }
 });
 
 test('WORK-UX-01: roles by layer; the onboarding style only presets who takes each action', { skip: templatesOn && 'DEC-057 replaces per-style action presets with a layer default assignee for layer-scoped layers (layer-scope tests)' }, () => {

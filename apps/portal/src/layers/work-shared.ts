@@ -9,15 +9,24 @@ import { Assignee, Batch, ProjectContext, WorkItem, layerLabel, priorityIcon, pr
 // WORK-UX-01 shared pieces for the Work layer: every person and agent looks the same everywhere, every referenced record
 // is a chip with a hover card, and every item is one card whether it sits in a batch or in the stack.
 
-// Only explicitly adapted actions and compatible profiles can be staged; host capacity is checked when queued work starts.
+// Only layers with checked change adapters or explicitly adapted actions and compatible profiles can be staged; host capacity is checked when queued work starts.
 const symphonyActions = new Set(['platform.implement', 'platform.security', 'product.define', 'product.clarify', 'product.brief', 'data.contract', 'design.audit', 'pages.a11y', 'deploy.review', 'work.review']);
-export const agentRunnable = (item: WorkItem, ctx: ProjectContext) => Boolean(item.action && (symphonyActions.has(item.action) || ctx.data()?.layerActions.some(action => action.id === item.action && action.agentRunnable)) &&
-  item.assignee?.kind === 'agent' && ctx.data()?.symphonyProfiles?.includes(item.assignee.id || '') &&
+export const agentRunnable = (item: WorkItem, ctx: ProjectContext) => {
+  if (item.assignee?.kind !== 'agent' || !ctx.data()?.symphonyProfiles?.includes(item.assignee.id || '')) return false;
+  // DEC-057: layer work uses the layer's checked change adapters, not a legacy action/type label.
+  if (item.scope === 'layer') return Boolean(ctx.layerInstances().find(layer => layer.key === item.layer)?.workScope);
+  return Boolean(item.action && (symphonyActions.has(item.action) || ctx.data()?.layerActions.some(action => action.id === item.action && action.agentRunnable)) &&
   (item.action !== 'product.clarify' || Boolean(item.question && !item.question.answer)) &&
   (item.action !== 'product.brief' || item.targets.length <= 1 && item.targets.every(target => target.kind === 'brief_claim')) &&
   (item.action !== 'product.define' || item.targets.some(target => target.kind === 'story')) &&
   (item.action !== 'data.contract' || item.targets.some(target => target.kind === 'data_object')) &&
   (item.action !== 'platform.implement' || item.targets.some(target => target.kind === 'story')));
+};
+export const agentStageBlock = (item: WorkItem, ctx: ProjectContext) => {
+  if (!ctx.data()?.symphonyProfiles?.includes(item.assignee?.id || '')) return 'This agent is not enabled for Symphony work. Check Work › Agents.';
+  return item.scope === 'layer' ? "Agents can't change this layer yet. Assign it to a person." : `Agents can't run “${ctx.actionById().get(item.action || '')?.name || item.type}” yet. Assign it to a person.`;
+};
+
 export const batchOf = (ctx: ProjectContext, item: WorkItem): Batch | null => (item.context?.batch && ctx.data()?.batches.find(batch => batch.id === item.context?.batch)) || null;
 export const isRunning = (batch: Batch | null) => Boolean(batch && (batch.state === 'running' || batch.state === 'stopping'));
 export const elapsed = (from: string | undefined, to: number) => {
@@ -257,7 +266,7 @@ export class WorkCardComponent {
       case 'queued':
         if (work.blockedBy.length) return { status: 'Blocked', icon: 'block', tone: 'blocked' };
         if (!work.assignee) return { primary: 'stage', disabled: 'Assign it to someone first' };
-        if (agent && !agentRunnable(work, this.ctx)) return { primary: 'stage', disabled: `Agents can't run “${this.ctx.actionById().get(work.action || '')?.name || work.type}” yet. Assign it to a person.` };
+        if (agent && !agentRunnable(work, this.ctx)) return { primary: 'stage', disabled: agentStageBlock(work, this.ctx) };
         return { primary: 'stage' };
       case 'staged':
         if (!agent) return { primary: 'done', second: 'unstage' };

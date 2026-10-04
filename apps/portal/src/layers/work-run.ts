@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Assignee, ProjectContext, ProofStatus, RunCheck, WorkChange, WorkItem, WorkRun, WorkRunState } from './context';
-import { AssigneeComponent, AvatarComponent, RefChipComponent, agentRunnable, batchOf, elapsed, isRunning, tokens } from './work-shared';
+import { AssigneeComponent, AvatarComponent, RefChipComponent, agentRunnable, agentStageBlock, batchOf, elapsed, isRunning, tokens } from './work-shared';
 
 // WORK-ITEM-UX-01: what a run's status block says and offers, by state (the run actions table in the work record).
 export const runTitle: Record<WorkRunState, string> = { working: 'Working', needs: 'Needs your answer', review: 'Run complete', failed: 'Failed', stopped: 'Stopped',
@@ -371,7 +371,7 @@ export class RunCardComponent {
         </form>
       }
       <div class="wi-actor"><span class="small lay-muted">Assigned to</span><aludel-assignee [assignee]="work.assignee" [locked]="lockReason()" (changed)="reassign($event)" />
-        @if (work.assignee?.kind === 'agent' && !agentRunnable(work, ctx) && work.status !== 'done') { <span class="small lay-muted">Agents can't run “{{ actionName() }}” yet.</span> }</div>
+        @if (work.assignee?.kind === 'agent' && !agentRunnable(work, ctx) && work.status !== 'done') { <span class="small lay-muted">{{ agentStageBlock(work, ctx) }}</span> }</div>
     </section>
 
     <details class="wi-sec" open><summary><mat-icon aria-hidden="true">assignment</mat-icon><span>Task</span><small>{{ editable() ? 'Editable until Go' : 'Pinned for the next run' }}</small><mat-icon aria-hidden="true" class="wi-chev">expand_more</mat-icon></summary>
@@ -423,6 +423,7 @@ export class NextRunComponent {
   readonly edits = input<WorkChange[]>([]);
   readonly changed = output<void>();
   readonly agentRunnable = agentRunnable;
+  readonly agentStageBlock = agentStageBlock;
   readonly dirty = signal(false);
   request = ''; criteria: string[] = []; answerDraft = ''; whyDraft = '';
   private loadedFor = '';

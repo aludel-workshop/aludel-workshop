@@ -1,0 +1,8 @@
+Natural-language request creates directly with zero journeys and zero invented criteria: passed
+Specify remains an explicit optional action in the journey picker: passed
+Journey search, empty search, step selection, revision reference and draft preservation: passed
+Dock/resume and failed save preserve description, metadata and journey references: passed
+390px composer/picker and axe checks on the composer: passed
+Ctrl+Enter follows creation and success path: passed
+Sender and receiver journeys attach together; adding a third preserves existing selections: passed
+No browser script errors

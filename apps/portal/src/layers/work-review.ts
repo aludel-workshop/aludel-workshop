@@ -6,6 +6,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ClaimKind, ProjectContext, ProofStatus, RunChange, RunFollowUp, WorkRun } from './context';
 import { AvatarComponent, RefChipComponent } from './work-shared';
+import { WorkCreateComponent } from './work-create';
 import { reviewFocus, runTitle } from './work-run';
 
 // JOURNEYS-01 J3: review steps come from the candidate's journeys, each with the result its step test had on this build.
@@ -32,7 +33,7 @@ const routeOf = (path: string | null | undefined) => (path || '').split(/[?#]/)[
 // with Under the hood at its bottom; on the right a claim at a time, its journey walked step by step, then the run's
 // suggestions and question, then Finish. Walking the journey in the preview moves the review on.
 @Component({
-  selector: 'aludel-work-review', standalone: true, imports: [FormsModule, NgTemplateOutlet, MatIconModule, MatTooltipModule, AvatarComponent, RefChipComponent],
+  selector: 'aludel-work-review', standalone: true, imports: [FormsModule, NgTemplateOutlet, MatIconModule, MatTooltipModule, AvatarComponent, RefChipComponent, WorkCreateComponent],
   template: `
   @if (item(); as work) {
     @if (run(); as r) {
@@ -72,7 +73,21 @@ const routeOf = (path: string | null | undefined) => (path || '').split(/[?#]/)[
         <div class="wr-panes">
           <section class="wr-left" aria-label="Evidence">
             <div class="wr-left-body">
-              @switch (leftView()) {
+              @if (current().kind === 'suggestion') {
+                <div class="wr-suggestions" aria-label="Suggested tasks"><h2 class="wr-eyebrow">Suggested tasks</h2>
+                  @for (entry of r.followUps || []; track entry.id) {
+                    @if (entry.state === 'proposed' && r.state === 'review' && elevated()) {
+                      <aludel-work-create [embedded]="true" [layer]="entry.layer" [followUp]="{ workId: work.id, entry }" (confirmed)="load()" (dismissed)="decide(entry.id, 'dismiss')" />
+                    } @else {
+                      <article class="wr-suggestion-done"><h3>{{ entry.createdTitle || entry.title }}</h3><p>{{ entry.createdBrief || entry.brief }}</p>
+                        @if (entry.createdWorkId) { <p>Created <a [href]="ctx.link('work', 'item', entry.createdWorkId)" (click)="ctx.go(ctx.link('work', 'item', entry.createdWorkId), $event)">{{ entry.createdRef }}</a> · {{ entry.decidedBy }}</p> }
+                        @else if (entry.state === 'dismissed') { <p>Dismissed by {{ entry.decidedBy }}</p> }
+                        @else { <p class="small">Elevated access is required to create this task.</p> }
+                      </article>
+                    }
+                  }
+                </div>
+              } @else { @switch (leftView()) {
                 @case ('preview') {
                   @if (preview()?.status === 'running') {
                     <div class="wr-frame"><div class="wr-fhead"><span class="wr-flabel">Proposed</span><span class="wr-addr">{{ walkPath() || stepPath() || '/' }}</span>
@@ -103,6 +118,7 @@ const routeOf = (path: string | null | undefined) => (path || '').split(/[?#]/)[
                 }
                 @default { <div class="wr-pane"><ng-container [ngTemplateOutlet]="changeList" /></div> }
               }
+              }
             </div>
             @if (hood()) {
               <div class="wr-hood" id="wr-hood" role="region" aria-label="Under the hood">
@@ -125,6 +141,7 @@ const routeOf = (path: string | null | undefined) => (path || '').split(/[?#]/)[
           <section class="wr-right" [class.wr-cover]="stepIndex() === null" [attr.aria-label]="stepIndex() === null ? 'Review' : 'Journey step'">
             <div class="wr-body">
               @if (r.state !== 'review') { <p class="wr-note"><mat-icon aria-hidden="true">{{ r.state === 'failed' ? 'error' : 'info' }}</mat-icon>@if (r.state === 'failed') { This run failed and cannot be accepted. Review its report, objectives and evidence to diagnose the blocker, then close it from the work item. } @else { Run {{ r.number }} is {{ runTitle[r.state].toLowerCase() }}. You can read it here; decisions are closed. }</p> }
+              @if (r.task.journeyAssessment; as assessment) { <details class="wr-ctx"><summary><mat-icon aria-hidden="true">route</mat-icon>Journey assessment</summary><div><p class="small">{{ assessment.reason }}</p>@for (ref of assessment.journeys; track $index) { <p class="small"><strong>{{ ref.journey }} · revision {{ ref.revision }}</strong> — {{ ref.why }}</p> }</div></details> }
               @switch (current().kind) {
                 @case ('claim') { @if (claim(); as c) {
                   @if (c.kind === 'journey' && stepIndex() !== null) {
@@ -185,16 +202,13 @@ const routeOf = (path: string | null | undefined) => (path || '').split(/[?#]/)[
                   }
                 } }
                 @case ('suggestion') { @if (suggestion(); as entry) {
-                  <div class="wr-coverhead"><span class="wr-kind"><mat-icon aria-hidden="true">playlist_add</mat-icon>Suggestion {{ entry.position + 1 }} · {{ entry.layerName }}</span><h2 id="wr-ph" tabindex="-1">{{ entry.title }}</h2>
-                    <p class="wr-lead">{{ r.performer.label }} suggests this work instead of doing it in this run. Creating it signs the task as created by {{ r.performer.label }} from {{ layerName(work.layer) }}; it starts in the {{ entry.layerName }} backlog.</p></div>
-                  <article class="wr-change wr-fu"><dl class="wr-text"><dt>Why</dt><dd>{{ entry.why }}</dd>@if (entry.brief) { <dt>Brief</dt><dd class="small">{{ entry.brief }}</dd> }
-                    @if (entry.target; as target) { <dt>Changes</dt><dd class="small">Journey {{ target.title }} (revision {{ target.revision }}), whose spec is kept in {{ layerName(target.layer) }} as {{ target.entry }}. {{ target.layer === 'platform' ? 'Creating it raises a Specify item for the journey.' : 'Creating it raises the change there; Code re-imports the journey once it is accepted.' }}</dd> }</dl>
-                    @if (entry.state === 'proposed') {
-                      @if (elevated() && r.state === 'review') { <div class="lay-row lay-wrap"><button type="button" class="lay-button small" (click)="decide(entry.id, 'create')"><mat-icon aria-hidden="true">add_task</mat-icon>Create task in {{ entry.layerName }}</button>
-                        <button type="button" class="lay-button ghost small" (click)="decide(entry.id, 'dismiss')">Dismiss</button></div> }
-                      @else if (!elevated()) { <p class="small">Someone with elevated {{ layerName(work.layer) }} access decides suggestions.</p> }
-                    } @else if (entry.createdWorkId) { <p class="small">Created <a [href]="ctx.link('work', 'item', entry.createdWorkId)" (click)="ctx.go(ctx.link('work', 'item', entry.createdWorkId), $event)">{{ entry.createdRef }}</a> · {{ entry.decidedBy }}</p> }
-                    @else { <p class="small">Dismissed by {{ entry.decidedBy }}</p> }</article>
+                  <div class="wr-coverhead"><span class="wr-kind"><mat-icon aria-hidden="true">playlist_add</mat-icon>Suggested work · {{ entry.layerName }}</span><h2 id="wr-ph" tabindex="-1">{{ entry.title }}</h2></div>
+                  <section class="wr-agent-note"><h3>Why this task</h3><p>{{ entry.why }}</p>
+                    @if (entry.target; as target) { <p class="small">Changes journey {{ target.title }} (revision {{ target.revision }}), kept in {{ layerName(target.layer) }} as {{ target.entry }}.</p> }
+                    <p class="small">Edit and confirm suggested tasks in the main area. Creating work does not start an agent.</p>
+                  </section>
+                  @if (r.summary) { <section class="wr-agent-note"><h3>Agent summary</h3><p>{{ r.summary }}</p></section> }
+                  @for (change of r.changes; track change.id) { @if (change.kind === 'report') { <section class="wr-agent-note"><h3>{{ change.name }}</h3><p>{{ change.after }}</p>@for (field of fields(change); track field[0]) { <p class="small"><strong>{{ field[0] }}</strong> {{ field[1] }}</p> }</section> } }
                 } }
                 @case ('question') { @if (r.question; as q) {
                   <div class="wr-coverhead"><span class="wr-kind"><mat-icon aria-hidden="true">help</mat-icon>Question</span><h2 id="wr-ph" tabindex="-1">Merge the reviewed change now, or keep it as a draft?</h2>
@@ -430,9 +444,10 @@ export class WorkReviewComponent implements OnDestroy {
       if (first) {
         const r = this.run(); const focus = reviewFocus(); reviewFocus.set(null);
         if (focus && r?.changes.some(change => change.id === focus)) { this.viewChoice.set('changes'); this.focus.set(focus); }
-        // Open on the first claim without a decision, else Finish.
+        // Open on the first undecided claim, then proposed work, then Finish.
         const next = r?.task.criteria.find(claim => !r.review.verdicts[claim.id]);
-        this.pageKey.set(next ? `claim:${next.id}` : 'finish');
+        const suggestion = r?.followUps?.find(entry => entry.state === 'proposed');
+        this.pageKey.set(next ? `claim:${next.id}` : suggestion ? `suggestion:${suggestion.id}` : 'finish');
         if (r?.layerSource && r.state === 'review' && this.elevated()) this.prepareReview();
         if (r?.candidate) void this.ctx.api<{ preview: { status: string; error?: string | null }; url: string }>(`${this.base()}/candidates/${encodeURIComponent(r.candidate.id)}/preview`)
           .then(status => this.preview.set({ ...status.preview, url: status.url }), () => this.preview.set(null));

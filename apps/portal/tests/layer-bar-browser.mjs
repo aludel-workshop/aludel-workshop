@@ -82,14 +82,14 @@ try {
   // A task created from the layer is an ordinary Work item, and comes back to the layer board as the same card.
   await page.locator('aludel-work-board').getByRole('link', { name: 'Create task' }).click();
   await page.waitForURL(/\/pages\/tasks\/create$/);
-  await page.getByRole('heading', { name: 'Create a Pages task' }).waitFor();
+  await page.getByRole('dialog', { name: 'Create task', exact: true }).waitFor();
   await oneBar('Pages create task', ['Map', 'Pages', 'Flows', 'Kit']);
   assert.equal(await page.locator('aludel-work-create select[name="role"]').count(), 0, 'the layer is fixed inside its own Tasks');
   const actionId = scoped ? null : await page.locator('aludel-work-create select[name="action"]').inputValue();
   if (scoped) assert.equal(await page.locator('aludel-work-create select[name="action"]').count(), 0, 'a layer-scoped task names no action');
   else assert.match(actionId, /^pages\./);
-  await page.getByLabel('Task title').fill('Check the checkout flow');
-  await page.getByRole('button', { name: 'Create task' }).click();
+  await page.getByLabel('Title', { exact: true }).fill('Check the checkout flow');
+  await page.getByRole('button', { name: 'Create', exact: true }).click();
   await page.waitForURL(/\/work\/item\//);
   await page.goto(origin + base + '/pages/tasks');
   const card = page.locator('aludel-work-card', { hasText: 'Check the checkout flow' });

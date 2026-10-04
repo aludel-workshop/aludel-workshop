@@ -1,0 +1,46 @@
+npm run test:server
+ℹ tests 335
+ℹ suites 0
+ℹ pass 304
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 31
+ℹ todo 0
+ℹ duration_ms 616347.14644
+
+npm run test:server:templates
+ℹ tests 335
+ℹ suites 0
+ℹ pass 326
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 9
+ℹ todo 0
+ℹ duration_ms 674902.057445
+
+Code browser journey: passed (Playwright 1.61.1, installed Chromium 1228).
+Code template UI typecheck at 82cb9ef: passed.
+Frontend launcher build: passed.
+Older-template restart regression: failed on merged main; passed with local fix.
+Portal HTTP: 200.
+
+Acceptance blocker follow-up:
+Journey/Work contracts
+ℹ tests 35
+ℹ suites 0
+ℹ pass 35
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 21242.575782
+Templates-mode Journey/Work/Code contracts
+ℹ tests 41
+ℹ suites 0
+ℹ pass 41
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 64117.141767
+pass  repository-review  PASS: generic Code review prepares/builds on open; author/viewer steps require no manual login/navigation; stale generat

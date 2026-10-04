@@ -1,5 +1,5 @@
 // JOURNEYS-01 J5: Specify, then implement, on a disposable imported app with no journeys. A person creates a Code task about
-// /settings through the visible form; Code offers to specify a journey first; the person specifies it on a real branch
+// /settings through the visible composer; the person optionally chooses Specify in Attach journey; the person specifies it on a real branch
 // (a characterization test for today's step, a new step without one); review builds and walks it; accepting it raises
 // Implement, whose claims are only the step the app doesn't do yet.
 // Usage: PLAYWRIGHT_MODULE=<…/playwright/index.mjs> MACHINE_LAYER_TEMPLATES_ENABLED=1 node tests/journey-work-browser.mjs
@@ -94,21 +94,21 @@ try {
 
   // 1. Create the request in Code's Tasks. A request about /settings, which no journey covers, is offered Specify.
   await page.goto(`${portal}/p/${project.slug}/code/tasks/create`);
-  await page.getByRole('heading', { name: 'Create a Code task' }).waitFor();
-  await page.getByText("an agent may change only this layer's declared repository files").waitFor();
-  await page.getByLabel('Task title').fill('Invite teammates');
-  await page.getByLabel('Task brief').fill('From /settings, a member invites people by email.');
-  await page.getByLabel('Assignee').selectOption({ label: 'You' });
-  await page.getByRole('button', { name: 'Create task', exact: true }).click();
-  await page.getByText('No journey covers /settings yet.').waitFor();
-  assert.equal(await page.getByLabel('Journey', { exact: true }).inputValue(), 'Invite teammates');
+  await page.getByRole('dialog', { name: 'Create task' }).waitFor();
+  await page.getByLabel('Title', { exact: true }).fill('Invite teammates');
+  await page.getByLabel('Description', { exact: true }).fill('From /settings, a member invites people by email.');
+  await page.getByLabel('Assignee', { exact: true }).selectOption({ label: 'You' });
+  await page.getByRole('button', { name: 'Attach journey', exact: true }).click();
+  await page.getByText('No journeys yet', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Specify a new journey', exact: true }).click();
+  assert.equal(await page.getByLabel('New journey', { exact: true }).inputValue(), 'Invite teammates');
   await axe();
   await page.screenshot({ path: `${out}/offer.png`, fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: `${out}/offer-narrow.png`, fullPage: true });
-  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'the offer fits a 390px screen');
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'the composer fits a 390px screen');
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.getByRole('button', { name: 'Specify first', exact: true }).click();
+  await page.getByRole('button', { name: 'Create Specify task', exact: true }).click();
   await page.waitForURL(/\/work\/item\//);
   const specify = items().find(item => item.context?.journeyWork?.kind === 'specify');
   assert.deepEqual(specify.checks.map(claim => claim.id), ['journey-spec', 'journeys-unchanged']);
@@ -182,7 +182,7 @@ try {
   assert.notEqual(integration.commit, base);
 
   assert.equal(errors.length, 0, errors.join('\n'));
-  console.log('PASS: a Code request about an uncovered route is offered Specify in the visible form; Specify runs as a person on a real branch; review builds and walks the journey and proves its record claim; accepting merges the reviewed commit and raises Implement claiming only the step the app does not do yet; axe and 390px pass.');
+  console.log('PASS: a Code request can explicitly choose Specify in the journey picker; Specify runs as a person on a real branch; review builds and walks the journey and proves its record claim; accepting merges the reviewed commit and raises Implement claiming only the step the app does not do yet; axe and 390px pass.');
 } catch (error) {
   console.error('SERVER', serverLog.slice(-4000)); throw error;
 } finally {
