@@ -26,7 +26,7 @@ Kept as they are or extended, not rebuilt: per-project SQLite work items (`serve
 Sizes are relative (S, M, L), not time. Each slice ends with server tests, the layer's browser journey where UI changes, both `npm run test:server` and `npm run test:server:templates`, and a retrospective. The old path keeps working behind a flag until A10 removes it.
 
 ### Phase 0: decisions and preparation (no code)
-- **D1 Spending (blocks A2).** The Agent SDK calls the Anthropic API, which costs money per token; today's Codex path uses ChatGPT Plus at no extra cost. Needs the owner's authorization of an API key and a monthly budget, or a decision to keep a no-cost runtime for now. *Inferred:* a Claude subscription can't be used as the SDK's credential for a separate app; check Anthropic's current terms before relying on either way.
+- **D1 Spending (blocks A2, no longer the first milestone).** The Agent SDK calls the Anthropic API, which costs money per token; today's Codex path uses ChatGPT Plus at no extra cost. Needs the owner's authorization of an API key and a monthly budget, or a decision to keep a no-cost runtime for now. *Inferred:* a Claude subscription can't be used as the SDK's credential for a separate app; check Anthropic's current terms before relying on either way.
 - **D2 Plan approval:** every definition waits for the owner (recommended to start) or small ones start on their own.
 - **D3 Review signing:** one reviewer per action with elevated layers needing their own (recommended), or per layer.
 - **D4 Kit source (blocks A7):** Design's HTML kit generated from component contracts only, or also extracted from built components.
@@ -40,7 +40,7 @@ Sizes are relative (S, M, L), not time. Each slice ends with server tests, the l
 - **Streaming.** Server-sent events for `work_events` and action state, replacing the 2 s poll for the new item page.
 - *Exit:* tests stage one changeset across Pages and Code through the MCP server and run Check on it; events stream to a test client.
 
-### A2 Orchestrator runtime (L) — critical path, needs D1
+### A2 Orchestrator runtime (L) — after the dogfood, needs D1
 - Agent SDK runner inside the existing per-project Docker sandbox, one session per item. Defining stage (Draft → Ready: questions, brief, drafted actions), then working stage.
 - Layer subagents from `agents/<layer>.md` and skills from `skills/` in each layer template (`layer-base`: allow those paths in `server/layer-package.mjs:115`, add their digests to `config/layer-reviewed-sources.json`). Host agents: Explore, Verify, Showcase.
 - `canUseTool` maps each layer's mode (stage freely, ask first, read-only) to an allow request on the action. Hooks run the host checks (API validation, package tests). Concurrency slots replace batches (the "3 slots" on the board).
@@ -70,13 +70,15 @@ Sizes are relative (S, M, L), not time. Each slice ends with server tests, the l
 ### A7 Design HTML kit and the Pages review action (L) — after A4, needs D4
 - Design: generate `kit.js` (tokens as CSS variables, components as custom elements) per Design revision from component contracts (`server/design.mjs:324`); the Components tab renders demos from it.
 - Pages: page specs as HTML files in the Pages repository pinned to a kit revision (with `data-go` links), migrated from `page` records; Spec view and Flows render them; `kit-render.ts` retires for spec previews.
-- Pages review action: the flow walker from pages-review/v1 (previous beside proposed, step badges, highlight changes, pinned notes, round 2 against the last review). Code review keeps the live build.
+- Scripted flows: a flow can carry scenarios (timed or triggered state changes across pages, as the prototypes' Play/Step and Scenarios do) and **branches** (a step with alternatives, such as a wrong password or an expired link). Each path through a branch is its own journey for the same persona, so Code's step tests and the one-persona rule hold.
+- Pages review action: the flow walker from pages-review/v1 (previous beside proposed, step badges, highlight changes, pinned notes, round 2 against the last review). Review input is flag-and-say: pin a note anywhere, say what you want instead; no confirmation questions, and approving needs no typing. Code review keeps the live build.
 - Starts with a spike: generate Biome's kit from its contracts and compare with its built screens (the open G3 question).
 - *Exit:* Biome's onboarding flow reviewed as HTML in the walker; spike result recorded.
 
-### A8 Local work style (M) — after A1
+### A8 Local work style (M) — critical path, after A3
 - `aludel` CLI: `aludel claim W-n` (assign, start a person run, write the MCP config and context for a local agent), `aludel status`, `aludel submit`. A local Claude Code session gets the same MCP tools, skills and previews; the item page shows the local thread from submitted progress.
-- *Exit:* claim, work in Claude Code locally, submit, and review in the portal, on a disposable project.
+- The local session is the orchestrator: it reads the item's brief and actions, adds and updates actions, posts its thread and asks on actions through the MCP server, so the item page looks the same as with a remote agent. Uses the owner's existing subscription; no API billing.
+- *Exit:* claim, work in Claude Code locally, submit, and review in the portal, on a disposable project; then the dogfood item on Aludel itself.
 
 ### A9 Linear sync (M) — needs D5 and the owner's go for external writes
 - Import first (Linear issues → Draft items), then two-way fields, status mapping and actions as sub-issues, with the orchestrator's summary as a comment. Credentials stay out of the repository.
@@ -87,7 +89,7 @@ Sizes are relative (S, M, L), not time. Each slice ends with server tests, the l
 
 ## Order
 
-Critical path: **Phase 0 → A1 → A2 and A3 (side by side) → A4 → A5.** A6 and A8 can start after A1/A3; A7 after A4; A9 last; A10 after A5. Existing queue items: T03-CODE and LAYER-GITHUB-01 continue only where they don't touch Work; LAT-08A (layer-owned Work review) and LAY-05 are absorbed into A4 and A10.
+**Owner decision 2026-10-04: local first (dogfood).** Critical path: **Phase 0 → A1 → A3 → A8 → A4 → dogfood**: AGENT-WORK-01's own remaining slices run as a work item in Aludel's own project, worked by Claude Code locally through the MCP server and reviewed on the new item page. Then **A2** (remote SDK orchestrator, once D1 is settled) and **A5** (Biome trial with the remote orchestrator). A6 can start after A3; A7 after A4; A9 last; A10 after A5. Existing queue items: T03-CODE and LAYER-GITHUB-01 continue only where they don't touch Work; LAT-08A (layer-owned Work review) and LAY-05 are absorbed into A4 and A10.
 
 ## Risks
 
