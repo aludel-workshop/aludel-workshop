@@ -235,21 +235,38 @@ export function workRuns({ db, know, candidates = null }) {
   // results are the step tests J3 ran on that exact build; the journeys are read from the same commit.
   function proven(projectId, run) {
     const claims = run.task.criteria || [];
-    if (!claims.some(claim => claim.kind === 'journey' || claim.covers === 'journeys' || journeyRecord(claim))) return { proofs: {}, gate: [] };
-    let built = {};
-    const integration = run.integration;
-    if (integration && db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'layer_review_journeys'").get()) {
-      const walked = db.prepare('SELECT steps_json FROM layer_review_journeys WHERE integration_id = ? AND commit_sha = ?').get(integration.id, integration.commit);
-      if (walked) {
-        let journeys = null, unreadable = null;
-        const key = db.prepare('SELECT layer_key FROM layer_review_integrations WHERE id = ?').get(integration.id)?.layer_key;
-        try { journeys = reviewInputs(layerBinding(db, projectId, key).repo, integration.commit)?.journeys || null; } catch (error) { unreadable = error.message; }
-        built = { journeys, results: parse(walked.steps_json, []), unreadable };
-      }
-    }
-    const proofs = Object.fromEntries(claims.map(claim => [claim.id, claimProof(claim, built, claims)]).filter(([, proof]) => proof)
+    if (!claims.some(claim => claim.kind === 'journey' || claim.covers === 'journeys' || journeyRecord(claim))) return { proofs: {}, gate: [], ...checked(projectId, run) };
+    const proofs = proofsOn(claims, builtAt(projectId, run.integration));
+    return { proofs, gate: claimGate(claims, proofs, run.performer.kind === 'person' ? run.reasons : {}), ...checked(projectId, run) };
+  }
+  // What a build of an integration showed: its journeys and inputs at that commit, each step's test result, and its checks.
+  function builtAt(projectId, integration) {
+    if (!integration || !db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'layer_review_journeys'").get()) return {};
+    const walked = db.prepare('SELECT steps_json, ran_at FROM layer_review_journeys WHERE integration_id = ? AND commit_sha = ?').get(integration.id, integration.commit);
+    if (!walked) return {};
+    let inputs = null, unreadable = null;
+    const key = db.prepare('SELECT layer_key FROM layer_review_integrations WHERE id = ?').get(integration.id)?.layer_key;
+    try { inputs = reviewInputs(layerBinding(db, projectId, key).repo, integration.commit); } catch (error) { unreadable = error.message; }
+    return { journeys: inputs?.journeys || null, inputs, results: parse(walked.steps_json, []), unreadable, ranAt: walked.ran_at };
+  }
+  function proofsOn(claims, built) {
+    return Object.fromEntries(claims.map(claim => [claim.id, claimProof(claim, built, claims)]).filter(([, proof]) => proof)
       .map(([id, proof]) => [id, built.unreadable && proof.status === 'not-run' ? { ...proof, detail: `The reviewed build's journeys can't be read: ${built.unreadable}` } : proof]));
-    return { proofs, gate: claimGate(claims, proofs, run.performer.kind === 'person' ? run.reasons : {}) };
+  }
+  // JOURNEYS-01 J7: the person's own check of a branch before submitting. It is the review's path (integration, combined
+  // build, journey step tests) on an integration of its own, so the review after submitting re-runs it from scratch.
+  const checkId = runId => `${runId}-check`;
+  function checked(projectId, run) {
+    if (run.performer.kind !== 'person' || !run.task.layerRepository) return {};
+    const asked = [...run.steps].reverse().find(step => step.kind === 'check');
+    const integration = asked && layerReview(db, projectId, checkId(run.id));
+    if (!integration || integration.id !== asked.integration) return { check: null };
+    const built = builtAt(projectId, integration), results = new Map((built.results || []).map(result => [result.id, result]));
+    const build = db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'layer_review_builds'").get() && db.prepare('SELECT checks_json FROM layer_review_builds WHERE integration_id = ? AND commit_sha = ?').get(integration.id, integration.commit);
+    return { check: { branch: asked.branch, commit: asked.commit, integration: integration.id, base: integration.base, at: asked.at, ranAt: built.ranAt || null,
+      current: layerBinding(db, projectId, run.task.layerRepository.key).commit === integration.base, files: integration.files.map(file => ({ path: file.path, status: file.status, added: file.added, removed: file.removed })),
+      checks: [...integration.tests, ...parse(build?.checks_json, [])], available: built.ranAt ? Boolean(built.inputs) : null,
+      journeys: (built.inputs?.journeys || []).map(journey => ({ id: journey.id, title: journey.title })), steps: (built.inputs?.steps || []).map(step => ({ ...step, result: results.get(step.id) || null })), proofs: built.ranAt ? proofsOn(run.task.criteria || [], built) : {} } };
   }
 
   const runFor = (projectId, workId, attemptId) => {
@@ -467,6 +484,35 @@ export function workRuns({ db, know, candidates = null }) {
     know.appendLog(workId, `Submitted person run for review: ${summary}`, { state: 'review', context: { ...(item.context || {}), personRun: runId } }, { by: { kind: 'person', id: user.id } });
     return runFor(projectId, workId, runId);
   }
+  // JOURNEYS-01 J8: a run the host performed itself (a template update). Its branch goes straight to review on the item's
+  // layer repository, through the same integration, build and acceptance as a person's; no member is its performer.
+  function hostRun(projectId, workId, { branch, commit, summary }) {
+    const item = know.workById(projectId, workId);
+    if (!item || item.scope !== 'layer') fail('Host runs are for layer work.', 409);
+    const binding = layerBinding(db, projectId, item.layer), task = taskSnapshot(item);
+    task.layerRepository = { key: item.layer, base: binding.commit, root: packageAt(binding.repo, binding.commit, item.layer).root };
+    const id = `person-run-${randomUUID()}`, at = now();
+    submitLayerBranch(db, { projectId, key: item.layer, attemptId: id, base: binding.commit, workRef: item.ref, branch, commit });
+    db.prepare(`INSERT INTO work_person_runs(id, project_id, work_id, performer_id, performer_name, task_json, state, started_at, updated_at, changes_json, evidence_json, reasons_json, summary, submitted_at)
+      VALUES (?, ?, ?, 'aludel', 'Aludel', ?, 'review', ?, ?, '[]', '[]', '{}', ?, ?)`).run(id, projectId, workId, JSON.stringify(task), at, at, clip(summary, 2000), at);
+    know.appendLog(workId, `Aludel submitted ${branch} for review`, { state: 'review', context: { ...(item.context || {}), personRun: id } });
+    return runFor(projectId, workId, id);
+  }
+  function checkPerson(user, projectId, workId, runId, input) {
+    const row = personRun(projectId, workId, runId);
+    if (!row) fail('Person run not found.', 404);
+    if (row.performer_id !== user.id) fail('Only the person doing this work can check it.', 403);
+    if (row.state !== 'working') fail('Only active person work can be checked.', 409);
+    const repository = parse(row.task_json, {}).layerRepository;
+    if (!repository) fail('This run did not pin a layer repository.', 409);
+    const item = know.workById(projectId, workId), branch = String(input.branch || '').trim(), commit = String(input.commit || '').trim();
+    const source = submitLayerBranch(db, { projectId, key: repository.key, attemptId: checkId(runId), base: repository.base, workRef: `${item.ref}-check`, branch, commit });
+    const instance = layerInstanceId(db, projectId, repository.key);
+    const recordsOf = kind => db.prepare('SELECT id, data_json FROM knowledge_records WHERE project_id = ? AND kind = ? AND layer_instance_id = ?').all(projectId, kind, instance).map(record => ({ id: record.id, data: JSON.parse(record.data_json) }));
+    const integration = prepareLayerReview(db, { projectId, key: repository.key, attemptId: checkId(runId), source, catalogs: know.catalogs, recordsOf });
+    addStep(runId, 'check', { branch, commit, integration: integration.id });
+    return integration;
+  }
   function stopPerson(user, projectId, workId, runId) {
     const row = personRun(projectId, workId, runId);
     if (!row) fail('Person run not found.', 404);
@@ -508,6 +554,8 @@ export function workRuns({ db, know, candidates = null }) {
     db.exec('BEGIN IMMEDIATE');
     try {
       merge = mergeLayerBranch(db, { projectId, key: item.layer, source: review, reviewer: user.name, workId, workRef: item.ref, catalogs: know.catalogs, recordsOf });
+      // JOURNEYS-01 J8: an accepted template update moves the template commit the instance follows.
+      if (item.context?.templateUpdate) db.prepare('UPDATE layer_package_bindings SET template_commit = ? WHERE project_id = ? AND layer_key = ?').run(item.context.templateUpdate.to, projectId, item.layer);
       know.updateWork(user, projectId, workId, { state: 'done' });
       db.exec('COMMIT');
     } catch (error) { if (db.isTransaction) db.exec('ROLLBACK'); undoLayerMerge(merge); throw error; }
@@ -628,5 +676,5 @@ export function workRuns({ db, know, candidates = null }) {
     return seq;
   }
 
-  return { list, runFor, preparePersonReview, acceptPersonRepository, saveReview, assertSignable, reviewNotes, recordSignature, sign, startPerson, submitPerson, stopPerson, reportPlan, reportProgress, checkEvidence, recordEvidence, addStep, steps };
+  return { list, runFor, checkPerson, hostRun, preparePersonReview, acceptPersonRepository, saveReview, assertSignable, reviewNotes, recordSignature, sign, startPerson, submitPerson, stopPerson, reportPlan, reportProgress, checkEvidence, recordEvidence, addStep, steps };
 }

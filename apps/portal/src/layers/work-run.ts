@@ -2,13 +2,20 @@ import { Component, computed, effect, inject, input, output, signal, untracked }
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { Assignee, ProjectContext, WorkChange, WorkItem, WorkRun, WorkRunState } from './context';
+import { Assignee, ProjectContext, ProofStatus, RunCheck, WorkChange, WorkItem, WorkRun, WorkRunState } from './context';
 import { AssigneeComponent, AvatarComponent, RefChipComponent, agentRunnable, batchOf, elapsed, isRunning, tokens } from './work-shared';
 
 // WORK-ITEM-UX-01: what a run's status block says and offers, by state (the run actions table in the work record).
 export const runTitle: Record<WorkRunState, string> = { working: 'Working', needs: 'Needs your answer', review: 'Run complete', failed: 'Failed', stopped: 'Stopped',
   accepted: 'Accepted', sent: 'Sent back', closed: 'Closed', parked: 'Kept as a draft' };
 export const runTone: Record<WorkRunState, string> = { working: 'live', needs: 'needs', review: 'review', failed: 'bad', stopped: 'bad', accepted: 'done', sent: 'past', closed: 'past', parked: 'past' };
+// JOURNEYS-01 J7: how a step test and a claim read in the person's check; the same words the review uses.
+const stepLabel: Record<string, string> = { passed: 'Test passed', failed: 'Test failed', skipped: 'Not run', uncovered: 'No test', 'no-fixture': 'No fixture', none: 'Not run yet' };
+const stepIcon: Record<string, string> = { passed: 'check_circle', failed: 'cancel', skipped: 'radio_button_unchecked', uncovered: 'remove', 'no-fixture': 'person_off', none: 'radio_button_unchecked' };
+const proofLabel: Record<ProofStatus, string> = { passed: 'Passed', failed: 'Failed', 'no-fixture': 'No fixture', uncovered: 'No test', skipped: 'Not run after a failure', missing: 'Not in the build',
+  stale: 'Older revision built', unsigned: 'Not written as authored', 'not-run': 'Not run yet' };
+const proofIcon: Record<ProofStatus, string> = { passed: 'check_circle', failed: 'cancel', 'no-fixture': 'person_off', uncovered: 'remove', skipped: 'radio_button_unchecked', missing: 'help',
+  stale: 'history', unsigned: 'edit_off', 'not-run': 'radio_button_unchecked' };
 // Which change the review should open on, when it is entered from a row in Changes.
 export const reviewFocus = signal<string | null>(null);
 type Objective = { text: string; state: 'done' | 'now' | 'todo' | 'stuck'; note: string; took: string };
@@ -79,21 +86,58 @@ export function objectivesOf(run: WorkRun, nowMs: number): { list: Objective[]; 
           <div class="lay-row lay-wrap"><button type="submit" class="lay-button" [disabled]="!answerDraft.trim()">Answer</button></div>
         </form>
       }
+      @if (r.performer.kind === 'person' && r.state === 'working' && r.task.layerRepository) {
+        <form class="wi-signoff wi-check" (ngSubmit)="checkBranch()" aria-labelledby="check-title">
+          <h3 id="check-title"><mat-icon aria-hidden="true">fact_check</mat-icon>Check my branch</h3>
+          <p class="small lay-muted">Runs what review will run on a committed branch: it's combined with the latest accepted code, built, and every journey step's test runs. Nothing is submitted, and review runs it all again.</p>
+          <label for="person-branch">Local branch</label><input id="person-branch" name="personBranch" [(ngModel)]="branchDraft" placeholder="work/my-change">
+          <label for="person-commit">Exact commit</label><input id="person-commit" name="personCommit" [(ngModel)]="commitDraft" placeholder="Full commit SHA">
+          <div class="lay-row lay-wrap"><button type="submit" class="lay-button ghost" [disabled]="checking() || !branchDraft.trim() || !commitDraft.trim()">@if (checking()) { <mat-icon aria-hidden="true" class="lay-spin">progress_activity</mat-icon>Checking… } @else { Check my branch }</button></div>
+          @if (checking()) { <p class="small lay-muted" role="status">Building the combined app and running the journey step tests. This can take a few minutes.</p> }
+          @if (checkError()) { <p class="wi-warn" role="alert"><mat-icon aria-hidden="true">warning</mat-icon>{{ checkError() }}</p> }
+          @if (r.check; as c) {
+            <div class="wi-checkreport" aria-labelledby="check-result">
+              <h4 id="check-result">Checked <code>{{ c.branch }}</code> at <code>{{ c.commit.slice(0, 12) }}</code> · {{ when(c.at) }}</h4>
+              @if (!c.current) { <p class="wi-warn"><mat-icon aria-hidden="true">history</mat-icon>The accepted code has moved since this check. Check again for what review will see.</p> }
+              @else if (c.commit !== commitDraft.trim()) { <p class="wi-warn"><mat-icon aria-hidden="true">history</mat-icon>This check is for a different commit than the one named above.</p> }
+              @if (claimChecks().length) {
+                <ul class="wr-tests">@for (entry of claimChecks(); track entry.id) {
+                  <li><mat-icon aria-hidden="true" [class]="'wr-t-' + entry.proof.status">{{ proofIcon[entry.proof.status] }}</mat-icon><span><strong>{{ entry.text }}</strong>: {{ proofLabel[entry.proof.status] }}@if (entry.proof.detail) { <small>{{ entry.proof.detail }}</small> }</span></li>
+                }</ul>
+              }
+              @if (c.steps.length) {
+                <table class="wr-reg"><caption class="visually-hidden">Journey step tests on the checked build</caption><thead><tr><th scope="col">Journey</th><th scope="col">Step</th><th scope="col">Test</th></tr></thead><tbody>
+                  @for (step of c.steps; track step.id) { <tr><td>{{ journeyTitle(c, step.journey) }}</td><td>{{ step.label }}</td>
+                    <td><mat-icon aria-hidden="true" [class]="'wr-t-' + (step.result?.status || 'skipped')">{{ stepIcon[step.result?.status || 'none'] }}</mat-icon>{{ stepLabel[step.result?.status || 'none'] }}@if (step.result?.detail) { <small>{{ step.result!.detail }}</small> }</td></tr> }
+                </tbody></table>
+              } @else if (c.available === false) { <p class="small">This app has no <code>.aludel/review.json</code> (version 2), so there are no journey steps to run.</p> }
+              @if (failedChecks().length) { <ul class="wr-tests">@for (check of failedChecks(); track $index) { <li><mat-icon aria-hidden="true" class="wr-t-failed">cancel</mat-icon><span><strong>{{ check.name }}</strong>@if (check.detail) { <small>{{ check.detail }}</small> }</span></li> }</ul> }
+              @else if (c.checks.length) { <p class="small lay-muted">{{ c.checks.length }} {{ c.checks.length === 1 ? 'check' : 'checks' }} passed: {{ checkNames() }}.</p> }
+              @if (walkLines().length) {
+                <details class="wi-walklocal"><summary>Walk it on your dev server</summary>
+                  <p class="small">Start your dev server with <code>ALUDEL_REVIEW_PREVIEW=1</code> and an <code>ALUDEL_REVIEW_TOKEN</code> you choose. Open the app, paste a journey's line into the browser console and enter that token: you arrive on its first step, signed in as its persona.</p>
+                  @for (line of walkLines(); track line.journey) {
+                    <p class="small"><strong>{{ line.title }}</strong> as {{ line.persona }}</p><pre class="wi-walkline" [attr.aria-label]="'Console line for ' + line.title">{{ line.code }}</pre>
+                  }
+                </details>
+              }
+            </div>
+          }
+        </form>
+      }
       @if (submitOpen() && r.performer.kind === 'person' && r.state === 'working') {
         <form class="wi-signoff" (ngSubmit)="submitPerson()">
           <h3><mat-icon aria-hidden="true">rate_review</mat-icon>Create the review packet</h3>
           <p class="small lay-muted">{{ editsSinceStart().length }} linked {{ editsSinceStart().length === 1 ? 'revision was' : 'revisions were' }} recorded during this run and will be included automatically.</p>
           @if (r.task.layerRepository) {
-            <p class="small lay-muted">Submit a committed local branch from this layer's repository. It stays unmerged until review acceptance.</p>
-            <label for="person-branch">Local branch</label><input id="person-branch" name="personBranch" [(ngModel)]="branchDraft" placeholder="work/my-change">
-            <label for="person-commit">Exact commit</label><input id="person-commit" name="personCommit" [(ngModel)]="commitDraft" placeholder="Full commit SHA">
+            <p class="small lay-muted">@if (branchDraft.trim()) { Submits <code>{{ branchDraft.trim() }}</code> at <code>{{ commitDraft.trim().slice(0, 12) || 'no commit' }}</code>, as named under Check my branch. } @else { Name your branch and commit under Check my branch first. } It stays unmerged until review acceptance.</p>
           }
           <label for="person-summary">What is ready for review</label><textarea id="person-summary" name="personSummary" rows="3" [(ngModel)]="summaryDraft" required></textarea>
           @for (criterion of r.task.criteria; track criterion.id) {
             <label [for]="'person-evidence-' + criterion.id">Evidence for {{ criterion.index + 1 }}. {{ criterion.text }}</label>
             <textarea [id]="'person-evidence-' + criterion.id" [name]="'personEvidence-' + criterion.id" rows="2" [(ngModel)]="evidenceDraft[criterion.id]" placeholder="What should the reviewer inspect?"></textarea>
             @if (criterion.kind === 'journey' || criterion.covers === 'journeys') {
-              <label [for]="'person-reason-' + criterion.id">If its step tests won't pass yet, say why (optional)</label>
+              <label [for]="'person-reason-' + criterion.id">If its step tests won't pass yet, say why (optional)@if (checkedProof(criterion.id); as proof) { <span class="wi-checkmark" [class]="'wr-t-' + proof.status"> · Your check: {{ proofLabel[proof.status] }}</span> }</label>
               <textarea [id]="'person-reason-' + criterion.id" [name]="'personReason-' + criterion.id" rows="2" [(ngModel)]="reasonDraft[criterion.id]" placeholder="Without a reason, review can't accept this run while a claimed step fails."></textarea>
             }
           }
@@ -186,6 +230,18 @@ export class RunCardComponent {
   readonly logOpen = signal(false);
   readonly signing = signal<'accept' | 'reject' | 'close' | null>(null);
   readonly submitOpen = signal(false);
+  readonly checking = signal(false);
+  readonly checkError = signal('');
+  readonly proofLabel = proofLabel; readonly proofIcon = proofIcon; readonly stepLabel = stepLabel; readonly stepIcon = stepIcon;
+  // JOURNEYS-01 J7: what the person's own check found, claim by claim, and a console line per journey to walk it locally.
+  readonly claimChecks = computed(() => { const c = this.run().check; if (!c) return [];
+    return this.run().task.criteria.filter(claim => c.proofs[claim.id]).map(claim => ({ id: claim.id, text: `${claim.index + 1}. ${claim.text}`, proof: c.proofs[claim.id] })); });
+  readonly failedChecks = computed(() => (this.run().check?.checks || []).filter(check => check.status !== 'passed'));
+  readonly checkNames = computed(() => (this.run().check?.checks || []).map(check => check.name).join(', '));
+  readonly walkLines = computed(() => { const c = this.run().check; if (!c) return [];
+    return c.steps.filter(step => step.available && !c.steps.some(other => other.journey === step.journey && c.steps.indexOf(other) < c.steps.indexOf(step))).map(step => ({
+      journey: step.journey, title: this.journeyTitle(c, step.journey), persona: step.persona || '',
+      code: `fetch('/api/__aludel/review', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + prompt('ALUDEL_REVIEW_TOKEN') }, body: ${JSON.stringify(JSON.stringify({ journey: step.journey, step: step.step, persona: step.persona, fixture: step.fixture, session: step.session, reset: true }))} }).then(r => r.ok ? location.assign(${JSON.stringify(step.path)}) : alert('Setup failed: ' + r.status))` })); });
   comment = ''; answerDraft = ''; whyDraft = ''; answerCriteria = ''; summaryDraft = ''; branchDraft = ''; commitDraft = ''; evidenceDraft: Record<string, string> = {}; reasonDraft: Record<string, string> = {};
   readonly tone = computed(() => runTone[this.run().state]);
   readonly title = computed(() => runTitle[this.run().state]);
@@ -235,7 +291,7 @@ export class RunCardComponent {
       : `Applies ${this.run().changes.length === 1 ? 'its change' : `its ${this.run().changes.length} changes`} and closes ${this.item().ref}. Your signature and comment are kept with it.`
     : 'Nothing is applied. The changes, your flags and your comment stay on this run and go to the next run as context. The task opens again as Next run.');
   readonly log = computed(() => this.run().steps.map(step => ({ at: step.at, text: step.kind === 'plan' ? `Planned ${step.objectives?.length || 0} objectives`
-    : step.kind === 'progress' ? `${step.status === 'done' ? 'Finished' : step.status === 'stuck' ? 'Stuck on' : 'Started'} “${this.objectives().list[step.index ?? -1]?.text || 'an objective'}”${step.note ? `: ${step.note}` : ''}` : step.text || '' })));
+    : step.kind === 'check' ? `Checked ${step.branch} at ${String(step.commit || '').slice(0, 12)}` : step.kind === 'progress' ? `${step.status === 'done' ? 'Finished' : step.status === 'stuck' ? 'Stuck on' : 'Started'} “${this.objectives().list[step.index ?? -1]?.text || 'an objective'}”${step.note ? `: ${step.note}` : ''}` : step.text || '' })));
   readonly actionText = computed(() => this.ctx.actionById().get(this.run().task.action || '')?.description || this.run().task.title);
   readonly actionName = computed(() => this.ctx.actionById().get(this.run().task.action || '')?.name || this.run().task.action || this.run().task.title);
   readonly editsSinceStart = computed(() => this.edits().filter(edit => edit.createdAt >= this.run().startedAt));
@@ -244,6 +300,7 @@ export class RunCardComponent {
     effect(() => { const r = this.run(); untracked(() => {
       if (r.state !== 'review') this.signing.set(null);
       if (!this.answerDraft) this.answerDraft = this.item().question?.recommendation || '';
+      if (r.check && !this.branchDraft && !this.commitDraft) { this.branchDraft = r.check.branch; this.commitDraft = r.check.commit; }
       if (!this.answerCriteria) this.answerCriteria = this.item().checks.filter(check => !check.backed).map(check => check.text).join('\n');
     }); });
   }
@@ -269,6 +326,13 @@ export class RunCardComponent {
     else await this.ctx.updateWork(this.item().id, { stop: true });
     this.changed.emit();
   }, `Stopping ${this.item().ref}.`); }
+  journeyTitle(check: RunCheck, id: string) { return check.journeys.find(journey => journey.id === id)?.title || id; }
+  checkedProof(claim: string) { return this.run().check?.proofs[claim] || null; }
+  checkBranch() {
+    this.checking.set(true); this.checkError.set('');
+    void this.ctx.api(this.base() + '/check', 'POST', { branch: this.branchDraft.trim(), commit: this.commitDraft.trim() })
+      .then(() => this.changed.emit(), (error: Error) => this.checkError.set(error.message || 'The check could not run.')).finally(() => this.checking.set(false));
+  }
   submitPerson() { const evidence = Object.entries(this.evidenceDraft).map(([claim, note]) => ({ claim, note: note?.trim() })).filter(entry => entry.note);
     const reasons = Object.fromEntries(Object.entries(this.reasonDraft).map(([claim, reason]) => [claim, reason?.trim()]).filter(([, reason]) => reason));
     void this.ctx.write(async () => { await this.ctx.api(this.base() + '/submit', 'POST', { summary: this.summaryDraft, evidence, reasons, ...(this.branchDraft.trim() ? { source: { branch: this.branchDraft.trim(), commit: this.commitDraft.trim() } } : {}) }); this.submitOpen.set(false); this.changed.emit(); }, 'Ready for review.'); }
