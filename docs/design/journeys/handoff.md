@@ -5,9 +5,13 @@ status: active
 updated: 2026-10-04
 ---
 
-# JOURNEYS-01 handoff: J8 task creation built; owner trial next
+# JOURNEYS-01 handoff: closed 2026-10-04; next is AGENT-WORK-01
 
 For a fresh agent (Claude in the cloud) picking up JOURNEYS-01. Run `tools/branch-handoffs.sh` first: this packet's slices have been landing on cloud-session branches that the owner hasn't merged into `main`, so the newest handoff may be on a branch. Then read this, [AGENTS.md](../../../AGENTS.md), [status](../../status.md), the [JOURNEYS-01 work record](work-record.md) (plan, authorizations, run log, retrospectives), [DEC-063](../../decisions.md) and the [deferred code-tracing record](../code-tracing/deferred.md).
+
+## Closed 2026-10-04
+
+J8 closed without signup, at the owner's choice; see the [closeout](work-record.md#j8-closeout-2026-10-04-claude-cloud-session). Codex's J8 branch is merged. Next is [AGENT-WORK-01](../agent-work/proposal.md): goal-level, cross-stack agent runs on the Claude Agent SDK. It takes over the agent-side check, prerequisite continuation and pre-start task status. The sections below are history.
 
 ## Task creation redesign (2026-10-03, Codex)
 

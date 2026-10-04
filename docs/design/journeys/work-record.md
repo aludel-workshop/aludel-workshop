@@ -944,3 +944,38 @@ The owner likes the Jira-like composer. Not every task has a journey; the agent 
 ### Task composer built locally (2026-10-03)
 
 Owner “build it” authorized implementing the accepted composer and DEC-064's optional/multiple-journey assessment contract. [Build record and verification](task-create/work-record.md#build-authorization-and-readiness--2026-10-03). Host Work owns this shared UI, so no template pin or handler digest changed. The Go bundle remains immutable; first-plan assessment adds validated journey steps to per-run review scope. The portal is running locally at `http://aludel.localhost:4310`; W-8 was preserved. J8's trial steps, status and handoff now distinguish direct creation from later agent assessment. The real model-driven pickup and owner review of the built form remain part of the live trial; no whole-packet completion is claimed.
+
+### J8 closeout (2026-10-04, Claude, cloud session)
+
+**Authorization.** The owner, in the project thread, 2026-10-04: "i dont care to finish the signup. id say give codexs work a quick look, see if you would make any improvements, then retrospective and merge." This covers reviewing and merging `codex/j8-trial-task-review-fixes` into `main` with this closeout. It does not cover signup, W-10, a new Go or any live project change.
+
+**Run log.** The owner ran J8 on their machine with Codex. Codex's [push handoff](handoff.md#j8-push-handoff--2026-10-04) and [task-create record](task-create/work-record.md) hold the details. In summary:
+
+| Trial step | What happened |
+|---|---|
+| 1. Biome's Code template update | Restart first failed on the older Code fork (seedBuiltInDefinitions compared the installed manifest to the newer catalog). Acceptance then asked for an app review recipe for an empty `journeys.json`. Both were repaired; the update was accepted. |
+| 2. Ask for signup without criteria | W-8 got the generic charter criterion silently. The owner asked for a Jira-like composer. DEC-064 then made journeys optional at creation, with the agent assessing affected journeys at pickup; this was built and checked. |
+| 3–4. Specify and implement | Not done as planned. The owner assigned W-9 (signup) to an agent. A worker-hook ID bug stalled it, and the fix let the same attempt start. W-9 returned a notes-only assessment and a Pages follow-up (W-10), and built nothing. Accepting it hit the zero-claim guard (repaired). Then W-10 vanished in backlog cleanup (repaired and restored). |
+| 5. Owner notes | The trial's real finding: a run limited to one layer can't carry a cross-stack goal. The owner chose to leave signup unfinished and open up agent work instead ([AGENT-WORK-01 proposal](../agent-work/proposal.md); runtime: Claude Agent SDK). |
+
+**Review of Codex's branch.** Server changes read in full; UI changes skimmed.
+- Sound and small: the installed-manifest guard, the empty-registry exception (only an added file whose whole content is `{"journeys": []}`), explicit `backlogGap` provenance with a narrow fallback for old items, the hook ID range, and server-side validation of edited follow-ups and journey attachments.
+- Accepted as is, though AGENT-WORK-01 replaces it: the additive journey assessment at pickup (`run-journey-assessment.mjs`) and zero-claim acceptance of layer proposals. They belong to the one-layer agent path, so improving them further would be throwaway work.
+- No changes made.
+
+**Moved to AGENT-WORK-01:**
+- the agent-side check (J7);
+- the blocked/prerequisite outcome and continuing the original task;
+- clearer task status when a run fails before its workspace starts.
+
+**Left as is:**
+- Signup (Biome Work #3, W-9) is not implemented.
+- W-10 stays in Pages › Tasks › Backlog, unassigned.
+
+#### Retrospective
+
+1. **What made it harder?** Observed: every break was at a boundary our checks never crossed: an old installed template meeting a new host, the composer handing off to staging, worker admission, optional claims meeting signature and closeout, and creation meeting routine cleanup. Cloud checks used fresh projects, so the old-fork startup failure only showed on the owner's machine. Structurally, the agent was given a cross-stack goal inside a one-layer run.
+2. **What would make the next one easier?** Observed: Codex's new checks cross those boundaries on disposable data. Prediction: a fixture project forked from an older template, upgraded in tests, would have caught the startup failure here. Not added, since AGENT-WORK-01 changes the run path anyway.
+3. **What changed for the roadmap?** JOURNEYS-01 closes. AGENT-WORK-01 (open, cross-stack agent runs on the Claude Agent SDK) becomes the next action, ahead of T03-CODE. Its first slice is a clickable prototype.
+4. **Questions.** Created: should a goal-level run's plan approval replace Go entirely, or only for agent runs? What happens to the per-layer tasks already in backlogs (W-10) once runs are goal-level?
+5. **Process change applied now:** none to code. The proposal makes the trial's finding the next packet's motivating evidence, rather than patching one more one-layer guard.

@@ -5,7 +5,7 @@ status: active
 updated: 2026-10-04
 current_phase: M1
 phase_state: in-progress
-next_action: JOURNEYS-01
+next_action: AGENT-WORK-01
 ---
 
 # Current project status
@@ -51,7 +51,8 @@ LAT-01–07 and the LAT-08 prototype established the isolated candidate, layer s
 
 ## Ready queue
 
-1. **JOURNEYS-01** (active; J6 done, J7 built, [handoff](design/journeys/handoff.md)): journey-driven Work and review. Spec, then implement; claims replace hand-written criteria; journeys, tests and review seams live in `.aludel/`; includes cleanup of Codex's guided-preview work ([plan](design/journeys/work-record.md)). J0–J2 done 2026-10-02 (Code template `cc30be2`: journeys facet and Journeys tab); code tracing removed by DEC-063; J3 done 2026-10-03 (Biome's steps move to J8); J4 done 2026-10-03 (claims, with the gate at acceptance); J5 done 2026-10-03 (Specify → Implement, browser journey passing); J6 done 2026-10-04 (owner accepted, merged); J7 built 2026-10-04 for people (the agent check waits on the Symphony toolchain). The owner waived waiting for T03-CODE's look.
+1. **AGENT-WORK-01** (next; [proposal](design/agent-work/proposal.md)): open, cross-stack agent runs modeled on Claude Code, with layer subagents, plan-first approval and one changeset review per run. Runtime: Claude Agent SDK (owner, 2026-10-04). First slice: a clickable prototype, after the owner's go.
+1. **JOURNEYS-01** (done 2026-10-04; J8 closed without signup, [handoff](design/journeys/handoff.md)): journey-driven Work and review. Spec, then implement; claims replace hand-written criteria; journeys, tests and review seams live in `.aludel/`; includes cleanup of Codex's guided-preview work ([plan](design/journeys/work-record.md)). J0–J2 done 2026-10-02 (Code template `cc30be2`: journeys facet and Journeys tab); code tracing removed by DEC-063; J3 done 2026-10-03 (Biome's steps move to J8); J4 done 2026-10-03 (claims, with the gate at acceptance); J5 done 2026-10-03 (Specify → Implement, browser journey passing); J6 done 2026-10-04 (owner accepted, merged); J7 built 2026-10-04 for people (the agent check waits on the Symphony toolchain). The owner waived waiting for T03-CODE's look.
 2. **T03-CODE**: run 1 built and agent-checked ([evidence](evidence/t03-code/README.md)). Waits on the owner's browser look, the live GitHub round trip and the candidate-preview question; then the compiled modules retire. F1 is done.
 3. **LAYER-GITHUB-01**: publish Vision, Design, Pages and Data repositories (and possibly `layer-base`) to the owner's GitHub with T03-CODE's sync (DEC-062).
 4. **LAYER-BINDINGS-01 step 4 (F10)**: Code ⇄ Pages binding, migrating `layer_connections` and the hard-coded Pages reconciliation, after T03-CODE.
@@ -249,6 +250,8 @@ New Operator role. Agent-checked: server 88/89 (1 pre-existing), all browser sui
 | M0 research/design | Product loop, local agent path, runner choice, recovery model, product workflow, knowledge boundary, experience architecture, and design-system strategy | [Execution plan](execution-plan.md), [decision register](decisions.md) |
 
 ## Latest handoff
+
+2026-10-04: **JOURNEYS-01 closed (J8).** Codex's J8 repairs and task composer merged to `main`. Signup was not implemented: W-9's agent, limited to one layer, returned an assessment and a Pages follow-up, and the owner chose to open up agent work instead (AGENT-WORK-01, Claude Agent SDK). The agent-side check, prerequisite continuation and pre-start status move there. [Closeout and retrospective](design/journeys/work-record.md#j8-closeout-2026-10-04-claude-cloud-session).
 
 2026-10-03: **J8 task creation built locally.** Owner accepted the composer and optional/multiple-journey assessment, then authorized the build (DEC-064). Shared UI and additive run assessment are built and running; W-8 is unchanged. Browser journeys, 22 focused Work checks, repaired worker compatibility checks and compiled adapter harness pass. Both full suites ran; their two historical-fixture failures were repaired and rerun. [Evidence and build retrospective](design/journeys/task-create/work-record.md#final-build-verification-and-closeout--2026-10-03). Next: owner reviews the built form and resumes [J8](design/journeys/j8-trial.md), including real agent pickup.
 
