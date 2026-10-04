@@ -18,6 +18,11 @@ IO.puts("advertised: #{Enum.filter(specs, &String.starts_with?(&1, "aludel_layer
 
 {true, listed} = call.("aludel_layer_call", %{"operation" => "listPages"})
 3 = length(listed["result"])
+plan_schema = Adapter.agent_tool_specs() |> Enum.find(&(&1["name"] == "aludel_task_plan"))
+true = Map.has_key?(plan_schema["inputSchema"]["properties"], "journeyAssessment")
+{false, rejected} = call.("aludel_task_plan", %{"objectives" => ["Assess affected journeys"], "journeyAssessment" => %{"reason" => "Pages work", "journeys" => []}})
+true = String.contains?(rejected["error"], "Code layer run")
+{true, _} = call.("aludel_task_plan", %{"objectives" => ["Create flow and revise description", "Check layer methods", "Submit changes"]})
 {true, _} = call.("aludel_layer_call", %{"operation" => "createFlow", "body" => %{"flow" => %{"title" => "Find a tool", "steps" => [%{"page" => browse, "name" => "Browse tools", "trigger" => "Open Tools"}, %{"page" => detail, "name" => "Read the detail"}]}}})
 {true, _} = call.("aludel_layer_call", %{"operation" => "updatePage", "id" => detail, "body" => %{"changes" => %{"description" => "Everything a neighbour needs before borrowing."}}})
 {true, got} = call.("aludel_layer_call", %{"operation" => "getPage", "id" => detail})

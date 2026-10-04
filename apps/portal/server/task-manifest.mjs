@@ -29,6 +29,7 @@ function compileLayerTask(bundle) {
     task: { performer: { kind: 'agent', id: guidance.profile.id }, title: work.title, brief: work.context?.suggestion || '', layer: scope.key,
       answeredQuestion: work.question?.answer ? { question: work.question.text, answer: work.question.answer } : null,
       // JOURNEYS-01 J4: what the run must make true, as claims with stable IDs. A journey claim names the steps whose tests must pass.
+      journeyAssessment: scope.key === 'platform' ? 'At pickup, assess affected journeys through the Library and accepted repository. Call aludel_task_plan with journeyAssessment: { reason, journeys: [{ journey, revision, steps, why }] }. The list may be empty when no journey applies; explain suitable review evidence in reason. Preserve owner claims; assessment adds coverage only. Several personas may require separate journeys. If a relevant journey is missing or incomplete, propose a Specify follow-up rather than inventing IDs. Assess once in the first plan before implementation, then use the returned claim IDs for evidence.' : null,
       claims: taskClaims(work.checks).map(({ index, source, ...claim }) => claim),
       profile: { id: guidance.profile.id, revision: guidance.profile.revision, name: guidance.profile.name, provider: guidance.profile.provider || 'codex', model: guidance.profile.model || '', effort: guidance.profile.effort || 'medium' } },
     guidance: { project: guidance.project, profile: guidance.profile.instructions,

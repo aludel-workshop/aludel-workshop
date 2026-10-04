@@ -1295,9 +1295,9 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     const number = counter(projectId, 'work');
     const id = `wrk-${randomBytes(4).toString('hex')}`;
     const created = now();
-    const assignee = input.assignee ? resolveAssignee(projectId, input.assignee) : layerScoped ? layerAssignee(projectId, layer) : defaultAssignee(projectId, actionId);
+    const assignee = input.assignee === null ? null : input.assignee ? resolveAssignee(projectId, input.assignee) : layerScoped ? layerAssignee(projectId, layer) : defaultAssignee(projectId, actionId);
     const claims = Array.isArray(input.claims) && input.claims.length ? backedClaims(input.claims) : [];
-    const checks = checkList(input.checks?.length ? input.checks : claims.length ? [] : (!layerScoped && actionRecord(projectId, actionId)?.checks) || definition.checks, targets, claims);
+    const checks = checkList(Array.isArray(input.checks) ? input.checks : claims.length ? [] : (!layerScoped && actionRecord(projectId, actionId)?.checks) || definition.checks, targets, claims);
     if (checks.length > 40) fail('A Work item has up to forty claims.');
     const projectRecord = input.project !== undefined ? (input.project ? get(projectId, input.project) : null) : projectFor(projectId, targets);
     if (input.project && projectRecord?.kind !== 'project') fail('Project not found.', 404);
@@ -1526,7 +1526,11 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
         if (item.action === 'platform.implement' && item.assignee?.kind === 'agent' &&
             (item.state !== 'review' || !input.candidateId || !db.prepare("SELECT 1 FROM code_candidates WHERE id = ? AND project_id = ? AND work_id = ? AND state = 'accepted' LIMIT 1").get(input.candidateId, projectId, workId)))
           fail('Accept an exact, independently checked code candidate before closing this work.', 409);
-        if (!outputs.length && !checks.length) fail('Name what this work checks or documents before closing it (DEC-036: logs are not documentation).', 409);
+        // A checked, explicitly accepted layer proposal is itself a durable output (including notes/follow-ups).
+        // Preserve the exact-proposal requirement above; empty logs alone still cannot close work.
+        const acceptedLayerOutput = item.scope === 'layer' && item.assignee?.kind === 'agent' && input.proposalId &&
+          db.prepare("SELECT 1 FROM symphony_proposals WHERE id = ? AND project_id = ? AND work_id = ? AND state = 'accepted'").get(input.proposalId, projectId, workId);
+        if (!outputs.length && !checks.length && !acceptedLayerOutput) fail('Name what this work checks or documents before closing it (DEC-036: logs are not documentation).', 409);
         if (item.state === 'review' && checks.some(check => check.verdict !== 'accept')) fail('Accept every check before accepting the work, or send it back.', 409);
         if (item.state === 'review' && item.scope === 'layer' && !hasElevated(db, user.id, projectId, item.layer))
           fail(`Elevated access to this layer is required to accept ${item.ref}.`, 403);
@@ -1675,20 +1679,28 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
 
   // ---- Backlog (WORK-UX-01, DEC-041): each gap a layer finds becomes an ordinary backlog item, assigned by its action ----
   const layerNames = { product: 'Product', design: 'Design', pages: 'Pages', data: 'Data', platform: 'Platform', work: 'Work' };
+  function generatedGapKey(item) {
+    if (typeof item.context?.backlogGap === 'string') return item.context.backlogGap;
+    // Compatibility for gaps created before explicit provenance. A description is not ownership.
+    if (item.context?.createdBy || item.log[0]?.text !== `Created by the ${layerNames[item.layer]} layer`) return null;
+    const key = item.context?.suggestion;
+    return typeof key === 'string' && item.targets.some(target =>
+      ['define', 'design', 'plan'].some(type => key === `${type}:${target.id}`) || key.startsWith(`clarify:${target.id}:`)) ? key : null;
+  }
   function syncBacklog(projectId) {
     const work = workList(projectId);
     const gaps = suggestions(projectId, { stories: list(projectId, 'story'), pages: pageList(projectId), work: [] });
     const current = new Set(gaps.map(gap => gap.key));
-    const covered = new Set(work.filter(item => item.state !== 'done').flatMap(item => [item.context?.suggestion, ...item.targets.map(target => `${item.action}:${target.id}`)]).filter(Boolean));
+    const covered = new Set(work.filter(item => item.state !== 'done').flatMap(item => [generatedGapKey(item), ...item.targets.map(target => `${item.action}:${target.id}`)]).filter(Boolean));
     const created = [];
     for (const gap of gaps) {
       const actionId = actionIdFor(gap.layer, gap.type, { question: gap.question });
       if (covered.has(gap.key) || (!gap.question && gap.targets.some(target => covered.has(`${actionId}:${target.id}`)))) continue;
-      created.push(createWork(projectId, { ...gap, action: actionId, state: 'suggested', context: { suggestion: gap.key }, logText: `Created by the ${layerNames[gap.layer]} layer` }));
+      created.push(createWork(projectId, { ...gap, action: actionId, state: 'suggested', context: { suggestion: gap.key, backlogGap: gap.key }, logText: `Created by the ${layerNames[gap.layer]} layer` }));
       covered.add(gap.key);
     }
     // A gap filled some other way closes its backlog item: removed if nobody touched it, otherwise marked done.
-    for (const item of work.filter(entry => entry.state === 'suggested' && entry.context?.suggestion && !current.has(entry.context.suggestion))) {
+    for (const item of work.filter(entry => entry.state === 'suggested' && generatedGapKey(entry) && !current.has(generatedGapKey(entry)))) {
       const touched = item.log.length > 1 || db.prepare('SELECT 1 FROM knowledge_revisions WHERE work_item_id = ?').get(item.id);
       if (!touched) db.prepare('DELETE FROM layer_work_items WHERE id = ?').run(item.id);
       else appendLog(item.id, 'Done: the gap was filled outside this item', { state: 'done' });

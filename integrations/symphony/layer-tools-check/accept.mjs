@@ -32,10 +32,14 @@ assert.equal(work.state, 'review');
 const proposal = work.context.workProposal;
 assert.equal(proposal.scope, 'layer');
 assert.deepEqual(proposal.changes.map(change => `${change.op} ${change.kind}`), ['create flow', 'update page']);
-// Accepting a run is an elevated review: each check first, then the run.
-await assert.rejects(call('PUT', `${base}/work/${seed.workA}`, { acceptProposal: proposal.id }), /Accept every Work check/);
-for (const index of work.checks.keys()) await call('PUT', `${base}/work/${seed.workA}`, { verdict: { index, value: 'accept', note: 'Scripted check' } });
-assert.equal((await call('PUT', `${base}/work/${seed.workA}`, { acceptProposal: proposal.id })).work.state, 'done');
+// Exercise the current retained-integration review contract on disposable data.
+const runsPath = `${base}/work/${seed.workA}/runs`;
+const [run] = (await call('GET', runsPath)).runs;
+const prepared = await call('POST', `${runsPath}/${run.id}/prepare`, {});
+const integrationId = prepared.run.integration.id;
+for (const claim of prepared.run.task.criteria) await call('PUT', `${runsPath}/${run.id}/review`, { integrationId, verdict: { claim: claim.id, value: 'accept', note: 'Scripted check' } });
+await call('POST', `${runsPath}/${run.id}/sign`, { integrationId, outcome: 'accept' });
+assert.equal((await knowledge()).work.find(value => value.id === seed.workA).state, 'done');
 
 const after = await knowledge();
 const flow = after.flows.find(value => value.title === 'Find a tool');

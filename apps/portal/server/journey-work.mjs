@@ -63,6 +63,26 @@ export function journeyWork({ db, know }) {
     return { available: true, commit: bound.commit, journeysError: error, ...journeyOffer({ title: clip(request?.title, 160), brief: clip(request?.brief, 2000) }, { routes: pageRoutes(projectId), journeys }) };
   }
 
+  function list(projectId) {
+    const bound = app(projectId);
+    if (!bound) return { journeys: [] };
+    const { journeys, error } = journeysAt(bound.repo, bound.commit);
+    if (error) fail(`Code's journeys can't be read: ${error}`, 409);
+    return { commit: bound.commit, journeys: journeys.map(entry => ({ ...entry, persona: journeyPersona(entry), steps: entry.steps.map(step => ({ ...step, title: step.name })) })) };
+  }
+  function validateAttachments(projectId, claims = []) {
+    if (!Array.isArray(claims)) fail('Journey attachments must be a list.');
+    const refs = claims.filter(claim => claim?.kind === 'journey');
+    if (!refs.length) return claims;
+    const { journeys } = list(projectId);
+    for (const ref of refs) {
+      const entry = journeys.find(journey => journey.id === ref.journey);
+      if (!entry || entry.revision !== ref.revision || !Array.isArray(ref.steps) || !ref.steps.length || ref.steps.some(id => !entry.steps.some(step => step.id === id)))
+        fail('A selected journey changed or is unavailable. Reopen Attach journey and confirm its current steps.', 409);
+    }
+    return claims;
+  }
+
   // The once-per-app prerequisite, reused while it is open.
   function reviewable(user, projectId, gaps) {
     const open = openItem(projectId, 'reviewable');
@@ -93,8 +113,8 @@ export function journeyWork({ db, know }) {
     const { recipe, error: recipeError } = recipeAt(bound.repo, bound.commit);
     const gaps = reviewableGaps({ recipe, recipeError, personas, setup: hasSetupRoute(bound.repo, bound.commit) });
     const what = existing ? `revise the “${journey.title}” journey (${journeyEntry(id)}, now at revision ${existing.revision})` : `draft the “${journey.title}” journey (${journeyEntry(id)}) from the app as it works today`;
-    const item = know.createWork(projectId, { layer: codeLayer, layerScoped: true, title: `Specify: ${title}`.slice(0, 160), claims, checks: [],
-      state: ['ready', 'suggested'].includes(input?.state) ? input.state : 'ready', ...(input?.priority ? { priority: input.priority } : {}), ...(input?.assignee ? { assignee: input.assignee } : {}),
+    const item = know.createWork(projectId, { layer: codeLayer, layerScoped: true, title: `Specify: ${title}`.slice(0, 160), claims: [...claims, ...validateAttachments(projectId, input?.claims || [])], checks: input?.checks || [],
+      state: ['ready', 'suggested'].includes(input?.state) ? input.state : 'ready', ...(input?.priority ? { priority: input.priority } : {}), ...(input && Object.hasOwn(input, 'assignee') ? { assignee: input.assignee } : {}),
       context: { journeyWork: { kind: 'specify', journey: id, title: journey.title, revision: journey.revision, request: { title, brief }, ...(input?.parked ? { parked: input.parked } : {}) },
         ...(input?.createdBy ? { createdBy: input.createdBy } : {}),
         suggestion: `Before “${title}” is built, ${what}. The request: ${brief || title}\n\n` +
@@ -153,5 +173,5 @@ export function journeyWork({ db, know }) {
     return implement;
   }
 
-  return { offer, specify, afterAccept };
+  return { list, validateAttachments, offer, specify, afterAccept };
 }

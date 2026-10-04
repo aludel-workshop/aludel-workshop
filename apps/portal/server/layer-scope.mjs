@@ -147,7 +147,7 @@ export function followUpsForAttempt(db, attemptId) {
 }
 
 // Creating a follow-up signs the new item as the agent's, from its layer; the reviewer's decision is logged beside it.
-export function decideFollowUp(db, know, user, projectId, workId, followUpId, decision) {
+export function decideFollowUp(db, know, user, projectId, workId, followUpId, decision, task) {
   const row = db.prepare('SELECT * FROM work_follow_ups WHERE id = ? AND project_id = ? AND work_id = ?').get(followUpId, projectId, workId);
   if (!row) fail('Follow-up not found.', 404);
   if (!['create', 'dismiss'].includes(decision)) fail('Create or dismiss the follow-up.', 400);
@@ -162,12 +162,21 @@ export function decideFollowUp(db, know, user, projectId, workId, followUpId, de
     const createdBy = { kind: 'agent', profileId: row.profile_id, name: profile?.name || 'Agent', layer: row.source_layer,
       workId, workRef: source?.ref || null, attemptId: row.attempt_id, proposalId: row.proposal_id, followUpId: row.id, why: row.why, acceptedBy: user.name };
     const target = row.target_json ? JSON.parse(row.target_json) : null;
+    if (task !== undefined && (!task || typeof task !== 'object' || Array.isArray(task))) fail('Provide the edited task.', 400);
+    const allowed = ['title', 'suggestion', 'priority', 'state', 'assignee', 'targets', 'checks', 'claims'];
+    if (task && Object.keys(task).some(key => !allowed.includes(key))) fail('Edit task fields, not its layer or provenance.', 400);
+    if (task && (typeof task.title !== 'string' || !task.title.trim())) fail('Give the task a title.', 400);
+    if (task && task.state !== undefined && !['ready', 'suggested'].includes(task.state)) fail('Choose Queue or Backlog.', 400);
+    const edited = task ? { ...task, claims: journeyWork({ db, know }).validateAttachments(projectId, task.claims || []) } : {};
+    const title = edited.title?.trim() || row.title;
+    const brief = task ? text(edited.suggestion, 2000) : row.brief;
+
     // J6: a spec change is raised where the spec is kept. Code's own journey gets a Specify item (J5); a replica's change goes
     // to the layer entry it was imported from, which Code re-imports once it is accepted.
-    if (target?.layer === codeLayer) created = journeyWork({ db, know }).specify(user, projectId, { title: row.title, brief: row.brief, journey: { id: target.journey, title: target.title },
-      state: 'suggested', createdBy }).specify;
-    else created = know.createWork(projectId, { layer: row.layer, layerScoped: true, title: row.title, state: 'suggested',
-      context: { suggestion: target ? `${row.brief}\n\nThis changes ${target.entry} (revision ${target.entryRevision}), which Code's journey ${target.journey} is imported from.` : row.brief,
+    if (target?.layer === codeLayer) created = journeyWork({ db, know }).specify(user, projectId, { ...edited, title, brief, journey: { id: target.journey, title: target.title },
+      state: edited.state || 'suggested', createdBy }).specify;
+    else created = know.createWork(projectId, { ...edited, layer: row.layer, layerScoped: true, title, state: edited.state || 'suggested',
+      context: { suggestion: target ? `${brief}\n\nThis changes ${target.entry} (revision ${target.entryRevision}), which Code's journey ${target.journey} is imported from.` : brief,
         createdBy, ...(target ? { specTarget: target } : {}) },
       logText: `Created by ${createdBy.name} from the ${layerName(row.source_layer)} layer as a follow-up to ${source?.ref || workId}; accepted by ${user.name}` }, createdBy.name);
   }

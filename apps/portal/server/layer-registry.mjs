@@ -61,15 +61,17 @@ export function seedBuiltInDefinitions(db,projectId,declarations,presentation) {
   const at=now();
   for(const layer of declarations){
     const pkg=ensureLayerPackage(db,projectId,layer.key);
-    const packaged=layer.outputs.filter(kind=>!(layer.hostHeld||[]).includes(kind));
-    if(pkg && (pkg.manifest.authority!==layer.authority || JSON.stringify(pkg.manifest.outputs)!==JSON.stringify(packaged))) throw new Error('Layer package output authority differs from the migration contract.');
+    // Existing installs keep their accepted manifest until template-update Work is reviewed.
+    // The catalog pin can add outputs (e.g. journeys) without changing that installed contract.
+    if(pkg && pkg.manifest.authority!==layer.authority) throw new Error('Layer package output authority differs from the migration contract.');
     const manifest=pkg?.manifest;
+    const outputs=manifest?[...manifest.outputs,...(layer.hostHeld||[]).filter(kind=>!manifest.outputs.includes(kind))]:layer.outputs;
     const [fallbackCategory,fallbackIcon,fallbackDescription]=presentation[layer.key];
     const identity=pkg?{...parseCharter(pkg.charter),markdown:pkg.charter}:builtInIdentity[layer.key];
     const category=manifest?.category||fallbackCategory,icon=manifest?.icon||fallbackIcon;
     const description=manifest?.description||fallbackDescription;
     insert.run(projectId,layer.key,manifest?.name||layer.name,description,category,icon,layer.path,layer.authority,
-      manifest?.outputProvider||layer.authority,manifest?.editorAdapter||`native:${layer.key}`,JSON.stringify(layer.outputs),1,at,JSON.stringify(identity));
+      manifest?.outputProvider||layer.authority,manifest?.editorAdapter||`native:${layer.key}`,JSON.stringify(outputs),1,at,JSON.stringify(identity));
     db.prepare("UPDATE layer_definitions SET identity_json=?,identity_revision=1 WHERE project_id=? AND layer_key=? AND built_in=1 AND identity_revision=0")
       .run(JSON.stringify(identity),projectId,layer.key);
     if(pkg)db.prepare("UPDATE layer_definitions SET output_tabs_json=?,package_commit=? WHERE project_id=? AND layer_key=? AND built_in=1 AND package_commit IS NULL")

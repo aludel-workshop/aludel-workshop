@@ -8,7 +8,14 @@ pin="be10a1b79df723d6d7612b5651c8522704dafb2e"
 image="elixir:1.19"
 codex_version="0.157.0"
 verify=0
-[[ "${1:-}" == "--verify" ]] && verify=1
+selected_project=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --verify) verify=1; shift ;;
+    --project) [[ $# -ge 2 && -n "$2" ]] || { echo "--project requires a project slug." >&2; exit 1; }; selected_project="$2"; shift 2 ;;
+    *) echo "Usage: $0 [--verify] [--project slug]" >&2; exit 1 ;;
+  esac
+done
 
 env_value() {
   local key="$1"
@@ -90,11 +97,11 @@ sandbox_security="seccomp=unconfined,no-new-privileges"
 gateway="$(docker run --rm "$image" getent hosts host.docker.internal | awk 'NR == 1 { print $1 }')"
 [[ -n "$gateway" ]] || { echo "Symphony local hosts: Docker host gateway was not found." >&2; exit 1; }
 started_at="$(node -e 'process.stdout.write(new Date().toISOString())')"
-pool_rows="$(DATABASE="$database" node --no-warnings -e '
+pool_rows="$(DATABASE="$database" SELECTED_PROJECT="$selected_project" node --no-warnings -e '
   const { DatabaseSync } = require("node:sqlite");
   const db = new DatabaseSync(process.env.DATABASE, { readOnly: true });
   for (const row of db.prepare(`SELECT p.id, p.slug, s.configured_capacity, s.credential_path
-    FROM symphony_pools s JOIN projects p ON p.id = s.project_id ORDER BY p.id`).all()) {
+    FROM symphony_pools s JOIN projects p ON p.id = s.project_id WHERE (length(?) = 0 OR p.slug = ?) ORDER BY p.id`).all(process.env.SELECTED_PROJECT, process.env.SELECTED_PROJECT)) {
     console.log([row.id, row.slug, row.configured_capacity, row.credential_path].join("\t"));
   }
   db.close();
@@ -162,10 +169,10 @@ done <<< "$pool_rows"
 if [[ "$verify" == "1" ]]; then
   echo "Symphony local hosts: waiting for $host_count fresh heartbeat(s)..."
   for _ in $(seq 1 30); do
-    fresh="$(DATABASE="$database" STARTED_AT="$started_at" node --no-warnings -e '
+    fresh="$(DATABASE="$database" STARTED_AT="$started_at" SELECTED_PROJECT="$selected_project" node --no-warnings -e '
       const { DatabaseSync } = require("node:sqlite");
       const db = new DatabaseSync(process.env.DATABASE, { readOnly: true });
-      console.log(db.prepare("SELECT count(*) AS n FROM symphony_pools WHERE last_seen_at > ? AND reported_capacity > 0").get(process.env.STARTED_AT).n);
+      console.log(db.prepare("SELECT count(*) AS n FROM symphony_pools s JOIN projects p ON p.id = s.project_id WHERE last_seen_at > ? AND reported_capacity > 0 AND (length(?) = 0 OR p.slug = ?)").get(process.env.STARTED_AT, process.env.SELECTED_PROJECT, process.env.SELECTED_PROJECT).n);
       db.close();
     ')"
     [[ "$fresh" == "$host_count" ]] && { echo "Symphony local hosts: all configured workers are online."; exit 0; }

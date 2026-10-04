@@ -722,6 +722,7 @@ test('a layer-scoped Pages task changes Pages only through its API; review shows
   assert.deepEqual(run.changes[1].fields.map(field => field.name), ['title', 'steps']);
   assert.equal(run.followUps[0].state, 'proposed');
 
+  assert.throws(() => f.worker.acceptProposal(f.owner, f.projectId, work.id, submitted.proposalId), /Accept every Work check first/, 'nonempty claims still need approval');
   const member = addMember(f, 'designer@example.com');
   f.know.updateWork(f.owner, f.projectId, work.id, { verdict: { index: 0, value: 'accept' } });
   assert.throws(() => f.worker.acceptProposal(member, f.projectId, work.id, submitted.proposalId), /Elevated access/);
@@ -737,7 +738,19 @@ test('a layer-scoped Pages task changes Pages only through its API; review shows
   assert.equal(f.db.prepare('SELECT work_item_id FROM knowledge_revisions WHERE record_id = ? AND revision = ?').get(flow.id, flow.revision + 1).work_item_id, work.id);
   assert.equal(f.know.workById(f.projectId, work.id).state, 'done');
 
-  const decided = decideFollowUp(f.db, f.know, member, f.projectId, work.id, run.followUps[0].id, 'create');
+  const followUpId = run.followUps[0].id;
+  assert.throws(() => decideFollowUp(f.db, f.know, member, f.projectId, work.id, followUpId, 'create', { title: 'Hijack', layer: 'pages' }), /layer or provenance/);
+  assert.throws(() => decideFollowUp(f.db, f.know, member, f.projectId, work.id, followUpId, 'create', { title: ' ', checks: [] }), /title/);
+  assert.throws(() => decideFollowUp(f.db, f.know, member, f.projectId, work.id, followUpId, 'create', { title: 'Already done', state: 'done' }), /Queue or Backlog/);
+  const decided = decideFollowUp(f.db, f.know, member, f.projectId, work.id, followUpId, 'create', {
+    title: 'Build accessible detail route', suggestion: 'Use the reviewed Detail page with keyboard access.', priority: 'high', state: 'suggested', assignee: null,
+    checks: ['The detail heading is visible.'], targets: [], claims: [] });
+  assert.equal(decided.work.title, 'Build accessible detail route');
+  assert.equal(decided.work.context.suggestion, 'Use the reviewed Detail page with keyboard access.');
+  assert.equal(decided.work.priority, 'high'); assert.equal(decided.work.assignee, null);
+  assert.equal(decided.work.checks[0].text, 'The detail heading is visible.');
+  assert.equal(decided.followUp.title, 'Build the detail route', 'the original agent proposal remains preserved');
+
   assert.equal(decided.work.layer, 'platform');
   assert.equal(decided.work.state, 'suggested');
   assert.equal(decided.work.scope, 'layer');
