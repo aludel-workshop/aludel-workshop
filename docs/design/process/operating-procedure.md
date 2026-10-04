@@ -85,7 +85,7 @@ At every stage, if scope expands or a required assumption changes, revise the wo
 
 Immediately before constructing an interaction prototype, write a verdict with evidence for:
 
-1. the exact questions it will answer and the cheapest suitable fidelity;
+1. the exact questions it will answer and the cheapest suitable fidelity; when the owner will judge an app's own pages in it, draw them from the app's recorded look (screenshots, kit) and name the source, and label any stand-in mock as one (AGENT-WORK-01 A0's skeletal app frames read as the intended review quality);
 2. actors, stories, pages and transitions included and excluded;
 3. valid parent structure and required scoped owner selections; when the prototype changes an accepted page's main area, name which parts of that page it keeps (AGENT-WORK-01 A0 v1 replaced the work item's run block and lost the item framework the owner wanted kept);
 4. component responsibility and state coverage, including empty, multiple-record, failed and stale outcomes where relevant;
