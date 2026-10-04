@@ -9,6 +9,10 @@ updated: 2026-10-04
 
 For a fresh agent (Claude in the cloud) picking up JOURNEYS-01. Run `tools/branch-handoffs.sh` first: this packet's slices have been landing on cloud-session branches that the owner hasn't merged into `main`, so the newest handoff may be on a branch. Then read this, [AGENTS.md](../../../AGENTS.md), [status](../../status.md), the [JOURNEYS-01 work record](work-record.md) (plan, authorizations, run log, retrospectives), [DEC-063](../../decisions.md) and the [deferred code-tracing record](../code-tracing/deferred.md).
 
+## Update 2026-10-04: J8 started
+
+The owner kept Biome for the trial. Template updates for existing projects are built on the same branch (`server/template-updates.mjs`; see the J8 sections of the work record). After the owner merges and restarts, they follow [j8-trial.md](j8-trial.md). Claude records the run log and retrospective from what they report.
+
 ## Update 2026-10-04: J7 built (people)
 
 J6 is merged to `main`. J7 is on `claude/j6-prototype-ptl3we` (new PR): *Check my branch* on person runs, on an integration of its own so review re-runs, plus a console line per journey to walk it on the app's dev server. See the [J7 run log](work-record.md#j7-person-check-2026-10-04-claude-cloud-session). **Next:** the owner looks and merges. Open: the agent-side check needs a new Symphony adapter tool, which needs an Elixir toolchain and a local Symphony build (`integrations/symphony/layer-tools-check/run.sh`). Then J8 (needs a template-update path for existing projects). In cloud sessions, the work-item browser check also needs `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`.

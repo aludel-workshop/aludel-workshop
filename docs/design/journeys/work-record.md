@@ -882,3 +882,26 @@ The owner chose to keep Biome for the J8 trial, so existing projects need a way 
 5. **Scope for J8.** Code first, since Biome needs it, with ordinary layers using the same item. Then Biome's own app work (the recipe moved to v2, its journeys) is Specify Work in the trial itself.
 
 **Not proposed:** re-forking (it would lose the instance's edits), or auto-applying updates that don't conflict (a pin bump would then change live projects silently).
+
+**Owner decision (2026-10-04):** on the card, the owner chose *Build as proposed*.
+
+#### Template updates built (2026-10-04, same session)
+
+- **`server/template-updates.mjs`.**
+  - `templateMerge` builds the update commit on the instance's pinned main. For each file the template changed:
+    - If the instance kept the old version, it takes the new one.
+    - If the instance already has the new version, it keeps it.
+    - If both changed the file, `git merge-file --diff3` merges it. A file that won't merge keeps conflict markers and is listed.
+    - Everything else is left alone: the app, outputs and the manifest's own name.
+  - `raise` runs after Code adoption on each restart. For any binding whose template moved past the commit it was forked from, it raises one item per new template commit. Older Code installs that recorded no template commit fall back to the install trailer, then to `refs/aludel/template`.
+  - Branches are named `template/<template>-<commit>`.
+- **`workRuns.hostRun`.** With no conflicts, Aludel submits the branch itself as a run (performer *Aludel*), so it goes through the same integration, package tests, review and acceptance as a person's run. Accepting it moves the pin and the binding's `template_commit`. With conflicts, the item stays ready and lists the files, and a person or agent resolves them on that branch and submits it.
+
+| Check | Result |
+|---|---|
+| `tests/template-updates.test.mjs` (new) | Pass. Covers Code's `.aludel/` layout: a template-only change is taken; edits from both sides merge; a same-line edit conflicts with diff3 markers; a removed file goes; outputs, the app and the instance's manifest name are kept; main doesn't move; an instance that is already current needs nothing |
+| New end-to-end test (`symphony-proposals.test.mjs`) | Pass, with Docker. A Pages instance forked from the previous template commit, with an edit of its own: one item is raised, it's not raised twice, raising applies nothing, the Aludel run is in review, the template's files are updated and the instance's edit is kept, review runs the package tests and acceptance moves the pin and template commit |
+| `npm run test:server` / `test:server:templates` (Docker up throughout) | 302/302 and 325/325 tests pass. The known file-level failure of `previews-docker` remains |
+| Review screen with *Aludel* as performer | Not browser-checked. It is the person-run path, and the avatar falls back to a generated one |
+
+**Found on the way.** `dockerd` stopped once more mid-run (its log ends on buildkit "healthcheck failed fatally"). Started detached with `setsid`, it stayed up through both suites. The J7 suite numbers above came from runs during which Docker may have been down. These reruns had it up, and they pass.
