@@ -116,6 +116,8 @@ When intent is genuinely missing (W-9's case), the agent asks in the thread and 
 
 ## Slices (each needs the owner's go)
 
+Superseded on 2026-10-04 by the [implementation plan](plan.md), which renumbers the slices after the prototype rounds (A1–A10). The table below is the original proposal.
+
 | Slice | Scope | Exit evidence |
 |---|---|---|
 | **A0 Prototype** | The plan card, the run's live checklist with layer agents, and the changeset review. A clickable prototype, as for J6 | Owner accepts the interaction |

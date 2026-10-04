@@ -207,3 +207,7 @@ Authorization: the owner's message "prototype pages." after the offer to prototy
 5. *Process change:* operating procedure §5 item 1 (real look for the owner's own pages, stand-ins labeled), applied and checked by screenshot comparison in this round.
 
 Status: waiting on the owner's answers to Q1–Q8 (v2), E1–E7 (ecosystem v1) and P1–P6 (Pages review v1).
+
+### Implementation plan (2026-10-04, Claude, cloud session)
+
+Owner, after the Pages review prototype: "alright, i like it. whats it going to take to make this all happen? plan it out, big shift from current modality". Authorized: the plan only. Written as [plan.md](plan.md) from an inventory of today's code (work items, batches and Go, Symphony runs, review, person runs, routines, layers, rendering, integrations, tests). The prototypes' interaction is accepted as the direction ("i like it"); answers to Q, E and P questions are still welcome but no longer block planning. Process: the plan lists what stays (parent-structure rule) and makes each prototype's walkthrough the acceptance journey for its slice. Next: the owner's go on A1 and decision D1 (API spending) before A2.
