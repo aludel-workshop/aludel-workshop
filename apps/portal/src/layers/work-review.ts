@@ -95,7 +95,7 @@ const routeOf = (path: string | null | undefined) => (path || '').split(/[?#]/)[
                           <td><mat-icon aria-hidden="true" [class]="'wr-t-' + (step.result?.status || 'skipped')">{{ stepResult[step.result?.status || 'none'][0] }}</mat-icon>{{ stepResult[step.result?.status || 'none'][1] }}
                             @if (step.result?.screenshot) { · <a [href]="screenshotUrl(step.id)" target="_blank" rel="noopener">screenshot<span class="visually-hidden"> of {{ step.label }}</span></a> }
                             @if (step.result?.detail) { <small>{{ step.result!.detail }}</small> }
-                            @if (r.state === 'review' && r.integration && step.available && preview()?.status === 'running' && firstStep(step)) { <button type="button" class="lay-button ghost small wr-open" (click)="openFromTests(step)">Open<span class="visually-hidden"> {{ step.label }}</span>@if (step.persona) { as {{ step.persona }}}</button> }</td></tr> }</tbody></table>
+                            @if (r.state === 'review' && r.integration && step.available && firstStep(step)) { <button type="button" class="lay-button ghost small wr-open" [disabled]="preparing()" (click)="openFromTests(step)">Open<span class="visually-hidden"> {{ step.label }}</span>@if (step.persona) { as {{ step.persona }}}</button> }</td></tr> }</tbody></table>
                     }
                     <h2 class="wr-eyebrow">Checks</h2>
                     <ng-container [ngTemplateOutlet]="testList" />
@@ -238,15 +238,15 @@ const routeOf = (path: string | null | undefined) => (path || '').split(/[?#]/)[
                         <button type="button" class="lay-button" (click)="next()">Next<mat-icon aria-hidden="true">arrow_forward</mat-icon></button>
                       } @else if (c.kind === 'journey' && !walkedCount(c) && !gateOf(c).length) {
                         <button type="button" class="lay-button ghost small wr-flagbtn" [disabled]="!!composing()" (click)="compose('claim')"><mat-icon aria-hidden="true">flag</mat-icon>Flag</button>
-                        <button type="button" class="lay-button" (click)="walk(0)"><mat-icon aria-hidden="true">directions_walk</mat-icon>Walk the journey</button>
+                        <button type="button" class="lay-button" [disabled]="preparing()" (click)="walk(0)"><mat-icon aria-hidden="true">directions_walk</mat-icon>Walk the journey</button>
                       } @else if (flaggedSteps(c).length) {
-                        <button type="button" class="lay-button ghost small" (click)="walk(0)">Walk again</button>
+                        <button type="button" class="lay-button ghost small" [disabled]="preparing()" (click)="walk(0)">Walk again</button>
                         <button type="button" class="lay-button wr-flagfill" (click)="flagJourney(c)"><mat-icon aria-hidden="true">flag</mat-icon>Flag this journey</button>
                       } @else if (gateOf(c).length) {
-                        @if (c.kind === 'journey') { <button type="button" class="lay-button ghost small" (click)="walk(0)">{{ walkedCount(c) ? 'Walk again' : 'Walk the journey' }}</button> }
+                        @if (c.kind === 'journey') { <button type="button" class="lay-button ghost small" [disabled]="preparing()" (click)="walk(0)">{{ walkedCount(c) ? 'Walk again' : 'Walk the journey' }}</button> }
                         <button type="button" class="lay-button wr-flagfill" [disabled]="!!composing()" (click)="compose('claim')"><mat-icon aria-hidden="true">flag</mat-icon>Flag it</button>
                       } @else {
-                        @if (c.kind === 'journey') { <button type="button" class="lay-button ghost small" (click)="walk(0)">Walk again</button> } @else { <button type="button" class="lay-button ghost small" (click)="next()">Skip</button> }
+                        @if (c.kind === 'journey') { <button type="button" class="lay-button ghost small" [disabled]="preparing()" (click)="walk(0)">Walk again</button> } @else { <button type="button" class="lay-button ghost small" (click)="next()">Skip</button> }
                         <button type="button" class="lay-button ghost small wr-flagbtn" [disabled]="!!composing()" (click)="compose('claim')"><mat-icon aria-hidden="true">flag</mat-icon>Flag</button>
                         <button type="button" class="lay-button lay-button-ok" (click)="setVerdict(c, 'accept')"><mat-icon aria-hidden="true">verified</mat-icon>{{ c.kind === 'journey' ? 'Approve journey' : 'Approve' }}</button>
                       }
@@ -550,8 +550,12 @@ export class WorkReviewComponent implements OnDestroy {
   walk(index: number) { const claim = this.claim(), r = this.run(); if (!claim || !r) return;
     const steps = this.journeySteps(claim); this.viewChoice.set(null); this.enterStep(index);
     const first = steps.find(step => step.available);
-    if (r.integration && first && this.preview()?.status === 'running' && r.state === 'review') this.openStep(first.id);
-    else if (r.integration?.appRepository && this.preview()?.status !== 'running' && r.state === 'review') this.buildPreview(); }
+    if (r.integration && first && r.state === 'review') this.whenRunning(() => this.openStep(first.id)); }
+  // Steps open in a running preview; one that isn't running yet is built first.
+  private whenRunning(then: () => void) {
+    if (this.preview()?.status === 'running') return then();
+    void this.buildPreview().then(() => { if (this.preview()?.status === 'running') then(); });
+  }
   // The preview's walk script says which page shows and when an action succeeded (server/review-walk.mjs). Arriving at the
   // next step's page, or an action on the last step or on a step that shares its page with the next, walks the current step.
   onWalk(event: MessageEvent) {
@@ -587,9 +591,9 @@ export class WorkReviewComponent implements OnDestroy {
     const history = await this.ctx.api<{ runs: WorkRun[] }>(`${this.base()}/work/${encodeURIComponent(this.id())}/runs`);
     this.runs.set(history.runs);
   }
-  buildPreview() { const r = this.run(); if (!r || this.preparing()) return;
+  buildPreview(): Promise<unknown> { const r = this.run(); if (!r || this.preparing()) return Promise.resolve(false);
     this.preparing.set(true);
-    void this.ctx.write(async () => {
+    return this.ctx.write(async () => {
       if (r.integration) return this.loadIntegratedPreview(r);
       if (!r.candidate) return;
       const value = await this.ctx.api<{ preview: { status: string; error?: string | null }; url: string }>(`${this.base()}/candidates/${encodeURIComponent(r.candidate.id)}/preview`, 'POST', {});
@@ -605,7 +609,7 @@ export class WorkReviewComponent implements OnDestroy {
   }
   // Any journey can be entered from its first step as its persona, also when no claim names it.
   firstStep(step: ReviewStep) { return (this.preview()?.steps || []).find(other => other.journey === step.journey)?.id === step.id; }
-  openFromTests(step: ReviewStep) { this.viewChoice.set('preview'); this.openStep(step.id); }
+  openFromTests(step: ReviewStep) { this.viewChoice.set('preview'); this.whenRunning(() => this.openStep(step.id)); }
   closePreview() { const r = this.run(); if (!r?.integration) return;
     void this.ctx.write(async () => { const value = await this.ctx.api<{ preview: ReviewPreview }>(`${this.runPath(r)}/close-preview`, 'POST', { integrationId: r.integration!.id }); this.preview.set(value.preview); });
   }

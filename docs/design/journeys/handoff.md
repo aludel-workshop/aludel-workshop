@@ -5,13 +5,13 @@ status: active
 updated: 2026-10-04
 ---
 
-# JOURNEYS-01 handoff: J6 built, checks needing layer-base next
+# JOURNEYS-01 handoff: J6 built and checked, owner look next
 
 For a fresh agent (Claude in the cloud) picking up JOURNEYS-01. Run `tools/branch-handoffs.sh` first: this packet's slices have been landing on cloud-session branches that the owner hasn't merged into `main`, so the newest handoff may be on a branch. Then read this, [AGENTS.md](../../../AGENTS.md), [status](../../status.md), the [JOURNEYS-01 work record](work-record.md) (plan, authorizations, run log, retrospectives), [DEC-063](../../decisions.md) and the [deferred code-tracing record](../code-tracing/deferred.md).
 
 ## Update 2026-10-04: J6 built
 
-The J6 build is on `claude/j6-prototype-ptl3we` (draft PR #1): one persona per journey, targeted spec follow-ups, the merge-or-draft question and parked drafts, the walk script, and the rebuilt review screen. See the [J6 build run log](work-record.md#j6-build-2026-10-04-claude-cloud-session) for evidence and what's left. **Next session, with `layer-base` and Docker:** run `tests/layer-scope-browser.mjs`, `tests/repository-review-browser.mjs` and `npm run test:server:templates`; add a browser check that walking a journey in the preview advances the steps; add the persona rule to the Code template's journey indexer (pin, `typecheck-layer-ui.mjs`, reviewed-sources digest). Then the owner looks at the screen.
+The J6 build is on `claude/j6-prototype-ptl3we` (draft PR #1): one persona per journey, targeted spec follow-ups, the merge-or-draft question and parked drafts, the walk script, and the rebuilt review screen. See the [J6 build run log](work-record.md#j6-build-2026-10-04-claude-cloud-session) for evidence and what's left. Later the same day, with `layer-base` and Docker: the Code template's persona rule is on `layer-base` branch `claude/j6-one-persona` (`82cb9ef`, a fast-forward of `code`, pinned here), and all four review browser journeys pass. **Next:** the owner looks at the screen, merges PR #1 and fast-forwards `code`. Then J7 (person check). Before any Docker check in a cloud session, follow step 4 below exactly (proxy for `dockerd`, prebuilt runner image, uid 1000).
 
 ## Update 2026-10-03: J6 prototype v2
 

@@ -794,7 +794,7 @@ Branch `claude/j6-prototype-ptl3we`, on top of the prototype rounds; draft PR #1
 - **Not run here:** `tests/layer-scope-browser.mjs` and `tests/repository-review-browser.mjs` (updated to the new screen, but they need `layer-base`), `npm run test:server:templates`, and a browser check of the walk itself advancing steps (it needs a reviewable app with journeys, which needs the Code template).
 
 **Not done in J6.**
-- The Code template's own journey indexer (`layer-base`, `code-index.mjs`) does not yet reject mixed personas; the host does. Needs `layer-base`.
+- ~~The Code template's own journey indexer does not yet reject mixed personas.~~ Done below (`layer-base` `82cb9ef`).
 - No *Previous* build side by side: the left panel shows the proposed build; a second preview of the accepted head is a later addition.
 - Agents' task method describes targeted follow-ups and the question (`task-manifest.mjs`), but no agent has yet been run against it.
 
@@ -805,3 +805,26 @@ Branch `claude/j6-prototype-ptl3we`, on top of the prototype rounds; draft PR #1
 3. **What changed for the roadmap?** J7 (person check) can build on the step marks and walk messages. J8 (Biome) needs the Code template persona rule. Docker-in-Docker package installs need the proxy CA before journey step tests can run in cloud sessions.
 4. **Questions.** Created: should *Keep as a draft* also be offered when the agent didn't ask (reviewer-initiated)? Today only the agent's question enables it. Still open: the owner's look at the built screen.
 5. **Process change applied now:** the icon subset scan, tested by `icon-subset.test.mjs` failing before and passing after. Hypothesis only: that building model rules before the screen avoids UI rework in general; it held for this slice.
+
+#### J6 checks with `layer-base` (2026-10-04, same session)
+
+The owner approved adding `layer-base` ("yep, add layer-base, and edit it if you need"); authorization recorded above before execution.
+
+**Code template.** `layer-base` commit `82cb9ef` on branch `claude/j6-one-persona`, directly on top of `code` (a fast-forward): the journey indexer refuses a step persona that differs from the journey's, with the host's message, and Knowledge says a cross-role flow is one journey per persona. The template's own tests pass (13/13). `typecheck-layer-ui.mjs` passes at the commit. It is pinned in `config/layer-templates.json` (branch still `code`, so the owner fast-forwards `code` to `82cb9ef` when merging), and its indexer digest is added to `config/layer-reviewed-sources.json` with the old ones kept.
+
+**Review screen fix found by the checks.** Runs whose claims are notes had no way to enter a journey as its persona (the old screen's step buttons). The Tests view now offers *Open … as persona* on each journey's first step. Opening a step or walking a journey builds the preview first when it isn't running.
+
+| Check | Result |
+|---|---|
+| `npm run typecheck`, `npm run build` (real Pages UI from the pin) | Pass |
+| `tests/work-item-browser.mjs` | Pass (earlier in this session) |
+| `tests/layer-scope-browser.mjs` (templates on) | Pass |
+| `tests/repository-review-browser.mjs` (uid 1000, Docker, templates on) | **Pass**, extended for J6: notes-only runs open each journey from Tests as author and viewer; the person's journey claim is walked in two steps, following a link in the preview advances step 1, *Looks good* finishes step 2, both step marks are stored under the claim, and *Approve journey* records the verdict; axe and 390 px pass |
+| `tests/journey-work-browser.mjs` (uid 1000, Docker, templates on) | Pass |
+| `npm run test:server` / `test:server:templates` | 296/298 and 290/291 executed tests pass. The failures were Docker-backed tests that ran after `dockerd` stopped mid-suite. Rerun as uid 1000 with Docker up and the journey runner image prebuilt, `review-previews`, `previews-docker`, `symphony-worker` and `symphony-proposals` pass (41 pass, 3 skipped, 0 failed tests). `previews-docker.test.mjs` still reports a file-level failure: its sample app runs `npm install` inside Docker, which can't verify the session proxy's certificate |
+
+**Retrospective addendum.**
+1. *Harder than necessary (observed):* the environment steps for Docker checks (proxy for `dockerd`, prebuilt runner image with the proxy CA, uid 1000) were already in the handoff, but I started Docker without them and spent three test runs rediscovering them. My first report also said both review browser tests had been moved to the new screen when only one part of one had.
+2. *Applied now:* the handoff's cloud-session list is the first thing to run, before any Docker check. Tested: following it made every Docker-backed check above run. A one-command setup script would make it harder to skip; not added, since it would hold proxy-specific steps in the repository.
+3. *Hypothesis only:* that `dockerd` stopped because of the "only one connection allowed" health check in its log, triggered by starting it without the proxy environment; it did not recur after restarting it with `HTTPS_PROXY` set.
+

@@ -154,7 +154,7 @@ try {
   }
   assert.deepEqual([reviewed.proofs['journey-spec'].status, reviewed.proofs['journeys-unchanged'].status, reviewed.gate], ['passed', 'passed', []], JSON.stringify(reviewed.proofs));
   await page.goto(`${portal}/p/${project.slug}/work/item/${specify.id}/review/1`);
-  await page.getByRole('heading', { name: /Review W-\d+ · Run 1/ }).waitFor();
+  await page.getByRole('heading', { name: /W-\d+ · Run 1/, level: 1 }).waitFor();
   await page.getByText('The journey in this build: Passed').waitFor({ timeout: 60000 });
   await axe();
   await page.screenshot({ path: `${out}/specify-review.png`, fullPage: true });

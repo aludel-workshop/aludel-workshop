@@ -161,7 +161,7 @@ try {
     await open.click();
   };
   await openStep('Review the post editor', 'author');
-  await previewFrame.locator('#route').getByText('/posts/demo/edit', {exact:true}).waitFor();
+  try { await previewFrame.locator('#route').getByText('/posts/demo/edit', {exact:true}).waitFor({timeout:180000}); } catch (error) { await page.screenshot({path:`${out}/failure-open.png`,fullPage:true}); throw error; }
   await previewFrame.getByText('author@demo.invalid', {exact:true}).waitFor();
   await page.screenshot({path:`${out}/author-step.png`,fullPage:true});
   await openStep('Review the viewer page', 'viewer');
@@ -245,7 +245,7 @@ try {
   await page.getByRole('tab',{name:/^Done/}).click();
   await page.locator('[role=tabpanel][aria-labelledby=sub-done]').getByRole('link',{name:personWork.title,exact:true}).click();
   await page.getByRole('link',{name:/Review/}).filter({hasText:'Review'}).first().click();
-  await page.getByRole('heading',{name:/Review W-\d+ · Run 1/}).waitFor();
+  await page.getByRole('heading',{name:/W-\d+ · Run 1/,level:1}).waitFor();
   // The journey claim comes first, with its step's proof on this build and the person's reason beside it.
   await page.getByText('Step tests on this build: No test').waitFor({timeout:120000});
   await page.getByText('The viewer step has no test yet; the next slice writes one.').waitFor();
@@ -253,8 +253,7 @@ try {
   // JOURNEYS-01 J6: walking the journey in the preview moves the review on. Following the link to the next step's page
   // walks the first step; the last step is confirmed, and the review returns to the journey to decide.
   const walk = page.getByRole('button',{name:'Walk the journey'});
-  await page.waitForFunction(()=>document.querySelector('#wr-frame'),null,{timeout:180000});
-  await walk.click();
+  await walk.click({timeout:180000});
   await page.getByRole('heading',{name:'Review the viewer page',level:2}).waitFor();
   const personFrame = page.frameLocator('#wr-frame');
   await personFrame.getByText('viewer@demo.invalid',{exact:true}).waitFor({timeout:60000});
