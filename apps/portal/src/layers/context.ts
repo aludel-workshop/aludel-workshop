@@ -97,7 +97,9 @@ export interface WorkItem { id: string; number: number; ref: string; layer: stri
   profileId: string | null; instructions: InstructionPins | null; migration?: { actionId: string | null; actionRevision: number | null; disposition: 'mapped' | 'blocked'; reason: string | null } | null; project: string | null; checkpoint: string | null;
   context: { reconcile?: { recordId: string; fromRevision: number; toRevision: number }; routine?: string; suggestion?: string;
     // JOURNEYS-01 J5: a Specify, Implement or reviewable-app item and the journey it is about.
-    journeyWork?: { kind: 'reviewable' | 'specify' | 'implement'; journey?: string; revision?: number; specify?: string; request?: { title: string; brief: string } }; batch?: string; staged?: boolean; skip?: boolean;
+    journeyWork?: { kind: 'reviewable' | 'specify' | 'implement'; journey?: string; revision?: number; specify?: string; request?: { title: string; brief: string }; parked?: string };
+    // J6: the last sent-back or parked run's commit, which the next run merges and builds on.
+    draft?: { commit: string; branch: string | null; runRef: string | null; kept: boolean }; batch?: string; staged?: boolean; skip?: boolean;
     feedback?: { claim?: string; check: string; note: string; by: string; at: string }[]; reviewComment?: string | null; run?: RunState; personRun?: string; executionBlock?: ExecutionBlock;
     visionProposal?: { id: string; section: string; text: string; note: string; basis: string; targetId: string | null;
       expectedRevision: number | null; beforeText: string | null; briefRevision: number; acceptedClaimId?: string };
@@ -106,7 +108,7 @@ export interface WorkItem { id: string; number: number; ref: string; layer: stri
       checks: { name: string; status: string; detail?: string }[]; usedInputs?: { id: string; revision: number }[] } } | null; }
 export interface FieldChange { field: string; before: unknown; after: unknown; }
 // WORK-ITEM-UX-01: one started run of a work item, with the task it was given, what it produced and how it was signed.
-export type WorkRunState = 'working' | 'needs' | 'review' | 'failed' | 'stopped' | 'accepted' | 'sent' | 'closed';
+export type WorkRunState = 'working' | 'needs' | 'review' | 'failed' | 'stopped' | 'accepted' | 'sent' | 'closed' | 'parked';
 export interface RunChange { id: string; kind: 'claim' | 'proposal' | 'flow' | 'flow-revision' | 'record' | 'source' | 'report' | 'file'; icon: string; name: string; op: 'created' | 'modified' | 'removed'; size: string;
   before?: string | null; after?: string; note?: string; basis?: string; content?: Record<string, unknown>; findings?: { severity: string; title: string; affected: string; evidence: string; recommendation: string }[]; candidateId?: string;
   // PAGES-API-01: the fields a layer API change sets, before and after.
@@ -116,6 +118,8 @@ export interface RunChange { id: string; kind: 'claim' | 'proposal' | 'flow' | '
 export interface RunStep { seq: number; kind: 'plan' | 'progress' | 'note'; at: string; objectives?: string[]; index?: number; status?: 'active' | 'done' | 'stuck'; note?: string; text?: string; }
 // DEC-057: work an agent proposed for another (or its own) layer; the reviewer creates or dismisses each one.
 export interface RunFollowUp { id: string; position: number; layer: string; layerName: string; sourceLayer: string; title: string; brief: string; why: string;
+  // J6: the spec entry a follow-up would change, resolved by the host to the layer that keeps it.
+  target?: { journey: string; title: string; revision: number; layer: string; entry: string; entryRevision: number } | null;
   state: 'proposed' | 'created' | 'dismissed'; createdWorkId: string | null; createdRef: string | null; decidedBy: string | null; decidedAt: string | null; }
 export interface WorkRun { id: string; number: number; batchId: string | null; state: WorkRunState;
   performer: { kind: 'agent' | 'person'; id: string; label: string; model: string | null; effort: string | null };
@@ -129,7 +133,9 @@ export interface WorkRun { id: string; number: number; batchId: string | null; s
   proposalId: string | null; reportId: string | null; summary?: string | null; followUps?: RunFollowUp[];
   integration?: { id: string; base: string; commit: string; submittedCommit: string; current: boolean; appRepository: boolean; appChanged: boolean; tests: { name: string; status: string; detail?: string; source?: string }[] } | null;
   layerSource?: { branch: string; commit: string; base: string; tests: { name: string; status: string; detail?: string; source?: string }[] } | null;
-  review: { verdicts: Record<string, { value: 'accept' | 'reject' | 'skip'; note: string }>; flags: Record<string, string>; outcome: WorkRunState | null; comment: string | null; signedBy: string | null; signedAt: string | null };
+  // J6: a run may ask one question with fixed answers; steps are the reviewer's walk, keyed `<claim>/<step>`.
+  question?: { ask: 'merge-or-draft'; why: string } | null;
+  review: { verdicts: Record<string, { value: 'accept' | 'reject' | 'skip'; note: string }>; flags: Record<string, string>; steps?: Record<string, { value: 'ok' | 'flag'; note: string }>; answer?: 'merge' | 'draft' | null; outcome: WorkRunState | null; comment: string | null; signedBy: string | null; signedAt: string | null };
   // JOURNEYS-01 J4: verdicts are keyed by claim ID. Each claim with step tests has its proof on the reviewed build; the gate lists
   // the claims that stop acceptance, with a person's stated reason where one was given.
   proofs: Record<string, ClaimProof>; gate: { claim: string; text: string; status: ProofStatus; reason: string | null }[]; reasons: Record<string, string>; }

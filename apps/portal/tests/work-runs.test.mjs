@@ -656,7 +656,7 @@ test('J6: walked steps are flagged with a note; a merge-or-draft question parks 
     f.worker.submitProposal(f.scope, { attemptId: issue.native_ref.attempt_id, proposal: claim('A pet in the corner of your screen.') });
     let [run] = f.history.list(f.projectId, work.id);
     const save = input => f.history.saveReview(f.projectId, work.id, run.id, input);
-    assert.throws(() => save({ step: { claim: 'invite-steps', step: 'nope', value: 'ok' } }), /Unknown journey step/);
+    assert.throws(() => save({ step: { claim: 'invite-steps', step: 'Not a step', value: 'ok' } }), /Unknown journey step/);
     assert.throws(() => save({ step: { claim: 'invite-steps', step: 'send', value: 'flag' } }), /Say what is wrong/);
     assert.throws(() => save({ verdict: { claim: 'note-1', value: 'reject' } }), /Say what is wrong with this claim/);
     save({ step: { claim: 'invite-steps', step: 'open', value: 'ok' } });

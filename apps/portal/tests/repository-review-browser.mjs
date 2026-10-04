@@ -200,10 +200,11 @@ try {
   assert.equal(git(workspace, 'rev-parse', 'main'), combined.integration.commit);
   await page.goto(`${portal}/p/${project.slug}/work/item/${conflict.id}/review/1`);
   await page.getByText('The submission conflicts with the accepted repository. Send it back for resolution.', {exact:true}).waitFor();
-  await page.getByRole('button', {name:'Reject R',exact:true}).click();
-  await page.getByPlaceholder('What should change?').fill('Resolve this against the accepted page.');
-  await page.getByRole('button', {name:'Next',exact:true}).click();
-  await page.getByRole('button', {name:'Sign and send back',exact:true}).click();
+  await page.getByRole('button', {name:/^Flag( it)?$/}).click();
+  await page.getByLabel(/What is wrong/).fill('Resolve this against the accepted page.');
+  await page.getByRole('button', {name:'Save flag',exact:true}).click();
+  await page.locator('.wr-pickbtn').click(); await page.locator('.wr-menu').getByRole('button', {name:/^Finish/}).click();
+  await page.getByRole('button', {name:/Send back to/}).click();
   await page.waitForURL(new RegExp(`/work/item/${conflict.id}$`));
   assert.equal(git(workspace, 'rev-parse', 'main'), combined.integration.commit, 'rejecting an unprepared conflicting submission changes no accepted bytes');
 

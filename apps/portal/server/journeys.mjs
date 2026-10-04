@@ -97,7 +97,7 @@ export function reviewSteps(recipe, journeys) {
       const persona = journeyPersona(journey);
       const entry = persona ? recipe.personas[persona] : null;
       const reason = !step.route ? 'This step has no route in the app yet.' : !persona ? 'This step names no persona.' : !entry ? `No fixture is declared for persona ${persona}.` : null;
-      steps.push({ id: `${journey.id}.${step.id}`, journey: journey.id, revision: journey.revision, step: step.id, label: step.name, expected: step.expected, persona,
+      steps.push({ id: `${journey.id}.${step.id}`, journey: journey.id, revision: journey.revision, step: step.id, label: step.name, trigger: step.trigger, expected: step.expected, persona,
         fixture: entry?.fixture ?? null, session: entry?.session ?? null, path: step.route ?? null, after: previous, reset: previous === null, available: !reason, reason });
       previous = `${journey.id}.${step.id}`;
     }

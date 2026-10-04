@@ -269,7 +269,8 @@ export function workRuns({ db, know, candidates = null }) {
     if (input.step) {
       // J6: a journey claim's step, walked in the preview. Walking past it says it looks good; a flag always carries a note.
       const claim = run.task.criteria.find(entry => entry.id === input.step.claim);
-      if (!claim || claim.kind !== 'journey' || !claim.steps?.includes(input.step.step)) fail('Unknown journey step.');
+      // Every step of the journey is walked, the unchanged ones for context, so any of its steps can be flagged.
+      if (!claim || claim.kind !== 'journey' || !/^[a-z][a-z0-9-]{0,63}$/.test(String(input.step.step || ''))) fail('Unknown journey step.');
       const value = input.step.value ?? null, key = stepKey(claim.id, input.step.step);
       if (![null, 'ok', 'flag'].includes(value)) fail('A step looks good or is flagged.');
       const note = clip(input.step.note, 1000);

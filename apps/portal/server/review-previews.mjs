@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { previewManager, previewImageName } from './previews.mjs';
 import { layerBinding } from './layer-source.mjs';
-import { localPath, reviewSteps, undeclaredSeams, validateJourney, validateReviewRecipe, validateSeams } from './journeys.mjs';
+import { journeyPersona, localPath, reviewSteps, undeclaredSeams, validateJourney, validateReviewRecipe, validateSeams } from './journeys.mjs';
 import { journeyRunnerImage, runJourneySteps, stepPlan } from './journey-runner.mjs';
 import { injectWalk, walkPath, walkScript } from './review-walk.mjs';
 
@@ -76,7 +76,7 @@ export function reviewPreviews({ db, portalRoot, dataDirectory, appOrigin, porta
     const walked = db.prepare('SELECT * FROM layer_review_journeys WHERE integration_id = ? AND commit_sha = ?').get(id, row.commit_sha);
     const results = new Map((walked ? JSON.parse(walked.steps_json) : []).map(result => [result.id, result]));
     return { ...runtime.status(id), url: appOrigin(reviewHost(id)), fixtureCommit: row.commit_sha,
-      journeys: (inputs?.journeys || []).map(journey => ({ id: journey.id, title: journey.title, revision: journey.revision, origin: journey.origin })),
+      journeys: (inputs?.journeys || []).map(journey => ({ id: journey.id, title: journey.title, revision: journey.revision, origin: journey.origin, persona: journeyPersona(journey) })),
       steps: (inputs?.steps || []).map(step => ({ ...step, result: results.get(step.id) || null })), stepsRanAt: walked?.ran_at || null,
       separability: walked ? JSON.parse(walked.separability_json) : null,
       checks: build ? JSON.parse(build.checks_json) : [], checkedAt: build?.checked_at || null, available: Boolean(inputs),

@@ -157,52 +157,55 @@ try {
   await page.getByRole('button', { name: 'Create task' }).click();
   await page.getByRole('heading', { name: 'Tidy the browse flow', level: 1 }).waitFor();
 
-  // Review: Changes show the new flow and notes; Follow-ups show each reason.
+  // JOURNEYS-01 J6 review: each claim shows the evidence the run named for it; a reference to nothing it produced is marked,
+  // not hidden. Suggestions are pages of the review, each with its reason; Finish signs.
+  const goPage = async name => { await page.locator('.wr-pickbtn').click(); await page.locator('.wr-menu').getByRole('button', { name }).click(); };
   await page.goto(`${base}/work/item/${task.id}/review/1`);
-  await page.getByRole('heading', { name: /Review W-\d+ · Run 1/ }).waitFor();
-  // Each claim shows the evidence the run named for it; a reference to nothing it produced is marked, not hidden.
-  await page.getByRole('button', { name: 'Claim 1', exact: true }).click();
+  await page.getByRole('heading', { name: /W-\d+ · Run 1/, level: 1 }).waitFor();
+  await goPage(/^Claim 1 of/);
   await page.locator('.wr-ev', { hasText: 'Find a tool' }).waitFor();
-  await page.getByRole('button', { name: 'Claim 2', exact: true }).click();
+  await goPage(/^Claim 2 of/);
   await page.locator('.wr-ev', { hasText: 'knowledge/flow-method.md' }).waitFor();
   assert.match(await page.locator('.wr-ev-test', { hasText: 'node --test tests/' }).innerText(), /passed/);
   await page.locator('.wr-ev.missing', { hasText: 'phone walkthrough' }).waitFor();
   assert.deepEqual(await axe(), [], 'Evidence axe');
   await shot('evidence');
-  await page.getByRole('button', { name: 'Claim 1', exact: true }).click();
+  await goPage(/^Claim 1 of/);
   const fields = page.locator('table.wr-fields');
   await fields.first().waitFor();
   assert.equal(await fields.count(), 2, 'one field table per changed record');
   const sourceDiff = page.locator('article.wr-change', { hasText: 'repository › knowledge/flow-method.md' }).locator('pre.wr-diff');
   await sourceDiff.getByText('+Name the goal before the first step.').waitFor();
   assert.equal(await page.locator('.wr-owner').count(), 0, 'a Knowledge edit is not marked as changing what the layer runs');
-  await page.getByRole('tab', { name: /Tests/ }).click();
-  await page.getByText(/Run by the agent in its sandbox on/).waitFor();
+  await page.getByRole('button', { name: 'Tests', exact: true }).click();
+  await page.getByText(/Reported by the agent from its sandbox on/).first().waitFor();
   await shot('tests');
-  await page.getByRole('tab', { name: /Changes/ }).click();
+  await page.getByRole('button', { name: 'Changes', exact: true }).click();
   await fields.nth(1).getByRole('rowheader', { name: 'description' }).waitFor();
   await shot('changes');
-  await page.getByRole('tab', { name: /Follow-ups/ }).click();
+  await goPage(/Build the tool detail route/);
   await page.getByText('The Find a tool flow ends on a page Code has not built.').waitFor();
-  assert.deepEqual(await axe(), [], 'Follow-ups axe');
+  assert.deepEqual(await axe(), [], 'Suggestion axe');
   await shot('follow-ups');
   await page.getByRole('button', { name: /Create task in Code/ }).click();
-  await page.getByText('Follow-up task created.').waitFor();
-  const created = page.locator('.wr-fu', { hasText: 'Build the tool detail route' }).getByRole('link');
+  await page.getByText('Suggested task created.').waitFor();
+  const created = page.locator('.wr-fu').getByRole('link');
   await created.waitFor();
-  await page.locator('.wr-fu', { hasText: 'Write the borrow story' }).getByRole('button', { name: 'Dismiss' }).click();
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
+  await page.locator('.wr-fu').getByRole('button', { name: 'Dismiss' }).click();
   await page.getByText(/Dismissed by Charles/).waitFor();
   await shot('follow-ups-decided');
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
   await created.click();
   await page.getByRole('heading', { name: 'Build the tool detail route', level: 1 }).waitFor();
   await page.getByText(/from the Pages layer as a follow-up to W-\d+/).first().waitFor();
   await shot('follow-up-item');
 
-  // Sign and accept applies the new flow.
+  // Accept the run applies the new flow.
   await page.goto(`${base}/work/item/${task.id}/review/1`);
-  await page.getByRole('heading', { name: /Review W-\d+ · Run 1/ }).waitFor();
-  await page.locator('.wr-pip-end').click();
-  await page.getByRole('button', { name: 'Sign and accept' }).click();
+  await page.getByRole('heading', { name: /W-\d+ · Run 1/, level: 1 }).waitFor();
+  await goPage(/^Finish/);
+  await page.getByRole('button', { name: /Accept the run/ }).click();
   await page.getByText(/Run 1 accepted and applied/).waitFor();
   const reopened = openDatabase(join(root, 'machine.sqlite'));
   assert.equal(reopened.prepare("SELECT COUNT(*) AS n FROM knowledge_records WHERE project_id = ? AND kind = 'flow'").get(projectId).n, 1);
@@ -214,7 +217,8 @@ try {
   // Phone width: the review tabs and follow-ups stay within the page.
   await page.setViewportSize({ width: 390, height: 900 });
   await page.goto(`${base}/work/item/${task.id}/review/1`);
-  await page.getByRole('tab', { name: /Follow-ups/ }).click();
+  await goPage(/Build the tool detail route/);
+  await page.locator('.wr-fu').waitFor();
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, 'no horizontal page scroll at 390px');
   await shot('follow-ups-390');
 

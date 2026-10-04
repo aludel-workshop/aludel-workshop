@@ -7,8 +7,8 @@ import { AssigneeComponent, AvatarComponent, RefChipComponent, agentRunnable, ba
 
 // WORK-ITEM-UX-01: what a run's status block says and offers, by state (the run actions table in the work record).
 export const runTitle: Record<WorkRunState, string> = { working: 'Working', needs: 'Needs your answer', review: 'Run complete', failed: 'Failed', stopped: 'Stopped',
-  accepted: 'Accepted', sent: 'Sent back', closed: 'Closed' };
-export const runTone: Record<WorkRunState, string> = { working: 'live', needs: 'needs', review: 'review', failed: 'bad', stopped: 'bad', accepted: 'done', sent: 'past', closed: 'past' };
+  accepted: 'Accepted', sent: 'Sent back', closed: 'Closed', parked: 'Kept as a draft' };
+export const runTone: Record<WorkRunState, string> = { working: 'live', needs: 'needs', review: 'review', failed: 'bad', stopped: 'bad', accepted: 'done', sent: 'past', closed: 'past', parked: 'past' };
 // Which change the review should open on, when it is entered from a row in Changes.
 export const reviewFocus = signal<string | null>(null);
 type Objective = { text: string; state: 'done' | 'now' | 'todo' | 'stuck'; note: string; took: string };
