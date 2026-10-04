@@ -121,3 +121,61 @@ The plan and the owner's decisions so far are in the [proposal](proposal.md). Th
 5. *Process change:* the procedure §5 line about naming the parts of an accepted page a prototype keeps; applied in this round's brief (F1 kept the item's fields). Whether it prevents the next miss is a hypothesis.
 
 **Status:** prototype round 2 open, waiting on the owner's answers. A1 is not authorized.
+
+#### Round 2 feedback (2026-10-04)
+
+**Owner, on v2:** "alright, i like the work flow." The workflow in v2 (item framework, Draft → Ready by defining, actions in gated phases, needs on their action, orchestrator sidebar, per-action review, close-out) is accepted as the direction. Owner acceptance is of the interaction, from the prototype; nothing is built.
+
+| # | Ask | Position | Where it goes |
+|---|---|---|---|
+| G1 | The previews were skeletal; don't lose the quality of the real code previews | Clarification | The prototypes stub the app on purpose. The built review keeps J6's live preview of the real build; A4 reuses it, not the mock |
+| G2 | Page prototypes matter, not only the flow. Pages review actions should be like Pages' flow previewer (mockups, walked as a flow) with a clean Previous vs Proposed comparison. The interactive prototypes are essentially that kind of review | Required for the Pages review action | Proposal below; a prototype of the Pages review action is the next round |
+| G3 | Could page mockups be HTML? Could Design's component demos be interactive HTML without built code, and Pages consume them? | Question | Proposal below |
+| G4 | Mock the board: drop batches and Queue/Backlog for kanban columns; show it synced with Linear | Required | Work ecosystem prototype v1 |
+| G5 | Routines: a formula that runs a kind of work item on a trigger | Required | Same prototype |
+| G6 | Project management in the new setup | Required | Same prototype |
+
+**Proposal for G2/G3 (not built).** Today Design's component previews and Pages' Spec view both draw through the portal's Angular renderer (`app-kit/kit-render.ts`), which uses the stack's real components. That ties every mockup to the portal's build, so nothing outside the portal can show one, and an agent can't hand one over as a file.
+1. **Design publishes an HTML kit.** For each Design revision, the Design template generates one framework-free bundle: the tokens as CSS variables, and each component contract as a custom element (`<biome-button variant="filled">`) with its states. It is interactive (focus, hover, inputs, open/close) without the app's code. The Components tab renders demos from the same bundle. *Inferred, unverified:* Material Web (`@material/web`) implements the same Material 3 components as web components and could back the kit for Material stacks; its maintenance status needs checking before relying on it.
+2. **Pages page specs become HTML documents** composed from that kit: a page is a file in Pages' repository (`pages/sign-up.html`) pinned to a Design kit revision, and its links and buttons carry `data-go="<page>"`. A flow is then a walkable prototype with no built code, which is what the prototypes in this record already are.
+3. **The Pages review action is the flow walker:** steps down the side, the page in the middle as phone or desktop, and Previous (r3) beside Proposed (r4), each walked on its own as in J6. The same files show in the portal, an Artifact, or an agent's tools.
+4. **Code review keeps the real build.** Once Code builds the pages, the journeys are walked on the preview build (J6), and a page's HTML mockup becomes the reference that review compares against.
+
+Open: whether Design's kit is generated from contracts only, or can be extracted from the built app's components when they exist (EXISTING-PROJECTS-01's case).
+
+### Work ecosystem prototype round (2026-10-04, Claude, cloud session)
+
+Authorization: the owner's round-2 message ("maybe one more prototype, the broader work ecosystem focusing on board, routines, project management in this new setup"), within the A0 scope recorded above: a static prototype under `docs/design/agent-work/ecosystem/v1/`, its walkthrough and screenshots, records, commits and pushes to this branch and PR #4. Recorded before execution.
+
+**Process first.** The parent-structure line added in round 1 applies directly here. *Kept from the accepted Work board* (`work-board.ts`, `layer-routines.ts`): one board for every layer's items, also shown filtered as a layer's Tasks tab; Create task; routines that stage an ordinary task and never open a second while the last is open; the built-in *Discover neighboring layers* routine; per-layer routines. *Replaced, at the owner's word:* batches, Next and the Queue/Backlog split (G4). *Purpose test:* columns are derived from item status; a routine is produced by a person, consumed by its trigger, anchored to the layer or project; a project is produced by a person (or synced), consumed by the board's filter and the project page, anchored to the workspace; sync settings are produced by the owner and consumed by the sync job. No unanchored container.
+
+**References.** Named from prior knowledge and **not captured** in this session: Linear's board (workflow states typed backlog/unstarted/started/completed/canceled; issues with sub-issues, projects with milestones; agents can be delegated issues), Jira's board and automation rules (*When / If / Then*), GitHub Actions' trigger list. The routine editor borrows the *When / If / Then* formula shape.
+
+**Readiness verdict: ready for a prototype.** Questions E1–E7 below. Included: the board with Linear sync, moving items between columns (and what each move does with an agent), a quick peek at an item, routines as formulas with runs, projects with milestones and planning with Claude. Excluded: the item page (v2 covers it), Jira (Linear stands for both), real two-way sync semantics beyond the visible rules, cycles/sprints, people other than the owner.
+
+**Prototype:** [ecosystem/v1](ecosystem/v1/index.html), walkthrough [`ecosystem/v1/walkthrough.mjs`](ecosystem/v1/walkthrough.mjs), screenshots in `ecosystem/v1/shots/`.
+- *Board:* five columns (Draft, Ready, In progress, In review, Done), each labeled with the Linear states it maps to; cards show the Linear id, priority, layers, assignee (Claude remote or Henry local), action progress, project, needs-you count, a live dot, and routine or Linear origin. Filters: Needs you, project, layer, assignee. A card opens a peek on the right (fields, actions with states, Move to, Open item).
+- *Moves are the deliberate act:* a rough Draft to Ready asks to define it with Claude or mark it ready as is; an unassigned item to In progress asks Send to Claude or I'll work locally (`aludel claim`); Claude's item to In progress confirms Start; Claude's items can't be dragged to In review or Done (they get there through reviews and the orchestrator's close-out). Drag, the card's move menu and the peek's Move to do the same.
+- *Linear:* a sync pill and a settings drawer (status mapping, field directions, actions as sub-issues, orchestrator thread and reviews stay in Aludel with a link back, latest edit wins per field). Events show a Linear-created issue landing in Draft and a Linear priority change shown on the item.
+- *Routines:* a list (trigger, last run, on/off) and a formula editor (When, If, Create, Assign, Go as far as, one open at a time) that reads itself back as a sentence; Run now creates an item on the board; runs link to their items. New routines start off.
+- *Projects:* cards with progress and target; a project page with milestones and items; Plan the rest with Claude proposes Draft items to add or drop; See it on the board filters by project.
+
+**Questions for the owner (E1–E7, also in the prototype's Review questions):**
+- E1 Are the five columns right, or should Triage or Canceled be their own?
+- E2 Are the move rules right (define on Ready, confirm on Start, no dragging Claude's items to Done)?
+- E3 Is the card carrying too much or too little?
+- E4 Is the Linear split right (fields both ways, actions as sub-issues, the thread and reviews in Aludel)?
+- E5 Is the When / If / Create / Assign / Go as far as formula clear enough to write one yourself?
+- E6 Is "Go as far as" the right control for how much a routine does without you?
+- E7 Are projects with milestones and Plan with Claude useful, or should projects stay plain?
+
+**Checks (agent-checked, 2026-10-04).** `node docs/design/agent-work/ecosystem/v1/walkthrough.mjs`: NO ERRORS, 19 shots, 12 axe audits, at 1440×1000 and 390×844 with narrow overflow checks. First run: axe flagged `role="listitem"` on column sections and an `aria-label` on the live dot without a role, and the 390 px board clipped cards in a horizontally scrolled row; fixed by dropping the list roles, giving the dot `role="img"`, and stacking columns on phones. Screenshot review: the routine sentence lowercased "Claude" and the column header wrapped beside the peek; both fixed. Not checked: any Linear behavior (illustrative only), owner acceptance.
+
+**Retrospective (this round).**
+1. *Harder than necessary:* nothing new; the shared harness and v2's base CSS made this a build-and-check round. One class collision (`.proj` in the rail) cost a rename.
+2. *What would help next time:* keep the base shell CSS as its own file the prototypes import, instead of copying lines from the last prototype by line number. Hypothesis; not done, because published Artifacts need the CSS inline.
+3. *Roadmap:* routines and projects become part of AGENT-WORK-01's surface; Linear sync is a new integration (an external write) that needs its own packet and the owner's go before any real connection.
+4. *Questions:* E1–E7 created; G2/G3's HTML kit question is open and blocks nothing in A1, but shapes the Pages review action (A4).
+5. *Process change:* none new. The round-1 parent-structure line was applied (kept versus replaced parts named above) and held: nothing from the accepted board was dropped without the owner's word.
+
+Status: waiting on the owner's answers to Q1–Q8 (v2) and E1–E7 (ecosystem v1).
