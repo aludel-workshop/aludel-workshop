@@ -963,6 +963,8 @@ Owner “build it” authorized implementing the accepted composer and DEC-064's
 - Accepted as is, though AGENT-WORK-01 replaces it: the additive journey assessment at pickup (`run-journey-assessment.mjs`) and zero-claim acceptance of layer proposals. They belong to the one-layer agent path, so improving them further would be throwaway work.
 - No changes made.
 
+**Checks on the merged branch** (cloud, Docker up): `test:server` 341 tests, 308 pass, 0 fail, 32 skipped; `test:server:templates` 341 tests, 333 pass, 0 fail, 7 skipped. `previews-docker.test.mjs` still times out at file level for the known reason: its sample app runs `npm install` inside Docker, which can't verify the session proxy's certificate.
+
 **Moved to AGENT-WORK-01:**
 - the agent-side check (J7);
 - the blocked/prerequisite outcome and continuing the original task;
