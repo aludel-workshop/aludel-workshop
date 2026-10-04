@@ -866,3 +866,19 @@ Authorization recorded above before execution ("j6 looking good, lets go j7"). B
 3. **What changed for the roadmap?** J7 is done for people. The agent check moves to a session with the Symphony toolchain. J8 still needs a template-update path for existing projects.
 4. **Questions.** Created: should the reviewer see the person's last check beside the review's own run? Today they see only review's. Should the check's console line become a button once there is a local `.aludel/` command?
 5. **Process change applied now:** none new; J6's (environment steps first) held.
+
+### J8 prerequisite: template updates for existing projects (proposal, 2026-10-04)
+
+The owner chose to keep Biome for the J8 trial, so existing projects need a way to take a newer template. Facts (read from the code, not run): each binding records `template` and `template_commit`, but nothing reads them. A restart installs new pins only into new projects. Ordinary layers share history with `layer-base`. Code doesn't: its files are copied under `.aludel/`, in a commit whose parent is the app's head. The only existing host-made branch, the refacet proposal, skips `prepareLayerReview`.
+
+**Proposal: a template update is reviewed Work, raised by the host.**
+1. **Detect.** On restart, any binding whose `template_commit` is behind its template's pin gets one item on that layer: *Update the Code template to `<short>`*. Nothing is applied by the restart.
+2. **Build the branch.** For each file the template owns, the host does a three-way merge (`git merge-file`). The base is the file at the old template commit, ours is the instance's copy, and theirs is the new template's.
+   - For Code, these files sit under `.aludel/`. For other layers, it is an ordinary merge of the template commit.
+   - The instance's outputs (journeys, releases, records) are never touched.
+   - The result is committed on `template/<short>`, based on the pinned main.
+3. **Conflicts.** If a file conflicts, the item lists those files and keeps the branch with conflict markers. A person (or an agent) resolves them on that branch and submits it as an ordinary run. The host does not guess.
+4. **Review.** The branch goes through the normal path: `prepareLayerReview` (it runs the package tests, because authority files change), then the review screen with Changes and Under the hood. Acceptance merges it and moves the pin, and the binding's `template_commit` moves with it.
+5. **Scope for J8.** Code first, since Biome needs it, with ordinary layers using the same item. Then Biome's own app work (the recipe moved to v2, its journeys) is Specify Work in the trial itself.
+
+**Not proposed:** re-forking (it would lose the instance's edits), or auto-applying updates that don't conflict (a pin bump would then change live projects silently).
