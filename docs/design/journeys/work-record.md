@@ -773,3 +773,34 @@ Authorization: see the 2026-10-03 "J6 prototype" entry above. This round builds 
 7. **During the original task,** the same two tools are available: an agent that finds the spec wrong mid-task submits its build plus suggested spec changes, and asks the same question.
 
 **Defaults picked (owner may change):** the agent, not the reviewer, decides in or out of scope, and the reviewer can dismiss a suggestion; one question per run, with options the host knows how to act on (merge now, keep as draft), not free text.
+
+### J6 build (2026-10-04, Claude, cloud session)
+
+Branch `claude/j6-prototype-ptl3we`, on top of the prototype rounds; draft PR #1. Authorization: the 2026-10-04 entry under *Authorization and scope*, recorded before execution (`bb5fc6d`).
+
+**Process first.** The prototype rounds settled layout questions, but two model rules surfaced only while reviewing them: a journey keeps one persona, and agents need a way to say "the spec is wrong" instead of quietly widening their change. Both went into the host contract before the screen (`c21b6b5`, `e91e4bf`), so the review UI renders rules the server already enforces rather than inventing them. This ordering held up: the UI work needed no server changes beyond exposing two fields (step `trigger`, journey `persona`).
+
+**What was built.**
+- **One persona per journey** (`c21b6b5`): `validateJourney` rejects a step persona that differs from the journey's; `journeyPersona` resolves it.
+- **Suggested spec work and merge-or-draft** (`e91e4bf`): a follow-up may carry `target: {journey}`; the host resolves which layer keeps that journey's spec and refuses targets aimed at the wrong layer. Creating a targeted follow-up in Code raises a suggested *Specify* item; in another layer it raises the change there. A run may ask one question, `merge-or-draft`, only with committed source and a targeted follow-up. Reviews record per-step marks (`ok` / `flag` with a required note) and the answer. Signing gains *park*: nothing merges, the item waits on the created Specify items, and its next run gets the reviewed commit back as `refs/aludel/draft`. When that Specify run is accepted, its claims join the parked item instead of raising a new Implement.
+- **The walk** (`cdf7f79`): review previews inject `/__aludel/walk.js` into HTML pages; it reports page arrivals and successful actions to the portal origin only.
+- **The review screen** (`44fc7ed`, `work-review.ts`): one header line (S2); evidence left by claim kind (S4), with Under the hood in its bottom bar; on the right, a claim at a time. Journey claims list their steps and are walked: arriving at the next step's page, or a successful action, marks the step and moves on. Progress runs along the action bar's top border (S1). Flags always need a note; a journey with flagged steps can only be flagged; *Approve* / *Approve journey* (S3). Suggestions and the question are review pages; Finish offers *Accept the run*, *Send back*, or *Keep as a draft*.
+
+**Evidence (agent-checked, not owner-accepted).**
+- The typecheck (`ngc -p tsconfig.app.json`) and build (`vite build`) pass. Their npm scripts first sync the Pages UI from `layer-base`, which this session doesn't have, so both ran directly against a local, git-ignored stub of the Pages UI; the template pin did not change.
+- `tests/work-item-browser.mjs` passes end to end with Docker running: approve, a flag refused without a note and saved with one, skip, Finish refusing acceptance while anything is flagged, axe with no WCAG A/AA violations at 1440 and 390 px, no sideways scroll at 390 px, a person run accepted, and a code candidate's isolated preview, Tests, Changes and Under the hood, accepted as the exact commit.
+- New and changed server tests pass (`journeys`, `review-walk`, `review-previews`, `work-runs`, `icon-subset`). `npm run test:server` has 50 failures: the 49 that fail at the branch base without `layer-base`, plus `combined previews walk journey step tests…`, which runs now that Docker is up and fails because the journey-runner image can't install packages through this container's proxy from inside Docker. The preview it builds (with the walk script) serves fine.
+- **Not run here:** `tests/layer-scope-browser.mjs` and `tests/repository-review-browser.mjs` (updated to the new screen, but they need `layer-base`), `npm run test:server:templates`, and a browser check of the walk itself advancing steps (it needs a reviewable app with journeys, which needs the Code template).
+
+**Not done in J6.**
+- The Code template's own journey indexer (`layer-base`, `code-index.mjs`) does not yet reject mixed personas; the host does. Needs `layer-base`.
+- No *Previous* build side by side: the left panel shows the proposed build; a second preview of the accepted head is a later addition.
+- Agents' task method describes targeted follow-ups and the question (`task-manifest.mjs`), but no agent has yet been run against it.
+
+#### Retrospective
+
+1. **What made it harder?** Observed: no `layer-base` in the session, so the Angular build, two browser tests and the templates suite were out of reach, and a stub was needed even to compile. The icon font subset silently missed icons kept in `[icon, label]` tables (`person_off` and `sticky_note_2` were already missing before this work).
+2. **What would make the next one easier?** Observed: the subset script now reads those tables (`tools/subset-icons.py`), and the test caught the four new icons. Prediction: a small, committed stub mode for the Pages UI would let UI-only work build without `layer-base`; not added, because a stub in the tree could hide a broken pin.
+3. **What changed for the roadmap?** J7 (person check) can build on the step marks and walk messages. J8 (Biome) needs the Code template persona rule. Docker-in-Docker package installs need the proxy CA before journey step tests can run in cloud sessions.
+4. **Questions.** Created: should *Keep as a draft* also be offered when the agent didn't ask (reviewer-initiated)? Today only the agent's question enables it. Still open: the owner's look at the built screen.
+5. **Process change applied now:** the icon subset scan, tested by `icon-subset.test.mjs` failing before and passing after. Hypothesis only: that building model rules before the screen avoids UI rework in general; it held for this slice.
