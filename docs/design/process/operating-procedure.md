@@ -87,7 +87,7 @@ Immediately before constructing an interaction prototype, write a verdict with e
 
 1. the exact questions it will answer and the cheapest suitable fidelity;
 2. actors, stories, pages and transitions included and excluded;
-3. valid parent structure and required scoped owner selections;
+3. valid parent structure and required scoped owner selections; when the prototype changes an accepted page's main area, name which parts of that page it keeps (AGENT-WORK-01 A0 v1 replaced the work item's run block and lost the item framework the owner wanted kept);
 4. component responsibility and state coverage, including empty, multiple-record, failed and stale outcomes where relevant;
 5. the external review frame, tasks, expected observations and simulation boundaries;
 6. unresolved assumptions and whether each is the named experiment or an accidental decision.

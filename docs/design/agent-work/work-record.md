@@ -70,3 +70,54 @@ The plan and the owner's decisions so far are in the [proposal](proposal.md). Th
 5. *Process change:* the shared helper, applied and tested here (the walkthrough and the missing-axe check). Whether it saves the next prototype time is a hypothesis until one uses it.
 
 **Status:** prototype round open, waiting on the owner's answers. A1 is not authorized.
+
+#### Round 1 feedback and prototype v2 (2026-10-04)
+
+**Owner feedback on v1** (project thread, one message, condensed per ask; the owner called it "a rather loose train of thought, but the gist: we need a clearer overall structure").
+
+| # | Ask | Position | Where in v2 |
+|---|---|---|---|
+| F1 | Keep the work item framework: tasks that could be imported from Jira or Linear. Clicking in should make it quick to see what the item is about | Required | A top bar with the item's fields (status column, priority, assignee and work style, layers, source, links) and its brief; the existing item page's facts, kept |
+| F2 | Maybe drop batches for a plain kanban board | Proposed ("maybe") | A small board (Draft, Ready, In progress, In review, Done) that the item moves across. Batches aren't shown. Q-level decision, not settled |
+| F3 | Work style stays open: as easy to send to a remote agent as to claim and work locally with your CLI agent, with the same knowledge, resources and previews | Required | The work style picker on the item: *Send to Claude* or *Claim for local CLI*. Local shows the claim command; the sidebar becomes your local session's thread; actions, needs and reviews are the same |
+| F4 | A half-baked idea plus Go: the remote agent checks it over, asks questions, helps define the task and moves it to Ready; then layer work starts | Required | Go on a Draft item starts *defining*: questions stack on the brief card, the agent rewrites the brief and drafts the actions, the item moves to Ready, and *Start work* begins it |
+| F5 | Agent work and chat live in a right sidebar, not drifting through the main area; when an agent is on the item, that's the most important thing to see | Required | The right sidebar is the orchestrator's thread, with a composer to steer it |
+| F6 | Keep the plan; the actions are like Jira subtasks | Required | The main area is the action list: each action has a layer, goal, agent, dependencies and state |
+| F7 | Things needing you were in two places (a question at the top, a Data change in the checklist). Keep them consistent, always under the action itself; several questions stack on the card | Required | Every need (question, change to allow, new action to approve, review) sits on its action's card. The top bar only counts them and jumps to the first |
+| F8 | An overall orchestrator was missing: something checking what comes out of the subagents and whether it works together | Required | The orchestrator owns the thread, checks each finished action against the others (said in the thread), and owns the final *Check everything together* action |
+| F9 | Actions always open to change: add new ones, change their goals as the work informs | Required | *Add action* in each phase; *Edit goal* on actions not yet done; the orchestrator replies in the thread |
+| F10 | Review gates: review the flows before code is built. Phases with dividers; nothing below starts until reviews above are done, while dependencies still allow concurrent subagents | Required | Phases separated by review gates; within a phase, *after #n* dependencies, independent actions run side by side |
+| F11 | Review at the action level: when the flows are done, click Review on that action. Approve-and-run happens at the orchestrator level to close out | Required | *Review* on each action with a review; one *Approve and merge* in the orchestrator's thread once everything is reviewed and checked together |
+| F12 | Predicting binding steps at plan time sounds fragile. New actions get an Approve button, the orchestrator tells you about them, and approving opens the action's details | Required (replaces v1's expected step) | A binding-added action arrives as *New: needs your approval* with the orchestrator's note; *Review and approve* opens the action in the sidebar with its details. Approval is per action, not predicted |
+| F13 | How do you get to an action's details, and steer it? Maybe combined with the thread viewer | Proposed | Clicking an action opens it in the sidebar: details, its needs, its log and a composer to steer that action's agent; *Back to orchestrator* returns |
+
+**Process first (this round).**
+- *What it revealed.* v1 answered the proposal's slice row but skipped the procedure's parent-structure check: it replaced the run block without asking which parts of the accepted work item (WORK-ITEM-UX-01) were enduring. F1 and F3 are exactly those parts. **Applied now:** the v2 brief starts from the current item page (`work-item.ts`: eyebrow, facts row, Links and Planning, Activity) and keeps its fields; and the operating procedure's §5 readiness list gets one line: a prototype that changes a page's main area names which parts of the accepted page it keeps, before building.
+- *Model change from F12.* The proposal's §3 said plan approval authorizes what it names, and v1 tried to predict binding steps. v2 makes approval per action: the starting plan is approved by *Start work*, and every action added later carries its own approval. This removes A3's prediction problem rather than solving it.
+
+**Readiness (v2).** Same frame as v1. Fidelity unchanged; data is the same Biome goal, now starting as a half-baked Draft. New named variables: the board columns (F2), the sidebar as action viewer (F13), gates as phase dividers (F10), which actions need review (shown per action). Still excluded: importing from Jira (only shown as a source field), multi-person review, the local CLI itself (only its claim command and thread).
+
+**Prototype v2:** [a0/v2/index.html](a0/v2/index.html) · [walkthrough](a0/v2/walkthrough.mjs) · [screenshots](a0/v2/shots/). Same playback controls as v1. *Scenarios* jumps to the defined item, the two needs, the new action at the gate, the code review or the close-out, and turns on #4 failing twice.
+
+**What it shows, in order.** A rough Draft (*sign up flow?? …*) with no actions → Go → two questions stack on the brief → the orchestrator rewrites the brief, drafts 4 actions in 3 phases and the item moves to Ready → you edit #3's goal → *Start work* (In progress) → #1 and #2 run side by side, #1's question and #2's change to allow each on their own card → #1 is ready for review and the orchestrator says it checked #1 against #2 → the binding proposes #5 (*New: needs your approval*), and #3 now waits on it → the gate holds phase 2 until you review #1 and #2 → you flag #1 once and it comes back, then approve both → *Review and approve* on #5 opens it in the sidebar → you add #6 → #3 builds, #4 (the orchestrator's combined check) fails and sends it back, then passes → you walk both journeys to approve #3 → the orchestrator's *Approve and merge* → Done on the board. *Work locally* shows `aludel claim W-11`, and the sidebar becomes your local session's thread.
+
+**Questions for round 2.**
+- **Q1** The item page keeps the Jira-style top bar and the brief. Quick enough to see what the item is about?
+- **Q2** Go on a rough Draft: Claude asks its questions on the brief, rewrites the brief and drafts the actions, then the item moves to Ready; *Start work* begins. Right split between defining and doing?
+- **Q3** The sidebar is the orchestrator's thread; clicking an action shows its details, needs and log there, with its own steer box. Does that work as the one place for details and steering?
+- **Q4** Everything that needs you sits on its action, and the top bar only counts them. Consistent enough?
+- **Q5** Phases with review gates, plus *after #n* within a phase. Does that show the dependencies, and should you be able to move gates yourself?
+- **Q6** Review per action (some are only checked by the orchestrator), then one *Approve and merge* from the orchestrator. Right?
+- **Q7** Work style: *Send to Claude* or *Work locally*, with the same actions, needs and reviews. Is that the parity you want?
+- **Q8** A plain kanban board instead of batches. Keep going that way?
+
+**Checks (agent-checked).** The walkthrough drives everything above with visible controls in *Step* mode. It asserts that phase 2 doesn't start before both reviews, that an empty flag is refused, that #3 can't be approved before both journeys are walked, that the item lands in Done on the board, that local style shows the claim command and the local thread, that the twice-failed check puts its decision on #4, and that review answers survive Reset. It also checks the draft, the needs and the walk at 390 px. **Result: NO ERRORS · 19 screenshots · 15 axe audits.** Before that, the runs found four prototype defects, all fixed. #6 reused #5's number. *Next event* was disabled for actions you add. A working action hid its last log line while it waited on you. The sidebar sat below the top bar, which hid the orchestrator when you first click in; it now runs the full height. The walkthrough also matched a thread message instead of the card it meant, so its waits now target unique text.
+
+**Retrospective (round 2 build).**
+1. *Harder than necessary (observed):* text checks matched the orchestrator's thread when they meant an action card, because the thread repeats what cards say. Next time, scope assertions to the region (`.acard`, `.side`), not the whole view.
+2. *Would help next time:* the shared helper worked unchanged for a second prototype (font route, axe, narrow checks). That is the first evidence it saves set-up; the walkthrough was written against it from the start.
+3. *What it revealed:* per-action approval (F12) removes the proposal's plan-time prediction of binding steps. The proposal's §3 and §6 need that change before A1. Also, an orchestrator that "checks what comes out" needs a concrete contract: in v2 it checks each finished action against its neighbours (#1 against #2, #5 against #1) and owns the combined check (#4). A1/A2 have to define what those checks are, not only show them as messages.
+4. *Questions created:* Q1–Q8. Newly important: who may move a review gate (Q5), and whether a local session can act as the orchestrator for the remote agents (F3's parity, untested here).
+5. *Process change:* the procedure §5 line about naming the parts of an accepted page a prototype keeps; applied in this round's brief (F1 kept the item's fields). Whether it prevents the next miss is a hypothesis.
+
+**Status:** prototype round 2 open, waiting on the owner's answers. A1 is not authorized.
