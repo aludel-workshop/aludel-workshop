@@ -1,3 +1,4 @@
+import { templateUpdates } from './template-updates.mjs';
 import { initWorkflow, workList, workOperation } from './workflow.mjs';
 import { createServer } from 'node:http';
 import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
@@ -209,6 +210,9 @@ function adoptCodeRepositories() {
     ensureProjectRepositoryLayers(db, projectId);
     if (codeRepo.layer(projectId)) { codeRepo.adopt(projectId); codeRepo.seed(projectId, pool.outputEntries); }
   } catch (error) { console.error(`Could not move Code into ${projectId}'s repository: ${error.message}`); }
+  // JOURNEYS-01 J8: a layer whose template moved on gets one reviewed update item; nothing is applied by the restart.
+  for (const projectId of layerProjects()) try { templateUpdates({ db, know, runHistory }).raise(projectId); }
+  catch (error) { console.error(`Could not prepare template updates for ${projectId}: ${error.message}`); }
 }
 const storyRefs = projectId => know.list(projectId, 'story').map(story => ({ ...story, ref: `S${story.number}` }));
 const symphonyWorkspaceRoot = resolve(process.env.MACHINE_SYMPHONY_WORKSPACE_ROOT || join(dataDirectory, 'symphony-workspaces'));
@@ -1040,7 +1044,7 @@ async function api(request, response, url) {
     return json(response, result.status, result.body, { 'cache-control': 'no-store' });
   }
   // WORK-ITEM-UX-01: an item's runs, each with its own task snapshot, outputs, review and signature.
-  const runRoute = /^\/api\/projects\/([^/]+)\/work\/([^/]+)\/runs(?:\/([^/]+)\/(review|sign|submit|stop|prepare|preview|scenario|close-preview|step-screenshot))?$/.exec(url.pathname);
+  const runRoute = /^\/api\/projects\/([^/]+)\/work\/([^/]+)\/runs(?:\/([^/]+)\/(review|sign|submit|check|stop|prepare|preview|scenario|close-preview|step-screenshot))?$/.exec(url.pathname);
   if (runRoute) {
     const [, rawProject, rawWork, rawAttempt, operation] = runRoute;
     const projectId = decodeURIComponent(rawProject), workId = decodeURIComponent(rawWork), attemptId = rawAttempt ? decodeURIComponent(rawAttempt) : null;
@@ -1052,6 +1056,13 @@ async function api(request, response, url) {
       return json(response, 400, { error: 'Unknown run action.' });
     }
     if (operation === 'submit' && request.method === 'POST') return json(response, 200, runHistory.submitPerson(user, projectId, workId, attemptId, await readJson(request)), { 'cache-control': 'no-store' });
+    // JOURNEYS-01 J7: Check my branch builds and walks the person's branch as review will, then frees the preview slot.
+    if (operation === 'check' && request.method === 'POST') {
+      const integration = runHistory.checkPerson(user, projectId, workId, attemptId, await readJson(request));
+      await integrationPreviews.build(integration.id);
+      try { await integrationPreviews.close(integration.id); } catch { /* the idle sweep stops it */ }
+      return json(response, 200, { run: runHistory.runFor(projectId, workId, attemptId) }, { 'cache-control': 'no-store' });
+    }
     if (operation === 'stop' && request.method === 'POST') return json(response, 200, runHistory.stopPerson(user, projectId, workId, attemptId), { 'cache-control': 'no-store' });
     const reviewInputCurrent = (input, rejectionOnly = false) => {
       const run = runHistory.runFor(projectId, workId, attemptId);

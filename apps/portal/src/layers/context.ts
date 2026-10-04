@@ -85,6 +85,11 @@ export type WorkStatus = 'backlog' | 'queued' | 'staged' | 'working' | 'blocked'
 export type ClaimKind = 'journey' | 'record' | 'invariant' | 'note';
 export interface ClaimRef { id: string; kind: ClaimKind; backed: boolean; journey?: string; revision?: number; steps?: string[]; layer?: string; entry?: string; covers?: 'journeys'; }
 export type ProofStatus = 'passed' | 'failed' | 'no-fixture' | 'uncovered' | 'skipped' | 'missing' | 'stale' | 'unsigned' | 'not-run';
+// JOURNEYS-01 J7: a person's Check my branch, run as review will run it: each journey step's test result, and each claim's proof.
+export interface CheckStep { id: string; journey: string; step: string; label: string; expected: string; persona: string | null; fixture: string | null; session: string | null; path: string | null;
+  available: boolean; reason: string | null; result: { status: 'passed' | 'failed' | 'skipped' | 'uncovered' | 'no-fixture'; detail?: string | null } | null; }
+export interface RunCheck { branch: string; commit: string; integration: string; base: string; at: string; ranAt: string | null; current: boolean; available: boolean | null;
+  files: { path: string; status: string; added: number; removed: number }[]; checks: { name: string; status: string; detail?: string }[]; journeys: { id: string; title: string }[]; steps: CheckStep[]; proofs: Record<string, ClaimProof>; }
 export interface ClaimProof { status: ProofStatus; detail: string | null; steps: { id: string; status: ProofStatus; detail: string | null; screenshot: boolean }[]; }
 export interface WorkCheck extends ClaimRef { text: string; source: { id: string; revision?: number | null } | null; verdict: 'accept' | 'reject' | null; note: string; by?: string | null; at?: string | null; }
 export interface LogEntry { at: string; text: string; refs?: string[]; by?: { kind: string; id: string } | null; }
@@ -115,7 +120,7 @@ export interface RunChange { id: string; kind: 'claim' | 'proposal' | 'flow' | '
   fields?: { name: string; before: string | null; after: string }[];
   // LAYER-SOURCE-01: a changed file in the layer's repository.
   diff?: string; ownerReview?: boolean; commit?: string; }
-export interface RunStep { seq: number; kind: 'plan' | 'progress' | 'note'; at: string; objectives?: string[]; index?: number; status?: 'active' | 'done' | 'stuck'; note?: string; text?: string; }
+export interface RunStep { seq: number; kind: 'plan' | 'progress' | 'note' | 'check'; at: string; branch?: string; commit?: string; objectives?: string[]; index?: number; status?: 'active' | 'done' | 'stuck'; note?: string; text?: string; }
 // DEC-057: work an agent proposed for another (or its own) layer; the reviewer creates or dismisses each one.
 export interface RunFollowUp { id: string; position: number; layer: string; layerName: string; sourceLayer: string; title: string; brief: string; why: string;
   // J6: the spec entry a follow-up would change, resolved by the host to the layer that keeps it.
@@ -138,7 +143,7 @@ export interface WorkRun { id: string; number: number; batchId: string | null; s
   review: { verdicts: Record<string, { value: 'accept' | 'reject' | 'skip'; note: string }>; flags: Record<string, string>; steps?: Record<string, { value: 'ok' | 'flag'; note: string }>; answer?: 'merge' | 'draft' | null; outcome: WorkRunState | null; comment: string | null; signedBy: string | null; signedAt: string | null };
   // JOURNEYS-01 J4: verdicts are keyed by claim ID. Each claim with step tests has its proof on the reviewed build; the gate lists
   // the claims that stop acceptance, with a person's stated reason where one was given.
-  proofs: Record<string, ClaimProof>; gate: { claim: string; text: string; status: ProofStatus; reason: string | null }[]; reasons: Record<string, string>; }
+  proofs: Record<string, ClaimProof>; gate: { claim: string; text: string; status: ProofStatus; reason: string | null }[]; reasons: Record<string, string>; check?: RunCheck | null; }
 export interface WorkChange { recordId: string; revision: number; author: string; rationale: string | null; createdAt: string; kind: string | null; exists: boolean; fields: FieldChange[]; }
 export interface Routine extends RecordBase { key: string | null; title: string; layer: string; type: string; cadence: string; documents: string[]; enabled: boolean; actionKey?: string | null; executor?: 'utility' | 'agent'; trigger?: 'manual' | 'schedule' | 'output-change'; instructionDoc?: string | null; allowedReads?: string[]; capabilities?: string[]; outputKinds?: string[]; nextRunAt: string | null; lastRunAt: string | null; lastWorkId: string | null; history: Revision[]; }
 export interface LayerInstance { key: string; instanceId: string; name: string; path: string; category: string; icon: string; color: string | null; description: string; enabled: boolean; visible: boolean; dashboardVisible: boolean; outputProvider: string; editorAdapter: string; outputTabs?: {key:string;label:string}[]; packageCommit?: string | null; workScope?: Record<string, string[]> | null; elevated?: boolean; frameUi?: boolean; builtIn: boolean; lifecycle: 'draft' | 'active'; identityRevision: number; identity: Record<string,string> | null; domainActions: {key:string;title:string;purpose:string;method:string;checks:string[];revision:number}[]; }

@@ -1345,6 +1345,9 @@ aludel-finding,aludel-evidence{display:contents}aludel-finding{display:block}.la
 .wi-question,.wi-signoff{display:grid;gap:10px;margin:0 16px 12px;padding:12px 14px;border:1px solid var(--machine-line);border-radius:12px;background:#fff}
 .wi-question h3,.wi-signoff h3{display:flex;align-items:center;gap:6px;margin:0;font-size:15px}.wi-question h3 mat-icon,.wi-signoff h3 mat-icon{width:18px;height:18px;font-size:18px}
 .wi-signoff textarea,.wi-question textarea{width:100%}
+.wi-checkreport{display:grid;gap:10px;min-width:0}.wi-checkreport h4{margin:4px 0 0;font-size:14px}.wi-checkreport .wr-reg{display:block;overflow-x:auto}
+.wi-walklocal{font-size:14px}.wi-walklocal summary{cursor:pointer;font-weight:600}.wi-walkline{margin:0;padding:8px 10px;border:1px solid var(--machine-line);border-radius:8px;background:var(--machine-surface,#f6f7fb);font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere}
+.wi-checkmark{font-weight:600}
 .wi-warn{display:flex;gap:8px;align-items:flex-start;margin:0;padding:8px 10px;border-radius:8px;background:var(--machine-waiting-bg);color:var(--machine-waiting-ink);font-size:14px}.wi-warn mat-icon{width:18px;height:18px;font-size:18px;flex:none}
 .wi-flaglist{list-style:none;margin:0;padding:0;display:grid;gap:4px;font-size:14px}.wi-flaglist li{display:flex;gap:6px}.wi-flaglist mat-icon{width:16px;height:16px;font-size:16px;color:var(--machine-blocked-ink);flex:none;margin-top:3px}
 .wi-actor{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:10px 16px;border-top:1px solid color-mix(in srgb,var(--machine-line) 70%,transparent)}

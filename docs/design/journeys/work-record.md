@@ -35,6 +35,9 @@ depends_on: [T03-CODE, LAT-08A, LAYER-BINDINGS-01, EXISTING-PROJECTS-01, DEC-050
 - **2026-10-04, owner project thread (J6 checks):** asked whether `aludel-workshop/layer-base` could be added to the session, the owner answered: "yep, add layer-base, and edit it if you need." Authorized: add `layer-base` to this cloud session and change it for J6 (the Code template's one-persona rule and anything the J6 checks need), as commits on a `claude/` branch of `layer-base` that the portal pins. Not inferred: pushing to `layer-base`'s template branches (`code`, `main`, …), which the owner merges as with `main` here. The rest of the J6 build scope above is unchanged. Recorded before execution.
 
 - **2026-10-04, owner project thread (J6 merge):** after reviewing the screenshots of the built review: "alright, looks good to me, go ahead and merge." Authorized: merge PR #1 into `main`, and fast-forward `layer-base`'s `code` branch to `82cb9ef` (the pin the PR depends on, offered to the owner in the same thread). Recorded before execution. This is owner acceptance of the J6 build from screenshots, not from the owner walking the live screen.
+- **2026-10-04, owner project chat (J7):** "j6 looking good, lets go j7", relayed to this thread. Authorized: J7 (person check) in the same local scope as the J6 build: host code, tests, template changes as commits on a `claude/` branch of `layer-base` that the portal pins, local checks, and commits and pushes to `claude/j6-prototype-ptl3we` (reset to `main` at `17979fd`) with a new PR. Not authorized: pushes to `main` or `layer-base`'s template branches, deployment, spending, live owner data, owner-impersonating actions, restarting the owner's portal. Recorded before execution.
+- **2026-10-04, owner project thread (J8):** after the J7 results: "alright, looks good. lets start j8". Authorized: preparing J8 (trial plan, owner steps, any host or template fixes the trial needs) in the J7 scope. Not inferred: merging PR #2 (J7) into `main`, which waits for the owner's explicit word as J6's did. The trial's live actions are the owner's, in the normal UI. Recorded before execution.
+- **2026-10-04, owner project thread (merge J7 and J8 prep):** "merge". Authorized: merge PR #2 (J7 and the template-update path) into `main`. Nothing else: no `layer-base` push, no deployment, no restart. Recorded before execution.
 
 ## Owner direction (2026-10-02 chat)
 
@@ -831,3 +834,75 @@ The owner approved adding `layer-base` ("yep, add layer-base, and edit it if you
 3. *Hypothesis only:* that `dockerd` stopped because of the "only one connection allowed" health check in its log, triggered by starting it without the proxy environment; it did not recur after restarting it with `HTTPS_PROXY` set.
 
 **Owner acceptance (2026-10-04).** The owner reviewed the [screenshots](https://claude.ai/artifact/MCsBmXdn3ZxgFb9TJQNnET) and said "looks good to me, go ahead and merge." J6 is done; PR #1 merged to `main` and `layer-base` `code` fast-forwarded to `82cb9ef`. Next slice: J7 (person check).
+
+### J7 person check (2026-10-04, Claude, cloud session)
+
+Authorization recorded above before execution ("j6 looking good, lets go j7"). Branch `claude/j6-prototype-ptl3we`, reset to `main` at `17979fd`.
+
+**Built.**
+- **Check my branch** on a working person run that pinned a layer repository. The person names a local branch and exact commit; the host validates it as a submission would (descends from the pinned base, writable paths, the package loads), integrates it with the latest accepted code, builds the combined app, runs its checks and every journey step test, then stops the preview. Nothing is submitted and accepted code doesn't move.
+- The check runs on an integration of its own (`<run>-check`), so the review after submitting integrates, builds and walks the submission again. The person's report is never the evidence; the browser journey shows the two match.
+- The run card shows the result: each claim's proof (the same proof the review computes), a table of every journey step with ✓ test passed, — no test, ✗ test failed (with the failure), or no fixture, and failed checks. It warns when the accepted code moved since the check, or when the named commit differs. The submit form names the branch and commit it will submit and shows each journey claim's check result beside its optional reason.
+- **Dev-server walk.** The app's setup route already answers only with `ALUDEL_REVIEW_PREVIEW=1` and a matching `ALUDEL_REVIEW_TOKEN`. The check offers, per journey, one browser-console line for the dev server: it asks for the person's local token, calls the setup route with the journey's first step, persona, fixture and session, and opens the step's page signed in as that persona. A command shipped in `.aludel/` stays later, as planned.
+
+**Defaults chosen (owner may change).**
+1. The dev-server walk flag is the existing `ALUDEL_REVIEW_PREVIEW=1` plus a token the person picks; no new route and no weaker mode. Entry is a console line, not a button, because the portal can't set the dev app's cookies.
+2. The check waits for the build in the request, as the review's *Open the preview* does. It takes minutes on a cold build.
+3. **Not built: the agent-side check.** J4 and J5 recorded that agents should be able to check before submitting too. The host part is the same call, but agents reach the host only through the Symphony adapter's tools (Elixir), and this session has neither an Elixir toolchain nor a local Symphony build to compile and test a new tool. It is the first item for a session that has them.
+
+**Evidence.**
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | Pass |
+| `npm run test:server` / `test:server:templates` | 300/300 and 323/323 tests pass. Each run also reports the known file-level failure of `previews-docker.test.mjs` (its sample app's `npm install` inside Docker can't verify the session proxy's certificate) |
+| New server test (`symphony-proposals.test.mjs`) | A person checks a real branch: foreign user, moved branch and missing branch refused; the check submits nothing and moves no pin; the same branch reuses its check; checking after submit is refused; review prepares a different integration of the same commit |
+| `tests/repository-review-browser.mjs` (uid 1000, Docker, templates on) | **Pass**, extended for J7: the person's branch gives the viewer page a failing step test. *Check my branch* shows the viewer step failing with the assertion, the comments and editor steps without tests, and the claim failing, before submitting ([screenshot](j7/person-check.png)). The console line signs in as the viewer on the app's own server started with the flag ([screenshot](j7/person-dev-walk.png)). After submitting, review's own build has the same result for every step and the same claim proof, on a different integration |
+| `tests/journey-work-browser.mjs`, `tests/work-item-browser.mjs` | Pass |
+
+#### Retrospective
+
+1. **What made it harder?** Observed: little. Docker had stopped since J6 and was restarted with the handoff's recipe first, as J6's addendum said; the runner image and uid-1000 copy were still there. The agent-side check is blocked by tooling, not design (above).
+2. **What would make the next one easier?** Prediction: a Symphony build cached in the cloud environment (or a container image with its dependencies) would let adapter tools be compiled and tested here; today any agent-tool change needs the owner's machine.
+3. **What changed for the roadmap?** J7 is done for people. The agent check moves to a session with the Symphony toolchain. J8 still needs a template-update path for existing projects.
+4. **Questions.** Created: should the reviewer see the person's last check beside the review's own run? Today they see only review's. Should the check's console line become a button once there is a local `.aludel/` command?
+5. **Process change applied now:** none new; J6's (environment steps first) held.
+
+### J8 prerequisite: template updates for existing projects (proposal, 2026-10-04)
+
+The owner chose to keep Biome for the J8 trial, so existing projects need a way to take a newer template. Facts (read from the code, not run): each binding records `template` and `template_commit`, but nothing reads them. A restart installs new pins only into new projects. Ordinary layers share history with `layer-base`. Code doesn't: its files are copied under `.aludel/`, in a commit whose parent is the app's head. The only existing host-made branch, the refacet proposal, skips `prepareLayerReview`.
+
+**Proposal: a template update is reviewed Work, raised by the host.**
+1. **Detect.** On restart, any binding whose `template_commit` is behind its template's pin gets one item on that layer: *Update the Code template to `<short>`*. Nothing is applied by the restart.
+2. **Build the branch.** For each file the template owns, the host does a three-way merge (`git merge-file`). The base is the file at the old template commit, ours is the instance's copy, and theirs is the new template's.
+   - For Code, these files sit under `.aludel/`. For other layers, it is an ordinary merge of the template commit.
+   - The instance's outputs (journeys, releases, records) are never touched.
+   - The result is committed on `template/<short>`, based on the pinned main.
+3. **Conflicts.** If a file conflicts, the item lists those files and keeps the branch with conflict markers. A person (or an agent) resolves them on that branch and submits it as an ordinary run. The host does not guess.
+4. **Review.** The branch goes through the normal path: `prepareLayerReview` (it runs the package tests, because authority files change), then the review screen with Changes and Under the hood. Acceptance merges it and moves the pin, and the binding's `template_commit` moves with it.
+5. **Scope for J8.** Code first, since Biome needs it, with ordinary layers using the same item. Then Biome's own app work (the recipe moved to v2, its journeys) is Specify Work in the trial itself.
+
+**Not proposed:** re-forking (it would lose the instance's edits), or auto-applying updates that don't conflict (a pin bump would then change live projects silently).
+
+**Owner decision (2026-10-04):** on the card, the owner chose *Build as proposed*.
+
+#### Template updates built (2026-10-04, same session)
+
+- **`server/template-updates.mjs`.**
+  - `templateMerge` builds the update commit on the instance's pinned main. For each file the template changed:
+    - If the instance kept the old version, it takes the new one.
+    - If the instance already has the new version, it keeps it.
+    - If both changed the file, `git merge-file --diff3` merges it. A file that won't merge keeps conflict markers and is listed.
+    - Everything else is left alone: the app, outputs and the manifest's own name.
+  - `raise` runs after Code adoption on each restart. For any binding whose template moved past the commit it was forked from, it raises one item per new template commit. Older Code installs that recorded no template commit fall back to the install trailer, then to `refs/aludel/template`.
+  - Branches are named `template/<template>-<commit>`.
+- **`workRuns.hostRun`.** With no conflicts, Aludel submits the branch itself as a run (performer *Aludel*), so it goes through the same integration, package tests, review and acceptance as a person's run. Accepting it moves the pin and the binding's `template_commit`. With conflicts, the item stays ready and lists the files, and a person or agent resolves them on that branch and submits it.
+
+| Check | Result |
+|---|---|
+| `tests/template-updates.test.mjs` (new) | Pass. Covers Code's `.aludel/` layout: a template-only change is taken; edits from both sides merge; a same-line edit conflicts with diff3 markers; a removed file goes; outputs, the app and the instance's manifest name are kept; main doesn't move; an instance that is already current needs nothing |
+| New end-to-end test (`symphony-proposals.test.mjs`) | Pass, with Docker. A Pages instance forked from the previous template commit, with an edit of its own: one item is raised, it's not raised twice, raising applies nothing, the Aludel run is in review, the template's files are updated and the instance's edit is kept, review runs the package tests and acceptance moves the pin and template commit |
+| `npm run test:server` / `test:server:templates` (Docker up throughout) | 302/302 and 325/325 tests pass. The known file-level failure of `previews-docker` remains |
+| Review screen with *Aludel* as performer | Not browser-checked. It is the person-run path, and the avatar falls back to a generated one |
+
+**Found on the way.** `dockerd` stopped once more mid-run (its log ends on buildkit "healthcheck failed fatally"). Started detached with `setsid`, it stayed up through both suites. The J7 suite numbers above came from runs during which Docker may have been down. These reruns had it up, and they pass.
