@@ -86,7 +86,7 @@ Check the contents and accepted scope of prerequisites, not just whether files e
 
 ## Completion and phase gates
 
-A work packet is complete only when its acceptance evidence and post-hoc retrospective exist and are linked from `docs/status.md`. A retrospective may be a concise section in the evidence for routine work or a separate artifact for consequential work. It must answer, with observed evidence separated from prediction:
+A work packet is complete only when its acceptance evidence and post-hoc retrospective exist and are linked from `docs/status.md`. A retrospective may be a concise section in the evidence for routine work or a separate artifact for consequential work. A prototype or review round inside a packet gets a three-line note instead (what changed, what was checked, what waits on the owner); the full retrospective below is for a packet or slice closing. It must answer, with observed evidence separated from prediction:
 
 1. What made the work harder, slower, or more error-prone than necessary?
 2. What preparation, tool, contract, or check would make the next equivalent task easier?
@@ -115,7 +115,7 @@ Keep `docs/status.md` brief and operational. It must contain:
 - completed packets with evidence links;
 - latest handoff note.
 
-Do not duplicate detailed research or design in the status file. Do not mark a packet complete based only on partial notes. Use ISO dates. Preserve stable IDs.
+Do not duplicate detailed research or design in the status file. Keep each fact in one place: the work record is the source, `docs/status.md` carries one short pointer line per packet, and PR descriptions summarize the change and link the work record instead of restating it. Do not mark a packet complete based only on partial notes. Use ISO dates. Preserve stable IDs.
 
 ## Safety and repository hygiene
 
