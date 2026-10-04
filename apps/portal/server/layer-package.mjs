@@ -26,6 +26,8 @@ const configured = (key, template = null) => {
   if (!/^[0-9a-f]{40}$/.test(pin.commit) || typeof config.repo !== 'string') throw new Error('Layer template pin is invalid.');
   return { template: name, branch: pin.branch, commit: pin.commit, repo: resolve(candidate, config.repo) };
 };
+// JOURNEYS-01 J8: the pin a template is at now, for an installed layer's template update.
+export const templatePin = (key, template) => configured(key, template);
 const git = (repo, ...args) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8', maxBuffer: 1024 * 1024 }).trimEnd();
 const projectRoot = (projectId,instanceId) => join(resolve(process.env.MACHINE_DATA_DIR || join(portal, '.data')), 'layer-repos', createHash('sha256').update(projectId).digest('hex').slice(0, 20), instanceId);
 const content = (repo, commit, path, root = '') => {

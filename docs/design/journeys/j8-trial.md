@@ -2,38 +2,29 @@
 
 The owner runs this in the normal portal UI, signed in as themself. Claude prepares and records it, but never takes these actions for the owner. The plan's exit evidence is the owner's actions plus a retrospective that answers the five closing questions.
 
-## Change from the plan (proposed 2026-10-04, owner to confirm)
-
-The plan had two trials: (1) Biome Work #3 as a journey claim and (2) an imported onboarding scenario on a Code-only project. Biome can't hold journeys, because it was forked from an older Code template and existing projects have no way to take a template update. The owner has called Biome a throwaway. So both trials run on **one fresh project**, made from today's template:
-
-- Specify writes the journey and proves it with a **record claim**.
-- Accepting the Specify item raises Implement, which carries **journey claims** on the new steps. That is the journey-claim trial Biome would have run.
-
-The template-update path becomes a separate packet.
+The owner chose to keep **Biome** (2026-10-04). Biome was forked from an older Code template, so it first takes the new template as reviewed Work.
 
 ## Before starting
 
-1. Merge PR #2 (J7) into `main`. Pull `main` locally, then restart the portal.
-   - That restart runs the J4 claims migration. Existing items keep their criteria as `note` claims, and their saved run verdicts are rewritten to match. This migration was rehearsed on copied data.
+1. Merge J7 and the template-update work into `main`. Pull, then restart the portal. The restart does two things:
+   - **The J4 claims migration runs.** Existing items keep their criteria as `note` claims, and their saved run verdicts are rewritten to match. This was rehearsed on copied data.
+   - **Template updates are raised.** Each project layer whose template moved since it was installed gets one *Update … to the latest … template* item. Nothing is applied until you accept. Expect one for Biome's Code, and possibly for other layers and projects.
 2. Docker must be running: the review build and the journey step tests use it.
 
 ## Trial
 
-1. **New project.** Create a project with an app (auth on), using the normal flow. Code installs from the current template, and its generated app already has the review recipe and the preview-only setup route.
-2. **Ask for a change without writing criteria.** Under **Code › Tasks**, create a task about a route that has no journey yet, for example "Invite teammates: from /settings, a member invites people by email." Don't type any criteria.
-   - Expected: *No journey covers /settings yet* and a **Specify first** offer.
-   - Measured: whether you wanted to write free-text criteria anyway. This tests the reference-first rule (J4 retrospective).
-3. **Specify.** Take *Specify first*, then assign it to yourself or to an agent.
-   - Its claims are the journey record and "every other journey still passes".
-   - As a person: commit `.aludel/outputs/journeys.json` (one persona) and a characterization test in `.aludel/journeys/<id>.spec.mjs`. Then use **Check my branch**, then **Ready for review**.
-4. **Review the Specify run.** Open **Review**, check the journey's claim and **Walk the journey** in the preview, then accept.
-   - Expected: Implement is raised, claiming only the steps the app doesn't do yet.
-5. **Implement.** Assign Implement to an agent, or do it yourself with *Check my branch* before submitting.
-   - Review walks the journey's claimed steps on the built candidate: step marks, flags with notes, then Finish.
-6. **Tell Claude in the thread what felt wrong.** Each note becomes a line in the retrospective.
+1. **Take Biome's Code template update.** Open the update item.
+   - **No conflicts:** Aludel has already submitted the branch. Open **Review**, look at Changes and Under the hood, then accept. Biome's `.aludel/` now has the Journeys facet and the one-persona rule.
+   - **Conflicts:** the item lists the conflicted files, and its branch keeps conflict markers in them. Check out that branch in Biome's repository, resolve the conflicts, commit, then submit it as your own run.
+2. **Make Biome reviewable, without writing criteria.** Under **Code › Tasks**, ask for the signup change Work #3 was about (a new member signs up and sets up their first world).
+   - Expected: either the *Make the app reviewable* prerequisite (because Biome's review recipe predates version 2), or *No journey covers … yet* with **Specify first**.
+   - Measured: whether you wanted to type free-text criteria anyway. This tests the reference-first rule.
+3. **Specify.** Write the journey (one persona) and a characterization test for what Biome does today. Use **Check my branch** to see each step's result, then **Ready for review**. Review it, walk it, and accept it. This raises Implement, claiming only the steps Biome doesn't do yet.
+4. **Implement as a journey claim.** This is what Work #3 was for. Do it yourself (with *Check my branch*) or assign it to an agent. Review walks the claimed steps on the built candidate.
+5. **Tell Claude in the thread what felt wrong.** Each note becomes a line in the retrospective.
 
-## What Claude records afterwards
+## Afterwards (Claude)
 
-- Run log: what was done, the item references, and screenshots you share.
-- Answers to the five closing questions.
-- Updates to `docs/status.md` and the handoff.
+- Run log with the item references and any screenshots you share.
+- The five closing questions.
+- `docs/status.md` and the handoff.

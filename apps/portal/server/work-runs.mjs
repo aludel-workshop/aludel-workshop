@@ -484,6 +484,20 @@ export function workRuns({ db, know, candidates = null }) {
     know.appendLog(workId, `Submitted person run for review: ${summary}`, { state: 'review', context: { ...(item.context || {}), personRun: runId } }, { by: { kind: 'person', id: user.id } });
     return runFor(projectId, workId, runId);
   }
+  // JOURNEYS-01 J8: a run the host performed itself (a template update). Its branch goes straight to review on the item's
+  // layer repository, through the same integration, build and acceptance as a person's; no member is its performer.
+  function hostRun(projectId, workId, { branch, commit, summary }) {
+    const item = know.workById(projectId, workId);
+    if (!item || item.scope !== 'layer') fail('Host runs are for layer work.', 409);
+    const binding = layerBinding(db, projectId, item.layer), task = taskSnapshot(item);
+    task.layerRepository = { key: item.layer, base: binding.commit, root: packageAt(binding.repo, binding.commit, item.layer).root };
+    const id = `person-run-${randomUUID()}`, at = now();
+    submitLayerBranch(db, { projectId, key: item.layer, attemptId: id, base: binding.commit, workRef: item.ref, branch, commit });
+    db.prepare(`INSERT INTO work_person_runs(id, project_id, work_id, performer_id, performer_name, task_json, state, started_at, updated_at, changes_json, evidence_json, reasons_json, summary, submitted_at)
+      VALUES (?, ?, ?, 'aludel', 'Aludel', ?, 'review', ?, ?, '[]', '[]', '{}', ?, ?)`).run(id, projectId, workId, JSON.stringify(task), at, at, clip(summary, 2000), at);
+    know.appendLog(workId, `Aludel submitted ${branch} for review`, { state: 'review', context: { ...(item.context || {}), personRun: id } });
+    return runFor(projectId, workId, id);
+  }
   function checkPerson(user, projectId, workId, runId, input) {
     const row = personRun(projectId, workId, runId);
     if (!row) fail('Person run not found.', 404);
@@ -540,6 +554,8 @@ export function workRuns({ db, know, candidates = null }) {
     db.exec('BEGIN IMMEDIATE');
     try {
       merge = mergeLayerBranch(db, { projectId, key: item.layer, source: review, reviewer: user.name, workId, workRef: item.ref, catalogs: know.catalogs, recordsOf });
+      // JOURNEYS-01 J8: an accepted template update moves the template commit the instance follows.
+      if (item.context?.templateUpdate) db.prepare('UPDATE layer_package_bindings SET template_commit = ? WHERE project_id = ? AND layer_key = ?').run(item.context.templateUpdate.to, projectId, item.layer);
       know.updateWork(user, projectId, workId, { state: 'done' });
       db.exec('COMMIT');
     } catch (error) { if (db.isTransaction) db.exec('ROLLBACK'); undoLayerMerge(merge); throw error; }
@@ -660,5 +676,5 @@ export function workRuns({ db, know, candidates = null }) {
     return seq;
   }
 
-  return { list, runFor, checkPerson, preparePersonReview, acceptPersonRepository, saveReview, assertSignable, reviewNotes, recordSignature, sign, startPerson, submitPerson, stopPerson, reportPlan, reportProgress, checkEvidence, recordEvidence, addStep, steps };
+  return { list, runFor, checkPerson, hostRun, preparePersonReview, acceptPersonRepository, saveReview, assertSignable, reviewNotes, recordSignature, sign, startPerson, submitPerson, stopPerson, reportPlan, reportProgress, checkEvidence, recordEvidence, addStep, steps };
 }

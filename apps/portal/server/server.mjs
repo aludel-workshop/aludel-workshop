@@ -1,3 +1,4 @@
+import { templateUpdates } from './template-updates.mjs';
 import { initWorkflow, workList, workOperation } from './workflow.mjs';
 import { createServer } from 'node:http';
 import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
@@ -209,6 +210,9 @@ function adoptCodeRepositories() {
     ensureProjectRepositoryLayers(db, projectId);
     if (codeRepo.layer(projectId)) { codeRepo.adopt(projectId); codeRepo.seed(projectId, pool.outputEntries); }
   } catch (error) { console.error(`Could not move Code into ${projectId}'s repository: ${error.message}`); }
+  // JOURNEYS-01 J8: a layer whose template moved on gets one reviewed update item; nothing is applied by the restart.
+  for (const projectId of layerProjects()) try { templateUpdates({ db, know, runHistory }).raise(projectId); }
+  catch (error) { console.error(`Could not prepare template updates for ${projectId}: ${error.message}`); }
 }
 const storyRefs = projectId => know.list(projectId, 'story').map(story => ({ ...story, ref: `S${story.number}` }));
 const symphonyWorkspaceRoot = resolve(process.env.MACHINE_SYMPHONY_WORKSPACE_ROOT || join(dataDirectory, 'symphony-workspaces'));
