@@ -215,3 +215,100 @@ CW-1's affected run took 6 m 21 s with real time. That's no faster, because it t
 **What changed.** The implementation-readiness requirements in [the operating procedure](../process/operating-procedure.md#5-decide-readiness-at-the-boundary) now cover work, identity and repository features. A feature must name each actor and the machine it acts from. It must also include one check run as a second member, on a machine without access to the portal's filesystem or database.
 
 **Status: still a hypothesis.** The test is whether CW-1's and CW-2's checks catch a same-machine assumption before the owner trial does. We'll record the result in CW-6's retrospective.
+
+## Item containers: Go opens the item in a dev container (2026-10-05)
+
+**Authorization.** The owner said: "you click go, and it actually creates a new little container locally for you, with the exact setup that the remote agent gets, except here the agent acting in that environment is your local model … so it would open a new vscode window into that configured container". The proposal was approved with "yep, commit and push, then build from it". It covers a local spike and build of CW-3 and a container version of CW-4, on `claude/item-containers` (from `claude/assignee-open-vscode` @ `45f0dec`), with the owner's local Docker Desktop used for checks.
+
+**Not authorized:**
+- GitHub writes by the agent: Go's branch is created by the portal, only when the owner clicks it;
+- pushes to `main`;
+- spending;
+- the remote runtime (A2).
+
+### Spike (agent-checked, 2026-10-05)
+
+- **Docker.** Docker Desktop with WSL integration (`docker info`: "Docker Desktop"). Windows VS Code's Dev Containers and this WSL shell use the same engine and volumes.
+- **The link.** Dev Containers 0.469.0 (installed) handles `vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=…&volume=…`. Its parser takes everything after `/tree/` as the ref, so `https://github.com/<o>/<r>/tree/aludel/w-8` opens that branch. It clones into a Docker volume with the person's git credentials, builds the repository's `.devcontainer/`, and opens a window inside the container. This is read from the extension's code; the full open is still to be seen on the owner's machine.
+- **The portal from a container.** `host.docker.internal:4310` reaches the portal running in WSL, which answered 421 (unknown host). Node's `fetch` ignores a Host override, so the portal now accepts that host on `/api/editor/*` only, which is token-authenticated. Preview containers, which run agent-written app code, still get nothing else.
+- **Per-item clones.** Each container is a fresh clone, so the Aludel MCP is registered at Claude Code's user scope, in a shared volume, not in the clone's `.mcp.json`. Another project's repository doesn't contain Aludel's tools, so the container fetches them from the portal.
+
+### Owner, on pairing (2026-10-05)
+
+"if we have this custom little container created for the task, why do we need the pairing at all? like, say new collaborator, hasnt done any local setup, just wants to click get started from the task and drop into a session in a local container." The agent proposed connecting each container the way `gh auth login` works; the owner replied "yep, sounds great. do it that way."
+
+### Build (2026-10-05)
+
+- **Go** is Open in a container on the item page, for an item assigned to you that is in Draft, Ready or In progress. `POST …/goals/:id/container`:
+  - settles `main` with GitHub through Code's sync;
+  - creates `aludel/w-n` on GitHub from `main`, with an installation token, unless it already exists;
+  - logs it in the thread;
+  - returns `vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=<repo>/tree/aludel/w-n&volume=aludel-<project>-w-n`.
+
+  The page opens that link. Your own checkout stays a secondary link.
+- **Aludel's dev container** (`.devcontainer/`) is the one environment definition.
+  - **Image:** `node:24-bookworm`, git, Claude Code, and Playwright 1.61.1 with Chromium for the journeys. Nothing secret is in the image.
+  - **Shared volume:** one, `aludel-claude`, for Claude Code's login. You sign in once, for all containers.
+  - **Setup** (`aludel-setup.sh`, run after the container is created):
+    - fetches the Aludel tools from the portal (`GET /api/editor/tools/*.mjs`, which needs no token because it's code);
+    - registers the Aludel MCP at Claude Code's user scope;
+    - runs `npm ci`;
+    - runs `aludel connect`.
+- **No pairing.** `aludel connect` sends the clone's origin and branch (`POST /api/editor/connect`, no token), and the portal finds the open item they belong to.
+  - It returns a device code, which the container keeps, and a short code that it prints.
+  - The item page checks every 3 s while the item is yours, and shows "A container is asking to connect … Its terminal shows XXXX-XXXX" with Connect.
+  - Connect (assignee only) lets the container collect a token, once, for that item only (`editor_tokens.work_id`). The token stops working when the item closes.
+  - Requests expire after 10 minutes, at most 5 per item, and are stored on the platform database (`editor_connect_requests`).
+- **Inside a container,** `start_work` without arguments finds the item from the branch. `pair` and the MCP don't write `.mcp.json` or report a folder.
+- **Reaching the portal:** it answers `host.docker.internal` on `/api/editor/*` only.
+
+**Checked:**
+- **Spike, on the owner's Docker Desktop, against a throwaway portal on :4399:**
+  - the real image runs `aludel-setup.sh`, which prints "press Connect beside GJEP-6S86";
+  - the portal lists the request, and Connect returns "Connected to W-1";
+  - `claude mcp list` shows aludel "✔ Connected";
+  - `start_work` with no arguments returns W-1 on `aludel/w-1`;
+  - the token file is mode 600, and there's no `.mcp.json` in the clone.
+
+  The spike's portal, container, volumes and clone were removed afterwards.
+- **`tests/connect-browser.mjs` (fake GitHub):**
+  - the container route creates the branch on GitHub at `main`, returns the exact link, and keeps an existing branch;
+  - a clone of that branch runs `aludel connect`, and the item page shows its code (axe);
+  - Connect lets it finish;
+  - its token lists and reads only its own item, and gets 404 on the earlier one;
+  - `host.docker.internal` gets 200 on the editor API and 421 elsewhere, and the tools are served.
+- **`tests/agent-work-browser.mjs`:** the container button explains the refusal on a project without GitHub, and Team shows the connection.
+- **`test:affected`:** 266 tests, 261 pass, 1 fail, 4 skipped. The failure was security-audit's "portal restarted after report submission", which passes alone. It has failed under load in every larger run on 2026-10-05, so it's a recurring flake worth fixing, not noise. Typecheck and build pass.
+- **Bugs found by the checks:**
+  - the request table wasn't on the platform list, so requests landed in the wrong database;
+  - the goal route refused `GET connections`;
+  - `aludel` wasn't on the PATH in a new container, because `.bashrc` isn't shared (it now comes from the image).
+
+**Not checked, and to do on the owner's machine:**
+- the Dev Containers link opening a real VS Code window;
+- the first image build there;
+- the setup output and code showing in VS Code;
+- the Claude Code sign-in inside a container.
+
+**Not built:**
+- a dev container for other projects (CW-3's scaffold and template update);
+- recording the image digest for parity (A2 doesn't exist yet);
+- removing an item's container and volume after close-out;
+- the portal address for a server-hosted instance (it's fixed to `host.docker.internal:4310` in `devcontainer.json`; CW-4 moves it to `.aludel/`);
+- Docker inside the container, so preview tests that need Docker skip there.
+
+**The owner's first try failed (2026-10-05).** VS Code reported `git ls-remote https://github.com/aludel-workshop/aludel-workshop/tree/aludel/w-8` → "repository … not found". The extension's link handler checks `url` with `git ls-remote` as given, and only parses `/tree/<ref>` afterwards. The spike had read the parser, not the access check, so it missed this.
+
+**The fix:**
+- The link is now the plain clone URL, so the clone starts on `main`.
+- The container asks to connect without an item (`work_id ''`), and its request shows on the project's item pages assigned to you. Pressing Connect on W-n's page makes it W-n's.
+- `aludel connect` then switches to `aludel/w-n`, taking the branch from GitHub, before `npm ci`.
+- Go also moves an item branch up to `main` when it has no work of its own. W-8's branch was made from a `main` without `.devcontainer/`.
+
+**Checked:** the connect journey asserts the plain link; that a moved `main` brings the item branch along (`caughtUp`); and that a `main` clone says "Connect this container to its item", then is on `aludel/w-n` at `main` after Connect from that item. `agent-work` and `editor-bridge` tests, and the agent-work journey, pass.
+
+**Process note.** "Read from the extension's code" was recorded as evidence for the whole link, but it covered one function. Evidence about a third-party handler should name the path it actually follows, or be marked as untested until the real click.
+
+**Second try (2026-10-05).** VS Code offered its template picker, because the clone of `main` had no `.devcontainer/` (nothing merged yet). Go now refuses up front when `main` has no `.devcontainer/devcontainer.json`, which the connect journey checks. The owner asked to merge to `main`.
+
+**For the owner to try it:** Go creates the item's branch from GitHub's `main`, so `.devcontainer/` has to be on `main` first. That means merging this branch, then restarting the portal on `main`.

@@ -61,12 +61,13 @@ const actionIcon: Record<string, string> = { proposed: 'add_task', todo: 'radio_
           }
           @if (mine() && (goal.item.board === 'draft' || goal.item.board === 'ready' || goal.item.board === 'progress')) {
             <div class="wg-local" role="group" aria-label="Work on it in VS Code">
-              @if (checkout(); as place) {
-                <a class="lay-button" [href]="claudeLink()"><mat-icon aria-hidden="true">open_in_new</mat-icon>Open in VS Code</a>
-                <p class="wg-hint">@if (goal.item.board === 'draft') { Claude Code defines it: a brief and actions in phases. It moves to Ready for you to check, then you start it. } @else { Opens Claude Code in your front VS Code window, ready to work on {{ goal.item.ref }}. } Not your {{ folderName(place.path) }} window? <a [href]="folderLink()">Open {{ folderName(place.path) }}</a> first.</p>
-              } @else {
-                <p class="wg-hint"><mat-icon aria-hidden="true">link</mat-icon>Connect your checkout once to open items in VS Code: <a [href]="ctx.link('work', 'team')" (click)="ctx.go(ctx.link('work', 'team'), $event)">Work › Team</a>.</p>
+              @for (request of waiting(); track request.code) {
+                <div class="wg-connect" role="status"><mat-icon aria-hidden="true">deployed_code</mat-icon><span>A container is asking to connect. Its terminal shows <strong>{{ request.code }}</strong>; connecting it here makes it {{ goal.item.ref }}'s, on <code>aludel/{{ goal.item.ref.toLowerCase() }}</code>.</span>
+                  <button type="button" class="lay-button small" (click)="connect(request.code)" [attr.aria-label]="'Connect the container showing ' + request.code + ' to ' + goal.item.ref">Connect</button></div>
               }
+              <button type="button" class="lay-button" (click)="openContainer()" [disabled]="opening()"><mat-icon aria-hidden="true">deployed_code</mat-icon>{{ opening() ? 'Opening…' : 'Open in a container' }}</button>
+              <p class="wg-hint">A new VS Code window, in a container built from the repository's dev container on <code>aludel/{{ goal.item.ref.toLowerCase() }}</code>: the same setup a cloud agent gets. Claude Code there {{ goal.item.board === 'draft' ? 'defines it: a brief and actions in phases. It moves to Ready for you to check, then you start it.' : 'works it, with your own subscription.' }}
+                @if (checkout(); as place) { Or <a [href]="claudeLink()">work in your {{ folderName(place.path) }} checkout</a>. }</p>
             </div>
           }
           @if (goal.item.board === 'progress' && readyForReview()) {
@@ -240,7 +241,8 @@ export class WorkGoalComponent {
   constructor() {
     afterRenderEffect(() => { this.shownEvents(); const list = this.eventList()?.nativeElement; if (list && this.following) list.scrollTop = list.scrollHeight; });
     effect(() => { const id = this.id(); const project = this.ctx.projectId(); if (!id || !project) return; untracked(() => { this.view.set(null); this.failed.set(false); this.selected.set(null); this.following = true; void this.load(); this.listen(); }); });
-    inject(DestroyRef).onDestroy(() => { this.source?.close(); if (this.pending) clearTimeout(this.pending); });
+    this.watching = setInterval(() => this.checkWaiting(), 3000);
+    inject(DestroyRef).onDestroy(() => { this.source?.close(); if (this.pending) clearTimeout(this.pending); if (this.watching) clearInterval(this.watching); });
   }
   private base() { return `/api/projects/${encodeURIComponent(this.ctx.projectId())}/goals`; }
   private path(rest = '') { return `${this.base()}/${encodeURIComponent(this.id())}${rest}`; }
@@ -306,13 +308,26 @@ export class WorkGoalComponent {
     void this.act(() => this.ctx.api(this.path(`/answer/${need.id}`), 'POST', { text }), 'Answered.'); }
   allow(need: GoalEvent, allow: boolean) { void this.act(() => this.ctx.api(this.path(`/answer/${need.id}`), 'POST', { allow }), allow ? (need.kind === 'approval' ? `Approved #${need.action}.` : 'Allowed.') : 'Declined.'); }
   assign(who: Assignee) { void this.act(() => this.ctx.api(this.path('/assign'), 'POST', { assignee: who }), `Assigned to ${this.ctx.whoName(who)}.`).then(() => this.loadCheckout()); }
-  // Open in VS Code: the Claude Code extension's own link opens it with the prompt; the folder link opens the checkout.
+  // Working in your own checkout instead: the Claude Code extension's own link opens it with the prompt.
   readonly checkout = signal<{ path: string; distro: string | null } | null>(null);
   readonly assignLock = computed(() => ['draft', 'ready'].includes(this.view()?.item.board || '') ? null : 'It has started; the assignee stays');
   readonly claudeLink = computed(() => { const item = this.view()?.item; return item ? 'vscode://anthropic.claude-code/open?prompt=' + encodeURIComponent(`Work on ${item.ref} (${item.id}) using the Aludel tools.`) : ''; });
-  readonly folderLink = computed(() => { const place = this.checkout(); if (!place) return '';
-    const path = place.path.split('/').map(encodeURIComponent).join('/');
-    return place.distro ? `vscode://vscode-remote/wsl+${encodeURIComponent(place.distro)}${path}` : `vscode://file${path}`; });
+  readonly opening = signal(false);
+  // Containers asking to connect to this item (they show the same code in their terminal). Checked while the item is yours.
+  readonly waiting = signal<{ code: string; at: string }[]>([]);
+  private watching: ReturnType<typeof setInterval> | null = null;
+  private checkWaiting() {
+    const board = this.view()?.item.board || '';
+    if (!this.mine() || !['draft', 'ready', 'progress'].includes(board) || (typeof document !== 'undefined' && document.hidden)) { if (!this.mine()) this.waiting.set([]); return; }
+    void this.ctx.api<{ waiting: { code: string; at: string }[] }>(this.path('/connections')).then(value => this.waiting.set(value.waiting), () => {});
+  }
+  connect(code: string) { void this.act(() => this.ctx.api(this.path(`/connections/${encodeURIComponent(code)}`), 'POST', {}), `Connected the container (${code}).`).then(() => this.checkWaiting()); }
+  // Aludel makes the item's branch on GitHub, then VS Code's Dev Containers clones it into its own volume and opens it.
+  openContainer() {
+    this.opening.set(true);
+    void this.ctx.write(async () => { const result = await this.ctx.api<{ link: string; branch: string }>(this.path('/container'), 'POST', {}); location.href = result.link; await this.load(); },
+      'Opening VS Code. The first build of the container takes a few minutes.').finally(() => this.opening.set(false));
+  }
   folderName(path: string) { return path.split('/').filter(Boolean).at(-1) || path; }
   loadCheckout() { const id = this.ctx.projectId(); if (id && this.mine()) void this.ctx.api<{ checkout: { path: string; distro: string | null } | null }>(`/api/projects/${encodeURIComponent(id)}/editor`).then(value => this.checkout.set(value.checkout), () => this.checkout.set(null)); }
   move(to: string) { void this.act(() => this.ctx.api(this.path('/move'), 'POST', { to }), to === 'progress' ? 'Started.' : 'Moved to review.'); }

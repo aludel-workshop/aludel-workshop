@@ -186,8 +186,65 @@ try {
   assert.equal(closed.item.board, 'done');
   assert.deepEqual(git(bare, 'log', '-1', '--format=%P', 'main').split(' '), [git(merger, 'rev-parse', 'HEAD'), git(clone, 'rev-parse', 'HEAD')], 'main on GitHub merges the reviewed commit onto what GitHub had');
   assert.ok(closed.events.some(event => /Pushed main to GitHub \(octo\/tool-share\)/.test(event.text)));
+
+  // COLLAB-WORK-01 item containers: Go makes the item's branch on GitHub and hands VS Code a Dev Containers link; the
+  // container (here, a clone of that branch) connects itself to its item when its person presses Connect beside its code.
+  const next = (await goal('', { title: 'Lend shows the due date' })).item;
+  await goal(`/${next.id}/assign`, { assignee: { kind: 'person', id: (await call('/api/session')).user.id } });
+  // The container is built from the repository's dev container: none on main, nothing to open (not VS Code's template picker).
+  await assert.rejects(goal(`/${next.id}/container`, {}), /main has no \.devcontainer\/devcontainer\.json/);
+  const mover = join(root, 'mover'); git(root, 'clone', '-q', bare, mover);
+  write(mover, { '.devcontainer/devcontainer.json': '{ "image": "node:24" }\n' });
+  git(mover, 'add', '-A'); git(mover, 'commit', '-qm', 'A dev container lands on main'); git(mover, 'push', '-q', 'origin', 'main');
+  const opened = await goal(`/${next.id}/container`, {});
+  const branch = `aludel/${next.ref.toLowerCase()}`;
+  assert.equal(opened.branch, branch);
+  assert.equal(git(bare, 'rev-parse', branch), git(bare, 'rev-parse', 'main'), 'the item\'s branch starts at main on GitHub');
+  // Dev Containers checks the link's url with `git ls-remote` as given, so it is the plain repository (the clone starts on main).
+  assert.equal(opened.link, 'vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=' + encodeURIComponent(`http://127.0.0.1:${fakePort}/octo/tool-share.git`)
+    + '&volume=' + encodeURIComponent(`aludel-${project.slug}-${next.ref.toLowerCase()}`));
+  // Main moves on GitHub; opening it again moves the item's branch up with it, since it has no work of its own yet.
+  writeFileSync(join(mover, 'CHANGELOG.md'), '# Changes\n');
+  git(mover, 'add', '-A'); git(mover, 'commit', '-qm', 'Changes on main'); git(mover, 'push', '-q', 'origin', 'main');
+  const again = await goal(`/${next.id}/container`, {});
+  assert.deepEqual([again.created, again.caughtUp, git(bare, 'rev-parse', branch)], [false, true, git(bare, 'rev-parse', 'main')], 'the item branch follows main until it has work');
+  const box = join(root, 'container');
+  // Dev Containers clones with the person's own git credentials; the fake GitHub only serves tokens it minted, so the
+  // stand-in clones the bare repository on main and keeps GitHub's address as its origin, as that clone would.
+  git(root, 'clone', '-q', bare, box);
+  git(box, 'remote', 'set-url', 'origin', `http://127.0.0.1:${fakePort}/octo/tool-share.git`);
+  const boxEnv = { ...gitEnv, ALUDEL_URL: `http://127.0.0.1:${port}`, ALUDEL_CONTAINER: '1', ALUDEL_EDITOR_CONFIG: join(root, 'box-editor.json') };
+  const connecting = spawn(process.execPath, [join(portalDir, 'tools/aludel.mjs'), 'connect'], { cwd: box, env: boxEnv, stdio: ['ignore', 'pipe', 'pipe'] });
+  let said = ''; connecting.stdout.on('data', chunk => said += chunk); connecting.stderr.on('data', chunk => said += chunk);
+  const exited = new Promise(resolve => connecting.on('exit', resolve));
+  for (let tries = 0; !/press Connect beside [A-Z0-9]{4}-[A-Z0-9]{4}/.test(said) && tries < 100; tries++) await page.waitForTimeout(100);
+  assert.match(said, /Connect this container to its item: on the item's page/, 'on main, it doesn\'t know its item yet');
+  const shown = /beside ([A-Z0-9]{4}-[A-Z0-9]{4})/.exec(said)?.[1];
+  assert.ok(shown, `the container shows a code: ${said}`);
+  await page.goto(`${portal}/p/${project.slug}/work/item/${encodeURIComponent(next.id)}`);
+  const asking = page.getByRole('status').filter({ hasText: 'A container is asking to connect' });
+  await asking.waitFor();
+  assert.match(await asking.innerText(), new RegExp(shown));
+  await check('container-asking');
+  await page.getByRole('button', { name: `Connect the container showing ${shown} to ${next.ref}` }).click();
+  assert.equal(await exited, 0, said);
+  assert.match(said, new RegExp(`Connected to ${next.ref}, on ${branch}`));
+  assert.equal(git(box, 'rev-parse', '--abbrev-ref', 'HEAD'), branch, 'connected from the item, the container switched to its branch');
+  assert.equal(git(box, 'rev-parse', 'HEAD'), git(bare, 'rev-parse', 'main'));
+  await asking.waitFor({ state: 'detached' });
+  // The container's token works for its own item, and only that one.
+  const boxToken = JSON.parse(readFileSync(join(root, 'box-editor.json'), 'utf8')).token;
+  const asBox = async path => { const response = await fetch(`http://127.0.0.1:${port}/api/editor${path}`, { headers: { authorization: `Bearer ${boxToken}` } }); return { status: response.status, value: await response.json() }; };
+  assert.deepEqual((await asBox('/goals')).value.goals.map(item => item.id), [next.id]);
+  assert.equal((await asBox(`/goals/${next.id}`)).status, 200);
+  assert.equal((await asBox(`/goals/${workId}`)).status, 404, 'not the other items');
+  // The portal answers an item container at host.docker.internal on the editor API only.
+  const asHost = (path, headers = {}) => new Promise(resolve => import('node:http').then(({ request }) => request({ host: '127.0.0.1', port, path, headers: { host: 'host.docker.internal', ...headers } }, res => resolve(res.statusCode)).end()));
+  assert.equal(await asHost('/api/editor/goals', { authorization: `Bearer ${boxToken}` }), 200);
+  assert.equal(await asHost('/api/session'), 421);
+  assert.equal(await asHost('/api/editor/tools/editor-mcp.mjs'), 200, 'the tools are served for container setup');
   assert.deepEqual(errors, []);
-  console.log('PASS connect: start choice, working style, GitHub sign-in on the fake, repository list, master refused, monorepo code paths suggested and edited, layers, one .aludel/ commit pushed with the chosen paths, their AGENTS.md untouched and no starter docs, Code reads apps/web, a goal item closes out from GitHub onto a main that moved there; axe at 1440 and 390 px.');
+  console.log('PASS connect: start choice, working style, GitHub sign-in on the fake, repository list, master refused, monorepo code paths suggested and edited, layers, one .aludel/ commit pushed with the chosen paths, their AGENTS.md untouched and no starter docs, Code reads apps/web, a goal item closes out from GitHub onto a main that moved there, an item container’s branch and link, and the container connecting itself to its one item; axe at 1440 and 390 px.');
 } catch (error) {
   console.error(serverLog.split('\n').slice(-30).join('\n'));
   throw error;

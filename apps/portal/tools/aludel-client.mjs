@@ -9,7 +9,8 @@ export function validateUrl(value) {
   const url = new URL(value);
   // The portal's own address (aludel.localhost) is loopback, but Node doesn't resolve *.localhost names: use 127.0.0.1.
   if (url.protocol === 'http:' && url.hostname.endsWith('.localhost')) url.hostname = '127.0.0.1';
-  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname))) throw new Error('Use HTTPS or a loopback SSH tunnel.');
+  // host.docker.internal is the person's own machine, seen from an item container.
+  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]', 'host.docker.internal'].includes(url.hostname))) throw new Error('Use HTTPS or a loopback SSH tunnel.');
   if (url.username || url.password || url.search || url.hash) throw new Error('Use the Aludel portal origin only.');
   return url.origin;
 }
@@ -45,17 +46,45 @@ export function loadConfig() {
   config.url = validateUrl(config.url);
   return config;
 }
+function saveConfig(config) {
+  mkdirSync(dirname(configPath), { recursive: true, mode: 0o700 });
+  writeFileSync(configPath, JSON.stringify(config), { mode: 0o600 });
+  chmodSync(configPath, 0o600);
+}
 // Pairs this machine with the portal: checks the token, then stores it readable only by you.
 export async function pair(origin) {
-  const url = validateUrl(origin || 'http://127.0.0.1:4310');
+  const url = validateUrl(origin || process.env.ALUDEL_URL || 'http://127.0.0.1:4310');
   const token = await readToken();
   if (!token) throw new Error('No token supplied.');
   const config = { url, token };
   const me = await request(config, '/me');
-  mkdirSync(dirname(configPath), { recursive: true, mode: 0o700 });
-  writeFileSync(configPath, JSON.stringify(config), { mode: 0o600 });
-  chmodSync(configPath, 0o600);
+  saveConfig(config);
   return me;
+}
+async function post(url, path, payload) {
+  const response = await fetch(url + path, { method: 'POST', body: JSON.stringify(payload), headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(8000) });
+  const body = await response.json();
+  if (!response.ok) throw new Error(body.error || 'Aludel returned ' + response.status);
+  return body;
+}
+// COLLAB-WORK-01: an item container connects itself, as `gh auth login` does. It asks Aludel for a code for its item (found
+// from its repository and branch), its person presses Connect beside that code on the item's page, and it collects a token
+// for that one item. `said` reports the code to show; resolves once connected.
+export async function connectContainer(cwd, { origin, said = () => {}, wait = ms => new Promise(resolve => setTimeout(resolve, ms)) } = {}) {
+  const url = validateUrl(origin || process.env.ALUDEL_URL || 'http://127.0.0.1:4310');
+  const git = (...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  const asked = await post(url, '/api/editor/connect', { repository: git('remote', 'get-url', 'origin'), branch: git('rev-parse', '--abbrev-ref', 'HEAD') });
+  said(asked);
+  for (;;) {
+    await wait((asked.interval || 2) * 1000);
+    const polled = await post(url, '/api/editor/connect/poll', { deviceCode: asked.deviceCode });
+    if (polled.status === 'connected') {
+      saveConfig({ url, token: polled.token, workId: polled.workId });
+      // Cloned on main, the container now knows its item: switch to the item's branch.
+      const started = polled.item ? startBranch(cwd, polled.item.ref) : null;
+      return { ...asked, ...polled, item: polled.item || asked.item, started, token: undefined };
+    }
+  }
 }
 // Where the local checkout's work is: its branch, head, and the files changed since it left the base.
 export function gitReport(cwd, base = null) {
@@ -91,6 +120,13 @@ export function pushReport(cwd, base = null) {
   const { dirty, ...reported } = report;
   return reported;
 }
+// In an item container (COLLAB-WORK-01): the container is the place, so there's no folder to report or .mcp.json to write.
+export const inContainer = () => process.env.ALUDEL_CONTAINER === '1';
+// The item a checkout is on, from its branch (aludel/w-12 → W-12), or null.
+export function branchItem(cwd) {
+  try { const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim(); return /^aludel\/(w-\d+)$/i.exec(branch)?.[1].toUpperCase() || null; }
+  catch { return null; }
+}
 // Where this checkout is, for the item page's Open links: its top folder, and the WSL distribution when it runs in one.
 export function checkoutInfo(cwd) {
   const path = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
@@ -106,6 +142,11 @@ export function startBranch(cwd, ref) {
   const dirty = git('status', '--porcelain', '--untracked-files=no').split('\n').filter(Boolean).length;
   if (dirty) throw new Error(`Commit or stash the ${dirty} uncommitted change${dirty === 1 ? '' : 's'} here first, then start ${ref} again.`);
   if (has('rev-parse', '--verify', '--quiet', `refs/heads/${branch}`)) { git('checkout', '--quiet', branch); return { branch, created: false, base: null }; }
+  // The item's branch may already be on GitHub (Go makes it there, and an item container clones main): take it.
+  if (has('fetch', '--quiet', '--no-tags', 'origin', `+refs/heads/${branch}:refs/remotes/origin/${branch}`)) {
+    git('checkout', '--quiet', '-b', branch, '--track', `origin/${branch}`);
+    return { branch, created: false, base: `origin/${branch}` };
+  }
   has('fetch', '--quiet', 'origin', 'main');
   const base = ['origin/main', 'main', 'origin/master', 'master'].find(name => has('rev-parse', '--verify', '--quiet', name));
   if (!base) throw new Error('This checkout has no main branch to start from.');

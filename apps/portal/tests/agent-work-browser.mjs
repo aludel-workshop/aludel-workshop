@@ -112,35 +112,39 @@ try {
   await menu.getByText('Agents work remotely, which comes with the remote runtime (A2).').waitFor();
   await shot('01b-assignee'); await audit('assignee menu', '.cdk-overlay-container');
   await menu.getByRole('menuitem', { name: /^You/ }).click();
-  await main.getByText('Connect your checkout once to open items in VS Code').waitFor();
-  // No checkout connected yet: the page says where to connect one, and Team says how.
-  await main.getByRole('link', { name: 'Work › Team' }).click();
+  // Yours, it opens in a container. This project has no GitHub repository, so the page says why it can't
+  // (tests/connect-browser.mjs opens one against a GitHub repository).
+  const container = main.getByRole('button', { name: 'Open in a container' });
+  await container.waitFor();
+  await container.click();
+  await page.getByText("An item container clones the project's GitHub repository").waitFor();
+  // Team says how to connect, once for every container; a checkout that reports itself is named there.
+  await page.goto(`${portal}/p/${project.slug}/work/team`);
   await page.getByRole('heading', { name: 'Work in VS Code with Claude Code' }).waitFor();
-  await page.getByText('A token is active, but no checkout has connected with it yet.').waitFor();
+  await page.getByText(/Connected until \d{4}-\d{2}-\d{2}\./).waitFor();
   const placed = await context.request.post(`${portal}/api/editor/checkout`, { data: { path: '/home/ada/code/tool-share', distro: 'Ubuntu' }, headers: { authorization: `Bearer ${editorToken}` } });
   assert.ok(placed.ok(), 'the local tools report where the checkout is');
   await page.reload();
   await page.getByText('Connected: /home/ada/code/tool-share (WSL Ubuntu).').waitFor();
   await shot('01c-team'); await audit('team', 'aludel-work-team');
   await page.goBack();
-  const open = main.getByRole('link', { name: 'Open in VS Code' });
-  await open.waitFor();
+  await container.waitFor();
   const ref = (await main.locator('.lay-eyebrow').innerText()).split('›').pop().trim();
-  assert.equal(await open.getAttribute('href'), 'vscode://anthropic.claude-code/open?prompt=' + encodeURIComponent(`Work on ${ref} (${workId}) using the Aludel tools.`));
-  assert.equal(await main.getByRole('link', { name: 'Open tool-share' }).getAttribute('href'), 'vscode://vscode-remote/wsl+Ubuntu/home/ada/code/tool-share');
-  await shot('01d-open-in-vscode'); await audit('open in vscode');
+  assert.equal(await main.getByRole('link', { name: 'work in your tool-share checkout' }).getAttribute('href'),
+    'vscode://anthropic.claude-code/open?prompt=' + encodeURIComponent(`Work on ${ref} (${workId}) using the Aludel tools.`), 'your own checkout stays a choice');
+  await shot('01d-open-in-container'); await audit('open in a container');
   // A rough Draft assigned to you goes to Claude Code to define; the page doesn't ask you to write the actions.
   const goals = `${portal}/api/projects/${project.id}/goals`;
   const rough = (await (await context.request.post(goals, { data: { title: 'sign up flow??' } })).json()).item.id;
   assert.ok((await context.request.post(`${goals}/${rough}/assign`, { data: { assignee: { kind: 'person', id: owner.id } } })).ok());
   await page.goto(`${portal}/p/${project.slug}/work/item/${encodeURIComponent(rough)}`);
-  await main.getByText('Claude Code defines it: a brief and actions in phases.').waitFor();
+  await main.getByText(/Claude Code there defines it: a brief and actions in phases\./).waitFor();
   await main.getByText('No brief yet. Whoever works on it defines it').waitFor();
   assert.equal(await main.locator('#wg-brief-text').count(), 0, 'the brief editor stays closed: the agent writes it');
   assert.equal(await main.getByRole('button', { name: 'Start work' }).count(), 0, 'a Draft starts once it is defined and Ready');
   await shot('01e-draft-assigned'); await audit('draft assigned');
   await page.goBack();
-  await open.waitFor();
+  await container.waitFor();
   // Claimed, the local agent defines it as v2's orchestrator did: phases with a review gate after the spec work.
   await agent('/define', { brief: 'A visitor signs up with email and a password and lands in their first world. Google sign-up is separate.',
     phases: [{ title: 'Specify', gated: true }, { title: 'Build' }],
@@ -241,7 +245,7 @@ try {
   await page.reload(); await main.getByRole('heading', { name: 'Create the sign-up flow' }).waitFor();
   await shot('07-phone'); await audit('phone');
   assert.deepEqual(errors, []);
-  console.log('PASS goal item page: create, define, agent phases it with a review gate, assign yourself (agents wait on A2), Open in VS Code with the connected checkout, start, live question and approval on their actions, answer, staged changeset by layer, reported code, details and log, steer, per-action review with a flag the agent addresses, gate held and cleared, move to review, close-out that merges the branch into main, axe at 1440 and 390 px.');
+  console.log('PASS goal item page: create, define, agent phases it with a review gate, assign yourself (agents wait on A2), Open in a container (refused without a GitHub repository) or your checkout, start, live question and approval on their actions, answer, staged changeset by layer, reported code, details and log, steer, per-action review with a flag the agent addresses, gate held and cleared, move to review, close-out that merges the branch into main, axe at 1440 and 390 px.');
 } catch (error) {
   for (const open of browser.contexts().flatMap(context => context.pages())) await open.screenshot({ path: dest + 'failure.png', fullPage: true }).catch(() => {});
   console.error(serverLog.split('\n').filter(line => /error/i.test(line) && !/ExperimentalWarning/.test(line)).slice(-10).join('\n'));

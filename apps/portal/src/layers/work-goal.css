@@ -30,6 +30,8 @@
 .wg-go{margin-left:auto}
 .wg-who{margin:0;color:var(--machine-muted);font-size:14px}
 .wg-local{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-top:14px;padding-top:12px;border-top:1px solid var(--machine-line)}
+.wg-connect{flex:1 1 100%;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px 12px;border-radius:8px;background:var(--machine-waiting-bg);color:var(--machine-waiting-ink)}
+.wg-connect mat-icon{width:20px;height:20px;font-size:20px}.wg-connect span{flex:1 1 220px}.wg-connect strong{white-space:nowrap}
 .wg-local .wg-hint{flex:1 1 260px;margin:0;display:block}
 .wg-hint{display:flex;align-items:center;gap:6px;color:var(--machine-muted);font-size:13px}
 .wg-hint mat-icon{width:18px;height:18px;font-size:18px}

@@ -21,15 +21,15 @@ import { AvatarComponent } from './work-shared';
     <p class="lay-muted small">Owners can do everything, including keys, spending and deleting. Inviting more people arrives with multi-person projects.</p>
   </section>
   <section class="lay-gap-top lay-card" aria-labelledby="team-editor"><h2 id="team-editor">Work in VS Code with Claude Code</h2>
-    <p class="lay-muted small">Items assigned to you open in VS Code from their page. Connect your checkout once: Claude Code there then works the item through Aludel's tools, on its own branch, and you watch and review on the item page. Work comes back through GitHub; the connection can't deploy or close items.</p>
+    <p class="lay-muted small">Items assigned to you open from their page in a container with the project's dev setup, where Claude Code works them through Aludel's tools on their own branch; you watch and review on the item page. Connect once: create a token, then in any item container's terminal run <code>aludel pair</code> and paste it. Every container after that is connected. Work comes back through GitHub; the connection can't deploy or close items.</p>
     @if (editorError()) { <p role="alert" class="lay-warn-text">{{ editorError() }}</p> }
     @if (editorToken()) {
       <p role="status">Token created. Copy it now; Aludel won't show it again.</p>
       <div class="lay-row lay-wrap"><button type="button" class="lay-button small" (click)="copyToken()">Copy token</button><button type="button" class="lay-button ghost small" (click)="editorToken.set('')">Done</button>
         @if (copied()) { <span class="lay-muted small">Copied. Paste it when the command asks.</span> }</div>
-      <p class="lay-muted small">In your checkout, run <code>node apps/portal/tools/aludel.mjs pair {{ origin }}</code> and paste the token.</p>
+      <p class="lay-muted small">In an item container's terminal, run <code>aludel pair</code> and paste the token. To work in your own checkout instead, run <code>node apps/portal/tools/aludel.mjs pair {{ origin }}</code> there.</p>
     } @else {
-      <p class="lay-muted small">@if (editorStatus()?.checkout; as place) { Connected: {{ place.path }}{{ place.distro ? ' (WSL ' + place.distro + ')' : '' }}. } @else if (editorStatus()?.connected) { A token is active, but no checkout has connected with it yet. } @else { No checkout is connected. }</p>
+      <p class="lay-muted small">@if (editorStatus()?.checkout; as place) { Connected: {{ place.path }}{{ place.distro ? ' (WSL ' + place.distro + ')' : '' }}. } @else if (editorStatus()?.connected) { Connected until {{ editorStatus()?.expiresAt?.slice(0, 10) }}. } @else { Not connected yet. }</p>
       <div class="lay-row lay-wrap"><button type="button" class="lay-button small" (click)="createToken()" [disabled]="editorBusy()">{{ editorStatus()?.connected ? 'Connect again' : 'Connect a checkout' }}</button>
         @if (editorStatus()?.connected) { <button type="button" class="lay-button ghost small" (click)="revokeToken()" [disabled]="editorBusy()">Disconnect</button> }</div>
     }

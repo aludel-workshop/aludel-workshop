@@ -24,17 +24,22 @@ export function initEditorBridge(db) {
   `);
   // Where the person's connected checkout is, so the item page can open it in their editor.
   if (!db.prepare('PRAGMA table_info(editor_tokens)').all().some(column => column.name === 'checkout_json')) db.exec('ALTER TABLE editor_tokens ADD COLUMN checkout_json TEXT');
+  // An item container's token works for its one item only (COLLAB-WORK-01).
+  if (!db.prepare('PRAGMA table_info(editor_tokens)').all().some(column => column.name === 'work_id')) db.exec('ALTER TABLE editor_tokens ADD COLUMN work_id TEXT');
+  // A container asking to be connected, until its person connects it on the item's page and it collects its token.
+  db.exec(`CREATE TABLE IF NOT EXISTS editor_connect_requests (device_hash TEXT PRIMARY KEY, user_code TEXT NOT NULL UNIQUE,
+    project_id TEXT NOT NULL REFERENCES projects(id), work_id TEXT NOT NULL, created_at TEXT NOT NULL, expires_at TEXT NOT NULL, approved_by TEXT)`);
 }
 
 export function editorBridge({ db, know, projectSetup, previewStatus }) {
   const project = projectId => db.prepare('SELECT id, slug, name, description FROM projects WHERE id = ?').get(projectId);
-  const tokenRow = (user, projectId) => db.prepare('SELECT created_at, expires_at, checkout_json FROM editor_tokens WHERE user_id = ? AND project_id = ?').get(user.id, projectId);
+  const tokenRow = (user, projectId) => db.prepare('SELECT created_at, expires_at, checkout_json FROM editor_tokens WHERE user_id = ? AND project_id = ? AND work_id IS NULL').get(user.id, projectId);
   function issue(user, projectId) {
     requireMember(db, user, projectId);
     const token = randomBytes(32).toString('base64url');
     const created = now();
     const expires = new Date(Date.now() + 30 * 86400_000).toISOString();
-    db.prepare('DELETE FROM editor_tokens WHERE user_id = ? AND project_id = ?').run(user.id, projectId);
+    db.prepare('DELETE FROM editor_tokens WHERE user_id = ? AND project_id = ? AND work_id IS NULL').run(user.id, projectId);
     db.prepare('INSERT INTO editor_tokens(token_hash, user_id, project_id, created_at, expires_at) VALUES (?, ?, ?, ?, ?)').run(sha(token), user.id, projectId, created, expires);
     return { token, expiresAt: expires, project: project(projectId), tools };
   }
@@ -62,11 +67,53 @@ export function editorBridge({ db, know, projectSetup, previewStatus }) {
   function authenticate(header) {
     const match = /^Bearer ([A-Za-z0-9_-]{40,})$/.exec(String(header || ''));
     if (!match) fail('Editor connection required.', 401);
-    const row = db.prepare('SELECT user_id, project_id, expires_at FROM editor_tokens WHERE token_hash = ?').get(sha(match[1]));
+    const row = db.prepare('SELECT user_id, project_id, expires_at, work_id FROM editor_tokens WHERE token_hash = ?').get(sha(match[1]));
     if (!row || row.expires_at <= now()) fail('Editor connection expired or revoked.', 401);
     const user = getUser(db, row.user_id);
     requireMember(db, user, row.project_id);
-    return { user, projectId: row.project_id };
+    return { user, projectId: row.project_id, workId: row.work_id || null };
+  }
+
+  // COLLAB-WORK-01: an item container connects without pairing, as `gh auth login` does. It asks for a code; its person,
+  // signed in on the item's page, connects it; it collects a token for that one item. Nothing secret crosses a link or a
+  // terminal: the container keeps the device code to itself, and the person only compares the short code.
+  const codeAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  function requestConnection(projectId, workId) {
+    db.prepare('DELETE FROM editor_connect_requests WHERE expires_at <= ?').run(now());
+    if (db.prepare('SELECT COUNT(*) AS n FROM editor_connect_requests WHERE project_id = ?').get(projectId).n >= 10) fail('Too many containers are waiting to connect to this project. Connect them or let them expire first.', 429);
+    const deviceCode = randomBytes(32).toString('base64url');
+    const letters = [...randomBytes(8)].map(byte => codeAlphabet[byte % codeAlphabet.length]).join('');
+    const userCode = `${letters.slice(0, 4)}-${letters.slice(4)}`;
+    const expiresAt = new Date(Date.now() + 10 * 60_000).toISOString();
+    db.prepare('INSERT INTO editor_connect_requests VALUES (?, ?, ?, ?, ?, ?, NULL)').run(sha(deviceCode), userCode, projectId, workId, now(), expiresAt);
+    return { deviceCode, userCode, expiresAt, interval: 2 };
+  }
+  // A container that doesn't know its item yet (it was cloned on main) asks with work_id '' and shows on its project's items;
+  // the item it is connected from becomes its item.
+  function pendingConnections(projectId, workId) {
+    return db.prepare("SELECT user_code AS code, created_at AS at FROM editor_connect_requests WHERE project_id = ? AND work_id IN (?, '') AND approved_by IS NULL AND expires_at > ? ORDER BY created_at")
+      .all(projectId, workId, now());
+  }
+  function approveConnection(user, projectId, workId, code) {
+    requireMember(db, user, projectId);
+    const row = db.prepare("SELECT device_hash FROM editor_connect_requests WHERE project_id = ? AND work_id IN (?, '') AND user_code = ? AND approved_by IS NULL AND expires_at > ?")
+      .get(projectId, workId, String(code || '').toUpperCase(), now());
+    if (!row) fail('That container is no longer waiting. Start it again from the item.', 404);
+    db.prepare('UPDATE editor_connect_requests SET approved_by = ?, work_id = ? WHERE device_hash = ?').run(user.id, workId, row.device_hash);
+    return { connected: true };
+  }
+  // The container polls with its device code. Once connected, it gets its token once, and the request is gone.
+  function collectConnection(deviceCode) {
+    const row = db.prepare('SELECT * FROM editor_connect_requests WHERE device_hash = ?').get(sha(String(deviceCode || '')));
+    if (!row || row.expires_at <= now()) fail('This connection request expired. Run `aludel connect` again.', 410);
+    if (!row.approved_by) return { status: 'pending' };
+    const user = getUser(db, row.approved_by);
+    requireMember(db, user, row.project_id);
+    const token = randomBytes(32).toString('base64url');
+    db.prepare('INSERT INTO editor_tokens(token_hash, user_id, project_id, created_at, expires_at, work_id) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(sha(token), user.id, row.project_id, now(), new Date(Date.now() + 30 * 86400_000).toISOString(), row.work_id);
+    db.prepare('DELETE FROM editor_connect_requests WHERE device_hash = ?').run(row.device_hash);
+    return { status: 'connected', token, projectId: row.project_id, workId: row.work_id };
   }
   function assigned(user, projectId) {
     return know.workList(projectId).filter(item => item.assignee?.kind === 'person' && item.assignee.id === user.id && item.state !== 'done')
@@ -136,5 +183,5 @@ export function editorBridge({ db, know, projectSetup, previewStatus }) {
     const setup = projectSetup(user, projectId);
     return { project: project(projectId), preview: previewStatus(projectId), repository: { commit: head(setup.workspacePath) } };
   }
-  return { issue, revoke, status, noteCheckout, authenticate, assigned, context, saved, record, search, environment, tools };
+  return { issue, revoke, status, noteCheckout, authenticate, requestConnection, pendingConnections, approveConnection, collectConnection, assigned, context, saved, record, search, environment, tools };
 }

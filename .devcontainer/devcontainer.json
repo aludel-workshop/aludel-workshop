@@ -1,0 +1,24 @@
+{
+  "name": "Aludel",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "remoteUser": "node",
+  "containerEnv": {
+    "ALUDEL_URL": "http://host.docker.internal:4310",
+    "ALUDEL_CONTAINER": "1",
+    "CLAUDE_CONFIG_DIR": "/home/node/.claude",
+    "ALUDEL_EDITOR_CONFIG": "/home/node/.aludel/editor.json"
+  },
+  "mounts": [
+    "source=aludel-claude,target=/home/node/.claude,type=volume"
+  ],
+  "postCreateCommand": "bash .devcontainer/aludel-setup.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "anthropic.claude-code"
+      ]
+    }
+  }
+}
