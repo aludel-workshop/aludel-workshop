@@ -102,3 +102,5 @@
 .wg-send:disabled{opacity:.45;cursor:not-allowed}
 @media(max-width:1100px){.wg-layout{grid-template-columns:minmax(0,1fr)}.wg-side{position:static;max-height:none}.wg-events{max-height:420px}}
 @media(max-width:560px){.wg-titlerow{flex-direction:column}.wg-actionhead{flex-direction:column}.wg-head,.wg-card{padding:12px}.wg-go{margin-left:0;width:100%;justify-content:center}.wg-tools .lay-button{margin-left:0}}
+.wg-changes h3 code{font-size:12.5px;background:var(--machine-line);padding:1px 6px;border-radius:4px;text-transform:none;letter-spacing:0}
+.wg-path{font-family:ui-monospace,monospace;font-size:13px;overflow-wrap:anywhere}

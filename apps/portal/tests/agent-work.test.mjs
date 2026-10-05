@@ -237,3 +237,92 @@ test('a person drives a goal item in the portal while their local agent works it
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('A8: the aludel CLI claims a goal item from a checkout, connects Claude Code to Aludel, and reports committed code', async () => {
+  const { createServer } = await import('node:http');
+  const { execFileSync, spawn, spawnSync } = await import('node:child_process');
+  const { existsSync, mkdirSync, readFileSync, writeFileSync } = await import('node:fs');
+  const root = mkdtempSync(join(tmpdir(), 'aludel-agent-work-cli-'));
+  const db = openDatabase(join(root, 'machine.sqlite'));
+  initWorkflow(db); ensureProductWorkspace(db); initAccounts(db); initOnboarding(db); initKnowledge(db);
+  const know = knowledge({ db, catalogs, packs: catalogs.packs });
+  const flow = onboarding({ db, catalogs, secrets: openSecretStore(root), workspaceRoot: join(root, 'w'), assetRoot: join(root, 'a'), createWorkspace: () => {}, know });
+  const ada = createUser(db, { email: 'ada@example.com', name: 'Ada', password: 'correct-horse-battery' });
+  const { token: draft } = flow.saveDraft(null, { profile: 'planner' });
+  flow.saveDraft(draft, { name: 'Tool Share', pitch: 'Help neighbours share tools. Borrow a drill in minutes.' });
+  const id = flow.claimDraft(draft, ada, ada).project.id;
+  const probe = createServer();
+  await new Promise(resolve => probe.listen(0, '127.0.0.1', resolve));
+  const port = probe.address().port;
+  await new Promise(resolve => probe.close(resolve));
+  const server = spawn(process.execPath, [new URL('../server/server.mjs', import.meta.url).pathname], {
+    env: { ...process.env, MACHINE_DATA_DIR: root, MACHINE_PORT: String(port), MACHINE_PREVIEW_RUNTIME: 'process' }, stdio: ['ignore', 'pipe', 'pipe'] });
+  const origin = 'http://127.0.0.1:' + port;
+  try {
+    await waitForPortal(server, origin);
+    const cookie = createSession(db, ada.id).split(';')[0];
+    const portal = async (path, body) => (await fetch(origin + '/api/projects/' + id + '/goals' + path, { method: body ? 'POST' : 'GET', headers: { cookie, 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined })).json();
+    const created = await portal('', { title: 'Add a borrow button', brief: 'A member borrows a tool from its page.' });
+    const ref = created.item.ref, workId = created.item.id;
+    await portal('', { title: 'Someone else’s later goal' });
+    const apiToken = (await (await fetch(origin + '/api/projects/' + id + '/editor', { method: 'POST', headers: { cookie } })).json()).token;
+
+    // A throwaway checkout, as the person's own clone of their app.
+    const checkout = join(root, 'checkout'); mkdirSync(checkout);
+    const git = (...args) => execFileSync('git', args, { cwd: checkout, encoding: 'utf8' }).trim();
+    git('init', '-q', '-b', 'main'); writeFileSync(join(checkout, 'README.md'), 'Tool Share\n');
+    git('add', '.'); git('-c', 'user.name=Ada', '-c', 'user.email=ada@example.invalid', 'commit', '-qm', 'start');
+    const env = { ...process.env, ALUDEL_EDITOR_CONFIG: join(root, 'editor.json') };
+    const cli = (...args) => spawnSync(process.execPath, [new URL('../tools/aludel.mjs', import.meta.url).pathname, ...args], { cwd: checkout, env, input: apiToken + '\n', encoding: 'utf8', timeout: 8000 });
+
+    assert.match(cli('list').stderr, /Pair first/);
+    const paired = cli('pair', origin);
+    assert.equal(paired.status, 0, paired.stderr);
+    assert.match(paired.stdout, /Connected to .* as Ada/);
+    const listed = cli('list');
+    assert.match(listed.stdout, new RegExp(`${ref}\\s+Draft\\s+open`));
+    const claimed = cli('claim', ref.toLowerCase());
+    assert.equal(claimed.status, 0, claimed.stderr);
+    assert.match(claimed.stdout, new RegExp(`Work on ${ref} \\(${workId}\\) using the Aludel tools`));
+    const mcp = JSON.parse(readFileSync(join(checkout, '.mcp.json'), 'utf8'));
+    assert.match(mcp.mcpServers.aludel.args[0], /tools\/editor-mcp\.mjs$/, 'Claude Code in the checkout reaches the Aludel tools');
+    assert.match(readFileSync(join(checkout, '.git/info/exclude'), 'utf8'), /^\.mcp\.json$/m, 'the local connection stays out of commits');
+    assert.equal(git('status', '--porcelain'), '');
+    assert.equal((await portal('/' + workId)).item.assignee.id, ada.id);
+    assert.equal(cli('claim', 'W-999').status, 1);
+
+    // Claude Code, as the agent, defines it; the person starts it on the page; the agent commits code on a branch and reports it.
+    const tool = new URL('../tools/editor-mcp.mjs', import.meta.url).pathname;
+    const call = calls => {
+      const input = calls.map(([name, args], index) => JSON.stringify({ jsonrpc: '2.0', id: index + 1, method: 'tools/call', params: { name, arguments: args } })).join('\n') + '\n';
+      const result = spawnSync(process.execPath, [tool], { cwd: checkout, env, input, encoding: 'utf8', timeout: 8000 });
+      return result.stdout.trim().split('\n').map(line => JSON.parse(line).result).map(value => value.isError ? { error: value.content[0].text } : JSON.parse(value.content[0].text));
+    };
+    call([['define_work', { workId, brief: 'A member borrows a tool from its page.', actions: [{ goal: 'Add the borrow button' }] }]]);
+    await portal('/' + workId + '/move', { to: 'progress' });
+    git('checkout', '-q', '-b', `aludel/${ref.toLowerCase()}`);
+    writeFileSync(join(checkout, 'borrow.js'), 'export const borrow = () => true;\n');
+    const [dirty] = call([['report_code', { workId }]]);
+    assert.match(dirty.error, /Commit first/);
+    git('add', '.'); git('-c', 'user.name=Ada', '-c', 'user.email=ada@example.invalid', 'commit', '-qm', 'borrow button');
+    const [reported, moved] = call([['report_code', { workId }], ['update_action', { workId, number: 1, state: 'working' }]]);
+    assert.deepEqual([reported.code.branch, reported.code.files], [`aludel/${ref.toLowerCase()}`, [{ path: 'borrow.js', status: 'added' }]]);
+    assert.equal(reported.code.commit, git('rev-parse', 'HEAD'));
+    assert.equal(moved.actions[0].state, 'working');
+
+    writeFileSync(join(checkout, 'borrow.js'), 'export const borrow = tool => Boolean(tool);\n');
+    assert.match(cli('submit', ref).stderr, /Commit or stash the 1 uncommitted change/);
+    git('-c', 'user.name=Ada', '-c', 'user.email=ada@example.invalid', 'commit', '-qam', 'borrow takes a tool');
+    const submitted = cli('submit', ref);
+    assert.equal(submitted.status, 0, submitted.stderr);
+    assert.match(submitted.stdout, /Still open: #1/);
+    assert.equal((await portal('/' + workId)).code.commit, git('rev-parse', 'HEAD'));
+    const status = cli('status', ref).stdout;
+    assert.match(status, /In progress/); assert.match(status, /#1 working/); assert.match(status, /Code: aludel\/w-\d+ at [0-9a-f]{7}, 1 files/);
+    assert.ok(!existsSync(join(checkout, 'editor.json')), 'the token never lands in the checkout');
+  } finally {
+    await stopPortal(server);
+    db.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});

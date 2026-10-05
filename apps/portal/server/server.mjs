@@ -566,9 +566,12 @@ async function api(request, response, url) {
       const done = (status, value) => json(response, status, value, { 'cache-control': 'no-store' });
       const agent = { kind: 'agent', id: editorUser.id, name: `${editorUser.name}'s local agent` };
       if (path[0] === 'stack' && path.length === 1 && request.method === 'GET') return done(200, { layers: goals.stackMap(projectId) });
-      if (path.length === 1 && request.method === 'GET') return done(200, { goals: goals.goals(projectId, { assignedTo: editorUser.id }) });
+      if (path.length === 1 && request.method === 'GET')
+        return done(200, { goals: goals.goals(projectId, url.searchParams.get('claimable') ? { claimableBy: editorUser.id } : { assignedTo: editorUser.id }) });
       if (path[0] !== 'goals' || path.length < 2) return json(response, 404, { error: 'Not found.' });
       const workId = path[1];
+      // The token's person claims through their own CLI (`aludel claim`); their agent's tools never offer it.
+      if (path[2] === 'claim' && path.length === 3 && request.method === 'POST') return done(200, goals.claim(editorUser, projectId, workId));
       goals.assertPerformer(editorUser, projectId, workId);
       const [operation, sub] = path.slice(2);
       if (request.method === 'GET' && !operation) return done(200, goals.view(projectId, workId));
@@ -582,6 +585,7 @@ async function api(request, response, url) {
       if (operation === 'actions' && sub) return done(200, goals.updateAction(agent, projectId, workId, Number(sub), input));
       if (operation === 'events' && !sub) return done(201, goals.post(agent, projectId, workId, input));
       if (operation === 'stage' && !sub) return done(201, goals.stage(agent, projectId, workId, input));
+      if (operation === 'code' && !sub) return done(200, goals.recordCode(agent, projectId, workId, input));
       return json(response, 404, { error: 'Not found.' });
     }
     if (request.method !== 'GET') return json(response, 405, { error: 'Read only.' });

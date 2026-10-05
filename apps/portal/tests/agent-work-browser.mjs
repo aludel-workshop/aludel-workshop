@@ -155,6 +155,9 @@ try {
   await agent('/actions/3', { state: 'working' }); await agent('/actions/3', { state: 'review', summary: 'No overflow at 390 px.' });
   await card(3).getByRole('button', { name: 'Mark done' }).click();
   await state(3, 'Done');
+  // A8: code committed in the person's checkout shows beside the staged records.
+  await agent('/code', { branch: 'aludel/w-8', commit: '3f2a9c1d0b7e4a5c6d8e9f00112233445566778', base: '1111111', files: [{ path: 'src/pages/sign-up.html', status: 'added' }, { path: 'server/routes.mjs', status: 'modified' }] });
+  await main.locator('.wg-changes', { hasText: 'aludel/w-8' }).getByText('src/pages/sign-up.html').waitFor();
   await main.getByRole('button', { name: 'Move to review' }).click();
   await main.locator('.wg-board-review').waitFor();
   assert.deepEqual((await agent('/changeset')).changeset.map(group => group.layer), ['design', 'product']);
@@ -165,7 +168,7 @@ try {
   await page.reload(); await main.getByRole('heading', { name: 'Create the sign-up flow' }).waitFor();
   await shot('05-phone'); await audit('phone');
   assert.deepEqual(errors, []);
-  console.log('PASS goal item page: create, define, agent phases it with a review gate, claim locally, start, live question and approval on their actions, answer, staged changeset by layer, details and log, steer, interim done and send back, gate held and cleared, move to review, axe at 1440 and 390 px.');
+  console.log('PASS goal item page: create, define, agent phases it with a review gate, claim locally, start, live question and approval on their actions, answer, staged changeset by layer, reported code, details and log, steer, interim done and send back, gate held and cleared, move to review, axe at 1440 and 390 px.');
 } catch (error) {
   for (const open of browser.contexts().flatMap(context => context.pages())) await open.screenshot({ path: dest + 'failure.png', fullPage: true }).catch(() => {});
   console.error(serverLog.split('\n').filter(line => /error/i.test(line) && !/ExperimentalWarning/.test(line)).slice(-10).join('\n'));

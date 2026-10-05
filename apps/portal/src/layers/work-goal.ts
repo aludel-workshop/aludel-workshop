@@ -15,7 +15,8 @@ export type GoalEvent = { id: number; action: number | null; kind: 'message' | '
 export type GoalAction = { id: string; number: number; phase: number; layer: string | null; goal: string; after: number[]; state: 'proposed' | 'todo' | 'working' | 'review' | 'done';
   summary: string; addedBy: GoalAuthor | null; updatedAt: string; needs: GoalEvent[]; blocked: string | null };
 type GoalChange = { id: string; kind: string; op: 'create' | 'update' | 'delete'; after?: Record<string, unknown> | null; before?: Record<string, unknown> | null };
-export type GoalView = { item: WorkItem & { board: string }; brief: string; defined: boolean; performer: string | null; phases: { number: number; title: string; gated: boolean }[];
+export type GoalCode = { branch: string; commit: string; base: string | null; files: { path: string; status: string }[]; at: string };
+export type GoalView = { item: WorkItem & { board: string }; brief: string; defined: boolean; performer: string | null; code: GoalCode | null; phases: { number: number; title: string; gated: boolean }[];
   actions: GoalAction[]; needs: GoalEvent[]; events: GoalEvent[]; changeset: { layer: string; changes: GoalChange[] }[] };
 
 const boardLabel: Record<string, string> = { draft: 'Draft', ready: 'Ready', progress: 'In progress', review: 'In review', done: 'Done' };
@@ -59,7 +60,7 @@ const actionIcon: Record<string, string> = { proposed: 'add_task', todo: 'radio_
                 <button type="button" class="wg-seg" disabled matTooltip="The remote runtime comes later (A2, waiting on the spending decision)">Send to Claude</button>
                 <button type="button" class="wg-seg" [class.on]="mine()" [attr.aria-pressed]="mine()" (click)="claim()">{{ mine() ? 'Working locally' : 'Work locally' }}</button>
               </div>
-              @if (mine()) { <p class="wg-hint"><mat-icon aria-hidden="true">terminal</mat-icon>Claude Code on your machine works it through the Aludel tools once you start: <code>work_view {{ goal.item.id }}</code></p> }
+              @if (mine()) { <p class="wg-hint"><mat-icon aria-hidden="true">terminal</mat-icon>In your checkout run <code>aludel claim {{ goal.item.ref }}</code>, then ask Claude Code there to work on {{ goal.item.ref }}.</p> }
               <button type="button" class="lay-button wg-go" (click)="move('progress')" [disabled]="goal.item.board !== 'ready' || !goal.item.assignee" [matTooltip]="startBlock()"><mat-icon aria-hidden="true">play_arrow</mat-icon>Start work</button>
             </div>
           }
@@ -127,8 +128,13 @@ const actionIcon: Record<string, string> = { proposed: 'add_task', todo: 'radio_
           }
         </section>
 
-        @if (goal.changeset.length) {
+        @if (goal.changeset.length || goal.code) {
           <section aria-labelledby="wg-changes"><div class="wg-sectionhead"><h2 id="wg-changes">Changes staged</h2><span class="lay-muted small">Nothing applies until close-out</span></div>
+            @if (goal.code; as code) {
+              <div class="wg-card wg-changes"><h3><span class="lay-chip lay-l-platform">Code</span>{{ code.files.length }} file{{ code.files.length === 1 ? '' : 's' }} on <code>{{ code.branch }}</code> at <code>{{ code.commit.slice(0, 7) }}</code></h3>
+                <ul>@for (file of code.files.slice(0, 40); track file.path) { <li><span [class]="'wg-op wg-op-' + fileOp(file.status)">{{ fileLabel[file.status] || 'Changed' }}</span><span class="wg-path">{{ file.path }}</span></li> }
+                  @if (code.files.length > 40) { <li class="lay-muted small">and {{ code.files.length - 40 }} more</li> }</ul></div>
+            }
             @for (group of goal.changeset; track group.layer) {
               <div class="wg-card wg-changes"><h3><span [class]="'lay-chip lay-l-' + group.layer">{{ layerName(group.layer) }}</span>{{ group.changes.length }} change{{ group.changes.length === 1 ? '' : 's' }}</h3>
                 <ul>@for (change of group.changes; track change.id) { <li><span [class]="'wg-op wg-op-' + change.op">{{ opLabel[change.op] }}</span>{{ kindName(change.kind) }} <strong>{{ changeName(change) }}</strong></li> }</ul></div>
@@ -165,6 +171,8 @@ export class WorkGoalComponent {
   readonly boardLabel = boardLabel; readonly actionLabel = actionLabel; readonly actionIcon = actionIcon;
   readonly priorityLabel = priorityLabel; readonly priorities = priorityOrder;
   readonly opLabel: Record<string, string> = { create: 'New', update: 'Changed', delete: 'Removed' };
+  readonly fileLabel: Record<string, string> = { added: 'New', modified: 'Changed', deleted: 'Removed', renamed: 'Moved' };
+  fileOp(status: string) { return status === 'added' ? 'create' : status === 'deleted' ? 'delete' : 'update'; }
   readonly view = signal<GoalView | null>(null);
   readonly failed = signal(false);
   readonly live = signal(false);

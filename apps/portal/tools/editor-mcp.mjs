@@ -1,11 +1,8 @@
 // A small stdio MCP adapter for Aludel's editor API. It reads project context, and (AGENT-WORK-01) lets your local agent work a
 // goal item you have claimed: define it, add and move actions, talk in its thread, and stage changes through each layer's API.
-import { readFileSync, mkdirSync, writeFileSync, chmodSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { homedir } from 'node:os';
 import readline from 'node:readline';
+import { configPath, gitReport, loadConfig, pair, request } from './aludel-client.mjs';
 
-const configPath = process.env.ALUDEL_EDITOR_CONFIG || join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), 'aludel', 'editor.json');
 const names = {
   assigned_tasks: { description: 'List work assigned to you in this Aludel project.', schema: { type: 'object', properties: {} }, path: () => '/tasks' },
   task_context: { description: 'Read a task and save its versioned context bundle.', schema: { type: 'object', properties: { workId: { type: 'string' } }, required: ['workId'] }, path: a => '/tasks/' + encodeURIComponent(a.workId) },
@@ -44,64 +41,28 @@ const names = {
   stage_change: { description: 'Stage a write through a layer\u2019s API under a working action. The layer checks it now; nothing applies until your person closes the item.',
     schema: { type: 'object', properties: { workId: { type: 'string' }, action: { type: 'integer', minimum: 1 }, layer: { type: 'string' }, operationId: { type: 'string' }, id: { type: 'string' }, body: { type: 'object' } }, required: ['workId', 'action', 'operationId'] },
     post: a => [goal(a, '/stage'), pick(a, ['action', 'layer', 'operationId', 'id', 'body'])] },
+  report_code: { description: 'After committing code for the item on a branch in this checkout, report the branch, commit and changed files (read from git here) so your person can review them. Commit first; uncommitted changes are not reported.',
+    schema: { type: 'object', properties: { workId: { type: 'string' }, base: { type: 'string', description: 'Commit the work started from; defaults to the merge base with main.' } }, required: ['workId'] },
+    post: a => { const report = gitReport(process.cwd(), a.base || null); if (report.dirty) throw new Error('Commit first: ' + report.dirty + ' uncommitted change(s).');
+      return [goal(a, '/code'), { branch: report.branch, commit: report.commit, base: report.base, files: report.files }]; } },
   changeset: { description: 'List the item\u2019s staged changes, grouped by layer.', schema: { type: 'object', properties: { workId: { type: 'string' } }, required: ['workId'] }, path: a => goal(a, '/changeset') }
 };
 function goal(args, rest = '') { return '/goals/' + encodeURIComponent(args.workId) + rest; }
 function pick(args, keys) { return Object.fromEntries(keys.filter(key => args[key] !== undefined).map(key => [key, args[key]])); }
-function validateUrl(value) {
-  const url = new URL(value);
-  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname))) throw new Error('Use HTTPS or a loopback SSH tunnel.');
-  if (url.username || url.password || url.search || url.hash) throw new Error('Use the Aludel portal origin only.');
-  return url.origin;
-}
-async function readToken() {
-  if (!process.stdin.isTTY) return (await new Promise(resolve => {
-    let value = ''; process.stdin.setEncoding('utf8'); process.stdin.on('data', chunk => { value += chunk; }); process.stdin.on('end', () => resolve(value));
-  })).trim();
-  process.stderr.write('Paste the editor token from Work > Team, then press Enter: ');
-  const input = process.stdin;
-  input.setRawMode(true); input.resume(); input.setEncoding('utf8');
-  return new Promise(resolve => {
-    let value = '';
-    const onData = chunk => {
-      for (const char of chunk) {
-        if (char === '\r' || char === '\n') { input.off('data', onData); input.setRawMode(false); input.pause(); process.stderr.write('\n'); resolve(value.trim()); return; }
-        if (char === '\u0003') process.exit(130);
-        if (char === '\u007f') value = value.slice(0, -1);
-        else value += char;
-      }
-    };
-    input.on('data', onData);
-  });
-}
-async function request(config, path, payload) {
-  const response = await fetch(config.url + '/api/editor' + path, { method: payload ? 'POST' : 'GET', body: payload ? JSON.stringify(payload) : undefined,
-    headers: { authorization: 'Bearer ' + config.token, ...(payload ? { 'content-type': 'application/json' } : {}) }, signal: AbortSignal.timeout(8000) });
-  const body = await response.json();
-  if (!response.ok) throw new Error(body.error || 'Aludel returned ' + response.status);
-  return body;
-}
 if (process.argv[2] === 'pair') {
   try {
-    const url = validateUrl(process.argv[3] || 'http://127.0.0.1:4310');
-    const token = await readToken();
-    if (!token) throw new Error('No token supplied.');
-    const config = { url, token };
-    const me = await request(config, '/me');
-    mkdirSync(dirname(configPath), { recursive: true, mode: 0o700 });
-    writeFileSync(configPath, JSON.stringify(config), { mode: 0o600 });
-    chmodSync(configPath, 0o600);
+    const me = await pair(process.argv[3]);
     process.stdout.write('Connected to ' + me.projectId + '. Credential stored outside the repository at ' + configPath + '.\n');
   } catch (error) { process.stderr.write(error.message + '\n'); process.exitCode = 1; }
 } else {
   let config;
-  try { config = JSON.parse(readFileSync(configPath, 'utf8')); config.url = validateUrl(config.url); }
+  try { config = loadConfig(); }
   catch (error) { process.stderr.write('Pair Aludel first: ' + error.message + '\n'); process.exit(1); }
   const respond = object => process.stdout.write(JSON.stringify(object) + '\n');
   const rpcError = (id, code, message) => respond({ jsonrpc: '2.0', id, error: { code, message } });
   const handle = async msg => {
     if (msg.id === undefined) return;
-    if (msg.method === 'initialize') return respond({ jsonrpc: '2.0', id: msg.id, result: { protocolVersion: msg.params?.protocolVersion || '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'aludel-editor', version: '0.1.0' }, instructions: 'Read your assigned task context before editing. Project records are live; saved task bundles are immutable. For a goal item you have claimed: read work_view and stack_map first, move an action to working before staging its changes, ask on the action when you need your person, and hand actions to review; your person closes the item.' } });
+    if (msg.method === 'initialize') return respond({ jsonrpc: '2.0', id: msg.id, result: { protocolVersion: msg.params?.protocolVersion || '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'aludel-editor', version: '0.1.0' }, instructions: 'Read your assigned task context before editing. Project records are live; saved task bundles are immutable. For a goal item your person claimed, you are its orchestrator: read work_view and stack_map first. If it has no actions yet, define_work it in phases (a review gate after spec work) with one action per layer change. Work only on actions that are not blocked: move one to working, do it, post_message what you did, then update_action to review with a summary. Records change only through stage_change on that layer\'s API; code changes go on a branch named for the item in this checkout, committed, then report_code. When you need your person, ask on the action (or request_allow before anything outside its scope) and continue other unblocked actions meanwhile. Propose new actions with add_action and a reason. Never mark actions done or close the item; your person reviews.' } });
     if (msg.method === 'ping') return respond({ jsonrpc: '2.0', id: msg.id, result: {} });
     if (msg.method === 'tools/list') return respond({ jsonrpc: '2.0', id: msg.id, result: { tools: Object.entries(names).map(([name, tool]) => ({ name, description: tool.description, inputSchema: tool.schema })) } });
     if (msg.method === 'tools/call') {

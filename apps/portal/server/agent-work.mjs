@@ -95,7 +95,7 @@ export function agentWork({ db, know, catalogs = null }) {
     const item = goalItem(projectId, workId);
     const phases = phasesOf(projectId, workId), actions = actionRows(projectId, workId), needs = openNeeds(projectId, workId);
     const events = db.prepare('SELECT * FROM (SELECT * FROM work_goal_events WHERE project_id = ? AND work_id = ? ORDER BY id DESC LIMIT 300) ORDER BY id').all(projectId, workId).map(eventRow);
-    return { item, brief: goalOf(item).brief, defined: Boolean(goalOf(item).defined), performer: goalOf(item).performer || null, phases,
+    return { item, brief: goalOf(item).brief, defined: Boolean(goalOf(item).defined), performer: goalOf(item).performer || null, code: goalOf(item).code || null, phases,
       actions: actions.map(action => ({ ...action, needs: needs.filter(need => need.action === action.number), blocked: ['todo', 'proposed'].includes(action.state) ? blockedReason(action, actions, phases) : null })),
       needs, events, changeset: changeset(projectId, workId) };
   }
@@ -332,6 +332,24 @@ export function agentWork({ db, know, catalogs = null }) {
     if (result.staged) record(projectId, workId, { kind: 'log', action: action.number, author: actor, text: `Staged ${result.staged.op} of ${result.staged.kind.replace(/_/g, ' ')} in ${layer}` });
     return result;
   }
+  // A8: Code changes made locally live on a branch of the person's checkout, not in the record changeset. The local agent
+  // reports where they are; close-out (A4) reviews and merges that branch. Only names and hashes are stored, never content.
+  function recordCode(actor, projectId, workId, input = {}) {
+    const item = goalItem(projectId, workId);
+    if (!['progress', 'review'].includes(item.board)) fail(`Start ${item.ref} before reporting code.`, 409);
+    const branch = clean(input.branch, 200, 'Branch', true);
+    if (!/^[A-Za-z0-9._/-]+$/.test(branch)) fail('Name a git branch.');
+    const commit = clean(input.commit, 64, 'Commit', true);
+    if (!/^[0-9a-f]{7,64}$/.test(commit)) fail('Give the commit as a hex hash.');
+    const base = input.base ? clean(input.base, 64, 'Base commit') : null;
+    if (base && !/^[0-9a-f]{7,64}$/.test(base)) fail('Give the base as a hex hash.');
+    const files = (Array.isArray(input.files) ? input.files : []).slice(0, 500).map(file => ({ path: clean(file?.path, 400, 'File path', true), status: ['added', 'modified', 'deleted', 'renamed'].includes(file?.status) ? file.status : 'modified' }));
+    const code = { branch, commit, base, files, at: now() };
+    saveGoal(projectId, item, { code }, `${actor.name} reported ${branch} at ${commit.slice(0, 7)}`, byOf(actor));
+    record(projectId, workId, { kind: 'log', author: actor, text: `Code on ${branch} at ${commit.slice(0, 7)}: ${files.length} file${files.length === 1 ? '' : 's'} changed` });
+    emit(projectId, workId, { type: 'item' });
+    return view(projectId, workId);
+  }
   function changeset(projectId, workId) {
     const rows = db.prepare('SELECT layer_key, writes_json FROM layer_run_drafts WHERE attempt_id = ? AND project_id = ? ORDER BY seq').all(changesetKey(workId), projectId);
     if (!rows.length) return [];
@@ -364,8 +382,10 @@ export function agentWork({ db, know, catalogs = null }) {
     return callOperation({ db, catalogs: catalogs || know.catalogs, api, projectId, operationId: operation.operationId, id: input.id ?? null, overlay: workId ? draftOverlay(db, projectId, changesetKey(workId)) : null }).result;
   }
 
-  function goals(projectId, { assignedTo = null } = {}) {
-    return know.workList(projectId).filter(item => item.scope === 'goal' && (!assignedTo || (item.assignee?.kind === 'person' && item.assignee.id === assignedTo)))
+  // assignedTo: the person's own items. claimableBy: also the open items nobody has taken yet.
+  function goals(projectId, { assignedTo = null, claimableBy = null } = {}) {
+    const mine = (item, id) => item.assignee?.kind === 'person' && item.assignee.id === id;
+    return know.workList(projectId).filter(item => item.scope === 'goal' && (claimableBy ? mine(item, claimableBy) || (!item.assignee && ['draft', 'ready'].includes(item.board)) : !assignedTo || mine(item, assignedTo)))
       .map(item => ({ id: item.id, ref: item.ref, title: item.title, board: item.board, priority: item.priority, assignee: item.assignee, defined: Boolean(item.context?.goal?.defined),
         actions: db.prepare("SELECT state, COUNT(*) AS n FROM work_goal_actions WHERE project_id = ? AND work_id = ? AND state != 'proposed' GROUP BY state").all(projectId, item.id)
           .reduce((sum, row) => ({ ...sum, [row.state]: row.n }), {}), needs: openNeeds(projectId, item.id).length }));
@@ -377,5 +397,5 @@ export function agentWork({ db, know, catalogs = null }) {
     return () => bus.off(key, listener);
   }
 
-  return { createGoal, view, define, move, claim, assertPerformer, addAction, updateAction, post, answer, stage, changeset, stackMap, readLayer, goals, subscribe };
+  return { createGoal, view, define, move, claim, assertPerformer, addAction, updateAction, post, answer, stage, recordCode, changeset, stackMap, readLayer, goals, subscribe };
 }
