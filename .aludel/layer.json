@@ -1,0 +1,154 @@
+{
+  "schemaVersion": 1,
+  "hostSdkVersion": 1,
+  "key": "platform",
+  "name": "Code",
+  "category": "Make",
+  "icon": "code",
+  "description": "How the app's code fits together and connects to the other layers, read from its repository.",
+  "path": "/code",
+  "authority": "code_projection",
+  "outputProvider": "layer-files",
+  "editorAdapter": "native:code",
+  "install": "project-repository",
+  "outputs": [
+    "code_unit",
+    "code_release",
+    "journey"
+  ],
+  "facets": [
+    {
+      "key": "journeys",
+      "title": "User journeys",
+      "kinds": [
+        "journey"
+      ],
+      "roles": [
+        "authority",
+        "replica"
+      ],
+      "shape": "aludel.code-journeys",
+      "hints": [
+        "user-journeys"
+      ],
+      "views": [
+        "journeys"
+      ]
+    }
+  ],
+  "tabs": [
+    {
+      "key": "overview",
+      "label": "Overview"
+    },
+    {
+      "key": "explorer",
+      "label": "Explorer"
+    },
+    {
+      "key": "journeys",
+      "label": "Journeys"
+    },
+    {
+      "key": "tests",
+      "label": "Tests"
+    },
+    {
+      "key": "releases",
+      "label": "Releases"
+    }
+  ],
+  "knowledge": {
+    "charter": "knowledge/charter.md",
+    "documents": [
+      "knowledge/units.md",
+      "knowledge/release-method.md",
+      "knowledge/journeys.md"
+    ],
+    "docs": {
+      "map": "AGENTS.md",
+      "paths": [
+        "README.md",
+        "ARCHITECTURE.md",
+        "docs/"
+      ],
+      "sources": ".aludel/doc-sources.json"
+    }
+  },
+  "work": {
+    "scope": "layer"
+  },
+  "information": [
+    {
+      "key": "units",
+      "title": "Code units",
+      "intent": "The functions, components, handlers, tables and tests the app's code is made of, read from the repository at a commit.",
+      "select": {
+        "kind": "code_unit"
+      },
+      "tab": "explorer",
+      "doc": "knowledge/units.md"
+    },
+    {
+      "key": "releases",
+      "title": "Releases",
+      "intent": "Versions of the app made on purpose from one commit, with the stories they ship.",
+      "select": {
+        "kind": "code_release"
+      },
+      "tab": "releases",
+      "doc": "knowledge/release-method.md"
+    },
+    {
+      "key": "journeys",
+      "title": "Journeys",
+      "intent": "The steps people take through the app, each with the test that proves it. Review steps and Work claims come from them.",
+      "select": {
+        "kind": "journey"
+      },
+      "tab": "journeys",
+      "doc": "knowledge/journeys.md"
+    }
+  ],
+  "files": {
+    "paths": [
+      "outputs/releases.json",
+      "outputs/journeys.json"
+    ],
+    "kinds": [
+      "code_unit",
+      "code_release",
+      "journey"
+    ],
+    "indexer": "server/code-index.mjs",
+    "repository": [
+      "**"
+    ],
+    "units": [
+      "apps/portal/src/**",
+      "apps/portal/server/**",
+      "apps/portal/tests/**"
+    ],
+    "seeds": [
+      "install"
+    ]
+  },
+  "ui": {
+    "entry": "ui/code.ts",
+    "files": [
+      "ui/code.ts"
+    ],
+    "hostSdk": [
+      "context",
+      "roles"
+    ]
+  },
+  "hostCalls": [
+    "repositorySource",
+    "repositorySync",
+    "releaseDrafts",
+    "releasePublishing",
+    "ciResults",
+    "routeObservations"
+  ]
+}
