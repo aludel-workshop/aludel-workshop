@@ -178,7 +178,10 @@ try {
   await card(3).getByRole('button', { name: 'Approve' }).click();
   await state(3, 'Done');
   // A8: code committed in the person's checkout shows beside the staged records.
-  await agent('/code', { branch: 'aludel/w-8', commit: branchCommit, base: git(repo, 'rev-parse', 'main~1'), checkout, files: [{ path: 'src/pages/sign-up.html', status: 'added' }, { path: 'server/routes.mjs', status: 'modified' }] });
+  await agent('/code', { branch: 'aludel/w-8', commit: branchCommit, base: git(repo, 'rev-parse', 'main~1'), files: [{ path: 'src/pages/sign-up.html', status: 'added' }, { path: 'server/routes.mjs', status: 'modified' }] });
+  // CW-1: close-out takes the commit from the project's GitHub repository. This journey's portal has no GitHub, so the
+  // commit is put in Aludel's copy up front, standing in for that fetch (agent-work.test.mjs A4 covers the fetch itself).
+  git(repo, 'fetch', '-q', checkout, 'aludel/w-8');
   await main.locator('.wg-changes', { hasText: 'aludel/w-8' }).getByText('src/pages/sign-up.html').waitFor();
   await main.getByRole('button', { name: 'Move to review' }).click();
   await main.locator('.wg-board-review').waitFor();

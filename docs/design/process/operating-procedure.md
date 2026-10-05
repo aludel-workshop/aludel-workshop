@@ -92,7 +92,7 @@ Immediately before constructing an interaction prototype, write a verdict with e
 5. the external review frame, tasks, expected observations and simulation boundaries; the owner reviews by flagging anything and saying what they want instead, so don't add confirm-what-was-built question panels (AGENT-WORK-01: 21 such questions went unanswered and steered too narrowly); ask only a real fork, once, in the reply;
 6. unresolved assumptions and whether each is the named experiment or an accidental decision.
 
-For an implementation-readiness boundary, also require the exact design-system revision, catalog search result, allowed component-system changes, representative stories/checks and any approved escape from catalog-first assembly.
+For an implementation-readiness boundary, also require the exact design-system revision, catalog search result, allowed component-system changes, representative stories/checks and any approved escape from catalog-first assembly. For work, identity or repository features, also name each actor and the machine it acts from. Include one check run as a second member, on a machine with no access to the portal's filesystem or database. (AGENT-WORK-01 A8 passed its checks on one machine while its close-out read the person's checkout path; see COLLAB-WORK-01.)
 
 **Ready** means all applicable requirements are evidenced. **Needs groundwork** names the next ready prerequisite. **Needs owner judgment** links concrete alternatives and states the choice needed. **Needs authorization** names the external effect and authorization source required. Unknown is not ready.
 

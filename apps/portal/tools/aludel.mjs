@@ -10,7 +10,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
-import { configPath, gitReport, loadConfig, pair, request } from './aludel-client.mjs';
+import { configPath, pushReport, loadConfig, pair, request } from './aludel-client.mjs';
 
 const adapter = new URL('./editor-mcp.mjs', import.meta.url).pathname;
 const out = text => process.stdout.write(text + '\n');
@@ -78,10 +78,9 @@ try {
   } else if (command === 'submit') {
     const config = loadConfig();
     const item = await find(config, arg);
-    const report = gitReport(process.cwd());
-    if (report.dirty) throw new Error(`Commit or stash the ${report.dirty} uncommitted change${report.dirty === 1 ? '' : 's'} first; only committed work is reported.`);
-    const view = await request(config, `/goals/${encodeURIComponent(item.id)}/code`, { branch: report.branch, commit: report.commit, base: report.base, files: report.files, checkout: report.checkout });
-    out(`Reported ${report.branch} at ${report.commit.slice(0, 7)} (${report.files.length} files) to ${item.ref}.`);
+    const report = pushReport(process.cwd());
+    const view = await request(config, `/goals/${encodeURIComponent(item.id)}/code`, report);
+    out(`Pushed ${report.branch} and reported it at ${report.commit.slice(0, 7)} (${report.files.length} files) to ${item.ref}.`);
     const left = view.actions.filter(action => !['review', 'done', 'proposed'].includes(action.state));
     out(left.length ? `Still open: #${left.map(action => action.number).join(', #')}.` : `Every action is ready for review; move ${item.ref} to review on its page.`);
   } else {

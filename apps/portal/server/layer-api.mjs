@@ -19,7 +19,8 @@ const cache = new Map();
 const child = `
 let raw = '';
 process.stdin.setEncoding('utf8');
-process.stdin.on('data', chunk => { raw += chunk; if (raw.length > 1048576) process.exit(3); });
+const limit = Number(process.argv.at(-1)) || 1048576;
+process.stdin.on('data', chunk => { raw += chunk; if (raw.length > limit) process.exit(3); });
 process.stdin.on('end', async () => {
   try {
     const { source, call, args } = JSON.parse(raw);
@@ -133,11 +134,14 @@ export function layerApiAt(key, repo, commit, manifest) { return compile(key, re
 
 function handle(api, call, args) { return runPure(api.source, call, args); }
 // Runs one export of a pure, reviewed module in a limited child process: no filesystem, subprocess or network permission.
-export function runPure(source, call, args) {
+// API handlers get small limits. Indexing a repository gets larger, still bounded ones (`indexLimits`, EX-02A): a real app
+// such as Aludel's own portal is about 2,500 code units, a megabyte of input before the indexer's own output.
+export const indexLimits = { bytes: 16 * 1048576, timeout: 20000, heapMb: 256 };
+export function runPure(source, call, args, { bytes = 1048576, timeout = 3000, heapMb = 64 } = {}) {
   const payload = JSON.stringify({ source, call, args });
-  if (payload.length > 1048576) fail('The layer API input is too large.');
-  const result = spawnSync(process.execPath, ['--permission', '--max-old-space-size=64', '-e', child],
-    { input: payload, encoding: 'utf8', timeout: 3000, maxBuffer: 1048576, env: { PATH: process.env.PATH || '' } });
+  if (payload.length > bytes) fail('The layer API input is too large.');
+  const result = spawnSync(process.execPath, ['--permission', `--max-old-space-size=${heapMb}`, '-e', child, String(bytes)],
+    { input: payload, encoding: 'utf8', timeout, maxBuffer: bytes, env: { PATH: process.env.PATH || '' } });
   if (result.error || result.status !== 0 || !result.stdout) fail('The layer API handler did not finish within its limits.', 500);
   const response = JSON.parse(result.stdout);
   if (!response.ok) fail(response.message, response.status);

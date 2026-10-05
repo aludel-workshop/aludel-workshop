@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Aludel — Connect an existing repository (prototype v1)</title>
+<style>
+@font-face{font-family:Roboto;src:url(assets/roboto.woff2) format('woff2');font-weight:100 900;font-display:swap}
+@font-face{font-family:Symbols;src:url(assets/icons.ttf) format('truetype');font-display:block}
+:root{--ink:#161b26;--muted:#566275;--line:#d9dee8;--surface:#fff;--soft:#f4f6fb;--accent:#3047b9;--tint:#e9ecff;--ok:#1d7a46;--okbg:#e7f5ec;--warn:#8a5a00;--warnbg:#fff4dc;--bad:#ae2e24;--badbg:#fdeceb}
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(#f2f4fd,#f9fafe 320px);color:var(--ink);font:15px/1.5 Roboto,system-ui,sans-serif;min-height:100vh}
+button,input,textarea{font:inherit;color:inherit}button{cursor:pointer;border:0;background:transparent}button:disabled{cursor:default;opacity:.45}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+a{color:var(--accent)}
+.icon{font-family:Symbols;font-weight:normal;font-size:22px;line-height:1;display:inline-block;font-feature-settings:'liga';vertical-align:middle}
+[hidden]{display:none!important}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+/* bar and stepper, as today's onboarding */
+.bar{display:flex;align-items:center;justify-content:space-between;padding:18px 40px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:22px;color:var(--ink);text-decoration:none}.brand .icon{color:var(--accent);font-size:30px}
+.bar-right{font-weight:500;color:var(--accent);font-size:14px}
+.steps-compact{display:none;text-align:center;margin:0 16px 8px;font-size:14px;color:var(--muted)}.steps-compact b{color:var(--ink)}
+.steps{display:flex;justify-content:center;flex-wrap:wrap;gap:6px;margin:0 16px 8px;padding:0;list-style:none}
+.step{display:flex;align-items:center;gap:8px;padding:7px 12px;border-radius:999px;font-size:14px;color:var(--muted)}
+.step .dot{width:24px;height:24px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;font-size:12px;font-weight:600;background:#fff}
+.step.done .dot{background:var(--okbg);border-color:#bfe3cc;color:var(--ok)}.step.done{color:var(--ink)}
+.step.current{background:var(--tint);color:var(--accent);font-weight:600}.step.current .dot{background:var(--accent);border-color:var(--accent);color:#fff}
+main{max-width:900px;margin:0 auto;padding:16px 16px 96px}
+.eyebrow{margin:0;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+h1{margin:6px 0 10px;font-size:44px;line-height:1.1;letter-spacing:-.02em;font-weight:800}
+.lead{margin:0 0 28px;font-size:19px;color:#4a5568;max-width:640px}
+/* choice cards */
+.choices{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.choice{display:block;text-align:left;border:1.5px solid var(--line);background:#fff;border-radius:14px;padding:22px;min-height:190px}
+.choice:hover{border-color:#aab4d6}.choice[aria-checked=true]{border-color:var(--accent);box-shadow:0 0 0 3px var(--tint)}
+.choice .icon{color:var(--accent);font-size:30px}.choice h2{margin:10px 0 6px;font-size:21px;font-weight:700}.choice p{margin:0 0 8px}.choice small{color:var(--muted);font-size:13.5px;display:block}
+.style-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.actions{display:flex;justify-content:flex-end;align-items:center;gap:16px;margin-top:28px}
+.primary{background:var(--accent);color:#fff;border-radius:999px;padding:11px 22px;font-weight:500;display:inline-flex;align-items:center;gap:8px}
+.primary:disabled{background:#d9dce4;color:#6b7280;opacity:1}
+.link-btn{color:var(--accent);font-weight:500;display:inline-flex;align-items:center;gap:6px;padding:8px}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:20px}
+.github-btn{background:#1f2328;color:#fff;border-radius:999px;padding:12px 22px;font-weight:500;display:inline-flex;gap:10px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-size:13.5px;background:#fff}
+.chip[aria-pressed=true]{background:var(--tint);border-color:#b7c0ee;color:var(--accent);font-weight:500}
+.tag{display:inline-block;font-size:12px;border-radius:6px;padding:1px 7px;background:var(--soft);color:var(--muted);border:1px solid var(--line);white-space:nowrap}
+.tag.good{background:var(--okbg);color:var(--ok);border-color:#bfe3cc}
+.row-list{list-style:none;margin:0;padding:0;border:1px solid var(--line);border-radius:12px;background:#fff;overflow:hidden}
+.row-list li{display:flex;align-items:center;gap:12px;padding:13px 16px;border-top:1px solid var(--line)}.row-list li:first-child{border-top:0}
+.row-list li .grow{flex:1;min-width:0}.row-list .name{font-weight:500}.row-list .meta{color:var(--muted);font-size:13px}
+.row-list li[aria-selected=true]{background:#f6f7ff}
+.search{width:100%;padding:11px 14px 11px 40px;border:1px solid var(--line);border-radius:10px;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' fill='none' stroke='%23566275' stroke-width='2'%3E%3Ccircle cx='8' cy='8' r='6'/%3E%3Cpath d='m13 13 4 4'/%3E%3C/svg%3E") 13px 50% no-repeat;margin:12px 0}
+.facts{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 18px}
+.fact{display:inline-flex;align-items:center;gap:6px;font-size:14px}.fact .icon{font-size:19px}.fact.ok .icon{color:var(--ok)}
+.tree{list-style:none;margin:0;padding:0;border:1px solid var(--line);border-radius:12px;background:#fff}
+.tree li{display:flex;align-items:center;gap:12px;padding:12px 16px;border-top:1px solid var(--line)}.tree li:first-child{border-top:0}
+.tree li.nested{padding-left:44px}
+.tree input{width:18px;height:18px;accent-color:var(--accent)}
+.tree label{flex:1;display:flex;flex-direction:column;cursor:pointer}.tree .path{font-family:ui-monospace,Menlo,monospace;font-size:14px}.tree .meta{color:var(--muted);font-size:13px}
+.paths{margin-top:18px}
+.paths code,.mono{font-family:ui-monospace,Menlo,monospace;font-size:13.5px}
+.path-chips{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.path-chips code{background:var(--soft);border:1px solid var(--line);border-radius:6px;padding:3px 8px}
+textarea{width:100%;min-height:90px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-family:ui-monospace,Menlo,monospace;font-size:13.5px}
+.note{display:flex;gap:10px;align-items:flex-start;border-radius:10px;padding:12px 14px;font-size:14px;margin-top:16px;background:var(--soft);color:#3c4657}
+.note .icon{font-size:20px}
+.note.bad{background:var(--badbg);color:var(--bad)}.note.warn{background:var(--warnbg);color:var(--warn)}.note.ok{background:var(--okbg);color:var(--ok)}
+.layers{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.layer{border:1px solid var(--line);border-radius:12px;background:#fff;padding:14px 16px;display:flex;flex-direction:column;gap:4px}
+.layer header{display:flex;align-items:center;justify-content:space-between;font-weight:600}
+.layer p{margin:0;color:var(--muted);font-size:13.5px}
+.sw{width:38px;height:22px;border-radius:999px;background:#cfd5e2;position:relative;flex:none}.sw::after{content:'';position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .15s}
+.sw[aria-checked=true]{background:var(--accent)}.sw[aria-checked=true]::after{left:19px}.sw:disabled{opacity:.6}
+.summary{display:grid;grid-template-columns:170px 1fr;gap:10px 18px;margin:0}
+.summary dt{color:var(--muted)}.summary dd{margin:0}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:18px;max-width:420px}
+.field input{border:1px solid var(--line);border-radius:10px;padding:11px 14px;background:#fff}.field small{color:var(--muted);font-size:13px}
+details{margin-top:14px}summary{cursor:pointer;color:var(--accent);font-weight:500}
+.files{columns:2;margin:10px 0 0;padding-left:18px;font-family:ui-monospace,Menlo,monospace;font-size:13px}
+.progress{list-style:none;padding:0;margin:0 0 20px}.progress li{display:flex;gap:10px;align-items:center;padding:8px 0}.progress .icon{color:var(--ok)}
+/* review tools, outside the product */
+.review{background:#202632;color:#e7eaf2;padding:8px 40px;font-size:13px;display:flex;flex-wrap:wrap;gap:4px 18px;align-items:center}
+.review b{color:#fff}.review button{color:#c9d2ff;text-decoration:underline;padding:2px 4px;font-size:13px}.review .on{color:#fff;text-decoration:none;font-weight:600}
+.review p{margin:0}
+@media (max-width:760px){.bar{padding:14px 16px}h1{font-size:32px}.choices,.style-grid,.layers{grid-template-columns:1fr}.summary{grid-template-columns:1fr}.summary dt{margin-top:8px}.steps{display:none}.steps-compact{display:block}.tree li{flex-wrap:wrap;gap:6px 12px}.tree li.nested{padding-left:28px}.tree label{flex:1 1 calc(100% - 40px)}.tree .tag{margin-left:30px}.files{columns:1}.review{padding:8px 16px}}
+</style>
+</head>
+<body>
+<aside class="review" aria-label="Prototype review controls">
+  <p><b>Prototype v1</b> · EX-02A C0. Static, no real GitHub. Flag anything and say what you want instead.</p>
+  <p id="cases-line"><b>Code step cases:</b> <span id="cases"></span></p>
+</aside>
+<header class="bar"><a class="brand" href="#start"><span class="icon" aria-hidden="true">deployed_code</span>Aludel</a><span class="bar-right" id="who">Sign in</span></header>
+<nav aria-label="New project setup"><p class="steps-compact" id="steps-compact"></p><ol class="steps" id="steps"></ol></nav>
+<main id="main">
+
+<section data-screen="start">
+  <p class="eyebrow">New project</p>
+  <h1>Do you have code already?</h1>
+  <p class="lead">Aludel can start a new app for you, or work with one you already have.</p>
+  <div class="choices" role="radiogroup" aria-label="How to start">
+    <button class="choice" role="radio" aria-checked="false" data-path="new"><span class="icon" aria-hidden="true">auto_awesome</span><h2>Start a new app</h2><p>Describe your idea. Aludel sets up the repository, the design and a working skeleton.</p><small>Working style, your idea, layers, look &amp; feel, pages and build.</small></button>
+    <button class="choice" role="radio" aria-checked="false" data-path="connect"><span class="icon" aria-hidden="true">link</span><h2>Connect an existing repository</h2><p>Bring an app that's already on GitHub. Aludel reads its code and works alongside it.</p><small>Nothing about the app is assumed or generated. When you confirm, Aludel adds one folder, <span class="mono">.aludel/</span>.</small></button>
+  </div>
+  <div class="actions"><button class="primary" id="start-continue" disabled>Continue <span class="icon" aria-hidden="true">arrow_forward</span></button></div>
+</section>
+
+<section data-screen="new" hidden>
+  <p class="eyebrow">Start a new app</p>
+  <h1>Today's onboarding</h1>
+  <p class="lead">This path continues exactly as it does now: working style, your idea, layers, account, GitHub, agent, look &amp; feel, pages and build. The only change is that the import option leaves its GitHub step.</p>
+  <img src="../refs/current-01-start.png" alt="Today's first step, How do you want to work?" style="width:100%;border:1px solid var(--line);border-radius:12px">
+  <div class="actions"><button class="link-btn" data-go="start"><span class="icon" aria-hidden="true">arrow_back</span>Back</button></div>
+</section>
+
+<section data-screen="style" hidden>
+  <p class="eyebrow">Step 2 · Working style</p>
+  <h1>How do you want to work?</h1>
+  <p class="lead">This sets how much Aludel does for you. It isn't permanent: you can switch styles or change single preferences later.</p>
+  <div class="style-grid" role="radiogroup" aria-label="Working style">
+    <button class="choice" role="radio" aria-checked="false"><span class="icon" aria-hidden="true">auto_awesome</span><h2>Dreamer</h2><p>Describe what you imagine. Agents handle the implementation details.</p></button>
+    <button class="choice" role="radio" aria-checked="true"><span class="icon" aria-hidden="true">edit_note</span><h2>Planner</h2><p>Shape the vision, roadmap and finer details without writing the code.</p></button>
+    <button class="choice" role="radio" aria-checked="false"><span class="icon" aria-hidden="true">construction</span><h2>Tinkerer</h2><p>Hands-on and self-directed. No AI required.</p></button>
+  </div>
+  <p class="note"><span class="icon" aria-hidden="true">info</span>Unchanged from today's step.</p>
+  <div class="actions"><button class="link-btn" data-go="start"><span class="icon" aria-hidden="true">arrow_back</span>Back</button><button class="primary" data-go="account">Continue <span class="icon" aria-hidden="true">arrow_forward</span></button></div>
+</section>
+
+<section data-screen="account" hidden>
+  <p class="eyebrow">Step 3 · Account</p>
+  <h1>Sign in with GitHub</h1>
+  <p class="lead">Your repository is on GitHub, so your Aludel account starts there too. Aludel sees only the repositories its GitHub app is installed on.</p>
+  <div class="card" id="account-card">
+    <button class="github-btn" id="sign-in"><span class="icon" aria-hidden="true">code</span>Continue with GitHub</button>
+    <p id="signed-in" hidden><span class="fact ok"><span class="icon" aria-hidden="true">check_circle</span>Signed in as <b>henrydker</b></span></p>
+  </div>
+  <div class="actions"><button class="link-btn" data-go="style"><span class="icon" aria-hidden="true">arrow_back</span>Back</button><button class="primary" id="account-continue" data-go="repository" disabled>Continue <span class="icon" aria-hidden="true">arrow_forward</span></button></div>
+</section>
+
+<section data-screen="repository" hidden>
+  <p class="eyebrow">Step 4 · Repository</p>
+  <h1>Which repository?</h1>
+  <p class="lead">Repositories the Aludel app can reach on GitHub.</p>
+  <div role="group" aria-label="GitHub account" style="display:flex;gap:8px;flex-wrap:wrap">
+    <button class="chip" aria-pressed="true" data-account="aludel-workshop">aludel-workshop <span class="tag">Organization</span></button>
+    <button class="chip" aria-pressed="false" data-account="henrydker">henrydker <span class="tag">Personal</span></button>
+  </div>
+  <label class="sr" for="repo-search">Search repositories</label>
+  <input class="search" id="repo-search" placeholder="Search repositories">
+  <ul class="row-list" id="repos" role="listbox" aria-label="Repositories"></ul>
+  <p class="meta" style="color:var(--muted);font-size:13.5px;margin-top:10px">Missing one? <a href="#repository">Give the Aludel app access on GitHub</a>.</p>
+  <div class="actions"><button class="link-btn" data-go="account"><span class="icon" aria-hidden="true">arrow_back</span>Back</button><button class="primary" id="check" disabled>Check repository <span class="icon" aria-hidden="true">arrow_forward</span></button></div>
+</section>
+
+<section data-screen="code" hidden>
+  <p class="eyebrow">Step 5 · Code</p>
+  <h1>Where is the code?</h1>
+  <p class="lead" id="code-lead"></p>
+  <div class="facts" id="facts"></div>
+  <ul class="tree" id="tree" aria-label="Folders with an app in them"></ul>
+  <div class="paths">
+    <b>Code reads</b>
+    <div class="path-chips" id="path-chips"></div>
+    <details id="edit-paths"><summary>Edit paths</summary><label class="sr" for="paths-text">Paths Code reads, one per line</label><textarea id="paths-text"></textarea></details>
+  </div>
+  <div id="code-notes"></div>
+  <div class="actions"><button class="link-btn" data-go="repository"><span class="icon" aria-hidden="true">arrow_back</span>Back</button><button class="primary" id="code-continue" data-go="layers">Continue <span class="icon" aria-hidden="true">arrow_forward</span></button></div>
+</section>
+
+<section data-screen="layers" hidden>
+  <p class="eyebrow">Step 6 · Layers</p>
+  <h1>Which layers?</h1>
+  <p class="lead">Code reads the repository. The other layers start empty, and you fill them in as the project goes.</p>
+  <div class="layers" id="layers"></div>
+  <div class="actions"><button class="link-btn" data-go="code"><span class="icon" aria-hidden="true">arrow_back</span>Back</button><button class="primary" data-go="connect">Continue <span class="icon" aria-hidden="true">arrow_forward</span></button></div>
+</section>
+
+<section data-screen="connect" hidden>
+  <p class="eyebrow">Step 7 · Connect</p>
+  <h1>Ready to connect</h1>
+  <p class="lead">Check what Aludel will do, then connect.</p>
+  <div class="field"><label for="project-name">Project name</label><input id="project-name" value="Aludel"><small>Suggested from the repository's name. You can rename it later.</small></div>
+  <div class="card">
+    <dl class="summary" id="summary"></dl>
+    <div id="adds"></div>
+  </div>
+  <div class="actions"><button class="link-btn" data-go="layers"><span class="icon" aria-hidden="true">arrow_back</span>Back</button><button class="primary" id="do-connect">Connect and push <span class="icon" aria-hidden="true">arrow_forward</span></button></div>
+</section>
+
+<section data-screen="done" hidden>
+  <p class="eyebrow">Connected</p>
+  <h1 id="done-title">Aludel is connected</h1>
+  <ul class="progress" id="progress"></ul>
+  <p class="note ok" id="done-note" hidden><span class="icon" aria-hidden="true">check_circle</span><span>New commits on <span class="mono">main</span> on GitHub are picked up on their own. Work items in this project merge into it when you close them out.</span></p>
+  <div class="actions" id="done-actions" hidden><button class="link-btn" data-go="start">Start over</button><a class="primary" href="#done" style="text-decoration:none">Open Code <span class="icon" aria-hidden="true">arrow_forward</span></a></div>
+</section>
+</main>
+
+
+<script>
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+// Real data where it exists: aludel-workshop/aludel-workshop at main 095f01a, its folders with an app manifest, the
+// 17 files the install plan adds (dry run, 2026-10-05). Other repositories and the case variants are stand-ins.
+const repos = {
+  'aludel-workshop': [
+    { name: 'aludel-workshop', private: true, branch: 'main', updated: 'today', case: 'aludel' },
+    { name: 'layer-base', private: true, branch: 'main', updated: '3 days ago', case: 'root' }],
+  henrydker: [
+    { name: 'tool-share', private: true, branch: 'main', updated: 'last week', case: 'root' },
+    { name: 'old-blog', private: false, branch: 'master', updated: '2 years ago', case: 'master' }]
+};
+const cases = {
+  aludel: { label: 'Aludel (monorepo)', repo: 'aludel-workshop/aludel-workshop', commit: '095f01a', files: '1,391', existing: false,
+    folders: [
+      { path: 'aludel-workshop', root: true, meta: 'No app manifest here · docs/, tools/', checked: false },
+      { path: 'apps/portal', meta: 'package.json · 310 files · src/, server/, tests/', tag: 'Node · Angular', suggested: true, checked: true, reads: 263 },
+      { path: 'prototypes/d-01e', meta: 'package.json · 36 files', tag: 'Node', checked: false, reads: 0 },
+      { path: 'prototypes/d-01f', meta: 'package.json · 31 files', tag: 'Node', checked: false, reads: 0 }] },
+  root: { label: 'Single app at the root', repo: 'henrydker/tool-share', commit: '4be12c0', files: '212', existing: false,
+    folders: [{ path: 'tool-share', root: true, meta: 'package.json · src/, server/, tests/', tag: 'Node · Vite', suggested: true, checked: true, reads: 148 }] },
+  master: { label: 'Default branch isn’t main', repo: 'henrydker/old-blog', commit: '—', files: '96', existing: false, blocked: 'branch', folders: [] },
+  large: { label: 'Too large', repo: 'aludel-workshop/aludel-workshop', commit: '095f01a', files: '1,391', existing: false,
+    folders: [{ path: 'aludel-workshop', root: true, meta: 'Everything in the repository', tag: 'Whole repository', checked: true, reads: 3412 }] },
+  existing: { label: 'Already has .aludel/', repo: 'aludel-workshop/layer-base', commit: '9d0e7a1', files: '705', existing: true,
+    folders: [{ path: 'layer-base', root: true, meta: '.aludel/layer.json already says: src/**, server/**, tests/**', tag: 'From .aludel/', checked: true, reads: 211, locked: true }] }
+};
+const adds = ['.aludel/.gitignore','.aludel/AGENTS.md','.aludel/README.md','.aludel/docs/layer-contract.md','.aludel/docs/migration-ledger.md','.aludel/docs/source-inventory.md','.aludel/knowledge/charter.md','.aludel/knowledge/journeys.md','.aludel/knowledge/release-method.md','.aludel/knowledge/units.md','.aludel/layer.json','.aludel/outputs/journeys.json','.aludel/outputs/releases.json','.aludel/server/code-index.mjs','.aludel/tests/code-index.test.mjs','.aludel/tests/contract.test.mjs','.aludel/ui/code.ts'];
+const limit = 2000;
+const state = { path: null, screen: 'start', account: 'aludel-workshop', repo: null, signedIn: false, kase: 'aludel', layers: { Code: true, Vision: true, Design: true, Pages: true, Data: true, Deploy: false } };
+const connectSteps = [['start','Start'],['style','Working style'],['account','Account'],['repository','Repository'],['code','Code'],['layers','Layers'],['connect','Connect']];
+
+function show(screen) {
+  state.screen = screen;
+  $$('[data-screen]').forEach(el => el.hidden = el.dataset.screen !== screen);
+  const steps = state.path === 'connect' || screen === 'start' ? connectSteps : [['start','Start']];
+  const at = Math.max(0, steps.findIndex(([id]) => id === (screen === 'done' ? 'connect' : screen)));
+  $('#steps').innerHTML = (state.path === 'new' && screen === 'new') ? '' : steps.map(([id, label], i) =>
+    `<li class="step ${screen === 'done' || i < at ? 'done' : i === at ? 'current' : ''}"${i === at && screen !== 'done' ? ' aria-current="step"' : ''}><span class="dot" aria-hidden="true">${screen === 'done' || i < at ? '✓' : i + 1}</span><span class="label">${label}</span></li>`).join('');
+  const label = steps[at]?.[1];
+  $('#steps-compact').innerHTML = (state.path === 'new' && screen === 'new') ? '' : screen === 'done' ? '<b>Connected</b>' : `Step ${at + 1} of ${steps.length} · <b>${label}</b>`;
+  $('#cases-line').hidden = screen !== 'code';
+  if (screen === 'repository') renderRepos();
+  if (screen === 'code') renderCode();
+  if (screen === 'layers') renderLayers();
+  if (screen === 'connect') renderConnect();
+  if (location.hash.slice(1) !== screen) history.replaceState(null, '', '#' + screen);
+  window.scrollTo(0, 0);
+  const h = document.querySelector(`[data-screen="${screen}"] h1`); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); }
+}
+$$('[data-go]').forEach(b => b.addEventListener('click', () => show(b.dataset.go)));
+$$('[data-screen="start"] .choice').forEach(b => b.addEventListener('click', () => {
+  $$('[data-screen="start"] .choice').forEach(o => o.setAttribute('aria-checked', String(o === b)));
+  state.path = b.dataset.path; $('#start-continue').disabled = false;
+}));
+$('#start-continue').addEventListener('click', () => show(state.path === 'new' ? 'new' : 'style'));
+$$('[data-screen="style"] .choice').forEach(b => b.addEventListener('click', () => $$('[data-screen="style"] .choice').forEach(o => o.setAttribute('aria-checked', String(o === b)))));
+$('#sign-in').addEventListener('click', () => { state.signedIn = true; $('#sign-in').hidden = true; $('#signed-in').hidden = false; $('#account-continue').disabled = false; $('#who').textContent = 'henrydker'; });
+
+function renderRepos() {
+  $$('[data-account]').forEach(c => c.setAttribute('aria-pressed', String(c.dataset.account === state.account)));
+  const q = $('#repo-search').value.trim().toLowerCase();
+  const list = repos[state.account].filter(r => r.name.includes(q));
+  $('#repos').innerHTML = list.map(r => `<li role="option" tabindex="0" aria-selected="${state.repo?.name === r.name}" data-repo="${r.name}">
+    <span class="icon" aria-hidden="true">${r.private ? 'lock' : 'public'}</span>
+    <span class="grow"><span class="name">${state.account}/${r.name}</span><br><span class="meta">${r.private ? 'Private' : 'Public'} · default branch ${r.branch} · updated ${r.updated}</span></span>
+    ${state.repo?.name === r.name ? '<span class="icon" aria-hidden="true" style="color:var(--accent)">check_circle</span>' : ''}</li>`).join('') || '<li class="meta">No repositories match.</li>';
+  $$('#repos [data-repo]').forEach(li => { const pick = () => { state.repo = repos[state.account].find(r => r.name === li.dataset.repo); state.kase = state.repo.case; renderRepos(); $('#check').disabled = false; };
+    li.addEventListener('click', pick); li.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } }); });
+}
+$$('[data-account]').forEach(c => c.addEventListener('click', () => { state.account = c.dataset.account; state.repo = null; $('#check').disabled = true; renderRepos(); }));
+$('#repo-search').addEventListener('input', renderRepos);
+$('#check').addEventListener('click', () => show('code'));
+
+function chosen() { return cases[state.kase].folders.filter(f => f.checked); }
+function pathsFor(folders) { return folders.flatMap(f => f.root ? (state.kase === 'large' ? ['**'] : ['src/**', 'server/**', 'tests/**']) : [`${f.path}/src/**`, `${f.path}/server/**`, `${f.path}/tests/**`]); }
+function renderCode() {
+  const c = cases[state.kase];
+  $('#code-lead').innerHTML = c.blocked ? `Aludel checked <b>${c.repo}</b> without changing anything.` : `Aludel checked <b>${c.repo}</b> at <span class="mono">main</span> (${c.commit}) without changing anything. Pick the folders Code should read.`;
+  $('#facts').innerHTML = [
+    c.blocked === 'branch' ? `<span class="fact"><span class="icon" aria-hidden="true" style="color:var(--bad)">error</span>Default branch <span class="mono">master</span></span>` : `<span class="fact ok"><span class="icon" aria-hidden="true">check_circle</span>Default branch <span class="mono">main</span></span>`,
+    `<span class="fact"><span class="icon" aria-hidden="true">description</span>${c.files} files</span>`,
+    c.existing ? `<span class="fact ok"><span class="icon" aria-hidden="true">check_circle</span>Has <span class="mono">.aludel/</span></span>` : `<span class="fact"><span class="icon" aria-hidden="true">folder</span>No <span class="mono">.aludel/</span> yet</span>`].join('');
+  $('#tree').hidden = !c.folders.length;
+  $('#tree').innerHTML = c.folders.map((f, i) => `<li class="${f.root ? '' : 'nested'}"><input type="checkbox" id="f${i}" ${f.checked ? 'checked' : ''} ${f.locked ? 'disabled' : ''}>
+    <label for="f${i}"><span class="path">${f.root ? f.path + ' (root)' : f.path}</span><span class="meta">${f.meta}</span></label>
+    ${f.suggested ? '<span class="tag good">Suggested</span>' : ''}${f.tag ? `<span class="tag">${f.tag}</span>` : ''}</li>`).join('');
+  $$('#tree input').forEach((box, i) => box.addEventListener('change', () => { c.folders[i].checked = box.checked; renderCode(); }));
+  const paths = pathsFor(chosen()), reads = chosen().reduce((n, f) => n + (f.reads || 0), 0);
+  $('#path-chips').innerHTML = paths.length ? paths.map(p => `<code>${p}</code>`).join('') : '<span class="meta" style="color:var(--muted)">Nothing chosen yet.</span>';
+  if (document.activeElement !== $('#paths-text')) $('#paths-text').value = paths.join('\n');
+  const notes = [];
+  if (c.blocked === 'branch') notes.push(`<p class="note bad"><span class="icon" aria-hidden="true">error</span><span><b>${c.repo}</b> uses <span class="mono">master</span> as its default branch. Aludel works on <span class="mono">main</span> for now: rename the branch on GitHub, then check again.</span></p>`);
+  else if (reads > limit) notes.push(`<p class="note warn"><span class="icon" aria-hidden="true">warning</span><span>These paths cover ${reads.toLocaleString()} source files. Code reads up to ${limit.toLocaleString()}. Choose narrower folders or edit the paths.</span></p>`);
+  else if (paths.length) notes.push(`<p class="note"><span class="icon" aria-hidden="true">info</span><span>Code will read ${reads.toLocaleString()} files. ${c.existing ? 'This comes from the repository’s <span class="mono">.aludel/layer.json</span>; change it there.' : 'This is saved in the repository, in <span class="mono">.aludel/layer.json</span>. Changing it later is reviewed like any other change.'}</span></p>`);
+  $('#code-notes').innerHTML = notes.join('');
+  $('#code-continue').disabled = Boolean(c.blocked) || !paths.length || reads > limit;
+  $('#cases').innerHTML = Object.entries(cases).map(([k, v]) => `<button class="${k === state.kase ? 'on' : ''}" data-case="${k}">${v.label}</button>`).join(' · ');
+  $$('#cases [data-case]').forEach(b => b.addEventListener('click', () => { state.kase = b.dataset.case; renderCode(); }));
+}
+function renderLayers() {
+  const about = { Code: `Reads ${pathsFor(chosen()).length ? chosen().map(f => f.root ? 'the repository root' : f.path).join(', ') : 'the repository'}.`, Vision: 'Purpose, people and outcomes.', Design: 'Tokens and components.', Pages: 'Pages and flows.', Data: 'Objects and operations.', Deploy: 'Not set up yet: needs the app’s build declaration.' };
+  $('#layers').innerHTML = Object.entries(state.layers).map(([name, on]) => `<div class="layer"><header>${name}<button class="sw" role="switch" aria-label="${name}" aria-checked="${on}" ${name === 'Code' || name === 'Deploy' ? 'disabled' : ''} data-layer="${name}"></button></header><p>${about[name]}</p>${name !== 'Code' && name !== 'Deploy' ? '<p>Starts empty.</p>' : ''}</div>`).join('');
+  $$('#layers [data-layer]').forEach(sw => sw.addEventListener('click', () => { state.layers[sw.dataset.layer] = !state.layers[sw.dataset.layer]; renderLayers(); }));
+}
+function renderConnect() {
+  const c = cases[state.kase], paths = pathsFor(chosen());
+  const on = Object.entries(state.layers).filter(([, v]) => v).map(([k]) => k);
+  $('#summary').innerHTML = `<dt>Repository</dt><dd>${c.repo} · <span class="mono">main</span> · ${c.commit}</dd>
+    <dt>Code reads</dt><dd class="mono">${paths.join(', ')}</dd>
+    <dt>Layers</dt><dd>${on.join(', ')}</dd>
+    <dt>Working style</dt><dd>${$('[data-screen="style"] .choice[aria-checked=true] h2')?.textContent || 'Planner'}</dd>`;
+  $('#adds').innerHTML = c.existing
+    ? `<p class="note ok"><span class="icon" aria-hidden="true">check_circle</span><span>The repository already has <span class="mono">.aludel/</span>. Nothing is added or pushed.</span></p>`
+    : `<p class="note"><span class="icon" aria-hidden="true">commit</span><span>Aludel adds ${adds.length} files in one commit, <span class="mono">Add Aludel (.aludel/)</span>, and pushes it to <span class="mono">main</span> on GitHub. Nothing else in the repository changes.</span></p>
+       <details><summary>The ${adds.length} files</summary><ul class="files">${adds.map(f => `<li>${f}</li>`).join('')}</ul></details>`;
+  $('#do-connect').innerHTML = (c.existing ? 'Connect' : 'Connect and push') + ' <span class="icon" aria-hidden="true">arrow_forward</span>';
+}
+$('#do-connect').addEventListener('click', () => {
+  const c = cases[state.kase], name = $('#project-name').value.trim() || 'Your project';
+  show('done'); $('#done-title').textContent = `${name} is connected`;
+  const steps = [`Cloned ${c.repo}`, ...(c.existing ? [] : [`Added .aludel/ (${adds.length} files) in commit 7c41e2d`, 'Pushed to main on GitHub']), `Code read ${chosen().reduce((n, f) => n + (f.reads || 0), 0).toLocaleString()} files`];
+  $('#progress').innerHTML = ''; $('#done-note').hidden = true; $('#done-actions').hidden = true;
+  steps.forEach((text, i) => setTimeout(() => { $('#progress').insertAdjacentHTML('beforeend', `<li><span class="icon" aria-hidden="true">check_circle</span>${text}</li>`);
+    if (i === steps.length - 1) { $('#done-note').hidden = false; $('#done-actions').hidden = false; } }, 350 * (i + 1)));
+});
+const first = location.hash.slice(1);
+if (first && document.querySelector(`[data-screen="${first}"]`)) { state.path = first === 'new' ? 'new' : first === 'start' ? null : 'connect'; state.signedIn = true; if (first === 'repository' || first === 'code' || first === 'layers' || first === 'connect') state.repo = repos['aludel-workshop'][0]; }
+if (state.signedIn) { $('#sign-in').hidden = true; $('#signed-in').hidden = false; $('#account-continue').disabled = false; $('#who').textContent = 'henrydker'; }
+if (state.repo) $('#check').disabled = false;
+show(first && document.querySelector(`[data-screen="${first}"]`) ? first : 'start');
+</script>
+</body>
+</html>

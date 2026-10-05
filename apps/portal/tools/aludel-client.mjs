@@ -71,5 +71,21 @@ export function gitReport(cwd, base = null) {
     return { path: paths.at(-1), status: statuses[code[0]] || 'modified' };
   }) : [];
   const dirty = git('status', '--porcelain').split('\n').filter(Boolean).length;
-  return { branch, commit, base: from || null, files, dirty, checkout: git('rev-parse', '--show-toplevel') };
+  return { branch, commit, base: from || null, files, dirty };
+}
+// COLLAB-WORK-01 CW-1: committed work reaches Aludel through the project's GitHub repository, never a folder path. Push the
+// branch to origin with the person's own git credentials (never Aludel's), then report it. Main only changes at close-out.
+// The item's branch is rewritten by a rebase after a conflict, so the push is forced, but only over what this checkout last
+// saw there (--force-with-lease); close-out merges exactly the reported commit, so nothing else can slip in.
+export function pushReport(cwd, base = null) {
+  const report = gitReport(cwd, base);
+  if (report.dirty) throw new Error(`Commit or stash the ${report.dirty} uncommitted change${report.dirty === 1 ? '' : 's'} first; only committed work is reported.`);
+  if (['main', 'master'].includes(report.branch)) throw new Error(`Work on a branch named for the item, not ${report.branch}: main only changes when your person closes the item out.`);
+  try { execFileSync('git', ['push', '--quiet', '--force-with-lease', 'origin', `HEAD:refs/heads/${report.branch}`], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 120000 }); }
+  catch (error) {
+    const said = String(error.stderr || error.message).trim().split('\n').slice(-2).join(' ');
+    throw new Error(`Couldn't push ${report.branch} to origin: ${said}${/stale info|rejected/.test(said) ? ' (someone else pushed to it: fetch origin and look before pushing again)' : ''}`);
+  }
+  const { dirty, ...reported } = report;
+  return reported;
 }

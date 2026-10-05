@@ -7,8 +7,9 @@ import { execFileSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { existsSync } from 'node:fs';
-import { isAbsolute, join } from 'node:path';
+import { join } from 'node:path';
 import { requireMember } from './accounts.mjs';
+import { gitWithToken } from './git-repository.mjs';
 import { applyWrites, callOperation, draftChanges, draftOverlay, layerApi, stageOperation } from './layer-api.mjs';
 import { layerCatalog } from './layer-contract.mjs';
 import { layerPackageForProject } from './layer-package.mjs';
@@ -366,7 +367,8 @@ export function agentWork({ db, know, catalogs = null }) {
     return view(projectId, workId);
   }
   // A4: close-out merges the reported branch into the project's main branch, as a person saying "looks good, merge it".
-  // The commit comes from the person's checkout (the local work style runs the portal beside it). A fast-forward when it can,
+  // COLLAB-WORK-01 CW-1: the commit comes from the project's GitHub repository (fetchCode), never from a folder on the
+  // person's machine, so it works the same for a collaborator on another machine. A fast-forward when it can,
   // otherwise a merge commit written without touching any working tree; conflicts go back to the agent to rebase.
   function repository(projectId) {
     const workspace = db.prepare('SELECT workspace_path FROM project_setup WHERE project_id = ?').get(projectId)?.workspace_path;
@@ -384,11 +386,7 @@ export function agentWork({ db, know, catalogs = null }) {
     const repo = repository(projectId);
     if (!repo) fail(`This project has no repository with a main branch for Aludel to merge ${code.branch} into.`, 409);
     const { git, has, target } = repo;
-    if (!has(['cat-file', '-e', `${code.commit}^{commit}`])) {
-      if (!code.checkout || !existsSync(code.checkout)) fail(`Aludel can't reach the checkout with ${code.branch}. Report the code again from it.`, 409);
-      try { git(['fetch', '--no-tags', '--quiet', '--', code.checkout, `refs/heads/${code.branch}`]); } catch { fail(`Aludel couldn't fetch ${code.branch} from ${code.checkout}.`, 409); }
-      if (!has(['cat-file', '-e', `${code.commit}^{commit}`])) fail(`${code.branch} has moved since ${code.commit.slice(0, 7)} was reported. Report the code again.`, 409);
-    }
+    if (!has(['cat-file', '-e', `${code.commit}^{commit}`])) fail(`Aludel doesn't have ${code.branch} at ${code.commit.slice(0, 7)}. Push it to the project's GitHub repository, then close out.`, 409);
     const tip = git(['rev-parse', `refs/heads/${target}`]);
     const commit = git(['rev-parse', `${code.commit}^{commit}`]);
     if (has(['merge-base', '--is-ancestor', commit, tip])) return { ...repo, tip, to: tip, mode: 'already' };
@@ -421,6 +419,27 @@ export function agentWork({ db, know, catalogs = null }) {
     } else {
       try { git(['update-ref', `refs/heads/${target}`, to, tip]); } catch { fail(`${target} moved while closing out. Try again.`, 409); }
     }
+  }
+  // CW-1: before close-out, the host fetches the reported branch from the project's GitHub repository (remote: its clone URL
+  // and an installation token; a plain URL in tests). What merges is exactly the commit that was reported and reviewed: a
+  // branch that moved on GitHub since is refused until the code is reported again. Without a remote, the commit must
+  // already be in the project repository.
+  function fetchCode(projectId, workId, remote) {
+    const item = goalItem(projectId, workId), code = goalOf(item).code;
+    if (!code || item.board !== 'review') return null; // close-out itself says what's missing first
+    const repo = repository(projectId);
+    if (!repo) fail(`This project has no repository with a main branch for Aludel to merge ${code.branch} into.`, 409);
+    if (!remote) {
+      if (repo.has(['cat-file', '-e', `${code.commit}^{commit}`])) return code.commit;
+      fail(`This project has no GitHub repository to fetch ${code.branch} from. Connect one, push the branch, then close out.`, 409);
+    }
+    const ref = `refs/aludel/work/${workId}`;
+    const args = ['fetch', '--no-tags', '--quiet', remote.url, `+refs/heads/${code.branch}:${ref}`];
+    const fetched = remote.token ? gitWithToken(repo.workspace, args, remote.token).status === 0 : repo.has(args);
+    if (!fetched) fail(`Aludel couldn't fetch ${code.branch} from GitHub. Push it (aludel submit ${item.ref}), then close out.`, 409);
+    const tip = repo.git(['rev-parse', ref]);
+    if (!tip.startsWith(code.commit)) fail(`${code.branch} is at ${tip.slice(0, 7)} on GitHub, but ${code.commit.slice(0, 7)} was reported. Report the code again so what merges is what was reviewed.`, 409);
+    return tip;
   }
   // A4: close-out. Every action reviewed; the record changeset applies once, in one transaction, under each layer's API
   // checks it was staged with, after confirming nothing it changes moved since; the code merges into main in the same step.
@@ -467,8 +486,9 @@ export function agentWork({ db, know, catalogs = null }) {
     emit(projectId, workId, { type: 'item' });
   }
 
-  // A8: Code changes made locally live on a branch of the person's checkout, not in the record changeset. The local agent
-  // reports where they are and from which checkout, so close-out (A4) can fetch and merge it. Never file content.
+  // A8: Code changes made locally live on a branch, not in the record changeset. The local tools push the branch to the
+  // project's GitHub repository, then report it here, so close-out (A4) can fetch and merge it. Never file content, and
+  // never a folder path (CW-1: older clients still send `checkout`; it is ignored).
   function recordCode(actor, projectId, workId, input = {}) {
     const item = goalItem(projectId, workId);
     if (!['progress', 'review'].includes(item.board)) fail(`Start ${item.ref} before reporting code.`, 409);
@@ -479,9 +499,7 @@ export function agentWork({ db, know, catalogs = null }) {
     const base = input.base ? clean(input.base, 64, 'Base commit') : null;
     if (base && !/^[0-9a-f]{7,64}$/.test(base)) fail('Give the base as a hex hash.');
     const files = (Array.isArray(input.files) ? input.files : []).slice(0, 500).map(file => ({ path: clean(file?.path, 400, 'File path', true), status: ['added', 'modified', 'deleted', 'renamed'].includes(file?.status) ? file.status : 'modified' }));
-    const checkout = input.checkout ? clean(input.checkout, 1000, 'Checkout') : null;
-    if (checkout && !isAbsolute(checkout)) fail('Give the checkout as an absolute path.');
-    const code = { branch, commit, base, files, checkout, at: now() };
+    const code = { branch, commit, base, files, at: now() };
     saveGoal(projectId, item, { code }, `${actor.name} reported ${branch} at ${commit.slice(0, 7)}`, byOf(actor));
     record(projectId, workId, { kind: 'log', author: actor, text: `Code on ${branch} at ${commit.slice(0, 7)}: ${files.length} file${files.length === 1 ? '' : 's'} changed` });
     emit(projectId, workId, { type: 'item' });
@@ -535,5 +553,5 @@ export function agentWork({ db, know, catalogs = null }) {
     return () => bus.off(key, listener);
   }
 
-  return { createGoal, view, define, move, claim, assertPerformer, addAction, updateAction, post, answer, stage, recordCode, review, closeOut, notePush, changeset, stackMap, readLayer, goals, subscribe };
+  return { createGoal, view, define, move, claim, assertPerformer, addAction, updateAction, post, answer, stage, recordCode, review, fetchCode, closeOut, notePush, changeset, stackMap, readLayer, goals, subscribe };
 }

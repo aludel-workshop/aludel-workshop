@@ -66,11 +66,19 @@ export function indexSources(sources, { entries = defaultEntries } = {}) {
 
 // The source files a set of globs selects at one commit, read from Git (not the working tree), within the size limit.
 // `.env` files never match: they are never source.
+// The tracked files at a commit, with their blob, size and path.
+export function treeAt(repo, commit) {
+  return execFileSync('git', ['-C', repo, 'ls-tree', '-r', '-z', '--long', commit], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+    .split('\0').filter(Boolean).map(line => { const [meta, path] = line.split('\t'); const [, type, object, size] = meta.split(/\s+/); return { type, object, size: Number(size), path }; });
+}
+// The tree entries that are source a set of globs selects (without the size limit check): what Code would read.
+export function listSources(tree, globs, { exclude = null } = {}) {
+  return tree.filter(entry => entry.type === 'blob' && entry.size <= fileLimit && sourceFile(entry.path) && !/(^|\/)\.env/.test(entry.path)
+    && (!exclude || !entry.path.startsWith(exclude)) && globs.some(glob => matchesGlob(glob, entry.path)));
+}
+export const maxSourceFiles = maxFiles;
 export function sourcesAt(repo, commit, globs, { exclude = null } = {}) {
-  const listed = execFileSync('git', ['-C', repo, 'ls-tree', '-r', '-z', '--long', commit], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
-    .split('\0').filter(Boolean).map(line => { const [meta, path] = line.split('\t'); const [, type, object, size] = meta.split(/\s+/); return { type, object, size: Number(size), path }; })
-    .filter(entry => entry.type === 'blob' && entry.size <= fileLimit && sourceFile(entry.path) && !/(^|\/)\.env/.test(entry.path)
-      && (!exclude || !entry.path.startsWith(exclude)) && globs.some(glob => matchesGlob(glob, entry.path)));
+  const listed = listSources(treeAt(repo, commit), globs, { exclude });
   if (listed.length > maxFiles) throw Object.assign(new Error(`More than ${maxFiles} source files match; narrow the layer's units globs.`), { status: 413 });
   if (!listed.length) return {};
   // One `cat-file --batch` for every blob.

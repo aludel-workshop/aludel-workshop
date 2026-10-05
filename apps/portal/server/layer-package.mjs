@@ -192,7 +192,7 @@ function readPackage(repo, commit, key) {
 }
 // Forks the layer's template into this instance's own repository. Its `main` starts at the template commit; an install
 // commit makes the manifest this instance's (key, name, path) when they differ. `main` is what the host builds and serves.
-export function ensureLayerPackage(db, projectId, key, { template = null, name = null, path = null, charter = null, intoProjectRepository = false } = {}) {
+export function ensureLayerPackage(db, projectId, key, { template = null, name = null, path = null, charter = null, intoProjectRepository = false, units = null } = {}) {
   const pin = configured(key, template);
   if (!pin) return null;
   const existing = binding(db, projectId, key);
@@ -205,7 +205,7 @@ export function ensureLayerPackage(db, projectId, key, { template = null, name =
     let workspace = null;
     try { workspace = db.prepare('SELECT workspace_path AS path FROM project_setup WHERE project_id = ?').get(projectId)?.path; } catch { /* no project setup here: no repository yet */ }
     if (!workspace || !existsSync(join(workspace, '.git'))) return null;
-    try { const installed = installLayerPackageInto(db, projectId, key, workspace, { template: pin.template, name, path }); waiting.delete(`${projectId}:${key}`); return installed; }
+    try { const installed = installLayerPackageInto(db, projectId, key, workspace, { template: pin.template, name, path, units }); waiting.delete(`${projectId}:${key}`); return installed; }
     catch (error) { if (error.status === 409) { waiting.set(`${projectId}:${key}`, error.message); return null; } throw error; }
   }
   const id = instanceId(db, projectId, key);
@@ -271,7 +271,8 @@ export function installPlan(template, repository) {
   }
   return { adds, kept, conflicts };
 }
-export function installLayerPackageInto(db, projectId, key, repo, { template = null, name = null, path = null, author = 'Aludel', replace = false } = {}) {
+// `units` (globs, repository-relative) replaces the template's `files.units`: where this repository keeps its code (EX-02A).
+export function installLayerPackageInto(db, projectId, key, repo, { template = null, name = null, path = null, author = 'Aludel', replace = false, units = null } = {}) {
   const pin = configured(key, template);
   if (!pin) throw Object.assign(new Error('Layer templates are not enabled for this layer.'), { status: 409 });
   const id = instanceId(db, projectId, key);
@@ -294,6 +295,10 @@ export function installLayerPackageInto(db, projectId, key, repo, { template = n
     if (run(['rev-parse', 'refs/aludel/template']) !== pin.commit) throw new Error('Layer pin is absent from the template repository.');
     const manifest = JSON.parse(run(['show', `${pin.commit}:layer.json`]));
     const own = { ...manifest, key, name: name || manifest.name, path: path || (manifest.key === key ? manifest.path : `/${key.replace(/_/g, '-')}`) };
+    if (units) {
+      if (!manifest.files?.units) throw Object.assign(new Error('This layer does not read code units.'), { status: 409 });
+      own.files = { ...manifest.files, units: unitGlobs(units) };
+    }
     const scratch = mkdtempSync(join(repo, '.git', 'aludel-install-'));
     const env = { ...process.env, GIT_INDEX_FILE: join(scratch, 'index'), GIT_AUTHOR_NAME: String(author).slice(0, 80), GIT_AUTHOR_EMAIL: 'person@aludel.invalid', GIT_COMMITTER_NAME: 'Aludel', GIT_COMMITTER_EMAIL: 'aludel@aludel.invalid' };
     const plan = installPlan(treeFiles(run, pin.commit), treeFiles(run, head, installRoot));
@@ -335,8 +340,19 @@ export function projectRepositoryInstallPlan(checkout) {
   }
   return none;
 }
+// Code paths someone chose: repository-relative globs, no escapes, no secrets, at most 20.
+export function unitGlobs(globs) {
+  if (!Array.isArray(globs) || !globs.length || globs.length > 20) throw Object.assign(new Error('Choose between 1 and 20 code paths.'), { status: 400 });
+  return [...new Set(globs.map(glob => {
+    const value = String(glob || '').trim();
+    if (!value || value.length > 200 || value.startsWith('/') || value.split('/').includes('..') || /(^|\/)(\.git|\.aludel|\.env)(\/|$)/.test(value) || !/^[A-Za-z0-9._*\/@+-]+$/.test(value))
+      throw Object.assign(new Error(`“${value || glob}” isn't a usable code path. Use a path inside the repository, like apps/web/src/**.`), { status: 400 });
+    return value;
+  }))];
+}
 // Built-in layers that live in the project's repository install once that repository exists (after the first build, say).
-export function ensureProjectRepositoryLayers(db, projectId) {
+// `units` sets where a connected repository keeps its code, for the layer that reads code units (EX-02A).
+export function ensureProjectRepositoryLayers(db, projectId, { units = null } = {}) {
   if (!enabled()) return [];
   const config = catalog(), installed = [];
   for (const [key, template] of Object.entries(config.builtIn)) {
@@ -344,7 +360,7 @@ export function ensureProjectRepositoryLayers(db, projectId) {
     let manifest;
     try { manifest = JSON.parse(git(resolve(candidate, config.repo), 'show', `${pin.commit}:layer.json`)); } catch { continue; }
     if (manifest.install !== 'project-repository' || !db.prepare('SELECT 1 FROM layer_instances WHERE project_id = ? AND layer_key = ?').get(projectId, key)) continue;
-    const pkg = ensureLayerPackage(db, projectId, key, { intoProjectRepository: true });
+    const pkg = ensureLayerPackage(db, projectId, key, { intoProjectRepository: true, units: units && manifest.files?.units ? units : null });
     if (!pkg) continue;
     db.prepare('UPDATE layer_definitions SET output_tabs_json = ?, package_commit = ? WHERE project_id = ? AND layer_key = ? AND built_in = 1 AND package_commit IS NULL')
       .run(JSON.stringify(pkg.manifest.tabs), pkg.commit, projectId, key);

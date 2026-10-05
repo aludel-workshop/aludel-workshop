@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { createSession, createUser, initAccounts } from '../server/accounts.mjs';
 import { agentWork, changesetKey, initAgentWork } from '../server/agent-work.mjs';
+import { pushReport } from '../tools/aludel-client.mjs';
 import { initKnowledge, knowledge } from '../server/knowledge.mjs';
 import { initLayerApi } from '../server/layer-api.mjs';
 import { initOnboarding, loadCatalogs, onboarding } from '../server/onboarding.mjs';
@@ -273,6 +274,9 @@ test('A8: the aludel CLI claims a goal item from a checkout, connects Claude Cod
     const git = (...args) => execFileSync('git', args, { cwd: checkout, encoding: 'utf8' }).trim();
     git('init', '-q', '-b', 'main'); writeFileSync(join(checkout, 'README.md'), 'Tool Share\n');
     git('add', '.'); git('-c', 'user.name=Ada', '-c', 'user.email=ada@example.invalid', 'commit', '-qm', 'start');
+    // Its origin stands in for the project's GitHub repository (CW-1: code is reported by pushing there).
+    const github = join(root, 'github.git');
+    execFileSync('git', ['init', '-q', '--bare', '-b', 'main', github]); git('remote', 'add', 'origin', github); git('push', '-q', 'origin', 'main');
     const env = { ...process.env, ALUDEL_EDITOR_CONFIG: join(root, 'editor.json') };
     const cli = (...args) => spawnSync(process.execPath, [new URL('../tools/aludel.mjs', import.meta.url).pathname, ...args], { cwd: checkout, env, input: apiToken + '\n', encoding: 'utf8', timeout: 8000 });
 
@@ -304,7 +308,7 @@ test('A8: the aludel CLI claims a goal item from a checkout, connects Claude Cod
     git('checkout', '-q', '-b', `aludel/${ref.toLowerCase()}`);
     writeFileSync(join(checkout, 'borrow.js'), 'export const borrow = () => true;\n');
     const [dirty] = call([['report_code', { workId }]]);
-    assert.match(dirty.error, /Commit first/);
+    assert.match(dirty.error, /Commit or stash the 1 uncommitted change/);
     git('add', '.'); git('-c', 'user.name=Ada', '-c', 'user.email=ada@example.invalid', 'commit', '-qm', 'borrow button');
     const [reported, moved] = call([['report_code', { workId }], ['update_action', { workId, number: 1, state: 'working' }]]);
     assert.deepEqual([reported.code.branch, reported.code.files], [`aludel/${ref.toLowerCase()}`, [{ path: 'borrow.js', status: 'added' }]]);
@@ -318,6 +322,8 @@ test('A8: the aludel CLI claims a goal item from a checkout, connects Claude Cod
     assert.equal(submitted.status, 0, submitted.stderr);
     assert.match(submitted.stdout, /Still open: #1/);
     assert.equal((await portal('/' + workId)).code.commit, git('rev-parse', 'HEAD'));
+    assert.equal(execFileSync('git', ['-C', github, 'rev-parse', `aludel/${ref.toLowerCase()}`], { encoding: 'utf8' }).trim(), git('rev-parse', 'HEAD'), 'submit pushed the branch');
+    assert.match(submitted.stdout, /Pushed aludel\/w-\d+ and reported it/);
     const status = cli('status', ref).stdout;
     assert.match(status, /In progress/); assert.match(status, /#1 working/); assert.match(status, /Code: aludel\/w-\d+ at [0-9a-f]{7}, 1 files/);
     assert.ok(!existsSync(join(checkout, 'editor.json')), 'the token never lands in the checkout');
@@ -347,50 +353,65 @@ test('A4: an action is reviewed on its own; a flag sends it back to its agent; c
   assert.equal(approved.actions[1].blocked, null, 'approving the phase clears its gate');
   work.updateAction(agent, id, workId, 2, { state: 'working' });
 
-  // The project repository (main checked out) and the person's checkout, where the agent works on a branch.
+  // CW-1, as a second machine: the project's GitHub repository (a bare stand-in), Aludel's own copy of the project (main
+  // checked out), and the person's checkout elsewhere. The two copies share nothing but the remote.
   const root = mkdtempSync(join(tmpdir(), 'aludel-merge-'));
   const git = (cwd, ...args) => execFileSync('git', ['-c', 'user.name=Ada', '-c', 'user.email=ada@example.invalid', ...args], { cwd, encoding: 'utf8' }).trim();
-  const repo = join(root, 'project'), checkout = join(root, 'checkout');
+  const github = join(root, 'github.git'), repo = join(root, 'project'), checkout = join(root, 'elsewhere', 'checkout');
+  const remote = { url: github };
   try {
-    git(root, 'init', '-q', '-b', 'main', repo);
-    writeFileSync(join(repo, 'copy.txt'), 'Borrow\n'); git(repo, 'add', '.'); git(repo, 'commit', '-qm', 'start');
-    git(root, 'clone', '-q', repo, checkout); git(checkout, 'checkout', '-q', '-b', 'aludel/borrow');
+    git(root, 'init', '-q', '--bare', '-b', 'main', github);
+    git(root, 'clone', '-q', github, repo);
+    writeFileSync(join(repo, 'copy.txt'), 'Borrow\n'); git(repo, 'add', '.'); git(repo, 'commit', '-qm', 'start'); git(repo, 'push', '-q', 'origin', 'main');
+    git(root, 'clone', '-q', github, checkout); git(checkout, 'checkout', '-q', '-b', 'aludel/borrow');
     writeFileSync(join(checkout, 'copy.txt'), 'Borrow for 3 days\n'); writeFileSync(join(checkout, 'borrow.js'), 'export const borrow = () => true;\n');
     git(checkout, 'add', '.'); git(checkout, 'commit', '-qm', 'borrow button');
-    writeFileSync(join(repo, 'copy.txt'), 'Borrow it\n'); git(repo, 'commit', '-qam', 'main moves the same line');
-    const report = () => work.recordCode(agent, id, workId, { branch: 'aludel/borrow', commit: git(checkout, 'rev-parse', 'HEAD'), checkout, files: [{ path: 'borrow.js', status: 'added' }] });
-    report();
+    writeFileSync(join(repo, 'copy.txt'), 'Borrow it\n'); git(repo, 'commit', '-qam', 'main moves the same line'); git(repo, 'push', '-q', 'origin', 'main');
+    assert.throws(() => pushReport(join(root, 'project')), /Work on a branch named for the item, not main/);
+    // The person's tools push the branch to GitHub and report it: branch, commit and files, never a folder path.
+    const report = () => work.recordCode(agent, id, workId, { ...pushReport(checkout), checkout: '/an/old/client/still/sends/this' });
+    assert.equal(report().code.checkout, undefined, 'a folder path is never stored');
+    assert.equal(git(github, 'rev-parse', 'aludel/borrow'), git(checkout, 'rev-parse', 'HEAD'), 'the branch is on GitHub');
     assert.throws(() => work.recordCode(agent, id, workId, { branch: 'bad branch;', commit: 'a'.repeat(40) }), /Name a git branch/);
-    assert.throws(() => work.recordCode(agent, id, workId, { branch: 'aludel/borrow', commit: 'a'.repeat(40), checkout: 'relative/path' }), /absolute path/);
     work.updateAction(agent, id, workId, 2, { state: 'review' });
     assert.throws(() => work.closeOut(ada, id, workId), /Move .* to review first/);
     work.move(ada, id, workId, 'review');
     assert.throws(() => work.closeOut(ada, id, workId), /Review #2 first/);
     work.review(ada, id, workId, 2, { verdict: 'approve' });
-    assert.throws(() => work.closeOut(ada, id, workId), /no repository with a main branch/);
+    assert.throws(() => work.fetchCode(id, workId, remote), /no repository with a main branch/);
     db.prepare('UPDATE project_setup SET workspace_path = ? WHERE project_id = ?').run(repo, id);
     assert.equal(work.view(id, workId).code.target, 'main');
+    assert.throws(() => work.closeOut(ada, id, workId), /doesn't have aludel\/borrow at [0-9a-f]{7}\. Push it/, 'nothing reaches into the checkout');
+    assert.throws(() => work.fetchCode(id, workId, null), /no GitHub repository to fetch aludel\/borrow from/);
 
-    // A conflict goes back to the agent, who rebases and reports again.
+    // A conflict goes back to the agent, who rebases onto GitHub's main and pushes and reports again.
     const mainBefore = git(repo, 'rev-parse', 'main');
+    work.fetchCode(id, workId, remote);
     assert.throws(() => work.closeOut(ada, id, workId), error => error.status === 409 && /conflicts with main in copy\.txt\. Sent back to the agent to rebase/.test(error.message));
     const sentBack = work.view(id, workId);
     assert.equal(sentBack.item.board, 'progress');
     assert.match(sentBack.events.at(-1).text, /couldn't merge aludel\/borrow into main: it conflicts in copy\.txt\. Rebase it onto main/);
     assert.equal(git(repo, 'rev-parse', 'main'), mainBefore, 'nothing merged');
-    git(checkout, 'fetch', '-q', 'origin', 'main'); git(checkout, 'reset', '-q', '--hard', 'origin/main');
+    git(checkout, 'fetch', '-q', 'origin'); git(checkout, 'reset', '-q', '--hard', 'origin/main');
     writeFileSync(join(checkout, 'borrow.js'), 'export const borrow = () => true;\n'); git(checkout, 'add', '.'); git(checkout, 'commit', '-qm', 'borrow button, rebased');
     report();
-    // Main moves again without conflict: close-out writes a merge commit, and the records and code land together.
+    // Main moves again without conflict, and the branch moves on GitHub after it was reported: close-out refuses until the
+    // code is reported again, so what merges is what was reviewed.
     writeFileSync(join(repo, 'other.txt'), 'elsewhere\n'); git(repo, 'add', '.'); git(repo, 'commit', '-qm', 'unrelated');
     work.move(ada, id, workId, 'review');
+    writeFileSync(join(checkout, 'late.txt'), 'unreviewed\n'); git(checkout, 'add', '.'); git(checkout, 'commit', '-qm', 'late change'); git(checkout, 'push', '-q', 'origin', 'aludel/borrow');
+    assert.throws(() => work.fetchCode(id, workId, remote), /aludel\/borrow is at [0-9a-f]{7} on GitHub, but [0-9a-f]{7} was reported\. Report the code again/);
+    git(checkout, 'reset', '-q', '--hard', 'HEAD~1'); pushReport(checkout);
+    // The checkout is gone from this machine's view entirely: close-out needs only GitHub.
+    rmSync(join(root, 'elsewhere'), { recursive: true, force: true });
+    assert.equal(work.fetchCode(id, workId, remote), work.view(id, workId).code.commit);
     const closed = work.closeOut(ada, id, workId);
     assert.equal(closed.item.board, 'done');
     assert.equal(closed.code.merged.mode, 'merge commit');
     assert.equal(git(repo, 'rev-parse', 'main'), closed.code.merged.commit);
     assert.equal(git(repo, 'rev-list', '--parents', '-n', '1', 'main').split(' ').length, 3, 'a merge commit');
     assert.match(git(repo, 'log', '-1', '--format=%s %an', 'main'), /^Merge aludel\/borrow \(W-\d+: Borrow button\) Ada$/);
-    assert.ok(existsSync(join(repo, 'borrow.js')) && existsSync(join(repo, 'other.txt')), 'the checked-out main is fast-forwarded to the merge');
+    assert.ok(existsSync(join(repo, 'borrow.js')) && existsSync(join(repo, 'other.txt')) && !existsSync(join(repo, 'late.txt')), 'the reviewed commit merged, not the late one');
     assert.equal(git(repo, 'status', '--porcelain'), '');
     assert.equal(closed.code.inRepository, true);
     assert.match(closed.events.at(-1).text, /Closed: applied 0 record changes; merged aludel\/borrow into main with a merge commit \([0-9a-f]{7}\)/);

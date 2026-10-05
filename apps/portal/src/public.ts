@@ -6,6 +6,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { AgentConnectionComponent } from './agent-connection';
+import { ConnectComponent } from './connect';
 import { NgTemplateOutlet } from '@angular/common';
 import { AgentConnection, Catalog, Feel, PageRoute, ProjectSetup, Session } from './onboarding-model';
 import { ProtoSiteComponent } from './proto-site';
@@ -35,7 +36,7 @@ export class SafeUrlPipe implements PipeTransform {
 
 @Component({
   selector: 'aludel-public', standalone: true,
-  imports: [FormsModule, NgTemplateOutlet, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, AgentConnectionComponent, ProtoSiteComponent, SafeUrlPipe],
+  imports: [FormsModule, NgTemplateOutlet, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, AgentConnectionComponent, ConnectComponent, ProtoSiteComponent, SafeUrlPipe],
   templateUrl: './public.html'
 })
 export class PublicComponent implements OnDestroy {
@@ -60,6 +61,8 @@ export class PublicComponent implements OnDestroy {
     const [first, second, third] = this.segments();
     if (!first) return 'landing';
     if (first === 'login') return 'login';
+    // EX-02A: New project asks first whether there's code already; the connect path lives under /connect.
+    if (first === 'new' || first === 'connect') return 'connect';
     if (first === 'projects') return second ? 'moved' : 'projects';
     if (first === 'start') {
       if (!second) return 'profile';
@@ -69,6 +72,16 @@ export class PublicComponent implements OnDestroy {
     }
     return 'missing';
   });
+  readonly connectStep = computed(() => {
+    const [first, second] = this.segments();
+    return (first === 'connect' && ['style', 'account', 'repository', 'code', 'layers', 'finish'].includes(second) ? second : 'new') as 'new' | 'style' | 'account' | 'repository' | 'code' | 'layers' | 'finish';
+  });
+  // The connect path moves within the page through history, and refreshes the session (its draft) on each step.
+  readonly navigateTo = async (path: string) => {
+    if (!path.startsWith('/new') && !path.startsWith('/connect')) { this.go(path); return; }
+    await this.refreshSession().catch(() => {});
+    history.pushState({}, '', path); this.path.set(path); window.scrollTo(0, 0);
+  };
   readonly projectId = computed(() => {
     const [first, second] = this.segments();
     return (first === 'start' && second && !['idea', 'layers', 'account'].includes(second)) || (first === 'projects' && second) ? decodeURIComponent(second) : '';
@@ -124,10 +137,6 @@ export class PublicComponent implements OnDestroy {
   stackOptions: Record<string, boolean> = {};
   repositoryName = '';
   repositoryPrivate = true;
-  // T03-CODE: start from a new repository, or bring one the owner already has on GitHub.
-  repositorySource: 'new' | 'existing' = 'new';
-  existingName = '';
-  readonly importCheck = signal<{ repository: { owner: string; name: string; url: string; private: boolean }; files: number; adds: string[]; kept: string[]; conflicts: string[]; existing: boolean } | null>(null);
   installationId = '';
 
   constructor() {
@@ -204,7 +213,7 @@ export class PublicComponent implements OnDestroy {
     finally { this.busy.set(false); this.changeDetector.markForCheck(); }
   }
 
-  private async refreshSession() { this.session.set(await this.api<Session>('/api/session')); }
+  async refreshSession() { this.session.set(await this.api<Session>('/api/session')); }
 
   async load() {
     if (this.pollTimer) { clearTimeout(this.pollTimer); this.pollTimer = null; }
@@ -386,21 +395,6 @@ export class PublicComponent implements OnDestroy {
       }));
       const repository = this.setup()?.github.repository;
       this.notice.set(repository?.status === 'ready' ? 'Repository created and your first commit is on GitHub.' : 'The repository was created but the first push needs attention. Nothing will be created twice.');
-    });
-  }
-
-  checkImport() {
-    return this.run(async () => {
-      this.importCheck.set(null);
-      this.importCheck.set(await this.api(`/api/projects/${encodeURIComponent(this.projectId())}/repository/import`, 'POST', { installationId: Number(this.installationId), name: this.existingName.trim(), confirm: false }));
-    });
-  }
-
-  confirmImport() {
-    return this.run(async () => {
-      this.applySetup(await this.api<ProjectSetup>(`/api/projects/${encodeURIComponent(this.projectId())}/repository/import`, 'POST', { installationId: Number(this.installationId), name: this.existingName.trim(), confirm: true }));
-      this.importCheck.set(null);
-      this.notice.set('Imported. Aludel added its files in .aludel/ and pushed them to GitHub.');
     });
   }
 

@@ -201,10 +201,10 @@ const codeRemote = projectId => codeSyncing.connect(projectId);
 // Settles the Code layer with its repository: a newer local main first, then GitHub. Returns the sync state to show.
 const syncCode = projectId => codeSyncing.sync(projectId);
 // Lazily, because the GitHub integration is created further down.
-const codeImporter = { preview: (...args) => importer().preview(...args), confirm: (...args) => importer().confirm(...args) };
 let importing = null;
+// EX-02A: a connected repository's docs are its own, so its install refreshes Code without seeding starter docs.
 const importer = () => importing ||= codeImport({ db, github, importRoot: join(dataDirectory, 'imports'),
-  afterInstall: projectId => { codeRepo.seed(projectId, pool.outputEntries); codeRepo.refresh(projectId); },
+  afterInstall: projectId => { codeRepo.refresh(projectId); },
   sync: async projectId => { const code = codeRemote(projectId); return code ? remotes.sync(projectId, code.key) : null; } });
 // Existing projects: Code installs into each project's repository, then its releases move there once and its starter docs
 // are seeded (all idempotent). It runs once the portal is listening, so a restart isn't held up.
@@ -684,6 +684,35 @@ async function api(request, response, url) {
     await github.refreshInstallations(user.id);
     return json(response, 200, github.status(user.id, null, null));
   }
+  // EX-02A: create a project by connecting an existing GitHub repository. Everything stays on the draft until Connect.
+  if (url.pathname.startsWith('/api/onboarding/connect')) {
+    const token = cookie(request).aludel_draft;
+    const draft = flows.connectDraft(token);
+    if (url.pathname === '/api/onboarding/connect/repositories' && request.method === 'GET')
+      return json(response, 200, await importer().repositories(user.id, url.searchParams.get('installationId')), { 'cache-control': 'no-store' });
+    if (url.pathname === '/api/onboarding/connect/check' && request.method === 'POST') {
+      const input = await readJson(request);
+      const checked = await importer().check(user.id, draft.key, { installationId: input.installationId, name: input.name });
+      flows.saveDraft(token, { connect: { installationId: input.installationId, owner: checked.repository.owner, name: checked.repository.name, ...(checked.commit ? { commit: checked.commit } : {}) } });
+      return json(response, 200, checked, { 'cache-control': 'no-store' });
+    }
+    if (url.pathname === '/api/onboarding/connect/count' && request.method === 'POST')
+      return json(response, 200, importer().count(draft.key, (await readJson(request)).paths));
+    if (url.pathname === '/api/onboarding/connect' && request.method === 'POST') {
+      const input = await readJson(request);
+      const { installationId, name, commit } = draft.connect;
+      if (!installationId || !name) return json(response, 409, { error: 'Choose and check a repository first.' });
+      let setup = null;
+      const result = await importer().connect(user.id, draft.key, { installationId, name, commit, units: input.paths }, ({ repository }) => {
+        setup = flows.createConnected(token, user, { name: input.name, description: repository.description || '' });
+        return { projectId: setup.project.id, workspace: setup.workspacePath };
+      });
+      know.ensureAgents(result.projectId);
+      migrateActionProject(db, result.projectId);
+      return json(response, 201, { project: setup.project, installed: result.installed, reads: result.reads, sync: result.sync }, { 'set-cookie': draftCookie('', 0) });
+    }
+    return json(response, 404, { error: 'Not found.' });
+  }
   if (url.pathname === '/api/onboarding/claim' && request.method === 'POST') {
     const token = cookie(request).aludel_draft;
     const setup = flows.claimDraft(token, user, user);
@@ -1109,12 +1138,26 @@ async function api(request, response, url) {
     if (operation === 'answer' && sub) return done(200, goals.answer(user, projectId, workId, sub, input));
     if (operation === 'review' && sub) return done(200, goals.review(user, projectId, workId, Number(sub), input));
     if (operation === 'close' && !sub) {
-      // Close-out merged the code into main; a project with a GitHub repository gets main pushed there too, as the build does.
+      // CW-1: the reported branch comes from the project's GitHub repository, then close-out merges it into main and a
+      // project with a GitHub repository gets main pushed there too, as the build does (through Code's sync when it has one).
+      const binding = github.status(user.id, projectId, null).repository;
+      const ready = binding?.status === 'ready';
+      const token = ready && goals.view(projectId, workId).code ? await github.installationTokenForRepository(projectId, binding.name) : null;
+      goals.fetchCode(projectId, workId, token ? { url: binding.clone_url, token } : null);
+      // GitHub's main may have moved since (a merged pull request): Code's sync takes it first, so the merge is onto what
+      // GitHub has, and afterwards it pushes the merge. A main that can't be settled (diverged, held, unreachable) waits.
+      const code = token ? codeRemote(projectId) : null;
+      if (code) {
+        const before = (await syncCode(projectId)).remote;
+        if (before?.state !== 'in-sync') throw Object.assign(new Error(`Close-out waits until main matches GitHub: ${before?.detail || before?.state || 'Code has no remote'}.`), { status: 409 });
+      }
       const closed = goals.closeOut(user, projectId, workId);
-      const binding = closed.merged && github.status(user.id, projectId, null).repository;
-      if (binding?.status === 'ready') {
+      if (closed.merged && code) {
+        const after = await syncCode(projectId);
+        goals.notePush(projectId, workId, after.remote?.state === 'in-sync' && after.remote.remoteCommit === closed.merged.commit ? `Pushed ${closed.merged.into} to GitHub (${binding.owner}/${binding.name})`
+          : `Merged here, but ${closed.merged.into} isn't on GitHub yet: ${after.local?.detail || after.remote?.detail || after.remote?.state}`);
+      } else if (closed.merged && token) {
         try {
-          const token = await github.installationTokenForRepository(projectId, binding.name);
           pushWorkspace({ repository: closed.merged.workspace, remoteUrl: binding.clone_url, token, branch: closed.merged.into });
           goals.notePush(projectId, workId, `Pushed ${closed.merged.into} to GitHub (${binding.owner}/${binding.name})`);
         } catch (error) { goals.notePush(projectId, workId, `Merged here, but pushing ${closed.merged.into} to GitHub failed: ${String(error.message || error).slice(0, 300)}`); }
@@ -1575,14 +1618,6 @@ async function api(request, response, url) {
         return pushWorkspace({ repository: workspace, remoteUrl, token, branch: projectGitProfile.initialBranch });
       });
       codeRemote(projectId);
-      flows.markStep(user, projectId, 'github');
-      return json(response, 201, projectView(user, projectId));
-    }
-    // T03-CODE: an existing GitHub repository as the project's. `confirm: false` checks it and lists what would be added.
-    if (section === 'repository' && item === 'import' && method === 'POST' && projectId !== aludelProjectId) {
-      const input = await readJson(request);
-      if (!input.confirm) return json(response, 200, await codeImporter.preview(user.id, projectId, input));
-      await codeImporter.confirm(user.id, projectId, input, flows.projectSetup(user, projectId).workspacePath);
       flows.markStep(user, projectId, 'github');
       return json(response, 201, projectView(user, projectId));
     }
