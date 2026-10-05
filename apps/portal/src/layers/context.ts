@@ -96,7 +96,7 @@ export interface LogEntry { at: string; text: string; refs?: string[]; by?: { ki
 export interface ExecutionBlock { code: string; reason: string; recovery: 'deploy' | 'agents' | 'retry'; }
 export interface RunState { phases?: string[]; phase?: number; activity?: string; startedAt?: string; finishedAt?: string; model?: string; provider?: string; batch?: string; profileId?: string;
   usage?: { input: number; output: number }; at?: string; done?: boolean; }
-export interface WorkItem { id: string; number: number; ref: string; layer: string; type: string; action: string | null; scope?: 'layer' | 'action'; title: string; state: string; status: WorkStatus; priority: string;
+export interface WorkItem { id: string; number: number; ref: string; layer: string; type: string; action: string | null; scope?: 'layer' | 'action' | 'goal'; board?: 'draft' | 'ready' | 'progress' | 'review' | 'done'; title: string; state: string; status: WorkStatus; priority: string;
   assignee: Assignee | null; targets: WorkTarget[]; blocks: string[]; blockedBy: string[]; checks: WorkCheck[];
   question: { text: string; options: string[]; answer?: string; rationale?: string; answeredBy?: string; applied?: string[]; recommendation?: string; reasoning?: string } | null; documents: string[]; log: LogEntry[]; createdAt: string; updatedAt: string;
   profileId: string | null; instructions: InstructionPins | null; migration?: { actionId: string | null; actionRevision: number | null; disposition: 'mapped' | 'blocked'; reason: string | null } | null; project: string | null; checkpoint: string | null;

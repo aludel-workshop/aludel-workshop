@@ -6,6 +6,7 @@ import { WorkAgentsComponent } from './work-agents';
 import { WorkBoardComponent } from './work-board';
 import { WorkCreateComponent } from './work-create';
 import { WorkItemComponent } from './work-item';
+import { WorkGoalComponent } from './work-goal';
 import { WorkReviewComponent } from './work-review';
 import { WorkItemsComponent, WorkProjectsComponent } from './work-plan';
 import { WorkTeamComponent } from './work-team';
@@ -15,10 +16,11 @@ import { pollLiveBatches } from './work-shared';
 // the item page, Roles (who takes each action and how), Agents (who does agent work) and Routines.
 @Component({
   selector: 'aludel-work-layer', standalone: true,
-  imports: [FormsModule, MatIconModule, WorkBoardComponent, WorkCreateComponent, WorkItemComponent, WorkReviewComponent, WorkAgentsComponent, WorkItemsComponent, WorkProjectsComponent, WorkTeamComponent],
+  imports: [FormsModule, MatIconModule, WorkBoardComponent, WorkCreateComponent, WorkItemComponent, WorkGoalComponent, WorkReviewComponent, WorkAgentsComponent, WorkItemsComponent, WorkProjectsComponent, WorkTeamComponent],
   template: `
   @if (tab() === 'create') { <aludel-work-board /><aludel-work-create /> }
   @else if (tab() === 'item' && ctx.segments()[3] === 'review') { <aludel-work-review [id]="ctx.segments()[2] || ''" [number]="ctx.segments()[4] || ''" /> }
+  @else if (tab() === 'item' && ctx.workById().get(ctx.segments()[2] || '')?.scope === 'goal') { <aludel-work-goal [id]="ctx.segments()[2] || ''" /> }
   @else if (tab() === 'item') { <aludel-work-item [id]="ctx.segments()[2] || ''" /> }
   @else if (tab() === 'agents' && ctx.segments()[2]) { <aludel-work-agents [id]="ctx.segments()[2]" /> }
   @else if (tab() === 'projects' && ctx.segments()[2]) { <aludel-work-projects [selectedId]="ctx.segments()[2]" /> }

@@ -26,12 +26,13 @@ type Draft = { title: string; brief: string; assignee: string; state: string; pr
       <label class="wc-sr" [for]="fieldId('title')">Title</label><input [id]="fieldId('title')" name="title" class="wc-title" [(ngModel)]="title" (ngModelChange)="remember()" maxlength="160" placeholder="What needs to be done?" required cdkFocusInitial>
       <label class="wc-sr" [for]="fieldId('description')">Description</label><textarea [id]="fieldId('description')" name="brief" class="wc-description" [(ngModel)]="brief" (ngModelChange)="remember()" maxlength="2000" placeholder="Add a description…"></textarea>
       <div class="wc-metadata">
-        @if (!layer()) { <label class="wc-meta"><span class="wc-sr">Layer</span><select aria-label="Layer" name="role" [ngModel]="role()" (ngModelChange)="changeRole($event)">@for (key of layerKeys(); track key) { <option [value]="key">{{ layerName(key) }}</option> }</select></label> }
-        @if (!scope()) { <label class="wc-meta"><span class="wc-sr">Action</span><select aria-label="Action" name="action" [ngModel]="selectedAction()?.id || ''" (ngModelChange)="action.set($event); remember()">@for (entry of actions(); track entry.id) { <option [value]="entry.id">{{ entry.name }}</option> }</select></label> }
-        <label class="wc-meta"><mat-icon aria-hidden="true">person</mat-icon><span class="wc-sr">Assignee</span><select aria-label="Assignee" name="assignee" [(ngModel)]="assignee" (ngModelChange)="remember()"><option value="">{{ scope() ? 'Layer default' : 'Action default' }}</option><option value="unassigned">Unassigned</option>@for (member of ctx.data()?.members || []; track member.id) { <option [value]="'person:' + member.id">{{ member.id === ctx.me() ? 'You' : member.name }}</option> }@for (profile of ctx.data()?.profiles || []; track profile.id) { @if (profile.active) { <option [value]="'agent:' + profile.id">{{ profile.name }} (agent)</option> } }</select></label>
+        @if (!layer()) { <label class="wc-meta"><span class="wc-sr">Layer</span><select aria-label="Layer" name="role" [ngModel]="role()" (ngModelChange)="changeRole($event)"><option value="goal">Goal across layers</option>@for (key of layerKeys(); track key) { <option [value]="key">{{ layerName(key) }}</option> }</select></label> }
+        @if (!scope() && !goal()) { <label class="wc-meta"><span class="wc-sr">Action</span><select aria-label="Action" name="action" [ngModel]="selectedAction()?.id || ''" (ngModelChange)="action.set($event); remember()">@for (entry of actions(); track entry.id) { <option [value]="entry.id">{{ entry.name }}</option> }</select></label> }
+        @if (!goal()) { <label class="wc-meta"><mat-icon aria-hidden="true">person</mat-icon><span class="wc-sr">Assignee</span><select aria-label="Assignee" name="assignee" [(ngModel)]="assignee" (ngModelChange)="remember()"><option value="">{{ scope() ? 'Layer default' : 'Action default' }}</option><option value="unassigned">Unassigned</option>@for (member of ctx.data()?.members || []; track member.id) { <option [value]="'person:' + member.id">{{ member.id === ctx.me() ? 'You' : member.name }}</option> }@for (profile of ctx.data()?.profiles || []; track profile.id) { @if (profile.active) { <option [value]="'agent:' + profile.id">{{ profile.name }} (agent)</option> } }</select></label> }
         <label class="wc-meta"><mat-icon aria-hidden="true">flag</mat-icon><span class="wc-sr">Priority</span><select aria-label="Priority" name="priority" [(ngModel)]="priority" (ngModelChange)="remember()">@for (entry of priorities; track entry) { <option [value]="entry">{{ entry }}</option> }</select></label>
-        <label class="wc-meta"><mat-icon aria-hidden="true">view_kanban</mat-icon><span class="wc-sr">Place in</span><select aria-label="Place in" name="state" [(ngModel)]="state" (ngModelChange)="remember()"><option value="ready">Queue</option><option value="suggested">Backlog</option></select></label>
+        @if (!goal()) { <label class="wc-meta"><mat-icon aria-hidden="true">view_kanban</mat-icon><span class="wc-sr">Place in</span><select aria-label="Place in" name="state" [(ngModel)]="state" (ngModelChange)="remember()"><option value="ready">Queue</option><option value="suggested">Backlog</option></select></label> }
       </div>
+      @if (goal()) { <p class="wc-hint">A goal is worked across layers. Write what should be true when it's done; its actions are defined next, by you or the agent that works it.</p> } @else {
       <section class="wc-review" [attr.aria-labelledby]="fieldId('review-title')"><div class="wc-sectionhead"><h3 [id]="fieldId('review-title')">Acceptance criteria</h3><span>Optional</span></div>
         @for (criterion of criteria; track $index; let i = $index) { <div class="wc-criterion"><mat-icon aria-hidden="true">checklist</mat-icon><label class="wc-sr" [for]="fieldId('criterion-' + i)">Criterion {{ i + 1 }}</label><input [id]="fieldId('criterion-' + i)" [name]="'criterion-' + i" [ngModel]="criterion" (ngModelChange)="criteria[i] = $event; remember()" maxlength="300" placeholder="What must be true?"><button type="button" [attr.aria-label]="'Remove criterion ' + (i + 1)" (click)="criteria.splice(i, 1); remember()"><mat-icon>close</mat-icon></button></div> }
         @for (ref of linked; track ref.id) { <div class="wc-claim"><mat-icon aria-hidden="true">route</mat-icon><div><strong>{{ journey(ref.id)?.title || ref.id }}</strong><span class="wc-tag">Revision {{ ref.revision }}</span><p>{{ journey(ref.id)?.persona }} · {{ stepNames(ref) }}</p></div><button type="button" [attr.aria-label]="'Remove journey ' + ref.id" (click)="removeJourney(ref.id)"><mat-icon>close</mat-icon></button></div> }
@@ -47,11 +48,11 @@ type Draft = { title: string; brief: string; assignee: string; state: string; pr
           <footer>@if (!followUp()) { <button type="button" class="wc-quiet" (click)="specify = true; journeyTitle = title; closePicker(); remember()">Specify a new journey</button> }<button type="button" class="wc-primary" [disabled]="!hasSelection() || loading() || !!journeyError()" (click)="attach()">Attach steps</button></footer>
           </section>
         }
-      </section>
-      @if (targets().length) { <details class="wc-context-details"><summary>Link project context</summary><label>Target record<select aria-label="Target record" name="target" [(ngModel)]="target" (ngModelChange)="remember()"><option value="">No linked record</option>@for (entry of targets(); track entry.id) { <option [value]="entry.id">{{ entry.label }}</option> }</select></label></details> }
+      </section> }
+      @if (targets().length && !goal()) { <details class="wc-context-details"><summary>Link project context</summary><label>Target record<select aria-label="Target record" name="target" [(ngModel)]="target" (ngModelChange)="remember()"><option value="">No linked record</option>@for (entry of targets(); track entry.id) { <option [value]="entry.id">{{ entry.label }}</option> }</select></label></details> }
       @if (error()) { <p class="wc-error" role="alert">{{ error() }} Your draft is intact.</p> }
     </div>
-    <footer class="wc-footer"><div>@if (!embedded()) { <label><input name="another" type="checkbox" [(ngModel)]="another">Create another</label> }<p>Creates work. Doesn’t start an agent.</p></div><div><button type="button" class="wc-quiet" (click)="embedded() ? dismissed.emit() : close()">{{ embedded() ? 'Dismiss suggestion' : 'Cancel' }}</button><button type="submit" class="wc-primary" [disabled]="saving() || !title.trim() || (!scope() && !selectedAction()) || (specify && !journeyTitle.trim())">{{ saving() ? 'Saving…' : embedded() ? 'Create task' : specify ? 'Create Specify task' : 'Create' }}</button></div></footer>
+    <footer class="wc-footer"><div>@if (!embedded()) { <label><input name="another" type="checkbox" [(ngModel)]="another">Create another</label> }<p>Creates work. Doesn’t start an agent.</p></div><div><button type="button" class="wc-quiet" (click)="embedded() ? dismissed.emit() : close()">{{ embedded() ? 'Dismiss suggestion' : 'Cancel' }}</button><button type="submit" class="wc-primary" [disabled]="saving() || !title.trim() || (!scope() && !goal() && !selectedAction()) || (specify && !journeyTitle.trim())">{{ saving() ? 'Saving…' : embedded() ? 'Create task' : specify ? 'Create Specify task' : goal() ? 'Create goal' : 'Create' }}</button></div></footer>
     </fieldset></form>
   </section></div> }
   `
@@ -68,6 +69,7 @@ export class WorkCreateComponent {
   readonly layer = input<string | null>(null); readonly preset = input<string | null>(null);
   readonly priorities = priorityOrder; readonly role = signal('product'); readonly action = signal('product.define');
   readonly layerKeys = computed(() => [...new Set([...this.ctx.layerInstances().filter(entry => entry.enabled && entry.workScope).map(entry => entry.key), ...(this.ctx.data()?.layerActions || []).map(entry => entry.layer)])]);
+  readonly goal = computed(() => this.role() === 'goal' && !this.layer() && !this.followUp());
   readonly scope = computed(() => this.ctx.layerInstances().find(entry => entry.key === this.role())?.workScope || null);
   readonly actions = computed(() => (this.ctx.data()?.layerActions || []).filter(entry => entry.layer === this.role()));
   readonly selectedAction = computed<LayerWorkAction | null>(() => this.actions().find(entry => entry.id === this.action()) || this.actions()[0] || null);
@@ -102,21 +104,24 @@ export class WorkCreateComponent {
   private back() { this.ctx.go(this.layer() ? this.ctx.link(this.layer()!, 'tasks') : this.ctx.link('work', 'board')); }
   @HostListener('document:keydown', ['$event']) keyboard(event: KeyboardEvent) { if (this.minimized() || (this.embedded() && !this.host.nativeElement.contains(event.target as Node))) return; if (this.embedded() && event.key === 'Escape') return; if (event.key === 'Escape') { event.preventDefault(); if (this.picker()) this.closePicker(); else this.close(); } else if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); void this.create(); } }
   async create() {
-    if (this.saving() || !this.title.trim() || (!this.scope() && !this.selectedAction())) return;
+    if (this.saving() || !this.title.trim() || (!this.scope() && !this.goal() && !this.selectedAction())) return;
     if (this.criteria.some(text => !text.trim())) { this.error.set('Write the criterion or remove the empty row.'); return; }
     this.saving.set(true); this.error.set(''); const [kind, id] = this.assignee.split(':', 2);
     const assignment = this.assignee === 'unassigned' ? { assignee: null } : kind && id ? { assignee: { kind, id } } : {};
     let created: WorkItem | undefined;
     const ok = await this.ctx.write(async () => {
       const base = { title: this.title.trim(), priority: this.priority, state: this.state, ...assignment };
-      if (this.followUp()) {
+      if (this.goal()) {
+        // AGENT-WORK-01 A3: a goal item starts as a Draft; its actions are defined on its page.
+        created = (await this.ctx.api<{ item: WorkItem }>(`/api/projects/${encodeURIComponent(this.ctx.projectId())}/goals`, 'POST', { title: this.title.trim(), brief: this.brief.trim(), priority: this.priority })).item;
+      } else if (this.followUp()) {
         const followUp = this.followUp()!;
         const result = await this.ctx.api<{ work: WorkItem }>(`/api/projects/${encodeURIComponent(this.ctx.projectId())}/work/${encodeURIComponent(followUp.workId)}/follow-ups/${encodeURIComponent(followUp.entry.id)}`, 'POST', { decision: 'create', task: { ...base, suggestion: this.brief.trim(), targets: this.target ? [{ id: this.target }] : [], checks: this.criteria.map(text => text.trim()), claims: this.linked.map((ref, i) => ({ id: `journey-${i + 1}`, kind: 'journey', journey: ref.id, revision: ref.revision, steps: ref.steps })) } }); created = result.work;
       } else if (this.specify) {
         const journeyId = this.journeyTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 64) || `journey-${crypto.randomUUID().slice(0, 8)}`;
         const result = await this.ctx.api<{ specify: WorkItem }>(`/api/projects/${encodeURIComponent(this.ctx.projectId())}/work/specify`, 'POST', { ...base, brief: this.brief.trim(), checks: this.criteria.map(text => text.trim()), claims: this.linked.map((ref, i) => ({ id: `journey-${i + 1}`, kind: 'journey', journey: ref.id, revision: ref.revision, steps: ref.steps })), journey: { id: journeyId, title: this.journeyTitle.trim() } }); created = result.specify;
       } else created = await this.ctx.api<WorkItem>(`/api/projects/${encodeURIComponent(this.ctx.projectId())}/work`, 'POST', { ...base, ...(this.scope() ? { layer: this.role() } : { action: this.selectedAction()!.id }), suggestion: this.brief.trim(), targets: this.target ? [{ id: this.target }] : [], checks: this.criteria.map(text => text.trim()), claims: this.linked.map(ref => ({ id: `journey-${this.linked.indexOf(ref) + 1}`, kind: 'journey', journey: ref.id, revision: ref.revision, steps: ref.steps })) });
-    }, 'Task created.');
+    }, this.goal() ? 'Goal created.' : 'Task created.');
     this.saving.set(false);
     if (!ok) { this.error.set(this.ctx.error() || 'Could not save the task.'); return; }
     sessionStorage.removeItem(this.draftKey());
