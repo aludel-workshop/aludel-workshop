@@ -3,10 +3,12 @@
 // question, an allow request or a new action waiting for approval is a "need" that sits on its action. Changes are staged
 // into one changeset per item through each layer's own API (the same staging Symphony runs use, keyed by the item).
 // Design: docs/design/agent-work/plan.md (A1) and the a0/v2 prototype.
+import { execFileSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { requireMember } from './accounts.mjs';
-import { callOperation, draftChanges, draftOverlay, layerApi, stageOperation } from './layer-api.mjs';
+import { applyWrites, callOperation, draftChanges, draftOverlay, layerApi, stageOperation } from './layer-api.mjs';
+import { layerCatalog } from './layer-contract.mjs';
 import { layerPackageForProject } from './layer-package.mjs';
 import { projectLayerDefinition } from './layer-registry.mjs';
 
@@ -22,7 +24,8 @@ const clean = (value, max, label, required = false) => {
 
 export const actionStates = ['proposed', 'todo', 'working', 'review', 'done'];
 const needKinds = ['question', 'allow', 'approval'];
-const eventKinds = ['message', 'log', 'steer', ...needKinds];
+// A flag is a person's review note on an action: the action goes back to working and the agent addresses it.
+const eventKinds = ['message', 'log', 'steer', 'flag', ...needKinds];
 // The changeset of a goal item is staged under this key in layer_run_drafts.
 export const changesetKey = workId => `goal-${workId}`;
 
@@ -43,6 +46,10 @@ export function initAgentWork(db) {
       resolved_at TEXT, resolution_json TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_goal_events ON work_goal_events(work_id, id);
+    -- A4: which action staged each draft row of the item's changeset, so review is per action.
+    CREATE TABLE IF NOT EXISTS work_goal_staged (
+      project_id TEXT NOT NULL, work_id TEXT NOT NULL, seq INTEGER NOT NULL, action_number INTEGER NOT NULL, PRIMARY KEY(work_id, seq)
+    );
   `);
 }
 
@@ -95,7 +102,7 @@ export function agentWork({ db, know, catalogs = null }) {
     const item = goalItem(projectId, workId);
     const phases = phasesOf(projectId, workId), actions = actionRows(projectId, workId), needs = openNeeds(projectId, workId);
     const events = db.prepare('SELECT * FROM (SELECT * FROM work_goal_events WHERE project_id = ? AND work_id = ? ORDER BY id DESC LIMIT 300) ORDER BY id').all(projectId, workId).map(eventRow);
-    return { item, brief: goalOf(item).brief, defined: Boolean(goalOf(item).defined), performer: goalOf(item).performer || null, code: goalOf(item).code || null, phases,
+    return { item, brief: goalOf(item).brief, defined: Boolean(goalOf(item).defined), performer: goalOf(item).performer || null, code: goalOf(item).code ? { ...goalOf(item).code, inRepository: goalOf(item).code.merged === 'verified' || codeMerged(projectId, goalOf(item).code) } : null, phases,
       actions: actions.map(action => ({ ...action, needs: needs.filter(need => need.action === action.number), blocked: ['todo', 'proposed'].includes(action.state) ? blockedReason(action, actions, phases) : null })),
       needs, events, changeset: changeset(projectId, workId) };
   }
@@ -329,9 +336,77 @@ export function agentWork({ db, know, catalogs = null }) {
     const layer = checkLayer(projectId, input.layer || action.layer) || fail('Name the layer to change.');
     const api = layerApi(db, projectId, layer) || fail(`The ${layer} layer publishes no API to stage through.`, 409);
     const result = stageOperation({ db, catalogs: catalogs || know.catalogs, api, projectId, attemptId: changesetKey(workId), operationId: clean(input.operationId, 120, 'Operation', true), id: input.id ?? null, body: input.body || {} });
-    if (result.staged) record(projectId, workId, { kind: 'log', action: action.number, author: actor, text: `Staged ${result.staged.op} of ${result.staged.kind.replace(/_/g, ' ')} in ${layer}` });
+    if (result.staged) {
+      const seq = db.prepare('SELECT MAX(seq) AS seq FROM layer_run_drafts WHERE attempt_id = ? AND project_id = ?').get(changesetKey(workId), projectId).seq;
+      db.prepare('INSERT OR REPLACE INTO work_goal_staged VALUES (?, ?, ?, ?)').run(projectId, workId, seq, action.number);
+      record(projectId, workId, { kind: 'log', action: action.number, author: actor, text: `Staged ${result.staged.op} of ${result.staged.kind.replace(/_/g, ' ')} in ${layerCatalog.find(entry => entry.key === layer)?.name || layer}` });
+      emit(projectId, workId, { type: 'item' });
+    }
     return result;
   }
+  // A4: a person reviews one action that is ready: approve it (done), or flag it with a note (back to working, for the agent).
+  function review(user, projectId, workId, number, input = {}) {
+    const item = goalItem(projectId, workId);
+    if (!['progress', 'review'].includes(item.board)) fail(`${item.ref} isn't being worked on.`, 409);
+    const action = actionRows(projectId, workId).find(entry => entry.number === Number(number)) || fail('Action not found.', 404);
+    if (action.state !== 'review') fail(`#${action.number} isn't ready for review.`, 409);
+    const person = { kind: 'person', id: user.id, name: user.name };
+    if (input.verdict === 'approve') {
+      db.prepare("UPDATE work_goal_actions SET state = 'done', updated_at = ? WHERE id = ? AND project_id = ?").run(now(), action.id, projectId);
+      record(projectId, workId, { kind: 'log', action: action.number, author: person, text: `Approved #${action.number}` });
+    } else if (input.verdict === 'flag') {
+      const note = clean(input.note, 2000, 'Note', true);
+      db.prepare("UPDATE work_goal_actions SET state = 'working', updated_at = ? WHERE id = ? AND project_id = ?").run(now(), action.id, projectId);
+      if (item.board === 'review') setState(projectId, item, 'claimed', `Flagged #${action.number}`, byOf(person));
+      record(projectId, workId, { kind: 'flag', action: action.number, author: person, text: note });
+    } else fail('Approve it, or flag it with a note.');
+    emit(projectId, workId, { type: 'action', number: action.number });
+    return view(projectId, workId);
+  }
+  // Is the reported commit in the project's own repository? Only when the portal runs beside it (the local work style).
+  function codeMerged(projectId, code) {
+    const workspace = db.prepare('SELECT workspace_path FROM project_setup WHERE project_id = ?').get(projectId)?.workspace_path;
+    if (!workspace || !code) return false;
+    try { execFileSync('git', ['merge-base', '--is-ancestor', code.commit, 'HEAD'], { cwd: workspace, stdio: 'ignore', timeout: 5000 }); return true; } catch { return false; }
+  }
+  // A4: close-out. Every action reviewed; the record changeset applies once, in one transaction, under each layer's API
+  // checks it was staged with, after confirming nothing it changes moved since. Code merges outside Aludel (a pull request
+  // or git), so close-out confirms it is in the project repository, or that its person says it was merged.
+  function closeOut(user, projectId, workId, input = {}) {
+    const item = goalItem(projectId, workId);
+    if (item.board !== 'review') fail(`Move ${item.ref} to review first.`, 409);
+    const left = actionRows(projectId, workId).filter(action => action.state !== 'done');
+    if (left.length) fail(`Review #${left.map(action => action.number).join(', #')} first.`, 409);
+    if (openNeeds(projectId, workId).length) fail('Answer what the item is waiting on first.', 409);
+    const code = goalOf(item).code || null;
+    const verified = codeMerged(projectId, code);
+    if (code && !verified && input.codeMerged !== true) fail(`Merge ${code.branch} at ${code.commit.slice(0, 7)}, then close out.`, 409);
+    const groups = changeset(projectId, workId);
+    for (const group of groups) for (const change of group.changes) {
+      const current = know.get(projectId, change.id);
+      if (change.op === 'create' ? current : current?.revision !== change.baseRevision) fail(`A ${change.kind.replace(/_/g, ' ')} this item changes was changed since it was staged. Send its action back to restage.`, 409);
+    }
+    const author = user.name, rationale = `Closed ${item.ref}: ${item.title}`;
+    const own = !db.isTransaction;
+    if (own) db.exec('BEGIN IMMEDIATE');
+    let applied = 0;
+    try {
+      for (const group of groups) {
+        applyWrites(know, projectId, group.changes.map(change => ({ op: change.op, kind: change.kind, id: change.id, baseRevision: change.baseRevision, data: change.after, ...(change.parentId ? { parentId: change.parentId } : {}) })), [],
+          { layer: group.layer, author, rationale, workItemId: workId });
+        applied += group.changes.length;
+      }
+      if (own) db.exec('COMMIT');
+    } catch (error) { if (own) db.exec('ROLLBACK'); throw error; }
+    const by = { kind: 'person', id: user.id };
+    saveGoal(projectId, item, { closedAt: now(), applied, code: code ? { ...code, merged: verified ? 'verified' : 'confirmed' } : null }, `${user.name} closed it`, by);
+    setState(projectId, goalItem(projectId, workId), 'done', 'Closed', by);
+    record(projectId, workId, { kind: 'log', author: { kind: 'person', id: user.id, name: user.name },
+      text: `Closed: applied ${applied} record change${applied === 1 ? '' : 's'}${code ? `; code ${verified ? 'is in the project repository' : 'merged, as confirmed'} (${code.branch} at ${code.commit.slice(0, 7)})` : ''}` });
+    emit(projectId, workId, { type: 'item' });
+    return view(projectId, workId);
+  }
+
   // A8: Code changes made locally live on a branch of the person's checkout, not in the record changeset. The local agent
   // reports where they are; close-out (A4) reviews and merges that branch. Only names and hashes are stored, never content.
   function recordCode(actor, projectId, workId, input = {}) {
@@ -351,11 +426,12 @@ export function agentWork({ db, know, catalogs = null }) {
     return view(projectId, workId);
   }
   function changeset(projectId, workId) {
-    const rows = db.prepare('SELECT layer_key, writes_json FROM layer_run_drafts WHERE attempt_id = ? AND project_id = ? ORDER BY seq').all(changesetKey(workId), projectId);
+    const rows = db.prepare('SELECT seq, layer_key, writes_json FROM layer_run_drafts WHERE attempt_id = ? AND project_id = ? ORDER BY seq').all(changesetKey(workId), projectId);
     if (!rows.length) return [];
-    const layerOf = new Map();
-    for (const row of rows) for (const write of parse(row.writes_json, [])) layerOf.set(write.id, row.layer_key);
-    const changes = draftChanges(db, projectId, changesetKey(workId));
+    const actionOf = new Map(db.prepare('SELECT seq, action_number FROM work_goal_staged WHERE project_id = ? AND work_id = ?').all(projectId, workId).map(row => [row.seq, row.action_number]));
+    const layerOf = new Map(), byAction = new Map();
+    for (const row of rows) for (const write of parse(row.writes_json, [])) { layerOf.set(write.id, row.layer_key); byAction.set(write.id, actionOf.get(row.seq) ?? null); }
+    const changes = draftChanges(db, projectId, changesetKey(workId)).map(change => ({ ...change, action: byAction.get(change.id) ?? null }));
     const layers = [...new Set(rows.map(row => row.layer_key))];
     return layers.map(layer => ({ layer, changes: changes.filter(change => layerOf.get(change.id) === layer) }));
   }
@@ -397,5 +473,5 @@ export function agentWork({ db, know, catalogs = null }) {
     return () => bus.off(key, listener);
   }
 
-  return { createGoal, view, define, move, claim, assertPerformer, addAction, updateAction, post, answer, stage, recordCode, changeset, stackMap, readLayer, goals, subscribe };
+  return { createGoal, view, define, move, claim, assertPerformer, addAction, updateAction, post, answer, stage, recordCode, review, closeOut, changeset, stackMap, readLayer, goals, subscribe };
 }

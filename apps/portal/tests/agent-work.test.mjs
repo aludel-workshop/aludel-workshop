@@ -326,3 +326,65 @@ test('A8: the aludel CLI claims a goal item from a checkout, connects Claude Cod
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('A4: an action is reviewed on its own; a flag sends it back to its agent; close-out needs every action approved and the code merged', () => fixture(({ work, ada, id }) => {
+  const agent = { kind: 'agent', id: ada.id, name: "Ada's local agent" };
+  const workId = work.createGoal(ada, id, { title: 'Borrow button' }).item.id;
+  work.define(agent, id, workId, { brief: 'A member borrows a tool.', phases: [{ title: 'Build', gated: true }, { title: 'Polish' }], actions: [{ phase: 1, goal: 'Add the button' }, { phase: 2, goal: 'Tidy the copy' }] });
+  work.claim(ada, id, workId); work.move(ada, id, workId, 'progress');
+  work.updateAction(agent, id, workId, 1, { state: 'working' });
+  assert.throws(() => work.review(ada, id, workId, 1, { verdict: 'approve' }), /isn't ready for review/);
+  work.updateAction(agent, id, workId, 1, { state: 'review', summary: 'Button added' });
+  assert.throws(() => work.review(ada, id, workId, 1, { verdict: 'flag' }), /Note is required/);
+  const flagged = work.review(ada, id, workId, 1, { verdict: 'flag', note: 'Say how long the loan lasts' });
+  assert.equal(flagged.actions[0].state, 'working');
+  assert.deepEqual(flagged.events.filter(event => event.kind === 'flag').map(event => [event.action, event.text]), [[1, 'Say how long the loan lasts']], 'the agent reads the flag in its thread');
+  work.updateAction(agent, id, workId, 1, { state: 'review', summary: 'Button says "for 3 days"' });
+  assert.throws(() => work.updateAction(agent, id, workId, 2, { state: 'working' }), /review gate/);
+  const approved = work.review(ada, id, workId, 1, { verdict: 'approve' });
+  assert.equal(approved.actions[0].state, 'done');
+  assert.equal(approved.actions[1].blocked, null, 'approving the phase clears its gate');
+  work.updateAction(agent, id, workId, 2, { state: 'working' });
+  work.recordCode(agent, id, workId, { branch: 'aludel/borrow', commit: 'a'.repeat(40), files: [{ path: 'borrow.js', status: 'added' }] });
+  assert.throws(() => work.recordCode(agent, id, workId, { branch: 'bad branch;', commit: 'a'.repeat(40) }), /Name a git branch/);
+  work.updateAction(agent, id, workId, 2, { state: 'review' });
+  assert.throws(() => work.closeOut(ada, id, workId), /Move .* to review first/);
+  work.move(ada, id, workId, 'review');
+  assert.throws(() => work.closeOut(ada, id, workId), /Review #2 first/);
+  work.review(ada, id, workId, 2, { verdict: 'approve' });
+  assert.throws(() => work.closeOut(ada, id, workId), /Merge aludel\/borrow at aaaaaaa, then close out/);
+  const closed = work.closeOut(ada, id, workId, { codeMerged: true });
+  assert.equal(closed.item.board, 'done');
+  assert.equal(closed.code.merged, 'confirmed');
+  assert.match(closed.events.at(-1).text, /Closed: applied 0 record changes; code merged, as confirmed/);
+}));
+
+test('A4: close-out applies the staged changes of every layer at once, and refuses when a record moved since', { skip: !templates && 'needs layer templates' }, () => fixture(({ know, work, ada, id }) => {
+  const agent = { kind: 'agent', id: ada.id, name: "Ada's local agent" };
+  const workId = work.createGoal(ada, id, { title: 'Brand the sign-up flow' }).item.id;
+  work.define(agent, id, workId, { brief: 'A slogan and a joining activity.', actions: [{ layer: 'design', goal: 'Add a slogan' }, { layer: 'product', goal: 'Add the joining activity' }] });
+  work.claim(ada, id, workId); work.move(ada, id, workId, 'progress');
+  for (const number of [1, 2]) work.updateAction(agent, id, workId, number, { state: 'working' });
+  work.stage(agent, id, workId, { action: 1, operationId: 'createBrandAsset', body: { asset: { name: 'Slogan', type: 'text', text: 'Borrow, don’t buy.' } } });
+  const activity = work.stage(agent, id, workId, { action: 2, operationId: 'createActivity', body: { activity: { title: 'Join Tool Share' } } });
+  assert.deepEqual(work.view(id, workId).changeset.map(group => group.changes.map(change => change.action)), [[1], [2]], 'each change knows the action that staged it');
+  for (const number of [1, 2]) { work.updateAction(agent, id, workId, number, { state: 'review' }); work.review(ada, id, workId, number, { verdict: 'approve' }); }
+  work.move(ada, id, workId, 'review');
+  const closed = work.closeOut(ada, id, workId);
+  assert.equal(closed.item.board, 'done');
+  assert.ok(know.list(id, 'brand_asset').some(asset => asset.text === 'Borrow, don’t buy.'), 'Design got its slogan');
+  assert.ok(know.get(id, activity.staged.id), 'Vision got its activity');
+  assert.match(closed.events.at(-1).text, /Closed: applied 2 record changes/);
+
+  // A second item whose record moved under it.
+  const second = work.createGoal(ada, id, { title: 'Rename the slogan' }).item.id;
+  const slogan = know.list(id, 'brand_asset').find(asset => asset.text === 'Borrow, don’t buy.');
+  work.define(agent, id, second, { brief: 'Shorter.', actions: [{ layer: 'design', goal: 'Shorten it' }] });
+  work.claim(ada, id, second); work.move(ada, id, second, 'progress');
+  work.updateAction(agent, id, second, 1, { state: 'working' });
+  work.stage(agent, id, second, { action: 1, operationId: 'updateBrandAsset', id: slogan.id, body: { changes: { text: 'Borrow it.' } } });
+  know.update(id, slogan.id, { text: 'Borrow, never buy.' }, { author: 'Ada' });
+  work.updateAction(agent, id, second, 1, { state: 'review' }); work.review(ada, id, second, 1, { verdict: 'approve' }); work.move(ada, id, second, 'review');
+  assert.throws(() => work.closeOut(ada, id, second), /was changed since it was staged/);
+  assert.equal(know.get(id, slogan.id).text, 'Borrow, never buy.', 'nothing applied');
+}));

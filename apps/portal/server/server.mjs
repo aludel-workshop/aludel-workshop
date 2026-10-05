@@ -1085,7 +1085,7 @@ async function api(request, response, url) {
     return json(response, result.status, result.body, { 'cache-control': 'no-store' });
   }
   // AGENT-WORK-01 A1: goal items. People drive them here; their local agent works on them through /api/editor/goals.
-  const goalRoute = /^\/api\/projects\/([^/]+)\/goals(?:\/([^/]+)(?:\/(define|move|claim|actions|events|answer|stream|read)(?:\/([^/]+))?)?)?$/.exec(url.pathname);
+  const goalRoute = /^\/api\/projects\/([^/]+)\/goals(?:\/([^/]+)(?:\/(define|move|claim|actions|events|answer|review|close|stream|read)(?:\/([^/]+))?)?)?$/.exec(url.pathname);
   if (goalRoute) {
     const [, rawProject, rawWork, operation, rawSub] = goalRoute;
     const projectId = decodeURIComponent(rawProject), workId = rawWork ? decodeURIComponent(rawWork) : null, sub = rawSub ? decodeURIComponent(rawSub) : null;
@@ -1107,6 +1107,8 @@ async function api(request, response, url) {
     if (operation === 'actions' && sub) return done(200, goals.updateAction(person, projectId, workId, Number(sub), input));
     if (operation === 'events' && !sub) return done(201, goals.post(person, projectId, workId, input));
     if (operation === 'answer' && sub) return done(200, goals.answer(user, projectId, workId, sub, input));
+    if (operation === 'review' && sub) return done(200, goals.review(user, projectId, workId, Number(sub), input));
+    if (operation === 'close' && !sub) return done(200, goals.closeOut(user, projectId, workId, input));
     return json(response, 404, { error: 'Not found.' });
   }
   // WORK-ITEM-UX-01: an item's runs, each with its own task snapshot, outputs, review and signature.

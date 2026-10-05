@@ -141,19 +141,28 @@ try {
   await page.getByRole('button', { name: 'Send', exact: true }).click();
   await page.locator('.wg-events').getByText('Steer: Keep the slogan under six words').waitFor();
 
-  // Interim review (A4 brings per-action review): mark #1 done; #2 works and is sent back once.
-  await card(1).getByRole('button', { name: 'Mark done' }).click();
+  // A4: review #1 on its own. A flag needs a note and sends it back to the agent, who addresses it; then approve it.
+  await card(1).locator('.wg-review').waitFor();
+  await shot('04-review-action'); await audit('review action');
+  await card(1).getByRole('button', { name: 'Flag' }).click();
+  assert.equal(await card(1).getByRole('button', { name: 'Send to the agent' }).isEnabled(), false, 'a flag needs a note');
+  await card(1).getByLabel('What should change?').fill('Use the street name, not "your street"');
+  await card(1).getByRole('button', { name: 'Send to the agent' }).click();
+  await state(1, 'Working');
+  await page.locator('.wg-events').getByText('Flagged #1: Use the street name').waitFor();
+  assert.ok((await agent('')).events.some(event => event.kind === 'flag' && event.action === 1), 'the agent reads the flag');
+  await agent('/events', { kind: 'message', action: 1, text: 'Addressed your note: the slogan now names the street.' });
+  await agent('/actions/1', { state: 'review', summary: 'The slogan names the street.' });
+  await card(1).getByRole('button', { name: 'Approve' }).click();
   await state(1, 'Done');
   await main.locator('.wg-gate', { hasText: 'Review gate cleared' }).waitFor();
   await agent('/actions/2', { state: 'working' });
   await agent('/stage', { action: 2, operationId: 'createActivity', body: { activity: { title: 'Join Tool Share' } } });
   await agent('/actions/2', { state: 'review', summary: 'Added the activity.' });
-  await card(2).getByRole('button', { name: 'Send back' }).click();
-  await state(2, 'Working');
-  await agent('/actions/2', { state: 'review', summary: 'Added the activity, named as you asked.' });
-  await card(2).getByRole('button', { name: 'Mark done' }).click();
+  await card(2).locator('.wg-review').getByText('Join Tool Share').waitFor();
+  await card(2).getByRole('button', { name: 'Approve' }).click();
   await agent('/actions/3', { state: 'working' }); await agent('/actions/3', { state: 'review', summary: 'No overflow at 390 px.' });
-  await card(3).getByRole('button', { name: 'Mark done' }).click();
+  await card(3).getByRole('button', { name: 'Approve' }).click();
   await state(3, 'Done');
   // A8: code committed in the person's checkout shows beside the staged records.
   await agent('/code', { branch: 'aludel/w-8', commit: '3f2a9c1d0b7e4a5c6d8e9f00112233445566778', base: '1111111', files: [{ path: 'src/pages/sign-up.html', status: 'added' }, { path: 'server/routes.mjs', status: 'modified' }] });
@@ -161,14 +170,27 @@ try {
   await main.getByRole('button', { name: 'Move to review' }).click();
   await main.locator('.wg-board-review').waitFor();
   assert.deepEqual((await agent('/changeset')).changeset.map(group => group.layer), ['design', 'product']);
-  await shot('04-in-review'); await audit('in review');
+  // Close-out: the code isn't in the project repository here, so its person confirms the merge.
+  await main.getByRole('heading', { name: 'Ready to close out' }).waitFor();
+  assert.equal(await main.getByRole('button', { name: 'Close out' }).isEnabled(), false, 'unmerged code holds close-out');
+  await shot('05-close-out'); await audit('close out');
+  await main.getByLabel(/I've merged aludel\/w-8 at 3f2a9c1/).check();
+  await main.getByRole('button', { name: 'Close out' }).click();
+  await main.locator('.wg-board-done').waitFor();
+  await main.getByText(/Closed\. Applied 2 record changes; code merged, as confirmed/).waitFor();
+  await main.getByText('Applied at close-out').waitFor();
+  // The thread follows its newest entry, so the close-out is in view without scrolling the list.
+  const last = main.locator('.wg-events > li').last();
+  await last.filter({ hasText: 'Closed: applied 2 record changes' }).waitFor();
+  assert.ok(await last.evaluate(entry => { const list = entry.parentElement.getBoundingClientRect(), box = entry.getBoundingClientRect(); return box.bottom <= list.bottom + 1 && box.top >= list.top - 1; }), 'the newest thread entry is in view');
+  await shot('06-closed'); await audit('closed');
 
   // 390 px.
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload(); await main.getByRole('heading', { name: 'Create the sign-up flow' }).waitFor();
-  await shot('05-phone'); await audit('phone');
+  await shot('07-phone'); await audit('phone');
   assert.deepEqual(errors, []);
-  console.log('PASS goal item page: create, define, agent phases it with a review gate, claim locally, start, live question and approval on their actions, answer, staged changeset by layer, reported code, details and log, steer, interim done and send back, gate held and cleared, move to review, axe at 1440 and 390 px.');
+  console.log('PASS goal item page: create, define, agent phases it with a review gate, claim locally, start, live question and approval on their actions, answer, staged changeset by layer, reported code, details and log, steer, per-action review with a flag the agent addresses, gate held and cleared, move to review, close-out with confirmed merge, axe at 1440 and 390 px.');
 } catch (error) {
   for (const open of browser.contexts().flatMap(context => context.pages())) await open.screenshot({ path: dest + 'failure.png', fullPage: true }).catch(() => {});
   console.error(serverLog.split('\n').filter(line => /error/i.test(line) && !/ExperimentalWarning/.test(line)).slice(-10).join('\n'));

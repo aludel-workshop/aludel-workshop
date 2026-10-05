@@ -1,4 +1,4 @@
-import { Component, DestroyRef, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { Component, DestroyRef, ElementRef, afterRenderEffect, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
@@ -10,12 +10,12 @@ import { PriorityComponent } from './work-shared';
 // each naming a layer, with what blocks it and what it needs from you sitting on it; review gates between phases; the
 // changeset staged so far. The thread (and one action's details and log) sits beside it and updates live.
 type GoalAuthor = { kind: 'person' | 'agent'; id: string; name: string };
-export type GoalEvent = { id: number; action: number | null; kind: 'message' | 'log' | 'steer' | 'question' | 'allow' | 'approval'; author: GoalAuthor | null; text: string;
+export type GoalEvent = { id: number; action: number | null; kind: 'message' | 'log' | 'steer' | 'flag' | 'question' | 'allow' | 'approval'; author: GoalAuthor | null; text: string;
   options?: string[]; at: string; resolvedAt: string | null; resolution: { text?: string; allow?: boolean; note?: string; by?: { id: string; name: string } } | null };
 export type GoalAction = { id: string; number: number; phase: number; layer: string | null; goal: string; after: number[]; state: 'proposed' | 'todo' | 'working' | 'review' | 'done';
   summary: string; addedBy: GoalAuthor | null; updatedAt: string; needs: GoalEvent[]; blocked: string | null };
-type GoalChange = { id: string; kind: string; op: 'create' | 'update' | 'delete'; after?: Record<string, unknown> | null; before?: Record<string, unknown> | null };
-export type GoalCode = { branch: string; commit: string; base: string | null; files: { path: string; status: string }[]; at: string };
+type GoalChange = { id: string; kind: string; op: 'create' | 'update' | 'delete'; action?: number | null; after?: Record<string, unknown> | null; before?: Record<string, unknown> | null };
+export type GoalCode = { branch: string; commit: string; base: string | null; files: { path: string; status: string }[]; at: string; inRepository?: boolean; merged?: 'verified' | 'confirmed' };
 export type GoalView = { item: WorkItem & { board: string }; brief: string; defined: boolean; performer: string | null; code: GoalCode | null; phases: { number: number; title: string; gated: boolean }[];
   actions: GoalAction[]; needs: GoalEvent[]; events: GoalEvent[]; changeset: { layer: string; changes: GoalChange[] }[] };
 
@@ -67,6 +67,18 @@ const actionIcon: Record<string, string> = { proposed: 'add_task', todo: 'radio_
           @if (goal.item.board === 'progress' && readyForReview()) {
             <div class="wg-start"><p class="wg-hint">Every action is ready for review.</p><button type="button" class="lay-button wg-go" (click)="move('review')"><mat-icon aria-hidden="true">rate_review</mat-icon>Move to review</button></div>
           }
+          @if (goal.item.board === 'review') {
+            <div class="wg-close" role="group" aria-labelledby="wg-close-title">
+              <h2 id="wg-close-title"><mat-icon aria-hidden="true">task_alt</mat-icon>Ready to close out</h2>
+              <p>Closing applies {{ recordCount() }} staged record change{{ recordCount() === 1 ? '' : 's' }}@if (goal.changeset.length) { in {{ changedLayers() }} } at once.@if (!goal.changeset.length && !goal.code) { Nothing is staged; it closes as done. }</p>
+              @if (goal.code; as code) {
+                @if (code.inRepository) { <p class="wg-hint"><mat-icon aria-hidden="true">check_circle</mat-icon>{{ code.branch }} at {{ code.commit.slice(0, 7) }} is in the project repository.</p> }
+                @else { <label class="wg-confirm"><input type="checkbox" name="merged" [(ngModel)]="mergedConfirm">I've merged {{ code.branch }} at {{ code.commit.slice(0, 7) }} (a pull request or git merge)</label> }
+              }
+              <div class="wg-row wg-end"><button type="button" class="lay-button wg-go" (click)="close()" [disabled]="!!goal.code && !goal.code.inRepository && !mergedConfirm"><mat-icon aria-hidden="true">done_all</mat-icon>Close out</button></div>
+            </div>
+          }
+          @if (goal.item.board === 'done') { <p class="wg-hint wg-closed"><mat-icon aria-hidden="true">task_alt</mat-icon>Closed. {{ closedText() }}</p> }
         </section>
 
         <section aria-labelledby="wg-actions">
@@ -111,9 +123,22 @@ const actionIcon: Record<string, string> = { proposed: 'add_task', todo: 'radio_
                 <div class="wg-tools">
                   <button type="button" class="wg-link" (click)="select(action.number)" [attr.aria-pressed]="selected() === action.number"><mat-icon aria-hidden="true">forum</mat-icon>Details and log</button>
                   @if (open() && action.state !== 'done') { <button type="button" class="wg-link" (click)="editGoal(action)"><mat-icon aria-hidden="true">edit</mat-icon>Edit goal</button> }
-                  @if (action.state === 'review') { <button type="button" class="wg-link" (click)="setState(action, 'working', 'Sent #' + action.number + ' back.')"><mat-icon aria-hidden="true">undo</mat-icon>Send back</button>
-                    <button type="button" class="lay-button small" (click)="setState(action, 'done', '#' + action.number + ' done.')"><mat-icon aria-hidden="true">check</mat-icon>Mark done</button> }
                 </div>
+                @if (action.state === 'review') {
+                  <div class="wg-review" role="group" [attr.aria-label]="'Review #' + action.number">
+                    <p class="wg-needhead"><mat-icon aria-hidden="true">rate_review</mat-icon><strong>Ready for your review</strong></p>
+                    @if (changesOf(action.number).length) { <ul class="wg-reviewlist">@for (change of changesOf(action.number); track change.id) { <li><span [class]="'wg-op wg-op-' + change.op">{{ opLabel[change.op] }}</span>{{ kindName(change.kind) }} <strong>{{ changeName(change) }}</strong>@if (change.layer) { <span [class]="'lay-chip lay-l-' + change.layer">{{ layerName(change.layer) }}</span> }</li> }</ul> }
+                    @else if (goal.code && action.layer === 'platform') { <p class="small">Its code is on <code>{{ goal.code.branch }}</code> ({{ goal.code.files.length }} files), listed under Changes.</p> }
+                    @else { <p class="small lay-muted">No staged record changes; read its summary and log.</p> }
+                    @if (flagging() === action.number) {
+                      <form (ngSubmit)="flag(action)"><label class="wg-flaglabel" [for]="'flag-' + action.number">What should change?</label>
+                        <textarea class="wg-input" [id]="'flag-' + action.number" name="flagNote" rows="2" [(ngModel)]="flagDraft" placeholder="Say what you want different"></textarea>
+                        <div class="wg-row wg-end"><button type="button" class="lay-button ghost small" (click)="flagging.set(null)">Cancel</button><button type="submit" class="lay-button small" [disabled]="!flagDraft.trim()">Send to the agent</button></div></form>
+                    } @else {
+                      <div class="wg-row wg-end"><button type="button" class="lay-button ghost small" (click)="startFlag(action.number)"><mat-icon aria-hidden="true">flag</mat-icon>Flag</button><button type="button" class="lay-button small" (click)="approve(action)"><mat-icon aria-hidden="true">check</mat-icon>Approve</button></div>
+                    }
+                  </div>
+                }
               </article>
             }
             @if (open()) {
@@ -129,7 +154,7 @@ const actionIcon: Record<string, string> = { proposed: 'add_task', todo: 'radio_
         </section>
 
         @if (goal.changeset.length || goal.code) {
-          <section aria-labelledby="wg-changes"><div class="wg-sectionhead"><h2 id="wg-changes">Changes staged</h2><span class="lay-muted small">Nothing applies until close-out</span></div>
+          <section aria-labelledby="wg-changes"><div class="wg-sectionhead"><h2 id="wg-changes">{{ goal.item.board === 'done' ? 'Changes' : 'Changes staged' }}</h2><span class="lay-muted small">{{ goal.item.board === 'done' ? 'Applied at close-out' : 'Nothing applies until close-out' }}</span></div>
             @if (goal.code; as code) {
               <div class="wg-card wg-changes"><h3><span class="lay-chip lay-l-platform">Code</span>{{ code.files.length }} file{{ code.files.length === 1 ? '' : 's' }} on <code>{{ code.branch }}</code> at <code>{{ code.commit.slice(0, 7) }}</code></h3>
                 <ul>@for (file of code.files.slice(0, 40); track file.path) { <li><span [class]="'wg-op wg-op-' + fileOp(file.status)">{{ fileLabel[file.status] || 'Changed' }}</span><span class="wg-path">{{ file.path }}</span></li> }
@@ -148,7 +173,7 @@ const actionIcon: Record<string, string> = { proposed: 'add_task', todo: 'radio_
           @if (selectedAction(); as action) { <button type="button" class="wg-link" (click)="select(null)"><mat-icon aria-hidden="true">arrow_back</mat-icon>All activity</button> }
           @else { <p class="small lay-muted">Everything said and done on this item, by you and the agent working it.</p> }</header>
         @if (selectedAction(); as action) { <p class="wg-sidegoal">{{ action.goal }}</p> }
-        <ol class="wg-events" aria-live="polite">
+        <ol #events class="wg-events" aria-live="polite" (scroll)="following = atEnd($any($event.target))">
           @for (event of shownEvents(); track event.id) {
             <li [class]="'wg-ev wg-ev-' + event.kind" [class.wg-ev-open]="!event.resolvedAt && ['question', 'allow', 'approval'].includes(event.kind)">
               <span class="wg-who">{{ authorName(event) }}@if (event.action && !selectedAction()) { <button type="button" class="wg-chiplink" (click)="select(event.action)">#{{ event.action }}</button> }<time [attr.datetime]="event.at">{{ when(event.at) }}</time></span>
@@ -180,6 +205,8 @@ export class WorkGoalComponent {
   readonly editing = signal<number | null>(null);
   readonly adding = signal<number | null>(null);
   readonly editingBrief = signal(false);
+  readonly flagging = signal<number | null>(null);
+  flagDraft = ''; mergedConfirm = false;
   readonly stackKeys = signal<string[]>([]);
   briefDraft = ''; goalDraft = ''; layerDraft = ''; steerDraft = '';
   answers: Record<number, string> = {}; answerText: Record<number, string> = {};
@@ -196,11 +223,20 @@ export class WorkGoalComponent {
     return Boolean(view && actions.length && !view.needs.length && actions.every(action => ['review', 'done'].includes(action.state))); });
   readonly startBlock = computed(() => { const item = this.view()?.item; if (!item) return '';
     if (item.board === 'draft') return 'Write the brief and its actions, then save it to Ready'; if (!item.assignee) return 'Choose a work style first'; return ''; });
+  readonly recordCount = computed(() => (this.view()?.changeset || []).reduce((sum, group) => sum + group.changes.length, 0));
+  readonly changedLayers = computed(() => (this.view()?.changeset || []).map(group => this.layerName(group.layer)).join(' and '));
+  readonly closedText = computed(() => [...(this.view()?.events || [])].reverse().find(event => event.kind === 'log' && event.text.startsWith('Closed:'))?.text.replace(/^Closed: (.)/, (_, first: string) => first.toUpperCase()) || '');
   readonly selectedAction = computed(() => this.view()?.actions.find(action => action.number === this.selected()) || null);
   readonly shownEvents = computed(() => { const events = this.view()?.events || []; const number = this.selected(); return number === null ? events : events.filter(event => event.action === number); });
 
+  // The thread follows its newest entry, unless the person has scrolled up to read.
+  private readonly eventList = viewChild<ElementRef<HTMLElement>>('events');
+  following = true;
+  atEnd(list: HTMLElement) { return list.scrollHeight - list.scrollTop - list.clientHeight < 40; }
+
   constructor() {
-    effect(() => { const id = this.id(); const project = this.ctx.projectId(); if (!id || !project) return; untracked(() => { this.view.set(null); this.failed.set(false); this.selected.set(null); void this.load(); this.listen(); }); });
+    afterRenderEffect(() => { this.shownEvents(); const list = this.eventList()?.nativeElement; if (list && this.following) list.scrollTop = list.scrollHeight; });
+    effect(() => { const id = this.id(); const project = this.ctx.projectId(); if (!id || !project) return; untracked(() => { this.view.set(null); this.failed.set(false); this.selected.set(null); this.following = true; void this.load(); this.listen(); }); });
     inject(DestroyRef).onDestroy(() => { this.source?.close(); if (this.pending) clearTimeout(this.pending); });
   }
   private base() { return `/api/projects/${encodeURIComponent(this.ctx.projectId())}/goals`; }
@@ -225,6 +261,12 @@ export class WorkGoalComponent {
     return this.ctx.write(async () => { const result = await run(); if (result && typeof result === 'object' && 'item' in result && 'actions' in result) this.view.set(result as GoalView); else await this.load(); }, success);
   }
   layerName(key: string) { return this.ctx.layerInstances().find(entry => entry.key === key)?.name || layerLabel[key] || key; }
+  changesOf(number: number) { return (this.view()?.changeset || []).flatMap(group => group.changes.filter(change => change.action === number).map(change => ({ ...change, layer: group.layer }))); }
+  startFlag(number: number) { this.flagDraft = ''; this.flagging.set(number); setTimeout(() => document.getElementById(`flag-${number}`)?.focus()); }
+  approve(action: GoalAction) { void this.act(() => this.ctx.api(this.path(`/review/${action.number}`), 'POST', { verdict: 'approve' }), `Approved #${action.number}.`); }
+  flag(action: GoalAction) { const note = this.flagDraft.trim(); if (!note) return;
+    void this.act(() => this.ctx.api(this.path(`/review/${action.number}`), 'POST', { verdict: 'flag', note }), `Flagged #${action.number}; it's back with the agent.`).then(ok => { if (ok) this.flagging.set(null); }); }
+  close() { void this.act(() => this.ctx.api(this.path('/close'), 'POST', { codeMerged: this.mergedConfirm }), 'Closed.'); }
   actionsIn(phase: number) { return (this.view()?.actions || []).filter(action => action.phase === phase); }
   gate(phase: number) {
     const view = this.view(); const entry = view?.phases.find(item => item.number === phase);
@@ -238,14 +280,14 @@ export class WorkGoalComponent {
   needTitle(need: GoalEvent) { return need.kind === 'question' ? 'Question' : need.kind === 'allow' ? 'Allow request' : 'New action'; }
   authorName(event: GoalEvent) { const author = event.author; if (!author) return 'Aludel'; return author.kind === 'person' && author.id === this.ctx.me() ? 'You' : author.name; }
   eventText(event: GoalEvent) { const goal = this.view()?.actions.find(action => action.number === event.action)?.goal;
-    return event.kind === 'approval' ? `Proposed #${event.action}${goal ? ` (${goal})` : ''}: ${event.text}` : event.kind === 'steer' ? `Steer: ${event.text}` : event.text; }
+    return event.kind === 'approval' ? `Proposed #${event.action}${goal ? ` (${goal})` : ''}: ${event.text}` : event.kind === 'steer' ? `Steer: ${event.text}` : event.kind === 'flag' ? `Flagged #${event.action}: ${event.text}` : event.text; }
   resolutionText(event: GoalEvent) { const by = event.resolution?.by?.name || 'Someone'; const value = event.resolution;
     if (!value) return ''; if (value.text) return `${by}: ${value.text}`; return `${by} ${value.allow ? (event.kind === 'approval' ? 'approved' : 'allowed') : 'declined'} it${value.note ? `: ${value.note}` : ''}`; }
   kindName(kind: string) { return kind.replace(/_/g, ' '); }
   changeName(change: GoalChange) { const data = (change.after || change.before || {}) as Record<string, unknown>; return String(data['name'] || data['title'] || data['text'] || data['label'] || change.id).slice(0, 80); }
   when(at: string) { const date = new Date(at); return date.toDateString() === new Date().toDateString() ? date.toTimeString().slice(0, 5) : `${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} ${date.toTimeString().slice(0, 5)}`; }
 
-  select(number: number | null) { this.selected.set(this.selected() === number ? null : number); }
+  select(number: number | null) { this.following = true; this.selected.set(this.selected() === number ? null : number); }
   editBrief() { this.briefDraft = this.view()?.brief || ''; this.editingBrief.set(true); }
   saveBrief() {
     const view = this.view(); if (!view) return;
@@ -257,7 +299,6 @@ export class WorkGoalComponent {
   saveGoal(action: GoalAction) { void this.act(() => this.ctx.api(this.path(`/actions/${action.number}`), 'PATCH', { goal: this.goalDraft.trim(), layer: this.layerDraft || null }), `Updated #${action.number}.`).then(ok => { if (ok) this.editing.set(null); }); }
   startAdd(phase: number) { this.goalDraft = ''; this.layerDraft = ''; this.editing.set(null); this.adding.set(phase); setTimeout(() => document.getElementById(`add-${phase}`)?.focus()); }
   add(phase: number) { void this.act(() => this.ctx.api(this.path('/actions'), 'POST', { phase, goal: this.goalDraft.trim(), layer: this.layerDraft || null }), 'Action added.').then(ok => { if (ok) this.adding.set(null); }); }
-  setState(action: GoalAction, state: string, success: string) { void this.act(() => this.ctx.api(this.path(`/actions/${action.number}`), 'PATCH', { state }), success); }
   answer(need: GoalEvent) { const text = (this.answerText[need.id] || '').trim() || this.answers[need.id]; if (!text) return;
     void this.act(() => this.ctx.api(this.path(`/answer/${need.id}`), 'POST', { text }), 'Answered.'); }
   allow(need: GoalEvent, allow: boolean) { void this.act(() => this.ctx.api(this.path(`/answer/${need.id}`), 'POST', { allow }), allow ? (need.kind === 'approval' ? `Approved #${need.action}.` : 'Allowed.') : 'Declined.'); }
