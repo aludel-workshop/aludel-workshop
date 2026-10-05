@@ -201,13 +201,21 @@ try {
   assert.equal(opened.branch, branch);
   assert.equal(git(bare, 'rev-parse', branch), git(bare, 'rev-parse', 'main'), 'the item\'s branch starts at main on GitHub');
   // Dev Containers checks the link's url with `git ls-remote` as given, so it is the plain repository (the clone starts on main).
+  const firstVolume = `aludel-${project.slug}-${next.ref.toLowerCase()}-${git(bare, 'rev-parse', 'main').slice(0, 7)}`;
   assert.equal(opened.link, 'vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=' + encodeURIComponent(`http://127.0.0.1:${fakePort}/octo/tool-share.git`)
-    + '&volume=' + encodeURIComponent(`aludel-${project.slug}-${next.ref.toLowerCase()}`));
+    + '&volume=' + encodeURIComponent(firstVolume));
   // Main moves on GitHub; opening it again moves the item's branch up with it, since it has no work of its own yet.
   writeFileSync(join(mover, 'CHANGELOG.md'), '# Changes\n');
   git(mover, 'add', '-A'); git(mover, 'commit', '-qm', 'Changes on main'); git(mover, 'push', '-q', 'origin', 'main');
   const again = await goal(`/${next.id}/container`, {});
   assert.deepEqual([again.created, again.caughtUp, git(bare, 'rev-parse', branch)], [false, true, git(bare, 'rev-parse', 'main')], 'the item branch follows main until it has work');
+  assert.notEqual(again.volume, firstVolume, 'a branch that moved up gets a fresh clone, not the volume cloned before it');
+  // Once the branch has work, its start stays put, so reopening it reuses its container.
+  const worker = join(root, 'worker'); git(root, 'clone', '-q', '--branch', branch, bare, worker);
+  writeFileSync(join(worker, 'due.txt'), 'due\n'); git(worker, 'add', '-A'); git(worker, 'commit', '-qm', 'Work on the item'); git(worker, 'push', '-q', 'origin', branch);
+  const reopened = await goal(`/${next.id}/container`, {});
+  assert.deepEqual([reopened.caughtUp, reopened.volume], [false, again.volume], 'an item with work reopens in the same container');
+  git(bare, 'update-ref', `refs/heads/${branch}`, git(bare, 'rev-parse', 'main'));
   const box = join(root, 'container');
   // Dev Containers clones with the person's own git credentials; the fake GitHub only serves tokens it minted, so the
   // stand-in clones the bare repository on main and keeps GitHub's address as its origin, as that clone would.
