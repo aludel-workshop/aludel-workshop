@@ -1216,20 +1216,27 @@ async function api(request, response, url) {
       const push = what => { const pushed = gitWithToken(workspace, ['push', '--quiet', binding.clone_url, `refs/heads/main:refs/heads/${branch}`], token);
         if (pushed.status !== 0) refuse(`Couldn't ${what} ${branch} on GitHub: ${String(pushed.stderr || '').trim().split('\n').pop()}`); };
       let caughtUp = false;
+      const main = gitWithToken(workspace, ['rev-parse', 'refs/heads/main'], token).stdout.trim();
+      let base = main;
       if (created) push('create');
       else {
         // A branch with no work of its own yet follows main (so it has main's dev container); one with work is left alone.
-        const tip = listed.stdout.trim().split(/\s/)[0], main = gitWithToken(workspace, ['rev-parse', 'refs/heads/main'], token).stdout.trim();
+        const tip = listed.stdout.trim().split(/\s/)[0];
         gitWithToken(workspace, ['fetch', '--quiet', '--no-tags', binding.clone_url, `+refs/heads/${branch}:refs/aludel/item-branch`], token);
         if (tip !== main && gitWithToken(workspace, ['merge-base', '--is-ancestor', tip, main], token).status === 0) { push('update'); caughtUp = true; }
+        else if (tip !== main) base = gitWithToken(workspace, ['merge-base', tip, main], token).stdout.trim() || main;
       }
       goals.notePush(projectId, workId, created ? `Made ${branch} on GitHub from main, for an item container` : caughtUp ? `Moved ${branch} up to main on GitHub (it had no work yet) and opened it in an item container` : `Opened ${branch} in an item container`);
       const slug = db.prepare('SELECT slug FROM projects WHERE id = ?').get(projectId)?.slug || 'project';
       // Dev Containers checks the url with `git ls-remote` as given, so it is the plain repository: the clone starts on main
       // and switches to the item's branch once its person connects it from this item.
+      // Dev Containers reuses a volume that exists instead of cloning again. The volume is named for the commit the item's
+      // branch starts from: reopening an item with work reuses its container; a branch that moved up to main gets a fresh
+      // clone (with main's dev container), never one taken before it.
+      const volume = `aludel-${slug}-${item.ref.toLowerCase()}-${base.slice(0, 7)}`;
       const link = 'vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=' + encodeURIComponent(binding.clone_url)
-        + '&volume=' + encodeURIComponent(`aludel-${slug}-${item.ref.toLowerCase()}`);
-      return done(200, { branch, created, caughtUp, link });
+        + '&volume=' + encodeURIComponent(volume);
+      return done(200, { branch, created, caughtUp, volume, link });
     }
     if (operation === 'close' && !sub) {
       // CW-1: the reported branch comes from the project's GitHub repository, then close-out merges it into main and a

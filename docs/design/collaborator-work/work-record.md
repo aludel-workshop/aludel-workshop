@@ -311,4 +311,9 @@ CW-1's affected run took 6 m 21 s with real time. That's no faster, because it t
 
 **Second try (2026-10-05).** VS Code offered its template picker, because the clone of `main` had no `.devcontainer/` (nothing merged yet). Go now refuses up front when `main` has no `.devcontainer/devcontainer.json`, which the connect journey checks. The owner asked to merge to `main`.
 
+**Third try (2026-10-05): the same picker after the merge.** The cause was the volume. Go had named it `aludel-<project>-w-8`, and Dev Containers reuses a volume that exists instead of cloning again. The first try had cloned the old `main` into it (checked: `/aludel-workshop` at `9ef1e2e`, no `.devcontainer/`).
+- **Fix:** the volume is named for the commit the item's branch starts from (`aludel-<project>-w-n-<commit>`). A branch that moves up to `main` gets a fresh clone; a branch with work keeps its start, so reopening reuses its container.
+- **Checked by the connect journey:** a new volume after the catch-up, and the same volume once the branch has work.
+- **Left for the owner:** the stale volume `aludel-aludel-workshop-w-8`. Its open window's containers still use it, so it can be removed once that window is closed.
+
 **For the owner to try it:** Go creates the item's branch from GitHub's `main`, so `.devcontainer/` has to be on `main` first. That means merging this branch, then restarting the portal on `main`.
