@@ -105,23 +105,28 @@ test('T03-CODE github-sync: import, push, pick-up, divergence and unavailable st
       onHeld: (projectId, key, change) => work.push(know.createWork(projectId, { layer: key, layerScoped: true, state: 'ready', title: `Review GitHub changes (${change.to.slice(0, 7)})` }, 'Aludel')),
       onDiverged: (projectId, key, change) => work.push(know.createWork(projectId, { layer: key, layerScoped: true, state: 'ready', title: `Bring this copy and GitHub back together (${change.remote.slice(0, 7)})` }, 'Aludel')) });
     const syncing = codeSync({ db, codeRepo: code, remotes });
-    const importer = codeImport({ db, github: integration, importRoot: join(root, 'imports'), afterInstall: projectId => { code.seed(projectId, pool.outputEntries); code.refresh(projectId); },
+    const importer = codeImport({ db, github: integration, importRoot: join(root, 'imports'), afterInstall: projectId => { code.refresh(projectId); },
       sync: async projectId => { const layer = syncing.connect(projectId); return layer ? remotes.sync(projectId, layer.key) : null; } });
 
-    // ---- Import: check first (nothing changes), then confirm ----
-    await assert.rejects(() => importer.preview(ada.id, id, { installationId: 44, name: 'missing' }), /Unexpected request|can't reach/);
-    const check = await importer.preview(ada.id, id, { installationId: 44, name: 'legacy' });
-    assert.equal(check.repository.owner, 'octo'); assert.equal(check.files, 3); assert.equal(check.existing, false);
+    // ---- Connect (EX-02A): check first (nothing changes), then connect with the chosen code paths ----
+    await assert.rejects(() => importer.check(ada.id, 'draft-1', { installationId: 44, name: 'missing' }), /Unexpected request|can't reach/);
+    const check = await importer.check(ada.id, 'draft-1', { installationId: 44, name: 'legacy' });
+    assert.equal(check.repository.owner, 'octo'); assert.equal(check.files, 3); assert.equal(check.existing, null);
     assert.ok(check.adds.includes('.aludel/layer.json') && check.adds.includes('.aludel/server/code-index.mjs'), 'the check lists the files Aludel would add');
+    assert.equal(check.folders.find(folder => folder.suggested)?.path, '', 'no folder has an app manifest, so the root is suggested');
+    assert.deepEqual(check.folders.map(folder => [folder.path, folder.globs, folder.reads]), [['', ['src/**'], 2]]);
+    assert.deepEqual(importer.count('draft-1', ['src/lend.ts']), { reads: 1, limit: 2000, over: false });
     assert.equal(git(workspace, 'log', '-1', '--format=%s'), 'chore: start', 'checking changes nothing');
-    const imported = await importer.confirm(ada.id, id, { installationId: 44, name: 'legacy' }, workspace);
+    await assert.rejects(() => importer.connect(ada.id, 'draft-1', { installationId: 44, name: 'legacy', commit: 'f'.repeat(40), units: ['src/**'] }, () => assert.fail('no project before the check passes')), /moved since the check/);
+    const imported = await importer.connect(ada.id, 'draft-1', { installationId: 44, name: 'legacy', commit: check.commit, units: ['src/**'] }, () => ({ projectId: id, workspace }));
     assert.deepEqual(imported.installed, ['platform']);
+    assert.equal(imported.reads, 2);
     assert.equal(imported.sync.state, 'in-sync');
     assert.equal(git(workspace, 'log', '--format=%s', '--reverse').split('\n')[0], 'Their app', 'the workspace is their repository');
-    assert.ok(readdirSync(join(root, 'workspaces')).some(name => name.startsWith(`${id}.before-import-`)), 'the starter repository is moved aside, not deleted');
-    assert.equal(git(bare, 'rev-parse', 'main'), git(workspace, 'rev-parse', 'main'), 'GitHub has .aludel/ and the starter docs');
-    assert.ok(git(bare, 'ls-tree', '-r', '--name-only', 'main').split('\n').includes('.aludel/layer.json'));
-    assert.ok(git(bare, 'ls-tree', '-r', '--name-only', 'main').split('\n').includes('docs/product/index.md'));
+    assert.ok(readdirSync(join(root, 'workspaces')).some(name => name.startsWith(`${id}.before-connect-`)), 'what was there is moved aside, not deleted');
+    assert.equal(git(bare, 'rev-parse', 'main'), git(workspace, 'rev-parse', 'main'), 'GitHub has .aludel/');
+    assert.deepEqual(git(bare, 'diff', '--name-only', 'main^', 'main').split('\n').filter(path => !path.startsWith('.aludel/')), [], 'one commit, only .aludel/: no starter docs in a connected repository');
+    assert.deepEqual(JSON.parse(git(bare, 'show', 'main:.aludel/layer.json')).files.units, ['src/**']);
     assert.ok(units.snapshot(id).units.some(unit => unit.symbol === 'lend'), 'Code indexes code the scaffold never made');
 
     // ---- A Knowledge save, then pushed ----

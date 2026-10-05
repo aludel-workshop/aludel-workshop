@@ -1,6 +1,16 @@
 export interface SessionUser { id: string; email: string | null; name: string; owner: boolean; avatar?: Record<string, string | number> | null; }
 export interface ProjectSummary { id: string; slug: string; name: string; description: string; accent_color: string; role: string; updated_at: string; }
-export interface Draft { profile: string | null; name: string; pitch: string; layers: string[]; layersSelected: boolean; claimedProjectId: string | null; }
+export interface ConnectChoice { installationId?: number; owner?: string; name?: string; commit?: string; paths?: string[]; }
+export interface Draft { profile: string | null; name: string; pitch: string; layers: string[]; layersSelected: boolean; claimedProjectId: string | null; start?: 'new' | 'connect'; connect?: ConnectChoice; }
+// EX-02A: the connect path's check of a repository, and what Code would read.
+export interface CodeFolder { path: string; root: boolean; manifests: string[]; stack: string[]; files: number; dirs: string[]; globs: string[]; reads: number; limit: number; over: boolean; suggested: boolean; }
+export interface ConnectCheck {
+  repository: { owner: string; name: string; url: string; private: boolean; defaultBranch: string };
+  blocked?: { branch: string }; message?: string; commit?: string; files?: number;
+  existing?: { units: string[] } | null; readsLanguages?: string; folders?: CodeFolder[];
+  adds?: string[]; kept?: string[]; conflicts?: string[];
+}
+export interface ConnectRepository { owner: string; name: string; private: boolean; defaultBranch: string; updatedAt: string | null; description: string; }
 export interface Session { authenticated: boolean; user: SessionUser | null; setupRequired: boolean; aludelMember: boolean; githubSignIn: boolean; projects: ProjectSummary[]; draft: Draft | null; }
 
 export interface PreferenceDefinition { label: string; values: Record<string, string>; }

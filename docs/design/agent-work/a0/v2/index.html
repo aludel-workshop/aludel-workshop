@@ -1,0 +1,721 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aludel goal run</title>
+<!-- AGENT-WORK-01 A0 prototype v2 (round-1 rows F1-F13 and questions in ../../work-record.md). Static; illustrative Biome data;
+     nothing is saved or sent except the reviewer's own answers to the review questions, which stay in this browser. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block">
+<style>
+/* Tokens and shell as the built portal and the J6 prototype. */
+:root{color-scheme:light;
+  --bg:#fbfbfd;--surface:#fff;--rail:#f3f5f9;--panel:#f4f6fa;--hover:#e9edf5;--line:#dfe3ec;--line-strong:#c8cfdc;--ink:#1b1f2a;--muted:#5d6679;--faint:#636c80;
+  --accent:#3047b9;--accent-bg:#e3e8ff;--cover:#f3f1fc;--cover-line:#d9d2f7;
+  --ok:#146446;--ok-bg:#d9f3e7;--bad:#a1231f;--bad-bg:#fce1e0;--warn:#7a4f00;--warn-bg:#fff0cc;--info:#1a5fb4;--info-bg:#e2ecfb;
+  --new:#5b3cc4;--new-bg:#ece7fd;--shadow:0 18px 50px #1c2a5a2e;--bar:52px;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:Roboto,system-ui,sans-serif;font-size:14.5px;line-height:1.45;color:var(--ink);background:var(--bg)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:var(--accent)}
+.icon{font-family:'Material Symbols Rounded';font-weight:normal;font-style:normal;font-size:20px;line-height:1;letter-spacing:normal;text-transform:none;white-space:nowrap;display:inline-block;vertical-align:middle;font-feature-settings:'liga';-webkit-font-smoothing:antialiased;flex:none}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.mono,code{font-family:"Roboto Mono",ui-monospace,monospace;font-size:.88em}
+.muted{color:var(--muted)}.small{font-size:13px}.tiny{font-size:12px}
+.row{display:flex;align-items:center;gap:8px}.push{margin-left:auto}.wrap{flex-wrap:wrap}
+h1,h2,h3{margin:0}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.spin{animation:spin 1.2s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+
+.shell{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:100vh}
+.rail{background:var(--rail);border-right:1px solid var(--line);padding:14px 10px;display:flex;flex-direction:column;gap:2px;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:18px;padding:2px 8px 12px}
+.brand .icon{color:var(--accent);font-size:26px}
+.proj{display:flex;align-items:center;gap:9px;padding:8px;border-radius:12px;background:var(--surface);border:1px solid var(--line);margin-bottom:10px}
+.proj .mk{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:#2a7230;color:#fff;font-weight:700;font-size:12px}
+.proj small{display:block;color:var(--muted);font-size:11.5px}
+.nav a{display:flex;align-items:center;gap:10px;padding:5px 10px 5px 6px;border-radius:12px;color:var(--ink);text-decoration:none;font-weight:500}
+.nav a.active{background:var(--nb);font-weight:700}
+.tile{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:var(--nb);color:var(--nc)}
+.tile .icon{font-size:19px}
+.nav a.active .tile{background:var(--nc);color:#fff}
+.n-home{--nc:#c62828;--nb:#fde8e8}.n-vision{--nc:#b93c0a;--nb:#ffeddc}.n-design{--nc:#8a6100;--nb:#fff3cc}.n-pages{--nc:#2a7230;--nb:#e2f4e3}.n-data{--nc:#00766c;--nb:#d6f3ee}.n-code{--nc:#1a5fb4;--nb:#e2ecfb}.n-deploy{--nc:#2f3a9e;--nb:#e4e7f8}.n-work{--nc:#5b3cc4;--nb:#ece7fd}.n-host{--nc:#5d6679;--nb:#eceff4}
+.main{padding:10px 14px 14px;min-width:0;display:flex;flex-direction:column;gap:8px}
+
+.btn{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:var(--surface);font-weight:500;font-size:13.5px;white-space:nowrap;text-decoration:none;color:var(--ink)}
+.btn:hover{background:var(--hover)}.btn .icon{font-size:18px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}.btn.primary:hover{background:#2539a0}
+.btn.go{background:var(--ok);border-color:var(--ok);color:#fff}.btn.go:hover{background:#0f4f37}
+.btn.flag{border-color:var(--warn);color:var(--warn)}
+.btn.ghost{border-color:transparent;background:none}.btn.ghost:hover{background:var(--hover)}
+.btn.sm{padding:3px 9px;font-size:12.5px}.btn.sm .icon{font-size:16px}
+.btn:disabled{opacity:.5;cursor:default}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:500;background:var(--panel);color:var(--muted);white-space:nowrap}
+.chip .icon{font-size:15px}
+.chip.new{background:var(--new-bg);color:var(--new)}.chip.ok{background:var(--ok-bg);color:var(--ok)}.chip.bad{background:var(--bad-bg);color:var(--bad)}.chip.warn{background:var(--warn-bg);color:var(--warn)}.chip.info{background:var(--info-bg);color:var(--info)}
+.lchip{display:inline-flex;align-items:center;gap:4px;padding:1px 8px 1px 3px;border-radius:999px;font-size:12px;font-weight:700;background:var(--nb);color:var(--nc);white-space:nowrap}
+.lchip .icon{font-size:15px;background:var(--nc);color:#fff;border-radius:50%;padding:1px}
+.eyebrow{font-size:11.5px;letter-spacing:.8px;text-transform:uppercase;color:var(--faint);font-weight:700}
+.proto{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);padding:2px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.seg button{border:0;background:var(--surface);padding:3px 10px;font-size:12.5px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+/* Layout (F1, F5, F6): the work item keeps its Jira-style top bar (fields and brief); the main area is the action list in
+   phases with review gates; the right sidebar is the orchestrator's thread, or one action's details and log when selected. */
+.top{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px 16px;display:grid;gap:8px}
+.crumb{font-size:13px;color:var(--muted);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.crumb button{border:0;background:none;padding:0;color:var(--accent);font-size:13px}
+.titlerow{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap}
+.titlerow h1{font-size:22px;line-height:1.25;flex:1;min-width:220px;text-wrap:balance}
+.fields{display:flex;gap:6px 14px;flex-wrap:wrap;align-items:center;font-size:13px}
+.field{display:inline-flex;gap:5px;align-items:center}
+.field .k{color:var(--faint);font-size:11.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase}
+.col{display:inline-flex;align-items:center;gap:5px;padding:2px 10px;border-radius:6px;font-weight:700;font-size:12px;letter-spacing:.4px;text-transform:uppercase}
+.col-draft{background:#eceff4;color:#3d4556}.col-ready{background:var(--info-bg);color:var(--info)}.col-progress{background:var(--accent-bg);color:var(--accent)}.col-review{background:var(--warn-bg);color:var(--warn)}.col-done{background:var(--ok-bg);color:var(--ok)}
+.prio{color:#b3261e;font-weight:500}
+.needs{display:inline-flex;align-items:center;gap:5px;border:0;border-radius:999px;padding:3px 10px;background:var(--warn);color:#fff;font-weight:700;font-size:12.5px}
+.brief{border-top:1px solid var(--line);padding-top:8px;display:grid;gap:8px}
+.brief h2{font-size:14px;display:flex;gap:6px;align-items:center}
+.brief p{margin:0;max-width:75ch}
+.brief .rough{font-style:italic;color:var(--muted)}
+.acc{margin:0;padding-left:20px;font-size:13.5px;display:grid;gap:2px}
+.stylepick{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px}
+.cmd{display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 10px;font-size:13px}
+.cmd code{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:2px 8px}
+
+.cols3{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:12px;align-items:start}
+.actions{display:grid;gap:10px;min-width:0}
+.phase{display:grid;gap:8px}
+.phead{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.phead h2{font-size:15px}
+.phead .muted{font-size:12.5px}
+.gate{display:flex;gap:8px;align-items:center;padding:8px 12px;border:1.5px dashed var(--line-strong);border-radius:12px;font-size:13px;color:var(--muted);background:var(--surface)}
+.gate.open{border-color:var(--ok);color:var(--ok);background:var(--ok-bg);border-style:solid}
+.gate.wait{border-color:#e2b23c;color:var(--warn);background:#fffaeb}
+.gate .icon{font-size:19px}
+.acard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 12px;display:grid;gap:8px}
+.acard.st-working{border-color:#b9c6f3}.acard.st-needs,.acard.st-review,.acard.st-proposed{border-color:#e2b23c;box-shadow:0 0 0 1px #f3dc9c}.acard.st-done{background:#fbfdfc}
+.acard.sel{outline:2px solid var(--accent);outline-offset:1px}
+.ahead{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:4px 10px;align-items:start}
+.anum{font-weight:700;color:var(--muted);font-size:13px;padding-top:2px;font-variant-numeric:tabular-nums}
+.atitle{border:0;background:none;padding:0;text-align:left;font-weight:500;font-size:14.5px;color:var(--ink)}
+.atitle:hover{text-decoration:underline}
+.ameta{grid-column:2/4;display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12.5px;color:var(--muted)}
+.ast{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:500;white-space:nowrap;padding:1px 8px;border-radius:999px;background:var(--panel);color:var(--muted)}
+.ast .icon{font-size:16px}
+.ast.working{background:var(--accent-bg);color:var(--accent)}.ast.needs,.ast.review,.ast.proposed{background:var(--warn-bg);color:var(--warn)}.ast.done{background:var(--ok-bg);color:var(--ok)}.ast.flagged{background:var(--bad-bg);color:var(--bad)}
+.agoal{margin:0;font-size:13.5px;color:var(--muted);max-width:75ch}
+.anow{font-size:13px;display:flex;gap:6px;align-items:flex-start;color:var(--ink)}
+.anow .icon{font-size:16px;color:var(--accent)}
+.need{border:1px solid #f0d58a;background:#fffaeb;border-radius:12px;padding:10px;display:grid;gap:8px}
+.need h3{font-size:14px;display:flex;gap:6px;align-items:center}
+.need .who{font-size:12.5px;color:var(--muted)}
+.need pre{margin:0;font-family:"Roboto Mono",monospace;font-size:12.5px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px;white-space:pre-wrap}
+.need .stackn{font-size:12px;color:var(--warn);font-weight:700}
+.opts{display:grid;gap:6px}
+.opt{display:flex;gap:8px;align-items:flex-start;border:1px solid var(--line);border-radius:10px;padding:7px 10px;cursor:pointer;font-size:13.5px;background:var(--surface)}
+.opt:has(input:checked){border-color:var(--accent);background:var(--accent-bg)}
+.opt input{margin-top:3px}
+.aacts{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.edit{display:grid;gap:6px}
+.edit label{font-weight:700;font-size:13px}
+textarea,input[type=text]{width:100%;border:1px solid var(--line-strong);border-radius:8px;padding:6px 8px;background:var(--surface)}
+textarea{min-height:60px;resize:vertical}
+select{border:1px solid var(--line-strong);border-radius:8px;padding:5px 8px;background:var(--surface)}
+.addrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.addrow input{flex:1;min-width:180px}
+.empty{color:var(--muted);font-size:13.5px;margin:0}
+
+/* sidebar: the orchestrator's thread, or one action */
+.side{background:var(--surface);border:1px solid var(--line);border-radius:16px;display:flex;flex-direction:column;position:sticky;top:10px;max-height:calc(100vh - 20px);min-height:420px}
+.shead{display:flex;gap:8px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.shead h2{font-size:15px;display:flex;gap:6px;align-items:center}
+.shead .sub{font-size:12px;color:var(--muted);width:100%}
+.live{width:8px;height:8px;border-radius:50%;background:var(--ok);display:inline-block}
+.live.idle{background:var(--line-strong)}
+.msgs{flex:1;overflow:auto;padding:12px;display:grid;gap:10px;align-content:start;min-height:0}
+.msg{display:grid;gap:4px;font-size:13.5px}
+.msg .by{font-size:12px;color:var(--faint);font-weight:700;display:flex;gap:6px;align-items:center}
+.msg .tx{background:var(--panel);border-radius:12px;padding:8px 10px}
+.msg.you .tx{background:var(--accent-bg)}
+.msg.sys .tx{background:none;padding:0 2px;color:var(--muted);font-size:12.5px}
+.msg .links{display:flex;gap:6px;flex-wrap:wrap}
+.closeout{border:1px solid #a9dcc4;background:#f2fbf6;border-radius:12px;padding:10px;display:grid;gap:8px}
+.closeout h3{font-size:14px}
+.closeout ul{margin:0;padding-left:18px;font-size:13px}
+.composer{display:flex;gap:6px;padding:10px 12px;border-top:1px solid var(--line);align-items:flex-end}
+.composer textarea{min-height:38px;height:38px}
+.adet{display:grid;gap:10px;font-size:13.5px}
+.adet dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:0}
+.adet dt{color:var(--muted)}.adet dd{margin:0}
+.log{list-style:none;margin:0;padding:0;display:grid;gap:3px;font-size:13px;color:var(--muted)}
+.log li{display:flex;gap:6px;align-items:flex-start}
+.log li .icon{font-size:16px;margin-top:1px}
+.outs{list-style:none;margin:0;padding:0;display:grid;gap:3px;font-size:13px}
+.outs li{display:flex;gap:6px;align-items:flex-start}
+.outs .icon{font-size:16px;color:var(--ok);margin-top:1px}
+
+/* board */
+.board{display:grid;grid-template-columns:repeat(5,minmax(170px,1fr));gap:10px;overflow-x:auto;padding-bottom:4px}
+.bcol{background:var(--panel);border-radius:14px;padding:8px;display:grid;gap:8px;align-content:start;min-height:300px}
+.bcol h2{font-size:13px;display:flex;gap:6px;align-items:center;padding:2px 4px}
+.bcard{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:8px 10px;display:grid;gap:4px;text-align:left;width:100%}
+.bcard:hover{border-color:var(--line-strong)}
+.bcard .r{font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+
+/* review dialog (an action's review: J6's two panels, scoped to one action) */
+.dlg{position:fixed;inset:0;background:#1b1f2a8c;z-index:50;display:none;padding:16px}
+.dlg.open{display:flex}
+.dlg .rv{flex:1;display:flex;flex-direction:column;background:var(--surface);border-radius:16px;overflow:hidden;min-width:0}
+.rvtop{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--line);flex-wrap:wrap;min-height:var(--bar)}
+.rvtop h2{font-size:15px}
+.panes{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 400px;min-height:0}
+.pv{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--panel);border-right:1px solid var(--line)}
+.bar{display:flex;align-items:center;gap:8px;min-height:var(--bar);padding:8px 12px;background:var(--surface);flex-wrap:wrap}
+.bar.top{border-bottom:1px solid var(--line)}.bar.bottom{border-top:1px solid var(--line)}
+.persona{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:999px;background:var(--warn-bg);color:#5a3b00;font-size:12.5px;font-weight:500}
+.persona .icon{font-size:16px}
+.evid{flex:1;padding:12px;min-height:0;overflow:auto;display:grid;align-content:start;gap:12px}
+.evcard{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;display:grid;gap:8px}
+.evcard .evh{font-size:14px;display:flex;gap:6px;align-items:center}
+.flow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px}
+.flow .node{border:1px solid var(--line-strong);border-radius:10px;padding:5px 10px;background:var(--surface)}
+.flow .node.add{border-color:var(--new);background:var(--new-bg);color:var(--new);font-weight:500}
+.flow .arrow{color:var(--muted);font-size:18px}
+table.tb{border-collapse:collapse;width:100%;font-size:13.5px}
+table.tb th,table.tb td{text-align:left;padding:6px;border-bottom:1px solid var(--line);vertical-align:top}
+table.tb th{font-size:12px;color:var(--muted);font-weight:500}
+tr.add td{background:#f3fbf6}
+.frame{border:1px solid var(--line-strong);border-radius:12px;background:#fff;overflow:hidden;display:flex;flex-direction:column;min-height:400px;min-width:0}
+.fhead{display:flex;align-items:center;gap:6px;padding:6px 8px;background:#eef0f5;border-bottom:1px solid var(--line);font-size:12px}
+.fhead .addr{flex:1;min-width:0;background:#fff;border:1px solid var(--line);border-radius:999px;padding:2px 10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fbody{flex:1;position:relative;min-height:0}
+.cp{display:flex;flex-direction:column;min-width:0;min-height:0}
+.body{flex:1;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:12px;min-height:0;background:var(--cover)}
+.body.step{background:var(--surface)}
+.body h3{font-size:19px;line-height:1.25;text-wrap:balance}
+.lead{margin:0;color:var(--muted);font-size:13.5px}
+.slist{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.srow{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:2px 10px;align-items:center;width:100%;text-align:left;border:1px solid var(--cover-line);background:var(--surface);border-radius:12px;padding:8px 10px}
+.srow .num{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;border:1.5px solid var(--line-strong);font-size:11.5px;font-weight:700}
+.srow .num.walked{background:var(--ok);border-color:var(--ok);color:#fff}
+.srow .num .icon{font-size:14px}
+.jgroup{display:grid;gap:6px}
+.jgroup h4{margin:0;font-size:13.5px;display:flex;gap:6px;align-items:center}
+.spec{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;margin:0;font-size:14px}
+.spec dt{color:var(--muted);font-weight:500}.spec dd{margin:0}
+.flagbox{border:1px solid var(--warn);background:var(--warn-bg);border-radius:12px;padding:10px;display:grid;gap:6px}
+.flagbox label{font-weight:700;font-size:13px;color:var(--warn)}
+.decision{border-top:1px solid var(--cover-line);padding-top:12px;display:grid;gap:8px}
+.acts{display:flex;gap:6px;align-items:center;margin-left:auto;flex-wrap:wrap;justify-content:flex-end}
+.prog{display:flex;gap:3px;align-items:center;flex:1;min-width:60px;max-width:180px}
+.prog span{flex:1;height:6px;border-radius:3px;background:var(--line)}
+.prog span.walked{background:var(--ok)}.prog span.cur{outline:2px solid var(--accent);outline-offset:1px}
+.app{font-family:system-ui,sans-serif;font-size:13.5px;color:#222;height:100%;display:flex;flex-direction:column}
+.app .ah{display:flex;align-items:center;gap:12px;padding:10px 14px;background:#173b2b;color:#fff;flex-wrap:wrap}
+.app .ah b{font-size:14.5px}.app .ah .me{margin-left:auto;font-size:12px;color:#cfe8da}
+.app .am{padding:16px 18px;display:grid;gap:8px;align-content:start}
+.app .h{font-size:18px;font-weight:700}
+.app .abtn{background:#2a7a4f;color:#fff;border:0;border-radius:6px;padding:7px 13px;font-weight:600;justify-self:start}
+.app .abtn.sec{background:#e8f2ec;color:#1f5a3c}
+.app label{display:block;font-size:12px;color:#555;margin:2px 0 -4px}
+.app input{width:100%;max-width:300px;padding:6px 8px;border:1px solid #bbb;border-radius:6px}
+.app .sub{color:#595959;font-size:12.5px}
+.app .mail{border:1px solid #ddd;border-radius:8px;max-width:440px}
+.app .mail .mh{padding:8px 10px;border-bottom:1px solid #eee;font-size:12.5px;color:#555}
+.app .mail .mb{padding:10px;display:grid;gap:8px}
+.app .stub{font-size:11px;color:#595959}
+.app .hero{background:#eef6f0;border-radius:10px;padding:14px;display:grid;gap:8px}
+.app .link{background:none;border:0;color:#1f5a3c;text-decoration:underline;padding:0;justify-self:start}
+
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(420px,100vw);background:var(--surface);box-shadow:var(--shadow);z-index:60;padding:16px;overflow:auto;display:none}
+.drawer.open{display:block}
+.drawer h2{font-size:16px;margin-bottom:8px}
+.drawer fieldset{border:1px solid var(--line);border-radius:10px;margin:0 0 10px;padding:8px 10px}
+.drawer legend{font-weight:700;font-size:13px;padding:0 4px}
+.drawer label{display:flex;gap:6px;align-items:center;font-size:13.5px;padding:2px 0}
+.drawer .qa{margin-bottom:12px}.drawer .qa p{margin:0 0 4px;font-size:13.5px}
+.drawer .jump{display:flex;gap:6px;flex-wrap:wrap}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1b1f2a;color:#fff;padding:8px 14px;border-radius:10px;z-index:80;font-size:13.5px;max-width:90vw}
+
+@media (max-width:1180px){ .cols3{grid-template-columns:minmax(0,1fr) 320px} .panes{grid-template-columns:minmax(0,1fr) 340px} }
+@media (max-width:900px){
+  .shell{grid-template-columns:1fr} .rail{display:none} .main{padding:8px 16px}
+  .cols3{grid-template-columns:1fr} .side{position:static;max-height:none}
+  .panes{grid-template-columns:1fr} .pv{border-right:0;border-bottom:1px solid var(--line)}
+  .dlg{padding:0} .dlg .rv{border-radius:0;overflow:auto} .body{overflow:visible}
+  .board{grid-template-columns:repeat(5,minmax(200px,1fr))}
+}
+</style>
+<body>
+<div class="shell">
+  <nav class="rail" aria-label="Project">
+    <div class="brand"><span class="icon" aria-hidden="true">deployed_code</span>Aludel</div>
+    <div class="proj"><span class="mk" aria-hidden="true">BI</span><div><b>Biome</b><small>Worlds to explore</small></div></div>
+    <div class="nav">
+      <a href="#" class="n-home"><span class="tile"><span class="icon" aria-hidden="true">home</span></span>Home</a>
+      <a href="#" class="n-vision"><span class="tile"><span class="icon" aria-hidden="true">lightbulb</span></span>Vision</a>
+      <a href="#" class="n-design"><span class="tile"><span class="icon" aria-hidden="true">palette</span></span>Design</a>
+      <a href="#" class="n-pages"><span class="tile"><span class="icon" aria-hidden="true">web</span></span>Pages</a>
+      <a href="#" class="n-data"><span class="tile"><span class="icon" aria-hidden="true">schema</span></span>Data</a>
+      <a href="#" class="n-code"><span class="tile"><span class="icon" aria-hidden="true">code</span></span>Code</a>
+      <a href="#" class="n-deploy"><span class="tile"><span class="icon" aria-hidden="true">rocket_launch</span></span>Deploy</a>
+      <a href="#" class="n-work active" aria-current="page"><span class="tile"><span class="icon" aria-hidden="true">checklist</span></span>Work</a>
+    </div>
+  </nav>
+  <main class="main" id="main">
+    <div class="proto"><span class="icon" aria-hidden="true">science</span>Prototype v2 · illustrative data, nothing is sent
+      <span class="seg" role="group" aria-label="Run playback"><button type="button" data-speed="auto">Play</button><button type="button" data-speed="step">Step</button></span>
+      <button class="btn sm" type="button" data-act="tick" id="tickbtn"><span class="icon" aria-hidden="true">skip_next</span>Next event</button>
+      <button class="btn sm" type="button" data-act="scenarios"><span class="icon" aria-hidden="true">tune</span>Scenarios</button>
+      <button class="btn sm primary" type="button" data-act="questions"><span class="icon" aria-hidden="true">rate_review</span>Review questions</button></div>
+    <div id="view"></div>
+  </main>
+</div>
+<div class="dlg" id="dlg" role="dialog" aria-modal="true" aria-label="Review"></div>
+<aside class="drawer" id="scenarios" aria-label="Prototype scenarios"></aside>
+<aside class="drawer" id="questions" aria-label="Review questions"></aside>
+<script>
+// ---------- illustrative data ----------
+const LAYERS = { pages: ['Pages', 'web'], data: ['Data', 'schema'], code: ['Code', 'code'], host: ['Aludel', 'verified'] };
+const MODE = { pages: 'Stage freely', data: 'Ask first', code: 'Stage freely', host: 'Host check' };
+const lchip = l => `<span class="lchip n-${l}">${icon(LAYERS[l][1])}${LAYERS[l][0]}</span>`;
+const ROUGH = 'sign up flow?? email + password probably. then they should make their first world. W-9 couldn\'t do it, pages spec too thin';
+// Questions the orchestrator asks while defining the task (F4). They stack on the brief card.
+const DEF_QS = [
+  { id: 'confirm', text: 'How should a new member confirm their email?', rec: 0, why: 'The Vision brief says worlds can be shared publicly, so an unconfirmed address shouldn\'t own one.',
+    options: ['A link in an email, before they can create a world', 'Let them in now and confirm later', 'No confirmation for now'] },
+  { id: 'google', text: 'Is signing up with Google part of this task?', rec: 0, why: 'Nothing in Vision asks for it, and it adds a Deploy secret.',
+    options: ['Not now; a separate task later', 'Yes, include it'] },
+];
+const ACTION_QS = { a1: [{ id: 'signin', text: 'Should the Sign up page also link to Sign in?', rec: 0, why: 'Members who already have an account will land here from invites.', options: ['Yes, under the form', 'No'] }] };
+const mkAction = (id, n, phase, layer, agent, title, goal, opts = {}) => ({ id, n, phase, layer, agent, title, goal, deps: [], review: true, state: 'todo', log: [], outs: [], needs: [], ...opts });
+const INITIAL = () => [
+  mkAction('a1', 1, 1, 'pages', 'Pages agent', 'Add sign-up to the onboarding flow', 'Add Sign up, Check your email and Create your first world to the onboarding flow, with a page spec for each.'),
+  mkAction('a2', 2, 1, 'data', 'Data agent', 'Let a Member hold a password and a confirmed email', 'Add the fields signing up needs to Member.'),
+  mkAction('a3', 3, 2, 'code', 'Code agent', 'Build sign-up and first world', 'Routes for each new page, and a step test for every journey step.'),
+  mkAction('a4', 4, 3, 'host', 'Orchestrator', 'Check everything together', 'Build Pages, Data and Code together and run every journey, old and new.', { review: false, deps: ['a3'] }),
+];
+const PHASES = [
+  { n: 1, title: 'Specify', gate: true },
+  { n: 2, title: 'Build', gate: false },
+  { n: 3, title: 'Check together', gate: false },
+];
+
+// ---------- state ----------
+const SCN_DEFAULT = { verifyStuck: false };
+const store = { get(k, d) { try { const v = localStorage.getItem('a0v2:' + k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('a0v2:' + k, JSON.stringify(v)); } catch {} } };
+const fresh = () => ({ view: 'item', status: 'draft', stage: 'draft', style: 'remote', claimed: false, defined: false,
+  defQs: DEF_QS.map(q => ({ ...q, answer: null, pick: q.rec })), defAsked: false, actions: [], thread: [], side: null, fired: [],
+  editing: null, adding: null, stuck: false, dlg: null, walk: null, flagText: '', draft: '', nextN: 6 });
+const S = { ...fresh(), scn: { ...SCN_DEFAULT }, speed: 'auto' };
+
+// ---------- helpers ----------
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const icon = (n, cls = '') => `<span class="icon ${cls}" aria-hidden="true">${n}</span>`;
+function toast(t) { document.querySelectorAll('.toast').forEach(x => x.remove()); const el = document.createElement('div'); el.className = 'toast'; el.setAttribute('role', 'status'); el.textContent = t; document.body.append(el); setTimeout(() => el.remove(), 2600); }
+const A = id => S.actions.find(a => a.id === id);
+const fired = id => S.fired.includes(id);
+const say = (text, links = [], from = 'orch') => S.thread.push({ from, text, links });
+const log = (id, t) => A(id).log.push(t);
+const orchName = () => S.style === 'local' ? 'Your Claude Code (local)' : 'Orchestrator';
+const reviewed = id => A(id)?.state === 'done';
+const gateOpen = () => S.actions.filter(a => a.phase === 1).every(a => a.state === 'done');
+const openNeeds = () => S.actions.filter(a => a.needs.length || ['review', 'proposed'].includes(a.state)).length + (S.stage === 'defining' && S.defAsked ? S.defQs.filter(q => q.answer == null).length : 0) + (S.stage === 'closing' ? 1 : 0);
+
+// ---------- the run's events (Play takes one every 1.3 s; Step waits for Next event) ----------
+const EVENTS = [
+  { id: 'd1', when: s => s.stage === 'defining', run: s => say('Reading your note, the stack map and the Vision brief.') },
+  { id: 'd2', when: s => fired('d1'), run: s => { say('Read Pages\' onboarding flow (r3), Data\'s Member and Code\'s 3 journeys. Two things aren\'t clear from your note, so I\'ve put two questions on the brief.'); s.defAsked = true; } },
+  { id: 'd3', when: s => s.defAsked && s.defQs.every(q => q.answer != null), run: s => {
+    s.defined = true; s.actions = INITIAL(); s.stage = 'ready'; s.status = 'ready';
+    say('I\'ve rewritten the brief and drafted 4 actions in 3 phases, with a review gate after the specs so you see the flow before any code. Change anything, then Start work.'); toast('W-11 moved to Ready'); } },
+  // phase 1
+  { id: 'r1', when: s => s.stage === 'running', run: s => { for (const id of ['a1', 'a2']) A(id).state = 'working'; log('a1', 'Reading the onboarding flow and the Pages charter'); log('a2', 'Reading Member and its API spec');
+    say('Started #1 (Pages agent) and #2 (Data agent) side by side; they don\'t depend on each other.', ['a1', 'a2']); } },
+  { id: 'r2', when: s => fired('r1'), run: s => { log('a1', 'Using skill: Write a page spec'); log('a2', 'Drafted one change to Member');
+    A('a2').state = 'needs'; A('a2').needs.push({ kind: 'allow' }); } },
+  { id: 'r3', when: s => fired('r2'), run: s => { const a = A('a1'); a.state = 'needs'; a.needs.push(...ACTION_QS.a1.map(q => ({ kind: 'question', q: { ...q, answer: null, pick: q.rec } }))); log('a1', 'Asked you about linking to Sign in'); } },
+  { id: 'r3b', when: s => fired('r3'), run: s => log('a1', 'Meanwhile: wrote Create your first world, which doesn\'t depend on your answer') },
+  { id: 'r4', when: s => fired('r3b') && !A('a1').needs.length, run: s => { const a = A('a1'); log('a1', 'Wrote Sign up and Check your email'); a.state = 'review';
+    a.outs = ['Flow onboarding r3 → r4', 'Page spec: Sign up (new)', 'Page spec: Check your email (new)', 'Page spec: Create your first world (new)', 'Pages API validated'];
+    say('#1 is ready for your review. I checked it against #2: the Sign up page asks for exactly the fields Member will hold.', ['a1']); } },
+  { id: 'r5', when: s => fired('r4'), run: s => {
+    const a = mkAction('a5', 5, 2, 'code', 'Code agent', 'Journeys follow the new flow', 'Write Sign up (as a visitor) and Create your first world (as a new member), one persona each, with fixtures.', { state: 'proposed', review: false, deps: ['a1'], binding: true,
+      why: 'Pages\' onboarding flow drives Code\'s journeys (a binding). The flow changed in #1, so the journeys have to follow it.' });
+    s.actions.splice(2, 0, a); A('a3').deps = ['a5'];
+    say('The binding from Pages\' flow to Code\'s journeys asks for journeys that follow the new flow, so I\'ve proposed #5. It needs your approval, and #3 now waits on it.', ['a5', 'a3']); } },
+  { id: 'rd', when: s => A('a2')?.allowed, run: s => { const a = A('a2'); log('a2', 'Staged the change you allowed'); a.state = 'review'; a.outs = ['Member: + password_hash', 'Member: + email_confirmed_at', 'Data API validated'];
+    say('#2 is ready for your review.', ['a2']); } },
+  // phase 2: waits on the gate
+  { id: 'r6', when: s => fired('r5') && gateOpen() && A('a5').state === 'todo', run: s => { A('a5').state = 'working'; log('a5', 'Using skill: Write a journey and its step tests');
+    say('Gate cleared: you reviewed #1 and #2. Started #5 (Code agent).', ['a5']); } },
+  { id: 'r7', when: s => fired('r6'), run: s => { const a = A('a5'); a.state = 'done'; a.outs = ['Journey sign-up r1 (visitor, 3 steps)', 'Journey create-first-world r1 (new member, 2 steps)'];
+    say('#5 is done. I checked it against the flow: every new page is a step, and each journey has one persona. No review needed; you\'ll walk both journeys in #3.', ['a5']);
+    A('a3').state = 'working'; log('a3', 'Reading the two journeys and the Code charter'); } },
+  { id: 'r8', when: s => fired('r7'), run: s => log('a3', 'Routes /signup, /signup/check-email, /verify, /worlds/new') },
+  { id: 'r9', when: s => fired('r8'), run: s => { const a = A('a3'); a.state = 'checking'; log('a3', 'Built; 5 step tests written; package tests: 41 passed'); a.outs = ['Branch aludel/w-11: 9 files', '5 step tests'];
+    A('a4').state = 'working'; log('a4', 'Building Pages r4, the Data change and the Code branch together'); say('#3 is built. Running #4: everything together.', ['a3', 'a4']); } },
+  { id: 'r10', when: s => fired('r9'), run: s => { A('a4').state = 'waiting'; log('a4', 'Sign up step 3 failed: the email\'s link opened /verify without its token');
+    A('a3').state = 'working'; log('a3', 'Fixing what #4 found: the confirmation link drops its token');
+    say('#4 found a problem: the confirmation link drops its token. I sent it back to #3.', ['a4', 'a3']); } },
+  { id: 'r11', when: s => fired('r10'), run: s => { log('a3', 'Fixed: the link carries its token; the step test now checks it'); A('a3').state = 'checking'; A('a3').outs[0] = 'Branch aludel/w-11: 10 files';
+    A('a4').state = 'working'; log('a4', 'Running again');
+    if (s.scn.verifyStuck) { const a = A('a4'); a.state = 'needs'; log('a4', 'The same step failed again: the token expires before the test opens the email'); a.needs.push({ kind: 'stuck' }); s.stuck = true;
+      say('#4 failed twice on the same step. I need you to decide how to go on; it\'s on #4.', ['a4']); } } },
+  { id: 'r12', when: s => fired('r11') && !s.stuck, run: s => { const a = A('a4'); a.state = 'done'; log('a4', 'All 5 new journey steps and 3 existing journeys pass'); a.outs = ['Combined build', 'Journey tests: 5 new steps, 3 existing journeys'];
+    A('a3').state = 'review'; say('#4 passed on the combined build. #3 is ready for your review: walk both journeys.', ['a3']); } },
+  { id: 'c1', when: s => s.stage === 'running' && fired('r12') && s.actions.every(a => ['done', 'declined'].includes(a.state)), run: s => { s.stage = 'closing'; s.status = 'review';
+    say('Everything is reviewed and works together. Approving merges every part.'); } },
+];
+const liveP = p => S.stage === 'running' && (p === 1 || (p === 2 && gateOpen()) || (p === 3 && fired('r9')));
+const canTick = () => S.actions.some(a => a.state === 'fixing' || (a.added && ((a.state === 'todo' && liveP(a.phase)) || a.state === 'working'))) || EVENTS.some(e => !fired(e.id) && e.when(S));
+// A flagged action goes back to its agent and returns for review on the next event.
+function tick() {
+  const back = S.actions.find(a => a.state === 'fixing');
+  if (back) { back.state = 'review'; log(back.id, 'Addressed your note'); say(`#${back.n} addressed your note and is ready for review again.`, [back.id]); render(); return true; }
+  if (!canTick()) return false;
+  // Actions you add run in their phase: phase 1 once work starts, phase 2 once the gate clears, phase 3 once #3 is built.
+  const live = p => S.stage === 'running' && (p === 1 || (p === 2 && gateOpen()) || (p === 3 && fired('r9')));
+  const mine = S.actions.find(a => a.added && ((a.state === 'todo' && live(a.phase)) || a.state === 'working'));
+  if (mine) { if (mine.state === 'todo') { mine.state = 'working'; log(mine.id, 'Started'); } else { mine.state = 'review'; mine.outs = ['Staged in ' + LAYERS[mine.layer][0]]; say(`#${mine.n} is ready for your review.`, [mine.id]); } render(); return true; }
+  const e = EVENTS.find(e => !fired(e.id) && e.when(S)); if (!e) return false; S.fired.push(e.id); e.run(S); render(); return true;
+}
+setInterval(() => { if (S.speed === 'auto' && !document.hidden && !S.dlg) tick(); }, 1300);
+
+// ---------- the item page ----------
+const COLS = { draft: 'Draft', ready: 'Ready', progress: 'In progress', review: 'In review', done: 'Done' };
+const ST = { todo: ['radio_button_unchecked', 'To do'], working: ['progress_activity', 'Working'], needs: ['front_hand', 'Needs you'], review: ['rate_review', 'Ready for review'],
+  proposed: ['add_task', 'New: needs your approval'], done: ['check_circle', 'Done'], checking: ['hourglass_top', 'Built; waiting on #4'], waiting: ['hourglass_top', 'Waiting on #3'], fixing: ['build', 'Fixing your note'], declined: ['block', 'Declined'] };
+function topBar() {
+  const layers = [...new Set(S.actions.map(a => a.layer).filter(l => l !== 'host'))];
+  const n = openNeeds();
+  const style = S.style === 'remote' ? `${icon('smart_toy')}Claude, remote` : `${icon('terminal')}You, local CLI`;
+  return `<section class="top" aria-labelledby="ttl">
+    <div class="crumb"><button type="button" data-act="board">Work</button>${icon('chevron_right')}<span>W-11</span></div>
+    <div class="titlerow"><h1 id="ttl">${S.defined ? 'Create the sign-up flow' : 'sign up flow'}</h1>${n ? `<button type="button" class="needs" data-act="first-need">${icon('front_hand')}${n} ${n === 1 ? 'needs' : 'need'} you</button>` : ''}</div>
+    <div class="fields">
+      <span class="field"><span class="k">Status</span><span class="col col-${S.status}">${COLS[S.status]}</span></span>
+      <span class="field"><span class="k">Priority</span><span class="prio">${icon('keyboard_double_arrow_up')}High</span></span>
+      <span class="field"><span class="k">Assignee</span>${S.stage === 'draft' && !S.claimed ? '<span class="muted">Unassigned</span>' : style}</span>
+      <span class="field"><span class="k">Layers</span>${layers.length ? layers.map(lchip).join(' ') : '<span class="muted">Not known yet</span>'}</span>
+      <span class="field"><span class="k">Source</span><span class="chip">${icon('link')}Jira BIO-142</span></span>
+      <span class="field"><span class="k">Blocks</span><span class="chip">W-14 Invite to a world</span></span>
+    </div>
+    <div class="brief">${briefBody()}</div></section>`;
+}
+function briefBody() {
+  if (!S.defined) {
+    const qs = S.defAsked ? S.defQs.filter(q => q.answer == null) : [];
+    return `<h2>${icon('notes')}Brief</h2><p class="rough">${esc(ROUGH)}</p>
+      ${S.stage === 'draft' ? styleRow() : ''}
+      ${qs.length ? questionNeed(qs[0], 'def', `${S.defQs.length - qs.length + 1} of ${S.defQs.length}`, orchName()) : ''}
+      ${S.stage === 'defining' && !qs.length ? `<p class="small muted">${icon('progress_activity', 'spin')} ${orchName()} is reading the project to define this.</p>` : ''}`;
+  }
+  return `<h2>${icon('notes')}Brief <span class="chip info">Defined with ${S.style === 'local' ? 'your local session' : 'Claude'}</span></h2>
+    <p>A new person can sign up with their email and a password, confirm the address by a link (${esc(S.defQs[0].options[S.defQs[0].answer].toLowerCase())}), and land on creating their first world. Google sign-up is ${S.defQs[1].answer === 0 ? 'a separate task' : 'included'}.</p>
+    <details><summary class="small">Done when</summary><ul class="acc"><li>A visitor can walk <i>Sign up</i> on the preview build</li><li>A new member can walk <i>Create your first world</i></li><li>Existing journeys still pass</li></ul></details>
+    ${S.stage === 'ready' ? styleRow() : ''}`;
+}
+function styleRow() {
+  const go = S.stage === 'draft' ? (S.style === 'remote' ? 'Go: define it with Claude' : 'Claim and define locally') : (S.style === 'remote' ? 'Start work' : 'Claim and start locally');
+  return `<div class="stylepick"><span class="k eyebrow">Work style</span>
+      <span class="seg" role="group" aria-label="Work style"><button type="button" data-style="remote" aria-pressed="${S.style === 'remote'}">Send to Claude</button><button type="button" data-style="local" aria-pressed="${S.style === 'local'}">Work locally</button></span>
+      <button type="button" class="btn go push" data-act="${S.stage === 'draft' ? 'go' : 'start'}">${icon(S.style === 'remote' ? 'play_arrow' : 'terminal')}${go}</button></div>
+    ${S.style === 'local' ? `<div class="cmd">${icon('terminal')}<span>In your project folder:</span><code>aludel claim W-11</code><span class="muted">Your Claude Code gets the same stack map, layer knowledge, skills, previews and reviews. Its thread shows here.</span></div>` : ''}`;
+}
+function questionNeed(q, scope, stackn, who) {
+  const name = `q-${scope}-${q.id}`;
+  return `<form class="need" data-form="answer" data-scope="${scope}" data-q="${q.id}" aria-labelledby="${name}-h">
+    ${stackn ? `<span class="stackn">Question ${stackn}</span>` : ''}<h3 id="${name}-h">${icon('help')}${esc(q.text)}</h3>
+    <div class="who">From ${esc(who)} · recommends the first option. ${esc(q.why)}</div>
+    <div class="opts" role="radiogroup" aria-labelledby="${name}-h">${q.options.map((o, i) => `<label class="opt"><input type="radio" name="${name}" value="${i}" ${q.pick === i ? 'checked' : ''}><span>${esc(o)}${i === q.rec ? ' <span class="chip info">Recommended</span>' : ''}</span></label>`).join('')}</div>
+    <div class="row"><button type="submit" class="btn primary push">${icon('send')}Answer</button></div></form>`;
+}
+// Everything an action needs from you sits on the action (F7): its questions (stacked), a change to allow, its approval, its review.
+function needsOf(a, where) {
+  const out = [];
+  const qs = a.needs.filter(n => n.kind === 'question' && n.q.answer == null);
+  if (qs.length) out.push(questionNeed(qs[0].q, a.id, qs.length > 1 ? `1 of ${qs.length}` : '', a.agent));
+  if (a.needs.some(n => n.kind === 'allow')) out.push(`<div class="need"><h3>${icon('front_hand')}Data is in Ask first mode. Stage this change?</h3><pre>Member
++ password_hash      text, write-only
++ email_confirmed_at time, optional</pre><div class="row"><button type="button" class="btn ghost" data-act="decline" data-a="${a.id}">Decline</button><button type="button" class="btn go push" data-act="allow" data-a="${a.id}">${icon('check')}Allow</button></div></div>`);
+  if (a.needs.some(n => n.kind === 'stuck')) out.push(`<div class="need"><h3>${icon('help')}#4 failed twice on the same step. How should it go on?</h3><div class="who">From ${orchName()}. #3's two fixes are on the branch; the failing step is “Confirm your email”.</div>
+    <div class="row wrap"><button type="button" class="btn" data-act="stuck-more">Let #3 try once more</button><button type="button" class="btn" data-act="stuck-review">Review what there is</button></div></div>`);
+  if (a.state === 'proposed') out.push(where === 'side'
+    ? `<div class="need"><h3>${icon('add_task')}Approve this new action?</h3><div class="who">${esc(a.why)}</div><div class="row"><button type="button" class="btn ghost" data-act="reject-new" data-a="${a.id}">Decline</button><button type="button" class="btn go push" data-act="approve-new" data-a="${a.id}">${icon('check')}Approve</button></div></div>`
+    : `<div class="aacts"><button type="button" class="btn primary" data-act="open" data-a="${a.id}">${icon('visibility')}Review and approve</button></div>`);
+  if (a.state === 'review') out.push(`<div class="aacts"><button type="button" class="btn primary" data-act="review" data-a="${a.id}">${icon('rate_review')}Review</button><span class="small muted">${a.id === 'a3' ? 'Walk both journeys on the preview build' : a.id === 'a1' ? 'The flow and three page specs' : 'One change to Member'}</span></div>`);
+  return out.join('');
+}
+function card(a) {
+  const [ic, label] = ST[a.state];
+  const deps = a.deps.map(d => A(d)).filter(Boolean);
+  const last = a.log[a.log.length - 1];
+  const editable = !['done', 'declined'].includes(a.state);
+  return `<li class="acard st-${a.state} ${S.side === a.id ? 'sel' : ''}" id="card-${a.id}">
+    <div class="ahead"><span class="anum">#${a.n}</span><button type="button" class="atitle" data-act="open" data-a="${a.id}">${esc(a.title)}</button>
+      <span class="ast ${a.state === 'checking' || a.state === 'waiting' ? '' : a.state}">${icon(ic, a.state === 'working' ? 'spin' : '')}${label}</span>
+      <div class="ameta">${a.layer === 'host' ? `<span class="chip">${icon('hub')}Orchestrator</span>` : lchip(a.layer)} ${a.layer !== 'host' ? `<span>${icon('smart_toy')}${esc(a.agent)}</span>` : ''}
+        ${deps.length ? `<span class="chip">${icon('subdirectory_arrow_right')}After ${deps.map(d => '#' + d.n).join(', ')}</span>` : ''}
+        <span class="chip">${icon(a.review ? 'rate_review' : 'fact_check')}${a.review ? 'You review' : 'Checked by the orchestrator'}</span>
+        ${a.binding ? `<span class="chip new">${icon('link')}From a binding</span>` : ''}${a.added ? `<span class="chip new">${icon('person')}Added by you</span>` : ''}</div></div>
+    ${S.editing === a.id ? `<div class="edit"><label for="goal-${a.id}">Goal for #${a.n}</label><textarea id="goal-${a.id}" data-bind="goal">${esc(a.goal)}</textarea>
+      <div class="row"><button type="button" class="btn ghost" data-act="cancel-edit">Cancel</button><button type="button" class="btn primary push" data-act="save-edit" data-a="${a.id}">Save goal</button></div></div>`
+      : `<p class="agoal">${esc(a.goal)}</p>`}
+    ${['working', 'needs'].includes(a.state) && last ? `<div class="anow">${icon('arrow_right')}<span>${esc(last)}</span></div>` : ''}
+    ${needsOf(a, 'card')}
+    <div class="aacts"><button type="button" class="btn sm ghost" data-act="open" data-a="${a.id}">${icon('forum')}Details and log</button>
+      ${editable && S.editing !== a.id ? `<button type="button" class="btn sm ghost" data-act="edit" data-a="${a.id}">${icon('edit')}Edit goal</button>` : ''}</div></li>`;
+}
+function gateBar() {
+  const p1 = S.actions.filter(a => a.phase === 1);
+  const left = p1.filter(a => a.state !== 'done');
+  if (!S.actions.length) return '';
+  if (!left.length) return `<div class="gate open" role="note">${icon('lock_open')}Review gate cleared: you reviewed ${p1.map(a => '#' + a.n).join(' and ')}.</div>`;
+  const ready = left.filter(a => a.state === 'review');
+  return `<div class="gate ${ready.length ? 'wait' : ''}" role="note">${icon('lock')}Review gate: phase 2 starts once you've reviewed ${p1.map(a => '#' + a.n).join(' and ')}.${ready.length ? ` ${ready.map(a => '#' + a.n).join(' and ')} ${ready.length === 1 ? 'is' : 'are'} ready.` : ''}</div>`;
+}
+function actionsArea() {
+  if (!S.actions.length) return `<section class="actions" aria-labelledby="acth"><div class="top"><h2 id="acth" style="font-size:15px">Actions</h2>
+    <p class="empty">${S.stage === 'draft' ? 'None yet. Go asks Claude to check the idea over, ask what it needs, and draft the actions; or work it locally.' : 'Drafted once the questions on the brief are answered.'}</p></div></section>`;
+  return `<section class="actions" aria-labelledby="acth"><div class="row"><h2 id="acth" style="font-size:17px">Actions</h2><span class="small muted">${S.actions.length} subtasks · ${S.actions.filter(a => a.state === 'done').length} done</span></div>
+    ${PHASES.map(p => { const list = S.actions.filter(a => a.phase === p.n);
+      return `<div class="phase"><div class="phead"><span class="eyebrow">Phase ${p.n}</span><h2>${p.title}</h2></div><ol class="cl" style="list-style:none;margin:0;padding:0;display:grid;gap:8px">${list.map(card).join('')}</ol>
+        ${S.adding === p.n ? `<div class="addrow"><input type="text" id="add-${p.n}" aria-label="New action for phase ${p.n}" data-bind="draft" placeholder="What should happen?" value="${esc(S.draft)}">
+          <select id="addl-${p.n}" aria-label="Layer"><option value="pages">Pages</option><option value="data">Data</option><option value="code" ${p.n > 1 ? 'selected' : ''}>Code</option></select>
+          <button type="button" class="btn ghost" data-act="cancel-add">Cancel</button><button type="button" class="btn primary" data-act="save-add" data-p="${p.n}">Add</button></div>`
+        : S.stage !== 'done' ? `<div><button type="button" class="btn sm ghost" data-act="add" data-p="${p.n}">${icon('add')}Add action</button></div>` : ''}</div>${p.gate ? gateBar() : ''}`; }).join('')}</section>`;
+}
+function sidebar() {
+  if (S.side) return actionSide(A(S.side));
+  const active = ['defining', 'running'].includes(S.stage);
+  return `<aside class="side" aria-labelledby="sideh"><div class="shead"><span class="live ${active ? '' : 'idle'}" aria-hidden="true"></span><h2 id="sideh">${icon(S.style === 'local' ? 'terminal' : 'hub')}${orchName()}</h2>
+      <span class="sub">${S.style === 'local' ? 'Running on your machine; its thread mirrors here.' : 'Plans the actions, starts their agents, checks what comes back and how it fits together.'}</span></div>
+    <div class="msgs" aria-live="polite">${S.thread.length ? S.thread.map(m => `<div class="msg ${m.from}"><span class="by">${m.from === 'you' ? 'You' : m.from === 'orch' ? orchName() : 'Aludel'}</span><div class="tx">${esc(m.text)}</div>
+      ${m.links.length ? `<div class="links">${m.links.map(id => A(id) ? `<button type="button" class="btn sm" data-act="open" data-a="${id}">#${A(id).n} ${esc(A(id).title)}</button>` : '').join('')}</div>` : ''}</div>`).join('') : `<p class="empty">${S.stage === 'draft' ? 'Nobody is on this yet.' : 'Starting…'}</p>`}
+      ${S.stage === 'closing' ? `<div class="closeout" id="closeout"><h3>${icon('task_alt')}Ready to close out</h3><ul>${S.actions.map(a => `<li>#${a.n} ${esc(a.title)}: ${a.review ? 'reviewed by you' : 'checked'}</li>`).join('')}</ul>
+        <div class="row"><button type="button" class="btn go push" data-act="merge">${icon('merge')}Approve and merge</button></div></div>` : ''}
+      ${S.stage === 'done' ? `<div class="closeout"><h3>${icon('check_circle')}Merged</h3><p class="small" style="margin:0">Pages onboarding flow r4, the Member change and the Code branch merged as one. W-14 is unblocked.</p></div>` : ''}</div>
+    <form class="composer" data-form="steer"><textarea id="steer" data-bind="steer" aria-label="Message the ${S.style === 'local' ? 'local session' : 'orchestrator'}" placeholder="Steer: ask, add or change actions…"></textarea><button type="submit" class="btn primary" aria-label="Send">${icon('send')}</button></form></aside>`;
+}
+function actionSide(a) {
+  const deps = a.deps.map(d => A(d)).filter(Boolean);
+  return `<aside class="side" aria-labelledby="sideh"><div class="shead"><button type="button" class="btn sm ghost" data-act="back-orch">${icon('arrow_back')}${orchName()}</button>
+      <h2 id="sideh" style="width:100%">#${a.n} ${esc(a.title)}</h2></div>
+    <div class="msgs"><div class="adet">
+      <dl><dt>Status</dt><dd>${ST[a.state][1]}</dd><dt>Layer</dt><dd>${a.layer === 'host' ? 'All (orchestrator)' : LAYERS[a.layer][0] + ' · ' + MODE[a.layer]}</dd><dt>Agent</dt><dd>${esc(a.agent)}</dd>
+        <dt>Phase</dt><dd>${a.phase} · ${PHASES[a.phase - 1].title}</dd><dt>After</dt><dd>${deps.length ? deps.map(d => '#' + d.n).join(', ') : 'Nothing; can start at once'}</dd><dt>Review</dt><dd>${a.review ? 'You review it' : 'The orchestrator checks it'}</dd></dl>
+      <div><b>Goal.</b> ${esc(a.goal)}</div>${a.why ? `<div><b>Why.</b> ${esc(a.why)}</div>` : ''}
+      ${needsOf(a, 'side')}
+      ${a.outs.length ? `<div><b>What it produced</b><ul class="outs">${a.outs.map(o => `<li>${icon('add_circle')}<span>${esc(o)}</span></li>`).join('')}</ul></div>` : ''}
+      <div><b>Log</b>${a.log.length ? `<ul class="log">${a.log.map(l => `<li>${icon('chevron_right')}<span>${esc(l)}</span></li>`).join('')}</ul>` : '<p class="empty">Nothing yet.</p>'}</div></div></div>
+    <form class="composer" data-form="steer-action" data-a="${a.id}"><textarea id="steer-${a.id}" aria-label="Message #${a.n}'s agent" placeholder="Steer #${a.n}…"></textarea><button type="submit" class="btn primary" aria-label="Send">${icon('send')}</button></form></aside>`;
+}
+// The sidebar runs the full height beside the item, so whoever is working on it is always in view (F5).
+function itemView() { return `<div class="cols3"><div style="display:grid;gap:12px;min-width:0">${topBar()}${actionsArea()}</div>${sidebar()}</div>`; }
+
+function boardView() {
+  const cards = { draft: [['W-12', 'Password reset', 'Draft idea']], ready: [['W-13', 'Zoom the world map', 'Defined']], progress: [], review: [], done: [['W-8', 'Code template update', 'Merged']] };
+  const mine = `<button type="button" class="bcard" data-act="open-item"><b>W-11 · ${S.defined ? 'Create the sign-up flow' : 'sign up flow'}</b><span class="r">${S.stage === 'draft' ? 'Unassigned' : S.style === 'remote' ? icon('smart_toy') + 'Claude' : icon('terminal') + 'You, local'}${openNeeds() ? ` · <span class="chip warn">${openNeeds()} need you</span>` : ''}</span></button>`;
+  return `<section aria-labelledby="bh" style="display:grid;gap:10px"><h1 id="bh" style="font-size:22px">Work</h1><div class="board">${Object.keys(COLS).map(c => `<section class="bcol" aria-label="${COLS[c]}"><h2><span class="col col-${c}">${COLS[c]}</span></h2>
+    ${S.status === c ? mine : ''}${cards[c].map(([r, t, d]) => `<div class="bcard"><b>${r} · ${t}</b><span class="r">${d}</span></div>`).join('')}</section>`).join('')}</div></section>`;
+}
+
+// ---------- an action's review (F11) ----------
+const JOURNEYS = {
+  signup: { title: 'Sign up', persona: 'visitor', steps: [
+    { name: 'Open sign up', start: 'landing', end: 'signup', when: 'On the welcome page, press Sign up.', expect: 'A form asks for a name, an email and a password.' },
+    { name: 'Create an account', start: 'signup', end: 'check', when: 'Fill in the form and press Create account.', expect: 'A page says to check your email and names the address.' },
+    { name: 'Confirm your email', start: 'check', end: 'first', when: 'Open the email in the preview inbox and press Confirm email.', expect: 'They land on Create your first world, signed in.' } ] },
+  first: { title: 'Create your first world', persona: 'new member', steps: [
+    { name: 'Start a world', start: 'home', end: 'first', when: 'On Home, press Create your first world.', expect: 'A form asks for the world\'s name.' },
+    { name: 'Name your world', start: 'first', end: 'world', when: 'Enter a name and press Create world.', expect: 'They land in the new world, with a welcome line.' } ] },
+};
+const URL_OF = { landing: '/', signup: '/signup', check: '/signup/check-email', email: '/_preview/inbox/1', first: '/worlds/new', world: '/worlds/ember-isle', home: '/home' };
+function app(screen, jk) {
+  const signedIn = ['first', 'world', 'home'].includes(screen);
+  const body = {
+    landing: `<div class="hero"><div class="h">Worlds to explore, together</div><div class="sub">Build a world, invite friends, wander.</div><div class="row"><button type="button" class="abtn" data-go="signup">Sign up</button><button type="button" class="abtn sec">Sign in</button></div></div>`,
+    signup: `<div class="h">Create your account</div><label for="f-name">Name</label><input id="f-name" value="Mara Quill"><label for="f-email">Email</label><input id="f-email" value="mara@biome.invalid"><label for="f-pass">Password</label><input id="f-pass" type="password" value="correct horse">
+      <button type="button" class="abtn" data-go="check">Create account</button>${A('a1')?.needs.find(n => n.q)?.q.answer === 1 ? '' : '<button type="button" class="link">Already a member? Sign in</button>'}`,
+    check: `<div class="h">Check your email</div><div>We sent a link to <b>mara@biome.invalid</b>. Open it to confirm it's yours.</div><div class="stub">Preview inbox (only in review builds)</div><button type="button" class="abtn sec" data-go="email">Open the email</button>`,
+    email: `<div class="stub">Preview inbox</div><div class="mail"><div class="mh">To mara@biome.invalid · Confirm your Biome account</div><div class="mb"><div>Hi Mara, confirm this address to start your first world.</div><button type="button" class="abtn" data-go="first">Confirm email</button></div></div>`,
+    home: `<div class="h">Home</div><div class="sub">You don't have a world yet.</div><button type="button" class="abtn" data-go="first">Create your first world</button>`,
+    first: `<div class="h">Create your first world</div><label for="f-world">World name</label><input id="f-world" value="Ember Isle"><button type="button" class="abtn" data-go="world">Create world</button>`,
+    world: `<div class="hero"><div class="h">Ember Isle</div><div>Welcome to your world. It's empty for now: add a place, or invite someone.</div></div>`,
+  }[screen];
+  return `<div class="app"><div class="ah"><b>Biome</b><span class="me">${signedIn ? (jk === 'first' ? 'rin@biome.invalid' : 'mara@biome.invalid') : 'Signed out'}</span></div><div class="am">${body}</div></div>`;
+}
+function evidenceFor(a) {
+  if (a.id === 'a1') return `<div class="evid"><div class="evcard"><h3 class="evh">${icon('history')}Previous · r3</h3><div class="flow"><span class="node">Welcome</span>${icon('arrow_forward', 'arrow')}<span class="node">Sign in</span>${icon('arrow_forward', 'arrow')}<span class="node">Home</span></div></div>
+    <div class="evcard"><h3 class="evh">${icon('edit')}Proposed · r4</h3><div class="flow"><span class="node">Welcome</span>${icon('arrow_forward', 'arrow')}<span class="node add">Sign up</span>${icon('arrow_forward', 'arrow')}<span class="node add">Check your email</span>${icon('arrow_forward', 'arrow')}<span class="node add">Create your first world</span>${icon('arrow_forward', 'arrow')}<span class="node">Home</span></div>
+    <div class="flow small muted">Sign in: unchanged, still reached from Welcome${A('a1').needs[0]?.q.answer === 0 ? ' and now linked from Sign up' : ''}.</div></div>
+    <div class="evcard"><h3 class="evh">${icon('description')}Page spec · Check your email (new)</h3><p class="small" style="margin:0">Says where the link went and offers <i>Send it again</i> after 60 seconds. A confirmed address is required before creating a world.</p></div></div>`;
+  if (a.id === 'a2') return `<div class="evid"><div class="evcard"><h3 class="evh">${icon('schema')}Member · previous and proposed</h3><table class="tb"><thead><tr><th>Field</th><th>Type</th><th>Change</th></tr></thead><tbody>
+    <tr><td class="mono">email</td><td>text, unique</td><td class="muted">unchanged</td></tr><tr><td class="mono">name</td><td>text</td><td class="muted">unchanged</td></tr>
+    <tr class="add"><td class="mono">password_hash</td><td>text, write-only</td><td>added</td></tr><tr class="add"><td class="mono">email_confirmed_at</td><td>time, optional</td><td>added</td></tr></tbody></table></div></div>`;
+  const w = S.walk; const J = JOURNEYS[w.j];
+  return `<div class="bar top"><span class="persona">${icon('person')}As ${J.persona}</span><span class="tiny muted">Preview build of W-11</span></div>
+    <div class="evid"><div class="frame"><div class="fhead"><span class="addr mono">w-11.biome.preview${URL_OF[w.screen]}</span></div><div class="fbody" data-j="${w.j}">${app(w.screen, w.j)}</div></div></div>`;
+}
+function decisionFor(a) {
+  const flagBox = S.flagging ? `<div class="flagbox"><label for="flagtext">What should change? It goes back to #${a.n}'s agent.</label><textarea id="flagtext" data-bind="flag">${esc(S.flagText)}</textarea>
+    <div class="row"><button type="button" class="btn ghost" data-act="cancel-flag">Cancel</button><button type="button" class="btn flag push" data-act="save-flag">${icon('flag')}Send back to #${a.n}</button></div></div>` : '';
+  const acts = S.flagging ? '' : `<div class="decision"><div class="row"><span class="acts"><button type="button" class="btn flag" data-act="flag">${icon('flag')}Flag</button><button type="button" class="btn go" data-act="approve-action" ${a.id === 'a3' && !walkedAll() ? 'disabled' : ''}>${icon('check')}Approve #${a.n}</button></span></div>
+    ${a.id === 'a3' && !walkedAll() ? '<p class="small muted" style="margin:0">Walk both journeys to approve.</p>' : ''}</div>`;
+  if (a.id !== 'a3') return `<div class="body"><div class="eyebrow">#${a.n} · ${LAYERS[a.layer][0]}</div><h3>${esc(a.title)}</h3><p class="lead">${esc(a.goal)}</p>${flagBox}${acts}</div>`;
+  const w = S.walk;
+  if (w.mode === 'step') { const J = JOURNEYS[w.j], s = J.steps[w.i];
+    return `<div class="body step"><div class="eyebrow">${J.title} · step ${w.i + 1} of ${J.steps.length}</div><h3>${esc(s.name)}</h3>
+      <dl class="spec"><dt>As</dt><dd>${J.persona}</dd><dt>When</dt><dd>${esc(s.when)}</dd><dt>Expect</dt><dd>${esc(s.expect)}</dd></dl>
+      <p class="small muted" style="margin:0">${icon('touch_app')} Do it in the preview; that counts as looking good and moves on.</p></div>
+      <div class="bar bottom"><button type="button" class="btn ghost" data-act="walk-back">${icon('arrow_back')}Back</button><span class="prog" role="img" aria-label="Step ${w.i + 1} of ${J.steps.length}">${J.steps.map((t, i) => `<span class="${w.walked[w.j + i] ? 'walked' : ''} ${i === w.i ? 'cur' : ''}"></span>`).join('')}</span>
+        <span class="acts"><button type="button" class="btn go" data-act="looks-good">${icon('check')}Looks good</button></span></div>`; }
+  return `<div class="body"><div class="eyebrow">#3 · Code · 2 journeys</div><h3>${esc(a.title)}</h3><p class="lead">Built by the Code agent and passed #4's combined check. Walk each journey on the preview build.</p>
+    ${Object.entries(JOURNEYS).map(([jk, J]) => `<div class="jgroup"><h4>${icon('directions_walk')}${J.title} <span class="chip">as ${J.persona}</span></h4><ol class="slist">${J.steps.map((s, i) => `<li><div class="srow"><span class="num ${w.walked[jk + i] ? 'walked' : ''}">${w.walked[jk + i] ? icon('check') : i + 1}</span><span>${esc(s.name)}</span><span class="chip ok">${icon('check_circle')}Test passed</span></div></li>`).join('')}</ol>
+      <div><button type="button" class="btn sm" data-act="walk" data-j="${jk}">${icon('directions_walk')}Walk ${J.title}</button></div></div>`).join('')}${flagBox}${acts}</div>`;
+}
+const walkedAll = () => Object.entries(JOURNEYS).every(([jk, J]) => J.steps.every((_, i) => S.walk.walked[jk + i]));
+function dialog() {
+  const a = A(S.dlg); if (!a) return '';
+  return `<div class="rv"><div class="rvtop"><button type="button" class="btn ghost sm" data-act="close-dlg">${icon('close')}Close</button><h2>Review #${a.n} · ${esc(a.title)}</h2><span class="chip">${a.layer === 'host' ? 'Orchestrator' : LAYERS[a.layer][0]}</span></div>
+    <div class="panes"><section class="pv" aria-label="Evidence">${evidenceFor(a)}</section><section class="cp" aria-label="Decision">${decisionFor(a)}</section></div></div>`;
+}
+
+// ---------- render, keeping focus and typed text ----------
+function render() {
+  const a = document.activeElement; const id = a?.id; const sel = a && 'selectionStart' in a ? [a.selectionStart, a.selectionEnd] : null;
+  const typed = {}; document.querySelectorAll('textarea[id^="steer"]').forEach(t => typed[t.id] = t.value);
+  $('#view').innerHTML = S.view === 'board' ? boardView() : itemView();
+  const d = $('#dlg'); if (S.dlg) { d.innerHTML = dialog(); d.classList.add('open'); } else { d.classList.remove('open'); d.innerHTML = ''; }
+  for (const [k, v] of Object.entries(typed)) { const t = document.getElementById(k); if (t) t.value = v; }
+  const m = $('.side .msgs'); if (m && !S.side) m.scrollTop = m.scrollHeight;
+  document.querySelectorAll('[data-speed]').forEach(b => b.setAttribute('aria-pressed', b.dataset.speed === S.speed));
+  $('#tickbtn').disabled = S.speed === 'auto' || !canTick();
+  const el = id && document.getElementById(id);
+  if (el) { el.focus({ preventScroll: true }); if (sel && 'setSelectionRange' in el) try { el.setSelectionRange(...sel); } catch {} }
+}
+
+// ---------- actions ----------
+document.addEventListener('input', e => { const b = e.target.dataset?.bind; if (b === 'flag') S.flagText = e.target.value; if (b === 'draft') S.draft = e.target.value; if (b === 'goal') S.goalDraft = e.target.value;
+  if (e.target.type === 'radio') { const f = e.target.closest('form'); const q = findQ(f.dataset.scope, f.dataset.q); if (q) q.pick = +e.target.value; } });
+function findQ(scope, qid) { if (scope === 'def') return S.defQs.find(q => q.id === qid); return A(scope)?.needs.find(n => n.q?.id === qid)?.q; }
+document.addEventListener('submit', e => {
+  e.preventDefault(); const f = e.target;
+  if (f.dataset.form === 'answer') { const q = findQ(f.dataset.scope, f.dataset.q); q.answer = q.pick;
+    if (f.dataset.scope !== 'def') { const a = A(f.dataset.scope); a.needs = a.needs.filter(n => !(n.q && n.q.answer != null)); if (!a.needs.length && a.state === 'needs') a.state = 'working'; }
+    toast('Answered'); render(); return; }
+  if (f.dataset.form === 'steer') { const t = $('#steer'); const v = t.value.trim(); if (!v) return; t.value = ''; say(v, [], 'you');
+    say(S.stage === 'draft' ? 'Nobody is on this yet; press Go to start.' : `Noted. I'll fold that in and tell you if it changes any action.`); render(); return; }
+  if (f.dataset.form === 'steer-action') { const a = A(f.dataset.a); const t = f.querySelector('textarea'); const v = t.value.trim(); if (!v) return; t.value = '';
+    log(a.id, `You: ${v}`); log(a.id, `${a.agent}: noted; I'll take it into account.`); render(); return; }
+});
+document.addEventListener('click', e => {
+  const sp = e.target.closest('[data-speed]'); if (sp) { S.speed = sp.dataset.speed; render(); return; }
+  const st = e.target.closest('[data-style]'); if (st) { S.style = st.dataset.style; render(); return; }
+  const go = e.target.closest('.fbody [data-go]'); if (go) return walkTo(go.dataset.go);
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const a = b.dataset.a && A(b.dataset.a);
+  switch (b.dataset.act) {
+    case 'tick': if (!tick()) toast('Nothing can happen until you act'); return;
+    case 'board': S.view = 'board'; render(); return;
+    case 'open-item': S.view = 'item'; render(); return;
+    case 'go': S.stage = 'defining'; S.claimed = true; render(); return;
+    case 'start': S.stage = 'running'; S.status = 'progress'; say(S.style === 'local' ? 'Claimed in your local session; starting phase 1.' : 'Starting phase 1.', [], 'orch'); toast('W-11 moved to In progress'); render(); return;
+    case 'first-need': { const el = document.querySelector('.need, #closeout, .acard.st-review, .acard.st-proposed'); el?.scrollIntoView({ block: 'center' }); el?.querySelector('button, input')?.focus({ preventScroll: true }); return; }
+    case 'open': S.side = a.id; render(); $('[data-act="back-orch"]')?.focus(); return;
+    case 'back-orch': S.side = null; render(); return;
+    case 'allow': a.needs = a.needs.filter(n => n.kind !== 'allow'); a.allowed = true; a.state = 'working'; render(); return;
+    case 'decline': a.needs = []; a.state = 'declined'; say(`You declined #${a.n}'s change. I'll tell #3 that passwords aren't stored yet.`, [a.id]); render(); return;
+    case 'approve-new': a.state = 'todo'; say(`You approved #${a.n}. It starts ${gateOpen() ? 'now' : 'when the review gate clears'}.`, [a.id]); render(); return;
+    case 'reject-new': a.state = 'declined'; say(`You declined #${a.n}. #3 will build without new journeys; I'll flag that in #4.`, [a.id]); render(); return;
+    case 'stuck-more': S.scn.verifyStuck = false; S.stuck = false; { const x = A('a4'); x.needs = []; x.state = 'working'; log('a4', 'Trying once more'); } render(); return;
+    case 'stuck-review': S.stuck = false; { const x = A('a4'); x.needs = []; x.state = 'done'; log('a4', 'Stopped retrying at your word; the failing step is marked'); } S.fired.push('r12'); A('a3').state = 'review'; render(); return;
+    case 'edit': S.editing = a.id; S.goalDraft = a.goal; render(); $(`#goal-${a.id}`)?.focus(); return;
+    case 'cancel-edit': S.editing = null; render(); return;
+    case 'save-edit': a.goal = (S.goalDraft || a.goal).trim(); S.editing = null; say(`Updated #${a.n}'s goal. ${a.state === 'working' ? `${a.agent} has the new goal and will adjust.` : 'Its agent will start from it.'}`, [a.id]); render(); return;
+    case 'add': S.adding = +b.dataset.p; S.draft = ''; render(); $(`#add-${b.dataset.p}`)?.focus(); return;
+    case 'cancel-add': S.adding = null; render(); return;
+    case 'save-add': { const p = +b.dataset.p; const t = S.draft.trim(); if (!t) { toast('Say what the action should do'); return; } const layer = $(`#addl-${p}`).value; const n = S.nextN++;
+      const x = mkAction('u' + n, n, p, layer, `${LAYERS[layer][0]} agent`, t, t, { added: true }); S.actions.push(x); S.adding = null;
+      say(`Added #${n} to phase ${p}. ${p === 1 ? 'The review gate now waits on it too.' : 'I\'ll start it when its phase starts.'}`, [x.id]); render(); return; }
+    case 'review': S.dlg = a.id; S.flagging = false; S.flagText = ''; S.walk = { j: 'signup', screen: 'landing', mode: 'card', i: 0, walked: S.walk?.walked || {} }; render(); $('#dlg [data-act="close-dlg"]')?.focus(); return;
+    case 'close-dlg': S.dlg = null; render(); return;
+    case 'flag': S.flagging = true; render(); $('#flagtext')?.focus(); return;
+    case 'cancel-flag': S.flagging = false; render(); return;
+    case 'save-flag': { const x = A(S.dlg); const t = S.flagText.trim(); if (!t) { toast('A flag needs a note'); $('#flagtext')?.focus(); return; }
+      x.state = 'fixing'; log(x.id, `You flagged: ${t}`); say(`You flagged #${x.n}: “${t}”. I sent it back to ${x.agent}.`, [x.id]); S.dlg = null; S.flagging = false; render(); return; }
+    case 'approve-action': { const x = A(S.dlg); x.state = 'done'; log(x.id, 'You approved it'); S.dlg = null; toast(`#${x.n} approved`); render(); return; }
+    case 'walk': S.walk.j = b.dataset.j; S.walk.mode = 'step'; S.walk.i = 0; S.walk.screen = JOURNEYS[b.dataset.j].steps[0].start; render(); return;
+    case 'walk-back': if (S.walk.i === 0) S.walk.mode = 'card'; else { S.walk.i--; S.walk.screen = JOURNEYS[S.walk.j].steps[S.walk.i].start; } render(); return;
+    case 'looks-good': advance(); return;
+    case 'merge': S.stage = 'done'; S.status = 'done'; toast('Merged; W-11 moved to Done'); render(); return;
+    case 'scenarios': renderScenarios(); $('#questions').classList.remove('open'); $('#scenarios').classList.add('open'); return $('#scenarios input, #scenarios button')?.focus();
+    case 'questions': renderQuestions(); $('#scenarios').classList.remove('open'); $('#questions').classList.add('open'); return $('#questions textarea')?.focus();
+    case 'close-drawer': b.closest('.drawer').classList.remove('open'); return;
+    case 'reset': resetAll(); return toast('Reset; your answers to the questions are kept');
+    case 'jump': jump(b.dataset.to); return;
+    case 'copy': { const ans = store.get('answers', {}); const txt = QUESTIONS.map(([id]) => `${id}: ${ans[id] || ''}`).join('\n'); navigator.clipboard?.writeText(txt).then(() => toast('Copied'), () => toast('Copy failed; select the text instead')); return; }
+  }
+});
+function walkTo(target) { const w = S.walk; w.screen = target; if (w.mode === 'step' && JOURNEYS[w.j].steps[w.i].end === target) return advance(); render(); }
+function advance() { const w = S.walk; const J = JOURNEYS[w.j]; w.walked[w.j + w.i] = true; if (w.i < J.steps.length - 1) { w.i++; w.screen = J.steps[w.i].start; } else w.mode = 'card'; render(); }
+function resetAll() { const scn = S.scn, speed = S.speed; Object.assign(S, fresh(), { scn, speed }); render(); }
+// Prototype shortcut: replay the run with the recommended answers until a point.
+function jump(to) {
+  resetAll(); const speed = S.speed; S.speed = 'step'; S.stage = 'defining'; S.claimed = true;
+  const until = { ready: () => S.stage === 'ready', needs: () => fired('r3b'), gate: () => fired('r5'), review3: () => A('a3')?.state === 'review' || S.stuck, close: () => S.stage === 'closing' }[to];
+  for (let i = 0; i < 120 && !until(); i++) {
+    S.defQs.forEach(q => { if (S.defAsked && q.answer == null) q.answer = q.rec; });
+    if (S.stage === 'ready') { S.stage = 'running'; S.status = 'progress'; continue; }
+    if (to !== 'needs') for (const a of S.actions) {
+      for (const n of a.needs) if (n.q && n.q.answer == null) n.q.answer = n.q.rec;
+      a.needs = a.needs.filter(n => !(n.q && n.q.answer != null));
+      if (a.needs.some(n => n.kind === 'allow')) { a.needs = a.needs.filter(n => n.kind !== 'allow'); a.allowed = true; }
+      if (a.state === 'needs' && !a.needs.length) a.state = 'working';
+      if (a.state === 'proposed' && to !== 'gate') a.state = 'todo';
+      if (a.state === 'review' && (to === 'close' || (to === 'review3' && a.id !== 'a3'))) a.state = 'done';
+    }
+    if (!tick()) break;
+  }
+  S.speed = speed; $('#scenarios').classList.remove('open'); render();
+}
+
+// ---------- prototype-only: scenarios and review questions ----------
+const QUESTIONS = [
+  ['Q1', 'The item page keeps the Jira-style top bar (status column, priority, assignee, layers, source, links) and the brief. Quick enough to see what it\'s about when you click in?'],
+  ['Q2', 'From a rough Draft, Go has Claude check it over, ask its questions on the brief, rewrite the brief and draft the actions, then move it to Ready; Start work begins. Right split between defining and doing?'],
+  ['Q3', 'The right sidebar is the orchestrator\'s thread; clicking an action shows its details, needs and log there, with its own steer box. Does that work as the one place for details and steering?'],
+  ['Q4', 'Everything that needs you sits on its action: stacked questions, a change to allow, a new action to approve, Review. The top bar only counts them. Consistent enough?'],
+  ['Q5', 'Phases with review gates, plus "after #n" inside a phase for concurrency. Does that give you the dependency picture, and should you be able to move gates yourself?'],
+  ['Q6', 'Review per action (some actions are only checked by the orchestrator), then one Approve and merge from the orchestrator to close out. Right?'],
+  ['Q7', 'Work style: Send to Claude or Work locally (aludel claim W-11), with the same actions, needs and reviews, and your local session\'s thread in the sidebar. Is that the parity you want?'],
+  ['Q8', 'A plain kanban board (Draft, Ready, In progress, In review, Done) instead of batches. Keep going that way?'],
+];
+function renderScenarios() {
+  $('#scenarios').innerHTML = `<div class="row"><h2>Scenarios</h2><button type="button" class="btn ghost sm push" data-act="close-drawer">${icon('close')}Close</button></div>
+    <fieldset><legend>Jump to</legend><div class="jump">
+      <button type="button" class="btn sm" data-act="jump" data-to="ready">Defined (Ready)</button><button type="button" class="btn sm" data-act="jump" data-to="needs">Two things need you</button>
+      <button type="button" class="btn sm" data-act="jump" data-to="gate">New action at the gate</button><button type="button" class="btn sm" data-act="jump" data-to="review3">Code review</button><button type="button" class="btn sm" data-act="jump" data-to="close">Close out</button></div></fieldset>
+    <fieldset><legend>What happens</legend><label><input type="checkbox" id="scn-stuck" ${S.scn.verifyStuck ? 'checked' : ''}> #4 fails twice on the same step</label></fieldset>
+    <button type="button" class="btn" data-act="reset">${icon('restart_alt')}Reset to the Draft</button>`;
+  $('#scn-stuck').addEventListener('change', e => { S.scn.verifyStuck = e.target.checked; });
+}
+function renderQuestions() {
+  const ans = store.get('answers', {});
+  $('#questions').innerHTML = `<div class="row"><h2>Review questions</h2><button type="button" class="btn ghost sm push" data-act="close-drawer">${icon('close')}Close</button></div>
+    ${QUESTIONS.map(([id, q]) => `<div class="qa"><p><b>${id}</b> ${esc(q)}</p><textarea id="a-${id}" aria-label="${id} answer" data-q="${id}">${esc(ans[id] || '')}</textarea></div>`).join('')}
+    <button type="button" class="btn primary" data-act="copy">${icon('content_copy')}Copy answers</button>`;
+  $('#questions').querySelectorAll('textarea').forEach(t => t.addEventListener('input', () => { const all = store.get('answers', {}); all[t.dataset.q] = t.value; store.set('answers', all); }));
+}
+render();
+</script>
+</body>
+</html>

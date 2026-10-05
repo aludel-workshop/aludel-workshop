@@ -1,0 +1,72 @@
+{
+  "vercel-import": {
+    "url": "https://vercel.com/docs/getting-started-with-vercel/import",
+    "note": "Import an existing Git repository",
+    "accessed": "2026-10-05T18:40:27.277Z",
+    "status": 200,
+    "finalUrl": "https://vercel.com/docs/getting-started-with-vercel",
+    "title": "Getting started with Vercel",
+    "file": "vercel-import.png",
+    "ok": true
+  },
+  "vercel-monorepos": {
+    "url": "https://vercel.com/docs/monorepos",
+    "note": "Root Directory per project in a monorepo",
+    "accessed": "2026-10-05T18:40:31.403Z",
+    "status": 200,
+    "finalUrl": "https://vercel.com/docs/monorepos",
+    "title": "Using Monorepos",
+    "file": "vercel-monorepos.png",
+    "ok": true
+  },
+  "vercel-root-directory": {
+    "url": "https://vercel.com/docs/builds/configure-a-build",
+    "note": "Root Directory setting",
+    "accessed": "2026-10-05T18:40:35.787Z",
+    "status": 200,
+    "finalUrl": "https://vercel.com/docs/builds/configure-a-build",
+    "title": "Configuring a Build",
+    "file": "vercel-root-directory.png",
+    "ok": true
+  },
+  "railway-monorepo": {
+    "url": "https://docs.railway.com/guides/monorepo",
+    "note": "Root directory and watch paths",
+    "accessed": "2026-10-05T18:40:40.462Z",
+    "status": 200,
+    "finalUrl": "https://docs.railway.com/deployments/monorepo",
+    "title": "Deploying a Monorepo | Railway Docs",
+    "file": "railway-monorepo.png",
+    "ok": true
+  },
+  "render-monorepo": {
+    "url": "https://render.com/docs/monorepo-support",
+    "note": "Root directory and build filters",
+    "accessed": "2026-10-05T18:40:46.801Z",
+    "status": 200,
+    "finalUrl": "https://render.com/docs/monorepo-support",
+    "title": "Monorepo Support – Render Docs",
+    "file": "render-monorepo.png",
+    "ok": true
+  },
+  "netlify-import": {
+    "url": "https://docs.netlify.com/start/add-new-project/",
+    "note": "Import from an existing repository",
+    "accessed": "2026-10-05T18:41:04.046Z",
+    "status": 200,
+    "finalUrl": "https://docs.netlify.com/start/choose-your-path/",
+    "title": "Choose your path | Netlify Docs",
+    "file": "netlify-import.png",
+    "ok": true
+  },
+  "vercel-root-directory-dialog": {
+    "url": "https://vercel.com/docs/monorepos",
+    "note": "The Root Directory picker when importing a monorepo",
+    "accessed": "2026-10-05T18:41:22.906Z",
+    "status": 200,
+    "finalUrl": "https://vercel.com/docs/monorepos",
+    "title": "Using Monorepos",
+    "file": "vercel-root-directory-dialog.png",
+    "ok": true
+  }
+}

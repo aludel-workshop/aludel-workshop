@@ -1,0 +1,559 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aludel work board</title>
+<!-- AGENT-WORK-01 work ecosystem prototype v1 (scope and questions in ../../work-record.md). Static; illustrative Biome data
+     synced with an imaginary Linear team; nothing is saved or sent except the reviewer's answers, which stay in this browser. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block">
+<style>
+/* Tokens and shell as the built portal and the J6 prototype. */
+:root{color-scheme:light;
+  --bg:#fbfbfd;--surface:#fff;--rail:#f3f5f9;--panel:#f4f6fa;--hover:#e9edf5;--line:#dfe3ec;--line-strong:#c8cfdc;--ink:#1b1f2a;--muted:#5d6679;--faint:#636c80;
+  --accent:#3047b9;--accent-bg:#e3e8ff;--cover:#f3f1fc;--cover-line:#d9d2f7;
+  --ok:#146446;--ok-bg:#d9f3e7;--bad:#a1231f;--bad-bg:#fce1e0;--warn:#7a4f00;--warn-bg:#fff0cc;--info:#1a5fb4;--info-bg:#e2ecfb;
+  --new:#5b3cc4;--new-bg:#ece7fd;--shadow:0 18px 50px #1c2a5a2e;--bar:52px;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:Roboto,system-ui,sans-serif;font-size:14.5px;line-height:1.45;color:var(--ink);background:var(--bg)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:var(--accent)}
+.icon{font-family:'Material Symbols Rounded';font-weight:normal;font-style:normal;font-size:20px;line-height:1;letter-spacing:normal;text-transform:none;white-space:nowrap;display:inline-block;vertical-align:middle;font-feature-settings:'liga';-webkit-font-smoothing:antialiased;flex:none}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.mono,code{font-family:"Roboto Mono",ui-monospace,monospace;font-size:.88em}
+.muted{color:var(--muted)}.small{font-size:13px}.tiny{font-size:12px}
+.row{display:flex;align-items:center;gap:8px}.push{margin-left:auto}.wrap{flex-wrap:wrap}
+h1,h2,h3{margin:0}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.spin{animation:spin 1.2s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+
+.shell{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:100vh}
+.rail{background:var(--rail);border-right:1px solid var(--line);padding:14px 10px;display:flex;flex-direction:column;gap:2px;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:18px;padding:2px 8px 12px}
+.brand .icon{color:var(--accent);font-size:26px}
+.proj{display:flex;align-items:center;gap:9px;padding:8px;border-radius:12px;background:var(--surface);border:1px solid var(--line);margin-bottom:10px}
+.proj .mk{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:#2a7230;color:#fff;font-weight:700;font-size:12px}
+.proj small{display:block;color:var(--muted);font-size:11.5px}
+.nav a{display:flex;align-items:center;gap:10px;padding:5px 10px 5px 6px;border-radius:12px;color:var(--ink);text-decoration:none;font-weight:500}
+.nav a.active{background:var(--nb);font-weight:700}
+.tile{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:var(--nb);color:var(--nc)}
+.tile .icon{font-size:19px}
+.nav a.active .tile{background:var(--nc);color:#fff}
+.n-home{--nc:#c62828;--nb:#fde8e8}.n-vision{--nc:#b93c0a;--nb:#ffeddc}.n-design{--nc:#8a6100;--nb:#fff3cc}.n-pages{--nc:#2a7230;--nb:#e2f4e3}.n-data{--nc:#00766c;--nb:#d6f3ee}.n-code{--nc:#1a5fb4;--nb:#e2ecfb}.n-deploy{--nc:#2f3a9e;--nb:#e4e7f8}.n-work{--nc:#5b3cc4;--nb:#ece7fd}.n-host{--nc:#5d6679;--nb:#eceff4}
+.main{padding:10px 14px 14px;min-width:0;display:flex;flex-direction:column;gap:8px}
+
+.btn{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:var(--surface);font-weight:500;font-size:13.5px;white-space:nowrap;text-decoration:none;color:var(--ink)}
+.btn:hover{background:var(--hover)}.btn .icon{font-size:18px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}.btn.primary:hover{background:#2539a0}
+.btn.go{background:var(--ok);border-color:var(--ok);color:#fff}.btn.go:hover{background:#0f4f37}
+.btn.flag{border-color:var(--warn);color:var(--warn)}
+.btn.ghost{border-color:transparent;background:none}.btn.ghost:hover{background:var(--hover)}
+.btn.sm{padding:3px 9px;font-size:12.5px}.btn.sm .icon{font-size:16px}
+.btn:disabled{opacity:.5;cursor:default}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:500;background:var(--panel);color:var(--muted);white-space:nowrap}
+.chip .icon{font-size:15px}
+.chip.new{background:var(--new-bg);color:var(--new)}.chip.ok{background:var(--ok-bg);color:var(--ok)}.chip.bad{background:var(--bad-bg);color:var(--bad)}.chip.warn{background:var(--warn-bg);color:var(--warn)}.chip.info{background:var(--info-bg);color:var(--info)}
+.lchip{display:inline-flex;align-items:center;gap:4px;padding:1px 8px 1px 3px;border-radius:999px;font-size:12px;font-weight:700;background:var(--nb);color:var(--nc);white-space:nowrap}
+.lchip .icon{font-size:15px;background:var(--nc);color:#fff;border-radius:50%;padding:1px}
+.eyebrow{font-size:11.5px;letter-spacing:.8px;text-transform:uppercase;color:var(--faint);font-weight:700}
+.proto{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);padding:2px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.seg button{border:0;background:var(--surface);padding:3px 10px;font-size:12.5px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+/* Layout: Work keeps one header (views, filters, sync state); Board is five status columns; a card opens a peek panel on the
+   right; Routines and Projects are lists with a detail page each. */
+.whead{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.whead h1{font-size:22px}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.tabs button{border:0;background:none;padding:8px 12px;font-weight:500;color:var(--muted);border-bottom:2px solid transparent;display:inline-flex;gap:6px;align-items:center}
+.tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+.tabs .icon{font-size:18px}
+.sync{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;background:var(--surface);font-size:12.5px}
+.sync .dot{width:8px;height:8px;border-radius:50%;background:var(--ok)}
+.filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px}
+.filters select{border:1px solid var(--line-strong);border-radius:8px;padding:4px 8px;background:var(--surface)}
+.fchip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:3px 10px;font-size:12.5px;display:inline-flex;gap:5px;align-items:center}
+.fchip[aria-pressed="true"]{background:var(--warn);border-color:var(--warn);color:#fff}
+.cap{font-size:12.5px;color:var(--muted);display:inline-flex;gap:6px;align-items:center}
+
+.boardwrap{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
+.boardwrap.peeking{grid-template-columns:minmax(0,1fr) 360px}
+.board{display:grid;grid-template-columns:repeat(5,minmax(200px,1fr));gap:10px;overflow-x:auto;padding-bottom:6px;align-items:start}
+.bcol{background:var(--panel);border-radius:14px;padding:8px;display:grid;gap:8px;align-content:start;min-height:420px;border:2px solid transparent}
+.bcol.over{border-color:var(--accent);background:var(--accent-bg)}
+.bhead{display:flex;gap:6px;align-items:center;padding:2px 4px;flex-wrap:wrap}
+.bhead .col,.bhead .lin{white-space:nowrap}
+.bhead .n{font-size:12px;color:var(--muted)}
+.bhead .lin{margin-left:auto;font-size:11px;color:var(--faint)}
+.col{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:6px;font-weight:700;font-size:11.5px;letter-spacing:.4px;text-transform:uppercase}
+.col-draft{background:#e4e7ee;color:#3d4556}.col-ready{background:var(--info-bg);color:var(--info)}.col-progress{background:var(--accent-bg);color:var(--accent)}.col-review{background:var(--warn-bg);color:var(--warn)}.col-done{background:var(--ok-bg);color:var(--ok)}
+.card{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:8px 10px;display:grid;gap:6px;cursor:grab;position:relative}
+.card:hover{border-color:var(--line-strong)}
+.card.sel{outline:2px solid var(--accent);outline-offset:1px}
+.card.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%{background:var(--accent-bg)}100%{background:var(--surface)}}
+.card .top{display:flex;gap:6px;align-items:center;font-size:12px;color:var(--muted)}
+.card .top .lid{margin-left:auto;font-family:"Roboto Mono",monospace;font-size:11px}
+.card .t{border:0;background:none;padding:0;text-align:left;font-weight:500;font-size:14px;color:var(--ink);line-height:1.3}
+.card .t:hover{text-decoration:underline}
+.card .t.rough{font-style:italic;color:var(--muted);font-weight:400}
+.card .row2{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12px}
+.card .foot{display:flex;gap:6px;align-items:center;font-size:12px;color:var(--muted);flex-wrap:wrap}
+.who{display:inline-flex;gap:4px;align-items:center}
+.who .icon{font-size:16px}
+.live{width:8px;height:8px;border-radius:50%;background:var(--ok);display:inline-block}
+.pbar{display:flex;gap:2px;flex:1;min-width:50px;max-width:110px}
+.pbar span{flex:1;height:5px;border-radius:3px;background:var(--line)}
+.pbar span.d{background:var(--ok)}
+.prio{display:inline-flex;align-items:center;gap:2px;font-size:12px}
+.prio .icon{font-size:16px}
+.p-urgent{color:#b3261e}.p-high{color:#b3261e}.p-medium{color:var(--warn)}.p-low{color:var(--muted)}
+.needs{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:1px 8px;background:var(--warn);color:#fff;font-weight:700;font-size:11.5px}
+.movebtn{position:absolute;top:6px;right:6px;border:0;background:none;color:var(--muted);border-radius:6px;padding:2px;display:none}
+.card:hover .movebtn,.card:focus-within .movebtn{display:block}
+.card:hover .top .lid,.card:focus-within .top .lid{visibility:hidden}
+.menu{position:absolute;right:6px;top:30px;background:var(--surface);border:1px solid var(--line-strong);border-radius:10px;box-shadow:var(--shadow);z-index:20;padding:4px;list-style:none;margin:0;min-width:160px}
+.menu button{display:flex;gap:6px;align-items:center;width:100%;border:0;background:none;padding:6px 8px;border-radius:6px;text-align:left;font-size:13px}
+.menu button:hover{background:var(--hover)}
+
+.peek{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px 14px;display:grid;gap:10px;align-content:start;position:sticky;top:10px;max-height:calc(100vh - 20px);overflow:auto}
+.peek h2{font-size:17px;line-height:1.3}
+.peek dl{display:grid;grid-template-columns:auto 1fr;gap:5px 12px;margin:0;font-size:13.5px}
+.peek dt{color:var(--muted)}.peek dd{margin:0}
+.alist{list-style:none;margin:0;padding:0;display:grid;gap:4px;font-size:13px}
+.alist li{display:flex;gap:6px;align-items:flex-start}
+.alist .icon{font-size:17px}
+.a-done{color:var(--ok)}.a-work{color:var(--accent)}.a-need{color:var(--warn)}.a-todo{color:var(--line-strong)}
+.syncnote{display:flex;gap:6px;align-items:flex-start;background:var(--info-bg);color:#123f79;border-radius:10px;padding:7px 10px;font-size:12.5px}
+.syncnote .icon{font-size:17px}
+
+/* routines */
+.list{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.lrow{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1.6fr) minmax(0,1.2fr) auto;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line)}
+.lrow:last-child{border-bottom:0}
+.lrow.h{font-size:12px;color:var(--muted);font-weight:500;background:var(--panel)}
+.lrow b{font-weight:500}
+.lrow .s{font-size:12.5px;color:var(--muted)}
+.linkbtn{border:0;background:none;padding:0;color:var(--accent);font-weight:500;text-align:left}
+.linkbtn:hover{text-decoration:underline}
+.switch{display:inline-flex;gap:6px;align-items:center;font-size:12.5px}
+.formula{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:grid;gap:12px}
+.sentence{font-size:16px;line-height:1.5;background:var(--cover);border:1px solid var(--cover-line);border-radius:12px;padding:10px 14px}
+.sentence b{color:var(--new)}
+.frow{display:grid;grid-template-columns:110px minmax(0,1fr);gap:10px;align-items:start;padding-top:10px;border-top:1px solid var(--line)}
+.frow .kw{font-weight:700;font-size:12px;letter-spacing:.8px;text-transform:uppercase;color:var(--new);padding-top:6px}
+.frow .fx{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:13.5px}
+.frow input[type=text],.frow select{border:1px solid var(--line-strong);border-radius:8px;padding:5px 8px;background:var(--surface);min-width:0}
+.frow input[type=text]{flex:1;min-width:200px}
+.frow label{display:inline-flex;gap:5px;align-items:center}
+.runs{list-style:none;margin:0;padding:0;display:grid;gap:4px;font-size:13px}
+.runs li{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0;border-bottom:1px solid var(--line)}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:12px;align-items:start}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:grid;gap:8px}
+.panel h2{font-size:15px}
+.panel h3{font-size:13.5px}
+
+/* projects */
+.projs{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.pcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:grid;gap:8px;text-align:left}
+.pcard h2{font-size:16px}
+.meter{height:8px;border-radius:4px;background:var(--line);overflow:hidden;display:flex}
+.meter span{background:var(--ok)}
+.meter span.w{background:var(--accent)}
+.ms{display:grid;gap:8px}
+.msrow{display:grid;gap:6px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--surface)}
+.msrow h3{font-size:14px;display:flex;gap:6px;align-items:center}
+.mitems{list-style:none;margin:0;padding:0;display:grid;gap:4px;font-size:13.5px}
+.mitems li{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.sugg{border:1px dashed var(--new);background:var(--new-bg);border-radius:12px;padding:10px 12px;display:grid;gap:6px}
+.sugg h3{font-size:14px;color:var(--new);display:flex;gap:6px;align-items:center}
+
+/* dialogs and drawers */
+.dlg{position:fixed;inset:0;background:#1b1f2a8c;z-index:50;display:none;place-items:center;padding:16px}
+.dlg.open{display:grid}
+.dlg .box{background:var(--surface);border-radius:16px;padding:16px;max-width:460px;width:100%;display:grid;gap:10px}
+.dlg h2{font-size:17px}
+.dlg p{margin:0}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(440px,100vw);background:var(--surface);box-shadow:var(--shadow);z-index:60;padding:16px;overflow:auto;display:none}
+.drawer.open{display:block}
+.drawer h2{font-size:16px;margin-bottom:8px}
+.drawer h3{font-size:14px;margin:12px 0 6px}
+.drawer fieldset{border:1px solid var(--line);border-radius:10px;margin:0 0 10px;padding:8px 10px}
+.drawer legend{font-weight:700;font-size:13px;padding:0 4px}
+.drawer label{display:flex;gap:6px;align-items:center;font-size:13.5px;padding:2px 0}
+.drawer .qa{margin-bottom:12px}.drawer .qa p{margin:0 0 4px;font-size:13.5px}
+.drawer textarea{width:100%;min-height:60px;border:1px solid var(--line-strong);border-radius:8px;padding:6px 8px}
+table.map{border-collapse:collapse;width:100%;font-size:13px}
+table.map td,table.map th{padding:5px 4px;border-bottom:1px solid var(--line);text-align:left}
+table.map th{font-size:12px;color:var(--muted);font-weight:500}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1b1f2a;color:#fff;padding:8px 14px;border-radius:10px;z-index:80;font-size:13.5px;max-width:90vw}
+.vh{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+@media (max-width:1100px){ .boardwrap.peeking{grid-template-columns:minmax(0,1fr)} .peek{position:static;max-height:none} .grid2{grid-template-columns:1fr} }
+@media (max-width:860px){
+  .shell{grid-template-columns:1fr} .rail{display:none} .main{padding:8px 16px}
+  .board{grid-template-columns:1fr;overflow:visible} .bcol{min-height:0}
+  .lrow{grid-template-columns:1fr;gap:4px} .lrow.h{display:none}
+  .frow{grid-template-columns:1fr}
+}
+</style>
+<body>
+<div class="shell">
+  <nav class="rail" aria-label="Project">
+    <div class="brand"><span class="icon" aria-hidden="true">deployed_code</span>Aludel</div>
+    <div class="proj"><span class="mk" aria-hidden="true">BI</span><div><b>Biome</b><small>Worlds to explore</small></div></div>
+    <div class="nav">
+      <a href="#" class="n-home"><span class="tile"><span class="icon" aria-hidden="true">home</span></span>Home</a>
+      <a href="#" class="n-vision"><span class="tile"><span class="icon" aria-hidden="true">lightbulb</span></span>Vision</a>
+      <a href="#" class="n-design"><span class="tile"><span class="icon" aria-hidden="true">palette</span></span>Design</a>
+      <a href="#" class="n-pages"><span class="tile"><span class="icon" aria-hidden="true">web</span></span>Pages</a>
+      <a href="#" class="n-data"><span class="tile"><span class="icon" aria-hidden="true">schema</span></span>Data</a>
+      <a href="#" class="n-code"><span class="tile"><span class="icon" aria-hidden="true">code</span></span>Code</a>
+      <a href="#" class="n-deploy"><span class="tile"><span class="icon" aria-hidden="true">rocket_launch</span></span>Deploy</a>
+      <a href="#" class="n-work active" aria-current="page"><span class="tile"><span class="icon" aria-hidden="true">checklist</span></span>Work</a>
+    </div>
+  </nav>
+  <main class="main" id="main">
+    <div class="proto"><span class="icon" aria-hidden="true">science</span>Prototype v1 · illustrative data, nothing is sent
+      <span class="seg" role="group" aria-label="Playback"><button type="button" data-speed="auto">Play</button><button type="button" data-speed="step">Step</button></span>
+      <button class="btn sm" type="button" data-act="tick" id="tickbtn"><span class="icon" aria-hidden="true">skip_next</span>Next event</button>
+      <button class="btn sm" type="button" data-act="reset"><span class="icon" aria-hidden="true">restart_alt</span>Reset</button>
+      <button class="btn sm primary" type="button" data-act="questions"><span class="icon" aria-hidden="true">rate_review</span>Review questions</button></div>
+    <div id="view" style="display:grid;gap:10px"></div>
+  </main>
+</div>
+<div class="dlg" id="dlg" role="dialog" aria-modal="true" aria-labelledby="dlgh"></div>
+<aside class="drawer" id="syncd" aria-label="Linear sync"></aside>
+<aside class="drawer" id="questions" aria-label="Review questions"></aside>
+<script>
+// ---------- illustrative data ----------
+const COLS = [
+  ['draft', 'Draft', 'Backlog, Triage'], ['ready', 'Ready', 'Todo'], ['progress', 'In progress', 'In Progress'], ['review', 'In review', 'In Review'], ['done', 'Done', 'Done, Canceled'] ];
+const COLNAME = Object.fromEntries(COLS.map(([k, n]) => [k, n]));
+const LAYERS = { vision: ['Vision', 'lightbulb'], pages: ['Pages', 'web'], data: ['Data', 'schema'], code: ['Code', 'code'], deploy: ['Deploy', 'rocket_launch'] };
+const PRIO = { urgent: ['priority_high', 'Urgent'], high: ['keyboard_double_arrow_up', 'High'], medium: ['drag_handle', 'Medium'], low: ['keyboard_arrow_down', 'Low'] };
+const PROJECTS = () => [
+  { id: 'onb', name: 'Onboarding v1', lead: 'Henry', target: 'Oct 31', health: 'On track', desc: 'New people can join Biome and make their first world.',
+    milestones: [{ name: 'Sign-up', items: ['W-11', 'W-12'] }, { name: 'Invites', items: ['W-14'] }] },
+  { id: 'maps', name: 'World map', lead: 'Henry', target: 'Nov 15', health: 'At risk', desc: 'Explore a world from above: zoom, pan and see who\'s there.',
+    milestones: [{ name: 'Map basics', items: ['W-13', 'W-15', 'W-17'] }] },
+];
+const it = (ref, lin, title, status, o = {}) => ({ ref, lin, title, status, prio: 'medium', who: null, layers: [], project: null, actions: null, needs: 0, live: false, defined: true, ...o });
+const ITEMS = () => [
+  it('W-12', 'BIO-147', 'password reset — same as sign up but forgot pw', 'draft', { defined: false, project: 'onb' }),
+  it('W-14', 'BIO-151', 'Invite to a world', 'draft', { defined: false, project: 'onb', blockedBy: 'W-11' }),
+  it('W-13', 'BIO-148', 'Zoom the world map', 'ready', { prio: 'low', who: 'claude', layers: ['pages', 'code'], project: 'maps', actions: [0, 0, 0, 0] }),
+  it('W-17', 'BIO-160', 'Map tiles flicker on Safari', 'ready', { prio: 'urgent', who: 'claude', layers: ['code'], project: 'maps', actions: [0, 0, 0], routine: 'triage' }),
+  it('W-11', 'BIO-142', 'Create the sign-up flow', 'progress', { prio: 'high', who: 'claude', layers: ['pages', 'data', 'code'], project: 'onb', actions: [1, 1, 2, 0, 0], needs: 2, live: true }),
+  it('W-15', 'BIO-155', 'World card shows member count', 'progress', { who: 'local', layers: ['code'], project: 'maps', actions: [1, 0] }),
+  it('W-16', 'BIO-158', 'Weekly dependency updates · Oct 6', 'review', { who: 'claude', layers: ['code'], actions: [1, 1, 1], needs: 1, routine: 'deps' }),
+  it('W-9', 'BIO-139', 'Sign-up assessment', 'done', { who: 'claude', layers: ['code'], project: 'onb' }),
+  it('W-8', 'BIO-131', 'Code template update', 'done', { who: 'claude', layers: ['code'] }),
+];
+// actions: one number per action: 0 to do, 1 done, 2 needs you, 3 working
+const ROUTINES = () => [
+  { id: 'deps', name: 'Weekly dependency updates', on: true, when: 'schedule', whenText: 'Every Monday at 09:00', cond: 'outdated packages exist', title: 'Weekly dependency updates · {date}', layers: ['code'], project: '', prio: 'medium', who: 'claude', until: 'start', one: true,
+    runs: [['Oct 6', 'W-16', 'In review'], ['Sep 29', 'W-10', 'Done'], ['Sep 22', null, 'Skipped: nothing outdated']] },
+  { id: 'triage', name: 'Define new bugs from Linear', on: true, when: 'event', whenText: 'a Linear issue in BIO gets the label “bug”', cond: '', title: '{linear title}', layers: [], project: '', prio: 'high', who: 'claude', until: 'ready', one: false,
+    runs: [['Oct 3', 'W-17', 'Ready']] },
+  { id: 'regress', name: 'Journey check after deploy', on: true, when: 'event', whenText: 'a deploy to staging finishes', cond: 'a journey fails on staging', title: 'Journeys failing on staging · {build}', layers: ['code'], project: '', prio: 'urgent', who: 'claude', until: 'draft', one: true,
+    runs: [['Oct 3', null, 'Skipped: all journeys passed']] },
+  { id: 'disc', name: 'Discover neighboring layers', builtin: true, on: true, when: 'event', whenText: 'a layer is added or changes its charter', cond: '', title: 'Discover {layer}', layers: [], project: '', prio: 'low', who: 'claude', until: 'ready', one: true, runs: [] },
+];
+const UNTIL = { draft: 'Create it in Draft', ready: 'Define it with Claude, stop at Ready', start: 'Start work (reviews still stop for you)' };
+const UNTIL_SAY = { draft: 'leave it in Draft', ready: 'Claude defines it and stops at Ready', start: 'start work, with reviews still stopping for you' };
+const WHO = { claude: 'Claude, remote', local: 'Henry, local CLI', none: 'Unassigned' };
+
+// ---------- state ----------
+const store = { get(k, d) { try { const v = localStorage.getItem('eco1:' + k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('eco1:' + k, JSON.stringify(v)); } catch {} } };
+const fresh = () => ({ tab: 'board', items: ITEMS(), routines: ROUTINES(), projects: PROJECTS(), peek: null, menu: null, dlg: null, needsOnly: false, fProject: '', fLayer: '', fWho: '',
+  routine: null, project: null, fired: [], next: 19, flash: null, plan: null, syncedAgo: '2 min ago', subIssues: true, comment: true });
+const S = { ...fresh(), speed: 'auto' };
+
+// ---------- helpers ----------
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const icon = (n, cls = '') => `<span class="icon ${cls}" aria-hidden="true">${n}</span>`;
+function toast(t) { document.querySelectorAll('.toast').forEach(x => x.remove()); const el = document.createElement('div'); el.className = 'toast'; el.setAttribute('role', 'status'); el.textContent = t; document.body.append(el); setTimeout(() => el.remove(), 2800); }
+const I = ref => S.items.find(x => x.ref === ref);
+const R = id => S.routines.find(r => r.id === id);
+const P = id => S.projects.find(p => p.id === id);
+const lchip = l => `<span class="lchip n-${l}">${icon(LAYERS[l][1])}${LAYERS[l][0]}</span>`;
+const whoTag = w => w === 'claude' ? `<span class="who">${icon('smart_toy')}Claude</span>` : w === 'local' ? `<span class="who">${icon('terminal')}Henry, local</span>` : '<span class="who muted">Unassigned</span>';
+const newItem = (title, status, o) => { const ref = 'W-' + S.next, lin = 'BIO-' + (143 + S.next); S.next++; const x = it(ref, lin, title, status, o); S.items.push(x); S.flash = ref; return x; };
+
+// ---------- events: what arrives while you watch (sync, routines, agents) ----------
+const EVENTS = [
+  { id: 'e1', run: () => { const x = newItem('Empty state for Explore', 'draft', { defined: false, fromLinear: true }); toast(`${x.lin} was created in Linear; it's ${x.ref} in Draft`); } },
+  { id: 'e2', run: () => { const x = I('W-11'); x.actions = [1, 1, 3, 0, 0]; x.needs = 0; toast('W-11: you answered on the item; #3 is working'); } },
+  { id: 'e3', run: () => { const x = newItem('Search crashes with an emoji', 'draft', { prio: 'high', who: 'claude', routine: 'triage', live: true, defined: false, layers: ['code'] });
+    R('triage').runs.unshift(['Oct 4', x.ref, 'Defining']); toast(`Routine “Define new bugs from Linear” made ${x.ref} and Claude is defining it`); } },
+  { id: 'e4', run: () => { const x = I(S.items.find(i => i.routine === 'triage' && i.live && i.status === 'draft')?.ref || ''); if (!x) return; x.status = 'ready'; x.live = false; x.defined = true; x.actions = [0, 0]; S.flash = x.ref;
+    R('triage').runs[0][2] = 'Ready'; toast(`${x.ref} is defined and moved to Ready; it waits for you to start it`); } },
+  { id: 'e5', run: () => { const x = I('W-15'); x.prio = 'high'; x.syncNote = 'Priority changed in Linear by Henry: Medium → High'; S.flash = 'W-15'; toast('BIO-155 priority changed in Linear; W-15 follows'); } },
+];
+function tick() { const e = EVENTS.find(e => !S.fired.includes(e.id)); if (!e) return false; S.fired.push(e.id); e.run(); render(); return true; }
+setInterval(() => { if (S.speed === 'auto' && !document.hidden && !S.dlg && S.tab === 'board') tick(); }, 3500);
+
+// ---------- header ----------
+function header() {
+  const tabs = [['board', 'view_kanban', 'Board'], ['routines', 'autorenew', 'Routines'], ['projects', 'folder_open', 'Projects']];
+  return `<div class="whead"><h1>Work</h1><span class="sync">${icon('sync')}<span class="dot" aria-hidden="true"></span>Linear · team BIO · synced ${S.syncedAgo}</span>
+      <button type="button" class="btn sm" data-act="sync">${icon('settings')}Sync settings</button><button type="button" class="btn sm primary push" data-act="create">${icon('add')}Create task</button></div>
+    <div class="tabs" role="tablist" aria-label="Work views">${tabs.map(([k, ic, n]) => `<button type="button" role="tab" data-tab="${k}" aria-selected="${S.tab === k}">${icon(ic)}${n}</button>`).join('')}</div>`;
+}
+
+// ---------- board ----------
+function visible() {
+  return S.items.filter(x => (!S.needsOnly || x.needs) && (!S.fProject || x.project === S.fProject) && (!S.fLayer || x.layers.includes(S.fLayer)) && (!S.fWho || (x.who || 'none') === S.fWho));
+}
+function boardView() {
+  const needs = S.items.filter(x => x.needs).length;
+  const running = S.items.filter(x => x.live).length;
+  const v = visible();
+  return `<div class="filters"><button type="button" class="fchip" data-act="needs-only" aria-pressed="${S.needsOnly}">${icon('front_hand')}Needs you · ${needs}</button>
+      <label>Project <select id="f-project" data-f="fProject"><option value="">All</option>${S.projects.map(p => `<option value="${p.id}" ${S.fProject === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>
+      <label>Layer <select id="f-layer" data-f="fLayer"><option value="">All</option>${Object.entries(LAYERS).map(([k, [n]]) => `<option value="${k}" ${S.fLayer === k ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+      <label>Assignee <select id="f-who" data-f="fWho"><option value="">Anyone</option>${Object.entries(WHO).map(([k, n]) => `<option value="${k}" ${S.fWho === k ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+      <span class="cap push">${icon('smart_toy')}Claude: ${running} working · 3 slots</span></div>
+    <div class="boardwrap ${S.peek ? 'peeking' : ''}"><div class="board" aria-label="Board">${COLS.map(([k, n, lin]) => { const list = v.filter(x => x.status === k);
+      return `<section class="bcol" data-col="${k}" aria-labelledby="col-${k}"><div class="bhead"><span class="col col-${k}" id="col-${k}">${n}</span><span class="n">${list.length}</span><span class="lin" title="Linear states">${esc(lin)}</span></div>
+        ${list.map(card).join('') || '<p class="empty small muted" style="margin:4px">Nothing here.</p>'}</section>`; }).join('')}</div>${S.peek ? peek(I(S.peek)) : ''}</div>`;
+}
+function bar(actions) { return actions ? `<span class="pbar" role="img" aria-label="${actions.filter(a => a === 1).length} of ${actions.length} actions done">${actions.map(a => `<span class="${a === 1 ? 'd' : ''}"></span>`).join('')}</span><span>${actions.filter(a => a === 1).length}/${actions.length}</span>` : ''; }
+function card(x) {
+  const p = P(x.project);
+  return `<article class="card ${S.peek === x.ref ? 'sel' : ''} ${S.flash === x.ref ? 'flash' : ''}" draggable="true" data-ref="${x.ref}" aria-label="${x.ref} ${esc(x.title)}">
+    <div class="top"><b>${x.ref}</b>${x.live ? '<span class="live" role="img" aria-label="An agent is working"></span>' : ''}<span class="lid">${x.lin}</span></div>
+    <button type="button" class="movebtn" data-act="menu" data-ref="${x.ref}" aria-label="Move ${x.ref}">${icon('more_horiz')}</button>
+    ${S.menu === x.ref ? `<ul class="menu" role="menu">${COLS.filter(([k]) => k !== x.status).map(([k, n]) => `<li><button type="button" role="menuitem" data-act="move" data-ref="${x.ref}" data-to="${k}">${icon('arrow_forward')}Move to ${n}</button></li>`).join('')}</ul>` : ''}
+    <button type="button" class="t ${x.defined ? '' : 'rough'}" data-act="peek" data-ref="${x.ref}">${esc(x.title)}</button>
+    <div class="row2"><span class="prio p-${x.prio}">${icon(PRIO[x.prio][0])}${PRIO[x.prio][1]}</span>${x.layers.map(lchip).join('')}${x.needs ? `<span class="needs">${icon('front_hand')}${x.needs}</span>` : ''}</div>
+    <div class="foot">${whoTag(x.who)}${bar(x.actions)}${p ? `<span>${icon('folder_open')}${esc(p.name)}</span>` : ''}${x.routine ? `<span>${icon('autorenew')}Routine</span>` : ''}${x.fromLinear ? `<span>${icon('sync')}From Linear</span>` : ''}${x.blockedBy ? `<span>${icon('block')}Blocked by ${x.blockedBy}</span>` : ''}</div></article>`;
+}
+const ASTATE = { 0: ['radio_button_unchecked', 'a-todo', 'To do'], 1: ['check_circle', 'a-done', 'Done'], 2: ['front_hand', 'a-need', 'Needs you'], 3: ['progress_activity', 'a-work', 'Working'] };
+const ANAMES = { 'W-11': ['Add sign-up to the onboarding flow', 'Let a Member hold a password', 'Journeys follow the new flow', 'Build sign-up and first world', 'Check everything together'],
+  'W-13': ['Zoom levels in the map page spec', 'Map tiles at three zoom levels', 'Pinch and wheel zoom', 'Check everything together'], 'W-16': ['Update packages', 'Fix what broke', 'Check everything together'],
+  'W-15': ['Count members in the world query', 'Show the count on the card'], 'W-17': ['Reproduce on Safari', 'Fix the tile layer', 'Check everything together'] };
+function peek(x) {
+  if (!x) return '';
+  const p = P(x.project); const names = ANAMES[x.ref] || (x.actions || []).map((_, i) => `Action #${i + 1}`);
+  return `<aside class="peek" aria-labelledby="peekh"><div class="row"><span class="col col-${x.status}">${COLNAME[x.status]}</span><span class="tiny muted mono">${x.ref} · ${x.lin}</span>
+      <button type="button" class="btn sm ghost push" data-act="close-peek" aria-label="Close">${icon('close')}</button></div>
+    <h2 id="peekh">${esc(x.title)}</h2>
+    ${x.syncNote ? `<div class="syncnote">${icon('sync')}<span>${esc(x.syncNote)}</span></div>` : ''}
+    <dl><dt>Priority</dt><dd><span class="prio p-${x.prio}">${icon(PRIO[x.prio][0])}${PRIO[x.prio][1]}</span></dd><dt>Assignee</dt><dd>${whoTag(x.who)}</dd>
+      <dt>Layers</dt><dd>${x.layers.length ? x.layers.map(lchip).join(' ') : '<span class="muted">Not known yet</span>'}</dd><dt>Project</dt><dd>${p ? esc(p.name) : '<span class="muted">None</span>'}</dd>
+      ${x.routine ? `<dt>From</dt><dd>${icon('autorenew')}${esc(R(x.routine)?.name)}</dd>` : ''}${x.blockedBy ? `<dt>Blocked by</dt><dd>${x.blockedBy}</dd>` : ''}
+      <dt>Move to</dt><dd><select id="peek-move" aria-label="Move ${x.ref} to a column">${COLS.map(([k, n]) => `<option value="${k}" ${x.status === k ? 'selected' : ''}>${n}</option>`).join('')}</select></dd></dl>
+    ${x.defined ? '' : `<p class="small muted" style="margin:0">${icon('edit_note')} A rough note. Moving it to Ready asks Claude to define it first, or you can mark it ready as is.</p>`}
+    ${x.actions ? `<div><b class="small">Actions</b><ul class="alist">${x.actions.map((a, i) => `<li>${icon(ASTATE[a][0], ASTATE[a][1])}<span>#${i + 1} ${esc(names[i])}</span><span class="tiny muted">${ASTATE[a][2]}</span></li>`).join('')}</ul></div>` : ''}
+    ${x.needs ? `<p class="small" style="margin:0;color:var(--warn)">${icon('front_hand')} ${x.needs} ${x.needs === 1 ? 'thing needs' : 'things need'} you on this item's actions.</p>` : ''}
+    <div class="row wrap"><button type="button" class="btn primary" data-act="open-item" data-ref="${x.ref}">${icon('open_in_full')}Open item</button><span class="tiny muted">Linear: ${x.lin} · ${S.subIssues && x.actions ? 'actions sync as sub-issues' : 'no sub-issues'}</span></div></aside>`;
+}
+
+// Moving a card is the deliberate start (G4): what a move does depends on who works on it.
+function requestMove(ref, to) {
+  const x = I(ref); S.menu = null; if (!x || x.status === to) { render(); return; }
+  if (to === 'ready' && !x.defined) { S.dlg = { kind: 'define', ref, to }; render(); return; }
+  if (to === 'progress' && !x.who) { S.dlg = { kind: 'assign', ref, to }; render(); return; }
+  if (to === 'progress' && x.who === 'claude' && x.status !== 'progress') { S.dlg = { kind: 'start', ref, to }; render(); return; }
+  if (['review', 'done'].includes(to) && x.who === 'claude' && x.status !== 'done') { S.dlg = { kind: 'closeout', ref, to }; render(); return; }
+  move(x, to);
+}
+function move(x, to, note) { x.status = to; S.flash = x.ref; S.dlg = null; toast(note || `${x.ref} moved to ${COLNAME[to]}; ${x.lin} follows in Linear`); render(); }
+function dialogHtml() {
+  const d = S.dlg; if (!d) return '';
+  if (d.kind === 'plan-done') return '';
+  const x = I(d.ref);
+  const body = {
+    define: [`${x.ref} is still a rough note`, `“${esc(x.title)}”. Claude can check it over, ask what it needs, write the brief and draft its actions, then move it to Ready. Or mark it ready as it is.`,
+      `<button type="button" class="btn ghost" data-act="dlg-cancel">Cancel</button><button type="button" class="btn" data-act="dlg-asis">Mark Ready as is</button><button type="button" class="btn primary" data-act="dlg-define">${icon('smart_toy')}Define with Claude</button>`],
+    assign: [`Who works on ${x.ref}?`, 'Starting needs someone on it. Either way you get the same actions, previews and reviews.',
+      `<button type="button" class="btn ghost" data-act="dlg-cancel">Cancel</button><button type="button" class="btn" data-act="dlg-local">${icon('terminal')}I'll work locally</button><button type="button" class="btn primary" data-act="dlg-claude">${icon('smart_toy')}Send to Claude</button>`],
+    start: [`Start ${x.ref} with Claude?`, `Claude works through its ${x.actions?.length || 0} actions. Questions, review gates and reviews still stop for you, on the item.`,
+      `<button type="button" class="btn ghost" data-act="dlg-cancel">Cancel</button><button type="button" class="btn go" data-act="dlg-start">${icon('play_arrow')}Start work</button>`],
+    closeout: [`${x.ref} closes from the item`, `Claude's items reach ${COLNAME[d.to]} through their reviews and the orchestrator's Approve and merge, so the board can't skip them. Open the item to see what's left.`,
+      `<button type="button" class="btn ghost" data-act="dlg-cancel">Cancel</button><button type="button" class="btn primary" data-act="open-item" data-ref="${x.ref}">${icon('open_in_full')}Open item</button>`],
+  }[d.kind];
+  return `<div class="box"><h2 id="dlgh">${body[0]}</h2><p>${body[1]}</p><div class="row wrap" style="justify-content:flex-end">${body[2]}</div></div>`;
+}
+
+// ---------- routines ----------
+function sentence(r) {
+  const proj = P(r.project);
+  return `<b>When</b> ${esc(r.when === 'schedule' ? r.whenText.charAt(0).toLowerCase() + r.whenText.slice(1) : r.when === 'manual' ? 'you press Run now' : r.whenText)}${r.cond ? `, <b>if</b> ${esc(r.cond)}` : ''}, <b>create</b> “${esc(r.title)}”${r.layers.length ? ` in ${r.layers.map(l => LAYERS[l][0]).join(', ')}` : ''}${proj ? ` under ${esc(proj.name)}` : ''}, <b>assign</b> ${esc(WHO[r.who])} and <b>go as far as</b>: ${esc(UNTIL_SAY[r.until])}.${r.one ? ' Never more than one open at a time.' : ''}`;
+}
+function routinesView() {
+  if (S.routine) return routineDetail(R(S.routine));
+  return `<p class="muted small" style="margin:0">A routine is a formula: when a trigger fires, it creates an ordinary work item and takes it as far as you allow. Everything it makes lands on the board.</p>
+    <div class="list" role="table" aria-label="Routines"><div class="lrow h" role="row"><span role="columnheader">Routine</span><span role="columnheader">Trigger</span><span role="columnheader">Last run</span><span role="columnheader">On</span></div>
+    ${S.routines.map(r => `<div class="lrow" role="row"><span role="cell"><button type="button" class="linkbtn" data-act="routine" data-id="${r.id}">${esc(r.name)}</button><br><span class="s">${r.builtin ? 'Built in · ' : ''}${esc(UNTIL[r.until])}</span></span>
+      <span role="cell" class="s">${icon(r.when === 'schedule' ? 'schedule' : 'bolt')} ${esc(r.whenText)}</span>
+      <span role="cell" class="s">${r.runs[0] ? `${r.runs[0][0]} · ${r.runs[0][1] ? r.runs[0][1] + ' ' : ''}${esc(r.runs[0][2])}` : 'Not yet'}</span>
+      <span role="cell"><label class="switch"><input type="checkbox" data-toggle="${r.id}" ${r.on ? 'checked' : ''} ${r.builtin ? 'disabled' : ''} aria-label="${r.on ? 'Turn off' : 'Turn on'} ${esc(r.name)}"></label></span></div>`).join('')}</div>
+    <div><button type="button" class="btn" data-act="new-routine">${icon('add')}New routine</button></div>`;
+}
+function routineDetail(r) {
+  const opt = (v, cur, label) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${label}</option>`;
+  const dis = r.builtin ? 'disabled' : '';
+  return `<div class="row"><button type="button" class="btn sm ghost" data-act="routines-back">${icon('arrow_back')}Routines</button></div>
+    <div class="grid2"><section class="formula" aria-labelledby="rh"><div class="row wrap"><h2 id="rh" style="font-size:18px">${esc(r.name)}</h2>${r.builtin ? '<span class="chip">Built in</span>' : ''}
+        <button type="button" class="btn go push" data-act="run-now" data-id="${r.id}" ${r.on ? '' : 'disabled'}>${icon('play_arrow')}Run now</button></div>
+      <div class="sentence" id="sentence" aria-live="polite">${sentence(r)}</div>
+      <div class="frow"><span class="kw">When</span><div class="fx"><select id="r-when" data-r="when" aria-label="Trigger kind" ${dis}>${opt('schedule', r.when, 'On a schedule')}${opt('event', r.when, 'When something happens')}${opt('manual', r.when, 'Only when run by hand')}</select>
+        ${r.when !== 'manual' ? `<input type="text" id="r-whentext" data-r="whenText" value="${esc(r.whenText)}" aria-label="Trigger" ${dis}>` : ''}</div></div>
+      <div class="frow"><span class="kw">If</span><div class="fx"><input type="text" id="r-cond" data-r="cond" value="${esc(r.cond)}" placeholder="Always (optional condition)" aria-label="Condition" ${dis}></div></div>
+      <div class="frow"><span class="kw">Create</span><div class="fx"><input type="text" id="r-title" data-r="title" value="${esc(r.title)}" aria-label="Title of the work item" ${dis}>
+        <select id="r-project" data-r="project" aria-label="Project" ${dis}>${opt('', r.project, 'No project')}${S.projects.map(p => opt(p.id, r.project, esc(p.name))).join('')}</select>
+        <select id="r-prio" data-r="prio" aria-label="Priority" ${dis}>${Object.entries(PRIO).map(([k, [, n]]) => opt(k, r.prio, n)).join('')}</select>
+        ${Object.entries(LAYERS).map(([k, [n]]) => `<label><input type="checkbox" data-rl="${k}" ${r.layers.includes(k) ? 'checked' : ''} ${dis}>${n}</label>`).join('')}</div></div>
+      <div class="frow"><span class="kw">Assign</span><div class="fx"><select id="r-who" data-r="who" aria-label="Assignee" ${dis}>${opt('claude', r.who, 'Claude, remote')}${opt('local', r.who, 'Henry, local CLI')}${opt('none', r.who, 'Unassigned')}</select></div></div>
+      <div class="frow"><span class="kw">Go as far as</span><div class="fx"><select id="r-until" data-r="until" aria-label="How far the routine takes the item" ${dis}>${Object.entries(UNTIL).map(([k, n]) => opt(k, r.until, n)).join('')}</select>
+        <label><input type="checkbox" id="r-one" data-rb="one" ${r.one ? 'checked' : ''} ${dis}>Never more than one open at a time</label></div></div>
+      ${r.who !== 'claude' && r.until === 'start' ? `<p class="small" style="margin:0;color:var(--warn)">${icon('info')} Starting needs Claude as the assignee; for ${WHO[r.who]} the routine stops at Ready.</p>` : ''}
+    </section>
+    <aside class="panel" aria-labelledby="runsh"><h2 id="runsh">Runs</h2><ul class="runs">${r.runs.map(([d, ref, st]) => `<li><span class="tiny muted">${d}</span>${ref ? `<button type="button" class="linkbtn" data-act="peek-from" data-ref="${ref}">${ref}</button>` : ''}<span class="small">${esc(st)}</span></li>`).join('') || '<li class="muted small">No runs yet.</li>'}</ul>
+      <h3>What the agent gets</h3><p class="small" style="margin:0">The same as any item: the stack map, the layers' knowledge and skills, previews and reviews. A routine adds its own brief template, kept as a Knowledge document in the layer it belongs to.</p></aside></div>`;
+}
+
+// ---------- projects ----------
+function projectsView() {
+  if (S.project) return projectDetail(P(S.project));
+  return `<p class="muted small" style="margin:0">Projects group work items toward a target, with milestones. They sync with Linear projects.</p><div class="projs">${S.projects.map(p => { const items = p.milestones.flatMap(m => m.items).map(I).filter(Boolean);
+    const done = items.filter(x => x.status === 'done').length, going = items.filter(x => ['progress', 'review'].includes(x.status)).length;
+    return `<article class="pcard"><div class="row"><h2><button type="button" class="linkbtn" data-act="project" data-id="${p.id}" style="font-size:16px">${esc(p.name)}</button></h2><span class="chip ${p.health === 'On track' ? 'ok' : 'warn'} push">${p.health}</span></div>
+      <p class="small muted" style="margin:0">${esc(p.desc)}</p><div class="meter" role="img" aria-label="${done} done, ${going} in progress of ${items.length}"><span style="width:${items.length ? done / items.length * 100 : 0}%"></span><span class="w" style="width:${items.length ? going / items.length * 100 : 0}%"></span></div>
+      <div class="row small muted wrap"><span>${done}/${items.length} done</span><span>${icon('flag')}Target ${p.target}</span><span>${icon('person')}${p.lead}</span><span>${icon('sync')}Linear</span></div></article>`; }).join('')}
+    <article class="pcard" style="border-style:dashed"><h2 style="font-size:15px">New project</h2><p class="small muted" style="margin:0">Describe the outcome; Claude can propose the work items and milestones.</p><button type="button" class="btn" data-act="new-project">${icon('add')}New project</button></article></div>`;
+}
+function projectDetail(p) {
+  const row = ref => { const x = I(ref); if (!x) return ''; return `<li><span class="col col-${x.status}">${COLNAME[x.status]}</span><button type="button" class="linkbtn" data-act="peek-from" data-ref="${x.ref}">${x.ref} ${esc(x.title)}</button>${whoTag(x.who)}${x.needs ? `<span class="needs">${icon('front_hand')}${x.needs}</span>` : ''}</li>`; };
+  return `<div class="row"><button type="button" class="btn sm ghost" data-act="projects-back">${icon('arrow_back')}Projects</button></div>
+    <div class="grid2"><section style="display:grid;gap:12px" aria-labelledby="ph"><div class="row wrap"><h2 id="ph" style="font-size:20px">${esc(p.name)}</h2><span class="chip ${p.health === 'On track' ? 'ok' : 'warn'}">${p.health}</span>
+        <button type="button" class="btn push" data-act="plan" data-id="${p.id}" ${S.plan ? 'disabled' : ''}>${icon('smart_toy')}Plan the rest with Claude</button></div>
+      <p style="margin:0">${esc(p.desc)}</p>
+      ${S.plan && S.plan.project === p.id ? `<div class="sugg" aria-live="polite"><h3>${icon('smart_toy')}Claude suggests</h3>${S.plan.items.length ? `<p class="small" style="margin:0">From the Vision brief and the milestones, Onboarding is missing these. Each lands in Draft for you to define or drop.</p>
+        <ul class="mitems">${S.plan.items.map((t, i) => `<li><span>${esc(t[0])}</span><span class="chip">${esc(t[1])}</span><button type="button" class="btn sm" data-act="accept-sugg" data-i="${i}">${icon('add')}Add to Draft</button><button type="button" class="btn sm ghost" data-act="drop-sugg" data-i="${i}">Drop</button></li>`).join('')}</ul>` : '<p class="small" style="margin:0">All suggestions handled.</p>'}</div>` : ''}
+      <div class="ms">${p.milestones.map(m => `<div class="msrow"><h3>${icon('flag')}${esc(m.name)}</h3><ul class="mitems">${m.items.map(row).join('')}</ul></div>`).join('')}</div></section>
+    <aside class="panel" aria-labelledby="pdh"><h2 id="pdh">Details</h2><dl class="small" style="display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:0"><dt class="muted">Lead</dt><dd style="margin:0">${p.lead}</dd><dt class="muted">Target</dt><dd style="margin:0">${p.target}</dd><dt class="muted">Linear</dt><dd style="margin:0">Project “${esc(p.name)}”, synced</dd></dl>
+      <button type="button" class="btn" data-act="project-board" data-id="${p.id}">${icon('view_kanban')}See it on the board</button></aside></div>`;
+}
+
+// ---------- sync settings ----------
+function renderSync() {
+  $('#syncd').innerHTML = `<div class="row"><h2>Linear sync</h2><button type="button" class="btn ghost sm push" data-act="close-drawer">${icon('close')}Close</button></div>
+    <p class="small" style="margin:0">Connected to <b>biome-studio</b>, team <b>BIO</b>. Last synced ${S.syncedAgo}.</p>
+    <h3>Columns and Linear states</h3><table class="map"><thead><tr><th>Aludel</th><th>Linear</th></tr></thead><tbody>${COLS.map(([k, n, lin]) => `<tr><td><span class="col col-${k}">${n}</span></td><td>${esc(lin)}</td></tr>`).join('')}</tbody></table>
+    <h3>What syncs</h3><table class="map"><thead><tr><th>Field</th><th>Direction</th></tr></thead><tbody>
+      <tr><td>Title, priority, assignee, project, labels</td><td>Both ways</td></tr><tr><td>Brief</td><td>Both ways (Linear description)</td></tr><tr><td>Status</td><td>Both ways, by the mapping above</td></tr>
+      <tr><td>Actions</td><td>Aludel → Linear sub-issues</td></tr><tr><td>Orchestrator thread, reviews, previews</td><td>Aludel only; Linear gets a link and a status comment</td></tr></tbody></table>
+    <fieldset><legend>Options</legend><label><input type="checkbox" id="o-sub" ${S.subIssues ? 'checked' : ''}> Sync actions as Linear sub-issues</label><label><input type="checkbox" id="o-com" ${S.comment ? 'checked' : ''}> Post a comment in Linear when an item needs you or closes</label></fieldset>
+    <h3>Claude in Linear</h3><p class="small" style="margin:0">Assigning or delegating a Linear issue to Claude does the same as Send to Claude here. <span class="muted">(Inferred from Linear's agent support; not verified.)</span></p>
+    <h3>When both sides change</h3><p class="small" style="margin:0">The latest edit wins per field, and the item shows what changed and where, as on W-15 after its Linear priority change.</p>`;
+  $('#o-sub').addEventListener('change', e => { S.subIssues = e.target.checked; render(); });
+  $('#o-com').addEventListener('change', e => { S.comment = e.target.checked; });
+}
+
+// ---------- render ----------
+function render() {
+  const a = document.activeElement; const id = a?.id;
+  $('#view').innerHTML = header() + (S.tab === 'board' ? boardView() : S.tab === 'routines' ? routinesView() : projectsView());
+  const d = $('#dlg'); if (S.dlg) { d.innerHTML = dialogHtml(); d.classList.add('open'); } else { d.classList.remove('open'); d.innerHTML = ''; }
+  document.querySelectorAll('[data-speed]').forEach(b => b.setAttribute('aria-pressed', b.dataset.speed === S.speed));
+  $('#tickbtn').disabled = S.speed === 'auto' || S.fired.length === EVENTS.length;
+  const el = id && document.getElementById(id); if (el) el.focus({ preventScroll: true });
+  if (S.dlg) d.querySelector('.btn.primary, .btn.go')?.focus();
+  setTimeout(() => { S.flash = null; }, 0);
+}
+
+// ---------- interactions ----------
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.dataset.f) { S[t.dataset.f] = t.value; render(); return; }
+  if (t.id === 'peek-move') { requestMove(S.peek, t.value); return; }
+  if (t.dataset.toggle) { const r = R(t.dataset.toggle); r.on = t.checked; toast(`${r.name} is ${r.on ? 'on' : 'off'}`); render(); return; }
+  const r = S.routine && R(S.routine);
+  if (r && t.dataset.r) { r[t.dataset.r] = t.value; render(); return; }
+  if (r && t.dataset.rl) { r.layers = t.checked ? [...r.layers, t.dataset.rl] : r.layers.filter(l => l !== t.dataset.rl); render(); return; }
+  if (r && t.dataset.rb) { r[t.dataset.rb] = t.checked; render(); return; }
+});
+document.addEventListener('input', e => { const t = e.target; const r = S.routine && R(S.routine); if (r && t.dataset.r && t.type === 'text') { r[t.dataset.r] = t.value; $('#sentence').innerHTML = sentence(r); } });
+document.addEventListener('click', e => {
+  const sp = e.target.closest('[data-speed]'); if (sp) { S.speed = sp.dataset.speed; render(); return; }
+  const tab = e.target.closest('[data-tab]'); if (tab) { S.tab = tab.dataset.tab; S.routine = null; S.project = null; render(); return; }
+  if (e.target === $('#dlg')) { S.dlg = null; render(); return; }
+  const b = e.target.closest('[data-act]'); if (!b) { if (S.menu) { S.menu = null; render(); } return; }
+  const ref = b.dataset.ref; const d = S.dlg;
+  switch (b.dataset.act) {
+    case 'tick': if (!tick()) toast('Nothing else arrives in this prototype'); return;
+    case 'reset': { const speed = S.speed; Object.assign(S, fresh(), { speed }); render(); toast('Reset; your answers to the questions are kept'); return; }
+    case 'needs-only': S.needsOnly = !S.needsOnly; render(); return;
+    case 'menu': S.menu = S.menu === ref ? null : ref; render(); document.querySelector('.menu button')?.focus(); return;
+    case 'move': requestMove(ref, b.dataset.to); return;
+    case 'peek': S.peek = ref; S.menu = null; render(); $('#peekh')?.setAttribute('tabindex', '-1'); $('#peekh')?.focus(); return;
+    case 'peek-from': S.tab = 'board'; S.peek = ref; S.routine = null; S.project = null; render(); return;
+    case 'close-peek': S.peek = null; render(); return;
+    case 'open-item': S.dlg = null; render(); toast(`Opens ${ref}'s item page, as in the goal-run prototype`); return;
+    case 'dlg-cancel': S.dlg = null; render(); return;
+    case 'dlg-asis': { const x = I(d.ref); x.defined = true; move(x, 'ready', `${x.ref} marked Ready as is`); return; }
+    case 'dlg-define': { const x = I(d.ref); x.who = x.who || 'claude'; x.live = true; S.dlg = null; toast(`Claude is defining ${x.ref}; it moves to Ready when done`); render();
+      setTimeout(() => { x.live = false; x.defined = true; x.title = x.ref === 'W-12' ? 'Reset a forgotten password' : x.title; x.layers = x.layers.length ? x.layers : ['pages', 'code']; x.actions = [0, 0, 0]; x.status = 'ready'; S.flash = x.ref; render(); }, 900); return; }
+    case 'dlg-claude': { const x = I(d.ref); x.who = 'claude'; S.dlg = { kind: x.defined ? 'start' : 'define', ref: x.ref, to: x.defined ? 'progress' : 'ready' }; render(); return; }
+    case 'dlg-local': { const x = I(d.ref); x.who = 'local'; move(x, 'progress', `${x.ref} is yours, in progress locally: aludel claim ${x.ref}`); return; }
+    case 'dlg-start': { const x = I(d.ref); x.live = true; if (x.actions) x.actions[0] = 3; move(x, 'progress', `${x.ref} started; Claude is on #1`); return; }
+    case 'create': toast('Create task opens the composer (J8), now with an optional layer'); return;
+    case 'sync': renderSync(); $('#questions').classList.remove('open'); $('#syncd').classList.add('open'); $('#syncd button')?.focus(); return;
+    case 'questions': renderQuestions(); $('#syncd').classList.remove('open'); $('#questions').classList.add('open'); $('#questions textarea')?.focus(); return;
+    case 'close-drawer': b.closest('.drawer').classList.remove('open'); return;
+    case 'routine': S.routine = b.dataset.id; render(); return;
+    case 'routines-back': S.routine = null; render(); return;
+    case 'new-routine': { const r = { id: 'r' + S.next, name: 'New routine', on: false, when: 'manual', whenText: '', cond: '', title: 'New item', layers: [], project: '', prio: 'medium', who: 'claude', until: 'draft', one: true, runs: [] };
+      S.routines.push(r); S.routine = r.id; render(); toast('New routines start off, so you can set them up first'); return; }
+    case 'run-now': { const r = R(b.dataset.id); const status = r.until === 'draft' ? 'draft' : r.until === 'ready' ? 'ready' : (r.who === 'claude' ? 'progress' : 'ready');
+      const title = r.title.replace('{date}', 'Oct 13').replace('{build}', 'b-412').replace('{linear title}', 'Login button misaligned').replace('{layer}', 'Deploy');
+      const x = newItem(title, status, { who: r.who === 'none' ? null : r.who, layers: [...r.layers], project: r.project || null, prio: r.prio, routine: r.id, live: status === 'progress', actions: status === 'draft' ? null : [status === 'progress' ? 3 : 0, 0, 0], defined: status !== 'draft' });
+      r.runs.unshift(['Oct 4', x.ref, COLNAME[status]]); toast(`${r.name} made ${x.ref} in ${COLNAME[status]}`); render(); return; }
+    case 'project': S.project = b.dataset.id; render(); return;
+    case 'projects-back': S.project = null; render(); return;
+    case 'new-project': toast('New project: name, outcome, target; Claude can propose its items'); return;
+    case 'project-board': S.tab = 'board'; S.fProject = b.dataset.id; S.project = null; render(); return;
+    case 'plan': S.plan = { project: b.dataset.id, items: [['Welcome email after confirming', 'Pages, Code'], ['First-world checklist on Home', 'Pages, Code'], ['Resend the confirmation link', 'Code']] }; render(); return;
+    case 'accept-sugg': { const [t, ls] = S.plan.items.splice(+b.dataset.i, 1)[0]; const p = P(S.plan.project); const x = newItem(t, 'draft', { project: p.id, defined: false, layers: ls.toLowerCase().split(', ') });
+      p.milestones[0].items.push(x.ref); toast(`${x.ref} added to Draft under ${p.name}`); render(); return; }
+    case 'drop-sugg': S.plan.items.splice(+b.dataset.i, 1); render(); return;
+    case 'copy': { const ans = store.get('answers', {}); const txt = QUESTIONS.map(([id]) => `${id}: ${ans[id] || ''}`).join('\n'); navigator.clipboard?.writeText(txt).then(() => toast('Copied'), () => toast('Copy failed; select the text instead')); return; }
+  }
+});
+// Drag and drop between columns (the move menu and the peek's Move to do the same for keyboards and phones).
+document.addEventListener('dragstart', e => { const c = e.target.closest?.('.card'); if (c) { e.dataTransfer.setData('text/plain', c.dataset.ref); e.dataTransfer.effectAllowed = 'move'; } });
+document.addEventListener('dragover', e => { const col = e.target.closest?.('.bcol'); if (col) { e.preventDefault(); document.querySelectorAll('.bcol.over').forEach(c => c !== col && c.classList.remove('over')); col.classList.add('over'); } });
+document.addEventListener('dragleave', e => { const col = e.target.closest?.('.bcol'); if (col && !col.contains(e.relatedTarget)) col.classList.remove('over'); });
+document.addEventListener('drop', e => { const col = e.target.closest?.('.bcol'); if (!col) return; e.preventDefault(); col.classList.remove('over'); requestMove(e.dataTransfer.getData('text/plain'), col.dataset.col); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (S.dlg) { S.dlg = null; render(); } else if (S.menu) { S.menu = null; render(); } } });
+
+const QUESTIONS = [
+  ['E1', 'Five columns (Draft, Ready, In progress, In review, Done), each mapped to Linear states. Right set, or do you want Triage or Canceled as their own columns?'],
+  ['E2', 'Moving a card is the deliberate act: to Ready asks Claude to define a rough note (or mark it as is), to In progress starts work after one confirm, and Claude\'s items can\'t be dragged to Done. Right rules?'],
+  ['E3', 'Cards show priority, layers, who\'s on it, action progress, project, a needs-you count and a live dot. Too much, too little?'],
+  ['E4', 'Linear sync: fields both ways, actions as sub-issues, the orchestrator thread and reviews stay in Aludel with a link back. Is that the split you want?'],
+  ['E5', 'Routines as a When / If / Create / Assign / Go as far as formula, with a sentence that reads it back. Clear enough to write one yourself?'],
+  ['E6', '"Go as far as" (Draft, define to Ready, or start work) is how much a routine may do without you. Is that the right control?'],
+  ['E7', 'Projects with milestones, synced with Linear projects, and Plan the rest with Claude proposing Draft items. Useful, or keep projects plain?'],
+];
+function renderQuestions() {
+  const ans = store.get('answers', {});
+  $('#questions').innerHTML = `<div class="row"><h2>Review questions</h2><button type="button" class="btn ghost sm push" data-act="close-drawer">${icon('close')}Close</button></div>
+    ${QUESTIONS.map(([id, q]) => `<div class="qa"><p><b>${id}</b> ${esc(q)}</p><textarea id="a-${id}" aria-label="${id} answer" data-q="${id}">${esc(ans[id] || '')}</textarea></div>`).join('')}
+    <button type="button" class="btn primary" data-act="copy">${icon('content_copy')}Copy answers</button>`;
+  $('#questions').querySelectorAll('textarea').forEach(t => t.addEventListener('input', () => { const all = store.get('answers', {}); all[t.dataset.q] = t.value; store.set('answers', all); }));
+}
+render();
+</script>
+</body>
+</html>

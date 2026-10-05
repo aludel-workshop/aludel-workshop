@@ -25,6 +25,7 @@ import { codeReleases, initCodeLayer, readDocs, readSource, readStack, readVaria
 import { agentRuns, initAgentRuns } from './agent-runs.mjs';
 import { codeCandidates, initCodeCandidates } from './code-candidates.mjs';
 import { editorBridge, initEditorBridge } from './editor-bridge.mjs';
+import { agentWork, initAgentWork } from './agent-work.mjs';
 import { symphonyWorker, initSymphonyWorker } from './symphony-worker.mjs';
 import { reviewPreviews, reviewHost } from './review-previews.mjs';
 import { workRuns, initWorkRuns } from './work-runs.mjs';
@@ -84,6 +85,7 @@ initCodeLayer(db);
 initAgentRuns(db);
 initCodeCandidates(db);
 initEditorBridge(db);
+initAgentWork(db);
 initSymphonyWorker(db);
 initWorkRuns(db);
 initLayerContract(db);
@@ -134,6 +136,7 @@ function createWorkspace(setup, user) {
   commitWorkspace({ repository: setup.workspacePath, profile: projectGitProfile, message: `chore: start ${setup.project.name} with Aludel`, ...commitIdentity(user) });
 }
 const know = knowledge({ db, catalogs, packs: catalogs.packs });
+const goals = agentWork({ db, know, catalogs });
 const pool = library({ db, know });
 const bindingStore = bindingRecords({ db });
 const bindings = bindingRoutines({ db, know, pool, store: bindingStore });
@@ -198,10 +201,10 @@ const codeRemote = projectId => codeSyncing.connect(projectId);
 // Settles the Code layer with its repository: a newer local main first, then GitHub. Returns the sync state to show.
 const syncCode = projectId => codeSyncing.sync(projectId);
 // Lazily, because the GitHub integration is created further down.
-const codeImporter = { preview: (...args) => importer().preview(...args), confirm: (...args) => importer().confirm(...args) };
 let importing = null;
+// EX-02A: a connected repository's docs are its own, so its install refreshes Code without seeding starter docs.
 const importer = () => importing ||= codeImport({ db, github, importRoot: join(dataDirectory, 'imports'),
-  afterInstall: projectId => { codeRepo.seed(projectId, pool.outputEntries); codeRepo.refresh(projectId); },
+  afterInstall: projectId => { codeRepo.refresh(projectId); },
   sync: async projectId => { const code = codeRemote(projectId); return code ? remotes.sync(projectId, code.key) : null; } });
 // Existing projects: Code installs into each project's repository, then its releases move there once and its starter docs
 // are seeded (all idempotent). It runs once the portal is listening, so a restart isn't held up.
@@ -315,6 +318,16 @@ const json = (response, status, value, headers = {}) => {
   response.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'content-length': Buffer.byteLength(body), ...headers });
   response.end(body);
 };
+// AGENT-WORK-01: a goal item's live thread. Each change is a small notice; the page refetches the item.
+function streamGoal(request, response, projectId, workId) {
+  const write = (event, data) => response.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  const stop = goals.subscribe(projectId, workId, change => write('change', change));
+  response.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive', 'x-accel-buffering': 'no' });
+  write('ready', { workId });
+  const beat = setInterval(() => response.write(': keep-alive\n\n'), 20000);
+  const close = () => { clearInterval(beat); stop(); };
+  request.on('close', close); response.on('close', close);
+}
 const readJson = (request, maxBytes = 1024 * 1024) => new Promise((resolveBody, reject) => {
   let body = '';
   request.on('data', chunk => { body += chunk; if (body.length > maxBytes) reject(Object.assign(new Error('Request too large'), { status: 413 })); });
@@ -544,11 +557,38 @@ async function api(request, response, url) {
     response.writeHead(302, { location: result.returnTo || '/#/the-machine/overview?github=installed' });
     return response.end();
   }
-  // Editor tokens are accepted only on these read-only routes, never as portal sessions or write authority.
+  // Editor tokens are accepted only on these routes, never as portal sessions. They read; the one write authority they carry
+  // (AGENT-WORK-01) is the token person's local agent working a goal item that person has claimed.
   if (url.pathname.startsWith('/api/editor/')) {
-    if (request.method !== 'GET') return json(response, 405, { error: 'Read only.' });
     const { user: editorUser, projectId } = editor.authenticate(request.headers.authorization);
     const path = url.pathname.slice('/api/editor/'.length).split('/').map(decodeURIComponent);
+    if (path[0] === 'goals' || path[0] === 'stack') {
+      const done = (status, value) => json(response, status, value, { 'cache-control': 'no-store' });
+      const agent = { kind: 'agent', id: editorUser.id, name: `${editorUser.name}'s local agent` };
+      if (path[0] === 'stack' && path.length === 1 && request.method === 'GET') return done(200, { layers: goals.stackMap(projectId) });
+      if (path.length === 1 && request.method === 'GET')
+        return done(200, { goals: goals.goals(projectId, url.searchParams.get('claimable') ? { claimableBy: editorUser.id } : { assignedTo: editorUser.id }) });
+      if (path[0] !== 'goals' || path.length < 2) return json(response, 404, { error: 'Not found.' });
+      const workId = path[1];
+      // The token's person claims through their own CLI (`aludel claim`); their agent's tools never offer it.
+      if (path[2] === 'claim' && path.length === 3 && request.method === 'POST') return done(200, goals.claim(editorUser, projectId, workId));
+      goals.assertPerformer(editorUser, projectId, workId);
+      const [operation, sub] = path.slice(2);
+      if (request.method === 'GET' && !operation) return done(200, goals.view(projectId, workId));
+      if (request.method === 'GET' && operation === 'changeset' && !sub) return done(200, { changeset: goals.changeset(projectId, workId) });
+      if (request.method === 'GET' && operation === 'read' && !sub)
+        return done(200, { result: goals.readLayer(projectId, workId, url.searchParams.get('layer'), { operationId: url.searchParams.get('operationId'), id: url.searchParams.get('id') }) });
+      if (request.method !== 'POST') return json(response, 405, { error: 'Method not allowed.' });
+      const input = await readJson(request);
+      if (operation === 'define' && !sub) return done(200, goals.define(agent, projectId, workId, input));
+      if (operation === 'actions' && !sub) return done(201, goals.addAction(agent, projectId, workId, input));
+      if (operation === 'actions' && sub) return done(200, goals.updateAction(agent, projectId, workId, Number(sub), input));
+      if (operation === 'events' && !sub) return done(201, goals.post(agent, projectId, workId, input));
+      if (operation === 'stage' && !sub) return done(201, goals.stage(agent, projectId, workId, input));
+      if (operation === 'code' && !sub) return done(200, goals.recordCode(agent, projectId, workId, input));
+      return json(response, 404, { error: 'Not found.' });
+    }
+    if (request.method !== 'GET') return json(response, 405, { error: 'Read only.' });
     if (path[0] === 'me' && path.length === 1) return json(response, 200, { projectId, user: editorUser, tools: editor.tools }, { 'cache-control': 'no-store' });
     if (path[0] === 'tasks' && path.length === 1) return json(response, 200, { tasks: editor.assigned(editorUser, projectId) }, { 'cache-control': 'no-store' });
     if (path[0] === 'tasks' && path.length === 2) return json(response, 200, editor.context(editorUser, projectId, path[1]), { 'cache-control': 'no-store' });
@@ -643,6 +683,35 @@ async function api(request, response, url) {
   if (url.pathname === '/api/github/installations/refresh' && request.method === 'POST') {
     await github.refreshInstallations(user.id);
     return json(response, 200, github.status(user.id, null, null));
+  }
+  // EX-02A: create a project by connecting an existing GitHub repository. Everything stays on the draft until Connect.
+  if (url.pathname.startsWith('/api/onboarding/connect')) {
+    const token = cookie(request).aludel_draft;
+    const draft = flows.connectDraft(token);
+    if (url.pathname === '/api/onboarding/connect/repositories' && request.method === 'GET')
+      return json(response, 200, await importer().repositories(user.id, url.searchParams.get('installationId')), { 'cache-control': 'no-store' });
+    if (url.pathname === '/api/onboarding/connect/check' && request.method === 'POST') {
+      const input = await readJson(request);
+      const checked = await importer().check(user.id, draft.key, { installationId: input.installationId, name: input.name });
+      flows.saveDraft(token, { connect: { installationId: input.installationId, owner: checked.repository.owner, name: checked.repository.name, ...(checked.commit ? { commit: checked.commit } : {}) } });
+      return json(response, 200, checked, { 'cache-control': 'no-store' });
+    }
+    if (url.pathname === '/api/onboarding/connect/count' && request.method === 'POST')
+      return json(response, 200, importer().count(draft.key, (await readJson(request)).paths));
+    if (url.pathname === '/api/onboarding/connect' && request.method === 'POST') {
+      const input = await readJson(request);
+      const { installationId, name, commit } = draft.connect;
+      if (!installationId || !name) return json(response, 409, { error: 'Choose and check a repository first.' });
+      let setup = null;
+      const result = await importer().connect(user.id, draft.key, { installationId, name, commit, units: input.paths }, ({ repository }) => {
+        setup = flows.createConnected(token, user, { name: input.name, description: repository.description || '' });
+        return { projectId: setup.project.id, workspace: setup.workspacePath };
+      });
+      know.ensureAgents(result.projectId);
+      migrateActionProject(db, result.projectId);
+      return json(response, 201, { project: setup.project, installed: result.installed, reads: result.reads, sync: result.sync }, { 'set-cookie': draftCookie('', 0) });
+    }
+    return json(response, 404, { error: 'Not found.' });
   }
   if (url.pathname === '/api/onboarding/claim' && request.method === 'POST') {
     const token = cookie(request).aludel_draft;
@@ -1043,6 +1112,59 @@ async function api(request, response, url) {
     const input = await readJson(request);
     const result = await acceptCandidate(user, projectId, candidateId, input.commit);
     return json(response, result.status, result.body, { 'cache-control': 'no-store' });
+  }
+  // AGENT-WORK-01 A1: goal items. People drive them here; their local agent works on them through /api/editor/goals.
+  const goalRoute = /^\/api\/projects\/([^/]+)\/goals(?:\/([^/]+)(?:\/(define|move|claim|actions|events|answer|review|close|stream|read)(?:\/([^/]+))?)?)?$/.exec(url.pathname);
+  if (goalRoute) {
+    const [, rawProject, rawWork, operation, rawSub] = goalRoute;
+    const projectId = decodeURIComponent(rawProject), workId = rawWork ? decodeURIComponent(rawWork) : null, sub = rawSub ? decodeURIComponent(rawSub) : null;
+    requireMember(db, user, projectId);
+    const person = { kind: 'person', id: user.id, name: user.name };
+    const method = request.method;
+    const done = (status, value) => json(response, status, value, { 'cache-control': 'no-store' });
+    if (!workId && method === 'GET') return done(200, { goals: goals.goals(projectId), stack: goals.stackMap(projectId) });
+    if (!workId && method === 'POST') return done(201, goals.createGoal(user, projectId, await readJson(request)));
+    if (!operation && method === 'GET') return done(200, goals.view(projectId, workId));
+    if (operation === 'stream' && method === 'GET') return streamGoal(request, response, projectId, workId);
+    if (operation === 'read' && method === 'GET') return done(200, { result: goals.readLayer(projectId, workId, url.searchParams.get('layer'), { operationId: url.searchParams.get('operationId'), id: url.searchParams.get('id') }) });
+    if (method !== 'POST' && !(operation === 'actions' && sub && method === 'PATCH')) return json(response, 405, { error: 'Method not allowed.' });
+    const input = await readJson(request);
+    if (operation === 'define' && !sub) return done(200, goals.define(person, projectId, workId, input));
+    if (operation === 'move' && !sub) return done(200, goals.move(user, projectId, workId, input.to));
+    if (operation === 'claim' && !sub) return done(200, goals.claim(user, projectId, workId));
+    if (operation === 'actions' && !sub) return done(201, goals.addAction(person, projectId, workId, input));
+    if (operation === 'actions' && sub) return done(200, goals.updateAction(person, projectId, workId, Number(sub), input));
+    if (operation === 'events' && !sub) return done(201, goals.post(person, projectId, workId, input));
+    if (operation === 'answer' && sub) return done(200, goals.answer(user, projectId, workId, sub, input));
+    if (operation === 'review' && sub) return done(200, goals.review(user, projectId, workId, Number(sub), input));
+    if (operation === 'close' && !sub) {
+      // CW-1: the reported branch comes from the project's GitHub repository, then close-out merges it into main and a
+      // project with a GitHub repository gets main pushed there too, as the build does (through Code's sync when it has one).
+      const binding = github.status(user.id, projectId, null).repository;
+      const ready = binding?.status === 'ready';
+      const token = ready && goals.view(projectId, workId).code ? await github.installationTokenForRepository(projectId, binding.name) : null;
+      goals.fetchCode(projectId, workId, token ? { url: binding.clone_url, token } : null);
+      // GitHub's main may have moved since (a merged pull request): Code's sync takes it first, so the merge is onto what
+      // GitHub has, and afterwards it pushes the merge. A main that can't be settled (diverged, held, unreachable) waits.
+      const code = token ? codeRemote(projectId) : null;
+      if (code) {
+        const before = (await syncCode(projectId)).remote;
+        if (before?.state !== 'in-sync') throw Object.assign(new Error(`Close-out waits until main matches GitHub: ${before?.detail || before?.state || 'Code has no remote'}.`), { status: 409 });
+      }
+      const closed = goals.closeOut(user, projectId, workId);
+      if (closed.merged && code) {
+        const after = await syncCode(projectId);
+        goals.notePush(projectId, workId, after.remote?.state === 'in-sync' && after.remote.remoteCommit === closed.merged.commit ? `Pushed ${closed.merged.into} to GitHub (${binding.owner}/${binding.name})`
+          : `Merged here, but ${closed.merged.into} isn't on GitHub yet: ${after.local?.detail || after.remote?.detail || after.remote?.state}`);
+      } else if (closed.merged && token) {
+        try {
+          pushWorkspace({ repository: closed.merged.workspace, remoteUrl: binding.clone_url, token, branch: closed.merged.into });
+          goals.notePush(projectId, workId, `Pushed ${closed.merged.into} to GitHub (${binding.owner}/${binding.name})`);
+        } catch (error) { goals.notePush(projectId, workId, `Merged here, but pushing ${closed.merged.into} to GitHub failed: ${String(error.message || error).slice(0, 300)}`); }
+      }
+      return done(200, goals.view(projectId, workId));
+    }
+    return json(response, 404, { error: 'Not found.' });
   }
   // WORK-ITEM-UX-01: an item's runs, each with its own task snapshot, outputs, review and signature.
   const runRoute = /^\/api\/projects\/([^/]+)\/work\/([^/]+)\/runs(?:\/([^/]+)\/(review|sign|submit|check|stop|prepare|preview|scenario|close-preview|step-screenshot))?$/.exec(url.pathname);
@@ -1496,14 +1618,6 @@ async function api(request, response, url) {
         return pushWorkspace({ repository: workspace, remoteUrl, token, branch: projectGitProfile.initialBranch });
       });
       codeRemote(projectId);
-      flows.markStep(user, projectId, 'github');
-      return json(response, 201, projectView(user, projectId));
-    }
-    // T03-CODE: an existing GitHub repository as the project's. `confirm: false` checks it and lists what would be added.
-    if (section === 'repository' && item === 'import' && method === 'POST' && projectId !== aludelProjectId) {
-      const input = await readJson(request);
-      if (!input.confirm) return json(response, 200, await codeImporter.preview(user.id, projectId, input));
-      await codeImporter.confirm(user.id, projectId, input, flows.projectSetup(user, projectId).workspacePath);
       flows.markStep(user, projectId, 'github');
       return json(response, 201, projectView(user, projectId));
     }

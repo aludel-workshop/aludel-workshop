@@ -6,7 +6,7 @@
 // branch (layer-source.mjs). Either way the new commit's files must index cleanly before `main` moves.
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { runPure, sourceReviewed } from './layer-api.mjs';
+import { indexLimits, runPure, sourceReviewed } from './layer-api.mjs';
 import { unitsAt } from './source-units.mjs';
 import { refuseDirtySharedCheckout } from './layer-source.mjs';
 import { fileOutputs, layerPackageForProject, outputPath, packageAt, packageRootAt } from './layer-package.mjs';
@@ -17,7 +17,8 @@ const fail = (message, status = 400) => { throw Object.assign(new Error(message)
 const now = () => new Date().toISOString();
 const git = (repo, args, options = {}) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, ...options });
 export const entryId = /^[a-z][a-z0-9]*-[a-z0-9][a-z0-9-]{1,62}$/;
-const maxFileBytes = 512 * 1024, maxEntries = 2000;
+// Entries per layer: a code unit is an entry, and real apps reach a few thousand (EX-02A: Aludel's portal is about 2,500).
+const maxFileBytes = 512 * 1024, maxEntries = 20000;
 
 export function initLayerFiles(db) {
   db.exec(`CREATE TABLE IF NOT EXISTS layer_file_entries (project_id TEXT NOT NULL, entry_id TEXT NOT NULL, revision INTEGER NOT NULL,
@@ -57,7 +58,7 @@ export function indexAt(db, projectId, key, repo, commit, { reviewed = true } = 
   // stable per project (the IDs Code's units always had).
   const units = declared.units.length ? unitsAt(repo, commit, declared.units, { exclude: rootAt(repo, commit) || null,
     idOf: unitKey => `cu-${createHash('sha256').update(`${projectId}:${unitKey}`).digest('hex').slice(0, 12)}` }) : undefined;
-  const entries = runPure(source, 'entries', [files, units ? { kinds: declared.kinds, units } : { kinds: declared.kinds }]);
+  const entries = runPure(source, 'entries', [files, units ? { kinds: declared.kinds, units } : { kinds: declared.kinds }], indexLimits);
   if (!Array.isArray(entries) || entries.length > maxEntries) fail('The layer indexer returned an invalid result.', 500);
   const seen = new Set();
   for (const entry of entries) {

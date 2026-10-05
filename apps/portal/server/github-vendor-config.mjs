@@ -31,8 +31,19 @@ export function loadGitHubVendorConfig(environment = process.env, readFile = rea
       privateKey = null;
     }
   }
+  // Where GitHub answers: github.com by default, a GitHub Enterprise Server's own addresses, or a fake GitHub in browser
+  // journeys (EX-02A C1). Plain http is only accepted for loopback addresses.
+  const base = (variable, fallback) => {
+    const value = String(environment[variable] || fallback).trim().replace(/\/+$/, '');
+    try { const url = new URL(value); if (url.protocol === 'https:' || (url.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname))) return value; } catch { /* reported below */ }
+    issues.push(`${variable} (an https address, or http on loopback)`);
+    return fallback;
+  };
+  const apiUrl = base('MACHINE_GITHUB_API_URL', 'https://api.github.com');
+  const webUrl = base('MACHINE_GITHUB_WEB_URL', 'https://github.com');
   return {
     configured: issues.length === 0,
+    apiUrl, webUrl,
     issues,
     appId: values.appId,
     appSlug: values.appSlug,

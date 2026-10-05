@@ -6,7 +6,8 @@ import { compileTaskManifest } from './task-manifest.mjs';
 const sha = value => createHash('sha256').update(value).digest('hex');
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const now = () => new Date().toISOString();
-const tools = ['assigned_tasks', 'task_context', 'saved_context', 'read_record', 'search_knowledge', 'environment_status'];
+const tools = ['assigned_tasks', 'task_context', 'saved_context', 'read_record', 'search_knowledge', 'environment_status',
+  'work_list', 'work_view', 'stack_map', 'read_layer', 'define_work', 'add_action', 'update_action', 'post_message', 'ask', 'request_allow', 'stage_change', 'report_code', 'changeset'];
 
 export function initEditorBridge(db) {
   db.exec(`

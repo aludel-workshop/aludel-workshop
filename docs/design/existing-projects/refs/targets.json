@@ -1,0 +1,8 @@
+[
+ {"name":"vercel-import","url":"https://vercel.com/docs/getting-started-with-vercel/import","fullPage":true,"note":"Import an existing Git repository"},
+ {"name":"vercel-monorepos","url":"https://vercel.com/docs/monorepos","fullPage":true,"note":"Root Directory per project in a monorepo"},
+ {"name":"vercel-root-directory","url":"https://vercel.com/docs/builds/configure-a-build","fullPage":true,"note":"Root Directory setting"},
+ {"name":"railway-monorepo","url":"https://docs.railway.com/guides/monorepo","fullPage":true,"note":"Root directory and watch paths"},
+ {"name":"render-monorepo","url":"https://render.com/docs/monorepo-support","fullPage":true,"note":"Root directory and build filters"},
+ {"name":"netlify-import","url":"https://docs.netlify.com/start/add-new-project/","fullPage":true,"note":"Import from an existing repository"}
+]

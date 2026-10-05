@@ -23,7 +23,7 @@ Read `docs/status.md` for the selected packet, engineering context, and limitati
 
 ## Current focus (2026-09-24)
 
-The portal is being rebuilt around project **layers** (Home, Vision, Design, Pages, Data, Code, Deploy, Work; Platform split into Code and Deploy by DEC-049). Start from [the layers implementation plan and handoff](docs/design/portal-layers/implementation-plan.md) before touching the portal UI or onboarding. The layer-template transition (DEC-055/057/059: every layer is a fork of `layer-base`; layers read each other only through the Library; outputs are records or repository files) continues with T03-CODE (LAYER-BINDINGS-01 and LAYER-KNOWLEDGE-01 are closed). Start from [its brief](docs/design/layer-app-transition/t03-code-brief.md), which waits on the owner's plan approval; run `apps/portal/tools/typecheck-layer-ui.mjs` on every template pin, add a changed indexer's or handler's digest to `apps/portal/config/layer-reviewed-sources.json` (keep the old ones for existing installs), and run both `npm run test:server` and `npm run test:server:templates` plus the layer's browser journey for any layer change. The next pass, PLATFORM-PIPELINE-01 (owner-owned repositories, app-defined environments, containers per subdomain, multi-instance sync), starts from [its brief](docs/design/platform-pipeline/work-record.md).
+The portal is being rebuilt around project **layers** (Home, Vision, Design, Pages, Data, Code, Deploy, Work; Platform split into Code and Deploy by DEC-049). Start from [the layers implementation plan and handoff](docs/design/portal-layers/implementation-plan.md) before touching the portal UI or onboarding. The layer-template transition (DEC-055/057/059: every layer is a fork of `layer-base`; layers read each other only through the Library; outputs are records or repository files) continues with T03-CODE (LAYER-BINDINGS-01 and LAYER-KNOWLEDGE-01 are closed). Start from [its brief](docs/design/layer-app-transition/t03-code-brief.md), which waits on the owner's plan approval; run `apps/portal/tools/typecheck-layer-ui.mjs` on every template pin, add a changed indexer's or handler's digest to `apps/portal/config/layer-reviewed-sources.json` (keep the old ones for existing installs), and run the layer's browser journey for any layer change. Test in two tiers: while developing, `npm run test:affected` (in `apps/portal`) runs only the test files that reach a changed file, with templates on (`--list` shows why each was picked); before a commit or handoff, `npm run test:server:templates` is the full gate (start it in the background and write up meanwhile). Run `npm run test:server` (templates off) as well only when a change touches the templates switch or a code path that only runs with it off. The next pass, PLATFORM-PIPELINE-01 (owner-owned repositories, app-defined environments, containers per subdomain, multi-instance sync), starts from [its brief](docs/design/platform-pipeline/work-record.md).
 
 ## Required reading
 
@@ -86,7 +86,7 @@ Check the contents and accepted scope of prerequisites, not just whether files e
 
 ## Completion and phase gates
 
-A work packet is complete only when its acceptance evidence and post-hoc retrospective exist and are linked from `docs/status.md`. A retrospective may be a concise section in the evidence for routine work or a separate artifact for consequential work. It must answer, with observed evidence separated from prediction:
+A work packet is complete only when its acceptance evidence and post-hoc retrospective exist and are linked from `docs/status.md`. A retrospective may be a concise section in the evidence for routine work or a separate artifact for consequential work. A prototype or review round inside a packet gets a three-line note instead (what changed, what was checked, what waits on the owner); the full retrospective below is for a packet or slice closing. It must answer, with observed evidence separated from prediction:
 
 1. What made the work harder, slower, or more error-prone than necessary?
 2. What preparation, tool, contract, or check would make the next equivalent task easier?
@@ -115,7 +115,7 @@ Keep `docs/status.md` brief and operational. It must contain:
 - completed packets with evidence links;
 - latest handoff note.
 
-Do not duplicate detailed research or design in the status file. Do not mark a packet complete based only on partial notes. Use ISO dates. Preserve stable IDs.
+Do not duplicate detailed research or design in the status file. Keep each fact in one place: the work record is the source, `docs/status.md` carries one short pointer line per packet, and PR descriptions summarize the change and link the work record instead of restating it. Do not mark a packet complete based only on partial notes. Use ISO dates. Preserve stable IDs.
 
 ## Safety and repository hygiene
 

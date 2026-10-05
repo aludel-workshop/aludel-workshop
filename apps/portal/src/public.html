@@ -12,6 +12,9 @@
   </nav>
 </header>
 
+@if (view() === 'connect') {
+  <aludel-connect [session]="session()" [catalog]="catalog()" [step]="connectStep()" [navigate]="navigateTo" />
+} @else {
 @if (isStep()) {
   <nav class="pub-steps" aria-label="New app setup">
     <p class="pub-steps-compact">Step {{ stepIndex() + 1 }} of {{ steps.length }} · <strong>{{ steps[stepIndex()].label }}</strong></p>
@@ -41,7 +44,7 @@
           <h1 id="landing-heading" tabindex="-1">Turn an idea into an app you can click around.</h1>
           <p class="pub-lead">Describe what you imagine. Aludel sets up the repository, the design and a working skeleton, then keeps your plan, code and previews in one place.</p>
           <div class="pub-actions">
-            <a mat-flat-button class="pub-cta" href="/start" (click)="go('/start', $event)">Get started</a>
+            <a mat-flat-button class="pub-cta" href="/new" (click)="go('/new', $event)">Get started</a>
             @if (!session()?.authenticated) { <a mat-button href="/login" (click)="go('/login', $event)">I have an account</a> }
           </div>
           <p class="field-hint">No account needed to start. You'll create one after you've described your idea.</p>
@@ -89,7 +92,7 @@
             <button mat-flat-button type="submit" [disabled]="busy() || !email || !password">{{ busy() ? 'Signing in…' : 'Sign in' }}</button>
           </form>
           <div class="pub-actions">
-            <a mat-button href="/start" (click)="go('/start', $event)">New here? Start an app</a>
+            <a mat-button href="/new" (click)="go('/new', $event)">New here? Start a project</a>
             <button mat-button type="button" (click)="accountMode.set('owner')">{{ session()?.setupRequired ? 'Set up owner access' : 'Use owner access key' }}</button>
           </div>
         }
@@ -235,33 +238,6 @@
             <div class="pub-actions"><button mat-flat-button type="button" (click)="installGithub()">Install the Aludel GitHub App</button><button mat-button type="button" (click)="refreshInstallations()" [disabled]="busy()">I've installed it, check again</button></div>
           } @else {
             <p>Connected as <strong>{{ current.github.login }}</strong>.</p>
-            <fieldset class="pub-choice">
-              <legend class="pub-select-label">Repository</legend>
-              <label class="pub-check"><input type="radio" name="repositorySource" value="new" [(ngModel)]="repositorySource"> Create a new repository</label>
-              <label class="pub-check"><input type="radio" name="repositorySource" value="existing" [(ngModel)]="repositorySource" (ngModelChange)="importCheck.set(null)"> Use a repository I already have</label>
-            </fieldset>
-            @if (repositorySource === 'existing') {
-              <form (ngSubmit)="importCheck() ? confirmImport() : checkImport()">
-                <label class="pub-select-label" for="import-installation">Owner</label>
-                <select id="import-installation" name="importInstallation" class="pub-select" [(ngModel)]="installationId" (ngModelChange)="importCheck.set(null)">
-                  @for (item of eligibleInstallations(); track item.installation_id) { <option [value]="item.installation_id">{{ item.account_login }} ({{ item.target_type === 'User' ? 'personal' : 'organization' }})</option> }
-                </select>
-                <mat-form-field appearance="outline" class="wide-field"><mat-label>Repository name</mat-label><input matInput name="existingName" [(ngModel)]="existingName" (ngModelChange)="importCheck.set(null)" pattern="[A-Za-z0-9._-]+"></mat-form-field>
-                <p class="field-hint">Its default branch must be <code>main</code>. This replaces the starter repository Aludel made, which is kept aside.</p>
-                @if (importCheck(); as found) {
-                  <div class="pub-status-card">
-                    <mat-icon aria-hidden="true">inventory_2</mat-icon>
-                    <div><strong>{{ found.repository.owner }}/{{ found.repository.name }}</strong>
-                      <span>{{ found.files }} files{{ found.repository.private ? ', private' : ', public' }}. {{ found.existing ? 'It already has Aludel\'s files; nothing will be added.' : 'Aludel will add ' + found.adds.length + ' files in .aludel/, plus starter docs where none exist, as its own commits, and push them.' }}</span>
-                      @if (found.kept.length) { <span>It already keeps {{ found.kept.length }} of Aludel's files in .aludel/; Code reads those in as they are.</span> }
-                      @if (found.conflicts.length) { <span class="error-message" role="alert">It has its own version of Code's code in .aludel/, which Aludel won't overwrite: {{ found.conflicts.join(', ') }}. Move or remove those files, then check again.</span> }
-                      @if (found.adds.length) { <details><summary>Files Aludel adds</summary><ul class="pub-file-list">@for (path of found.adds; track path) { <li><code>{{ path }}</code></li> }</ul></details> }
-                      @if (found.kept.length) { <details><summary>Files Aludel keeps</summary><ul class="pub-file-list">@for (path of found.kept; track path) { <li><code>{{ path }}</code></li> }</ul></details> }</div>
-                  </div>
-                }
-                <div class="pub-actions pub-footer-actions"><button mat-flat-button type="submit" [disabled]="busy() || !existingName.trim() || !installationId || !!importCheck()?.conflicts?.length">{{ busy() ? 'Working…' : importCheck() ? 'Import and push' : 'Check repository' }}</button></div>
-              </form>
-            } @else {
             <form (ngSubmit)="createRepository()">
               <label class="pub-select-label" for="installation">Owner</label>
               <select id="installation" name="installation" class="pub-select" [(ngModel)]="installationId">
@@ -273,7 +249,7 @@
               <label class="pub-check"><input type="checkbox" name="private" [(ngModel)]="repositoryPrivate"> Private repository</label>
               <div class="pub-actions pub-footer-actions"><button mat-flat-button type="submit" [disabled]="busy() || !repositoryName || !installationId">{{ busy() ? 'Creating…' : 'Create repository' }}</button></div>
             </form>
-            }
+            <p class="field-hint">Have a repository already? <a href="/new" (click)="go('/new', $event)">Connect it as a new project</a> instead.</p>
           }
         </section>
       }
@@ -450,7 +426,7 @@
 
     @case ('projects') {
       <section aria-labelledby="projects-heading">
-        <div class="pub-workbench"><h1 id="projects-heading" tabindex="-1">Your apps</h1><a mat-flat-button href="/start" (click)="go('/start', $event)"><mat-icon aria-hidden="true">add</mat-icon>New app</a></div>
+        <div class="pub-workbench"><h1 id="projects-heading" tabindex="-1">Your apps</h1><a mat-flat-button href="/new" (click)="go('/new', $event)"><mat-icon aria-hidden="true">add</mat-icon>New project</a></div>
         @if (session()?.projects?.length) {
           <ul class="pub-project-list">
             @for (item of session()?.projects; track item.id) {
@@ -459,7 +435,7 @@
             }
           </ul>
         } @else {
-          <p>No apps yet. <a href="/start" (click)="go('/start', $event)">Start one</a>.</p>
+          <p>No apps yet. <a href="/new" (click)="go('/new', $event)">Start one</a>.</p>
         }
       </section>
     }
@@ -472,6 +448,7 @@
     }
   }
 </main>
+}
 
 <ng-template #stage let-mode="mode" let-current="current" let-building="building">
   <div class="pub-stage" [class.building]="building">

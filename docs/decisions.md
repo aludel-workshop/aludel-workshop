@@ -11,6 +11,28 @@ This is the seed of the portal's decision workflow. Confirmed owner answers and 
 
 ## Confirmed
 
+2026-10-05 — **DEC-067: projects can start by connecting an existing repository; the built-in Aludel project retires.** The owner, in chat: "like the onboarding suggestion. agree we can't assume what the app looks like. built in aludel project exists: thats trying to implement exactly what we have here. probably fine to get rid of that, right, and just let us use this new method? other suggestions fine."
+(1) New project offers two starts: start a new app (today's onboarding), or connect an existing repository. The second skips the recipe, look, features, stack and skeleton steps.
+(2) Where the code is gets detected, chosen by the owner, and written into the repository's `.aludel/layer.json`. Nothing is assumed about the layout.
+(3) The `.aludel/` commit is pushed to `main` when the owner confirms, as DEC-061 allows.
+(4) Aludel itself is connected as a project named "Aludel". The built-in `the-machine` project then retires (EX-02A C5): an explicit instance owner replaces membership in it, then its special cases, seed and data are removed, after a backup. LAY-06 is superseded.
+This decision authorizes no agent-held tokens and no live GitHub calls by the agent. [Plan](design/existing-projects/connect-repository.md).
+
+2026-10-05 — **DEC-066: Deploy gets real hosting tooling; DigitalOcean is the first provider; Aludel bootstraps itself with it.** The owner, in chat: "instead of a once off setup, we create the tooling that our deploy layer is going to have to configure and manage the droplet. obviously there will be a bit of bootstrap in order to get it up, but i want to make sure if someone has say a digital ocean account, how do we make it as easy as possible for them to get deployed to a droplet on it, and see deployment/server status in aludel?" The owner also approved COLLAB-WORK-01's plan, previews visible to signed-in members only, and protecting `main` so only close-out changes it.
+(1) Hosting is a provider-neutral host contract, provision → probe → deploy → rollback. The two first targets are a cloud account (DigitalOcean) and any server adopted by SSH.
+(2) Desired state is a Deploy record. Live state is an imported replica. Drift is adopted, changed back, or assessed.
+(3) Releases are pulled by image digest. No builds run on the host.
+(4) Secrets stay on the Aludel server, never with agents.
+(5) Aludel's own server is created by the same code, run from the CLI.
+This decision replaces COLLAB-WORK-01's CW-5. It doesn't authorize DigitalOcean tokens, resources, DNS or spending; DH-6 needs the owner's go. [Brief](design/deploy-hosting/work-record.md).
+
+2026-10-05 — **DEC-065: collaborators work from their own machines against a server-hosted Aludel; the Code role grants repository access.** The owner, in chat: "i do want to run this on a server. i have one we can use. just need it set up for deploy. aludel adds collaborator to repo, when the user is given code role privileges."
+(1) Aludel will run on the owner's server. Deployment design is in scope. Connecting to the server, DNS, TLS, the GitHub App's URLs and public exposure each need the owner's go.
+(2) Holding any grant on a project's Code layer makes the person a collaborator on the project's Code repository with push access. Losing the last grant removes them. Aludel only removes collaborators it added itself. Other layer repositories aren't shared.
+(3) Code work returns through the project's GitHub remote, not a checkout path, for local work too.
+(4) People and cloud agents use one dev-container image definition.
+This decision doesn't authorize real collaborator changes, protecting `main`, or spending money. [Brief](design/collaborator-work/work-record.md).
+
 2026-10-03 — **DEC-064: task creation captures intent; journey assessment belongs at agent pickup.** The owner accepted the Jira-like composer, clarified that journeys are optional and an agent augments owner attachments, then said “build it”. A task may affect multiple journeys for different personas (invitation sender and recipient). Create saves directly with title/description and optional custom criteria/journey references; no generic charter criterion or Specify interruption is inferred from missing journeys. At pickup, Code assesses relevant journeys, adds uncovered steps with reasons, and preserves owner selections. No applicable journey is valid with suitable non-journey review evidence; missing relevant coverage may need Specify. Implementation keeps the immutable Go bundle and a single explicit assessment overlay per run, before implementation; added claims use the same review/evidence gates. Local build/check/restart is authorized; live owner acceptance, deployment, spending and external writes are not. [Contract and build evidence](design/journeys/task-create/work-record.md).
 
 2026-10-02 — **DEC-063: code tracing is removed and deferred to a later phase; journeys are the thread.** The owner, in chat during JOURNEYS-01: "we're pulling the tracing. box it up, lets revisit at a later phase. don't need it mvp, too much distraction without enough clarity to add value." Asked how far, they chose "remove entirely. truth is, those links were not following our new binding approach anyways." Earlier the same day: "happy to just axe the link to stories entirely and use journeys. i don't want to rely on too many primitives."

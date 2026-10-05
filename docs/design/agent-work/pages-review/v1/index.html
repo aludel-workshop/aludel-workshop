@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pages flow review</title>
+<!-- AGENT-WORK-01 Pages review action prototype v1 (scope and questions in ../../work-record.md). Static; the mockups are
+     HTML pages (pages.js) made from Biome's Design kit (biome-kit.js), with no app build. Nothing is saved or sent except
+     the reviewer's answers to the questions, which stay in this browser. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block">
+<script src="biome-kit.js"></script>
+<script src="pages.js"></script>
+<style>
+/* Tokens and shell as the built portal and the J6 prototype. */
+:root{color-scheme:light;
+  --bg:#fbfbfd;--surface:#fff;--rail:#f3f5f9;--panel:#f4f6fa;--hover:#e9edf5;--line:#dfe3ec;--line-strong:#c8cfdc;--ink:#1b1f2a;--muted:#5d6679;--faint:#636c80;
+  --accent:#3047b9;--accent-bg:#e3e8ff;--cover:#f3f1fc;--cover-line:#d9d2f7;
+  --ok:#146446;--ok-bg:#d9f3e7;--bad:#a1231f;--bad-bg:#fce1e0;--warn:#7a4f00;--warn-bg:#fff0cc;--info:#1a5fb4;--info-bg:#e2ecfb;
+  --new:#5b3cc4;--new-bg:#ece7fd;--shadow:0 18px 50px #1c2a5a2e;--bar:52px;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:Roboto,system-ui,sans-serif;font-size:14.5px;line-height:1.45;color:var(--ink);background:var(--bg)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:var(--accent)}
+.icon{font-family:'Material Symbols Rounded';font-weight:normal;font-style:normal;font-size:20px;line-height:1;letter-spacing:normal;text-transform:none;white-space:nowrap;display:inline-block;vertical-align:middle;font-feature-settings:'liga';-webkit-font-smoothing:antialiased;flex:none}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.mono,code{font-family:"Roboto Mono",ui-monospace,monospace;font-size:.88em}
+.muted{color:var(--muted)}.small{font-size:13px}.tiny{font-size:12px}
+.row{display:flex;align-items:center;gap:8px}.push{margin-left:auto}.wrap{flex-wrap:wrap}
+h1,h2,h3{margin:0}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.spin{animation:spin 1.2s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+
+.shell{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:100vh}
+.rail{background:var(--rail);border-right:1px solid var(--line);padding:14px 10px;display:flex;flex-direction:column;gap:2px;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:18px;padding:2px 8px 12px}
+.brand .icon{color:var(--accent);font-size:26px}
+.proj{display:flex;align-items:center;gap:9px;padding:8px;border-radius:12px;background:var(--surface);border:1px solid var(--line);margin-bottom:10px}
+.proj .mk{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:#2a7230;color:#fff;font-weight:700;font-size:12px}
+.proj small{display:block;color:var(--muted);font-size:11.5px}
+.nav a{display:flex;align-items:center;gap:10px;padding:5px 10px 5px 6px;border-radius:12px;color:var(--ink);text-decoration:none;font-weight:500}
+.nav a.active{background:var(--nb);font-weight:700}
+.tile{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:var(--nb);color:var(--nc)}
+.tile .icon{font-size:19px}
+.nav a.active .tile{background:var(--nc);color:#fff}
+.n-home{--nc:#c62828;--nb:#fde8e8}.n-vision{--nc:#b93c0a;--nb:#ffeddc}.n-design{--nc:#8a6100;--nb:#fff3cc}.n-pages{--nc:#2a7230;--nb:#e2f4e3}.n-data{--nc:#00766c;--nb:#d6f3ee}.n-code{--nc:#1a5fb4;--nb:#e2ecfb}.n-deploy{--nc:#2f3a9e;--nb:#e4e7f8}.n-work{--nc:#5b3cc4;--nb:#ece7fd}.n-host{--nc:#5d6679;--nb:#eceff4}
+.main{padding:10px 14px 14px;min-width:0;display:flex;flex-direction:column;gap:8px}
+
+.btn{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:var(--surface);font-weight:500;font-size:13.5px;white-space:nowrap;text-decoration:none;color:var(--ink)}
+.btn:hover{background:var(--hover)}.btn .icon{font-size:18px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}.btn.primary:hover{background:#2539a0}
+.btn.go{background:var(--ok);border-color:var(--ok);color:#fff}.btn.go:hover{background:#0f4f37}
+.btn.flag{border-color:var(--warn);color:var(--warn)}
+.btn.ghost{border-color:transparent;background:none}.btn.ghost:hover{background:var(--hover)}
+.btn.sm{padding:3px 9px;font-size:12.5px}.btn.sm .icon{font-size:16px}
+.btn:disabled{opacity:.5;cursor:default}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:500;background:var(--panel);color:var(--muted);white-space:nowrap}
+.chip .icon{font-size:15px}
+.chip.new{background:var(--new-bg);color:var(--new)}.chip.ok{background:var(--ok-bg);color:var(--ok)}.chip.bad{background:var(--bad-bg);color:var(--bad)}.chip.warn{background:var(--warn-bg);color:var(--warn)}.chip.info{background:var(--info-bg);color:var(--info)}
+.lchip{display:inline-flex;align-items:center;gap:4px;padding:1px 8px 1px 3px;border-radius:999px;font-size:12px;font-weight:700;background:var(--nb);color:var(--nc);white-space:nowrap}
+.lchip .icon{font-size:15px;background:var(--nc);color:#fff;border-radius:50%;padding:1px}
+.eyebrow{font-size:11.5px;letter-spacing:.8px;text-transform:uppercase;color:var(--faint);font-weight:700}
+.proto{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);padding:2px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.seg button{border:0;background:var(--surface);padding:3px 10px;font-size:12.5px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+/* Layout: the action's review takes the work item's main area and sidebar. Top: where you are and the action's verdict.
+   Then Pages' Flows view: steps left, the page(s) in the middle, what changed and notes right. */
+.rhead{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.crumb{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.crumb b{color:var(--ink);font-weight:500}
+.rhead h1{font-size:20px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.verdict{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-left:auto}
+.seen{font-size:12.5px;color:var(--muted)}
+.banner{display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-radius:12px;padding:8px 12px;font-size:13.5px}
+.banner.round{background:var(--new-bg);color:#3b2591}
+.banner.ok{background:var(--ok-bg);color:var(--ok)}
+.banner.work{background:var(--accent-bg);color:#1e2f86}
+.controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px}
+.controls label.tog{display:inline-flex;gap:6px;align-items:center}
+.seg button:disabled{color:var(--faint);cursor:not-allowed}
+.review{display:grid;grid-template-columns:210px minmax(0,1fr) 310px;gap:12px;align-items:start}
+.steps{display:grid;gap:6px;align-content:start}
+.steps h2,.side h2{font-size:12px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);font-weight:700}
+.stepbtn{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:6px;text-align:left;width:100%}
+.stepbtn[aria-current="step"]{border-color:var(--accent);outline:2px solid var(--accent);outline-offset:-1px}
+.stepbtn.removed{background:var(--panel);border-style:dashed}
+.thumb{width:56px;height:84px;border-radius:7px;overflow:hidden;border:1px solid var(--line);background:#f6f6f0;position:relative}
+.thumb .screen{width:375px;height:560px;zoom:.15;overflow:hidden;pointer-events:none}
+.stepbtn .nm{display:grid;gap:3px;font-size:13px;min-width:0}
+.stepbtn .nm b{font-weight:500}
+.badge{display:inline-flex;gap:3px;align-items:center;border-radius:6px;padding:0 6px;font-size:11px;font-weight:700;width:fit-content}
+.b-new{background:var(--ok-bg);color:var(--ok)}.b-changed{background:var(--warn-bg);color:var(--warn)}.b-same{background:var(--panel);color:var(--muted)}.b-removed{background:var(--bad-bg);color:var(--bad)}.b-since{background:var(--new-bg);color:var(--new)}
+.seenmark{font-size:11.5px;color:var(--ok);display:inline-flex;gap:2px;align-items:center}
+.seenmark .icon{font-size:14px}
+.stage{display:grid;gap:10px;grid-template-columns:1fr;min-width:0}
+.stage.two{grid-template-columns:1fr 1fr}
+.frame{border:1px solid var(--line-strong);border-radius:14px;background:var(--surface);overflow:hidden;min-width:0;display:grid}
+.fhead{display:flex;gap:8px;align-items:center;padding:6px 10px;border-bottom:1px solid var(--line);font-size:12.5px;background:var(--panel)}
+.fhead .addr{font-family:"Roboto Mono",monospace;font-size:11.5px;color:var(--muted);margin-left:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fwrap{display:grid;justify-items:center;background:#e9ebe4;padding:10px;min-width:0;overflow:hidden}
+.screen{position:relative;overflow:auto;background:#f6f6f0}
+.fwrap .screen{border-radius:10px;box-shadow:0 2px 10px #0002}
+.screen.phone{width:375px;height:720px}.screen.desktop{width:1200px;height:760px}
+.screen>.bk-root{min-height:100%}
+.pin .screen[data-side="proposed"]{cursor:crosshair}
+.pin .screen[data-side="proposed"] :is(bk-button,bk-field,bk-choice,bk-notice,bk-steps,bk-link,bk-text):hover{outline:2px dashed var(--accent);outline-offset:2px}
+.absent{display:grid;place-items:center;text-align:center;gap:6px;color:var(--muted);padding:24px;height:100%;font-family:Roboto,sans-serif;font-size:15px}
+.absent .icon{font-size:36px}
+.screen.desktop .absent{font-size:28px}.screen.desktop .absent .icon{font-size:64px}
+.hl [data-change]{outline:3px solid;outline-offset:3px;border-radius:6px}
+.hl [data-change="new"]{outline-color:#1f9d55}.hl [data-change="changed"]{outline-color:#e0a100}
+.hl .screen[data-side="previous"] [data-change="removed"]{outline-color:#d93a2f}
+.hl .screen[data-side="previous"] [data-change="new"],.hl .screen[data-side="previous"] [data-change="changed"],.hl .screen[data-side="proposed"] [data-change="removed"]{outline:none}
+.flash{animation:fl 1.6s ease-out}
+@keyframes fl{0%,40%{box-shadow:0 0 0 8px #3047b955}100%{box-shadow:0 0 0 0 #3047b900}}
+.marker{position:absolute;width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font:700 13px Roboto,sans-serif;display:grid;place-items:center;box-shadow:0 2px 6px #0004;z-index:5;pointer-events:none}
+.side{display:grid;gap:12px;align-content:start}
+.box{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:grid;gap:8px}
+.box h3{font-size:15px}
+.chg{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.chg button{display:flex;gap:8px;align-items:flex-start;border:0;background:none;padding:4px;text-align:left;border-radius:8px;font-size:13.5px;width:100%}
+.chg button:hover{background:var(--hover)}
+.notes{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.notes li{display:grid;grid-template-columns:auto 1fr;gap:8px;font-size:13.5px}
+.notes .num{width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:700;font-size:12px}
+.notes .num.done{background:var(--ok)}
+.kind{font-size:11.5px;font-weight:700;color:var(--muted)}
+.reply{font-size:12.5px;color:var(--ok);display:flex;gap:4px}
+.reply .icon{font-size:15px}
+.noteform{display:grid;gap:8px;border:1px solid var(--accent);border-radius:12px;padding:10px;background:var(--accent-bg)}
+.noteform fieldset{border:0;padding:0;margin:0;display:flex;gap:6px;flex-wrap:wrap}
+.noteform legend{font-size:12.5px;font-weight:500;margin-bottom:4px}
+.noteform label{display:inline-flex;gap:4px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:2px 8px;font-size:12.5px}
+.noteform textarea{width:100%;min-height:60px;border:1px solid var(--line-strong);border-radius:8px;padding:6px 8px;font:inherit}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(520px,100vw);background:var(--surface);box-shadow:var(--shadow);z-index:60;padding:16px;overflow:auto;display:none}
+.drawer.open{display:block}
+.drawer h2{font-size:16px}
+.drawer h3{font-size:14px;margin:14px 0 6px}
+.drawer pre{background:#1b1f2a;color:#e7eaf3;border-radius:10px;padding:10px 12px;font-size:12px;overflow:auto;white-space:pre-wrap}
+.drawer .qa{margin-bottom:12px}.drawer .qa p{margin:0 0 4px;font-size:13.5px}
+.drawer textarea{width:100%;min-height:60px;border:1px solid var(--line-strong);border-radius:8px;padding:6px 8px}
+.demo{border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:12px}
+.demo .bk-root{padding:16px;display:grid;justify-items:start}
+.demo .meta{padding:8px 12px;border-top:1px solid var(--line);font-size:12.5px;display:grid;gap:4px}
+.demo code{font-family:"Roboto Mono",monospace;font-size:11.5px;color:var(--muted);word-break:break-all}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1b1f2a;color:#fff;padding:8px 14px;border-radius:10px;z-index:80;font-size:13.5px;max-width:90vw}
+@media (max-width:1250px){ .review{grid-template-columns:190px minmax(0,1fr)} .side{grid-column:1/-1;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))} }
+@media (max-width:860px){
+  .shell{grid-template-columns:1fr} .rail{display:none} .main{padding:8px 16px}
+  .review{grid-template-columns:1fr} .stage.two{grid-template-columns:1fr} .side{grid-template-columns:1fr}
+  .steps{grid-template-columns:1fr 1fr} .steps h2{grid-column:1/-1} .thumb{display:none} .stepbtn{grid-template-columns:1fr}
+  .verdict{margin-left:0}
+}
+</style>
+<body>
+<div class="shell">
+  <nav class="rail" aria-label="Project">
+    <div class="brand"><span class="icon" aria-hidden="true">deployed_code</span>Aludel</div>
+    <div class="proj"><span class="mk" aria-hidden="true">BI</span><div><b>Biome</b><small>Worlds to explore</small></div></div>
+    <div class="nav">
+      <a href="#" class="n-home"><span class="tile"><span class="icon" aria-hidden="true">home</span></span>Home</a>
+      <a href="#" class="n-vision"><span class="tile"><span class="icon" aria-hidden="true">lightbulb</span></span>Vision</a>
+      <a href="#" class="n-design"><span class="tile"><span class="icon" aria-hidden="true">palette</span></span>Design</a>
+      <a href="#" class="n-pages"><span class="tile"><span class="icon" aria-hidden="true">web</span></span>Pages</a>
+      <a href="#" class="n-data"><span class="tile"><span class="icon" aria-hidden="true">schema</span></span>Data</a>
+      <a href="#" class="n-code"><span class="tile"><span class="icon" aria-hidden="true">code</span></span>Code</a>
+      <a href="#" class="n-deploy"><span class="tile"><span class="icon" aria-hidden="true">rocket_launch</span></span>Deploy</a>
+      <a href="#" class="n-work active" aria-current="page"><span class="tile"><span class="icon" aria-hidden="true">checklist</span></span>Work</a>
+    </div>
+  </nav>
+  <main class="main" id="main">
+    <div class="proto"><span class="icon" aria-hidden="true">science</span>Prototype v1 · the mockups are HTML from Biome's Design kit; nothing is sent
+      <button class="btn sm" type="button" data-act="reset"><span class="icon" aria-hidden="true">restart_alt</span>Reset</button>
+      <button class="btn sm primary" type="button" data-act="questions"><span class="icon" aria-hidden="true">rate_review</span>Review questions</button></div>
+    <div id="view" style="display:grid;gap:10px"></div>
+  </main>
+</div>
+<aside class="drawer" id="source" aria-label="Page source"></aside>
+<aside class="drawer" id="kit" aria-label="Design kit"></aside>
+<aside class="drawer" id="questions" aria-label="Review questions"></aside>
+<script>
+const D = window.BIOME_PAGES, KIT = window.BIOME_KIT;
+const KINDS = { looks: 'Looks right', content: 'Content fix', change: 'Change request', question: 'Question' };
+const store = { get(k, d) { try { const v = localStorage.getItem('pr1:' + k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('pr1:' + k, JSON.stringify(v)); } catch {} } };
+const fresh = () => ({ round: 1, proposed: 'r4', base: 'r3', step: 'marketing', mode: 'side', vp: 'phone', hl: true, seen: { 1: ['marketing'], 2: [] }, looks: [],
+  notes: [], pin: false, draft: null, revising: false, approved: false, next: 1 });
+const S = fresh();
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const icon = (n, cls = '') => `<span class="icon ${cls}" aria-hidden="true">${n}</span>`;
+function toast(t) { document.querySelectorAll('.toast').forEach(x => x.remove()); const el = document.createElement('div'); el.className = 'toast'; el.setAttribute('role', 'status'); el.textContent = t; document.body.append(el); setTimeout(() => el.remove(), 3000); }
+
+// ---------- the comparison ----------
+const rev = r => D.revisions[r];
+// What changed from base to proposed, per page: r3 → r5 is r4's changes plus r5's.
+function changesFor(page) {
+  const chain = S.base === 'r3' && S.proposed === 'r5' ? ['r4', 'r5'] : [S.proposed];
+  return chain.flatMap(r => (D.changes[r] || {})[page] || []);
+}
+function steps() {
+  const p = rev(S.proposed).flow, b = rev(S.base).flow;
+  const list = p.map(id => ({ id, kind: !b.includes(id) ? 'new' : changesFor(id).length ? 'changed' : 'same' }));
+  b.filter(id => !p.includes(id)).forEach(id => { const i = b.indexOf(id); list.splice(Math.min(i, list.length), 0, { id, kind: 'removed' }); });
+  return list;
+}
+// Steps you must see before approving: in round 1 every new or changed step; in round 2 what changed since your notes.
+const needed = () => S.round === 1 ? steps().filter(s => s.kind === 'new' || s.kind === 'changed').map(s => s.id) : Object.keys(D.changes.r5);
+const seen = () => S.seen[S.round];
+const openAsks = () => S.notes.filter(n => n.round === S.round && (n.kind === 'content' || n.kind === 'change') && n.status === 'open');
+const sinceNotes = id => S.round === 2 && D.changes.r5[id];
+
+// ---------- render ----------
+function header() {
+  const need = needed(), left = need.filter(id => !seen().includes(id)).length, asks = openAsks().length;
+  const canApprove = !left && !asks && !S.revising && !S.approved;
+  return `<div class="rhead"><div class="crumb"><button type="button" class="btn sm ghost" data-act="back">${icon('arrow_back')}W-11 Create the sign-up flow</button><span>›</span><b>#1 Add sign-up to the onboarding flow</b><span class="lchip n-pages">${icon('web')}Pages</span></div></div>
+    <div class="rhead"><h1>Review the New visitor joins flow <span class="chip">${S.proposed} against ${S.base === 'r3' ? 'r3, accepted' : 'r4, your last review'}</span></h1>
+      <div class="verdict">${S.approved ? `<span class="chip ok">${icon('check')}Approved</span>` : `<span class="seen" id="seencount">${left ? `See ${left} more changed ${left === 1 ? 'step' : 'steps'} to approve` : 'All changed steps seen'}</span>
+        <button type="button" class="btn" data-act="request" ${asks && !S.revising ? '' : 'disabled'}>${icon('undo')}Request changes${asks ? ` (${asks})` : ''}</button>
+        <button type="button" class="btn go" data-act="approve" ${canApprove ? '' : 'disabled'}>${icon('check')}Approve #1</button>`}</div></div>
+    ${S.revising ? `<div class="banner work" role="status">${icon('progress_activity', 'spin')}Claude is working on your ${S.notes.filter(n => n.round === 1 && n.status !== 'looks').length > 1 ? 'notes' : 'note'} on #1…</div>` : ''}
+    ${S.round === 2 && !S.approved ? `<div class="banner round">${icon('history')}<span>Round 2: Claude changed <b>Check your email</b> for your notes. Compare against</span>
+      <span class="seg" role="group" aria-label="Compare against"><button type="button" data-base="r4" aria-pressed="${S.base === 'r4'}">r4, your last review</button><button type="button" data-base="r3" aria-pressed="${S.base === 'r3'}">r3, accepted</button></span></div>` : ''}
+    ${S.approved ? `<div class="banner ok">${icon('check_circle')}<span>#1 approved. The review gate clears when #2 is approved too; then #3 and #4 start. The pages are in Pages as ${S.proposed}, waiting for the work item to close.</span><button type="button" class="btn sm" data-act="back">Back to W-11</button></div>` : ''}
+    <div class="controls"><span class="seg" role="group" aria-label="Show"><button type="button" data-mode="previous" aria-pressed="${S.mode === 'previous'}">Previous</button><button type="button" data-mode="side" aria-pressed="${S.mode === 'side'}">Side by side</button><button type="button" data-mode="proposed" aria-pressed="${S.mode === 'proposed'}">Proposed</button></span>
+      <span class="seg" role="group" aria-label="Viewport"><button type="button" data-vp="phone" aria-pressed="${S.vp === 'phone'}">${icon('smartphone')}Phone</button><button type="button" data-vp="desktop" aria-pressed="${S.vp === 'desktop'}">${icon('desktop_windows')}Desktop</button></span>
+      <span class="seg" role="group" aria-label="Source"><button type="button" aria-pressed="true">Mockup</button><button type="button" disabled title="The built preview comes with #4, Build sign-up and first world">Built</button></span><span class="tiny muted">Built arrives with #4</span>
+      <label class="tog"><input type="checkbox" id="hl" ${S.hl ? 'checked' : ''}>Highlight changes</label>
+      <span class="push row wrap"><button type="button" class="btn sm" data-act="source">${icon('code')}View source</button><button type="button" class="btn sm" data-act="kit">${icon('palette')}Kit ${KIT.revision}</button></span></div>`;
+}
+function stepList() {
+  const st = steps(); let n = 0;
+  return `<nav class="steps" aria-label="Flow steps"><h2>New visitor joins · ${rev(S.proposed).flow.length} steps</h2>${st.map(s => { const pg = D.pages[s.id]; const num = s.kind === 'removed' ? 0 : ++n;
+    const lbl = s.kind === 'removed' ? 'Removed' : s.kind === 'new' ? 'New' : s.kind === 'changed' ? 'Changed' : 'Same';
+    const html = (s.kind === 'removed' ? rev(S.base) : rev(S.proposed)).html[s.id];
+    return `<button type="button" class="stepbtn ${s.kind === 'removed' ? 'removed' : ''}" data-step="${s.id}" ${S.step === s.id ? 'aria-current="step"' : ''}>
+      <span class="thumb" aria-hidden="true"><span class="screen" inert><span class="bk-root">${html}</span></span></span>
+      <span class="nm"><b>${s.kind === 'removed' ? '' : num + '. '}${esc(pg.name)}</b><span class="badge b-${s.kind}">${lbl}</span>${sinceNotes(s.id) ? '<span class="badge b-since">Changed since your notes</span>' : ''}${seen().includes(s.id) && needed().includes(s.id) ? `<span class="seenmark">${icon('check')}Seen</span>` : ''}</span></button>`; }).join('')}</nav>`;
+}
+function frame(side) {
+  const r = side === 'proposed' ? S.proposed : S.base, flow = rev(r).flow, here = flow.includes(S.step);
+  const pg = D.pages[S.step];
+  const body = here ? `<div class="bk-root">${rev(r).html[S.step]}</div>`
+    : `<div class="absent">${icon(side === 'previous' ? 'add_circle' : 'remove_circle')}<b>${side === 'previous' ? `Not in ${r}` : `Not a step in ${r}`}</b><span>${side === 'previous' ? `${esc(pg.name)} is new in ${S.proposed}.` : `${esc(pg.name)} was step ${rev(S.base).flow.indexOf(S.step) + 1} in ${S.base}.`}</span></div>`;
+  return `<section class="frame" aria-label="${side === 'proposed' ? 'Proposed' : 'Previous'} ${r}: ${esc(pg.name)}"><div class="fhead"><b>${side === 'proposed' ? 'Proposed' : 'Previous'} · ${r}</b>${side === 'previous' && S.base === 'r3' ? '<span class="chip ok">Accepted</span>' : ''}<span class="addr">${here ? pg.file : ''}</span></div>
+    <div class="fwrap"><div class="screen ${S.vp}" data-side="${side}">${body}</div></div></section>`;
+}
+function stage() {
+  const sides = S.mode === 'side' ? ['previous', 'proposed'] : [S.mode];
+  return `<div class="stage ${sides.length === 2 && S.vp === 'phone' ? 'two' : ''} ${S.hl ? 'hl' : ''} ${S.pin ? 'pin' : ''}">${sides.map(frame).join('')}</div>`;
+}
+function side() {
+  const s = steps().find(x => x.id === S.step), pg = D.pages[S.step], ch = changesFor(S.step);
+  const mine = S.notes.filter(n => n.page === S.step);
+  return `<div class="side"><section class="box" aria-labelledby="sh"><h2 id="sh">This step</h2><h3>${esc(pg.name)} <span class="badge b-${s.kind}">${s.kind === 'removed' ? 'Removed from the flow' : s.kind[0].toUpperCase() + s.kind.slice(1)}</span></h3>
+      ${ch.length ? `<ul class="chg" aria-label="What changed">${ch.map(([id, k, t]) => `<li><button type="button" data-chg="${id || ''}" data-k="${k}"><span class="badge b-${k}">${k}</span><span>${esc(t)}</span></button></li>`).join('')}</ul>` : `<p class="small muted" style="margin:0">Same as ${S.base}.</p>`}
+      ${s.kind !== 'removed' && !S.approved ? `<div class="row wrap"><button type="button" class="btn sm" data-act="looks" ${S.looks.includes(S.step + S.round) ? 'aria-pressed="true"' : ''}>${icon('thumb_up')}${S.looks.includes(S.step + S.round) ? 'Looks right ✓' : 'Looks right'}</button><button type="button" class="btn sm primary" data-act="pin" aria-pressed="${S.pin}">${icon('add_comment')}${S.pin ? 'Click the page…' : 'Add a note'}</button></div>` : ''}
+      ${S.draft ? noteForm() : ''}</section>
+    <section class="box" aria-labelledby="nh"><h2 id="nh">Notes on this step</h2>${mine.length ? `<ul class="notes">${mine.map(n => `<li><span class="num ${n.status === 'addressed' ? 'done' : ''}">${n.n}</span><span><span class="kind">${KINDS[n.kind]} · round ${n.round} · on ${esc(n.target)}</span><br>${esc(n.text)}${n.reply ? `<span class="reply">${icon('check')}${esc(n.reply)}</span>` : ''}</span></li>`).join('')}</ul>` : '<p class="small muted" style="margin:0">None yet. Add one and click the part of the page it\'s about.</p>'}
+      <p class="tiny muted" style="margin:0">Content fixes and change requests go back to #1 with Request changes. Questions go to the orchestrator's thread.</p></section>
+    <section class="box" aria-labelledby="kh"><h2 id="kh">Built from</h2><p class="small" style="margin:0">${esc(pg.file)} · ${S.proposed}, HTML using ${KIT.name} kit ${KIT.revision}. No app build: it renders anywhere the kit loads.</p></section></div>`;
+}
+function noteForm() {
+  return `<form class="noteform" data-form="note"><b class="small">Note on ${esc(S.draft.target)}</b><fieldset><legend>Kind</legend>${Object.entries(KINDS).filter(([k]) => k !== 'looks').map(([k, n], i) => `<label><input type="radio" name="kind" value="${k}" ${i === 0 ? 'checked' : ''}>${n}</label>`).join('')}</fieldset>
+    <textarea id="notetext" aria-label="Note" placeholder="What should change?"></textarea><div class="row"><button type="submit" class="btn sm primary">Save note</button><button type="button" class="btn sm ghost" data-act="cancel-note">Cancel</button></div></form>`;
+}
+function render() {
+  const a = document.activeElement?.id;
+  $('#view').innerHTML = header() + `<div class="review">${stepList()}${stage()}${side()}</div>`;
+  document.querySelectorAll('.thumb button, .thumb input').forEach(x => x.tabIndex = -1);
+  fit(); markers();
+  if (a && document.getElementById(a)) document.getElementById(a).focus({ preventScroll: true });
+}
+// Each frame fits its column: phone at most 1:1, desktop scaled down from 1200 px.
+function fit() {
+  document.querySelectorAll('.fwrap').forEach(w => { const sc = w.querySelector('.screen'); const avail = w.clientWidth - 20; const base = S.vp === 'phone' ? 375 : 1200; sc.style.zoom = Math.min(1, avail / base).toFixed(3); });
+}
+new ResizeObserver(() => fit()).observe(document.body);
+const KITSEL = 'bk-button, bk-field, bk-choice, bk-notice, bk-steps, bk-link, bk-text, bk-hero, bk-card, bk-topbar, bk-world';
+const kitEls = sc => [...sc.querySelectorAll('*')].filter(e => e.tagName.startsWith('BK-'));
+function markers() {
+  const sc = document.querySelector('.screen[data-side="proposed"]'); if (!sc) return;
+  S.notes.filter(n => n.page === S.step && n.rev === S.proposed).forEach(n => { const el = kitEls(sc)[n.idx]; if (!el) return;
+    const r = el.getBoundingClientRect(), b = sc.getBoundingClientRect(), z = parseFloat(sc.style.zoom) || 1;
+    const m = document.createElement('span'); m.className = 'marker'; m.textContent = n.n; m.setAttribute('aria-hidden', 'true');
+    m.style.left = ((r.right - b.left) / z + sc.scrollLeft - 14) + 'px'; m.style.top = ((r.top - b.top) / z + sc.scrollTop - 14) + 'px'; sc.append(m); });
+}
+const friendly = el => { const t = el.tagName.toLowerCase().replace('bk-', ''); const txt = (el.getAttribute('label') || el.getAttribute('headline') || el.getAttribute('title') || el.textContent || '').trim().replace(/\|/g, ' ').slice(0, 40); return `${t}${txt ? ` “${txt}”` : ''}`; };
+function goStep(id) { S.step = id; if (!seen().includes(id)) seen().push(id); S.pin = false; S.draft = null; render(); }
+
+// ---------- interactions ----------
+document.addEventListener('click', e => {
+  const t = e.target;
+  // Pin mode: the next click on the proposed page picks what the note is about.
+  const sc = t.closest('.screen[data-side="proposed"]');
+  if (sc && S.pin) { e.preventDefault(); const k = t.closest(KITSEL); if (!k || !sc.contains(k)) return;
+    S.draft = { idx: kitEls(sc).indexOf(k), target: friendly(k) }; S.pin = false; render(); $('#notetext')?.focus(); return; }
+  // Walking: links inside a mockup move that frame's flow to the linked step.
+  const go = t.closest('.screen [data-go]');
+  if (go) { const id = go.dataset.go, side = go.closest('.screen').dataset.side; const flow = rev(side === 'proposed' ? S.proposed : S.base).flow;
+    if (steps().some(s => s.id === id) && (flow.includes(id) || side === 'proposed')) goStep(id); else toast(`${D.pages[id]?.name || id} isn't a step in this flow`); return; }
+  const sb = t.closest('[data-step]'); if (sb) { goStep(sb.dataset.step); return; }
+  const md = t.closest('[data-mode]'); if (md) { S.mode = md.dataset.mode; render(); return; }
+  const vp = t.closest('[data-vp]'); if (vp) { S.vp = vp.dataset.vp; render(); return; }
+  const bs = t.closest('[data-base]'); if (bs) { S.base = bs.dataset.base; render(); return; }
+  const cg = t.closest('[data-chg]'); if (cg) { const id = cg.dataset.chg; const side = cg.dataset.k === 'removed' ? 'previous' : 'proposed';
+    const el = document.querySelector(`.screen[data-side="${side}"] [data-id="${id}"]`); if (el) { el.scrollIntoView({ block: 'center' }); el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); } else toast(side === 'previous' ? 'Switch to Previous or Side by side to see it' : 'Shown on the whole page'); return; }
+  const b = t.closest('[data-act]'); if (!b) return;
+  switch (b.dataset.act) {
+    case 'reset': Object.assign(S, fresh()); render(); toast('Reset; your answers to the questions are kept'); return;
+    case 'back': toast('Back to W-11, as in the goal-run prototype'); return;
+    case 'pin': S.pin = !S.pin; S.draft = null; if (S.pin && S.mode === 'previous') S.mode = 'side'; render(); return;
+    case 'cancel-note': S.draft = null; render(); return;
+    case 'looks': { const k = S.step + S.round; S.looks = S.looks.includes(k) ? S.looks.filter(x => x !== k) : [...S.looks, k]; render(); return; }
+    case 'request': S.revising = true; render(); setTimeout(revise, 1400); return;
+    case 'approve': S.approved = true; render(); toast('#1 approved'); return;
+    case 'source': openSource(); return;
+    case 'kit': openKit(); return;
+    case 'questions': renderQuestions(); openDrawer('#questions'); $('#questions textarea')?.focus(); return;
+    case 'close-drawer': b.closest('.drawer').classList.remove('open'); return;
+    case 'copy': { const ans = store.get('answers', {}); navigator.clipboard?.writeText(QUESTIONS.map(([id]) => `${id}: ${ans[id] || ''}`).join('\n')).then(() => toast('Copied'), () => toast('Copy failed; select the text instead')); return; }
+  }
+});
+document.addEventListener('change', e => { if (e.target.id === 'hl') { S.hl = e.target.checked; render(); } });
+document.addEventListener('submit', e => {
+  if (e.target.dataset.form !== 'note') return; e.preventDefault();
+  const text = $('#notetext').value.trim(); if (!text) { $('#notetext').focus(); toast('Write what the note is about first'); return; }
+  const kind = e.target.querySelector('input[name="kind"]:checked').value;
+  S.notes.push({ n: S.next++, round: S.round, rev: S.proposed, page: S.step, idx: S.draft.idx, target: S.draft.target, kind, text, status: kind === 'question' ? 'asked' : 'open' });
+  S.draft = null; render(); toast(kind === 'question' ? 'Question sent to the orchestrator\'s thread' : 'Note saved; send it with Request changes');
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (S.pin || S.draft) { S.pin = false; S.draft = null; render(); } else document.querySelectorAll('.drawer.open').forEach(d => d.classList.remove('open')); } });
+// Claude revises #1 for the notes: Check your email changes; round 2 compares against your last review by default.
+function revise() {
+  S.notes.filter(n => n.round === 1 && n.status === 'open').forEach(n => { n.status = 'addressed'; n.reply = n.page === 'check-email' ? 'Claude: added “The link lasts 24 hours” and Use a different email (r5).' : 'Claude: changed in r5.'; });
+  Object.assign(S, { revising: false, round: 2, proposed: 'r5', base: 'r4', step: 'check-email' }); S.seen[2] = ['check-email'];
+  render(); toast('Claude revised #1: r5 changes Check your email');
+}
+
+// ---------- drawers ----------
+function openDrawer(sel) { document.querySelectorAll('.drawer').forEach(d => d.classList.toggle('open', d.matches(sel))); }
+function openSource() {
+  const r = rev(S.proposed).flow.includes(S.step) ? S.proposed : S.base, pg = D.pages[S.step];
+  const src = `<!-- ${pg.file} · ${r} · Pages -->\n<script src="biome-kit.js"><\/script>  <!-- ${KIT.name} ${KIT.revision} -->\n\n${rev(r).html[S.step].replace(/ data-change="[^"]*"| data-id="[^"]*"/g, '')}`;
+  $('#source').innerHTML = `<div class="row"><h2>${esc(pg.file)}</h2><button type="button" class="btn ghost sm push" data-act="close-drawer">${icon('close')}Close</button></div>
+    <p class="small">The page is this file: kit tags and text, nothing else. Agents edit it like any file; Pages, the review and an Artifact all render the same thing.</p><pre><code>${esc(src)}</code></pre>`;
+  openDrawer('#source'); $('#source button')?.focus();
+}
+function openKit() {
+  $('#kit').innerHTML = `<div class="row"><h2>${KIT.name} kit ${KIT.revision}</h2><button type="button" class="btn ghost sm push" data-act="close-drawer">${icon('close')}Close</button></div>
+    <p class="small">What Design publishes: one file, <code>biome-kit.js</code>, with the tokens and these components. These demos are live, the same elements the pages use; Design's Components tab would show the same.</p>
+    ${KIT.components.map(([tag, name, desc, demo]) => `<div class="demo"><div class="bk-root">${demo}</div><div class="meta"><b>${name}</b><span class="muted">${esc(desc)}</span><code>&lt;${tag}&gt;</code></div></div>`).join('')}`;
+  openDrawer('#kit'); $('#kit button')?.focus();
+}
+const QUESTIONS = [
+  ['P1', 'Previous beside Proposed, with each step marked New, Changed, Same or Removed. Is that the comparison you want, or would you rather flip or overlay one page on the other?'],
+  ['P2', 'Highlight changes outlines what changed (green new, amber changed, red removed) and lists it on the right. Enough to see what changed at a glance?'],
+  ['P3', 'Approve waits until you have seen every new or changed step. Right rule, or too strict?'],
+  ['P4', 'Notes pin to a part of the page, with Pages\' kinds (content fix, change request, question). In round 2 you compare against your last review. Does that loop work?'],
+  ['P5', 'The mockups are HTML from Biome\'s Design kit, with no app build. Close enough to the real app to approve flows before code?'],
+  ['P6', 'View source and the kit drawer show that a page is just kit tags. Useful in review, or keep that out of sight?'],
+];
+function renderQuestions() {
+  const ans = store.get('answers', {});
+  $('#questions').innerHTML = `<div class="row"><h2>Review questions</h2><button type="button" class="btn ghost sm push" data-act="close-drawer">${icon('close')}Close</button></div>
+    ${QUESTIONS.map(([id, q]) => `<div class="qa"><p><b>${id}</b> ${esc(q)}</p><textarea id="a-${id}" aria-label="${id} answer" data-q="${id}">${esc(ans[id] || '')}</textarea></div>`).join('')}
+    <button type="button" class="btn primary" data-act="copy">${icon('content_copy')}Copy answers</button>`;
+  $('#questions').querySelectorAll('textarea').forEach(t => t.addEventListener('input', () => { const all = store.get('answers', {}); all[t.dataset.q] = t.value; store.set('answers', all); }));
+}
+render();
+</script>
+</body>
+</html>

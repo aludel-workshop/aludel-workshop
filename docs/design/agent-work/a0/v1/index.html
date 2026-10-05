@@ -1,0 +1,847 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aludel goal run</title>
+<!-- AGENT-WORK-01 A0 prototype v1 (brief ledger, readiness and questions in ../../work-record.md). Static; illustrative Biome
+     data; nothing is saved or sent except the reviewer's own answers to the review questions, which stay in this browser. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block">
+<style>
+/* Tokens and shell as the built portal and the J6 prototype. */
+:root{color-scheme:light;
+  --bg:#fbfbfd;--surface:#fff;--rail:#f3f5f9;--panel:#f4f6fa;--hover:#e9edf5;--line:#dfe3ec;--line-strong:#c8cfdc;--ink:#1b1f2a;--muted:#5d6679;--faint:#636c80;
+  --accent:#3047b9;--accent-bg:#e3e8ff;--cover:#f3f1fc;--cover-line:#d9d2f7;
+  --ok:#146446;--ok-bg:#d9f3e7;--bad:#a1231f;--bad-bg:#fce1e0;--warn:#7a4f00;--warn-bg:#fff0cc;--info:#1a5fb4;--info-bg:#e2ecfb;
+  --new:#5b3cc4;--new-bg:#ece7fd;--shadow:0 18px 50px #1c2a5a2e;--bar:52px;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:Roboto,system-ui,sans-serif;font-size:14.5px;line-height:1.45;color:var(--ink);background:var(--bg)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:var(--accent)}
+.icon{font-family:'Material Symbols Rounded';font-weight:normal;font-style:normal;font-size:20px;line-height:1;letter-spacing:normal;text-transform:none;white-space:nowrap;display:inline-block;vertical-align:middle;font-feature-settings:'liga';-webkit-font-smoothing:antialiased;flex:none}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.mono,code{font-family:"Roboto Mono",ui-monospace,monospace;font-size:.88em}
+.muted{color:var(--muted)}.small{font-size:13px}.tiny{font-size:12px}
+.row{display:flex;align-items:center;gap:8px}.push{margin-left:auto}.wrap{flex-wrap:wrap}
+h1,h2,h3{margin:0}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.spin{animation:spin 1.2s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+
+.shell{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:100vh}
+.rail{background:var(--rail);border-right:1px solid var(--line);padding:14px 10px;display:flex;flex-direction:column;gap:2px;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:18px;padding:2px 8px 12px}
+.brand .icon{color:var(--accent);font-size:26px}
+.proj{display:flex;align-items:center;gap:9px;padding:8px;border-radius:12px;background:var(--surface);border:1px solid var(--line);margin-bottom:10px}
+.proj .mk{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:#2a7230;color:#fff;font-weight:700;font-size:12px}
+.proj small{display:block;color:var(--muted);font-size:11.5px}
+.nav a{display:flex;align-items:center;gap:10px;padding:5px 10px 5px 6px;border-radius:12px;color:var(--ink);text-decoration:none;font-weight:500}
+.nav a.active{background:var(--nb);font-weight:700}
+.tile{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:var(--nb);color:var(--nc)}
+.tile .icon{font-size:19px}
+.nav a.active .tile{background:var(--nc);color:#fff}
+.n-home{--nc:#c62828;--nb:#fde8e8}.n-vision{--nc:#b93c0a;--nb:#ffeddc}.n-design{--nc:#8a6100;--nb:#fff3cc}.n-pages{--nc:#2a7230;--nb:#e2f4e3}.n-data{--nc:#00766c;--nb:#d6f3ee}.n-code{--nc:#1a5fb4;--nb:#e2ecfb}.n-deploy{--nc:#2f3a9e;--nb:#e4e7f8}.n-work{--nc:#5b3cc4;--nb:#ece7fd}.n-host{--nc:#5d6679;--nb:#eceff4}
+.main{padding:10px 14px 14px;min-width:0;display:flex;flex-direction:column;gap:8px}
+
+.btn{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:var(--surface);font-weight:500;font-size:13.5px;white-space:nowrap;text-decoration:none;color:var(--ink)}
+.btn:hover{background:var(--hover)}.btn .icon{font-size:18px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}.btn.primary:hover{background:#2539a0}
+.btn.go{background:var(--ok);border-color:var(--ok);color:#fff}.btn.go:hover{background:#0f4f37}
+.btn.flag{border-color:var(--warn);color:var(--warn)}
+.btn.ghost{border-color:transparent;background:none}.btn.ghost:hover{background:var(--hover)}
+.btn.sm{padding:3px 9px;font-size:12.5px}.btn.sm .icon{font-size:16px}
+.btn:disabled{opacity:.5;cursor:default}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:500;background:var(--panel);color:var(--muted);white-space:nowrap}
+.chip .icon{font-size:15px}
+.chip.new{background:var(--new-bg);color:var(--new)}.chip.ok{background:var(--ok-bg);color:var(--ok)}.chip.bad{background:var(--bad-bg);color:var(--bad)}.chip.warn{background:var(--warn-bg);color:var(--warn)}.chip.info{background:var(--info-bg);color:var(--info)}
+.lchip{display:inline-flex;align-items:center;gap:4px;padding:1px 8px 1px 3px;border-radius:999px;font-size:12px;font-weight:700;background:var(--nb);color:var(--nc);white-space:nowrap}
+.lchip .icon{font-size:15px;background:var(--nc);color:#fff;border-radius:50%;padding:1px}
+.eyebrow{font-size:11.5px;letter-spacing:.8px;text-transform:uppercase;color:var(--faint);font-weight:700}
+.proto{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);padding:2px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.seg button{border:0;background:var(--surface);padding:3px 10px;font-size:12.5px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+
+/* ---------- the Work item page ---------- */
+.ihead{display:grid;gap:4px;padding:4px 2px 6px}
+.crumb{font-size:13px;color:var(--muted);display:flex;gap:6px;align-items:center}
+.ihead h1{font-size:22px;line-height:1.25}
+.icols{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:12px;align-items:start}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px;display:grid;gap:10px}
+.card h2{font-size:17px}
+.card h3{font-size:14px}
+.goal{margin:0;color:var(--ink)}
+.status{border-radius:16px;padding:12px 16px;display:grid;gap:8px;border:1px solid var(--line);background:var(--surface)}
+.status .top{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.status .txt{flex:1;min-width:220px}
+.status h2{font-size:17px;display:flex;gap:6px;align-items:center}
+.status p{margin:2px 0 0;color:var(--muted);font-size:13.5px}
+.status.live{border-color:#b9c6f3;background:#f6f8ff}
+.status.needs{border-color:#f0d58a;background:#fffaeb}
+.status.review{border-color:#a9dcc4;background:#f2fbf6}
+.status.bad{border-color:#f2b8b5;background:#fff6f5}
+.status.done{border-color:#a9dcc4;background:#f2fbf6}
+.stages{list-style:none;margin:4px 0 0;padding:0;display:grid;gap:4px;font-size:13.5px}
+.stages li{display:flex;gap:8px;align-items:flex-start}
+.stages .icon{font-size:18px}
+.q{border:1px solid #f0d58a;background:var(--surface);border-radius:12px;padding:10px 12px;display:grid;gap:8px}
+.q h3{font-size:14.5px;display:flex;gap:6px;align-items:center}
+.q .who{font-size:12.5px;color:var(--muted)}
+.opts{display:grid;gap:6px}
+.opt{display:flex;gap:8px;align-items:flex-start;border:1px solid var(--line);border-radius:10px;padding:7px 10px;cursor:pointer;font-size:13.5px}
+.opt:has(input:checked){border-color:var(--accent);background:var(--accent-bg)}
+.opt input{margin-top:3px}
+.opt b{font-weight:500}
+
+/* plan */
+.plan{border-color:#c9d2f5}
+.psteps{list-style:none;margin:0;padding:0;display:grid;gap:6px;counter-reset:ps}
+.pstep{display:grid;grid-template-columns:26px minmax(0,1fr);gap:2px 10px;border:1px solid var(--line);border-radius:12px;padding:9px 10px}
+.pstep .num{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--panel);font-weight:700;font-size:12px}
+.pstep .t{font-weight:500}
+.pstep .why{grid-column:2;font-size:13px;color:var(--muted)}
+.pstep .meta{grid-column:2;display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12.5px;color:var(--muted)}
+.pstep.expected{border-style:dashed;background:#fbfbfe}
+.pstep.changed{border-color:var(--accent);background:#f6f8ff}
+.claims{list-style:none;margin:0;padding:0;display:grid;gap:4px;font-size:13.5px}
+.claims li{display:flex;gap:8px;align-items:flex-start}
+.claims .icon{font-size:18px;color:var(--muted)}
+details.ctx{border:1px solid var(--line);border-radius:12px}
+details.ctx summary{cursor:pointer;padding:8px 10px;font-weight:500;display:flex;gap:6px;align-items:center;list-style:none}
+details.ctx summary::-webkit-details-marker{display:none}
+details.ctx[open] summary .chev{transform:rotate(180deg)}
+.ctxlist{margin:0;padding:0 10px 10px;display:grid;gap:8px;font-size:13px}
+.ctxlist dt{font-weight:700;font-size:12px;color:var(--faint);text-transform:uppercase;letter-spacing:.6px}
+.ctxlist dd{margin:0;display:flex;gap:6px;flex-wrap:wrap}
+.approve{display:flex;gap:10px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:10px}
+.approve p{margin:0;flex:1;min-width:240px;font-size:13.5px;color:var(--muted)}
+.notebox{border:1px solid var(--line-strong);border-radius:12px;padding:10px;display:grid;gap:6px;background:var(--panel)}
+.notebox label{font-weight:700;font-size:13px}
+textarea{width:100%;min-height:64px;border:1px solid var(--line-strong);border-radius:8px;padding:6px 8px;resize:vertical;background:var(--surface)}
+.revised{display:flex;gap:8px;align-items:flex-start;background:var(--accent-bg);color:#1f2f86;border-radius:10px;padding:8px 10px;font-size:13.5px}
+.feed{list-style:none;margin:0;padding:0;display:grid;gap:5px;font-size:13.5px}
+.feed li{display:flex;gap:8px;align-items:flex-start}
+.feed .icon{font-size:18px;color:var(--muted)}
+
+/* checklist */
+.round{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-top:4px}
+.round::after{content:"";flex:1;border-top:1px solid var(--line)}
+.cl{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.clrow{border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden}
+.clrow.st-now{border-color:#b9c6f3}.clrow.st-needs,.clrow.st-ask{border-color:#f0d58a}.clrow.st-fail{border-color:#f2b8b5}
+.clhead{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:2px 10px;align-items:center;width:100%;border:0;background:none;text-align:left;padding:9px 10px}
+.clhead:hover{background:var(--hover)}
+.clhead .st{font-size:20px}
+.st-done .clhead .st{color:var(--ok)}.st-now .clhead .st{color:var(--accent)}.st-needs .clhead .st,.st-ask .clhead .st{color:var(--warn)}.st-fail .clhead .st{color:var(--bad)}.st-todo .clhead .st,.st-skip .clhead .st{color:var(--line-strong)}
+.clhead .t{font-weight:500}
+.clhead .r{font-size:12.5px;color:var(--muted);white-space:nowrap;display:flex;gap:6px;align-items:center}
+.clhead .sum{grid-column:2/4;font-size:13px;color:var(--muted)}
+.clhead .chev{font-size:18px;color:var(--muted)}
+.clhead[aria-expanded="true"] .chev{transform:rotate(180deg)}
+.clbody{padding:0 12px 12px 44px;display:grid;gap:8px;font-size:13.5px}
+.log{list-style:none;margin:0;padding:0;display:grid;gap:3px;font-size:13px;color:var(--muted)}
+.log li{display:flex;gap:6px;align-items:flex-start}
+.log li .icon{font-size:16px;margin-top:1px}
+.log li.cur{color:var(--ink)}
+.staged{list-style:none;margin:0;padding:0;display:grid;gap:3px;font-size:13px}
+.staged li{display:flex;gap:6px;align-items:flex-start}
+.staged .icon{font-size:16px;color:var(--ok);margin-top:1px}
+.checks{display:flex;gap:6px;flex-wrap:wrap}
+.askbox{border:1px solid #f0d58a;background:#fffaeb;border-radius:10px;padding:10px;display:grid;gap:6px}
+.askbox pre{margin:0;font-family:"Roboto Mono",monospace;font-size:12.5px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px;white-space:pre-wrap}
+.agent{display:inline-flex;align-items:center;gap:4px}
+.agent .icon{font-size:16px}
+.bound{display:flex;gap:6px;align-items:flex-start;background:var(--new-bg);color:var(--new);border-radius:10px;padding:6px 10px;font-size:13px}
+.bound .icon{font-size:17px}
+.failnote{display:flex;gap:6px;align-items:flex-start;background:var(--bad-bg);color:var(--bad);border-radius:10px;padding:6px 10px;font-size:13px}
+.failnote .icon{font-size:17px}
+
+/* side */
+.side{display:grid;gap:12px;position:sticky;top:10px}
+.cs{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.cs li{display:grid;grid-template-columns:30px minmax(0,1fr);gap:2px 10px;align-items:start}
+.cs .tile{grid-row:span 2}
+.cs b{font-weight:500}
+.cs .d{font-size:12.5px;color:var(--muted)}
+.empty{color:var(--muted);font-size:13.5px;margin:0}
+
+/* ---------- the review (J6 v2, grouped by layer) ---------- */
+.rv{flex:1;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden;min-height:max(640px,calc(100vh - 60px))}
+.rvtop{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--line);flex-wrap:wrap;min-height:var(--bar)}
+.rvtop h1{font-size:15px;display:flex;gap:6px;align-items:center}
+.panes{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 410px;min-height:0}
+.pv{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--panel);border-right:1px solid var(--line)}
+.bar{display:flex;align-items:center;gap:8px;min-height:var(--bar);padding:8px 12px;background:var(--surface);flex-wrap:wrap}
+.bar.top{border-bottom:1px solid var(--line)}
+.bar.bottom{border-top:1px solid var(--line)}
+.persona{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:999px;background:var(--warn-bg);color:#5a3b00;font-size:12.5px;font-weight:500}
+.persona .icon{font-size:16px}
+.evid{flex:1;padding:12px;min-height:0;overflow:auto;display:grid;align-content:start;gap:12px}
+.frame{border:1px solid var(--line-strong);border-radius:12px;background:#fff;overflow:hidden;display:flex;flex-direction:column;min-height:440px;min-width:0}
+.fhead{display:flex;align-items:center;gap:6px;padding:6px 8px;background:#eef0f5;border-bottom:1px solid var(--line);font-size:12px}
+.fhead .addr{flex:1;min-width:0;background:#fff;border:1px solid var(--line);border-radius:999px;padding:2px 10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fhead .lbl{font-weight:700;font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--accent)}
+.fhead .lbl.prev{color:var(--muted)}
+.fbody{flex:1;position:relative;min-height:0}
+.evcard{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;display:grid;gap:8px}
+.evcard .evh{font-size:14px;display:flex;gap:6px;align-items:center}
+.flow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px}
+.flow .node{border:1px solid var(--line-strong);border-radius:10px;padding:5px 10px;background:#fff}
+.flow .node.add{border-color:var(--new);background:var(--new-bg);color:var(--new);font-weight:500}
+.flow .arrow{color:var(--muted);font-size:18px}
+table.tb{border-collapse:collapse;width:100%;font-size:13.5px}
+table.tb th,table.tb td{text-align:left;padding:6px;border-bottom:1px solid var(--line);vertical-align:top}
+table.tb th{font-size:12px;color:var(--muted);font-weight:500}
+tr.add td{background:#f3fbf6}
+tr.add td:first-child{box-shadow:inset 3px 0 var(--ok)}
+.cp{display:flex;flex-direction:column;min-width:0;min-height:0}
+.cp.cover .body{background:var(--cover)}
+.claimpick{position:relative;flex:1;min-width:0}
+.claimbtn{display:flex;align-items:center;gap:8px;width:100%;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:5px 10px;text-align:left}
+.claimbtn .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700;font-size:13.5px}
+.menu{position:absolute;left:0;right:0;top:calc(100% + 4px);background:var(--surface);border:1px solid var(--line-strong);border-radius:12px;box-shadow:var(--shadow);z-index:30;padding:6px;list-style:none;margin:0;max-height:70vh;overflow:auto}
+.menu .grp{font-size:11.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--faint);padding:6px 8px 2px}
+.menu button{display:flex;align-items:center;gap:8px;width:100%;border:0;background:none;border-radius:8px;padding:7px 8px;text-align:left}
+.menu button:hover,.menu button[aria-current="true"]{background:var(--hover)}
+.menu .t{flex:1;min-width:0}
+.body{flex:1;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:14px;min-height:0}
+.body h2{font-size:20px;line-height:1.25;text-wrap:balance}
+.lead{margin:0;color:var(--muted);font-size:13.5px}
+.coverhead{display:grid;gap:4px;padding-bottom:12px;border-bottom:1px solid var(--cover-line)}
+.slist{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.srow{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:2px 10px;align-items:center;width:100%;text-align:left;border:1px solid var(--cover-line);background:var(--surface);border-radius:12px;padding:8px 10px}
+.srow:hover{background:var(--hover)}
+.srow .num{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;border:1.5px solid var(--line-strong);font-size:11.5px;font-weight:700}
+.srow .num.walked{background:var(--ok);border-color:var(--ok);color:#fff}
+.srow .num.flagged{background:var(--warn);border-color:var(--warn);color:#fff}
+.srow .num .icon{font-size:14px}
+.srow .fl{grid-column:2/4;font-size:13px;color:var(--warn)}
+.spec{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;margin:0;font-size:14px}
+.spec dt{color:var(--muted);font-weight:500}
+.spec dd{margin:0}
+details.proof{border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+details.proof summary{display:flex;align-items:center;gap:8px;padding:9px 10px;cursor:pointer;list-style:none;font-weight:500}
+details.proof summary::-webkit-details-marker{display:none}
+details.proof summary .chev{margin-left:auto;color:var(--muted)}
+details.proof[open] summary .chev{transform:rotate(180deg)}
+.proofbody{padding:0 10px 10px;display:grid;gap:6px;font-size:13px}
+.t-passed{color:var(--ok)}
+.flagbox{border:1px solid var(--warn);background:var(--warn-bg);border-radius:12px;padding:10px;display:grid;gap:6px}
+.flagbox label{font-weight:700;font-size:13px;color:var(--warn)}
+.flagnote{display:flex;gap:8px;align-items:flex-start;background:var(--warn-bg);color:var(--warn);border-radius:10px;padding:8px 10px;font-size:13.5px}
+.caution{display:flex;gap:6px;align-items:flex-start;background:var(--warn-bg);color:var(--warn);border-radius:10px;padding:8px 10px;font-size:13px}
+.done{display:flex;gap:6px;align-items:flex-start;background:var(--ok-bg);color:var(--ok);border-radius:10px;padding:8px 10px;font-size:13.5px}
+.caution .icon,.done .icon,.flagnote .icon{font-size:18px}
+.decision{border-top:1px solid var(--cover-line);padding-top:12px;display:grid;gap:8px}
+.prog{display:flex;gap:3px;align-items:center;flex:1;min-width:60px;max-width:180px}
+.prog span{flex:1;height:6px;border-radius:3px;background:var(--line)}
+.prog span.walked{background:var(--ok)}.prog span.flagged{background:var(--warn)}.prog span.cur{outline:2px solid var(--accent);outline-offset:1px}
+.acts{display:flex;gap:6px;align-items:center;margin-left:auto;flex-wrap:wrap;justify-content:flex-end}
+.parts{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.parts li{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:2px 10px;align-items:center;border:1px solid var(--cover-line);background:var(--surface);border-radius:12px;padding:8px 10px}
+.parts .d{grid-column:2/4;font-size:12.5px;color:var(--muted)}
+
+/* the mock app: Biome */
+.app{font-family:system-ui,sans-serif;font-size:13.5px;color:#222;height:100%;display:flex;flex-direction:column}
+.app .ah{display:flex;align-items:center;gap:12px;padding:10px 14px;background:#173b2b;color:#fff;flex-wrap:wrap}
+.app .ah b{font-size:14.5px}
+.app .ah .me{margin-left:auto;font-size:12px;color:#cfe8da}
+.app .am{padding:16px 18px;display:grid;gap:8px;align-content:start}
+.app .h{font-size:18px;font-weight:700}
+.app .abtn{background:#2a7a4f;color:#fff;border:0;border-radius:6px;padding:7px 13px;font-weight:600;justify-self:start}
+.app .abtn.sec{background:#e8f2ec;color:#1f5a3c}
+.app label{display:block;font-size:12px;color:#555;margin:2px 0 -4px}
+.app input{width:100%;max-width:300px;padding:6px 8px;border:1px solid #bbb;border-radius:6px}
+.app .sub{color:#595959;font-size:12.5px}
+.app .mail{border:1px solid #ddd;border-radius:8px;max-width:440px}
+.app .mail .mh{padding:8px 10px;border-bottom:1px solid #eee;font-size:12.5px;color:#555}
+.app .mail .mb{padding:10px;display:grid;gap:8px}
+.app .stub{font-size:11px;color:#595959}
+.app.nf{align-items:center;justify-content:center;color:#595959;gap:6px;padding:16px;text-align:center}
+.app.nf b{font-size:30px;color:#767676}
+.app .hero{background:#eef6f0;border-radius:10px;padding:14px;display:grid;gap:8px}
+
+/* prototype-only drawers */
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(420px,100vw);background:var(--surface);box-shadow:var(--shadow);z-index:60;padding:16px;overflow:auto;display:none}
+.drawer.open{display:block}
+.drawer h2{font-size:16px;margin-bottom:8px}
+.drawer fieldset{border:1px solid var(--line);border-radius:10px;margin:0 0 10px;padding:8px 10px}
+.drawer legend{font-weight:700;font-size:13px;padding:0 4px}
+.drawer label{display:flex;gap:6px;align-items:center;font-size:13.5px;padding:2px 0}
+.drawer .qa{margin-bottom:12px}
+.drawer .qa p{margin:0 0 4px;font-size:13.5px}
+.drawer .jump{display:flex;gap:6px;flex-wrap:wrap}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1b1f2a;color:#fff;padding:8px 14px;border-radius:10px;z-index:80;font-size:13.5px;max-width:90vw}
+
+@media (max-width:1100px){ .panes{grid-template-columns:minmax(0,1fr) 360px} .icols{grid-template-columns:minmax(0,1fr) 280px} }
+@media (max-width:860px){
+  .shell{grid-template-columns:1fr} .rail{display:none} .main{padding:8px 16px}
+  .icols{grid-template-columns:1fr} .side{position:static}
+  .panes{grid-template-columns:1fr}
+  .pv{border-right:0;border-bottom:1px solid var(--line)}
+  .frame{min-height:400px}
+  .cp .bar.bottom{position:sticky;bottom:0;z-index:20;box-shadow:0 -8px 20px #1c2a5a1a}
+  .body{overflow:visible}
+  .clbody{padding-left:12px}
+}
+</style>
+<body>
+<div class="shell">
+  <nav class="rail" aria-label="Project">
+    <div class="brand"><span class="icon" aria-hidden="true">deployed_code</span>Aludel</div>
+    <div class="proj"><span class="mk" aria-hidden="true">BI</span><div><b>Biome</b><small>Worlds to explore</small></div></div>
+    <div class="nav">
+      <a href="#" class="n-home"><span class="tile"><span class="icon" aria-hidden="true">home</span></span>Home</a>
+      <a href="#" class="n-vision"><span class="tile"><span class="icon" aria-hidden="true">lightbulb</span></span>Vision</a>
+      <a href="#" class="n-design"><span class="tile"><span class="icon" aria-hidden="true">palette</span></span>Design</a>
+      <a href="#" class="n-pages"><span class="tile"><span class="icon" aria-hidden="true">web</span></span>Pages</a>
+      <a href="#" class="n-data"><span class="tile"><span class="icon" aria-hidden="true">schema</span></span>Data</a>
+      <a href="#" class="n-code"><span class="tile"><span class="icon" aria-hidden="true">code</span></span>Code</a>
+      <a href="#" class="n-deploy"><span class="tile"><span class="icon" aria-hidden="true">rocket_launch</span></span>Deploy</a>
+      <a href="#" class="n-work active" aria-current="page"><span class="tile"><span class="icon" aria-hidden="true">checklist</span></span>Work</a>
+    </div>
+  </nav>
+  <main class="main" id="main">
+    <div class="proto"><span class="icon" aria-hidden="true">science</span>Prototype v1 · illustrative data, nothing is sent
+      <span class="seg" role="group" aria-label="Run playback"><button type="button" data-speed="auto">Play</button><button type="button" data-speed="step">Step</button></span>
+      <button class="btn sm" type="button" data-act="tick" id="tickbtn"><span class="icon" aria-hidden="true">skip_next</span>Next event</button>
+      <button class="btn sm" type="button" data-act="scenarios"><span class="icon" aria-hidden="true">tune</span>Scenarios</button>
+      <button class="btn sm primary" type="button" data-act="questions"><span class="icon" aria-hidden="true">rate_review</span>Review questions</button></div>
+    <div id="view"></div>
+  </main>
+</div>
+<aside class="drawer" id="scenarios" aria-label="Prototype scenarios"></aside>
+<aside class="drawer" id="questions" aria-label="Review questions"></aside>
+<script>
+// ---------- illustrative data ----------
+const LAYERS = {
+  vision: ['Vision', 'lightbulb'], design: ['Design', 'palette'], pages: ['Pages', 'web'], data: ['Data', 'schema'],
+  code: ['Code', 'code'], deploy: ['Deploy', 'rocket_launch'], host: ['Aludel', 'verified'],
+};
+const MODES = { free: ['Stage freely', 'lock_open'], ask: ['Ask first', 'front_hand'], read: ['Read only', 'visibility'] };
+// Project setting (proposal §4): the mode each layer runs in once a plan is approved.
+const LAYER_MODE = { vision: 'read', design: 'read', pages: 'free', data: 'ask', code: 'free', deploy: 'read' };
+const AGENTS = { pages: 'Pages agent', data: 'Data agent', code: 'Code agent', verify: 'Verify', showcase: 'Showcase', explore: 'Explore' };
+const lchip = l => `<span class="lchip n-${l}">${icon(LAYERS[l][1])}${LAYERS[l][0]}</span>`;
+const agentTag = a => `<span class="agent">${icon(a === 'verify' ? 'fact_check' : a === 'showcase' ? 'photo_library' : 'smart_toy')}${AGENTS[a]}</span>`;
+
+const PLAN_STEPS = () => [
+  { id: 'p', layer: 'pages', agent: 'pages', title: 'Add Sign up, Check your email and Create your first world to the onboarding flow',
+    why: 'The onboarding flow (r3) goes from Welcome to Sign in; nothing lets a new person make an account. W-9 found these specs too thin to build from.' },
+  { id: 'd', layer: 'data', agent: 'data', title: 'Let a Member hold a password and a confirmed email',
+    why: 'Member has email and name only. Signing up needs a password and a way to know the email is theirs.' },
+  { id: 'j', layer: 'code', agent: 'code', expected: true, title: 'Journeys follow the new flow: Sign up (visitor) and Create your first world (new member)',
+    why: 'The binding Pages flow → Code journeys adds this step when step 1 is staged. One persona per journey, so the flow becomes two journeys.' },
+  { id: 'c', layer: 'code', agent: 'code', title: 'Build the routes and their step tests', why: '/signup, /signup/check-email, /verify and /worlds/new, with a test for every journey step.' },
+  { id: 'v', layer: 'host', agent: 'verify', title: 'Check the combined changeset', why: 'Build Pages, Data and Code together and run every journey step test, old and new.' },
+  { id: 's', layer: 'host', agent: 'showcase', title: 'Collect the review evidence', why: 'Screenshots of each step and the walk results, for your review.' },
+];
+const CLAIMS_PLANNED = [
+  ['web', 'Pages', 'The onboarding flow gains sign-up (r3 → r4)'],
+  ['schema', 'Data', 'Member gains a password and a confirmed email'],
+  ['directions_walk', 'Code', 'Journey: Sign up, as a visitor (new)'],
+  ['directions_walk', 'Code', 'Journey: Create your first world, as a new member (new)'],
+  ['replay', 'Code', 'Existing journeys still work'],
+];
+const CONTEXT = {
+  always: ['Stack map (generated: 7 layers, 4 bindings)', 'Vision brief'],
+  loaded: ['Pages Knowledge: charter, onboarding.md', 'Pages: onboarding flow r3, 4 page specs', 'Data: Member, World', 'Code Knowledge: README, 3 journeys'],
+  skills: ['Pages: Write a page spec', 'Code: Write a journey and its step tests'],
+};
+const QUESTION = { from: 'Pages agent', text: 'How should a new member confirm their email?', rec: 0,
+  why: 'The Vision brief says worlds can be shared publicly, so an unconfirmed address shouldn\'t own one.',
+  options: ['A link in an email, before they can create a world', 'Let them in now and confirm later', 'No confirmation for now'] };
+
+// The run's events, in the order they become possible. Each waits on `when`; Play takes one every 1.3 s.
+const EVENTS = [
+  // planning
+  { id: 'pl1', when: s => s.phase === 'planning', run: s => s.feed.push(['map', 'Read the stack map: 7 layers, 4 bindings']) },
+  { id: 'pl2', when: s => s.phase === 'planning', run: s => s.feed.push(['lightbulb', 'Read the Vision brief']) },
+  { id: 'pl3', when: s => s.phase === 'planning', run: s => s.feed.push(['web', 'Pages: read the onboarding flow (r3) and 4 page specs']) },
+  { id: 'pl4', when: s => s.phase === 'planning', run: s => s.feed.push(['code', 'Code: read 3 journeys; none covers signing up']) },
+  { id: 'pl5', when: s => s.phase === 'planning', run: s => { s.feed.push(['schema', 'Data: read Member and World']); s.phase = 'plan'; } },
+  // round 1
+  { id: 'r1', when: s => s.phase === 'running', run: s => { start(s, 'p', 'Reading the onboarding flow and the Pages charter'); start(s, 'd', 'Reading Member and its API spec'); } },
+  { id: 'r2', when: s => s.phase === 'running', run: s => { log(s, 'p', 'Using skill: Write a page spec'); log(s, 'd', 'Drafted one change to Member'); step(s, 'd').state = 'ask'; } },
+  { id: 'r3', when: s => s.phase === 'running', run: s => { log(s, 'p', 'Asked you how a new member confirms their email'); step(s, 'p').state = 'needs'; s.question.asked = true; } },
+  { id: 'r4', when: s => s.question.asked, run: s => log(s, 'p', 'Meanwhile: wrote Create your first world, which doesn\'t depend on your answer') },
+  { id: 'r5', when: s => s.question.answer != null, run: s => { step(s, 'p').state = 'now'; log(s, 'p', `Wrote Sign up and Check your email: ${QUESTION.options[s.question.answer].toLowerCase()}`); } },
+  { id: 'r6', when: s => done(s, 'r5'), run: s => {
+    finish(s, 'p', 'Onboarding flow r4: Welcome → Sign up → Check your email → Create your first world → Home. Three pages added; Sign in unchanged.',
+      ['Flow onboarding r3 → r4', 'Page spec: Sign up (new)', 'Page spec: Check your email (new)', 'Page spec: Create your first world (new)'], ['Pages API validated']);
+    s.cs.pages = ['Onboarding flow r3 → r4', '3 page specs added'];
+    const j = step(s, 'j'); j.expected = false; j.derived = true; j.state = 'now'; j.log.push('Added by the binding: Pages onboarding flow → Code journeys');
+    toast('The binding added a Code step to the plan'); } },
+  { id: 'r7', when: s => done(s, 'r6'), run: s => log(s, 'j', 'Using skill: Write a journey and its step tests') },
+  { id: 'r8', when: s => done(s, 'r7'), run: s => {
+    finish(s, 'j', 'Two journeys, one persona each: Sign up (visitor, 3 steps) and Create your first world (new member, 2 steps), with fixtures.',
+      ['Journey sign-up r1 (visitor, fixture: no account)', 'Journey create-first-world r1 (new member, fixture: confirmed member, no worlds)'], ['Journeys validated']);
+    s.cs.code = ['Branch aludel/w-11', '2 journeys']; } },
+  { id: 'rd', when: s => s.dataAsk === 'allowed', run: s => {
+    finish(s, 'd', 'Member gains password_hash (write-only) and email_confirmed_at (optional time).', ['Member: + password_hash', 'Member: + email_confirmed_at'], ['Data API validated']);
+    s.cs.data = ['Member: 2 fields added']; } },
+  { id: 'r9', when: s => done(s, 'r8') && ['allowed', 'declined'].includes(s.dataAsk) && (s.dataAsk === 'declined' || done(s, 'rd')), run: s => start(s, 'c', 'Reading the two journeys and the Code charter') },
+  { id: 'r10', when: s => done(s, 'r9'), run: s => log(s, 'c', 'Routes /signup, /signup/check-email, /verify, /worlds/new') },
+  { id: 'r11', when: s => done(s, 'r10'), run: s => {
+    finish(s, 'c', '4 routes and 5 step tests; the confirmation email uses the preview inbox.', ['9 files changed on aludel/w-11', '5 step tests'], ['Package tests: 41 passed']);
+    s.cs.code = ['Branch aludel/w-11', '2 journeys · 9 files']; start(s, 'v', 'Building Pages r4, the Data change and the Code branch together'); } },
+  { id: 'r12', when: s => done(s, 'r11'), run: s => {
+    const v = step(s, 'v'); v.state = 'fail'; v.fail = 'Sign up, step 3 “Confirm your email” failed: the email\'s link opened /verify without its token.';
+    log(s, 'v', 'Ran 5 new steps and 3 existing journeys: 1 step failed'); const c = step(s, 'c'); c.state = 'now'; c.log.push('Fixing what Verify found: the confirmation link drops its token'); } },
+  { id: 'r13', when: s => done(s, 'r12'), run: s => {
+    const c = step(s, 'c'); c.state = 'done'; c.log.push('Fixed: the link carries its token; the step test now checks it'); c.summary += ' Fixed the token Verify caught.';
+    s.cs.code = ['Branch aludel/w-11', '2 journeys · 10 files']; const v = step(s, 'v'); v.state = 'now'; v.log.push('Running again');
+    if (s.scn.verifyStuck) { v.state = 'fail'; v.fail = 'The same step failed again: the token expires before the test opens the email.'; s.stuck = true; } } },
+  { id: 'r14', when: s => done(s, 'r13') && !s.stuck, run: s => {
+    finish(s, 'v', 'All 5 new journey steps and 3 existing journeys pass on the combined build.', [], ['Combined build', 'Journey tests: 5 new, 3 existing']);
+    s.fail = null; start(s, 's', 'Walking both journeys in the preview'); } },
+  { id: 'r15', when: s => done(s, 'r14'), run: s => { finish(s, 's', '5 step screenshots and 2 walks recorded for your review.', [], []); s.phase = 'review'; } },
+  // round 2: Send back resumes the same run with the review's flags
+  { id: 's1', when: s => s.phase === 'running' && s.round === 2, run: s => { const a = step(s, 'a'); a.state = 'now'; a.log.push('Resumed with your notes; round 1\'s work and context are kept'); } },
+  { id: 's2', when: s => done(s, 's1'), run: s => { finish(s, 'a', 'Addressed each flag; the affected step tests were updated.', ['Changes on aludel/w-11 for your flags'], ['Package tests: 41 passed']); start(s, 'v2', 'Re-running every journey step test'); } },
+  { id: 's3', when: s => done(s, 's2'), run: s => { finish(s, 'v2', 'All 5 new journey steps and 3 existing journeys pass.', [], ['Combined build', 'Journey tests']); start(s, 's2x', 'Refreshing the screenshots of changed steps'); } },
+  { id: 's4', when: s => done(s, 's3'), run: s => { finish(s, 's2x', 'Screenshots refreshed.', [], []); s.phase = 'review'; } },
+];
+
+// ---------- the mock app (Biome) ----------
+const JOURNEYS = {
+  signup: { title: 'Sign up', persona: 'visitor', fixture: 'no account', session: null, steps: [
+    { id: 'open', name: 'Open sign up', start: 'landing', end: 'signup', when: 'On the welcome page, press Sign up.', expect: 'A form asks for a name, an email and a password.', ms: 0.7 },
+    { id: 'create', name: 'Create an account', start: 'signup', end: 'check', when: 'Fill in the form and press Create account.', expect: 'A page says to check your email and names the address.', ms: 1.2 },
+    { id: 'confirm', name: 'Confirm your email', start: 'check', end: 'first', when: 'Open the email in the preview inbox and press Confirm email.', expect: 'They land on Create your first world, signed in.', ms: 1.5 } ] },
+  first: { title: 'Create your first world', persona: 'new member', fixture: 'confirmed member, no worlds', session: 'rin@biome.invalid', steps: [
+    { id: 'start', name: 'Start a world', start: 'home', end: 'first', when: 'On Home, press Create your first world.', expect: 'A form asks for the world\'s name.', ms: 0.6 },
+    { id: 'name', name: 'Name your world', start: 'first', end: 'world', when: 'Enter a name and press Create world.', expect: 'They land in the new world, with a welcome line.', ms: 1.1 } ] },
+};
+const CLAIMS = [
+  { id: 'pages', layer: 'pages', kind: 'record', title: 'The onboarding flow gains sign-up', sub: 'Flow onboarding r3 → r4' },
+  { id: 'data', layer: 'data', kind: 'record', title: 'Member gains a password and a confirmed email', sub: 'Member, 2 fields added' },
+  { id: 'signup', layer: 'code', kind: 'journey', journey: 'signup', title: 'Sign up' },
+  { id: 'first', layer: 'code', kind: 'journey', journey: 'first', title: 'Create your first world' },
+  { id: 'existing', layer: 'code', kind: 'invariant', title: 'Existing journeys still work', sub: '3 journeys, unchanged' },
+];
+function app(screen, side, jk) {
+  const J = JOURNEYS[jk];
+  if (side === 'previous' && screen !== 'landing' && screen !== 'home') return `<div class="app nf"><b>404</b><div>Not in the accepted build</div></div>`;
+  const signedIn = ['first', 'world', 'home'].includes(screen);
+  const head = `<div class="ah"><b>Biome</b><span class="me">${signedIn ? (J.session || 'mara@biome.invalid') : 'Signed out'}</span></div>`;
+  const body = {
+    landing: `<div class="hero"><div class="h">Worlds to explore, together</div><div class="sub">Build a world, invite friends, wander.</div>
+      <div class="row">${side === 'previous' ? '' : '<button type="button" class="abtn" data-go="signup">Sign up</button>'}<button type="button" class="abtn sec">Sign in</button></div></div>`,
+    signup: `<div class="h">Create your account</div><label for="f-name">Name</label><input id="f-name" value="Mara Quill"><label for="f-email">Email</label><input id="f-email" value="mara@biome.invalid">
+      <label for="f-pass">Password</label><input id="f-pass" type="password" value="correct horse"><button type="button" class="abtn" data-go="check">Create account</button>`,
+    check: `<div class="h">Check your email</div><div>We sent a link to <b>mara@biome.invalid</b>. Open it to confirm it's yours.</div>
+      <div class="stub">Preview inbox (only in review builds)</div><button type="button" class="abtn sec" data-go="email">Open the email</button>`,
+    email: `<div class="stub">Preview inbox</div><div class="mail"><div class="mh">To mara@biome.invalid · Confirm your Biome account</div>
+      <div class="mb"><div>Hi Mara, confirm this address to start your first world.</div><button type="button" class="abtn" data-go="first">Confirm email</button></div></div>`,
+    home: side === 'previous' ? `<div class="h">Home</div><div class="sub">Your worlds will show here.</div>` : `<div class="h">Home</div><div class="sub">You don't have a world yet.</div><button type="button" class="abtn" data-go="first">Create your first world</button>`,
+    first: `<div class="h">Create your first world</div><label for="f-world">World name</label><input id="f-world" value="Ember Isle"><button type="button" class="abtn" data-go="world">Create world</button>`,
+    world: `<div class="hero"><div class="h">Ember Isle</div><div>Welcome to your world. It's empty for now: add a place, or invite someone.</div></div>`,
+  }[screen];
+  return `<div class="app">${head}<div class="am">${body}</div></div>`;
+}
+const SCREEN_URL = { landing: '/', signup: '/signup', check: '/signup/check-email', email: '/_preview/inbox/1', first: '/worlds/new', world: '/worlds/ember-isle', home: '/home' };
+
+// ---------- state ----------
+const SCN_DEFAULT = { failStart: false, verifyStuck: false, stale: false };
+const store = { get(k, d) { try { const v = localStorage.getItem('a0v1:' + k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('a0v1:' + k, JSON.stringify(v)); } catch {} } };
+const freshReview = () => ({ claim: 'pages', mode: 'card', step: 0, view: 'proposed', screen: {}, walked: {}, flags: {}, decision: {}, claimNote: {}, composing: null, menu: false });
+const fresh = () => ({ phase: 'ready', view: 'item', round: 1, planRev: 1, planNote: '', composingPlan: false, feed: [], fired: [], steps: PLAN_STEPS().map(s => ({ ...s, state: 'todo', log: [], staged: [], checks: [], summary: '' })),
+  question: { asked: false, answer: null, pick: QUESTION.rec }, dataAsk: null, cs: {}, stuck: false, open: {}, review: freshReview(), sentFlags: [], merged: false });
+const S = { ...fresh(), scn: { ...SCN_DEFAULT }, speed: 'auto' };
+
+// ---------- helpers ----------
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const icon = (n, cls = '') => `<span class="icon ${cls}" aria-hidden="true">${n}</span>`;
+function toast(t) { document.querySelectorAll('.toast').forEach(x => x.remove()); const el = document.createElement('div'); el.className = 'toast'; el.setAttribute('role', 'status'); el.textContent = t; document.body.append(el); setTimeout(() => el.remove(), 2600); }
+const step = (s, id) => s.steps.find(x => x.id === id);
+const done = (s, id) => s.fired.includes(id);
+function start(s, id, line) { const x = step(s, id); x.state = 'now'; x.log.push(line); }
+function log(s, id, line) { step(s, id).log.push(line); }
+function finish(s, id, summary, staged, checks) { const x = step(s, id); x.state = 'done'; x.summary = summary; x.staged = staged; x.checks = checks; }
+
+function nextEvent() { return EVENTS.find(e => !S.fired.includes(e.id) && e.when(S)); }
+function tick() { const e = nextEvent(); if (!e) return false; S.fired.push(e.id); e.run(S); render(); return true; }
+setInterval(() => { if (S.speed === 'auto' && !document.hidden) tick(); }, 1300);
+
+// ---------- the Work item page ----------
+const activeSteps = () => S.steps.filter(x => x.state === 'now');
+function statusBlock() {
+  const p = S.phase;
+  if (p === 'ready') return `<section class="status" aria-labelledby="st"><div class="top"><div class="txt"><h2 id="st">Not started</h2>
+      <p>Go starts an agent that reads the project and proposes a plan first. Nothing changes until you approve it.</p></div>
+      <button type="button" class="btn go" data-act="go">${icon('play_arrow')}Go</button></div></section>`;
+  if (p === 'failedStart') return `<section class="status bad" aria-labelledby="st"><div class="top"><div class="txt"><h2 id="st">${icon('error')}Didn't start</h2>
+      <p>The run stopped before the agent began, so no agent turns were used and nothing was read or staged.</p></div>
+      <button type="button" class="btn" data-act="close-run">Close run</button><button type="button" class="btn primary" data-act="retry">${icon('refresh')}Try again</button></div>
+      <ol class="stages" aria-label="How far it got">
+        <li>${icon('check_circle', 't-passed')}<span><b>Queued</b> · a worker picked it up at 08:41</span></li>
+        <li>${icon('cancel')}<span><b>Workspace</b> · the workspace hook rejected the task's identifier <code>BIOME-W-11</code> (exit 2). This is Aludel's fault, not the goal's.</span></li>
+        <li>${icon('radio_button_unchecked')}<span class="muted"><b>Agent</b> · not reached</span></li></ol></section>`;
+  if (p === 'planning') return `<section class="status live" aria-labelledby="st"><div class="top"><div class="txt"><h2 id="st">${icon('progress_activity', 'spin')}Planning</h2>
+      <p>${S.planRev > 1 ? 'Revising the plan with your note.' : 'Reading the stack. Agents change nothing while planning.'}</p></div>
+      <button type="button" class="btn ghost" data-act="stop">${icon('stop_circle')}Stop</button></div></section>`;
+  if (p === 'plan') return `<section class="status needs" aria-labelledby="st"><div class="top"><div class="txt"><h2 id="st">${icon('assignment')}Plan ready for you</h2>
+      <p>Approve it to let agents work in the layers it names, or ask for changes.</p></div></div></section>`;
+  if (p === 'running') {
+    const q = S.question.asked && S.question.answer == null;
+    const asks = S.dataAsk === 'pending' || S.steps.some(x => x.state === 'ask');
+    const n = activeSteps().length;
+    const stuck = S.stuck;
+    const tone = stuck || (n === 0 && (q || asks)) ? 'needs' : 'live';
+    const title = stuck ? 'Needs your answer' : n ? `Working · ${n} ${n === 1 ? 'agent' : 'agents'} active` : (q || asks) ? 'Waiting on you' : 'Working';
+    const needsYou = [q && 'a question', asks && 'a Data change to allow'].filter(Boolean);
+    return `<section class="status ${tone}" aria-labelledby="st"><div class="top"><div class="txt"><h2 id="st">${tone === 'live' ? icon('progress_activity', 'spin') : icon('pending')}${title}</h2>
+      <p>${S.round === 2 ? 'Round 2 of the same run, working from your review. ' : ''}${needsYou.length ? `Needs you: ${needsYou.join(' and ')}. Steps that don't depend on it keep going.` : 'Nothing is applied until you review the whole changeset.'}</p></div>
+      <button type="button" class="btn ghost" data-act="stop">${icon('stop_circle')}Stop</button></div>${q ? questionCard() : ''}${stuck ? stuckCard() : ''}</section>`;
+  }
+  if (p === 'review') return `<section class="status review" aria-labelledby="st"><div class="top"><div class="txt"><h2 id="st">${icon('rate_review')}Ready for review</h2>
+      <p>Verify passed on the combined changeset${S.round === 2 ? ' after round 2' : ''}. One review covers Pages, Data and Code.</p></div>
+      <button type="button" class="btn primary" data-act="open-review">${icon('rate_review')}Review</button></div></section>`;
+  if (p === 'accepted') return `<section class="status done" aria-labelledby="st"><div class="top"><div class="txt"><h2 id="st">${icon('check_circle')}Accepted</h2>
+      <p>Merged as one: Pages onboarding flow r4, the Data change to Member${S.scn.stale ? ', and the Code branch after updating it to main and re-running Verify' : ', and the Code branch'} into main.</p></div></div></section>`;
+  if (p === 'stopped') return `<section class="status bad" aria-labelledby="st"><div class="top"><div class="txt"><h2 id="st">${icon('stop_circle')}Stopped</h2>
+      <p>You stopped the run. What it staged is kept on its branch and records until you close it.</p></div><button type="button" class="btn" data-act="reset-all">Start over (prototype)</button></div></section>`;
+  return '';
+}
+function questionCard() {
+  return `<form class="q" data-form="answer" aria-labelledby="qh"><h3 id="qh">${icon('help')}${esc(QUESTION.text)}</h3><div class="who">Asked by the ${QUESTION.from} · recommends the first option. ${esc(QUESTION.why)}</div>
+    <div class="opts" role="radiogroup" aria-labelledby="qh">${QUESTION.options.map((o, i) => `<label class="opt"><input type="radio" name="qopt" value="${i}" ${S.question.pick === i ? 'checked' : ''}><span><b>${esc(o)}</b>${i === QUESTION.rec ? ' <span class="chip info">Recommended</span>' : ''}</span></label>`).join('')}</div>
+    <div class="row"><button type="submit" class="btn primary push">${icon('send')}Answer</button></div></form>`;
+}
+function stuckCard() {
+  return `<div class="q" role="group" aria-labelledby="sh"><h3 id="sh">${icon('help')}Verify failed twice on the same step. How should the run go on?</h3>
+    <div class="who">Asked by Claude. The Code agent's two fixes are on the branch; the failing step is “Confirm your email”.</div>
+    <div class="row wrap"><button type="button" class="btn" data-act="stuck-more">Let it try once more</button><button type="button" class="btn" data-act="stuck-review">Review what it has</button><button type="button" class="btn ghost" data-act="stop">Stop</button></div></div>`;
+}
+
+function planCard() {
+  const steps = S.steps;
+  return `<section class="card plan" aria-labelledby="planh">
+    <div class="eyebrow">Plan ${S.planRev} · by Claude</div>
+    <h2 id="planh">How the sign-up flow gets built</h2>
+    ${S.planRev > 1 ? `<div class="revised">${icon('edit_note')}<span>Revised for your note: “${esc(S.planNote)}”. Step 1 changed.</span></div>` : ''}
+    <ol class="psteps">${steps.map((x, i) => `<li class="pstep ${x.expected ? 'expected' : ''} ${S.planRev > 1 && x.id === 'p' ? 'changed' : ''}"><span class="num">${i + 1}</span>
+      <div class="t">${x.layer === 'host' ? '' : lchip(x.layer) + ' '}${esc(x.title)}</div>
+      <div class="why">${esc(x.why)}${S.planRev > 1 && x.id === 'p' ? ` Per your note: ${esc(S.planNote)}` : ''}</div>
+      <div class="meta">${agentTag(x.agent)}${x.layer !== 'host' ? ` · <span class="chip">${icon(MODES[LAYER_MODE[x.layer]][1])}${MODES[LAYER_MODE[x.layer]][0]}</span>` : ' · <span class="chip">' + icon('lock') + 'Host check, can\'t be skipped</span>'}${x.expected ? ' · <span class="chip new">' + icon('link') + 'From a binding</span>' : ''}</div></li>`).join('')}</ol>
+    <h3>What you'll review</h3>
+    <ul class="claims">${CLAIMS_PLANNED.map(([ic, l, t]) => `<li>${icon(ic)}<span><b>${l}</b> · ${esc(t)}</span></li>`).join('')}</ul>
+    <details class="ctx"><summary>${icon('menu_book')}What the agent read to plan this${icon('expand_more', 'chev')}</summary>
+      <dl class="ctxlist"><dt>Always loaded</dt><dd>${CONTEXT.always.map(c => `<span class="chip">${esc(c)}</span>`).join('')}</dd>
+        <dt>Loaded for this goal</dt><dd>${CONTEXT.loaded.map(c => `<span class="chip">${esc(c)}</span>`).join('')}</dd>
+        <dt>Skills it will use</dt><dd>${CONTEXT.skills.map(c => `<span class="chip new">${esc(c)}</span>`).join('')}</dd></dl></details>
+    ${S.composingPlan ? `<div class="notebox"><label for="plannote">What should change in the plan?</label><textarea id="plannote" data-bind="planNote">${esc(S.planNote)}</textarea>
+      <div class="row"><button type="button" class="btn ghost" data-act="cancel-plannote">Cancel</button><button type="button" class="btn primary push" data-act="send-plannote">${icon('send')}Send to Claude</button></div></div>` : ''}
+    <div class="approve"><p>Approving lets agents stage changes in ${lchip('pages')} ${lchip('data')} (each Data change asks you first) and ${lchip('code')}. Vision, Design and Deploy stay read only. Nothing is applied until you review.</p>
+      <button type="button" class="btn" data-act="request-changes" ${S.composingPlan ? 'disabled' : ''}>${icon('edit_note')}Request changes</button>
+      <button type="button" class="btn go" data-act="approve-plan">${icon('check')}Approve plan</button></div></section>`;
+}
+
+const ST_ICON = { todo: 'radio_button_unchecked', now: 'progress_activity', needs: 'help', ask: 'front_hand', done: 'check_circle', fail: 'cancel', skip: 'block' };
+const ST_TEXT = { todo: 'To do', now: 'Working', needs: 'Asked you', ask: 'Waiting for your OK', done: 'Done', fail: 'Failed', skip: 'Skipped by you' };
+function clRow(x, i) {
+  const autoOpen = ['now', 'needs', 'ask', 'fail'].includes(x.state);
+  const open = S.open[x.id] ?? autoOpen;
+  const head = `<button type="button" class="clhead" aria-expanded="${open}" data-act="toggle-step" data-step="${x.id}">
+      ${icon(ST_ICON[x.state], 'st' + (x.state === 'now' ? ' spin' : ''))}
+      <span class="t">${i}. ${x.layer === 'host' ? '' : lchip(x.layer)} ${esc(x.title)}${x.derived ? ' <span class="chip new">' + icon('link') + 'Added by binding</span>' : x.expected ? ' <span class="chip">' + icon('link') + 'Expected from a binding</span>' : ''}</span>
+      <span class="r">${agentTag(x.agent)} · ${ST_TEXT[x.state]}${icon('expand_more', 'chev')}</span>
+      ${!open && x.summary ? `<span class="sum">${esc(x.summary)}</span>` : ''}</button>`;
+  if (!open) return `<li class="clrow st-${x.state}">${head}</li>`;
+  const lines = x.log.map((l, k) => `<li class="${k === x.log.length - 1 && x.state === 'now' ? 'cur' : ''}">${icon(k === x.log.length - 1 && x.state === 'now' ? 'arrow_right' : 'check')}<span>${esc(l)}</span></li>`).join('');
+  const body = [
+    x.derived && x.state !== 'done' ? `<div class="bound">${icon('link')}<span>Pages' onboarding flow drives Code's journeys, so the host added this step when step 1 was staged. It is part of this run, not a follow-up task.</span></div>` : '',
+    lines ? `<ul class="log" aria-label="What the agent did">${lines}</ul>` : `<p class="empty">Starts when the steps before it are done.</p>`,
+    x.state === 'fail' && x.fail ? `<div class="failnote">${icon('error')}<span>${esc(x.fail)}${S.stuck ? '' : ' Handed back to the Code agent.'}</span></div>` : '',
+    x.state === 'ask' ? `<div class="askbox"><b>Data is in Ask first mode. Stage this change?</b><pre>Member
++ password_hash      text, write-only
++ email_confirmed_at time, optional</pre>
+      <div class="row"><button type="button" class="btn ghost" data-act="data-decline">Decline</button><button type="button" class="btn go push" data-act="data-allow">${icon('check')}Allow</button></div></div>` : '',
+    x.state === 'needs' ? `<p class="small">${icon('arrow_upward')} The question is at the top of the page.</p>` : '',
+    x.summary ? `<p><b>Summary.</b> ${esc(x.summary)}</p>` : '',
+    x.staged.length ? `<ul class="staged" aria-label="Staged">${x.staged.map(t => `<li>${icon('add_circle')}<span>${esc(t)}</span></li>`).join('')}</ul>` : '',
+    x.checks.length ? `<div class="checks">${x.checks.map(c => `<span class="chip ok">${icon('check')}${esc(c)}</span>`).join('')}</div>` : '',
+  ].join('');
+  return `<li class="clrow st-${x.state}">${head}<div class="clbody">${body}</div></li>`;
+}
+function checklist() {
+  const r2 = S.steps.filter(x => x.round2);
+  const list1 = S.steps.filter(x => !x.round2);
+  return `<section class="card" aria-labelledby="clh"><div class="row wrap"><h2 id="clh">Run 1 · the plan as a checklist</h2><span class="chip push">${icon('smart_toy')}Claude coordinates</span></div>
+    ${r2.length ? `<div class="round">Round 1</div>` : ''}
+    <ol class="cl">${list1.map((x, i) => clRow(x, i + 1)).join('')}</ol>
+    ${r2.length ? `<div class="round">Round 2 · from your review</div><ol class="cl">${r2.map((x, i) => clRow(x, list1.length + i + 1)).join('')}</ol>` : ''}</section>`;
+}
+function feedCard() {
+  return `<section class="card" aria-labelledby="fh"><h2 id="fh">${icon('travel_explore')} Explore is reading (read only)</h2>
+    <ul class="feed">${S.feed.map(([ic, t]) => `<li>${icon(ic)}<span>${esc(t)}</span></li>`).join('') || '<li class="muted">Starting…</li>'}</ul></section>`;
+}
+function side() {
+  const parts = ['pages', 'data', 'code'].filter(l => S.cs[l]);
+  return `<aside class="side" aria-label="Run details"><section class="card" aria-labelledby="csh"><h2 id="csh">Changeset</h2>
+      ${parts.length ? `<ul class="cs">${parts.map(l => `<li><span class="tile n-${l}">${icon(LAYERS[l][1])}</span><b>${LAYERS[l][0]}</b><span class="d">${S.cs[l].map(esc).join(' · ')}</span></li>`).join('')}</ul>
+        <p class="empty small">${S.phase === 'accepted' ? 'Merged.' : 'Staged on this run. Nothing is applied until review.'}</p>` : `<p class="empty">Nothing staged yet. ${['ready', 'planning', 'plan', 'failedStart'].includes(S.phase) ? 'Agents stage changes once you approve the plan.' : ''}</p>`}</section>
+    <section class="card" aria-labelledby="goalh"><h2 id="goalh">Goal</h2><p class="goal">A new person can sign up with their email and land on creating their first world.</p>
+      <div class="row wrap small"><span class="chip">${icon('flag')}Project goal, no layer</span><span class="chip">${icon('person')}Requested by Henry</span></div></section></aside>`;
+}
+function itemView() {
+  const p = S.phase;
+  const mainCol = [statusBlock(), p === 'planning' ? feedCard() : '', p === 'plan' ? planCard() : '', ['running', 'review', 'accepted', 'stopped'].includes(p) ? checklist() : ''].join('');
+  return `<div class="ihead"><div class="crumb">${icon('checklist')}Work · W-11</div><h1>Create the sign-up flow</h1></div>
+    <div class="icols"><div style="display:grid;gap:12px;min-width:0">${mainCol}</div>${side()}</div>`;
+}
+
+// ---------- the review ----------
+const R = () => S.review;
+const claim = () => CLAIMS.find(c => c.id === R().claim);
+const Jk = () => claim()?.kind === 'journey' ? claim().journey : null;
+const sk = (j, s) => `${j}:${s.id}`;
+// Claims that go back with the run: flagged ones, and journeys with a flagged step.
+const flagged = () => CLAIMS.filter(c => R().decision[c.id] === 'flag' || (c.kind === 'journey' && JOURNEYS[c.journey].steps.some(s => R().flags[sk(c.journey, s)]))).length;
+function statusOf(c) {
+  const d = R().decision[c.id];
+  if (d === 'ok') return ['ok', 'check_circle', 'Approved'];
+  if (d === 'flag') return ['warn', 'flag', 'Flagged'];
+  if (c.kind === 'journey') { const j = JOURNEYS[c.journey]; const n = j.steps.filter(s => R().walked[sk(c.journey, s)] || R().flags[sk(c.journey, s)]).length; if (n) return ['info', 'directions_walk', `${n} of ${j.steps.length} walked`]; }
+  return ['', 'radio_button_unchecked', 'Not started'];
+}
+const badge = c => { const [cls, ic, l] = statusOf(c); return `<span class="chip ${cls}">${icon(ic)}${l}</span>`; };
+const changed = c => S.round === 2 && S.sentFlags.includes(c.id);
+
+function evidence() {
+  const c = claim(); const rv = R();
+  if (!c) return `<div class="evid"><div class="evcard"><h2 class="evh">${icon('inventory_2')}This run's changeset</h2>
+    <table class="tb"><thead><tr><th>Layer</th><th>Part</th><th>Checks</th></tr></thead><tbody>
+    <tr><td>${lchip('pages')}</td><td>Onboarding flow r4, 3 page specs</td><td>Pages API validated</td></tr>
+    <tr><td>${lchip('data')}</td><td>Member: 2 fields</td><td>Data API validated</td></tr>
+    <tr><td>${lchip('code')}</td><td>Branch aludel/w-11: 2 journeys, ${S.round === 2 ? 11 : 10} files</td><td>41 package tests, combined build, 8 journeys</td></tr></tbody></table></div></div>`;
+  if (c.id === 'pages') return `<div class="evid"><div class="evcard"><h2 class="evh">${icon('history')}Previous · r3</h2><div class="flow"><span class="node">Welcome</span>${icon('arrow_forward', 'arrow')}<span class="node">Sign in</span>${icon('arrow_forward', 'arrow')}<span class="node">Home</span></div></div>
+    <div class="evcard"><h2 class="evh">${icon('edit')}Proposed · r4</h2><div class="flow"><span class="node">Welcome</span>${icon('arrow_forward', 'arrow')}<span class="node add">Sign up</span>${icon('arrow_forward', 'arrow')}<span class="node add">Check your email</span>${icon('arrow_forward', 'arrow')}<span class="node add">Create your first world</span>${icon('arrow_forward', 'arrow')}<span class="node">Home</span></div>
+    <div class="flow small muted">Sign in: unchanged, still reached from Welcome.</div></div>
+    <div class="evcard"><h2 class="evh">${icon('description')}Page spec · Check your email (new)</h2><p class="small" style="margin:0">Says where the link went and offers <i>Send it again</i> after 60 seconds. A confirmed address is required before creating a world (${esc(QUESTION.options[S.question.answer ?? 0].toLowerCase())}).</p></div></div>`;
+  if (c.id === 'data') return `<div class="evid"><div class="evcard"><h2 class="evh">${icon('schema')}Member · Previous and proposed</h2><table class="tb"><thead><tr><th>Field</th><th>Type</th><th>Change</th></tr></thead><tbody>
+    <tr><td class="mono">id</td><td>id</td><td class="muted">unchanged</td></tr><tr><td class="mono">email</td><td>text, unique</td><td class="muted">unchanged</td></tr><tr><td class="mono">name</td><td>text</td><td class="muted">unchanged</td></tr>
+    <tr class="add"><td class="mono">password_hash</td><td>text, write-only</td><td>added</td></tr><tr class="add"><td class="mono">email_confirmed_at</td><td>time, optional</td><td>added</td></tr></tbody></table></div></div>`;
+  if (c.id === 'existing') return `<div class="evid"><div class="evcard"><h2 class="evh">${icon('replay')}Existing journeys on the combined build</h2><table class="tb"><thead><tr><th>Journey</th><th>Persona</th><th>Steps</th><th>Result</th></tr></thead><tbody>
+    ${[['Sign in', 'member', 2], ['Explore a world', 'member', 3], ['Invite to a world', 'world owner', 3]].map(([t, p, n]) => `<tr><td>${t}</td><td>${p}</td><td>${n}</td><td><span class="chip ok">${icon('check_circle')}Passed</span></td></tr>`).join('')}</tbody></table></div></div>`;
+  const jk = c.journey, J = JOURNEYS[jk];
+  const scr = rv.screen[jk] || J.steps[0].start;
+  const prevScr = rv.view === 'previous' ? (jk === 'signup' ? 'landing' : 'home') : scr;
+  return `<div class="bar top"><span class="persona">${icon('person')}As ${esc(J.persona)}</span><span class="tiny muted">Fixture: ${esc(J.fixture)}</span>
+      <span class="seg push" role="group" aria-label="Build"><button type="button" data-view="previous" aria-pressed="${rv.view === 'previous'}">Previous</button><button type="button" data-view="proposed" aria-pressed="${rv.view === 'proposed'}">Proposed</button></span></div>
+    <div class="evid"><div class="frame"><div class="fhead"><span class="lbl ${rv.view === 'previous' ? 'prev' : ''}">${rv.view}</span><span class="addr mono">${rv.view === 'previous' ? 'main' : 'w-11'}.biome.preview${SCREEN_URL[prevScr]}</span></div>
+      <div class="fbody" data-side="${rv.view}" data-journey="${jk}">${app(prevScr, rv.view, jk)}</div></div></div>`;
+}
+
+function picker() {
+  const cur = claim();
+  const label = cur ? `${LAYERS[cur.layer][0]} · ${cur.title}` : 'Finish';
+  const groups = ['pages', 'data', 'code'].map(l => `<li class="grp">${LAYERS[l][0]}</li>${CLAIMS.filter(c => c.layer === l).map(c => `<li><button type="button" data-claim="${c.id}" aria-current="${R().claim === c.id}"><span class="t">${esc(c.title)}</span>${badge(c)}</button></li>`).join('')}`).join('');
+  return `<div class="claimpick"><button type="button" class="claimbtn" data-act="menu" aria-expanded="${R().menu}" aria-haspopup="true"><span class="t">${esc(label)}</span>${cur ? badge(cur) : ''}${icon('expand_more')}</button>
+    ${R().menu ? `<ul class="menu" id="claimmenu">${groups}<li class="grp">Review</li><li><button type="button" data-claim="finish" aria-current="${R().claim === 'finish'}"><span class="t">Finish</span></button></li></ul>` : ''}</div>`;
+}
+function flagBox(kind) {
+  return `<div class="flagbox"><label for="flagtext">What's wrong? It goes back to the run with your review.</label><textarea id="flagtext" data-bind="flagText"></textarea>
+    <div class="row"><button type="button" class="btn ghost" data-act="cancel-flag">Cancel</button><button type="button" class="btn flag push" data-act="save-flag" data-kind="${kind}">${icon('flag')}Save flag</button></div></div>`;
+}
+function claimPanel() {
+  const c = claim(); const rv = R();
+  if (!c) return finishPanel();
+  const kindLabel = c.kind === 'journey' ? `${LAYERS[c.layer][0]} · journey · as ${JOURNEYS[c.journey].persona}` : c.kind === 'record' ? `${LAYERS[c.layer][0]} · record claim` : `${LAYERS[c.layer][0]} · regression`;
+  if (c.kind === 'journey' && rv.mode === 'step') {
+    const J = JOURNEYS[c.journey], s = J.steps[rv.step], key = sk(c.journey, s);
+    return `<div class="body"><div class="eyebrow">${esc(J.title)} · step ${rv.step + 1} of ${J.steps.length}</div><h2>${esc(s.name)}</h2>
+      <dl class="spec"><dt>As</dt><dd>${esc(J.persona)}</dd><dt>When</dt><dd>${esc(s.when)}</dd><dt>Expect</dt><dd>${esc(s.expect)}</dd></dl>
+      <p class="small muted" style="margin:0">${icon('touch_app')} Do it in the preview; that counts as looking good and moves on.</p>
+      <details class="proof"><summary>${icon('check_circle', 't-passed')}Test passed · ${s.ms} s${icon('expand_more', 'chev')}</summary><div class="proofbody"><span>Step test <code>${c.journey}/${s.id}</code> on the combined build, run by Verify.</span><span class="muted">Screenshot captured by Showcase.</span></div></details>
+      ${rv.flags[key] ? `<div class="flagnote">${icon('flag')}<span>${esc(rv.flags[key])}</span></div>` : ''}
+      ${rv.composing === 'step' ? flagBox('step') : ''}</div>
+      <div class="bar bottom"><button type="button" class="btn ghost" data-act="back">${icon('arrow_back')}Back</button>
+        <span class="prog" role="img" aria-label="Step ${rv.step + 1} of ${J.steps.length}">${J.steps.map((t, i) => `<span class="${R().flags[sk(c.journey, t)] ? 'flagged' : R().walked[sk(c.journey, t)] ? 'walked' : ''} ${i === rv.step ? 'cur' : ''}"></span>`).join('')}</span>
+        <span class="acts"><button type="button" class="btn flag" data-act="flag-step">${icon('flag')}Flag</button><button type="button" class="btn go" data-act="looks-good">${icon('check')}Looks good</button></span></div>`;
+  }
+  const J = c.kind === 'journey' ? JOURNEYS[c.journey] : null;
+  const anyFlag = J && J.steps.some(s => rv.flags[sk(c.journey, s)]);
+  const dec = rv.decision[c.id];
+  const lead = { pages: 'Pages agent staged the flow change and three page specs. The flow is the authority Code\'s journeys follow.', data: 'Data agent staged this after you allowed it (Ask first).',
+    signup: 'Written by the Code agent from the new flow. Walk it in the preview.', first: 'A second journey, because its persona differs from Sign up\'s.', existing: 'Verify ran every journey this run didn\'t change, on the combined build.' }[c.id];
+  return `<div class="body"><div class="coverhead"><div class="eyebrow">${kindLabel}</div><h2>${esc(J ? J.title : c.title)}</h2><p class="lead">${esc(lead)}</p>
+      ${changed(c) ? `<span class="chip info">${icon('update')}Changed in round 2 for your flag</span>` : ''}</div>
+    ${J ? `<ol class="slist">${J.steps.map((s, i) => { const k = sk(c.journey, s); const st = rv.flags[k] ? 'flagged' : rv.walked[k] ? 'walked' : '';
+      return `<li><button type="button" class="srow" data-step="${i}"><span class="num ${st}">${st === 'walked' ? icon('check') : st === 'flagged' ? icon('flag') : i + 1}</span><span>${esc(s.name)}</span><span class="chip new">New</span>
+      ${rv.flags[k] ? `<span class="fl">${esc(rv.flags[k])}</span>` : ''}</button></li>`; }).join('')}</ol>` : ''}
+    ${dec === 'flag' && rv.claimNote[c.id] ? `<div class="flagnote">${icon('flag')}<span>${esc(rv.claimNote[c.id])}</span></div>` : ''}
+    ${rv.composing === 'claim' ? flagBox('claim') : ''}
+    <div class="decision">${dec ? `<div class="${dec === 'ok' ? 'done' : 'caution'}">${icon(dec === 'ok' ? 'check_circle' : 'flag')}<span>${dec === 'ok' ? 'Approved' : 'Flagged; it goes back with the run'}.</span></div>
+      <div class="row"><button type="button" class="btn ghost" data-act="undecide">Change decision</button><button type="button" class="btn primary push" data-act="next-claim">Next${icon('arrow_forward')}</button></div>`
+      : `<div class="row wrap">${J ? `<button type="button" class="btn" data-act="walk">${icon('directions_walk')}Walk the journey</button>` : ''}
+        <span class="acts">${anyFlag ? `<button type="button" class="btn flag" data-act="flag-journey">${icon('flag')}Flag this journey</button>` : `<button type="button" class="btn flag" data-act="flag-claim">${icon('flag')}Flag</button><button type="button" class="btn go" data-act="approve">${icon('check')}Approve${J ? ' journey' : ''}</button>`}</span></div>`}</div></div>`;
+}
+function finishPanel() {
+  const rv = R(); const undecided = CLAIMS.filter(c => !rv.decision[c.id]);
+  const n = flagged();
+  const part = (l, what) => { const cs = CLAIMS.filter(c => c.layer === l); const f = cs.filter(c => rv.decision[c.id] === 'flag').length; const ok = cs.every(c => rv.decision[c.id] === 'ok');
+    return `<li><span class="tile n-${l}">${icon(LAYERS[l][1])}</span><b>${LAYERS[l][0]}</b>${f ? `<span class="chip warn">${icon('flag')}${f} flagged</span>` : ok ? `<span class="chip ok">${icon('check')}Approved</span>` : `<span class="chip">${icon('radio_button_unchecked')}Open</span>`}
+      <span class="d">${what} · you sign</span></li>`; };
+  return `<div class="body"><div class="coverhead"><div class="eyebrow">Finish · W-11 run 1</div><h2>${n ? 'Send it back to the same run' : 'Accept the whole changeset'}</h2>
+      <p class="lead">One decision for the run. Accepting merges every part; sending back resumes this run with your flags.</p></div>
+    <ul class="parts">${part('pages', 'Records: onboarding flow r4, 3 page specs')}${part('data', 'Record: Member')}${part('code', 'Branch aludel/w-11 into main')}</ul>
+    ${S.scn.stale ? `<div class="caution">${icon('update')}<span>main moved since the Code branch was made. Accepting first brings main into the branch and re-runs Verify; it merges only if Verify passes.</span></div>` : ''}
+    ${undecided.length && !n ? `<div class="caution">${icon('info')}<span>${undecided.length} ${undecided.length === 1 ? 'claim is' : 'claims are'} still open.</span></div>` : ''}
+    <div class="decision"><div class="row wrap"><span class="acts">
+      ${n ? `<button type="button" class="btn primary" data-act="send-back">${icon('reply')}Send back with ${n} flagged ${n === 1 ? 'claim' : 'claims'}</button>` : `<button type="button" class="btn go" data-act="accept" ${undecided.length ? 'disabled' : ''}>${icon('merge')}Accept and merge</button>`}</span></div></div></div>`;
+}
+function reviewView() {
+  const c = claim();
+  return `<div class="rv"><div class="rvtop"><button type="button" class="btn ghost sm" data-act="close-review">${icon('close')}Close</button><h1>W-11 · Run 1${S.round === 2 ? ', round 2' : ''} review</h1>
+      <span class="chip">${icon('smart_toy')}Claude</span><span class="chip">${icon('inventory_2')}Pages, Data, Code</span></div>
+    <div class="panes"><section class="pv" aria-label="Evidence">${evidence()}</section>
+      <section class="cp ${c && R().mode === 'step' ? '' : 'cover'}" aria-label="Claim"><div class="bar top">${picker()}</div>${claimPanel()}</section></div></div>`;
+}
+
+// ---------- render, keeping focus and typed text ----------
+function render() {
+  const a = document.activeElement; const id = a?.id; const sel = a && 'selectionStart' in a ? [a.selectionStart, a.selectionEnd] : null;
+  const act = a?.dataset?.act; const st = a?.dataset?.step;
+  $('#view').innerHTML = S.view === 'review' ? reviewView() : itemView();
+  document.querySelectorAll('[data-speed]').forEach(b => b.setAttribute('aria-pressed', b.dataset.speed === S.speed));
+  $('#tickbtn').disabled = S.speed === 'auto' || !nextEvent();
+  const bound = $('#flagtext'); if (bound && S._flagText) bound.value = S._flagText;
+  let el = id && document.getElementById(id);
+  if (!el && act) el = document.querySelector(`[data-act="${act}"]${st ? `[data-step="${st}"]` : ''}`);
+  if (el && el !== document.body) { el.focus({ preventScroll: true }); if (sel && 'setSelectionRange' in el) try { el.setSelectionRange(...sel); } catch {} }
+}
+
+// ---------- actions ----------
+document.addEventListener('input', e => { const b = e.target.dataset?.bind; if (b === 'planNote') S.planNote = e.target.value; if (b === 'flagText') S._flagText = e.target.value;
+  if (e.target.name === 'qopt') S.question.pick = +e.target.value; });
+document.addEventListener('change', e => { if (e.target.name === 'qopt') S.question.pick = +e.target.value;
+  if (e.target.closest('#scenarios') && e.target.dataset.scn) { S.scn[e.target.dataset.scn] = e.target.checked; render(); } });
+document.addEventListener('submit', e => { if (e.target.dataset.form === 'answer') { e.preventDefault(); S.question.answer = S.question.pick; toast('Answered; the Pages agent continues'); render(); } });
+document.addEventListener('click', e => {
+  const sp = e.target.closest('[data-speed]'); if (sp) { S.speed = sp.dataset.speed; render(); return; }
+  const go = e.target.closest('.fbody [data-go]'); if (go) return walkTo(go.closest('.fbody'), go.dataset.go);
+  const cl = e.target.closest('[data-claim]'); if (cl) { Object.assign(R(), { claim: cl.dataset.claim, mode: 'card', menu: false, composing: null }); render(); return; }
+  const v = e.target.closest('[data-view]'); if (v) { R().view = v.dataset.view; render(); return; }
+  const sr = e.target.closest('.srow'); if (sr) { const J = JOURNEYS[Jk()]; Object.assign(R(), { mode: 'step', step: +sr.dataset.step }); R().screen[Jk()] = J.steps[+sr.dataset.step].start; R().view = 'proposed'; render(); return; }
+  const b = e.target.closest('[data-act]'); if (!b) { if (R().menu && !e.target.closest('.claimpick')) { R().menu = false; render(); } return; }
+  const rv = R();
+  switch (b.dataset.act) {
+    case 'tick': if (!tick()) toast('Nothing can happen until you act'); return;
+    case 'go': if (S.scn.failStart) { S.phase = 'failedStart'; render(); return; } S.phase = 'planning'; render(); return;
+    case 'retry': S.scn.failStart = false; S.phase = 'planning'; toast('Started again; the same goal and brief'); render(); return;
+    case 'close-run': toast('Prototype: closing is the existing Close run'); return;
+    case 'stop': S.phase = 'stopped'; render(); return;
+    case 'reset-all': resetAll(); return;
+    case 'request-changes': S.composingPlan = true; render(); $('#plannote')?.focus(); return;
+    case 'cancel-plannote': S.composingPlan = false; render(); return;
+    case 'send-plannote': if (!S.planNote.trim()) { toast('Say what should change'); $('#plannote')?.focus(); return; }
+      S.composingPlan = false; S.planRev = 2; S.phase = 'planning'; S.feed = [['edit_note', 'Read your note']]; S.fired = S.fired.filter(id => !id.startsWith('pl')); render(); return;
+    case 'approve-plan': S.phase = 'running'; S.dataAsk = null; toast('Plan approved; agents start in Pages and Data'); render(); return;
+    case 'toggle-step': { const x = step(S, b.dataset.step); const autoOpen = ['now', 'needs', 'ask', 'fail'].includes(x.state); S.open[x.id] = !(S.open[x.id] ?? autoOpen); render(); return; }
+    case 'data-allow': S.dataAsk = 'allowed'; step(S, 'd').state = 'now'; log(S, 'd', 'You allowed the change; staging it'); render(); return;
+    case 'data-decline': S.dataAsk = 'declined'; Object.assign(step(S, 'd'), { state: 'skip', summary: 'You declined the change. The Code agent will be told passwords aren\'t stored yet.' }); render(); return;
+    case 'stuck-more': S.scn.verifyStuck = false; S.stuck = false; step(S, 'v').state = 'now'; step(S, 'v').log.push('Trying once more'); render(); return;
+    case 'stuck-review': S.stuck = false; Object.assign(step(S, 'v'), { state: 'fail' }); S.fired.push('r14', 'r15'); finish(S, 's', 'Collected what there is; the failing step is marked.', [], []); S.phase = 'review'; render(); return;
+    case 'open-review': S.view = 'review'; render(); return;
+    case 'close-review': S.view = 'item'; render(); return;
+    case 'menu': rv.menu = !rv.menu; render(); return;
+    case 'walk': { const J = JOURNEYS[Jk()]; Object.assign(rv, { mode: 'step', step: 0, view: 'proposed' }); rv.screen[Jk()] = J.steps[0].start; render(); return; }
+    case 'back': if (rv.step === 0) rv.mode = 'card'; else { rv.step--; rv.screen[Jk()] = JOURNEYS[Jk()].steps[rv.step].start; } render(); return;
+    case 'looks-good': advance(true); return;
+    case 'flag-step': rv.composing = 'step'; S._flagText = ''; render(); $('#flagtext')?.focus(); return;
+    case 'flag-claim': case 'flag-journey': rv.composing = 'claim'; S._flagText = ''; render(); $('#flagtext')?.focus(); return;
+    case 'cancel-flag': rv.composing = null; render(); return;
+    case 'save-flag': { const t = (S._flagText || '').trim(); if (!t) { toast('A flag needs a note'); $('#flagtext')?.focus(); return; }
+      if (b.dataset.kind === 'step') { const J = JOURNEYS[Jk()]; rv.flags[sk(Jk(), J.steps[rv.step])] = t; rv.composing = null; advance(false); return; }
+      rv.decision[claim().id] = 'flag'; rv.claimNote[claim().id] = t; rv.composing = null; render(); return; }
+    case 'approve': rv.decision[claim().id] = 'ok'; render(); return;
+    case 'undecide': { const c = claim(); delete rv.decision[c.id]; delete rv.claimNote[c.id]; if (c.kind === 'journey') JOURNEYS[c.journey].steps.forEach(s => delete rv.flags[sk(c.journey, s)]); render(); return; }
+    case 'next-claim': { const i = CLAIMS.findIndex(c => c.id === rv.claim); Object.assign(rv, { claim: CLAIMS[i + 1]?.id || 'finish', mode: 'card' }); render(); return; }
+    case 'send-back': sendBack(); return;
+    case 'accept': S.phase = 'accepted'; S.view = 'item'; S.cs = { pages: ['Onboarding flow r4', '3 page specs'], data: ['Member: 2 fields'], code: ['aludel/w-11 merged'] }; toast('Accepted; every part merged'); render(); return;
+    case 'scenarios': renderScenarios(); $('#questions').classList.remove('open'); $('#scenarios').classList.add('open'); return $('#scenarios input')?.focus();
+    case 'questions': renderQuestions(); $('#scenarios').classList.remove('open'); $('#questions').classList.add('open'); return $('#questions textarea')?.focus();
+    case 'close-drawer': b.closest('.drawer').classList.remove('open'); return;
+    case 'reset': resetAll(); return toast('Reset; your answers to the questions are kept');
+    case 'jump': jump(b.dataset.to); return;
+    case 'copy': { const a = store.get('answers', {}); const txt = QUESTIONS.map(([id]) => `${id}: ${a[id] || ''}`).join('\n'); navigator.clipboard?.writeText(txt).then(() => toast('Copied'), () => toast('Copy failed; select the text instead')); return; }
+  }
+});
+function walkTo(fbody, target) {
+  const rv = R(); const jk = fbody.dataset.journey;
+  if (fbody.dataset.side === 'previous') return;
+  rv.screen[jk] = target;
+  if (rv.mode === 'step') { const s = JOURNEYS[jk].steps[rv.step]; if (s.end === target) return advance(true); }
+  render();
+}
+function advance(good) {
+  const rv = R(); const jk = Jk(); const J = JOURNEYS[jk]; const s = J.steps[rv.step];
+  if (good) rv.walked[sk(jk, s)] = true;
+  if (rv.step < J.steps.length - 1) { rv.step++; rv.screen[jk] = J.steps[rv.step].start; } else { rv.mode = 'card'; }
+  render();
+}
+function sendBack() {
+  const rv = R();
+  const notes = [...Object.values(rv.flags), ...Object.values(rv.claimNote)];
+  S.sentFlags = CLAIMS.filter(c => rv.decision[c.id] === 'flag').map(c => c.id);
+  S.round = 2; S.phase = 'running'; S.view = 'item';
+  S.steps.push({ id: 'a', round2: true, layer: 'code', agent: 'code', title: `Address your review: ${notes.join('; ')}`, state: 'todo', log: [], staged: [], checks: [], summary: '' },
+    { id: 'v2', round2: true, layer: 'host', agent: 'verify', title: 'Check the combined changeset again', state: 'todo', log: [], staged: [], checks: [], summary: '' },
+    { id: 's2x', round2: true, layer: 'host', agent: 'showcase', title: 'Refresh the review evidence', state: 'todo', log: [], staged: [], checks: [], summary: '' });
+  // Approved claims stay approved; flagged ones reopen for round 2.
+  for (const id of S.sentFlags) { delete rv.decision[id]; delete rv.claimNote[id]; }
+  for (const k of Object.keys(rv.flags)) { delete rv.flags[k]; delete rv.walked[k]; }
+  rv.claim = 'pages'; rv.mode = 'card';
+  toast('Sent back; the same run resumes with your notes'); render();
+}
+function resetAll() { const scn = S.scn, speed = S.speed; Object.assign(S, fresh(), { scn, speed }); render(); }
+function jump(to) {
+  resetAll(); const auto = S.speed; S.speed = 'step';
+  const until = { plan: () => S.phase === 'plan', running: () => S.question.asked, review: () => S.phase === 'review' }[to];
+  S.phase = 'planning';
+  for (let i = 0; i < 80 && !until(); i++) {
+    if (S.phase === 'plan' && to !== 'plan') { S.phase = 'running'; continue; }
+    if (to === 'review' && S.question.asked && S.question.answer == null) S.question.answer = QUESTION.rec;
+    if (to === 'review' && step(S, 'd').state === 'ask') { S.dataAsk = 'allowed'; step(S, 'd').state = 'now'; }
+    if (!tick()) break;
+  }
+  S.speed = auto; if (S.phase === 'review') S.view = 'review';
+  $('#scenarios').classList.remove('open'); render();
+}
+
+// ---------- prototype-only: scenarios and review questions ----------
+const QUESTIONS = [
+  ['Q1', 'The plan card: steps by layer, each with its agent, why and the layer\'s mode, plus what you\'ll review and what the agent read. Right level of detail to approve from?'],
+  ['Q2', 'Approving authorizes the layers the plan names; Data in Ask first mode still asks per change. Is that the right split, or should approval cover everything?'],
+  ['Q3', 'The checklist: each plan step runs in its layer agent, side by side when independent, and collapses to a summary when done. Enough to trust what happened without reading logs?'],
+  ['Q4', 'The binding adds a Code step mid-run (marked Added by binding) instead of a follow-up task. Clear?'],
+  ['Q5', 'A question doesn\'t stop the run: steps that don\'t depend on it keep going. And Verify catching a failure goes back to the Code agent before you see anything. Right behaviour?'],
+  ['Q6', 'The review is J6\'s, with claims grouped by layer in plan order and one Finish for every part. Does one review for the whole changeset work?'],
+  ['Q7', 'Send back resumes the same run as round 2 on the same checklist, keeping approved claims. Right, or should each round be its own run?'],
+];
+function renderScenarios() {
+  const c = (k, t) => `<label><input type="checkbox" data-scn="${k}" ${S.scn[k] ? 'checked' : ''}> ${t}</label>`;
+  $('#scenarios').innerHTML = `<div class="row"><h2>Scenarios</h2><button type="button" class="btn ghost sm push" data-act="close-drawer">${icon('close')}Close</button></div>
+    <fieldset><legend>Jump to</legend><div class="jump"><button type="button" class="btn sm" data-act="jump" data-to="plan">Plan</button><button type="button" class="btn sm" data-act="jump" data-to="running">A question mid-run</button><button type="button" class="btn sm" data-act="jump" data-to="review">Review</button></div></fieldset>
+    <fieldset><legend>What happens</legend>${c('failStart', 'Go fails before the agent starts')}${c('verifyStuck', 'Verify fails twice on the same step')}${c('stale', 'main moves before you accept')}</fieldset>
+    <button type="button" class="btn" data-act="reset">${icon('restart_alt')}Reset the run</button>
+    <p class="small muted">Scenarios apply from the next time the run reaches that point; Reset starts over from Go.</p>`;
+}
+function renderQuestions() {
+  const a = store.get('answers', {});
+  $('#questions').innerHTML = `<div class="row"><h2>Review questions</h2><button type="button" class="btn ghost sm push" data-act="close-drawer">${icon('close')}Close</button></div>
+    ${QUESTIONS.map(([id, q]) => `<div class="qa"><p><b>${id}</b> ${esc(q)}</p><textarea id="a-${id}" aria-label="${id} answer" data-q="${id}">${esc(a[id] || '')}</textarea></div>`).join('')}
+    <button type="button" class="btn primary" data-act="copy">${icon('content_copy')}Copy answers</button>`;
+  $('#questions').querySelectorAll('textarea').forEach(t => t.addEventListener('input', () => { const all = store.get('answers', {}); all[t.dataset.q] = t.value; store.set('answers', all); }));
+}
+render();
+</script>
+</body>
+</html>

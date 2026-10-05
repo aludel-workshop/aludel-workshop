@@ -84,6 +84,9 @@ export function initOnboarding(db) {
   const draftColumns = new Set(db.prepare('PRAGMA table_info(onboarding_drafts)').all().map(column => column.name));
   if (!draftColumns.has('layers_json')) db.exec("ALTER TABLE onboarding_drafts ADD COLUMN layers_json TEXT NOT NULL DEFAULT '[]'");
   if (!draftColumns.has('layers_selected')) db.exec('ALTER TABLE onboarding_drafts ADD COLUMN layers_selected INTEGER NOT NULL DEFAULT 0');
+  // EX-02A: which way the project starts (a new app, or connecting an existing repository) and the connect path's choices.
+  if (!draftColumns.has('start')) db.exec('ALTER TABLE onboarding_drafts ADD COLUMN start TEXT');
+  if (!draftColumns.has('connect_json')) db.exec("ALTER TABLE onboarding_drafts ADD COLUMN connect_json TEXT NOT NULL DEFAULT '{}'");
   if (!setupColumns.has('layer_onboarding_version')) db.exec('ALTER TABLE project_setup ADD COLUMN layer_onboarding_version INTEGER NOT NULL DEFAULT 0');
   db.prepare('DELETE FROM onboarding_drafts WHERE claimed_project_id IS NULL AND expires_at < ?').run(now());
 }
@@ -118,7 +121,18 @@ export function agentKeyChecker(env = process.env, request = fetch) {
 export function onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot, createWorkspace, know, checkAgentKey = agentKeyChecker() }) {
   const agentProviders = catalogs.agentProviders.providers;
   const draftRow = token => token ? db.prepare('SELECT * FROM onboarding_drafts WHERE token_hash = ? AND expires_at > ?').get(digest(token), now()) : null;
-  const draftView = row => row && { profile: row.profile, name: row.name, pitch: row.pitch, layers: parse(row.layers_json, []), layersSelected: Boolean(row.layers_selected), claimedProjectId: row.claimed_project_id };
+  const draftView = row => row && { profile: row.profile, name: row.name, pitch: row.pitch, layers: parse(row.layers_json, []), layersSelected: Boolean(row.layers_selected), claimedProjectId: row.claimed_project_id,
+    start: row.start || 'new', connect: parse(row.connect_json, {}) };
+  // The connect path's choices, kept on the draft across the GitHub sign-in round trip: the repository and the code paths.
+  function validateConnect(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) fail('Choose a repository.');
+    const out = {};
+    if (value.installationId !== undefined) { if (!Number.isInteger(Number(value.installationId)) || Number(value.installationId) <= 0) fail('Choose a GitHub installation.'); out.installationId = Number(value.installationId); }
+    for (const field of ['owner', 'name']) if (value[field] !== undefined) { if (!/^[A-Za-z0-9._-]{1,100}$/.test(String(value[field]))) fail('Use a valid GitHub repository.'); out[field] = String(value[field]); }
+    if (value.commit !== undefined) { if (!/^[0-9a-f]{40}$/.test(String(value.commit))) fail('Check the repository again.'); out.commit = String(value.commit); }
+    if (value.paths !== undefined) { if (!Array.isArray(value.paths) || value.paths.length > 20 || value.paths.some(path => typeof path !== 'string' || path.length > 200)) fail('Choose up to 20 code paths.'); out.paths = value.paths; }
+    return out;
+  }
 
   function effectivePreferences(profile, overrides) {
     const defaults = catalogs.profiles[profile]?.defaults || catalogs.profiles.dreamer.defaults;
@@ -198,19 +212,21 @@ export function onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot, cr
       const profile = input.profile === undefined ? existing?.profile : validateProfile(input.profile);
       let { name = existing?.name || '', pitch = existing?.pitch || '' } = input;
       if (input.name !== undefined || input.pitch !== undefined) ({ name, pitch } = validateIdea({ name, pitch }));
+      const start = input.start === undefined ? existing?.start || null : ['new', 'connect'].includes(input.start) ? input.start : fail('Start a new app or connect a repository.');
+      const connect = input.connect === undefined ? parse(existing?.connect_json, {}) : input.connect === null ? {} : { ...parse(existing?.connect_json, {}), ...validateConnect(input.connect) };
       const selected = input.layers === undefined ? parse(existing?.layers_json, []) : input.layers;
       if (!Array.isArray(selected) || selected.some(key => typeof key !== 'string' || !layerCatalog.some(layer => layer.key === key)) || new Set(selected).size !== selected.length)
         fail('Choose layers from the available catalog.');
       const updated = now();
       const expires = new Date(Date.now() + draftMaxAge * 1000).toISOString();
       if (existing) {
-        db.prepare('UPDATE onboarding_drafts SET profile = ?, name = ?, pitch = ?, layers_json = ?, layers_selected = ?, updated_at = ?, expires_at = ? WHERE id = ?')
-          .run(profile || null, name, pitch, JSON.stringify(selected), input.layers === undefined ? existing.layers_selected : 1, updated, expires, existing.id);
+        db.prepare('UPDATE onboarding_drafts SET profile = ?, name = ?, pitch = ?, layers_json = ?, layers_selected = ?, start = ?, connect_json = ?, updated_at = ?, expires_at = ? WHERE id = ?')
+          .run(profile || null, name, pitch, JSON.stringify(selected), input.layers === undefined ? existing.layers_selected : 1, start, JSON.stringify(connect), updated, expires, existing.id);
         return { draft: draftView(draftRow(token)), token: null };
       }
       const newToken = randomBytes(32).toString('base64url');
-      db.prepare(`INSERT INTO onboarding_drafts(id, token_hash, profile, name, pitch, layers_json, layers_selected, created_at, updated_at, expires_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(`draft-${randomUUID()}`, digest(newToken), profile || null, name, pitch, JSON.stringify(selected), input.layers === undefined ? 0 : 1, updated, updated, expires);
+      db.prepare(`INSERT INTO onboarding_drafts(id, token_hash, profile, name, pitch, layers_json, layers_selected, start, connect_json, created_at, updated_at, expires_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(`draft-${randomUUID()}`, digest(newToken), profile || null, name, pitch, JSON.stringify(selected), input.layers === undefined ? 0 : 1, start, JSON.stringify(connect), updated, updated, expires);
       return { draft: draftView(draftRow(newToken)), token: newToken, maxAge: draftMaxAge };
     },
 
@@ -249,6 +265,43 @@ export function onboarding({ db, catalogs, secrets, workspaceRoot, assetRoot, cr
       // Older direct-claim clients retain the original scaffold; explicit catalog selection owns the blank start.
       if (!row.layers_selected) { know.ensureProject(projectId, { pitch }); know.seedPages(projectId, null); }
       createWorkspace(api.projectSetup(user, projectId), authorIdentity);
+      return api.projectSetup(user, projectId);
+    },
+
+    // EX-02A: the draft's key for its staging clone, for a signed-in person on the connect path.
+    connectDraft(token) {
+      const row = draftRow(token);
+      if (!row || row.claimed_project_id) fail('Start again from New project.', 409);
+      if (row.start !== 'connect') fail('This draft starts a new app, not a connection.', 409);
+      return { key: row.id, profile: row.profile, layers: row.layers_selected ? parse(row.layers_json, []) : null, connect: parse(row.connect_json, {}) };
+    },
+    // A project made by connecting a repository: no pitch, no generated app, no scaffold workspace (the repository's clone
+    // becomes it). Like a claim, it happens once per draft, and only when the person connects.
+    createConnected(token, user, { name, description = '' }) {
+      if (!user) fail('Sign in to continue.', 401);
+      const row = draftRow(token);
+      if (!row || row.claimed_project_id) fail('Start again from New project.', 409);
+      if (row.start !== 'connect') fail('This draft starts a new app, not a connection.', 409);
+      if (!row.profile) fail('Choose how you want to work first.', 409);
+      const cleanName = String(name || '').trim();
+      if (!cleanName || cleanName.length > 60) fail('Give the project a name (up to 60 characters).');
+      const layers = row.layers_selected ? parse(row.layers_json, []) : null;
+      if (layers && !layers.includes('platform')) fail('A connected repository needs the Code layer.', 409);
+      const projectId = `p-${randomBytes(5).toString('hex')}`;
+      const created = now();
+      const workspacePath = join(workspaceRoot, projectId);
+      db.exec('BEGIN IMMEDIATE');
+      try {
+        db.prepare(`INSERT INTO projects(id, slug, name, description, tagline, accent_color, hero_image_path, created_at, updated_at)
+          VALUES (?, ?, ?, ?, '', ?, NULL, ?, ?)`).run(projectId, uniqueSlug(cleanName), cleanName, String(description || '').slice(0, 280), catalogs.feels['sleek-saas'].accent, created, created);
+        const claimed = db.prepare('UPDATE onboarding_drafts SET claimed_project_id = ?, updated_at = ? WHERE id = ? AND claimed_project_id IS NULL').run(projectId, created, row.id);
+        if (!claimed.changes) fail('This draft already became a project.', 409);
+        db.prepare(`INSERT INTO project_members(project_id, user_id, role, created_at) VALUES (?, ?, 'owner', ?)`).run(projectId, user.id, created);
+        createLayerInstances(db, projectId, created, layers);
+        db.prepare(`INSERT INTO project_setup(project_id, profile, workspace_path, completed_steps_json, layer_onboarding_version, created_by, created_at, updated_at)
+          VALUES (?, ?, ?, ?, 1, ?, ?, ?)`).run(projectId, row.profile, workspacePath, JSON.stringify(['connect', 'profile', 'account', 'github', 'layers']), user.id, created, created);
+        db.exec('COMMIT');
+      } catch (error) { db.exec('ROLLBACK'); throw error; }
       return api.projectSetup(user, projectId);
     },
 

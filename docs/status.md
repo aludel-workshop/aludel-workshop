@@ -2,10 +2,10 @@
 id: status-001
 kind: project-status
 status: active
-updated: 2026-10-04
+updated: 2026-10-05
 current_phase: M1
 phase_state: in-progress
-next_action: AGENT-WORK-01
+next_action: COLLAB-WORK-01
 ---
 
 # Current project status
@@ -15,6 +15,15 @@ next_action: AGENT-WORK-01
 Convert Code onto its template with GitHub sync, now on `main`: the layer-template candidate was promoted by DEC-062. Then publish every layer's repository to the owner's GitHub. Deploy stays deferred.
 
 ## Next action
+
+**COLLAB-WORK-01 CW-1 built and agent-checked (2026-10-05)** ([brief and evidence](design/collaborator-work/work-record.md#cw-1-build-work-comes-back-through-the-github-remote-2026-10-05)). Report and submit now push the item's branch; close-out fetches the reported commit from GitHub and refuses a branch that moved. Live GitHub is unverified until CW-6. Testing now runs in two tiers (`test:affected` while developing, then `test:server:templates` as the gate; AGENTS.md). The owner accepted CW-1 (2026-10-05). The AGENT-WORK-01 dogfood needs Aludel's repository connected to a project first, so the next step is [EX-02A](design/existing-projects/connect-repository.md): create a project by connecting an existing repository. The plan was approved on 2026-10-05 (DEC-067): C0 prototype, C1 fake GitHub in browser journeys, C2 code paths, C3 build, C4 the owner connects Aludel live, C5 retire the built-in project. Then the dogfood, then CW-2. Committed on `claude/agent-work-prototype-7en0jx` (PR #4).
+
+**EX-02A C1–C3 built and agent-checked (2026-10-05)** ([plan and evidence](design/existing-projects/connect-repository.md#c1c3-build-2026-10-05)).
+- **What's built:** New project asks "Do you have code already?". Connect an existing repository chooses where the code is and installs `.aludel/` as one commit with those paths, with no starter docs. There's also a fake GitHub for browser journeys.
+- **Checks:** the connect browser journey, new unit tests, and the templates gate (347 pass, 0 fail).
+- **Restart effect:** additive only. Two draft columns and the AGENT-WORK-01 goal tables are added. No existing data changes.
+- **C4 done by the owner (2026-10-05):** the project "Aludel Workshop" is connected; `.aludel/` is on GitHub `main` at `a98c5c9`; Code reads 2,507 units ([check](design/existing-projects/connect-repository.md#c4-the-owner-connected-aludel-2026-10-05)). Close-out now settles `main` with GitHub through Code's sync before merging (found while preparing the dogfood; journey-checked).
+- **Next: the AGENT-WORK-01 dogfood** in Aludel Workshop. Its tooling (A8 CLI, CW-1) is on PR #4, so PR #4 merges to `main` first. Then: restart (no data changes), pair an editor token, create and claim the item, and work it in Claude Code from this checkout. After that, C5 retires `the-machine`.
 
 **JOURNEYS-01 J8: task creation redesign and owner Biome trial** ([prototype/work record](design/journeys/task-create/work-record.md), [trial steps](design/journeys/j8-trial.md), [handoff](design/journeys/handoff.md#local-j8-preparation-2026-10-03-codex)). PR #2 is pulled at `440c2bd`; Docker and the portal are running with local startup/acceptance repairs. The owner accepted Code Work #5, then created W-8; an unmatched request silently received the generic charter criterion. The owner requested a Jira-like creation experience and approved disposable Playwright checks. The owner accepts the composer direction: journeys are optional at creation, and the agent assesses and augments multiple affected journeys at pickup. The owner authorized “build it”: the real composer and additive assessment contract are implemented, browser-checked, and running locally. Next: owner tries Code › Tasks › Create task and resumes J8, including a real agent pickup. W-8 remains unchanged; the creation UI is updated locally. Owner-reported short-screen overflow and the legacy agent staging guard are repaired, with disposable short-height and agent create → stage checks. W-9 then hit a worker-hook identifier bug: repaired and the same owner-started attempt reached its first Codex turn. W-9 submitted a notes-only assessment and proposed a Pages spec follow-up; no feature was built. Owner then reported suggestion-review overflow and asked for editable tasks in the main pane. The shared form stack and sidebar notes are built and checked locally; the owner confirmed its suggestion through that review. The owner then attempted acceptance: legacy empty-claim and closeout guards are repaired, with a real disposable signature and negative guard checks. The owner signed W-9. Its created Pages follow-up W-10 then disappeared: backlog cleanup confused the task description with a generated gap key. Cleanup now uses explicit generator provenance; regression and receiving-board browser checks pass. The owner confirmed the suggestion was unchanged, and W-10 is restored under its original ID/number in Pages › Tasks › Backlog, surviving startup cleanup. No agent performed the owner signature or a new Go. Prerequisite/continuation handling and pre-registration startup errors need clearer task status. J7's agent check remains unverified; J8's live journey and retrospective remain pending. The accumulated fixes and failure account are handed off on `codex/j8-trial-task-review-fixes` ([push notes](design/journeys/handoff.md#j8-push-handoff--2026-10-04)); Fresh full server suites pass (310 standard / 335 template, zero failures); JOURNEYS-01 remains the next action.
 
@@ -51,8 +60,10 @@ LAT-01–07 and the LAT-08 prototype established the isolated candidate, layer s
 
 ## Ready queue
 
-1. **AGENT-WORK-01** (next; [proposal](design/agent-work/proposal.md)): open, cross-stack agent runs modeled on Claude Code, with layer subagents, plan-first approval and one changeset review per run. Runtime: Claude Agent SDK (owner, 2026-10-04). First slice: a clickable prototype, after the owner's go.
+1. **AGENT-WORK-01** (next; [plan](design/agent-work/plan.md), [work record](design/agent-work/work-record.md)): cross-stack agent work. Prototypes accepted as direction 2026-10-04; owner go to build 2026-10-04; local-first order A1 → A3 → A8 → A4 → dogfood. A1, A3, A8 and A4 built on PR #4 (goal model, item page, local CLI, review and close-out); next the dogfood in the owner's local Claude Code.
 1. **JOURNEYS-01** (done 2026-10-04; J8 closed without signup, [handoff](design/journeys/handoff.md)): journey-driven Work and review. Spec, then implement; claims replace hand-written criteria; journeys, tests and review seams live in `.aludel/`; includes cleanup of Codex's guided-preview work ([plan](design/journeys/work-record.md)). J0–J2 done 2026-10-02 (Code template `cc30be2`: journeys facet and Journeys tab); code tracing removed by DEC-063; J3 done 2026-10-03 (Biome's steps move to J8); J4 done 2026-10-03 (claims, with the gate at acceptance); J5 done 2026-10-03 (Specify → Implement, browser journey passing); J6 done 2026-10-04 (owner accepted, merged); J7 built 2026-10-04 for people (the agent check waits on the Symphony toolchain). The owner waived waiting for T03-CODE's look.
+2. **COLLAB-WORK-01** (next; plan approved 2026-10-05, DEC-065; [brief](design/collaborator-work/work-record.md)): a collaborator works a task from her own machine. CW-1 remote handoff (before the AGENT-WORK-01 dogfood) → CW-2 members and Code-role GitHub collaborators, with `main` protected → CW-3 dev container → CW-4 `aludel work`. CW-6 live trial needs DH-6.
+2. **DEPLOY-HOST-01** (planned 2026-10-05, DEC-066; [brief](design/deploy-hosting/work-record.md)): Deploy provisions and operates servers on the owner's cloud account. DigitalOcean is the first adapter, behind a provider-neutral host contract; Aludel bootstraps itself with the same code. DH-1 to DH-5 are local, against fakes. DH-6 (live droplet) needs the owner's go plus Q-4 (new or existing droplet) and Q-5 (domain).
 2. **T03-CODE**: run 1 built and agent-checked ([evidence](evidence/t03-code/README.md)). Waits on the owner's browser look, the live GitHub round trip and the candidate-preview question; then the compiled modules retire. F1 is done.
 3. **LAYER-GITHUB-01**: publish Vision, Design, Pages and Data repositories (and possibly `layer-base`) to the owner's GitHub with T03-CODE's sync (DEC-062).
 4. **LAYER-BINDINGS-01 step 4 (F10)**: Code ⇄ Pages binding, migrating `layer_connections` and the hard-coded Pages reconciliation, after T03-CODE.
@@ -63,7 +74,7 @@ LAT-01–07 and the LAT-08 prototype established the isolated candidate, layer s
 9. **PAGES-UX-01**: built and agent-checked (DEC-048; [evidence](evidence/pages-ux-01-pages-layer.md)). Next: owner review of the built layer.
 10. **PLATFORM-UX-01**: **built and agent-checked** (DEC-049; [evidence](evidence/platform-ux-01-code-deploy.md)). Next: owner review of the built Code and Deploy layers ([work record](design/platform-layer/work-record.md), [prototype](design/platform-layer/v1/index.html)). It supplies PP-01D's Environments UX and absorbs the Platform half of DATA-PLATFORM-UX-01.
 11. **DATA-PLATFORM-UX-01**: the rest of Data (owner: "perhaps").
-12. **LAY-06**: Aludel's own knowledge into its layers; retire the hash workspace.
+12. ~~**LAY-06**~~: superseded by DEC-067 (Aludel connects as an ordinary project; EX-02A C5 retires the built-in one).
 
 **Proposed cross-layer plan:** [EXISTING-PROJECTS-01](design/existing-projects/work-record.md) covers connecting existing repositories, reconstructing layer drafts from pinned evidence, and reconciling later external commits. The 2026-09-27 owner request authorized this plan and read-only inspection only. EX-01 research is the first proposed slice; knowledge authority, Work action coverage and app-defined environments remain dependencies. It does not replace T03-CODE as the current handoff.
 

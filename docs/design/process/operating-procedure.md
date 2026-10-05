@@ -85,14 +85,14 @@ At every stage, if scope expands or a required assumption changes, revise the wo
 
 Immediately before constructing an interaction prototype, write a verdict with evidence for:
 
-1. the exact questions it will answer and the cheapest suitable fidelity;
+1. the exact questions it will answer and the cheapest suitable fidelity; when the owner will judge an app's own pages in it, draw them from the app's recorded look (screenshots, kit) and name the source, and label any stand-in mock as one (AGENT-WORK-01 A0's skeletal app frames read as the intended review quality);
 2. actors, stories, pages and transitions included and excluded;
-3. valid parent structure and required scoped owner selections;
+3. valid parent structure and required scoped owner selections; when the prototype changes an accepted page's main area, name which parts of that page it keeps (AGENT-WORK-01 A0 v1 replaced the work item's run block and lost the item framework the owner wanted kept);
 4. component responsibility and state coverage, including empty, multiple-record, failed and stale outcomes where relevant;
-5. the external review frame, tasks, expected observations and simulation boundaries;
+5. the external review frame, tasks, expected observations and simulation boundaries; the owner reviews by flagging anything and saying what they want instead, so don't add confirm-what-was-built question panels (AGENT-WORK-01: 21 such questions went unanswered and steered too narrowly); ask only a real fork, once, in the reply;
 6. unresolved assumptions and whether each is the named experiment or an accidental decision.
 
-For an implementation-readiness boundary, also require the exact design-system revision, catalog search result, allowed component-system changes, representative stories/checks and any approved escape from catalog-first assembly.
+For an implementation-readiness boundary, also require the exact design-system revision, catalog search result, allowed component-system changes, representative stories/checks and any approved escape from catalog-first assembly. For work, identity or repository features, also name each actor and the machine it acts from. Include one check run as a second member, on a machine with no access to the portal's filesystem or database. (AGENT-WORK-01 A8 passed its checks on one machine while its close-out read the person's checkout path; see COLLAB-WORK-01.)
 
 **Ready** means all applicable requirements are evidenced. **Needs groundwork** names the next ready prerequisite. **Needs owner judgment** links concrete alternatives and states the choice needed. **Needs authorization** names the external effect and authorization source required. Unknown is not ready.
 

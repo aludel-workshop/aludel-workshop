@@ -1192,6 +1192,8 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
   // A running batch locks all its items in (claimed); only the one the runner has started is working, the rest wait staged.
   const statusOf = (state, context) => !['done', 'review', 'needs-input'].includes(state) && context?.executionBlock ? 'blocked' : state === 'suggested' ? 'backlog' : state === 'ready' ? (context?.batch || context?.staged ? 'staged' : 'queued')
     : state === 'claimed' ? (context?.personRun || context?.run?.startedAt && !context.run.done ? 'working' : 'staged') : state === 'needs-input' ? 'needs' : state;
+  // AGENT-WORK-01: the five board columns, derived from the stored state (Draft, Ready, In progress, In review, Done).
+  const boardStatus = state => state === 'suggested' ? 'draft' : state === 'ready' ? 'ready' : ['claimed', 'needs-input'].includes(state) ? 'progress' : state;
   const workRow = item => {
     if (!item) return null;
     const context = parse(item.context_json, null);
@@ -1201,7 +1203,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     if (workTargets.some(target => target.layerInstanceId && ['page_map','page','flow'].includes(target.kind) && target.layerInstanceId !== pagesInstanceId(db, item.project_id))) return null;
     const migration = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_work_migration'").get()
       ? db.prepare('SELECT action_id AS actionId, action_revision AS actionRevision, disposition, reason FROM layer_work_migration WHERE project_id = ? AND work_id = ?').get(item.project_id, item.id) : null;
-    return { id: item.id, number: item.number, ref: `W-${item.number}`, layer: item.layer, layerInstanceId: item.layer_instance_id || null, type: item.type, action: item.action || null, scope: item.work_scope === 'layer' ? 'layer' : 'action', title: item.title, state: item.state,
+    return { id: item.id, number: item.number, ref: `W-${item.number}`, layer: item.layer, layerInstanceId: item.layer_instance_id || null, type: item.type, action: item.action || null, scope: item.work_scope === 'layer' ? 'layer' : item.work_scope === 'goal' ? 'goal' : 'action', title: item.title, state: item.state, board: boardStatus(item.state),
       status: migration?.disposition === 'blocked' && item.state !== 'done' ? 'blocked' : statusOf(item.state, context), migration, priority: priorities.includes(item.priority) ? item.priority : 'medium',
       assignee: item.assignee_kind ? { kind: item.assignee_kind, id: item.assignee_id || (item.assignee_kind === 'agent' ? item.profile_id : null), label: item.assignee_label } : null,
       targets: workTargets, question: parse(item.question_json, null), documents: parse(item.documents_json, []), log: parse(item.log_json, []),
@@ -1279,15 +1281,17 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     });
     const question = input.question ? { text: text(input.question.text, 400, 'Question', true), options: lines(input.question.options, 200, 'Option') } : null;
     // DEC-057: an item for a layer-scoped layer (or an agent follow-up) names only its layer; the layer's charter guides it.
-    const layerScoped = !input.action && typeof input.layer === 'string' && (input.layerScoped === true || Boolean(layerWorkScope(db, projectId, input.layer)));
-    const installedAction = layerScoped ? null : compiledLocalActions.find(action => action.id === input.action) || actionForProject(db,projectId,input.action);
-    const actionId = layerScoped ? null : catalogs.roles.actions.has(input.action) || installedAction ? input.action : actionIdFor(input.layer, input.type, { question, routineKey: input.routineKey });
-    const definition = layerScoped ? { layer: input.layer, type: 'design', checks: [`The change fits the ${projectLayerDefinition(db, projectId, input.layer)?.name || input.layer} charter and cites the exact inputs it used`] }
+    // AGENT-WORK-01: a goal item belongs to the project, not a layer or an action; its actions (server/agent-work.mjs) name the layers.
+    const goal = input.scope === 'goal';
+    const layerScoped = !goal && !input.action && typeof input.layer === 'string' && (input.layerScoped === true || Boolean(layerWorkScope(db, projectId, input.layer)));
+    const installedAction = layerScoped || goal ? null : compiledLocalActions.find(action => action.id === input.action) || actionForProject(db,projectId,input.action);
+    const actionId = layerScoped || goal ? null : catalogs.roles.actions.has(input.action) || installedAction ? input.action : actionIdFor(input.layer, input.type, { question, routineKey: input.routineKey });
+    const definition = goal ? { layer: 'work', type: 'plan', checks: [] } : layerScoped ? { layer: input.layer, type: 'design', checks: [`The change fits the ${projectLayerDefinition(db, projectId, input.layer)?.name || input.layer} charter and cites the exact inputs it used`] }
       : catalogs.roles.actions.get(actionId) || (installedAction ? { layer: installedAction.layer, type: installedAction.key === 'edit' ? 'implement' : 'audit', checks: installedAction.checks } : null);
     if (!definition) fail('Action not found.', 404);
-    const layer = input.layer ?? definition.layer;
+    const layer = goal ? 'work' : input.layer ?? definition.layer;
     const layerInstanceId = layer === 'pages' ? pagesInstanceId(db, projectId) : null;
-    const type = input.type ?? definition.type;
+    const type = goal ? 'plan' : input.type ?? definition.type;
     if (!projectLayerDefinition(db,projectId,layer) && !layers.includes(layer)) fail('Unknown layer.');
     if (!workTypes.includes(type)) fail('Unknown work type.');
     if (!workStates.includes(input.state || 'ready')) fail('Unknown work state.');
@@ -1295,7 +1299,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     const number = counter(projectId, 'work');
     const id = `wrk-${randomBytes(4).toString('hex')}`;
     const created = now();
-    const assignee = input.assignee === null ? null : input.assignee ? resolveAssignee(projectId, input.assignee) : layerScoped ? layerAssignee(projectId, layer) : defaultAssignee(projectId, actionId);
+    const assignee = input.assignee === null ? null : input.assignee ? resolveAssignee(projectId, input.assignee) : goal ? null : layerScoped ? layerAssignee(projectId, layer) : defaultAssignee(projectId, actionId);
     const claims = Array.isArray(input.claims) && input.claims.length ? backedClaims(input.claims) : [];
     const checks = checkList(Array.isArray(input.checks) ? input.checks : claims.length ? [] : (!layerScoped && actionRecord(projectId, actionId)?.checks) || definition.checks, targets, claims);
     if (checks.length > 40) fail('A Work item has up to forty claims.');
@@ -1307,7 +1311,7 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
         assignee?.kind || null, assignee?.label || null, JSON.stringify(targets), question ? JSON.stringify(question) : null,
         JSON.stringify(lines(input.documents, 300, 'Document')), JSON.stringify([{ at: created, text: input.logText || `Created by ${author}`, refs: targets.map(target => target.id) }]), created, created,
         input.context && typeof input.context === 'object' ? JSON.stringify(input.context) : null, actionId, assignee?.id || null, assignee?.kind === 'agent' ? assignee.id : null,
-        input.priority || priorityLevel(projectId, type, targets), '[]', JSON.stringify(checks), projectRecord?.id || null, layerInstanceId, layerScoped ? 'layer' : null);
+        input.priority || priorityLevel(projectId, type, targets), '[]', JSON.stringify(checks), projectRecord?.id || null, layerInstanceId, goal ? 'goal' : layerScoped ? 'layer' : null);
     if (actionId) recordNewWorkAction(db, projectId, id, actionId);
     return workById(projectId, id);
   }

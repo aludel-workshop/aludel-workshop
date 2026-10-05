@@ -68,6 +68,7 @@ export function initGithubIdentities(db) {
 
 export function githubIntegration({ db, secrets, config, callbackUrl, setupUrl, fetcher = fetch, mintInstallationToken = mintToken,
   createUserFromGithub = () => { throw failure('Signing in with GitHub is not available here.', 503); } }) {
+  const apiBase = config.apiUrl || 'https://api.github.com', webBase = config.webUrl || 'https://github.com';
   const user = userId => db.prepare('SELECT * FROM github_identities WHERE user_id = ?').get(userId);
   const binding = projectId => db.prepare(`SELECT provider, owner, name, html_url, clone_url, default_branch, private,
     status, commit_sha, tracked_files, last_error, installation_id, account_type FROM repository_bindings WHERE project_id = ?`).get(projectId) || null;
@@ -79,7 +80,7 @@ export function githubIntegration({ db, secrets, config, callbackUrl, setupUrl, 
     if (!row?.access_token_encrypted) throw failure('Authorize the vendor GitHub App first.');
     if (!row.token_expires_at || row.token_expires_at > new Date(Date.now() + 60_000).toISOString()) return secrets.open(row.access_token_encrypted);
     if (!row.refresh_token_encrypted) throw failure('The GitHub authorization expired. Connect again.', 409);
-    const response = await fetcher('https://github.com/login/oauth/access_token', {
+    const response = await fetcher(`${webBase}/login/oauth/access_token`, {
       method: 'POST', headers: { accept: 'application/json', 'content-type': 'application/json' },
       body: JSON.stringify({ client_id: config.clientId, client_secret: config.clientSecret,
         grant_type: 'refresh_token', refresh_token: secrets.open(row.refresh_token_encrypted) })
@@ -98,7 +99,7 @@ export function githubIntegration({ db, secrets, config, callbackUrl, setupUrl, 
   }
 
   async function syncInstallations(userId, token) {
-    const value = await requestJson('https://api.github.com/user/installations?per_page=100', token, {}, fetcher);
+    const value = await requestJson(`${apiBase}/user/installations?per_page=100`, token, {}, fetcher);
     const seen = [];
     db.exec('BEGIN');
     try {
@@ -125,7 +126,7 @@ export function githubIntegration({ db, secrets, config, callbackUrl, setupUrl, 
   }
 
   function authorizeUrl(state, verifier) {
-    const url = new URL('https://github.com/login/oauth/authorize');
+    const url = new URL(`${webBase}/login/oauth/authorize`);
     url.searchParams.set('client_id', config.clientId); url.searchParams.set('redirect_uri', callbackUrl);
     url.searchParams.set('state', state); url.searchParams.set('code_challenge', challenge(verifier));
     url.searchParams.set('code_challenge_method', 'S256'); url.searchParams.set('prompt', 'select_account');
@@ -133,13 +134,13 @@ export function githubIntegration({ db, secrets, config, callbackUrl, setupUrl, 
   }
 
   async function exchange(code, verifier) {
-    const response = await fetcher('https://github.com/login/oauth/access_token', {
+    const response = await fetcher(`${webBase}/login/oauth/access_token`, {
       method: 'POST', headers: { accept: 'application/json', 'content-type': 'application/json' },
       body: JSON.stringify({ client_id: config.clientId, client_secret: config.clientSecret, code, redirect_uri: callbackUrl, code_verifier: verifier })
     });
     const token = await response.json();
     if (!response.ok || !token.access_token) throw failure(token.error_description || 'GitHub authorization failed.', 502);
-    return { token, profile: await requestJson('https://api.github.com/user', token.access_token, {}, fetcher) };
+    return { token, profile: await requestJson(`${apiBase}/user`, token.access_token, {}, fetcher) };
   }
 
   async function saveIdentity(userId, token, profile) {
@@ -173,7 +174,7 @@ export function githubIntegration({ db, secrets, config, callbackUrl, setupUrl, 
   async function pushToken(projectId, repositoryName) {
     return (await tryToken(projectId, { contents: 'write', workflows: 'write' }, repositoryName)) || scopedToken(projectId, { contents: 'write' }, repositoryName);
   }
-  const api = (repo, path) => `https://api.github.com/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}${path}`;
+  const api = (repo, path) => `${apiBase}/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}${path}`;
 
   return {
     status(userId, projectId, local) {
@@ -239,7 +240,7 @@ export function githubIntegration({ db, secrets, config, callbackUrl, setupUrl, 
       db.prepare('UPDATE github_identities SET install_state_hash=?, install_state_expires_at=?, return_to=?, updated_at=? WHERE user_id=?').run(
         digest(state), new Date(Date.now() + 10 * 60_000).toISOString(), returnTo, now(), userId
       );
-      return `https://github.com/apps/${config.appSlug}/installations/new?state=${encodeURIComponent(state)}`;
+      return `${webBase}/apps/${config.appSlug}/installations/new?state=${encodeURIComponent(state)}`;
     },
     async installed({ installationId, state }) {
       const row = db.prepare('SELECT * FROM github_identities WHERE install_state_hash = ?').get(digest(String(state || '')));
@@ -266,7 +267,7 @@ export function githubIntegration({ db, secrets, config, callbackUrl, setupUrl, 
         createToken = await usableUserToken(user(userId));
         path = '/user/repos';
       } else throw failure('That GitHub installation account type is not supported.', 409);
-      const remote = await requestJson(`https://api.github.com${path}`, createToken, {
+      const remote = await requestJson(`${apiBase}${path}`, createToken, {
         method: 'POST', body: JSON.stringify({ name, description, private: Boolean(isPrivate), auto_init: false })
       }, fetcher);
       const created = now();
@@ -286,6 +287,18 @@ export function githubIntegration({ db, secrets, config, callbackUrl, setupUrl, 
         db.prepare(`UPDATE repository_bindings SET status='local-setup-needed', last_error=?, updated_at=? WHERE project_id=?`).run(String(error.message || error), now(), projectId);
       }
       return binding(projectId);
+    },
+    // EX-02A: the repositories one of the person's installations can reach, for the connect path's Repository step.
+    async installationRepositories(userId, installationId) {
+      const installation = installations(userId).find(item => Number(item.installation_id) === Number(installationId));
+      if (!installation) throw failure('Choose one of your GitHub installations.', 404);
+      const token = await installationToken(installation.installation_id, { permissions: { metadata: 'read' } });
+      const value = await requestJson(`${apiBase}/installation/repositories?per_page=100`, token, {}, fetcher);
+      return { installation: { id: installation.installation_id, account: installation.account_login, type: installation.target_type, eligible: installation.eligible },
+        repositories: (value.repositories || []).map(repo => ({ owner: repo.owner?.login || installation.account_login, name: repo.name, private: Boolean(repo.private),
+          defaultBranch: repo.default_branch, updatedAt: repo.pushed_at || repo.updated_at || null, description: repo.description || '' }))
+          .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''))),
+        more: Number(value.total_count || 0) > (value.repositories || []).length };
     },
     // T03-CODE: an existing repository an installation can reach, to become the project's. The short-lived token is for
     // the host's clone and push; it never leaves the server.

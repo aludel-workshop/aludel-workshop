@@ -17,7 +17,7 @@ export async function mintInstallationToken(config, installationId, { permission
   const body = {};
   if (permissions) body.permissions = permissions;
   if (repositories?.length) body.repositories = repositories;
-  const response = await fetcher(`https://api.github.com/app/installations/${installationId}/access_tokens`, {
+  const response = await fetcher(`${config.apiUrl || 'https://api.github.com'}/app/installations/${installationId}/access_tokens`, {
     method: 'POST',
     headers: {
       accept: 'application/vnd.github+json', authorization: `Bearer ${createAppJwt(config, clock)}`,

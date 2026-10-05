@@ -20,7 +20,8 @@
     "prebuild": "npm run sync:layers",
     "pretypecheck": "npm run sync:layers",
     "predev": "npm run sync:layers",
-    "test:server:templates": "MACHINE_LAYER_TEMPLATES_ENABLED=1 node --test --test-timeout=300000 tests/*.test.mjs"
+    "test:server:templates": "MACHINE_LAYER_TEMPLATES_ENABLED=1 node --test --test-timeout=300000 tests/*.test.mjs",
+    "test:affected": "node tools/test-affected.mjs"
   },
   "dependencies": {
     "@angular/animations": "22.1.7",
