@@ -11,7 +11,7 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 export const platformTables = new Set(['projects', 'users', 'sessions', 'auth_config', 'login_tickets', 'github_identities', 'github_sign_ins',
-  'github_user_installations', 'github_users', 'github_installations', 'onboarding_drafts', 'project_members', 'project_setup', 'symphony_pools', 'symphony_worker_tokens', 'editor_tokens', 'import_runs',
+  'github_user_installations', 'github_users', 'github_installations', 'onboarding_drafts', 'project_members', 'project_setup', 'symphony_pools', 'symphony_worker_tokens', 'editor_tokens', 'editor_connect_requests', 'import_runs',
   // The bootstrap workflow's own task list predates projects.
   'work_items', 'work_events',
   // Candidate preview runtime state is keyed by candidate, not project.

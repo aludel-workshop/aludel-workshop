@@ -256,3 +256,36 @@ Owner, on the A4 handover: "i want aludel to handle the merge. you know how i te
 - **Checked:** the model test now uses real repositories: no repository refuses, a conflict sends the item back with main untouched, and after the rebase a merge commit lands with both sides in the checked-out main. The browser journey closes out against a real checkout and repository. Plain suite 309 pass, 3 fail; templates suite 306 pass, the worker-token failure and the `symphony-proposals` load timeout. All match the A4 run above.
 - **Not checked:** the push to GitHub. No project here has a GitHub repository; it reuses the build's push. This replaces the earlier deviation: the plan's `mergeLayerBranch` is still not used, because the code is in the person's checkout rather than a layer branch.
 
+
+### Drift fix: the assignee decides who works, and Open in VS Code (2026-10-05)
+
+Owner, before the dogfood: "the work style, claude or local? thats supposed to be managed by assignee, instead of 'claude' its one of the defined agents working remote, local would be assigned to me. and instead of running a command locally, id love to just have an open in vscode button". The proposal was accepted ("sounds good, build it"). Authorized: host code, tests and records on branch `claude/assignee-open-vscode`. This record was written after the build, not before it.
+
+- **Changed:**
+  - **The item page** drops the Work style buttons. Assignee is the shared assignee chip:
+    - people work on their own machine;
+    - the project's agents are listed but disabled, with "Agents work remotely, which comes with the remote runtime (A2)";
+    - it locks once the item starts.
+
+    The server adds `POST …/goals/:id/assign`: a member, or unassigned, until the item starts; agents are refused until A2. `claim` stays for the CLI.
+  - **Open in VS Code.** Once the item is yours, the page offers it as a link to the Claude Code extension's own handler, `vscode://anthropic.claude-code/open?prompt=Work on W-n (id) using the Aludel tools.`, checked in extension 2.1.289. Beside it is "Open <folder>" (`vscode://vscode-remote/wsl+<distro>/<path>`, or `vscode://file/<path>`), for when the right window isn't in front.
+  - **The MCP's new `start_work`** checks out `aludel/w-n` from the latest `origin/main`, or keeps the branch it's already on. It refuses uncommitted changes. Its instructions call it first.
+  - **`aludel pair` sets the checkout up once:** it stores the token, writes `.mcp.json` (kept out of commits), and reports the checkout's location. The MCP re-reports the location on startup. The location is stored on the editor token (`editor_tokens.checkout_json`, an additive column) and is only something to open: Aludel never reads from it.
+  - **Work › Team** loses its Codex-era copy and becomes "Work in VS Code with Claude Code", showing the connected checkout.
+  - **The CLI** accepts the portal's own `*.localhost` address and talks to 127.0.0.1, because Node can't resolve those names.
+- **Checked:**
+  - **The A8 test, rewritten.** `pair` through `aludel.localhost` writes `.mcp.json` and the checkout location, and a relative path is refused. Assigning an agent is refused, as is a non-member; assign then unassign works, and the assignee locks once started. `start_work` refuses uncommitted changes, then creates the branch from `origin/main`, and calling it again keeps the branch. Then the existing report and submit steps.
+  - **The browser journey.** The assignee menu (axe on the menu), the connect hint, the Team tab (axe) before and after a checkout reports itself, and the exact hrefs of Open in VS Code and Open tool-share. The rest of the journey is unchanged. Screens are in `test-results/agent-work/01b`–`01d`.
+  - **Typecheck and build.**
+  - **`test:affected`:** 79 tests, 74 pass, 2 fail, 3 skipped.
+    - One failure was expected: `editor-bridge` now sees the startup checkout report, so it filters that request out. It passes.
+    - The other was the known security-audit restart flake, which passes when run alone.
+  - **Bugs found by the tests:**
+    - the new column broke `INSERT INTO editor_tokens VALUES (…)`, which is now named-column. A live portal would have failed to create tokens after the restart.
+    - the goal route's operation list lacked `assign`.
+- **Follow-up, same day:** the owner found a Draft's Start work blocked, as if they had to write the actions themselves. The v2 flow has the orchestrator define a rough Draft, which moves it to Ready for the person to check and start. The server already allowed that; the page hid it.
+  - Open in VS Code now also shows on a Draft assigned to you, saying "Claude Code defines it… then you start it".
+  - The brief editor no longer opens by itself when someone is assigned, and the Start row is hidden for your own Draft.
+  - The MCP instructions say to stop after `define_work` until the person starts the item. The server already refuses actions before Start.
+  - The journey checks the assigned Draft (`01e-draft-assigned`).
+- **Not checked:** the links on the owner's machine. That covers whether the prompt is filled in or sent (the extension stores it as the conversation's initial prompt, so probably filled in), and which window wins when several are open. The owner tries this at the dogfood's start.

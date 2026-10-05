@@ -20,18 +20,18 @@ import { AvatarComponent } from './work-shared';
     </tbody></table></div>
     <p class="lay-muted small">Owners can do everything, including keys, spending and deleting. Inviting more people arrives with multi-person projects.</p>
   </section>
-  <section class="lay-gap-top lay-card" aria-labelledby="team-editor"><h2 id="team-editor">Work with Codex in VS Code</h2>
-    <p class="lay-muted small">Connect your editor to this project's assigned tasks and live knowledge. The connection can only read; it cannot run a batch, change records or deploy.</p>
+  <section class="lay-gap-top lay-card" aria-labelledby="team-editor"><h2 id="team-editor">Work in VS Code with Claude Code</h2>
+    <p class="lay-muted small">Items assigned to you open from their page in a container with the project's dev setup, where Claude Code works them through Aludel's tools on their own branch; you watch and review on the item page. Connect once: create a token, then in any item container's terminal run <code>aludel pair</code> and paste it. Every container after that is connected. Work comes back through GitHub; the connection can't deploy or close items.</p>
     @if (editorError()) { <p role="alert" class="lay-warn-text">{{ editorError() }}</p> }
     @if (editorToken()) {
-      <p role="status">Editor token created. Copy it now; Aludel won't show it again.</p>
+      <p role="status">Token created. Copy it now; Aludel won't show it again.</p>
       <div class="lay-row lay-wrap"><button type="button" class="lay-button small" (click)="copyToken()">Copy token</button><button type="button" class="lay-button ghost small" (click)="editorToken.set('')">Done</button>
-        @if (copied()) { <span class="lay-muted small">Copied. Paste it into the pairing command.</span> }</div>
-      <p class="lay-muted small">From the Aludel checkout, run <code>node apps/portal/tools/editor-mcp.mjs pair http://127.0.0.1:4310</code>, then paste the token when prompted. Run <code>codex mcp add aludel -- node /absolute/path/to/aludel-workshop/apps/portal/tools/editor-mcp.mjs</code> with your checkout's absolute path. Restart Codex.</p>
+        @if (copied()) { <span class="lay-muted small">Copied. Paste it when the command asks.</span> }</div>
+      <p class="lay-muted small">In an item container's terminal, run <code>aludel pair</code> and paste the token. To work in your own checkout instead, run <code>node apps/portal/tools/aludel.mjs pair {{ origin }}</code> there.</p>
     } @else {
-      <p class="lay-muted small">{{ editorStatus()?.connected ? 'This project has an active editor connection.' : 'No editor connection is active for this project.' }}</p>
-      <div class="lay-row lay-wrap"><button type="button" class="lay-button small" (click)="createToken()" [disabled]="editorBusy()">Create editor token</button>
-        @if (editorStatus()?.connected) { <button type="button" class="lay-button ghost small" (click)="revokeToken()" [disabled]="editorBusy()">Revoke connection</button> }</div>
+      <p class="lay-muted small">@if (editorStatus()?.checkout; as place) { Connected: {{ place.path }}{{ place.distro ? ' (WSL ' + place.distro + ')' : '' }}. } @else if (editorStatus()?.connected) { Connected until {{ editorStatus()?.expiresAt?.slice(0, 10) }}. } @else { Not connected yet. }</p>
+      <div class="lay-row lay-wrap"><button type="button" class="lay-button small" (click)="createToken()" [disabled]="editorBusy()">{{ editorStatus()?.connected ? 'Connect again' : 'Connect a checkout' }}</button>
+        @if (editorStatus()?.connected) { <button type="button" class="lay-button ghost small" (click)="revokeToken()" [disabled]="editorBusy()">Disconnect</button> }</div>
     }
   </section>
   <section class="lay-gap-top" aria-labelledby="team-agents"><h2 id="team-agents">Agents</h2><aludel-work-agents /></section>`
@@ -39,7 +39,9 @@ import { AvatarComponent } from './work-shared';
 export class WorkTeamComponent {
   readonly ctx = inject(ProjectContext);
   readonly grants = computed(() => this.ctx.data()?.layerGrants || []);
-  readonly editorStatus = signal<{ connected: boolean; expiresAt: string | null } | null>(null);
+  readonly editorStatus = signal<{ connected: boolean; expiresAt: string | null; checkout?: { path: string; distro: string | null } | null } | null>(null);
+  // The CLI can't resolve *.localhost names itself, but accepts them: it talks to 127.0.0.1.
+  readonly origin = location.origin;
   readonly editorToken = signal('');
   readonly editorError = signal('');
   readonly editorBusy = signal(false);
@@ -47,7 +49,7 @@ export class WorkTeamComponent {
   constructor() {
     effect(() => {
       const id = this.ctx.projectId();
-      if (id) void this.ctx.api<{ connected: boolean; expiresAt: string | null }>(`/api/projects/${encodeURIComponent(id)}/editor`)
+      if (id) void this.ctx.api<{ connected: boolean; expiresAt: string | null; checkout: { path: string; distro: string | null } | null }>(`/api/projects/${encodeURIComponent(id)}/editor`)
         .then(value => this.editorStatus.set(value), error => this.editorError.set(error.message));
     });
   }
@@ -61,7 +63,7 @@ export class WorkTeamComponent {
   }
   async copyToken() {
     try { await navigator.clipboard.writeText(this.editorToken()); this.copied.set(true); }
-    catch { this.editorError.set('Clipboard access failed. Use the pairing command in a browser that allows clipboard access.'); }
+    catch { this.editorError.set('Clipboard access failed. Allow clipboard access for this page, then copy again.'); }
   }
   async revokeToken() {
     this.editorBusy.set(true); this.editorError.set('');

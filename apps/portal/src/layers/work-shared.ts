@@ -143,8 +143,8 @@ export class RefChipComponent {
       <button mat-menu-item type="button" [disabled]="!allowAgents() || !ctx.data()?.symphonyProfiles?.includes(profile.id)" (click)="changed.emit({ kind: 'agent', id: profile.id })"><aludel-avatar [who]="{ kind: 'agent', id: profile.id }" />
         <span>{{ profile.name }}<small>{{ profile.model || 'Account default' }} · {{ profile.effort }} effort</small></span>@if (isCurrent('agent', profile.id)) { <mat-icon class="lay-menu-check" aria-label="current">check</mat-icon> }</button>
     }
-    @if (!allowPeople() || !allowAgents()) { <p class="lay-menu-note"><mat-icon aria-hidden="true">info</mat-icon>{{ allowPeople() ? 'No checked agent adapter for this action yet.' : 'No checked person adapter for this action yet.' }}</p> }
-    @if (!ctx.data()?.symphonyProfiles?.length) { <p class="lay-menu-note"><mat-icon aria-hidden="true">power_off</mat-icon>Create a Codex agent profile to assign agent work. Other providers need a runtime adapter.</p> }
+    @if (!allowPeople() || !allowAgents()) { <p class="lay-menu-note"><mat-icon aria-hidden="true">info</mat-icon>{{ allowPeople() ? (agentsNote() || 'No checked agent adapter for this action yet.') : 'No checked person adapter for this action yet.' }}</p> }
+    @if (!agentsNote() && !ctx.data()?.symphonyProfiles?.length) { <p class="lay-menu-note"><mat-icon aria-hidden="true">power_off</mat-icon>Create a Codex agent profile to assign agent work. Other providers need a runtime adapter.</p> }
     <a mat-menu-item [href]="ctx.link('work', 'agents')" (click)="ctx.go(ctx.link('work', 'agents'), $event)"><mat-icon aria-hidden="true">tune</mat-icon><span>Manage agent profiles</span></a>
   </mat-menu>`
 })
@@ -156,6 +156,8 @@ export class AssigneeComponent {
   // An action without a checked person or agent adapter can't go to one (the server refuses it too).
   readonly allowPeople = input(true);
   readonly allowAgents = input(true);
+  // Why agents can't be picked here, when it isn't a missing adapter (a goal item's remote agents wait on A2).
+  readonly agentsNote = input<string | null>(null);
   readonly changed = output<Assignee>();
   readonly activeProfiles = computed(() => (this.ctx.data()?.profiles || []).filter(profile => profile.active));
   readonly metal = computed(() => { const who = this.assignee(); return who?.kind === 'agent' ? this.ctx.profileById().get(who.id || '')?.avatar.color || null : null; });

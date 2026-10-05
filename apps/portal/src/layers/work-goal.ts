@@ -3,8 +3,8 @@ import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { ProjectContext, WorkItem, layerLabel, priorityLabel, priorityOrder } from './context';
-import { PriorityComponent } from './work-shared';
+import { Assignee, ProjectContext, WorkItem, layerLabel, priorityLabel, priorityOrder } from './context';
+import { AssigneeComponent, PriorityComponent } from './work-shared';
 
 // AGENT-WORK-01 A3: a goal item, as the a0/v2 prototype drew it. The brief and how it is worked on top; actions in phases,
 // each naming a layer, with what blocks it and what it needs from you sitting on it; review gates between phases; the
@@ -24,7 +24,7 @@ const actionLabel: Record<string, string> = { proposed: 'New: needs your approva
 const actionIcon: Record<string, string> = { proposed: 'add_task', todo: 'radio_button_unchecked', working: 'progress_activity', review: 'rate_review', done: 'check_circle' };
 
 @Component({
-  selector: 'aludel-work-goal', standalone: true, imports: [FormsModule, MatIconModule, MatMenuModule, MatTooltipModule, PriorityComponent],
+  selector: 'aludel-work-goal', standalone: true, imports: [FormsModule, MatIconModule, MatMenuModule, MatTooltipModule, AssigneeComponent, PriorityComponent],
   styleUrl: './work-goal.css',
   template: `
   @if (view(); as goal) {
@@ -38,7 +38,7 @@ const actionIcon: Record<string, string> = { proposed: 'add_task', todo: 'radio_
             <div><dt>Status</dt><dd><span [class]="'wg-board wg-board-' + goal.item.board">{{ boardLabel[goal.item.board] }}</span></dd></div>
             <div><dt>Priority</dt><dd><button type="button" class="lay-prio-btn" [matMenuTriggerFor]="priorityMenu" [attr.aria-label]="'Priority: ' + priorityLabel[goal.item.priority] + '. Change'"><aludel-priority [value]="goal.item.priority" [text]="true" /><mat-icon aria-hidden="true">expand_more</mat-icon></button>
               <mat-menu #priorityMenu="matMenu" class="lay-menu">@for (level of priorities; track level) { <button mat-menu-item type="button" (click)="priority(level)"><aludel-priority [value]="level" /><span>{{ priorityLabel[level] }}</span></button> }</mat-menu></dd></div>
-            <div><dt>Assignee</dt><dd>@if (goal.item.assignee) { <mat-icon aria-hidden="true">{{ goal.performer === 'local' ? 'terminal' : 'smart_toy' }}</mat-icon>{{ ctx.whoName(goal.item.assignee) }}{{ goal.performer === 'local' ? ', locally' : '' }} } @else { <span class="lay-muted">Nobody yet</span> }</dd></div>
+            <div><dt>Assignee</dt><dd><aludel-assignee [assignee]="goal.item.assignee" [locked]="assignLock()" [allowAgents]="false" agentsNote="Agents work remotely, which comes with the remote runtime (A2). Assign a person for now." (changed)="assign($event)" /></dd></div>
             @if (layers().length) { <div><dt>Layers</dt><dd class="wg-chips">@for (key of layers(); track key) { <span [class]="'lay-chip lay-l-' + key">{{ layerName(key) }}</span> }</dd></div> }
           </dl>
           <div class="wg-brief">
@@ -49,19 +49,25 @@ const actionIcon: Record<string, string> = { proposed: 'add_task', todo: 'radio_
               <div class="wg-row"><button type="button" class="lay-button small" (click)="saveBrief()" [disabled]="!briefDraft.trim() || !goal.actions.length" [matTooltip]="goal.actions.length ? '' : 'Add an action first'">{{ goal.item.board === 'draft' ? 'Save and move to Ready' : 'Save brief' }}</button>
                 @if (goal.brief) { <button type="button" class="lay-button ghost small" (click)="editingBrief.set(false)">Cancel</button> }</div>
             } @else {
-              <p class="wg-brieftext">{{ goal.brief || 'No brief yet.' }}</p>
+              <p class="wg-brieftext">{{ goal.brief || (goal.item.assignee ? 'No brief yet. Whoever works on it defines it: a brief and its actions.' : 'No brief yet.') }}</p>
               @if (open()) { <button type="button" class="lay-button ghost small" (click)="editBrief()"><mat-icon aria-hidden="true">edit</mat-icon>Edit brief</button> }
             }
           </div>
-          @if (goal.item.board === 'ready' || goal.item.board === 'draft') {
+          @if (goal.item.board === 'ready' || (goal.item.board === 'draft' && !mine())) {
             <div class="wg-start">
-              <div class="wg-style" role="group" aria-label="Work style">
-                <span class="wg-label">Work style</span>
-                <button type="button" class="wg-seg" disabled matTooltip="The remote runtime comes later (A2, waiting on the spending decision)">Send to Claude</button>
-                <button type="button" class="wg-seg" [class.on]="mine()" [attr.aria-pressed]="mine()" (click)="claim()">{{ mine() ? 'Working locally' : 'Work locally' }}</button>
-              </div>
-              @if (mine()) { <p class="wg-hint"><mat-icon aria-hidden="true">terminal</mat-icon>In your checkout run <code>aludel claim {{ goal.item.ref }}</code>, then ask Claude Code there to work on {{ goal.item.ref }}.</p> }
+              @if (!mine()) { <p class="wg-who">@if (!goal.item.assignee) { Assign it to start: a person works on their own machine. } @else { {{ ctx.whoName(goal.item.assignee) }} works on it on their own machine. }</p> }
               <button type="button" class="lay-button wg-go" (click)="move('progress')" [disabled]="goal.item.board !== 'ready' || !goal.item.assignee" [matTooltip]="startBlock()"><mat-icon aria-hidden="true">play_arrow</mat-icon>Start work</button>
+            </div>
+          }
+          @if (mine() && (goal.item.board === 'draft' || goal.item.board === 'ready' || goal.item.board === 'progress')) {
+            <div class="wg-local" role="group" aria-label="Work on it in VS Code">
+              @for (request of waiting(); track request.code) {
+                <div class="wg-connect" role="status"><mat-icon aria-hidden="true">deployed_code</mat-icon><span>A container is asking to connect. Its terminal shows <strong>{{ request.code }}</strong>; connecting it here makes it {{ goal.item.ref }}'s, on <code>aludel/{{ goal.item.ref.toLowerCase() }}</code>.</span>
+                  <button type="button" class="lay-button small" (click)="connect(request.code)" [attr.aria-label]="'Connect the container showing ' + request.code + ' to ' + goal.item.ref">Connect</button></div>
+              }
+              <button type="button" class="lay-button" (click)="openContainer()" [disabled]="opening()"><mat-icon aria-hidden="true">deployed_code</mat-icon>{{ opening() ? 'Opening…' : 'Open in a container' }}</button>
+              <p class="wg-hint">A new VS Code window, in a container built from the repository's dev container on <code>aludel/{{ goal.item.ref.toLowerCase() }}</code>: the same setup a cloud agent gets. Claude Code there {{ goal.item.board === 'draft' ? 'defines it: a brief and actions in phases. It moves to Ready for you to check, then you start it.' : 'works it, with your own subscription.' }}
+                @if (checkout(); as place) { Or <a [href]="claudeLink()">work in your {{ folderName(place.path) }} checkout</a>. }</p>
             </div>
           }
           @if (goal.item.board === 'progress' && readyForReview()) {
@@ -219,7 +225,8 @@ export class WorkGoalComponent {
   readonly readyForReview = computed(() => { const view = this.view(); const actions = (view?.actions || []).filter(action => action.state !== 'proposed');
     return Boolean(view && actions.length && !view.needs.length && actions.every(action => ['review', 'done'].includes(action.state))); });
   readonly startBlock = computed(() => { const item = this.view()?.item; if (!item) return '';
-    if (item.board === 'draft') return 'Write the brief and its actions, then save it to Ready'; if (!item.assignee) return 'Choose a work style first'; return ''; });
+    if (item.board === 'draft') return this.mine() ? 'Claude Code defines it first: Open in VS Code' : item.assignee ? `${this.ctx.whoName(item.assignee)} defines it first` : 'Assign it, or write the brief and actions yourself';
+    if (!item.assignee) return 'Assign it first'; return ''; });
   readonly recordCount = computed(() => (this.view()?.changeset || []).reduce((sum, group) => sum + group.changes.length, 0));
   readonly changedLayers = computed(() => (this.view()?.changeset || []).map(group => this.layerName(group.layer)).join(' and '));
   readonly closedText = computed(() => [...(this.view()?.events || [])].reverse().find(event => event.kind === 'log' && event.text.startsWith('Closed:'))?.text.replace(/^Closed: (.)/, (_, first: string) => first.toUpperCase()) || '');
@@ -234,12 +241,13 @@ export class WorkGoalComponent {
   constructor() {
     afterRenderEffect(() => { this.shownEvents(); const list = this.eventList()?.nativeElement; if (list && this.following) list.scrollTop = list.scrollHeight; });
     effect(() => { const id = this.id(); const project = this.ctx.projectId(); if (!id || !project) return; untracked(() => { this.view.set(null); this.failed.set(false); this.selected.set(null); this.following = true; void this.load(); this.listen(); }); });
-    inject(DestroyRef).onDestroy(() => { this.source?.close(); if (this.pending) clearTimeout(this.pending); });
+    this.watching = setInterval(() => this.checkWaiting(), 3000);
+    inject(DestroyRef).onDestroy(() => { this.source?.close(); if (this.pending) clearTimeout(this.pending); if (this.watching) clearInterval(this.watching); });
   }
   private base() { return `/api/projects/${encodeURIComponent(this.ctx.projectId())}/goals`; }
   private path(rest = '') { return `${this.base()}/${encodeURIComponent(this.id())}${rest}`; }
   async load() {
-    try { const view = await this.ctx.api<GoalView>(this.path()); this.view.set(view); if (!view.brief && !this.editingBrief() && ['draft', 'ready'].includes(view.item.board)) this.editBrief(); }
+    try { const view = await this.ctx.api<GoalView>(this.path()); const first = !this.view(); this.view.set(view); if (first) this.loadCheckout(); if (!view.brief && !view.item.assignee && !this.editingBrief() && ['draft', 'ready'].includes(view.item.board)) this.editBrief(); }
     catch { if (!this.view()) this.failed.set(true); }
     if (!this.stackKeys().length) void this.ctx.api<{ stack: { key: string }[] }>(this.base()).then(value => this.stackKeys.set(value.stack.map(layer => layer.key)), () => {});
   }
@@ -299,7 +307,29 @@ export class WorkGoalComponent {
   answer(need: GoalEvent) { const text = (this.answerText[need.id] || '').trim() || this.answers[need.id]; if (!text) return;
     void this.act(() => this.ctx.api(this.path(`/answer/${need.id}`), 'POST', { text }), 'Answered.'); }
   allow(need: GoalEvent, allow: boolean) { void this.act(() => this.ctx.api(this.path(`/answer/${need.id}`), 'POST', { allow }), allow ? (need.kind === 'approval' ? `Approved #${need.action}.` : 'Allowed.') : 'Declined.'); }
-  claim() { if (!this.mine()) void this.act(() => this.ctx.api(this.path('/claim'), 'POST', {}), 'Claimed to work locally.'); }
+  assign(who: Assignee) { void this.act(() => this.ctx.api(this.path('/assign'), 'POST', { assignee: who }), `Assigned to ${this.ctx.whoName(who)}.`).then(() => this.loadCheckout()); }
+  // Working in your own checkout instead: the Claude Code extension's own link opens it with the prompt.
+  readonly checkout = signal<{ path: string; distro: string | null } | null>(null);
+  readonly assignLock = computed(() => ['draft', 'ready'].includes(this.view()?.item.board || '') ? null : 'It has started; the assignee stays');
+  readonly claudeLink = computed(() => { const item = this.view()?.item; return item ? 'vscode://anthropic.claude-code/open?prompt=' + encodeURIComponent(`Work on ${item.ref} (${item.id}) using the Aludel tools.`) : ''; });
+  readonly opening = signal(false);
+  // Containers asking to connect to this item (they show the same code in their terminal). Checked while the item is yours.
+  readonly waiting = signal<{ code: string; at: string }[]>([]);
+  private watching: ReturnType<typeof setInterval> | null = null;
+  private checkWaiting() {
+    const board = this.view()?.item.board || '';
+    if (!this.mine() || !['draft', 'ready', 'progress'].includes(board) || (typeof document !== 'undefined' && document.hidden)) { if (!this.mine()) this.waiting.set([]); return; }
+    void this.ctx.api<{ waiting: { code: string; at: string }[] }>(this.path('/connections')).then(value => this.waiting.set(value.waiting), () => {});
+  }
+  connect(code: string) { void this.act(() => this.ctx.api(this.path(`/connections/${encodeURIComponent(code)}`), 'POST', {}), `Connected the container (${code}).`).then(() => this.checkWaiting()); }
+  // Aludel makes the item's branch on GitHub, then VS Code's Dev Containers clones it into its own volume and opens it.
+  openContainer() {
+    this.opening.set(true);
+    void this.ctx.write(async () => { const result = await this.ctx.api<{ link: string; branch: string }>(this.path('/container'), 'POST', {}); location.href = result.link; await this.load(); },
+      'Opening VS Code. The first build of the container takes a few minutes.').finally(() => this.opening.set(false));
+  }
+  folderName(path: string) { return path.split('/').filter(Boolean).at(-1) || path; }
+  loadCheckout() { const id = this.ctx.projectId(); if (id && this.mine()) void this.ctx.api<{ checkout: { path: string; distro: string | null } | null }>(`/api/projects/${encodeURIComponent(id)}/editor`).then(value => this.checkout.set(value.checkout), () => this.checkout.set(null)); }
   move(to: string) { void this.act(() => this.ctx.api(this.path('/move'), 'POST', { to }), to === 'progress' ? 'Started.' : 'Moved to review.'); }
   priority(level: string) { void this.ctx.write(() => this.ctx.updateWork(this.id(), { priority: level }), `Now ${priorityLabel[level]} priority.`).then(() => this.load()); }
   steer() {

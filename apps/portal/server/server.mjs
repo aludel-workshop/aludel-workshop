@@ -59,7 +59,7 @@ import { answerDecision, createProposal, ensureB02Fixture, getDecision, getPropo
 import { openSecretStore } from './secret-store.mjs';
 import { githubIntegration, initGithubIdentities } from './github-integration.mjs';
 import { loadGitHubVendorConfig } from './github-vendor-config.mjs';
-import { commitWorkspace, initializeAndPush, inspectGitRepository, loadGitProfile, pushWorkspace } from './git-repository.mjs';
+import { commitWorkspace, gitWithToken, initializeAndPush, inspectGitRepository, loadGitProfile, pushWorkspace } from './git-repository.mjs';
 import { getProjectBrand, updateProjectBrand } from './project-brand.mjs';
 import { ensureProductWorkspace, getProductWorkspace, saveProductRecord } from './product-workspace.mjs';
 
@@ -160,6 +160,26 @@ for (const project of db.prepare(`SELECT p.id, p.description, s.feel FROM projec
   know.seedPages(project.id, project.feel);
 }
 // LAY-07: projects from before the Data layer and agent profiles get them (idempotent).
+// COLLAB-WORK-01: the project an item container belongs to, from its repository (as cloned), and its open goal item when its
+// branch names one (aludel/w-n). A container cloned on main has no item until its person connects it from one.
+function itemForBranch(repository, branch) {
+  const failWith = (message, status) => { throw Object.assign(new Error(message), { status }); };
+  const ref = /^aludel\/(w-\d+)$/i.exec(String(branch || ''))?.[1]?.toUpperCase() || null;
+  const key = /([^/:@]+)\/([^/]+?)(?:\.git)?\/?$/.exec(String(repository || '').replace(/^[a-z+]+:\/\/[^@/]*@/i, ''))?.slice(1).join('/').toLowerCase();
+  if (!key) failWith('Send the repository the container was cloned from.', 400);
+  for (const projectId of layerProjects()) {
+    const hit = db.withProject(projectId, () => {
+      let binding = null;
+      try { binding = db.prepare("SELECT owner, name FROM repository_bindings WHERE project_id = ? AND status = 'ready'").get(projectId); } catch { /* no repository */ }
+      if (!binding || `${binding.owner}/${binding.name}`.toLowerCase() !== key) return null;
+      if (!ref) return { projectId, item: null };
+      const item = know.workList(projectId).find(entry => entry.ref === ref && entry.scope === 'goal' && entry.state !== 'done');
+      return item ? { projectId, item } : null;
+    });
+    if (hit) return hit;
+  }
+  failWith(ref ? 'No open item in Aludel matches this repository and branch.' : 'No project in Aludel uses this repository.', 404);
+}
 const layerProjects = () => db.prepare("SELECT p.id FROM projects p JOIN project_setup s ON s.project_id = p.id WHERE p.id <> 'the-machine'").all().map(row => row.id);
 for (const projectId of layerProjects().filter(id => !db.prepare('SELECT layer_onboarding_version FROM project_setup WHERE project_id = ?').get(id)?.layer_onboarding_version)) {
   know.ensureAgents(projectId);
@@ -559,18 +579,42 @@ async function api(request, response, url) {
   }
   // Editor tokens are accepted only on these routes, never as portal sessions. They read; the one write authority they carry
   // (AGENT-WORK-01) is the token person's local agent working a goal item that person has claimed.
+  // The local tools themselves, for an item container to fetch at setup (COLLAB-WORK-01). Code, not secrets: no token.
+  const toolFile = /^\/api\/editor\/tools\/(aludel\.mjs|aludel-client\.mjs|editor-mcp\.mjs)$/.exec(url.pathname);
+  if (toolFile && request.method === 'GET') {
+    response.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' });
+    return response.end(readFileSync(new URL(`../tools/${toolFile[1]}`, import.meta.url)));
+  }
+  // COLLAB-WORK-01: an item container asks to be connected (its repository and the item's branch), then collects its token
+  // once its person connects it on the item's page. No token yet, so these two come before authentication.
+  if (url.pathname === '/api/editor/connect' && request.method === 'POST') {
+    const input = await readJson(request);
+    const found = itemForBranch(input.repository, input.branch);
+    const slug = db.prepare('SELECT slug FROM projects WHERE id = ?').get(found.projectId)?.slug;
+    return json(response, 201, { ...editor.requestConnection(found.projectId, found.item?.id || ''), item: found.item ? { ref: found.item.ref, title: found.item.title } : null,
+      verifyUrl: `${topology.portalOrigin}/p/${encodeURIComponent(slug)}/${found.item ? `work/item/${encodeURIComponent(found.item.id)}` : 'work'}` }, { 'cache-control': 'no-store' });
+  }
+  if (url.pathname === '/api/editor/connect/poll' && request.method === 'POST') {
+    const polled = editor.collectConnection((await readJson(request)).deviceCode);
+    const item = polled.workId ? db.withProject(polled.projectId, () => goals.view(polled.projectId, polled.workId).item) : null;
+    return json(response, 200, { ...polled, item: item ? { ref: item.ref, title: item.title } : undefined }, { 'cache-control': 'no-store' });
+  }
   if (url.pathname.startsWith('/api/editor/')) {
-    const { user: editorUser, projectId } = editor.authenticate(request.headers.authorization);
+    const { user: editorUser, projectId, workId: scope } = editor.authenticate(request.headers.authorization);
+    // An item container's token is for its one item, and stops when the item closes.
+    if (scope && goals.view(projectId, scope).item.board === 'done') return json(response, 401, { error: 'This item is closed; its container is done.' });
     const path = url.pathname.slice('/api/editor/'.length).split('/').map(decodeURIComponent);
     if (path[0] === 'goals' || path[0] === 'stack') {
       const done = (status, value) => json(response, status, value, { 'cache-control': 'no-store' });
       const agent = { kind: 'agent', id: editorUser.id, name: `${editorUser.name}'s local agent` };
       if (path[0] === 'stack' && path.length === 1 && request.method === 'GET') return done(200, { layers: goals.stackMap(projectId) });
       if (path.length === 1 && request.method === 'GET')
-        return done(200, { goals: goals.goals(projectId, url.searchParams.get('claimable') ? { claimableBy: editorUser.id } : { assignedTo: editorUser.id }) });
+        return done(200, { goals: goals.goals(projectId, url.searchParams.get('claimable') && !scope ? { claimableBy: editorUser.id } : { assignedTo: editorUser.id }).filter(item => !scope || item.id === scope) });
       if (path[0] !== 'goals' || path.length < 2) return json(response, 404, { error: 'Not found.' });
       const workId = path[1];
-      // The token's person claims through their own CLI (`aludel claim`); their agent's tools never offer it.
+      if (scope && workId !== scope) return json(response, 404, { error: 'Task not found.' });
+      // The token's person claims through their own CLI (`aludel claim`); their agent's tools never offer it. The item page
+      // assigns instead (people, or later remote agents).
       if (path[2] === 'claim' && path.length === 3 && request.method === 'POST') return done(200, goals.claim(editorUser, projectId, workId));
       goals.assertPerformer(editorUser, projectId, workId);
       const [operation, sub] = path.slice(2);
@@ -588,6 +632,8 @@ async function api(request, response, url) {
       if (operation === 'code' && !sub) return done(200, goals.recordCode(agent, projectId, workId, input));
       return json(response, 404, { error: 'Not found.' });
     }
+    if (path[0] === 'checkout' && path.length === 1 && request.method === 'POST')
+      return json(response, 200, editor.noteCheckout(editorUser, projectId, request.headers.authorization, await readJson(request)), { 'cache-control': 'no-store' });
     if (request.method !== 'GET') return json(response, 405, { error: 'Read only.' });
     if (path[0] === 'me' && path.length === 1) return json(response, 200, { projectId, user: editorUser, tools: editor.tools }, { 'cache-control': 'no-store' });
     if (path[0] === 'tasks' && path.length === 1) return json(response, 200, { tasks: editor.assigned(editorUser, projectId) }, { 'cache-control': 'no-store' });
@@ -1114,7 +1160,7 @@ async function api(request, response, url) {
     return json(response, result.status, result.body, { 'cache-control': 'no-store' });
   }
   // AGENT-WORK-01 A1: goal items. People drive them here; their local agent works on them through /api/editor/goals.
-  const goalRoute = /^\/api\/projects\/([^/]+)\/goals(?:\/([^/]+)(?:\/(define|move|claim|actions|events|answer|review|close|stream|read)(?:\/([^/]+))?)?)?$/.exec(url.pathname);
+  const goalRoute = /^\/api\/projects\/([^/]+)\/goals(?:\/([^/]+)(?:\/(define|move|claim|assign|container|connections|actions|events|answer|review|close|stream|read)(?:\/([^/]+))?)?)?$/.exec(url.pathname);
   if (goalRoute) {
     const [, rawProject, rawWork, operation, rawSub] = goalRoute;
     const projectId = decodeURIComponent(rawProject), workId = rawWork ? decodeURIComponent(rawWork) : null, sub = rawSub ? decodeURIComponent(rawSub) : null;
@@ -1127,16 +1173,64 @@ async function api(request, response, url) {
     if (!operation && method === 'GET') return done(200, goals.view(projectId, workId));
     if (operation === 'stream' && method === 'GET') return streamGoal(request, response, projectId, workId);
     if (operation === 'read' && method === 'GET') return done(200, { result: goals.readLayer(projectId, workId, url.searchParams.get('layer'), { operationId: url.searchParams.get('operationId'), id: url.searchParams.get('id') }) });
-    if (method !== 'POST' && !(operation === 'actions' && sub && method === 'PATCH')) return json(response, 405, { error: 'Method not allowed.' });
-    const input = await readJson(request);
+    if (method !== 'POST' && !(operation === 'actions' && sub && method === 'PATCH') && !(operation === 'connections' && !sub && method === 'GET')) return json(response, 405, { error: 'Method not allowed.' });
+    const input = method === 'GET' ? {} : await readJson(request);
     if (operation === 'define' && !sub) return done(200, goals.define(person, projectId, workId, input));
     if (operation === 'move' && !sub) return done(200, goals.move(user, projectId, workId, input.to));
     if (operation === 'claim' && !sub) return done(200, goals.claim(user, projectId, workId));
+    if (operation === 'assign' && !sub) return done(200, goals.assign(user, projectId, workId, input.assignee ?? null));
     if (operation === 'actions' && !sub) return done(201, goals.addAction(person, projectId, workId, input));
     if (operation === 'actions' && sub) return done(200, goals.updateAction(person, projectId, workId, Number(sub), input));
     if (operation === 'events' && !sub) return done(201, goals.post(person, projectId, workId, input));
     if (operation === 'answer' && sub) return done(200, goals.answer(user, projectId, workId, sub, input));
     if (operation === 'review' && sub) return done(200, goals.review(user, projectId, workId, Number(sub), input));
+    // The containers waiting to connect to this item, and connecting one (its person, signed in here).
+    if (operation === 'connections') {
+      const item = goals.view(projectId, workId).item;
+      if (!(item.assignee?.kind === 'person' && item.assignee.id === user.id)) throw Object.assign(new Error(`Only the person ${item.ref} is assigned to connects its containers.`), { status: 403 });
+      if (!sub && method === 'GET') return done(200, { waiting: editor.pendingConnections(projectId, workId) });
+      if (sub && method === 'POST') { const result = editor.approveConnection(user, projectId, workId, sub); goals.notePush(projectId, workId, `Connected a container (${sub.toUpperCase()})`); return done(200, result); }
+    }
+    if (operation === 'container' && !sub) {
+      // COLLAB-WORK-01: Go opens the item in a dev container on the person's machine. Aludel makes the item's branch on GitHub
+      // from main (unless it exists), and returns the Dev Containers link that clones it into its own volume and opens it.
+      const item = goals.view(projectId, workId).item;
+      const refuse = message => { throw Object.assign(new Error(message), { status: 409 }); };
+      if (!(item.assignee?.kind === 'person' && item.assignee.id === user.id)) refuse(`Assign ${item.ref} to yourself to open it in a container.`);
+      if (!['draft', 'ready', 'progress'].includes(item.board)) refuse(`${item.ref} is ${item.board === 'done' ? 'closed' : 'in review'}.`);
+      const binding = github.status(user.id, projectId, null).repository;
+      if (binding?.status !== 'ready') refuse('An item container clones the project\'s GitHub repository; connect one to the project first.');
+      if (codeRemote(projectId)) {
+        const settled = (await syncCode(projectId)).remote;
+        if (settled?.state !== 'in-sync') refuse(`The item's branch starts from main, and main doesn't match GitHub yet: ${settled?.detail || settled?.state}.`);
+      }
+      const branch = `aludel/${item.ref.toLowerCase()}`;
+      const workspace = flows.projectSetup(user, projectId).workspacePath;
+      // The container is built from the repository's own dev container; without one, VS Code would only offer templates.
+      if (gitWithToken(workspace, ['cat-file', '-e', 'refs/heads/main:.devcontainer/devcontainer.json'], null).status !== 0)
+        refuse(`main has no .devcontainer/devcontainer.json, so there's nothing to build ${item.ref}'s container from. Add one to the repository first.`);
+      const token = await github.installationTokenForRepository(projectId, binding.name);
+      const listed = gitWithToken(workspace, ['ls-remote', '--heads', binding.clone_url, `refs/heads/${branch}`], token);
+      if (listed.status !== 0) refuse(`Couldn't reach ${binding.owner}/${binding.name} on GitHub.`);
+      const created = !listed.stdout.trim();
+      const push = what => { const pushed = gitWithToken(workspace, ['push', '--quiet', binding.clone_url, `refs/heads/main:refs/heads/${branch}`], token);
+        if (pushed.status !== 0) refuse(`Couldn't ${what} ${branch} on GitHub: ${String(pushed.stderr || '').trim().split('\n').pop()}`); };
+      let caughtUp = false;
+      if (created) push('create');
+      else {
+        // A branch with no work of its own yet follows main (so it has main's dev container); one with work is left alone.
+        const tip = listed.stdout.trim().split(/\s/)[0], main = gitWithToken(workspace, ['rev-parse', 'refs/heads/main'], token).stdout.trim();
+        gitWithToken(workspace, ['fetch', '--quiet', '--no-tags', binding.clone_url, `+refs/heads/${branch}:refs/aludel/item-branch`], token);
+        if (tip !== main && gitWithToken(workspace, ['merge-base', '--is-ancestor', tip, main], token).status === 0) { push('update'); caughtUp = true; }
+      }
+      goals.notePush(projectId, workId, created ? `Made ${branch} on GitHub from main, for an item container` : caughtUp ? `Moved ${branch} up to main on GitHub (it had no work yet) and opened it in an item container` : `Opened ${branch} in an item container`);
+      const slug = db.prepare('SELECT slug FROM projects WHERE id = ?').get(projectId)?.slug || 'project';
+      // Dev Containers checks the url with `git ls-remote` as given, so it is the plain repository: the clone starts on main
+      // and switches to the item's branch once its person connects it from this item.
+      const link = 'vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=' + encodeURIComponent(binding.clone_url)
+        + '&volume=' + encodeURIComponent(`aludel-${slug}-${item.ref.toLowerCase()}`);
+      return done(200, { branch, created, caughtUp, link });
+    }
     if (operation === 'close' && !sub) {
       // CW-1: the reported branch comes from the project's GitHub repository, then close-out merges it into main and a
       // project with a GitHub repository gets main pushed there too, as the build does (through Code's sync when it has one).
@@ -1807,7 +1901,10 @@ async function serveApp(request, response, slug) {
 
 const server = createServer(async (request, response) => {
   try {
-    const target = topology.classify(request.headers.host);
+    let target = topology.classify(request.headers.host);
+    // Item containers (COLLAB-WORK-01) reach a portal on their machine as host.docker.internal. They get the editor API
+    // only (token-authenticated); anything else there, such as an app preview's container, still gets nothing.
+    if (target.kind === 'unknown' && target.host === 'host.docker.internal' && /^\/api\/editor\//.test(new URL(request.url, 'http://x').pathname)) target = { kind: 'portal', host: target.host };
     // PROJECT-DB-01: each request runs with its project as the current project, so its statements reach only that
     // project's database. The project comes from the URL, the worker credential or the app host.
     const projectId = requestProject(request, target);

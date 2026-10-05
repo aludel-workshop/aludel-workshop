@@ -1,8 +1,9 @@
 // A small stdio MCP adapter for Aludel's editor API. It reads project context, and (AGENT-WORK-01) lets your local agent work a
 // goal item you have claimed: define it, add and move actions, talk in its thread, and stage changes through each layer's API.
 import readline from 'node:readline';
-import { configPath, loadConfig, pair, pushReport, request } from './aludel-client.mjs';
+import { branchItem, checkoutInfo, configPath, inContainer, loadConfig, pair, pushReport, request, startBranch } from './aludel-client.mjs';
 
+let config;
 const names = {
   assigned_tasks: { description: 'List work assigned to you in this Aludel project.', schema: { type: 'object', properties: {} }, path: () => '/tasks' },
   task_context: { description: 'Read a task and save its versioned context bundle.', schema: { type: 'object', properties: { workId: { type: 'string' } }, required: ['workId'] }, path: a => '/tasks/' + encodeURIComponent(a.workId) },
@@ -12,6 +13,16 @@ const names = {
   search_knowledge: { description: 'Search this project’s live knowledge by text.', schema: { type: 'object', properties: { query: { type: 'string', minLength: 2 } }, required: ['query'] }, path: a => '/search?q=' + encodeURIComponent(a.query) },
   environment_status: { description: 'Inspect the project preview and source commit.', schema: { type: 'object', properties: {} }, path: () => '/environment' },
   work_list: { description: 'List the goal work items you have claimed, with their board column, action counts and open needs.', schema: { type: 'object', properties: {} }, path: () => '/goals' },
+  start_work: { description: 'Start on a goal item assigned to your person: checks out its branch (aludel/w-n) in this checkout, from the latest main, and returns the item. Call it first when asked to work on an item. Without workId, the item is the one this checkout\u2019s branch is for (an item container opens on it).',
+    schema: { type: 'object', properties: { workId: { type: 'string', description: 'The item id, or its number such as W-12.' } } },
+    run: async a => {
+      a = { ...a, workId: a.workId || branchItem(process.cwd()) };
+      if (!a.workId) throw new Error('Name the item, for example W-12: this checkout is not on an item\u2019s branch.');
+      const id = /^w-\d+$/i.test(a.workId) ? ((await request(config, '/goals')).goals.find(item => item.ref.toLowerCase() === a.workId.toLowerCase())?.id) : a.workId;
+      if (!id) throw new Error(`${a.workId} isn't assigned to your person.`);
+      const view = await request(config, goal({ workId: id }));
+      return { started: startBranch(process.cwd(), view.item.ref), item: view };
+    } },
   work_view: { description: 'Read a goal item: its brief, phases, actions (with what blocks each), open needs, recent thread and staged changeset.',
     schema: { type: 'object', properties: { workId: { type: 'string' } }, required: ['workId'] }, path: a => goal(a) },
   stack_map: { description: 'List the project\u2019s layers: what each owns, its charter and the operations its API offers.', schema: { type: 'object', properties: {} }, path: () => '/stack' },
@@ -54,14 +65,15 @@ if (process.argv[2] === 'pair') {
     process.stdout.write('Connected to ' + me.projectId + '. Credential stored outside the repository at ' + configPath + '.\n');
   } catch (error) { process.stderr.write(error.message + '\n'); process.exitCode = 1; }
 } else {
-  let config;
   try { config = loadConfig(); }
   catch (error) { process.stderr.write('Pair Aludel first: ' + error.message + '\n'); process.exit(1); }
+  // Tell Aludel where this checkout is, so the item page can open it. Best effort: the tools work without it.
+  if (!inContainer()) try { request(config, '/checkout', checkoutInfo(process.cwd())).catch(() => {}); } catch { /* not a git checkout */ }
   const respond = object => process.stdout.write(JSON.stringify(object) + '\n');
   const rpcError = (id, code, message) => respond({ jsonrpc: '2.0', id, error: { code, message } });
   const handle = async msg => {
     if (msg.id === undefined) return;
-    if (msg.method === 'initialize') return respond({ jsonrpc: '2.0', id: msg.id, result: { protocolVersion: msg.params?.protocolVersion || '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'aludel-editor', version: '0.1.0' }, instructions: 'Read your assigned task context before editing. Project records are live; saved task bundles are immutable. For a goal item your person claimed, you are its orchestrator: read work_view and stack_map first. If it has no actions yet, define_work it in phases (a review gate after spec work) with one action per layer change. Work only on actions that are not blocked: move one to working, do it, post_message what you did, then update_action to review with a summary. Records change only through stage_change on that layer\'s API; code changes go on a branch named for the item in this checkout, committed, then report_code (it pushes the branch to origin). If close-out finds your branch conflicts with main, your person\'s note says so: fetch origin, rebase onto origin/main, resolve, commit and report_code again. Check work_view between actions: a flag on an action you handed to review moves it back to working with your person\'s note; address the note, post_message what changed, and hand it back. When you need your person, ask on the action (or request_allow before anything outside its scope) and continue other unblocked actions meanwhile. Propose new actions with add_action and a reason. Never mark actions done or close the item; your person reviews.' } });
+    if (msg.method === 'initialize') return respond({ jsonrpc: '2.0', id: msg.id, result: { protocolVersion: msg.params?.protocolVersion || '2024-11-05', capabilities: { tools: {} }, serverInfo: { name: 'aludel-editor', version: '0.1.0' }, instructions: 'Read your assigned task context before editing. Project records are live; saved task bundles are immutable. For a goal item assigned to your person, you are its orchestrator: call start_work first (it checks out the item\'s branch; in an item container, with no workId, it finds the item from the branch), then read work_view and stack_map. If it has no actions yet, define_work it in phases (a review gate after spec work) with one action per layer change; that moves it to Ready, so post_message a short summary and stop: your person checks it and starts it on its page, and actions can\'t start before that. Work only on actions that are not blocked: move one to working, do it, post_message what you did, then update_action to review with a summary. Records change only through stage_change on that layer\'s API; code changes go on the item\'s branch (start_work checked it out), committed, then report_code (it pushes the branch to origin). If close-out finds your branch conflicts with main, your person\'s note says so: fetch origin, rebase onto origin/main, resolve, commit and report_code again. Check work_view between actions: a flag on an action you handed to review moves it back to working with your person\'s note; address the note, post_message what changed, and hand it back. When you need your person, ask on the action (or request_allow before anything outside its scope) and continue other unblocked actions meanwhile. Propose new actions with add_action and a reason. Never mark actions done or close the item; your person reviews.' } });
     if (msg.method === 'ping') return respond({ jsonrpc: '2.0', id: msg.id, result: {} });
     if (msg.method === 'tools/list') return respond({ jsonrpc: '2.0', id: msg.id, result: { tools: Object.entries(names).map(([name, tool]) => ({ name, description: tool.description, inputSchema: tool.schema })) } });
     if (msg.method === 'tools/call') {
@@ -70,7 +82,7 @@ if (process.argv[2] === 'pair') {
       try {
         const args = msg.params?.arguments || {};
         for (const key of tool.schema.required || []) if (args[key] === undefined || args[key] === null || args[key] === '') throw new Error('Missing ' + key + '.');
-        const result = tool.post ? await request(config, ...tool.post(args)) : await request(config, tool.path(args));
+        const result = tool.run ? await tool.run(args) : tool.post ? await request(config, ...tool.post(args)) : await request(config, tool.path(args));
         return respond({ jsonrpc: '2.0', id: msg.id, result: { content: [{ type: 'text', text: JSON.stringify(result) }] } });
       } catch (error) { return respond({ jsonrpc: '2.0', id: msg.id, result: { isError: true, content: [{ type: 'text', text: error.message }] } }); }
     }

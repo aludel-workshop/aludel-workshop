@@ -2,7 +2,10 @@
 // AGENT-WORK-01 A8: the local work style. You claim a goal item from your checkout; Claude Code (on your own subscription)
 // works it through the Aludel tools in tools/editor-mcp.mjs, and you watch and answer on the item page.
 //
-//   node apps/portal/tools/aludel.mjs pair [portal origin]   store an editor token from Work › Team (outside the repository)
+//   node apps/portal/tools/aludel.mjs pair [portal origin]   once per checkout: store an editor token from Work › Team (outside
+//                                                           the repository) and connect Claude Code in this folder to Aludel
+//   aludel connect                                          in an item container: connect it to its item (press Connect on
+//                                                           the item's page beside the code it shows); no token to copy
 //   node apps/portal/tools/aludel.mjs list                   your goal items, and the open ones you could claim
 //   node apps/portal/tools/aludel.mjs claim W-12             claim it and connect Claude Code in this folder to Aludel
 //   node apps/portal/tools/aludel.mjs status W-12            where it stands: actions, what waits on you, the changeset
@@ -10,7 +13,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
-import { configPath, pushReport, loadConfig, pair, request } from './aludel-client.mjs';
+import { checkoutInfo, configPath, connectContainer, inContainer, pushReport, loadConfig, pair, request } from './aludel-client.mjs';
 
 const adapter = new URL('./editor-mcp.mjs', import.meta.url).pathname;
 const out = text => process.stdout.write(text + '\n');
@@ -46,6 +49,19 @@ try {
   if (command === 'pair') {
     const me = await pair(arg);
     out(`Connected to ${me.projectId} as ${me.user.name}. The token is stored outside the repository at ${configPath}.`);
+    if (inContainer()) out('Every item container uses this connection. Claude Code here can reach Aludel; ask it to start on the item.');
+    else {
+      const file = connect(process.cwd());
+      try { await request(loadConfig(), '/checkout', checkoutInfo(process.cwd())); } catch { /* not a git checkout: Open in VS Code still works from a window you open */ }
+      out(`Claude Code in this folder can reach Aludel (${file}). Items assigned to you now open here from their page: Open in VS Code.`);
+    }
+  } else if (command === 'connect') {
+    const done = await connectContainer(process.cwd(), { origin: arg, said: asked => {
+      out(asked.item ? `Connect this container to ${asked.item.ref} “${asked.item.title}”: on its page in Aludel, press Connect beside ${asked.userCode}.`
+        : `Connect this container to its item: on the item's page in Aludel, press Connect beside ${asked.userCode}.`);
+      out(`  ${asked.verifyUrl}`);
+    } });
+    out(`Connected to ${done.item.ref}${done.started ? `, on ${done.started.branch}` : ''}. Claude Code here can work on it: ask it to start.`);
   } else if (command === 'list') {
     const config = loadConfig();
     const { goals } = await request(config, '/goals?claimable=1');
@@ -84,7 +100,7 @@ try {
     const left = view.actions.filter(action => !['review', 'done', 'proposed'].includes(action.state));
     out(left.length ? `Still open: #${left.map(action => action.number).join(', #')}.` : `Every action is ready for review; move ${item.ref} to review on its page.`);
   } else {
-    out('Usage: aludel pair [origin] | list | claim W-n | status W-n | submit W-n');
+    out('Usage: aludel connect | pair [origin] | list | claim W-n | status W-n | submit W-n');
     if (command && command !== 'help') process.exitCode = 1;
   }
 } catch (error) {

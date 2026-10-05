@@ -8,7 +8,7 @@ import { randomBytes } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { requireMember } from './accounts.mjs';
+import { getUser, isMember, requireMember } from './accounts.mjs';
 import { gitWithToken } from './git-repository.mjs';
 import { applyWrites, callOperation, draftChanges, draftOverlay, layerApi, stageOperation } from './layer-api.mjs';
 import { layerCatalog } from './layer-contract.mjs';
@@ -206,6 +206,29 @@ export function agentWork({ db, know, catalogs = null }) {
       .run(user.id, user.name, now(), workId, projectId);
     saveGoal(projectId, goalItem(projectId, workId), { performer: 'local' }, `${user.name} claimed it to work locally`, { kind: 'person', id: user.id });
     record(projectId, workId, { kind: 'log', author: { kind: 'person', id: user.id, name: user.name }, text: 'Claimed to work locally' });
+    emit(projectId, workId, { type: 'item' });
+    return view(projectId, workId);
+  }
+  // Who works on it is the assignee: a person works on their own machine (with their own agent), and one of the project's
+  // agents works remotely, which waits for the remote runtime (A2). Changeable until the item starts.
+  function assign(user, projectId, workId, assignee) {
+    requireMember(db, user, projectId);
+    const item = goalItem(projectId, workId);
+    if (!['draft', 'ready'].includes(item.board)) fail(`${item.ref} has started; its assignee stays.`, 409);
+    const by = { kind: 'person', id: user.id }, author = { kind: 'person', id: user.id, name: user.name };
+    if (!assignee) {
+      db.prepare("UPDATE layer_work_items SET assignee_kind = NULL, assignee_id = NULL, assignee_label = NULL, profile_id = NULL, updated_at = ? WHERE id = ? AND project_id = ?").run(now(), workId, projectId);
+      saveGoal(projectId, goalItem(projectId, workId), { performer: null }, `${user.name} unassigned it`, by);
+      record(projectId, workId, { kind: 'log', author, text: 'Unassigned' });
+    } else if (assignee.kind === 'agent') {
+      fail('Remote agents come with the remote runtime (AGENT-WORK-01 A2). Assign a person for now.', 409);
+    } else if (assignee.kind === 'person') {
+      const person = isMember(db, String(assignee.id || ''), projectId) ? getUser(db, String(assignee.id)) : null;
+      if (!person) fail('Assign someone who is a member of this project.', 409);
+      db.prepare("UPDATE layer_work_items SET assignee_kind = 'person', assignee_id = ?, assignee_label = ?, profile_id = NULL, updated_at = ? WHERE id = ? AND project_id = ?").run(person.id, person.name, now(), workId, projectId);
+      saveGoal(projectId, goalItem(projectId, workId), { performer: 'local' }, `${user.name} assigned it to ${person.id === user.id ? 'themself' : person.name}`, by);
+      record(projectId, workId, { kind: 'log', author, text: person.id === user.id ? 'Assigned to themself' : `Assigned to ${person.name}` });
+    } else fail('Assign a person or an agent.');
     emit(projectId, workId, { type: 'item' });
     return view(projectId, workId);
   }
@@ -553,5 +576,5 @@ export function agentWork({ db, know, catalogs = null }) {
     return () => bus.off(key, listener);
   }
 
-  return { createGoal, view, define, move, claim, assertPerformer, addAction, updateAction, post, answer, stage, recordCode, review, fetchCode, closeOut, notePush, changeset, stackMap, readLayer, goals, subscribe };
+  return { createGoal, view, define, move, claim, assign, assertPerformer, addAction, updateAction, post, answer, stage, recordCode, review, fetchCode, closeOut, notePush, changeset, stackMap, readLayer, goals, subscribe };
 }
