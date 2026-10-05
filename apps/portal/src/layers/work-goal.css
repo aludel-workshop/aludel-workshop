@@ -111,6 +111,5 @@
 .wg-close{margin-top:14px;padding:12px 14px;border:1px solid var(--lay-ok-ink);border-radius:10px;background:var(--lay-ok-bg)}
 .wg-close h2{display:flex;align-items:center;gap:8px;margin:0 0 6px;font-size:16px}
 .wg-close p{margin:0 0 6px}
-.wg-confirm{display:flex;align-items:center;gap:8px;font-size:14px;margin:6px 0}
 .wg-closed{margin-top:12px}
 .wg-ev-flag p{background:#fde8e6;border:1px solid #f4b8b0}

@@ -4,8 +4,8 @@
 // a staged change shows in the changeset; review gates clear. Screens and axe at 1440 and 390 px.
 // Usage: npm run build, then PLAYWRIGHT_MODULE=<…/playwright/index.mjs> MACHINE_LAYER_TEMPLATES_ENABLED=1 node tests/agent-work-browser.mjs
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { execFileSync, spawn } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -33,6 +33,19 @@ const { token } = flows.saveDraft(null, { profile: 'planner' });
 flows.saveDraft(token, { name: 'Tool Share', pitch: 'Help neighbours share tools. Borrow a drill in minutes.' });
 const project = flows.claimDraft(token, owner, owner).project;
 know.ensureDesign(project.id);
+// The project repository (main checked out) and the person's checkout, where the agent commits on aludel/w-8 while main moves on.
+const git = (cwd, ...args) => execFileSync('git', ['-c', 'user.name=Charles', '-c', 'user.email=owner@example.com', ...args], { cwd, encoding: 'utf8' }).trim();
+const repo = join(root, 'project'), checkout = join(root, 'checkout');
+git(root, 'init', '-q', '-b', 'main', repo);
+mkdirSync(join(repo, 'server')); writeFileSync(join(repo, 'server/routes.mjs'), 'export const routes = [];\n');
+git(repo, 'add', '.'); git(repo, 'commit', '-qm', 'start');
+git(root, 'clone', '-q', repo, checkout); git(checkout, 'checkout', '-q', '-b', 'aludel/w-8');
+mkdirSync(join(checkout, 'src/pages'), { recursive: true }); writeFileSync(join(checkout, 'src/pages/sign-up.html'), '<h1>Join Tool Share</h1>\n');
+writeFileSync(join(checkout, 'server/routes.mjs'), "export const routes = ['/sign-up'];\n");
+git(checkout, 'add', '.'); git(checkout, 'commit', '-qm', 'sign-up page');
+writeFileSync(join(repo, 'README.md'), 'Tool Share\n'); git(repo, 'add', '.'); git(repo, 'commit', '-qm', 'readme');
+db.prepare('UPDATE project_setup SET workspace_path = ? WHERE project_id = ?').run(repo, project.id);
+const branchCommit = git(checkout, 'rev-parse', 'HEAD'), short = branchCommit.slice(0, 7);
 db.close();
 
 const probe = createServer(); await new Promise(resolve => probe.listen(0, '127.0.0.1', resolve));
@@ -165,19 +178,20 @@ try {
   await card(3).getByRole('button', { name: 'Approve' }).click();
   await state(3, 'Done');
   // A8: code committed in the person's checkout shows beside the staged records.
-  await agent('/code', { branch: 'aludel/w-8', commit: '3f2a9c1d0b7e4a5c6d8e9f00112233445566778', base: '1111111', files: [{ path: 'src/pages/sign-up.html', status: 'added' }, { path: 'server/routes.mjs', status: 'modified' }] });
+  await agent('/code', { branch: 'aludel/w-8', commit: branchCommit, base: git(repo, 'rev-parse', 'main~1'), checkout, files: [{ path: 'src/pages/sign-up.html', status: 'added' }, { path: 'server/routes.mjs', status: 'modified' }] });
   await main.locator('.wg-changes', { hasText: 'aludel/w-8' }).getByText('src/pages/sign-up.html').waitFor();
   await main.getByRole('button', { name: 'Move to review' }).click();
   await main.locator('.wg-board-review').waitFor();
   assert.deepEqual((await agent('/changeset')).changeset.map(group => group.layer), ['design', 'product']);
-  // Close-out: the code isn't in the project repository here, so its person confirms the merge.
+  // Close-out is "looks good, merge it": the branch merges into main (a merge commit, as main moved) with the records.
   await main.getByRole('heading', { name: 'Ready to close out' }).waitFor();
-  assert.equal(await main.getByRole('button', { name: 'Close out' }).isEnabled(), false, 'unmerged code holds close-out');
+  await main.locator('.wg-close').getByText(`Closing merges aludel/w-8 (${short}) into main and applies 2 staged record changes in Design and Vision at once.`).waitFor();
   await shot('05-close-out'); await audit('close out');
-  await main.getByLabel(/I've merged aludel\/w-8 at 3f2a9c1/).check();
-  await main.getByRole('button', { name: 'Close out' }).click();
+  await main.getByRole('button', { name: 'Close out and merge' }).click();
   await main.locator('.wg-board-done').waitFor();
-  await main.getByText(/Closed\. Applied 2 record changes; code merged, as confirmed/).waitFor();
+  await main.getByText(/Closed\. Applied 2 record changes; merged aludel\/w-8 into main with a merge commit \([0-9a-f]{7}\)/).waitFor();
+  assert.equal(git(repo, 'rev-list', '--parents', '-n', '1', 'main').split(' ').length, 3, 'main has the merge commit');
+  assert.ok(existsSync(join(repo, 'src/pages/sign-up.html')) && existsSync(join(repo, 'README.md')), 'the checked-out main has both sides');
   await main.getByText('Applied at close-out').waitFor();
   // The thread follows its newest entry, so the close-out is in view without scrolling the list.
   const last = main.locator('.wg-events > li').last();
@@ -190,7 +204,7 @@ try {
   await page.reload(); await main.getByRole('heading', { name: 'Create the sign-up flow' }).waitFor();
   await shot('07-phone'); await audit('phone');
   assert.deepEqual(errors, []);
-  console.log('PASS goal item page: create, define, agent phases it with a review gate, claim locally, start, live question and approval on their actions, answer, staged changeset by layer, reported code, details and log, steer, per-action review with a flag the agent addresses, gate held and cleared, move to review, close-out with confirmed merge, axe at 1440 and 390 px.');
+  console.log('PASS goal item page: create, define, agent phases it with a review gate, claim locally, start, live question and approval on their actions, answer, staged changeset by layer, reported code, details and log, steer, per-action review with a flag the agent addresses, gate held and cleared, move to review, close-out that merges the branch into main, axe at 1440 and 390 px.');
 } catch (error) {
   for (const open of browser.contexts().flatMap(context => context.pages())) await open.screenshot({ path: dest + 'failure.png', fullPage: true }).catch(() => {});
   console.error(serverLog.split('\n').filter(line => /error/i.test(line) && !/ExperimentalWarning/.test(line)).slice(-10).join('\n'));

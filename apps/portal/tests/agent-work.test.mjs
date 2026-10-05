@@ -1,6 +1,7 @@
 // AGENT-WORK-01 A1: goal items with phases, gated actions, needs on actions, a live thread and one changeset across layers.
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -327,7 +328,7 @@ test('A8: the aludel CLI claims a goal item from a checkout, connects Claude Cod
   }
 });
 
-test('A4: an action is reviewed on its own; a flag sends it back to its agent; close-out needs every action approved and the code merged', () => fixture(({ work, ada, id }) => {
+test('A4: an action is reviewed on its own; a flag sends it back to its agent; close-out merges the code, sending conflicts back to rebase', () => fixture(({ db, work, ada, id }) => {
   const agent = { kind: 'agent', id: ada.id, name: "Ada's local agent" };
   const workId = work.createGoal(ada, id, { title: 'Borrow button' }).item.id;
   work.define(agent, id, workId, { brief: 'A member borrows a tool.', phases: [{ title: 'Build', gated: true }, { title: 'Polish' }], actions: [{ phase: 1, goal: 'Add the button' }, { phase: 2, goal: 'Tidy the copy' }] });
@@ -345,18 +346,55 @@ test('A4: an action is reviewed on its own; a flag sends it back to its agent; c
   assert.equal(approved.actions[0].state, 'done');
   assert.equal(approved.actions[1].blocked, null, 'approving the phase clears its gate');
   work.updateAction(agent, id, workId, 2, { state: 'working' });
-  work.recordCode(agent, id, workId, { branch: 'aludel/borrow', commit: 'a'.repeat(40), files: [{ path: 'borrow.js', status: 'added' }] });
-  assert.throws(() => work.recordCode(agent, id, workId, { branch: 'bad branch;', commit: 'a'.repeat(40) }), /Name a git branch/);
-  work.updateAction(agent, id, workId, 2, { state: 'review' });
-  assert.throws(() => work.closeOut(ada, id, workId), /Move .* to review first/);
-  work.move(ada, id, workId, 'review');
-  assert.throws(() => work.closeOut(ada, id, workId), /Review #2 first/);
-  work.review(ada, id, workId, 2, { verdict: 'approve' });
-  assert.throws(() => work.closeOut(ada, id, workId), /Merge aludel\/borrow at aaaaaaa, then close out/);
-  const closed = work.closeOut(ada, id, workId, { codeMerged: true });
-  assert.equal(closed.item.board, 'done');
-  assert.equal(closed.code.merged, 'confirmed');
-  assert.match(closed.events.at(-1).text, /Closed: applied 0 record changes; code merged, as confirmed/);
+
+  // The project repository (main checked out) and the person's checkout, where the agent works on a branch.
+  const root = mkdtempSync(join(tmpdir(), 'aludel-merge-'));
+  const git = (cwd, ...args) => execFileSync('git', ['-c', 'user.name=Ada', '-c', 'user.email=ada@example.invalid', ...args], { cwd, encoding: 'utf8' }).trim();
+  const repo = join(root, 'project'), checkout = join(root, 'checkout');
+  try {
+    git(root, 'init', '-q', '-b', 'main', repo);
+    writeFileSync(join(repo, 'copy.txt'), 'Borrow\n'); git(repo, 'add', '.'); git(repo, 'commit', '-qm', 'start');
+    git(root, 'clone', '-q', repo, checkout); git(checkout, 'checkout', '-q', '-b', 'aludel/borrow');
+    writeFileSync(join(checkout, 'copy.txt'), 'Borrow for 3 days\n'); writeFileSync(join(checkout, 'borrow.js'), 'export const borrow = () => true;\n');
+    git(checkout, 'add', '.'); git(checkout, 'commit', '-qm', 'borrow button');
+    writeFileSync(join(repo, 'copy.txt'), 'Borrow it\n'); git(repo, 'commit', '-qam', 'main moves the same line');
+    const report = () => work.recordCode(agent, id, workId, { branch: 'aludel/borrow', commit: git(checkout, 'rev-parse', 'HEAD'), checkout, files: [{ path: 'borrow.js', status: 'added' }] });
+    report();
+    assert.throws(() => work.recordCode(agent, id, workId, { branch: 'bad branch;', commit: 'a'.repeat(40) }), /Name a git branch/);
+    assert.throws(() => work.recordCode(agent, id, workId, { branch: 'aludel/borrow', commit: 'a'.repeat(40), checkout: 'relative/path' }), /absolute path/);
+    work.updateAction(agent, id, workId, 2, { state: 'review' });
+    assert.throws(() => work.closeOut(ada, id, workId), /Move .* to review first/);
+    work.move(ada, id, workId, 'review');
+    assert.throws(() => work.closeOut(ada, id, workId), /Review #2 first/);
+    work.review(ada, id, workId, 2, { verdict: 'approve' });
+    assert.throws(() => work.closeOut(ada, id, workId), /no repository with a main branch/);
+    db.prepare('UPDATE project_setup SET workspace_path = ? WHERE project_id = ?').run(repo, id);
+    assert.equal(work.view(id, workId).code.target, 'main');
+
+    // A conflict goes back to the agent, who rebases and reports again.
+    const mainBefore = git(repo, 'rev-parse', 'main');
+    assert.throws(() => work.closeOut(ada, id, workId), error => error.status === 409 && /conflicts with main in copy\.txt\. Sent back to the agent to rebase/.test(error.message));
+    const sentBack = work.view(id, workId);
+    assert.equal(sentBack.item.board, 'progress');
+    assert.match(sentBack.events.at(-1).text, /couldn't merge aludel\/borrow into main: it conflicts in copy\.txt\. Rebase it onto main/);
+    assert.equal(git(repo, 'rev-parse', 'main'), mainBefore, 'nothing merged');
+    git(checkout, 'fetch', '-q', 'origin', 'main'); git(checkout, 'reset', '-q', '--hard', 'origin/main');
+    writeFileSync(join(checkout, 'borrow.js'), 'export const borrow = () => true;\n'); git(checkout, 'add', '.'); git(checkout, 'commit', '-qm', 'borrow button, rebased');
+    report();
+    // Main moves again without conflict: close-out writes a merge commit, and the records and code land together.
+    writeFileSync(join(repo, 'other.txt'), 'elsewhere\n'); git(repo, 'add', '.'); git(repo, 'commit', '-qm', 'unrelated');
+    work.move(ada, id, workId, 'review');
+    const closed = work.closeOut(ada, id, workId);
+    assert.equal(closed.item.board, 'done');
+    assert.equal(closed.code.merged.mode, 'merge commit');
+    assert.equal(git(repo, 'rev-parse', 'main'), closed.code.merged.commit);
+    assert.equal(git(repo, 'rev-list', '--parents', '-n', '1', 'main').split(' ').length, 3, 'a merge commit');
+    assert.match(git(repo, 'log', '-1', '--format=%s %an', 'main'), /^Merge aludel\/borrow \(W-\d+: Borrow button\) Ada$/);
+    assert.ok(existsSync(join(repo, 'borrow.js')) && existsSync(join(repo, 'other.txt')), 'the checked-out main is fast-forwarded to the merge');
+    assert.equal(git(repo, 'status', '--porcelain'), '');
+    assert.equal(closed.code.inRepository, true);
+    assert.match(closed.events.at(-1).text, /Closed: applied 0 record changes; merged aludel\/borrow into main with a merge commit \([0-9a-f]{7}\)/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 }));
 
 test('A4: close-out applies the staged changes of every layer at once, and refuses when a record moved since', { skip: !templates && 'needs layer templates' }, () => fixture(({ know, work, ada, id }) => {

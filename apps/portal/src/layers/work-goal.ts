@@ -15,7 +15,7 @@ export type GoalEvent = { id: number; action: number | null; kind: 'message' | '
 export type GoalAction = { id: string; number: number; phase: number; layer: string | null; goal: string; after: number[]; state: 'proposed' | 'todo' | 'working' | 'review' | 'done';
   summary: string; addedBy: GoalAuthor | null; updatedAt: string; needs: GoalEvent[]; blocked: string | null };
 type GoalChange = { id: string; kind: string; op: 'create' | 'update' | 'delete'; action?: number | null; after?: Record<string, unknown> | null; before?: Record<string, unknown> | null };
-export type GoalCode = { branch: string; commit: string; base: string | null; files: { path: string; status: string }[]; at: string; inRepository?: boolean; merged?: 'verified' | 'confirmed' };
+export type GoalCode = { branch: string; commit: string; base: string | null; files: { path: string; status: string }[]; at: string; inRepository?: boolean; target?: string | null; merged?: { into: string; commit: string; mode: string } | null };
 export type GoalView = { item: WorkItem & { board: string }; brief: string; defined: boolean; performer: string | null; code: GoalCode | null; phases: { number: number; title: string; gated: boolean }[];
   actions: GoalAction[]; needs: GoalEvent[]; events: GoalEvent[]; changeset: { layer: string; changes: GoalChange[] }[] };
 
@@ -70,12 +70,9 @@ const actionIcon: Record<string, string> = { proposed: 'add_task', todo: 'radio_
           @if (goal.item.board === 'review') {
             <div class="wg-close" role="group" aria-labelledby="wg-close-title">
               <h2 id="wg-close-title"><mat-icon aria-hidden="true">task_alt</mat-icon>Ready to close out</h2>
-              <p>Closing applies {{ recordCount() }} staged record change{{ recordCount() === 1 ? '' : 's' }}@if (goal.changeset.length) { in {{ changedLayers() }} } at once.@if (!goal.changeset.length && !goal.code) { Nothing is staged; it closes as done. }</p>
-              @if (goal.code; as code) {
-                @if (code.inRepository) { <p class="wg-hint"><mat-icon aria-hidden="true">check_circle</mat-icon>{{ code.branch }} at {{ code.commit.slice(0, 7) }} is in the project repository.</p> }
-                @else { <label class="wg-confirm"><input type="checkbox" name="merged" [(ngModel)]="mergedConfirm">I've merged {{ code.branch }} at {{ code.commit.slice(0, 7) }} (a pull request or git merge)</label> }
-              }
-              <div class="wg-row wg-end"><button type="button" class="lay-button wg-go" (click)="close()" [disabled]="!!goal.code && !goal.code.inRepository && !mergedConfirm"><mat-icon aria-hidden="true">done_all</mat-icon>Close out</button></div>
+              <p>Closing @if (goal.code && !goal.code.inRepository) { merges <code>{{ goal.code.branch }}</code> ({{ goal.code.commit.slice(0, 7) }}) into {{ goal.code.target || 'main' }} and }applies {{ recordCount() }} staged record change{{ recordCount() === 1 ? '' : 's' }}@if (goal.changeset.length) { in {{ changedLayers() }} } at once.@if (!goal.changeset.length && !goal.code) { Nothing is staged; it closes as done. }</p>
+              @if (goal.code?.inRepository) { <p class="wg-hint"><mat-icon aria-hidden="true">check_circle</mat-icon>{{ goal.code!.branch }} at {{ goal.code!.commit.slice(0, 7) }} is already in {{ goal.code!.target || 'main' }}.</p> }
+              <div class="wg-row wg-end"><button type="button" class="lay-button wg-go" (click)="close()"><mat-icon aria-hidden="true">done_all</mat-icon>{{ goal.code && !goal.code.inRepository ? 'Close out and merge' : 'Close out' }}</button></div>
             </div>
           }
           @if (goal.item.board === 'done') { <p class="wg-hint wg-closed"><mat-icon aria-hidden="true">task_alt</mat-icon>Closed. {{ closedText() }}</p> }
@@ -206,7 +203,7 @@ export class WorkGoalComponent {
   readonly adding = signal<number | null>(null);
   readonly editingBrief = signal(false);
   readonly flagging = signal<number | null>(null);
-  flagDraft = ''; mergedConfirm = false;
+  flagDraft = '';
   readonly stackKeys = signal<string[]>([]);
   briefDraft = ''; goalDraft = ''; layerDraft = ''; steerDraft = '';
   answers: Record<number, string> = {}; answerText: Record<number, string> = {};
@@ -266,7 +263,7 @@ export class WorkGoalComponent {
   approve(action: GoalAction) { void this.act(() => this.ctx.api(this.path(`/review/${action.number}`), 'POST', { verdict: 'approve' }), `Approved #${action.number}.`); }
   flag(action: GoalAction) { const note = this.flagDraft.trim(); if (!note) return;
     void this.act(() => this.ctx.api(this.path(`/review/${action.number}`), 'POST', { verdict: 'flag', note }), `Flagged #${action.number}; it's back with the agent.`).then(ok => { if (ok) this.flagging.set(null); }); }
-  close() { void this.act(() => this.ctx.api(this.path('/close'), 'POST', { codeMerged: this.mergedConfirm }), 'Closed.'); }
+  close() { void this.act(() => this.ctx.api(this.path('/close'), 'POST', {}), 'Closed.'); }
   actionsIn(phase: number) { return (this.view()?.actions || []).filter(action => action.phase === phase); }
   gate(phase: number) {
     const view = this.view(); const entry = view?.phases.find(item => item.number === phase);

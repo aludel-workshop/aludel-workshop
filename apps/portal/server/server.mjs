@@ -1108,7 +1108,19 @@ async function api(request, response, url) {
     if (operation === 'events' && !sub) return done(201, goals.post(person, projectId, workId, input));
     if (operation === 'answer' && sub) return done(200, goals.answer(user, projectId, workId, sub, input));
     if (operation === 'review' && sub) return done(200, goals.review(user, projectId, workId, Number(sub), input));
-    if (operation === 'close' && !sub) return done(200, goals.closeOut(user, projectId, workId, input));
+    if (operation === 'close' && !sub) {
+      // Close-out merged the code into main; a project with a GitHub repository gets main pushed there too, as the build does.
+      const closed = goals.closeOut(user, projectId, workId);
+      const binding = closed.merged && github.status(user.id, projectId, null).repository;
+      if (binding?.status === 'ready') {
+        try {
+          const token = await github.installationTokenForRepository(projectId, binding.name);
+          pushWorkspace({ repository: closed.merged.workspace, remoteUrl: binding.clone_url, token, branch: closed.merged.into });
+          goals.notePush(projectId, workId, `Pushed ${closed.merged.into} to GitHub (${binding.owner}/${binding.name})`);
+        } catch (error) { goals.notePush(projectId, workId, `Merged here, but pushing ${closed.merged.into} to GitHub failed: ${String(error.message || error).slice(0, 300)}`); }
+      }
+      return done(200, goals.view(projectId, workId));
+    }
     return json(response, 404, { error: 'Not found.' });
   }
   // WORK-ITEM-UX-01: an item's runs, each with its own task snapshot, outputs, review and signature.

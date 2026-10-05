@@ -6,6 +6,8 @@
 import { execFileSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { EventEmitter } from 'node:events';
+import { existsSync } from 'node:fs';
+import { isAbsolute, join } from 'node:path';
 import { requireMember } from './accounts.mjs';
 import { applyWrites, callOperation, draftChanges, draftOverlay, layerApi, stageOperation } from './layer-api.mjs';
 import { layerCatalog } from './layer-contract.mjs';
@@ -102,7 +104,7 @@ export function agentWork({ db, know, catalogs = null }) {
     const item = goalItem(projectId, workId);
     const phases = phasesOf(projectId, workId), actions = actionRows(projectId, workId), needs = openNeeds(projectId, workId);
     const events = db.prepare('SELECT * FROM (SELECT * FROM work_goal_events WHERE project_id = ? AND work_id = ? ORDER BY id DESC LIMIT 300) ORDER BY id').all(projectId, workId).map(eventRow);
-    return { item, brief: goalOf(item).brief, defined: Boolean(goalOf(item).defined), performer: goalOf(item).performer || null, code: goalOf(item).code ? { ...goalOf(item).code, inRepository: goalOf(item).code.merged === 'verified' || codeMerged(projectId, goalOf(item).code) } : null, phases,
+    return { item, brief: goalOf(item).brief, defined: Boolean(goalOf(item).defined), performer: goalOf(item).performer || null, code: goalOf(item).code ? { ...goalOf(item).code, inRepository: Boolean(goalOf(item).code.merged) || codeMerged(projectId, goalOf(item).code), target: goalOf(item).code.merged?.into || repository(projectId)?.target || null } : null, phases,
       actions: actions.map(action => ({ ...action, needs: needs.filter(need => need.action === action.number), blocked: ['todo', 'proposed'].includes(action.state) ? blockedReason(action, actions, phases) : null })),
       needs, events, changeset: changeset(projectId, workId) };
   }
@@ -363,29 +365,78 @@ export function agentWork({ db, know, catalogs = null }) {
     emit(projectId, workId, { type: 'action', number: action.number });
     return view(projectId, workId);
   }
-  // Is the reported commit in the project's own repository? Only when the portal runs beside it (the local work style).
-  function codeMerged(projectId, code) {
+  // A4: close-out merges the reported branch into the project's main branch, as a person saying "looks good, merge it".
+  // The commit comes from the person's checkout (the local work style runs the portal beside it). A fast-forward when it can,
+  // otherwise a merge commit written without touching any working tree; conflicts go back to the agent to rebase.
+  function repository(projectId) {
     const workspace = db.prepare('SELECT workspace_path FROM project_setup WHERE project_id = ?').get(projectId)?.workspace_path;
-    if (!workspace || !code) return false;
-    try { execFileSync('git', ['merge-base', '--is-ancestor', code.commit, 'HEAD'], { cwd: workspace, stdio: 'ignore', timeout: 5000 }); return true; } catch { return false; }
+    if (!workspace || !existsSync(join(workspace, '.git'))) return null;
+    const git = (args, options = {}) => execFileSync('git', args, { cwd: workspace, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 30000, ...options }).trim();
+    const has = args => { try { git(args); return true; } catch { return false; } };
+    const target = ['main', 'master'].find(name => has(['rev-parse', '--verify', '--quiet', `refs/heads/${name}`]));
+    return target ? { workspace, git, has, target } : null;
+  }
+  function codeMerged(projectId, code) {
+    const repo = code && repository(projectId);
+    return Boolean(repo && repo.has(['merge-base', '--is-ancestor', code.commit, `refs/heads/${repo.target}`]));
+  }
+  function planMerge(user, projectId, item, code) {
+    const repo = repository(projectId);
+    if (!repo) fail(`This project has no repository with a main branch for Aludel to merge ${code.branch} into.`, 409);
+    const { git, has, target } = repo;
+    if (!has(['cat-file', '-e', `${code.commit}^{commit}`])) {
+      if (!code.checkout || !existsSync(code.checkout)) fail(`Aludel can't reach the checkout with ${code.branch}. Report the code again from it.`, 409);
+      try { git(['fetch', '--no-tags', '--quiet', '--', code.checkout, `refs/heads/${code.branch}`]); } catch { fail(`Aludel couldn't fetch ${code.branch} from ${code.checkout}.`, 409); }
+      if (!has(['cat-file', '-e', `${code.commit}^{commit}`])) fail(`${code.branch} has moved since ${code.commit.slice(0, 7)} was reported. Report the code again.`, 409);
+    }
+    const tip = git(['rev-parse', `refs/heads/${target}`]);
+    const commit = git(['rev-parse', `${code.commit}^{commit}`]);
+    if (has(['merge-base', '--is-ancestor', commit, tip])) return { ...repo, tip, to: tip, mode: 'already' };
+    if (has(['merge-base', '--is-ancestor', tip, commit])) return { ...repo, tip, to: commit, mode: 'fast-forward' };
+    let tree;
+    try { tree = git(['merge-tree', '--write-tree', '--name-only', '--no-messages', tip, commit]).split('\n')[0]; }
+    catch (error) {
+      const conflicts = String(error.stdout || '').split('\n').slice(1).filter(Boolean);
+      const where = conflicts.length ? ` in ${conflicts.slice(0, 5).join(', ')}${conflicts.length > 5 ? ` and ${conflicts.length - 5} more` : ''}` : '';
+      const person = { kind: 'person', id: user.id, name: user.name };
+      setState(projectId, item, 'claimed', `Merge conflict on ${code.branch}`, byOf(person));
+      record(projectId, item.id, { kind: 'steer', author: person, text: `Close-out couldn't merge ${code.branch} into ${target}: it conflicts${where}. Rebase it onto ${target}, resolve, commit and report the code again.` });
+      emit(projectId, item.id, { type: 'item' });
+      fail(`${code.branch} conflicts with ${target}${where}. Sent back to the agent to rebase.`, 409);
+    }
+    const env = { ...process.env, GIT_AUTHOR_NAME: user.name, GIT_AUTHOR_EMAIL: user.email || 'aludel@localhost', GIT_COMMITTER_NAME: user.name, GIT_COMMITTER_EMAIL: user.email || 'aludel@localhost' };
+    const merge = git(['commit-tree', tree, '-p', tip, '-p', commit, '-m', `Merge ${code.branch} (${item.ref}: ${item.title})`], { env });
+    return { ...repo, tip, to: merge, mode: 'merge commit' };
+  }
+  // Moves the main branch, only if it is still where the plan found it. A checked-out main must be clean and is fast-forwarded.
+  function applyMerge(plan) {
+    const { git, target, tip, to } = plan;
+    if (to === tip) return;
+    let head = null;
+    try { head = git(['symbolic-ref', '--quiet', 'HEAD']); } catch { /* detached */ }
+    if (head === `refs/heads/${target}` && git(['rev-parse', '--is-bare-repository']) !== 'true') {
+      if (git(['status', '--porcelain', '--untracked-files=no'])) fail(`The project repository has uncommitted changes on ${target}. Commit or stash them, then close out.`, 409);
+      if (git(['rev-parse', 'HEAD']) !== tip) fail(`${target} moved while closing out. Try again.`, 409);
+      git(['merge', '--ff-only', '--quiet', to]);
+    } else {
+      try { git(['update-ref', `refs/heads/${target}`, to, tip]); } catch { fail(`${target} moved while closing out. Try again.`, 409); }
+    }
   }
   // A4: close-out. Every action reviewed; the record changeset applies once, in one transaction, under each layer's API
-  // checks it was staged with, after confirming nothing it changes moved since. Code merges outside Aludel (a pull request
-  // or git), so close-out confirms it is in the project repository, or that its person says it was merged.
-  function closeOut(user, projectId, workId, input = {}) {
+  // checks it was staged with, after confirming nothing it changes moved since; the code merges into main in the same step.
+  function closeOut(user, projectId, workId) {
     const item = goalItem(projectId, workId);
     if (item.board !== 'review') fail(`Move ${item.ref} to review first.`, 409);
     const left = actionRows(projectId, workId).filter(action => action.state !== 'done');
     if (left.length) fail(`Review #${left.map(action => action.number).join(', #')} first.`, 409);
     if (openNeeds(projectId, workId).length) fail('Answer what the item is waiting on first.', 409);
     const code = goalOf(item).code || null;
-    const verified = codeMerged(projectId, code);
-    if (code && !verified && input.codeMerged !== true) fail(`Merge ${code.branch} at ${code.commit.slice(0, 7)}, then close out.`, 409);
     const groups = changeset(projectId, workId);
     for (const group of groups) for (const change of group.changes) {
       const current = know.get(projectId, change.id);
       if (change.op === 'create' ? current : current?.revision !== change.baseRevision) fail(`A ${change.kind.replace(/_/g, ' ')} this item changes was changed since it was staged. Send its action back to restage.`, 409);
     }
+    const plan = code ? planMerge(user, projectId, item, code) : null;
     const author = user.name, rationale = `Closed ${item.ref}: ${item.title}`;
     const own = !db.isTransaction;
     if (own) db.exec('BEGIN IMMEDIATE');
@@ -396,19 +447,28 @@ export function agentWork({ db, know, catalogs = null }) {
           { layer: group.layer, author, rationale, workItemId: workId });
         applied += group.changes.length;
       }
+      if (plan) applyMerge(plan);
       if (own) db.exec('COMMIT');
     } catch (error) { if (own) db.exec('ROLLBACK'); throw error; }
     const by = { kind: 'person', id: user.id };
-    saveGoal(projectId, item, { closedAt: now(), applied, code: code ? { ...code, merged: verified ? 'verified' : 'confirmed' } : null }, `${user.name} closed it`, by);
+    const merged = plan ? { into: plan.target, commit: plan.to, mode: plan.mode } : null;
+    saveGoal(projectId, item, { closedAt: now(), applied, code: code ? { ...code, merged } : null }, `${user.name} closed it`, by);
     setState(projectId, goalItem(projectId, workId), 'done', 'Closed', by);
+    const codeText = !plan ? '' : plan.mode === 'already' ? `; ${code.branch} was already in ${plan.target}`
+      : `; merged ${code.branch} into ${plan.target}${plan.mode === 'merge commit' ? ` with a merge commit (${plan.to.slice(0, 7)})` : ` (${plan.to.slice(0, 7)})`}`;
     record(projectId, workId, { kind: 'log', author: { kind: 'person', id: user.id, name: user.name },
-      text: `Closed: applied ${applied} record change${applied === 1 ? '' : 's'}${code ? `; code ${verified ? 'is in the project repository' : 'merged, as confirmed'} (${code.branch} at ${code.commit.slice(0, 7)})` : ''}` });
+      text: `Closed: applied ${applied} record change${applied === 1 ? '' : 's'}${codeText}` });
     emit(projectId, workId, { type: 'item' });
-    return view(projectId, workId);
+    return { ...view(projectId, workId), merged: merged && merged.mode !== 'already' ? { ...merged, workspace: plan.workspace } : null };
+  }
+  // After a merge, the host pushes main when the project has a GitHub repository, and notes the outcome on the item.
+  function notePush(projectId, workId, text) {
+    record(projectId, workId, { kind: 'log', author: { kind: 'agent', id: 'aludel', name: 'Aludel' }, text });
+    emit(projectId, workId, { type: 'item' });
   }
 
   // A8: Code changes made locally live on a branch of the person's checkout, not in the record changeset. The local agent
-  // reports where they are; close-out (A4) reviews and merges that branch. Only names and hashes are stored, never content.
+  // reports where they are and from which checkout, so close-out (A4) can fetch and merge it. Never file content.
   function recordCode(actor, projectId, workId, input = {}) {
     const item = goalItem(projectId, workId);
     if (!['progress', 'review'].includes(item.board)) fail(`Start ${item.ref} before reporting code.`, 409);
@@ -419,7 +479,9 @@ export function agentWork({ db, know, catalogs = null }) {
     const base = input.base ? clean(input.base, 64, 'Base commit') : null;
     if (base && !/^[0-9a-f]{7,64}$/.test(base)) fail('Give the base as a hex hash.');
     const files = (Array.isArray(input.files) ? input.files : []).slice(0, 500).map(file => ({ path: clean(file?.path, 400, 'File path', true), status: ['added', 'modified', 'deleted', 'renamed'].includes(file?.status) ? file.status : 'modified' }));
-    const code = { branch, commit, base, files, at: now() };
+    const checkout = input.checkout ? clean(input.checkout, 1000, 'Checkout') : null;
+    if (checkout && !isAbsolute(checkout)) fail('Give the checkout as an absolute path.');
+    const code = { branch, commit, base, files, checkout, at: now() };
     saveGoal(projectId, item, { code }, `${actor.name} reported ${branch} at ${commit.slice(0, 7)}`, byOf(actor));
     record(projectId, workId, { kind: 'log', author: actor, text: `Code on ${branch} at ${commit.slice(0, 7)}: ${files.length} file${files.length === 1 ? '' : 's'} changed` });
     emit(projectId, workId, { type: 'item' });
@@ -473,5 +535,5 @@ export function agentWork({ db, know, catalogs = null }) {
     return () => bus.off(key, listener);
   }
 
-  return { createGoal, view, define, move, claim, assertPerformer, addAction, updateAction, post, answer, stage, recordCode, review, closeOut, changeset, stackMap, readLayer, goals, subscribe };
+  return { createGoal, view, define, move, claim, assertPerformer, addAction, updateAction, post, answer, stage, recordCode, review, closeOut, notePush, changeset, stackMap, readLayer, goals, subscribe };
 }

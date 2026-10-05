@@ -71,5 +71,5 @@ export function gitReport(cwd, base = null) {
     return { path: paths.at(-1), status: statuses[code[0]] || 'modified' };
   }) : [];
   const dirty = git('status', '--porcelain').split('\n').filter(Boolean).length;
-  return { branch, commit, base: from || null, files, dirty };
+  return { branch, commit, base: from || null, files, dirty, checkout: git('rev-parse', '--show-toplevel') };
 }

@@ -80,7 +80,7 @@ try {
     const item = await find(config, arg);
     const report = gitReport(process.cwd());
     if (report.dirty) throw new Error(`Commit or stash the ${report.dirty} uncommitted change${report.dirty === 1 ? '' : 's'} first; only committed work is reported.`);
-    const view = await request(config, `/goals/${encodeURIComponent(item.id)}/code`, { branch: report.branch, commit: report.commit, base: report.base, files: report.files });
+    const view = await request(config, `/goals/${encodeURIComponent(item.id)}/code`, { branch: report.branch, commit: report.commit, base: report.base, files: report.files, checkout: report.checkout });
     out(`Reported ${report.branch} at ${report.commit.slice(0, 7)} (${report.files.length} files) to ${item.ref}.`);
     const left = view.actions.filter(action => !['review', 'done', 'proposed'].includes(action.state));
     out(left.length ? `Still open: #${left.map(action => action.number).join(', #')}.` : `Every action is ready for review; move ${item.ref} to review on its page.`);
