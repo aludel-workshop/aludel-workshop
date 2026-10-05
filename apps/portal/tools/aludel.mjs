@@ -2,7 +2,8 @@
 // AGENT-WORK-01 A8: the local work style. You claim a goal item from your checkout; Claude Code (on your own subscription)
 // works it through the Aludel tools in tools/editor-mcp.mjs, and you watch and answer on the item page.
 //
-//   node apps/portal/tools/aludel.mjs pair [portal origin]   store an editor token from Work › Team (outside the repository)
+//   node apps/portal/tools/aludel.mjs pair [portal origin]   once per checkout: store an editor token from Work › Team (outside
+//                                                           the repository) and connect Claude Code in this folder to Aludel
 //   node apps/portal/tools/aludel.mjs list                   your goal items, and the open ones you could claim
 //   node apps/portal/tools/aludel.mjs claim W-12             claim it and connect Claude Code in this folder to Aludel
 //   node apps/portal/tools/aludel.mjs status W-12            where it stands: actions, what waits on you, the changeset
@@ -10,7 +11,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
-import { configPath, pushReport, loadConfig, pair, request } from './aludel-client.mjs';
+import { checkoutInfo, configPath, pushReport, loadConfig, pair, request } from './aludel-client.mjs';
 
 const adapter = new URL('./editor-mcp.mjs', import.meta.url).pathname;
 const out = text => process.stdout.write(text + '\n');
@@ -45,7 +46,10 @@ const [command, arg] = process.argv.slice(2);
 try {
   if (command === 'pair') {
     const me = await pair(arg);
+    const file = connect(process.cwd());
+    try { await request(loadConfig(), '/checkout', checkoutInfo(process.cwd())); } catch { /* not a git checkout: Open in VS Code still works from a window you open */ }
     out(`Connected to ${me.projectId} as ${me.user.name}. The token is stored outside the repository at ${configPath}.`);
+    out(`Claude Code in this folder can reach Aludel (${file}). Items assigned to you now open here from their page: Open in VS Code.`);
   } else if (command === 'list') {
     const config = loadConfig();
     const { goals } = await request(config, '/goals?claimable=1');

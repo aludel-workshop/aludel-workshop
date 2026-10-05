@@ -27,13 +27,10 @@
 .wg-end{justify-content:flex-end}
 .wg-start{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid var(--machine-line)}
 .wg-start .wg-hint{flex:1 1 100%;order:2;margin:0}
-.wg-style{display:flex;align-items:center;gap:0}
-.wg-label{font-size:12px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--machine-muted);margin-right:10px}
-.wg-seg{border:1px solid var(--machine-line);background:var(--mat-sys-surface,#fff);padding:6px 12px;font:inherit;font-size:14px;cursor:pointer;min-height:36px}
-.wg-seg:first-of-type{border-radius:8px 0 0 8px}.wg-seg:last-of-type{border-radius:0 8px 8px 0;border-left:0}
-.wg-seg.on{background:var(--machine-accent);border-color:var(--machine-accent);color:#fff}
-.wg-seg:disabled{color:var(--machine-muted);cursor:not-allowed}
 .wg-go{margin-left:auto}
+.wg-who{margin:0;color:var(--machine-muted);font-size:14px}
+.wg-local{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-top:14px;padding-top:12px;border-top:1px solid var(--machine-line)}
+.wg-local .wg-hint{flex:1 1 260px;margin:0;display:block}
 .wg-hint{display:flex;align-items:center;gap:6px;color:var(--machine-muted);font-size:13px}
 .wg-hint mat-icon{width:18px;height:18px;font-size:18px}
 .wg-hint code{font-size:12px;background:var(--machine-line);padding:1px 6px;border-radius:4px}

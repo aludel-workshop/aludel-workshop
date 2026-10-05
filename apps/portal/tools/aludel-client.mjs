@@ -7,6 +7,8 @@ import { homedir } from 'node:os';
 export const configPath = process.env.ALUDEL_EDITOR_CONFIG || join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), 'aludel', 'editor.json');
 export function validateUrl(value) {
   const url = new URL(value);
+  // The portal's own address (aludel.localhost) is loopback, but Node doesn't resolve *.localhost names: use 127.0.0.1.
+  if (url.protocol === 'http:' && url.hostname.endsWith('.localhost')) url.hostname = '127.0.0.1';
   if (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname))) throw new Error('Use HTTPS or a loopback SSH tunnel.');
   if (url.username || url.password || url.search || url.hash) throw new Error('Use the Aludel portal origin only.');
   return url.origin;
@@ -88,4 +90,25 @@ export function pushReport(cwd, base = null) {
   }
   const { dirty, ...reported } = report;
   return reported;
+}
+// Where this checkout is, for the item page's Open links: its top folder, and the WSL distribution when it runs in one.
+export function checkoutInfo(cwd) {
+  const path = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  return { path, distro: process.env.WSL_DISTRO_NAME || null };
+}
+// Starting work on an item: its own branch, named for it, from the latest main. Already on it: nothing changes. Moving off
+// another branch needs a clean checkout, so nothing uncommitted is carried into the item.
+export function startBranch(cwd, ref) {
+  const git = (...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 120000 }).trim();
+  const has = (...args) => { try { git(...args); return true; } catch { return false; } };
+  const branch = `aludel/${String(ref).toLowerCase().replace(/[^a-z0-9-]+/g, '-')}`;
+  if (git('rev-parse', '--abbrev-ref', 'HEAD') === branch) return { branch, created: false, base: null };
+  const dirty = git('status', '--porcelain', '--untracked-files=no').split('\n').filter(Boolean).length;
+  if (dirty) throw new Error(`Commit or stash the ${dirty} uncommitted change${dirty === 1 ? '' : 's'} here first, then start ${ref} again.`);
+  if (has('rev-parse', '--verify', '--quiet', `refs/heads/${branch}`)) { git('checkout', '--quiet', branch); return { branch, created: false, base: null }; }
+  has('fetch', '--quiet', 'origin', 'main');
+  const base = ['origin/main', 'main', 'origin/master', 'master'].find(name => has('rev-parse', '--verify', '--quiet', name));
+  if (!base) throw new Error('This checkout has no main branch to start from.');
+  git('checkout', '--quiet', '-b', branch, base);
+  return { branch, created: true, base };
 }

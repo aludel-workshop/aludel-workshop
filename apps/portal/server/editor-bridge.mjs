@@ -7,7 +7,7 @@ const sha = value => createHash('sha256').update(value).digest('hex');
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const now = () => new Date().toISOString();
 const tools = ['assigned_tasks', 'task_context', 'saved_context', 'read_record', 'search_knowledge', 'environment_status',
-  'work_list', 'work_view', 'stack_map', 'read_layer', 'define_work', 'add_action', 'update_action', 'post_message', 'ask', 'request_allow', 'stage_change', 'report_code', 'changeset'];
+  'work_list', 'start_work', 'work_view', 'stack_map', 'read_layer', 'define_work', 'add_action', 'update_action', 'post_message', 'ask', 'request_allow', 'stage_change', 'report_code', 'changeset'];
 
 export function initEditorBridge(db) {
   db.exec(`
@@ -22,18 +22,20 @@ export function initEditorBridge(db) {
       work_id TEXT NOT NULL, content_json TEXT NOT NULL, created_at TEXT NOT NULL
     );
   `);
+  // Where the person's connected checkout is, so the item page can open it in their editor.
+  if (!db.prepare('PRAGMA table_info(editor_tokens)').all().some(column => column.name === 'checkout_json')) db.exec('ALTER TABLE editor_tokens ADD COLUMN checkout_json TEXT');
 }
 
 export function editorBridge({ db, know, projectSetup, previewStatus }) {
   const project = projectId => db.prepare('SELECT id, slug, name, description FROM projects WHERE id = ?').get(projectId);
-  const tokenRow = (user, projectId) => db.prepare('SELECT created_at, expires_at FROM editor_tokens WHERE user_id = ? AND project_id = ?').get(user.id, projectId);
+  const tokenRow = (user, projectId) => db.prepare('SELECT created_at, expires_at, checkout_json FROM editor_tokens WHERE user_id = ? AND project_id = ?').get(user.id, projectId);
   function issue(user, projectId) {
     requireMember(db, user, projectId);
     const token = randomBytes(32).toString('base64url');
     const created = now();
     const expires = new Date(Date.now() + 30 * 86400_000).toISOString();
     db.prepare('DELETE FROM editor_tokens WHERE user_id = ? AND project_id = ?').run(user.id, projectId);
-    db.prepare('INSERT INTO editor_tokens VALUES (?, ?, ?, ?, ?)').run(sha(token), user.id, projectId, created, expires);
+    db.prepare('INSERT INTO editor_tokens(token_hash, user_id, project_id, created_at, expires_at) VALUES (?, ?, ?, ?, ?)').run(sha(token), user.id, projectId, created, expires);
     return { token, expiresAt: expires, project: project(projectId), tools };
   }
   function revoke(user, projectId) {
@@ -44,7 +46,18 @@ export function editorBridge({ db, know, projectSetup, previewStatus }) {
   function status(user, projectId) {
     requireMember(db, user, projectId);
     const row = tokenRow(user, projectId);
-    return { connected: Boolean(row && row.expires_at > now()), expiresAt: row?.expires_at || null, tools };
+    const connected = Boolean(row && row.expires_at > now());
+    return { connected, expiresAt: row?.expires_at || null, checkout: connected && row.checkout_json ? JSON.parse(row.checkout_json) : null, tools };
+  }
+  // The person's local tools say where their checkout is: an absolute path, and the WSL distribution it lives in, if any.
+  // Only a location to open; Aludel never reads from it (work comes back through GitHub).
+  function noteCheckout(user, projectId, header, input = {}) {
+    const path = String(input.path || ''), distro = input.distro ? String(input.distro) : null;
+    if (!path.startsWith('/') || path.length > 1024 || /[\u0000-\u001f]/.test(path) || path.split('/').includes('..')) fail('Send the checkout\'s absolute path.');
+    if (distro && !/^[A-Za-z0-9._-]{1,64}$/.test(distro)) fail('That WSL distribution name isn\'t valid.');
+    const checkout = { path, distro, at: now() };
+    db.prepare('UPDATE editor_tokens SET checkout_json = ? WHERE token_hash = ?').run(JSON.stringify(checkout), sha(/^Bearer (\S+)$/.exec(String(header))[1]));
+    return { checkout };
   }
   function authenticate(header) {
     const match = /^Bearer ([A-Za-z0-9_-]{40,})$/.exec(String(header || ''));
@@ -123,5 +136,5 @@ export function editorBridge({ db, know, projectSetup, previewStatus }) {
     const setup = projectSetup(user, projectId);
     return { project: project(projectId), preview: previewStatus(projectId), repository: { commit: head(setup.workspacePath) } };
   }
-  return { issue, revoke, status, authenticate, assigned, context, saved, record, search, environment, tools };
+  return { issue, revoke, status, noteCheckout, authenticate, assigned, context, saved, record, search, environment, tools };
 }

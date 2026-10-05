@@ -240,7 +240,7 @@ test('a person drives a goal item in the portal while their local agent works it
   }
 });
 
-test('A8: the aludel CLI claims a goal item from a checkout, connects Claude Code to Aludel, and reports committed code', async () => {
+test('A8: a checkout is connected once; the page assigns the item; Claude Code starts it on its own branch and reports committed code', async () => {
   const { createServer } = await import('node:http');
   const { execFileSync, spawn, spawnSync } = await import('node:child_process');
   const { existsSync, mkdirSync, readFileSync, writeFileSync } = await import('node:fs');
@@ -281,20 +281,28 @@ test('A8: the aludel CLI claims a goal item from a checkout, connects Claude Cod
     const cli = (...args) => spawnSync(process.execPath, [new URL('../tools/aludel.mjs', import.meta.url).pathname, ...args], { cwd: checkout, env, input: apiToken + '\n', encoding: 'utf8', timeout: 8000 });
 
     assert.match(cli('list').stderr, /Pair first/);
-    const paired = cli('pair', origin);
+    // Pairing, once per checkout: the token stays outside it, Claude Code here reaches Aludel, and the item page learns where it is.
+    const paired = spawnSync(process.execPath, [new URL('../tools/aludel.mjs', import.meta.url).pathname, 'pair', origin.replace('127.0.0.1', 'aludel.localhost')],
+      { cwd: checkout, env: { ...env, WSL_DISTRO_NAME: 'Ubuntu' }, input: apiToken + '\n', encoding: 'utf8', timeout: 8000 });
     assert.equal(paired.status, 0, paired.stderr);
     assert.match(paired.stdout, /Connected to .* as Ada/);
-    const listed = cli('list');
-    assert.match(listed.stdout, new RegExp(`${ref}\\s+Draft\\s+open`));
-    const claimed = cli('claim', ref.toLowerCase());
-    assert.equal(claimed.status, 0, claimed.stderr);
-    assert.match(claimed.stdout, new RegExp(`Work on ${ref} \\(${workId}\\) using the Aludel tools`));
     const mcp = JSON.parse(readFileSync(join(checkout, '.mcp.json'), 'utf8'));
     assert.match(mcp.mcpServers.aludel.args[0], /tools\/editor-mcp\.mjs$/, 'Claude Code in the checkout reaches the Aludel tools');
     assert.match(readFileSync(join(checkout, '.git/info/exclude'), 'utf8'), /^\.mcp\.json$/m, 'the local connection stays out of commits');
     assert.equal(git('status', '--porcelain'), '');
-    assert.equal((await portal('/' + workId)).item.assignee.id, ada.id);
-    assert.equal(cli('claim', 'W-999').status, 1);
+    const editorStatus = await (await fetch(origin + '/api/projects/' + id + '/editor', { headers: { cookie } })).json();
+    assert.deepEqual([editorStatus.checkout.path, editorStatus.checkout.distro], [git('rev-parse', '--show-toplevel'), 'Ubuntu'], 'the page can open this checkout');
+    assert.equal((await fetch(origin + '/api/editor/checkout', { method: 'POST', headers: { authorization: 'Bearer ' + apiToken }, body: JSON.stringify({ path: 'relative/path' }) })).status, 400);
+    const listed = cli('list');
+    assert.match(listed.stdout, new RegExp(`${ref}\\s+Draft\\s+open`));
+
+    // Who works on it is the assignee: a remote agent waits on A2; a person (here, herself) works on her own machine.
+    assert.match((await portal('/' + workId + '/assign', { assignee: { kind: 'agent', id: 'agt-any' } })).error, /Remote agents come with the remote runtime/);
+    assert.match((await portal('/' + workId + '/assign', { assignee: { kind: 'person', id: 'u-nobody' } })).error, /member of this project/);
+    const assigned = await portal('/' + workId + '/assign', { assignee: { kind: 'person', id: ada.id } });
+    assert.deepEqual([assigned.item.assignee.id, assigned.performer], [ada.id, 'local']);
+    assert.equal((await portal('/' + workId + '/assign', { assignee: null })).item.assignee, null, 'unassigned until it starts');
+    await portal('/' + workId + '/assign', { assignee: { kind: 'person', id: ada.id } });
 
     // Claude Code, as the agent, defines it; the person starts it on the page; the agent commits code on a branch and reports it.
     const tool = new URL('../tools/editor-mcp.mjs', import.meta.url).pathname;
@@ -305,7 +313,16 @@ test('A8: the aludel CLI claims a goal item from a checkout, connects Claude Cod
     };
     call([['define_work', { workId, brief: 'A member borrows a tool from its page.', actions: [{ goal: 'Add the borrow button' }] }]]);
     await portal('/' + workId + '/move', { to: 'progress' });
-    git('checkout', '-q', '-b', `aludel/${ref.toLowerCase()}`);
+    assert.match((await portal('/' + workId + '/assign', { assignee: null })).error, /has started/, 'the assignee stays once it starts');
+    // Open in VS Code asks Claude Code to work on it; its first call checks out the item's branch from the latest main.
+    writeFileSync(join(checkout, 'README.md'), 'Tool Share, edited\n');
+    assert.match(call([['start_work', { workId: ref }]])[0].error, /Commit or stash the 1 uncommitted change/);
+    git('checkout', '-q', 'README.md');
+    const [started, again] = call([['start_work', { workId: ref }], ['start_work', { workId }]]);
+    assert.deepEqual([started.started.branch, started.started.created, started.started.base, started.item.item.id], [`aludel/${ref.toLowerCase()}`, true, 'origin/main', workId]);
+    assert.equal(again.started.created, false, 'starting again keeps the branch');
+    assert.equal(git('rev-parse', '--abbrev-ref', 'HEAD'), `aludel/${ref.toLowerCase()}`);
+    assert.match(call([['start_work', { workId: 'W-999' }]])[0].error, /isn't assigned to your person/);
     writeFileSync(join(checkout, 'borrow.js'), 'export const borrow = () => true;\n');
     const [dirty] = call([['report_code', { workId }]]);
     assert.match(dirty.error, /Commit or stash the 1 uncommitted change/);

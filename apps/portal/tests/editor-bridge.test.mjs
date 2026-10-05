@@ -162,7 +162,9 @@ test('Codex stdio adapter exposes read tools and forwards a bearer-scoped task r
     await waitFor(3);
     assert.ok(results[1].result.tools.some(tool => tool.name === 'task_context'));
     assert.match(results[2].result.content[0].text, /Build it/);
-    assert.deepEqual(requests, [{ path: '/api/editor/tasks', authorization: 'Bearer test-token' }]);
+    // Besides the tool's request, the adapter tells Aludel where its checkout is when it starts in one (best effort).
+    assert.deepEqual(requests.filter(entry => entry.path !== '/api/editor/checkout'), [{ path: '/api/editor/tasks', authorization: 'Bearer test-token' }]);
+    assert.ok(requests.every(entry => entry.authorization === 'Bearer test-token'));
   } finally {
     child.stdin.end();
     server.closeAllConnections();

@@ -570,7 +570,8 @@ async function api(request, response, url) {
         return done(200, { goals: goals.goals(projectId, url.searchParams.get('claimable') ? { claimableBy: editorUser.id } : { assignedTo: editorUser.id }) });
       if (path[0] !== 'goals' || path.length < 2) return json(response, 404, { error: 'Not found.' });
       const workId = path[1];
-      // The token's person claims through their own CLI (`aludel claim`); their agent's tools never offer it.
+      // The token's person claims through their own CLI (`aludel claim`); their agent's tools never offer it. The item page
+      // assigns instead (people, or later remote agents).
       if (path[2] === 'claim' && path.length === 3 && request.method === 'POST') return done(200, goals.claim(editorUser, projectId, workId));
       goals.assertPerformer(editorUser, projectId, workId);
       const [operation, sub] = path.slice(2);
@@ -588,6 +589,8 @@ async function api(request, response, url) {
       if (operation === 'code' && !sub) return done(200, goals.recordCode(agent, projectId, workId, input));
       return json(response, 404, { error: 'Not found.' });
     }
+    if (path[0] === 'checkout' && path.length === 1 && request.method === 'POST')
+      return json(response, 200, editor.noteCheckout(editorUser, projectId, request.headers.authorization, await readJson(request)), { 'cache-control': 'no-store' });
     if (request.method !== 'GET') return json(response, 405, { error: 'Read only.' });
     if (path[0] === 'me' && path.length === 1) return json(response, 200, { projectId, user: editorUser, tools: editor.tools }, { 'cache-control': 'no-store' });
     if (path[0] === 'tasks' && path.length === 1) return json(response, 200, { tasks: editor.assigned(editorUser, projectId) }, { 'cache-control': 'no-store' });
@@ -1114,7 +1117,7 @@ async function api(request, response, url) {
     return json(response, result.status, result.body, { 'cache-control': 'no-store' });
   }
   // AGENT-WORK-01 A1: goal items. People drive them here; their local agent works on them through /api/editor/goals.
-  const goalRoute = /^\/api\/projects\/([^/]+)\/goals(?:\/([^/]+)(?:\/(define|move|claim|actions|events|answer|review|close|stream|read)(?:\/([^/]+))?)?)?$/.exec(url.pathname);
+  const goalRoute = /^\/api\/projects\/([^/]+)\/goals(?:\/([^/]+)(?:\/(define|move|claim|assign|actions|events|answer|review|close|stream|read)(?:\/([^/]+))?)?)?$/.exec(url.pathname);
   if (goalRoute) {
     const [, rawProject, rawWork, operation, rawSub] = goalRoute;
     const projectId = decodeURIComponent(rawProject), workId = rawWork ? decodeURIComponent(rawWork) : null, sub = rawSub ? decodeURIComponent(rawSub) : null;
@@ -1132,6 +1135,7 @@ async function api(request, response, url) {
     if (operation === 'define' && !sub) return done(200, goals.define(person, projectId, workId, input));
     if (operation === 'move' && !sub) return done(200, goals.move(user, projectId, workId, input.to));
     if (operation === 'claim' && !sub) return done(200, goals.claim(user, projectId, workId));
+    if (operation === 'assign' && !sub) return done(200, goals.assign(user, projectId, workId, input.assignee ?? null));
     if (operation === 'actions' && !sub) return done(201, goals.addAction(person, projectId, workId, input));
     if (operation === 'actions' && sub) return done(200, goals.updateAction(person, projectId, workId, Number(sub), input));
     if (operation === 'events' && !sub) return done(201, goals.post(person, projectId, workId, input));
