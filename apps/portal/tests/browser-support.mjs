@@ -1,5 +1,7 @@
 // Shared by the browser scripts. Set PLAYWRIGHT_MODULE to a playwright index.mjs when the bootstrap runtime lives elsewhere.
 import dns from 'node:dns';
+import { existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 
 // Browsers resolve *.localhost to loopback by themselves (DEC-033), but Node's resolver (used by Playwright's request
 // context since 1.61) asks the system, which on this WSL machine does not. Resolve them here, for the test process only.
@@ -20,8 +22,17 @@ dns.promises.lookup = async function lookup(hostname, options = {}) {
   return options.all ? found : found[0] || Promise.reject(Object.assign(new Error(`getaddrinfo ENOTFOUND ${hostname}`), { code: 'ENOTFOUND' }));
 };
 
-const modulePath = process.env.PLAYWRIGHT_MODULE || '/tmp/app-builder-d01b-browser/node_modules/playwright/index.mjs';
+// In an item container (.devcontainer/Dockerfile) Playwright is installed globally with its headless shell under
+// PLAYWRIGHT_BROWSERS_PATH, so the journeys find both there without settings; elsewhere PLAYWRIGHT_MODULE and CHROMIUM_PATH.
+const globalModule = '/usr/local/lib/node_modules/playwright/index.mjs';
+const modulePath = process.env.PLAYWRIGHT_MODULE || (existsSync(globalModule) ? globalModule : '/tmp/app-builder-d01b-browser/node_modules/playwright/index.mjs');
 export const { chromium } = await import(modulePath);
+if (!process.env.CHROMIUM_PATH && process.env.PLAYWRIGHT_BROWSERS_PATH) {
+  const browsers = process.env.PLAYWRIGHT_BROWSERS_PATH;
+  const shell = existsSync(browsers) && readdirSync(browsers).filter(name => name.startsWith('chromium_headless_shell-')).sort().pop();
+  const binary = shell && join(browsers, shell, 'chrome-headless-shell-linux64/chrome-headless-shell');
+  if (binary && existsSync(binary)) process.env.CHROMIUM_PATH = binary;
+}
 
 // Owner access moved from the root page to /login (ONB-01); first run sets the key, later runs enter it.
 export async function ownerSignIn(page, base, key) {

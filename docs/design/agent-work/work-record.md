@@ -583,3 +583,17 @@ Each entry is written to become a work item. Where an item already exists in Alu
 **Decisions waiting on the owner:**
 - **F30:** Docker inside item containers. Mounting the host's socket makes the container root-equivalent on the person's machine. Three Docker-only tests can't run in a container until this is decided.
 - **F29:** pull requests from Aludel. This needs the GitHub App's `pull_requests` permission, a GitHub settings change. Close-out makes it unnecessary for now.
+
+## Dogfood: W-8 attempt 2, in an item container (2026-10-06)
+
+Owner, in the item container's Claude Code chat: "alright, lets try this task again, made some changes." W-8 was moved back to In progress from the portal on 2026-10-06 (03:24). **Authorized:** W-8's own scope, as its brief and actions state: local edits on `aludel/w-8`, checks, local previews, Aludel tool calls on W-8, and commits reported with `report_code`. Not authorized: changes to `layer-base`, GitHub settings or other items. The agent is Claude Code (Opus 5.5) in W-8's item container (`ALUDEL_CONTAINER=1`).
+
+**Readiness (operating procedure §6, applied before code):**
+- Action 1 (the Pages spec) is approved, and its six records are still staged on the item. Action 2 was left `working` from attempt 1.
+- The container now has `./layer-base` (bundle-served, E1), `node_modules` and the person's git identity. `npm run typecheck` and `npm run build` pass here. This is the first check of E1 in a live item container; attempt 2's prerequisites had checked it only in a rebuilt image.
+- The attempt-1 board (`f638bc7`, on `w-8-attempt-1-board`) applies cleanly to current `main` and typechecks. It's reused, not rewritten.
+- The server's `move()` (`server/agent-work.mjs:192`) already enforces every move rule in the brief, so action 3 comes down to proving those rules with tests and wiring the board to them.
+
+### Findings (attempt 2)
+
+- **F31. The browser journeys couldn't find the container's browser.** The image installs Playwright globally with its headless shell under `/opt/playwright` (`PLAYWRIGHT_BROWSERS_PATH`). Every journey, though, defaults `PLAYWRIGHT_MODULE` to `/tmp/app-builder-…` and `CHROMIUM_PATH` to one of two other machines' paths (`/opt/pw-browsers/chromium`, `/home/henry/.cache/…`). The E1 acceptance check ran the build and the server gate in the image, but no journey. **Applied now:** `tests/browser-support.mjs` falls back to the global Playwright and the headless shell under `PLAYWRIGHT_BROWSERS_PATH`, so every journey runs in an item container with no settings. Explicit settings still win, so other machines are unaffected.

@@ -725,7 +725,8 @@ export function agentWork({ db, know, catalogs = null }) {
     return know.workList(projectId).filter(item => item.scope === 'goal' && (claimableBy ? mine(item, claimableBy) || (!item.assignee && ['draft', 'ready'].includes(item.board)) : !assignedTo || mine(item, assignedTo)))
       .map(item => ({ id: item.id, ref: item.ref, title: item.title, board: item.board, priority: item.priority, assignee: item.assignee, defined: Boolean(item.context?.goal?.defined),
         actions: db.prepare("SELECT state, COUNT(*) AS n FROM work_goal_actions WHERE project_id = ? AND work_id = ? AND state != 'proposed' GROUP BY state").all(projectId, item.id)
-          .reduce((sum, row) => ({ ...sum, [row.state]: row.n }), {}), needs: openNeeds(projectId, item.id).length }));
+          .reduce((sum, row) => ({ ...sum, [row.state]: row.n }), {}), needs: openNeeds(projectId, item.id).length,
+        layers: db.prepare("SELECT DISTINCT layer FROM work_goal_actions WHERE project_id = ? AND work_id = ? AND state != 'proposed' AND layer IS NOT NULL ORDER BY layer").all(projectId, item.id).map(row => row.layer) }));
   }
   function subscribe(projectId, workId, listener) {
     goalItem(projectId, workId);
