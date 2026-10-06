@@ -63,6 +63,8 @@ Official OpenAI documentation states that Codex discovers layered `AGENTS.md` in
 
 Begin with explicit typed relations, text search, and task bundle selection. Each record needs a stable ID, type, project, revision, status, provenance, timestamps, related records, and supersession/staleness links. Agents should query by task and relationship before broad semantic similarity.
 
+**One search (W-10, 2026-10-06; owner direction).** Everything a project knows is in the Library, and the Library's search is the only search: every layer's outputs, each layer's Knowledge as its tab shows it (repository docs included), the Library's own research and documents, and work items with their threads. Agents (`search_knowledge`, the worker), the top bar, Library › Layers, Research and a layer's Knowledge tab all call it. Knowledge becomes findable by being published to the Library, never by adding a search over a copy; a view may filter Library results, and pickers or navigation may filter what is on screen. `tests/library-search.test.mjs` checks the rule. [Work record](design/library-search/work-record.md).
+
 Add embeddings only after retained retrieval tests show that filters, links, and text search miss needed context. The evaluation set should ask representative questions such as:
 
 - Which accepted decisions constrain this task?
@@ -106,7 +108,7 @@ The portal now owns the supervised request/authorization/question cycle. Reposit
 
 ## D-02 — Domain migration is separate from source import
 
-The [local audit](design/project-workspace/v1/audit.md) confirms that Markdown import preserves documents/links, not native roadmap packets, views, design assets or causal relationships. Knowledge search currently indexes titles/paths. Do not count a searchable file as coverage of its intended product capability.
+The [local audit](design/project-workspace/v1/audit.md) confirms that Markdown import preserves documents/links, not native roadmap packets, views, design assets or causal relationships. Knowledge search then indexed titles/paths (W-10 replaced it with the Library's full-text search). Do not count a searchable file as coverage of its intended product capability.
 
 The proposed [record/reconciliation contract](design/project-workspace/v1/contracts.md) adds project-scoped typed identities, source assertions, explicit authority cutover, reviewable idempotent migration and build-bound provenance. Historical completion stays a source-backed assertion with its original scope; missing requests/authorizations/actors remain missing. Current portal seed summaries require attributed reconciliation, not retroactive fabrication of owner events. These contracts are pending structural review and implementation proof; the database schema has not gained them from this document.
 

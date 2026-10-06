@@ -189,3 +189,58 @@ The owner approved the spec without changing either open point, so the defaults 
 - **Server tests:** typecheck passes (warnings only, all already there); `library-search` and `library` pass with templates on and off.
 
 **Preview:** `library-browser` now keeps its portal up under `npm run preview -- library`. With `JOURNEY_PORT` set it starts its own portal on disposable data, as the preview-ready journeys do, and it calls `holdForPreview` after its PASS line. It still passes under `browser-checks.sh`. The editor MCP this container connected to doesn't offer `update_action`'s `preview` field yet; it comes with W-25 on `main`. So the preview link went in the item's thread.
+
+## #4 verify: checks and closeout (2026-10-06)
+
+**Live checks: pending until close-out.** The live portal runs `main`, so its `search_knowledge` still returns nothing for "DEC-062" and "operating procedure". The owner restarts the live portal; agents don't. After close-out merges W-10 and the portal runs it, the three queries are run through `search_knowledge` and recorded here.
+
+**The same three queries on real content.** A copy of this repository at `d0a8f6c` was indexed through the Library as a layer's repository docs (242 docs; script in the session scratchpad, not committed). Results, best first:
+
+| Query | First result | Then |
+|---|---|---|
+| `status` | `/docs/status.md` › Current project status | `/AGENTS.md` › Status-writing rules; `/docs/design/deploy-hosting/work-record.md` |
+| `DEC-062` | `/docs/decisions.md` › Confirmed, with the excerpt at "**DEC-062: the layer-template candidate becomes main…**" | `/docs/evidence/promotion-2026-10-01.md`; `/docs/status.md` |
+| `operating procedure` | `/docs/design/process/operating-procedure.md` › From request to the next justified action | `/docs/evidence/r-07c-process-validation.md`; `/docs/design/process/r-07c-dry-runs.md` |
+
+**Cost on real content:**
+- **First index:** 2.5 s cold (7.5 s once, while the gate was also running).
+- **Warm search:** 54 ms.
+- **Re-index after a one-doc commit:** 1.4 s, once per pin move. Reading the 242 docs takes 184 ms of that; the rest is index writes.
+
+The Code layer's pin moves with each merge to `main`, so the first search after a merge pays about 1.5 s. If that becomes noticeable, a part could keep each doc's blob id and rewrite only the docs that changed.
+
+**Gate** (`test:server:templates`, all 73 files at `--test-concurrency=3`, because the default parallel run is killed for memory in this container): 367 tests, 354 passed, 10 skipped, 3 failed. The three are the Docker-only F30 failures that also fail on the unchanged base `6a3e964` (#2): two `runner ENOENT` in `symphony-proposals`, and the worker run in `symphony-worker`. No other failures. `test:server` (templates off) wasn't run separately, since nothing changed the templates switch; the Library tests were run with templates off as well (#2, #3).
+
+## Retrospective (W-10, 2026-10-06)
+
+1. **What made it harder, slower or more error-prone than necessary?**
+   - *Observed:*
+     - Six searches had grown up separately. The Library, the one meant to be shared, read an older Knowledge source than the Knowledge tab did, which wasn't visible until the code was traced.
+     - `test:affected` was killed for memory in the item container.
+     - Proving three failures weren't mine took a base worktree, plus links to `layer-base` and `node_modules`, and the same again for a flaky journey.
+     - The Library journey couldn't be kept up as a preview until it learned to start its own portal.
+   - *Agent slips:*
+     - The "See all" link cleared its query before building the URL.
+     - The section scroll margin was smaller than the sticky bar.
+     - A test asserted "project-status" wasn't findable, though the title contains both words.
+     - The live-check question was worded as if the agent could point the live portal at a branch.
+2. **What would make the next equivalent task easier?**
+   - The rule and its static check, now in place: a new kind of knowledge is findable by publishing it to the Library.
+   - `test-affected --concurrency`, applied.
+   - Journeys that start their own portal when `JOURNEY_PORT` is set, so any journey can be a preview; the Library journey now does.
+   - A one-command base comparison (`tools/` script: worktree at a commit, linked dependencies, run named tests or journeys). Proposed.
+3. **What changes the roadmap, downstream items or process?**
+   - The cutover blocker in [readiness row 1](../self-hosting/readiness.md) is cleared in code.
+   - The decisions gap (row 5) is now about structure, not findability: DEC-n entries are found and ranked first, but they have no record kind with status or supersession.
+   - Items that migrate docs into records can rely on the Library to find what they move.
+4. **Questions created, resolved or made newly important.**
+   - *Resolved by the owner:* the Library is the single search for everything.
+   - *Resolved by default:* the Sources page stays out until C5; the top bar keeps grouped results inline.
+   - *Open:* whether re-indexing the Code layer after each merge (about 1.5 s) needs incremental per-doc updates. Not blocking.
+   - *Open:* the live checks, after close-out.
+5. **Process change applied now, how it was tested, what remains a hypothesis.**
+   - *Applied:* the one-search rule went into `docs/knowledge-strategy.md` and the head of `library.mjs`, and `tests/library-search.test.mjs` "only the Library searches" fails if server or client code adds its own text search, except named pickers and navigation.
+   - *Tested:* the check passes now, and the patterns it looks for match the three client searches that #3 removed.
+   - *Hypothesis:* that a grep-level check catches the next drift. A differently written search (a regex, or `indexOf`) would pass it.
+   - *Applied:* `test-affected --concurrency`.
+   - *Tested:* the 27-file development tier completed at concurrency 3 after the default run was killed.
