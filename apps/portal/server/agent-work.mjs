@@ -187,6 +187,11 @@ export function agentWork({ db, know, catalogs = null }) {
     return view(projectId, workId);
   }
 
+  // W-8 F34: an action added to an item in review has to be worked, so the item goes back to In progress, as a flag does.
+  function reopen(projectId, workId, number, actor) {
+    const item = goalItem(projectId, workId);
+    if (item.board === 'review') setState(projectId, item, 'claimed', `Back in progress: #${number} was added`, byOf(actor));
+  }
   // Board moves (the deliberate act of the board): Draft ⇄ Ready, Ready → In progress, In progress → In review.
   // Done comes only from the item's close-out (A4).
   function move(user, projectId, workId, to) {
@@ -200,6 +205,9 @@ export function agentWork({ db, know, catalogs = null }) {
       if (item.board !== 'draft') fail(`${item.ref} can't move back to Ready.`, 409);
       if (!goalOf(item).defined) fail(`Define ${item.ref} first: a brief and at least one action.`, 409);
       setState(projectId, item, 'ready', 'Moved to Ready', by);
+    } else if (to === 'progress' && item.board === 'review') {
+      // W-8 F34: a person takes an item back out of review to do more on it.
+      setState(projectId, item, 'claimed', 'Back in progress', by);
     } else if (to === 'progress') {
       if (item.board !== 'ready') fail(`Only a Ready item can start.`, 409);
       if (!item.assignee) fail(`Choose who works on ${item.ref}: send it to an agent or claim it.`, 409);
@@ -289,7 +297,7 @@ export function agentWork({ db, know, catalogs = null }) {
       .run(`act-${randomBytes(4).toString('hex')}`, projectId, workId, number, wrapUp ? Math.max(1, phases.length) : phase, checkLayer(projectId, input.layer), goal, JSON.stringify(wrapUp ? [] : after), needsApproval ? 'proposed' : 'todo',
         wrapUp ? clean(input.reason, 1000, 'Reason') : null, JSON.stringify(actor), at, at, wrapUp ? 'wrap-up' : null);
     if (needsApproval) record(projectId, workId, { kind: 'approval', action: number, author: actor, text: (wrapUp ? 'End as not done: ' : '') + (clean(input.reason, 1000, 'Reason') || `New action: ${goal}`) });
-    else record(projectId, workId, { kind: 'log', action: number, author: actor, text: `Added #${number}` });
+    else { record(projectId, workId, { kind: 'log', action: number, author: actor, text: `Added #${number}` }); reopen(projectId, workId, number, actor); }
     emit(projectId, workId, { type: 'action', number });
     return view(projectId, workId);
   }
@@ -370,7 +378,7 @@ export function agentWork({ db, know, catalogs = null }) {
       if (need.kind === 'approval') {
         const action = actionRows(projectId, workId).find(entry => entry.number === need.action);
         if (action?.state === 'proposed') {
-          if (input.allow) db.prepare("UPDATE work_goal_actions SET state = 'todo', updated_at = ? WHERE id = ? AND project_id = ?").run(now(), action.id, projectId);
+          if (input.allow) { db.prepare("UPDATE work_goal_actions SET state = 'todo', updated_at = ? WHERE id = ? AND project_id = ?").run(now(), action.id, projectId); reopen(projectId, workId, action.number, { kind: 'person', id: user.id }); }
           else db.prepare('DELETE FROM work_goal_actions WHERE id = ? AND project_id = ?').run(action.id, projectId);
         }
       }
