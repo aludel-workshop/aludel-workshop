@@ -63,6 +63,7 @@ import { commitWorkspace, gitWithToken, initializeAndPush, inspectGitRepository,
 import { getProjectBrand, updateProjectBrand } from './project-brand.mjs';
 import { ensureProductWorkspace, getProductWorkspace, saveProductRecord } from './product-workspace.mjs';
 import { sweepItemVolumes, templateBundle } from './item-environment.mjs';
+import { previewTunnels, tunnelProtocol } from './preview-tunnels.mjs';
 
 const portalRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const repositoryRoot = resolve(portalRoot, '../..');
@@ -243,6 +244,8 @@ const symphonyWorkspaceRoot = resolve(process.env.MACHINE_SYMPHONY_WORKSPACE_ROO
 const candidates = codeCandidates({ db, candidateRoot: join(dataDirectory, 'code-candidates'), externalRoot: symphonyWorkspaceRoot });
 const candidatePreviews = previewManager({ db, portalRoot, workspaceRoot: join(dataDirectory, 'candidate-preview-workspaces'),
   logRoot: join(dataDirectory, 'candidate-preview-logs'), dataRoot: join(dataDirectory, 'candidate-preview-data'), runtime: 'docker', kind: 'candidate' });
+// W-27 (A7) #2: previews an item's agent runs in its own container, relayed through connections the container dials out.
+const tunnels = previewTunnels({ portalOrigins: topology.portalOrigins, appOrigin: slug => topology.appOrigin(slug) });
 const integrationPreviews = reviewPreviews({ db, portalRoot, dataDirectory, appOrigin: slug => topology.appOrigin(slug), portalOrigins: topology.portalOrigins });
 const candidateHost = id => `candidate-${createHash('sha256').update(id).digest('hex').slice(0, 12)}`;
 function settleSymphonyBatch(projectId, batchId) {
@@ -647,6 +650,13 @@ async function api(request, response, url) {
       if (operation === 'events' && !sub) { const { id, ...view } = goals.post(agent, projectId, workId, input); return done(201, brief(view, { id })); }
       if (operation === 'stage' && !sub) return done(201, goals.stage(agent, projectId, workId, input));
       if (operation === 'code' && !sub) { const view = goals.recordCode(agent, projectId, workId, input); return done(200, brief(view, { code: view.code })); }
+      // W-27 #2: a preview tunnel for one open action; the container then dials in on its upgrade route (server 'upgrade').
+      if (operation === 'tunnels' && !sub) {
+        const action = goals.view(projectId, workId).actions.find(entry => entry.number === Number(input.action));
+        if (!action) return json(response, 404, { error: `#${input.action} isn't an action of this item.` });
+        if (['done', 'proposed'].includes(action.state)) return json(response, 409, { error: `#${action.number} is ${action.state === 'done' ? 'done' : 'waiting for approval'}; it has nothing to preview.` });
+        return done(201, tunnels.open({ projectId, workId, action: action.number }));
+      }
       return json(response, 404, { error: 'Not found.' });
     }
     if (path[0] === 'checkout' && path.length === 1 && request.method === 'POST')
@@ -1178,6 +1188,7 @@ async function api(request, response, url) {
   }
   // W-8 attempt 2, E2: closed items' container volumes go (archived items count as closed), noted on the item that closed.
   const sweepClosedVolumes = (projectId, workId = null) => {
+    if (workId) tunnels.closeItem(projectId, workId); // a closed item's previews close with it
     const slug = db.prepare('SELECT slug FROM projects WHERE id = ?').get(projectId)?.slug || 'project';
     const open = new Set(know.workList(projectId).filter(item => item.state !== 'done').map(item => item.ref));
     const swept = sweepItemVolumes(slug, ref => !open.has(ref));
@@ -1186,7 +1197,7 @@ async function api(request, response, url) {
     return swept;
   };
   // AGENT-WORK-01 A1: goal items. People drive them here; their local agent works on them through /api/editor/goals.
-  const goalRoute = /^\/api\/projects\/([^/]+)\/goals(?:\/([^/]+)(?:\/(define|move|claim|assign|container|connections|actions|events|answer|review|proposals|end|close|stream|read)(?:\/([^/]+))?)?)?$/.exec(url.pathname);
+  const goalRoute = /^\/api\/projects\/([^/]+)\/goals(?:\/([^/]+)(?:\/(define|move|claim|assign|container|connections|actions|events|answer|review|proposals|end|close|stream|read|previews)(?:\/([^/]+))?)?)?$/.exec(url.pathname);
   if (goalRoute) {
     const [, rawProject, rawWork, operation, rawSub] = goalRoute;
     const projectId = decodeURIComponent(rawProject), workId = rawWork ? decodeURIComponent(rawWork) : null, sub = rawSub ? decodeURIComponent(rawSub) : null;
@@ -1200,6 +1211,13 @@ async function api(request, response, url) {
     if (operation === 'stream' && method === 'GET') return streamGoal(request, response, projectId, workId);
     if (operation === 'read' && method === 'GET') return done(200, { result: goals.readLayer(projectId, workId, url.searchParams.get('layer'), { operationId: url.searchParams.get('operationId'), id: url.searchParams.get('id') }) });
     if (operation === 'actions' && sub && method === 'DELETE') return done(200, goals.dropAction(user, projectId, workId, Number(sub)));
+    // W-27 #2: a member opens an action's tunnelled preview: a one-time link that lets this browser in (members only).
+    if (operation === 'previews' && sub && method === 'POST') {
+      const [tunnel] = tunnels.find({ projectId, workId, action: Number(sub) });
+      if (!tunnel) return json(response, 404, { error: `#${sub} has no preview running. Ask the agent to run it again.` });
+      const path = String((await readJson(request)).path || '/');
+      return done(200, { ...tunnel, open: tunnels.ticket(tunnel.id, path) });
+    }
     if (method !== 'POST' && !(operation === 'actions' && sub && method === 'PATCH') && !(operation === 'connections' && !sub && method === 'GET')) return json(response, 405, { error: 'Method not allowed.' });
     const input = method === 'GET' ? {} : await readJson(request);
     if (operation === 'define' && !sub) return done(200, goals.define(person, projectId, workId, input));
@@ -1914,6 +1932,10 @@ function appPage(response, status, title, message) {
 
 // <slug>.<base> serves only that project's preview. Portal APIs and cookies never exist on app hosts.
 async function serveApp(request, response, slug) {
+  if (tunnels.owns(slug)) {
+    try { return await tunnels.serve(slug, request, response); }
+    catch (error) { if (!response.headersSent) return appPage(response, error.status || 503, 'Preview unavailable', error.message); return response.end(); }
+  }
   if (/^review-[a-f0-9]{12}$/.test(slug)) {
     const matches = db.prepare('SELECT id FROM layer_review_integrations').all().filter(row => reviewHost(row.id) === slug);
     if (matches.length !== 1) return appPage(response, 404, 'Review preview unavailable', 'Open this preview from its Work review.');
@@ -1979,6 +2001,30 @@ async function handle(request, response, target) {
   }
 }
 
+// W-27 #2: upgrades. An item container dials in to carry its preview (editor token, its own item only); a browser's
+// WebSocket on a tunnelled preview goes down one of those connections. Nothing else upgrades.
+server.on('upgrade', (request, socket, head) => {
+  socket.on('error', () => socket.destroy());
+  const refuse = (status, text) => socket.end(`HTTP/1.1 ${status} ${text}\r\nconnection: close\r\ncontent-length: 0\r\n\r\n`);
+  try {
+    const target = topology.classify(request.headers.host);
+    const path = new URL(request.url, 'http://x').pathname;
+    const dial = /^\/api\/editor\/goals\/([^/]+)\/tunnels\/([a-f0-9]{12})\/dial$/.exec(path);
+    if (dial && (target.kind === 'portal' || target.host === 'host.docker.internal')) {
+      if (String(request.headers.upgrade || '').toLowerCase() !== tunnelProtocol) return refuse(400, 'Bad Request');
+      const { user, projectId, workId: scope } = editor.authenticate(request.headers.authorization);
+      const raw = decodeURIComponent(dial[1]);
+      const workId = /^w-\d+$/i.test(raw) ? (know.workList(projectId).find(item => item.scope === 'goal' && item.ref.toLowerCase() === raw.toLowerCase())?.id || raw) : raw;
+      if (scope && workId !== scope) return refuse(404, 'Not Found');
+      goals.assertPerformer(user, projectId, workId);
+      if (goals.view(projectId, workId).item.board === 'done') return refuse(410, 'Gone');
+      return void tunnels.dial(dial[2], { projectId, workId }, socket);
+    }
+    if (target.kind === 'app' && tunnels.owns(target.slug)) return void tunnels.upgrade(target.slug, request, socket, head);
+    refuse(404, 'Not Found');
+  } catch (error) { refuse(error.status === 401 ? 401 : error.status === 403 ? 403 : 404, error.status === 401 ? 'Unauthorized' : error.status === 403 ? 'Forbidden' : 'Not Found'); }
+});
+
 // Clients keep idle connections longer than Node's 5-second default. A request sent on a socket the server has just closed
 // fails with ECONNRESET, so the server keeps idle sockets longer than any client's idle gap.
 server.keepAliveTimeout = 65000; server.headersTimeout = 66000;
@@ -1990,4 +2036,4 @@ server.listen(port, host, () => {
   console.log(`Symphony Work admission: ${symphonyDispatchEnabled ? 'enabled' : 'disabled'}; worker health: Deploy › Agents`);
 });
 
-for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => { previews.stopAll(); candidatePreviews.stopAll(); integrationPreviews.stopAll(); server.close(() => { db.close(); process.exit(0); }); server.closeAllConnections?.(); });
+for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => { previews.stopAll(); candidatePreviews.stopAll(); integrationPreviews.stopAll(); tunnels.stopAll(); server.close(() => { db.close(); process.exit(0); }); server.closeAllConnections?.(); });

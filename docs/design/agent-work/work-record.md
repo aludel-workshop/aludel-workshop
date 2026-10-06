@@ -735,3 +735,32 @@ Authorization: the owner created W-27 from [a7-brief.md](a7-brief.md), approved 
   - The `review-modal`, `agent-work` and `work-board` journeys pass.
   - Templates gate, run alone: 354 pass, 3 fail, 10 skipped. The 3 failures match W-25's: two Docker-only layer tests (`runner ENOENT`, F30) and the worker-token test, which also fails on `main`. The two Docker tests also failed here with this change stashed.
   - The first gate run caught two icons missing from the font subset (`add_circle`, `remove_circle`). fontTools isn't in the container, so the modal uses `add` and `delete`, which are in the subset.
+- **W27-F1. The kept preview's link didn't reach the owner (2026-10-06).** The owner opened `http://localhost:4390/…?review=1` and got "connection refused". In the container the preview was up: `localhost:4390` answered 200. So VS Code hadn't forwarded 4390 to the owner's machine, or had forwarded it to another local port. This answers W-25's open F32 question: forwarding can't be relied on. Workaround: forward 4390 from VS Code's Ports panel. Lasting fix: #2's tunnel, which serves the preview through the portal. **New constraint found while building #2:** the tunnel is portal code, and the owner's portal runs `main`. So a tunnelled preview reaches the owner only after W-27 merges, or through a branch-built portal that the owner chooses to run. This affects how #7's proof reviews run; see #7.
+- **Owner on #7 (2026-10-06):** "After close-out: #7 checks only the seeded preview portals (journeys plus a forwarded preview), and your live reviews of a Code action and a UI action happen on the next item, once W-27 is on main". So W-27's "done when" proof becomes agent-run journeys and seeded portals. The owner's live reviews in the modal are recorded as pending until a later item, as the standing live-portal rule says. #4 was approved on its summary; its forwarded preview hadn't reached the owner (W27-F1).
+
+### W-27 #2: the preview tunnel (2026-10-06)
+
+- **`server/preview-tunnels.mjs`.** Each connection the container dials in is an HTTP upgrade (`Upgrade: aludel-tunnel`, editor token, own item only). Once accepted, it becomes a raw byte pipe that waits in a small pool until the portal hands it one browser connection.
+  - **Pages and requests:** `http.request` runs with `createConnection` set to a pooled socket. That's the same proxy path as review previews: the walk script added to HTML, and `/__aludel/walk.js` served by the portal. One connection carries one request (`Connection: close`).
+  - **WebSockets:** the request head is written down a pooled socket, then bytes are piped both ways untouched.
+  - **Host:** the app receives `Host: localhost`, so a preview that is itself a portal answers as itself.
+  - **Framing:** its `frame-ancestors` becomes the portal's origins, and `X-Frame-Options` is dropped. Cookies the app sets get `SameSite=None; Secure; Partitioned` (CHIPS), so they work inside the portal's cross-site frame. Cookies with a `Domain` are dropped.
+  - **Members only:** a member asks the portal for a one-time link (`POST …/goals/:id/previews/:n`), and the preview host swaps it for its own host-only `aludel_review` cookie (also partitioned). That cookie is stripped before anything reaches the app.
+  - **Closing:** an item's tunnels close when it closes or ends, through the close-out hook that already sweeps its container volumes.
+- **Routes in `server/server.mjs`:**
+  - `POST /api/editor/goals/:id/tunnels {action}` opens a tunnel for one open action; a fresh one replaces the old.
+  - The server's `upgrade` handler takes the container's dial-ins and browser WebSockets on tunnelled hosts. Nothing else upgrades.
+  - Tunnelled `review-<id>` hosts are served before review-integration previews.
+- **`tools/preview-tunnel.mjs`:** the container's side. It opens the tunnel, keeps six dial-ins idle, and pipes each to `localhost:<port>` when a browser connection arrives. It redials with backoff, and stops when the portal answers 401, 404 or 410. Against a portal from before W-27, it says the portal has no tunnels yet.
+- **`npm run preview -- <journey> --tunnel <action>`** starts the tunnel beside the kept preview and prints the link to hand over (the tunnel's origin plus the journey's path). `npm run preview -- stop` stops both.
+- **Proof (`tests/preview-tunnel.test.mjs`):** a real portal and the real client tunnel to a preview app that refuses framing, sets its own cookie and speaks WebSocket.
+  - A stranger gets 403, and nothing reaches the app.
+  - The member link works once.
+  - The page carries the walk script, with the portal allowed as a framer and the app's cookie made partitioned.
+  - The app sees `Host: localhost` and never the access cookie.
+  - A POST body relays both ways.
+  - A WebSocket echoes, and a WebSocket without access gets 403.
+  - Another item's token can't dial in.
+  - Ending the item closes the preview, and the client stops on its own.
+- **Not proved yet:** a browser inside the portal's frame (partitioned cookies in Chromium, and the walk script reaching the modal). That's #6's journey. `--tunnel` itself was run only against the owner's portal, which runs `main` and refused it with the new message.
+- **Checks for #2 (agent-run):** `preview-tunnel.test.mjs` passes. Templates gate: 354 pass, 4 fail, 10 skipped. Three failures are the known ones (two Docker-only, plus the worker-token test, which fails on `main`). The fourth, the security-audit test, failed with the load average at 24 just after the container restarted. It passed when run alone, as it did in W-25.

@@ -2,8 +2,10 @@
 // W-25: a preview a person can open, from an item container. Runs a browser journey with its portal kept up afterwards
 // (tests/portal-support.mjs holdForPreview), in the background, and prints the link once the walk has passed. The link is
 // a localhost port VS Code forwards to the person's machine; hand it over with update_action's preview.
+// W-27 #2: with --tunnel <action>, the preview also goes through a tunnel to the portal (tools/preview-tunnel.mjs), so the
+// person opens it from the action's review, whatever VS Code forwards (W27-F1). Hand over the tunnel link it prints.
 // Usage (in apps/portal, after npm run build):
-//   npm run preview -- <journey> [--port 4390]   e.g. work-board runs tests/work-board-browser.mjs
+//   npm run preview -- <journey> [--port 4390] [--tunnel <action>]   e.g. work-board runs tests/work-board-browser.mjs
 //   npm run preview -- stop                      stops every kept preview
 import { spawn } from 'node:child_process';
 import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -12,7 +14,7 @@ import { join } from 'node:path';
 const portal = new URL('..', import.meta.url).pathname;
 const dir = join(portal, 'test-results', 'previews');
 const [name, ...rest] = process.argv.slice(2);
-const usage = 'Usage: npm run preview -- <journey> [--port 4390] | stop';
+const usage = 'Usage: npm run preview -- <journey> [--port 4390] [--tunnel <action>] | stop';
 
 function stop() {
   if (!existsSync(dir)) return 0;
@@ -49,8 +51,9 @@ async function start() {
       child.unref();
       console.log(`Preview of ${name}: ${link[1]}`);
       if (link[2].trim()) console.log(link[2].trim());
-      console.log(`Log: ${log}. Hand it over with update_action { preview: { url, try } }.`);
-      return 0;
+      const tunnelAt = rest.indexOf('--tunnel');
+      if (tunnelAt < 0) { console.log(`Log: ${log}. Hand it over with update_action { preview: { url, try } }.`); return 0; }
+      return tunnel(Number(rest[tunnelAt + 1]), port, new URL(link[1]));
     }
     if (exited !== null) {
       rmSync(join(dir, `${name}.pid`), { force: true });
@@ -60,6 +63,28 @@ async function start() {
   }
   try { process.kill(-child.pid, 'SIGTERM'); } catch { /* gone */ }
   console.error(`The ${name} journey took over ten minutes; stopped it. See ${log}.`);
+  return 1;
+}
+
+// The tunnel runs beside the preview, in its own process group, and stops with it (npm run preview -- stop).
+async function tunnel(action, port, local) {
+  if (!Number.isInteger(action) || action < 1) { console.error('Give --tunnel the number of the action the preview is for.'); return 2; }
+  const log = join(dir, `${name}-tunnel.log`), out = openSync(log, 'w');
+  const child = spawn(process.execPath, [join(portal, 'tools', 'preview-tunnel.mjs'), '--action', String(action), '--port', String(port)], { cwd: portal, detached: true, stdio: ['ignore', out, out] });
+  closeSync(out); writeFileSync(join(dir, `${name}-tunnel.pid`), String(child.pid));
+  let exited = null; child.once('exit', code => { exited = code ?? 1; });
+  for (const deadline = Date.now() + 20000; Date.now() < deadline; await new Promise(resolve => setTimeout(resolve, 250))) {
+    const text = readFileSync(log, 'utf8'), up = /^Tunnel: (\S+)/m.exec(text);
+    if (up) {
+      child.unref();
+      console.log(`Through the portal (members only): ${up[1]}${local.pathname}${local.search}`);
+      console.log(`Hand that link over with update_action { preview: { url, try } } on #${action}; the review opens it for your person. Logs: ${log}.`);
+      return 0;
+    }
+    if (exited !== null) { rmSync(join(dir, `${name}-tunnel.pid`), { force: true }); console.error(`The tunnel didn't start: ${text.trim() || `exit ${exited}`}. The preview itself is still up at ${local.href}.`); return 1; }
+  }
+  try { process.kill(-child.pid, 'SIGTERM'); } catch { /* gone */ }
+  console.error(`The tunnel didn't connect within 20 s; see ${log}. The preview itself is still up at ${local.href}.`);
   return 1;
 }
 
