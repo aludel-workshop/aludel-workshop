@@ -213,6 +213,10 @@ The Code layer's pin moves with each merge to `main`, so the first search after 
 
 **Finding W10-F1, for Work:** answering an agent's question moved the started item back to Ready ("Answered; work continues" in the log, while the board showed ready and the status queued). Then `report_code` refused with "Start W-10 before reporting code", so #4's commit couldn't be reported until the owner moved the item back to In progress. Expected: answering a need returns the item to In progress.
 
+**Follow-ups to propose on #4** once the item is In progress again (`propose_items` refused while it was Ready):
+1. *Answering a question keeps the item in progress* (W10-F1, Work).
+2. *Compare tests and journeys against base in one command*: a `tools/` script that checks out a commit in a scratch worktree, links its dependencies, builds when journeys are asked for, and runs the named tests or journeys there and on the branch.
+
 ## Retrospective (W-10, 2026-10-06)
 
 1. **What made it harder, slower or more error-prone than necessary?**
