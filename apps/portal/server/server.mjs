@@ -1330,7 +1330,12 @@ async function api(request, response, url) {
         const before = (await syncCode(projectId)).remote;
         if (before?.state !== 'in-sync') throw Object.assign(new Error(`Close-out waits until main matches GitHub: ${before?.detail || before?.state || 'Code has no remote'}.`), { status: 409 });
       }
-      const closed = goals.closeOut(user, projectId, workId);
+      // W-33 #5: an item with branches in other repositories closes them out together: each one's remote (with the
+      // installation token for GitHub), and the project's own, which is then pushed with them before anything applies here.
+      const reported = goals.view(projectId, workId).code?.repositories || [];
+      const remotes = reported.length ? { primary: token ? { url: binding.clone_url, token } : null,
+        companions: Object.fromEntries(await Promise.all([...new Set(reported.map(entry => entry.repository))].map(async key => [key, await companionRemote(projectId, key)]))) } : {};
+      const closed = goals.closeOut(user, projectId, workId, { remotes });
       sweepClosedVolumes(projectId, workId);
       if (closed.merged && code) {
         const after = await syncCode(projectId);

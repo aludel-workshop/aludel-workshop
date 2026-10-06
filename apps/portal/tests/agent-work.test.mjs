@@ -1,7 +1,7 @@
 // AGENT-WORK-01 A1: goal items with phases, gated actions, needs on actions, a live thread and one changeset across layers.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -649,17 +649,93 @@ test('W-33 #3: code is reported as a set, with the item’s branches in the proj
   assert.equal(work.recordCode(agent, id, workId, { branch: `aludel/${ref}`, commit: 'b'.repeat(40) }).code.repositories, undefined);
 }));
 
-test('W-33 #3: until close-out handles the set, an item with other repositories’ branches is refused rather than half merged', () => fixture(({ db, know, ada, id }) => {
-  const work = agentWork({ db, know, repositoriesOf: () => [{ key: 'tool-share', primary: true, lines: ['main'] }, { key: 'kit', primary: false, lines: ['main'] }] });
+test('W-33 #5: close-out merges the set together or not at all: pins checked, project checks run, referenced repositories pushed first', () => fixture(({ db, know, ada, id }) => {
+  const root = mkdtempSync(join(tmpdir(), 'aludel-set-close-'));
+  const git = (cwd, ...args) => execFileSync('git', ['-c', 'user.name=Ada', '-c', 'user.email=ada@example.com', ...args], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  // The kit, another repository the project owns, on GitHub (a bare repository here) with a buttons line.
+  const kitWork = join(root, 'kit-work'), kitRemote = join(root, 'kit.git');
+  git(root, 'init', '-q', '-b', 'main', kitWork); writeFileSync(join(kitWork, 'tokens.css'), ':root{}\n'); git(kitWork, 'add', '.'); git(kitWork, 'commit', '-qm', 'kit');
+  git(kitWork, 'branch', 'buttons'); git(kitWork, 'branch', 'forms');
+  git(root, 'clone', '-q', '--bare', kitWork, kitRemote);
+  // The project's own repository: Aludel's copy (the workspace) and its GitHub (bare), level with each other.
+  const app = join(root, 'app'), appRemote = join(root, 'app.git');
+  git(root, 'init', '-q', '-b', 'main', app); writeFileSync(join(app, 'README.md'), 'Tool Share\n'); git(app, 'add', '.'); git(app, 'commit', '-qm', 'start');
+  git(root, 'clone', '-q', '--bare', app, appRemote);
+  db.prepare('UPDATE project_setup SET workspace_path = ? WHERE project_id = ?').run(app, id);
+  const set = [
+    { key: 'tool-share', primary: true, lines: ['main'], references: [{ file: 'config/kit-pins.json', repository: 'kit', at: 'pins.*' }], checks: [{ name: 'Kit pins are listed', run: 'node check.mjs' }] },
+    { key: 'kit', primary: false, url: kitRemote, path: 'vendor/kit', lines: ['main', 'buttons', 'forms'], references: [], checks: [] }
+  ];
+  const work = agentWork({ db, know, repositoriesOf: () => set });
   const [first] = work.stackMap(id).map(layer => layer.key);
   const agent = { kind: 'agent', id: ada.id, name: "Ada's local agent" };
-  const workId = work.createGoal(ada, id, { title: 'Kit', brief: 'b' }).item.id;
-  const ref = work.view(id, workId).item.ref.toLowerCase();
-  work.define(agent, id, workId, { brief: 'A kit.', actions: [{ layer: first, goal: 'Build it' }] });
-  work.claim(ada, id, workId); work.move(ada, id, workId, 'progress');
-  work.recordCode(agent, id, workId, { branch: `aludel/${ref}`, commit: 'a'.repeat(40), repositories: [{ repository: 'kit', line: 'main', branch: `aludel/${ref}`, commit: 'c'.repeat(40) }] });
-  work.updateAction(agent, id, workId, 1, { state: 'working' }); work.updateAction(agent, id, workId, 1, { state: 'review', summary: 'Built.' });
-  work.updateAction(ada, id, workId, 1, { state: 'done' });
-  work.move(ada, id, workId, 'review');
-  assert.throws(() => work.closeOut(ada, id, workId), /changes kit too/);
+  const item = () => {
+    const workId = work.createGoal(ada, id, { title: 'Map button', brief: 'b' }).item.id;
+    work.define(agent, id, workId, { brief: 'A map button.', actions: [{ layer: first, goal: 'Build it' }] });
+    work.claim(ada, id, workId); work.move(ada, id, workId, 'progress');
+    return { workId, ref: work.view(id, workId).item.ref.toLowerCase() };
+  };
+  // The agent's work: a button on the kit's buttons line, and the project's pin to it (or to any commit given).
+  const build = ({ workId, ref }, pin = null) => {
+    const kit = join(root, `kit-${ref}`); git(root, 'clone', '-q', kitRemote, kit);
+    git(kit, 'checkout', '-qb', `aludel/${ref}--buttons`, 'origin/buttons');
+    writeFileSync(join(kit, 'button.css'), `.map-${ref}{}\n`); git(kit, 'add', '.'); git(kit, 'commit', '-qm', 'map button');
+    git(kit, 'push', '-q', 'origin', `aludel/${ref}--buttons`);
+    const kitCommit = git(kit, 'rev-parse', 'HEAD');
+    git(app, 'checkout', '-qb', `aludel/${ref}`, 'main'); mkdirSync(join(app, 'config'), { recursive: true });
+    writeFileSync(join(app, 'config/kit-pins.json'), JSON.stringify({ pins: { buttons: { branch: 'buttons', commit: pin || kitCommit } } }));
+    git(app, 'add', '.'); git(app, 'commit', '-qm', 'pin the map button'); const appCommit = git(app, 'rev-parse', 'HEAD'); git(app, 'checkout', '-q', 'main');
+    work.recordCode(agent, id, workId, { branch: `aludel/${ref}`, commit: appCommit, files: [{ path: 'config/kit-pins.json', status: 'added' }],
+      repositories: [{ repository: 'kit', line: 'buttons', branch: `aludel/${ref}--buttons`, commit: kitCommit, files: [{ path: 'button.css', status: 'added' }] }] });
+    work.updateAction(agent, id, workId, 1, { state: 'working' }); work.updateAction(agent, id, workId, 1, { state: 'review', summary: 'Built.' });
+    work.updateAction(ada, id, workId, 1, { state: 'done' }); work.move(ada, id, workId, 'review');
+    return { kitCommit, appCommit };
+  };
+  const remotes = { primary: { url: appRemote, token: null }, companions: { kit: { url: kitRemote, token: null } } };
+  const tips = () => ({ kitButtons: git(kitRemote, 'rev-parse', 'buttons'), appMain: git(appRemote, 'rev-parse', 'main'), hostMain: git(app, 'rev-parse', 'main') });
+  const before = tips();
+  const checked = [];
+  const passing = ({ dir, run, name }) => {
+    // The sealed workspace: the project's files at its merged commit, and the kit as a clone with its lines at their merged tips.
+    checked.push({ name, run, pins: JSON.parse(readFileSync(join(dir, 'config/kit-pins.json'), 'utf8')), buttons: git(join(dir, 'vendor/kit'), 'rev-parse', 'buttons'), head: git(join(dir, 'vendor/kit'), 'rev-parse', '--abbrev-ref', 'HEAD') });
+    return { ok: true, output: '' };
+  };
+
+  // A pin to a commit that isn't on its line (the kit's forms line here): stopped before anything moves.
+  const offLine = item();
+  const forms = git(kitWork, 'rev-parse', 'forms');
+  git(kitWork, 'checkout', '-q', 'forms'); writeFileSync(join(kitWork, 'form.css'), '.f{}\n'); git(kitWork, 'add', '.'); git(kitWork, 'commit', '-qm', 'form');
+  git(kitWork, 'push', '-q', kitRemote, 'forms'); const formCommit = git(kitWork, 'rev-parse', 'HEAD'); assert.notEqual(formCommit, forms);
+  build(offLine, formCommit);
+  assert.throws(() => work.closeOut(ada, id, offLine.workId, { remotes, runCheck: passing }), error => error.status === 409 && /pins kit buttons at [0-9a-f]{12}, which isn't on buttons/.test(error.message));
+  assert.deepEqual(tips(), before, 'nothing moved, here or on GitHub');
+  assert.equal(work.view(id, offLine.workId).item.board, 'review');
+
+  // A failing project check: stopped before anything moves, with what it said.
+  const failing = item(); build(failing);
+  assert.throws(() => work.closeOut(ada, id, failing.workId, { remotes, runCheck: () => ({ ok: false, output: 'server/button.mjs: digest 9f2c not listed' }) }),
+    /the check “Kit pins are listed” failed\. server\/button\.mjs: digest 9f2c not listed/);
+  assert.deepEqual(tips(), before);
+
+  // The project's own push fails after the kit's went through: the kit is put back, and nothing applies here.
+  const broken = { ...remotes, primary: { url: join(root, 'missing.git'), token: null } };
+  assert.throws(() => work.closeOut(ada, id, failing.workId, { remotes: broken, runCheck: passing }), /pushing main of tool-share failed .* Put back kit buttons\. Nothing was applied here\./);
+  assert.deepEqual(tips(), before, 'the kit is back where it was on GitHub');
+  assert.equal(work.view(id, failing.workId).item.board, 'review');
+
+  // Together: the kit's buttons line takes the button (pushed first), the project's main the pin, and both copies here follow.
+  checked.length = 0;
+  const done = work.closeOut(ada, id, failing.workId, { remotes, runCheck: passing });
+  assert.equal(done.item.board, 'done');
+  const after = tips();
+  const kitCopy = join(app, 'vendor/kit');
+  assert.equal(git(kitRemote, 'log', '-1', '--format=%s', 'buttons'), 'map button', 'the kit’s line has the button on GitHub');
+  assert.equal(git(kitCopy, 'rev-parse', 'buttons'), after.kitButtons, 'and in Aludel’s copy of the kit');
+  assert.equal(after.appMain, after.hostMain, 'the project’s main is the same on GitHub and here');
+  assert.equal(JSON.parse(git(app, 'show', 'main:config/kit-pins.json')).pins.buttons.commit, after.kitButtons, 'the pin names the kit commit on its line');
+  assert.equal(checked.length, 1); assert.equal(checked[0].buttons, after.kitButtons, 'the check saw the merged kit'); assert.equal(checked[0].head, 'main');
+  const closed = work.view(id, failing.workId);
+  assert.equal(closed.code.repositories[0].merged.into, 'buttons');
+  assert.equal(closed.code.repositories[0].merged.pushed, true);
+  assert.ok(closed.events.some(event => /Closed: .*merged aludel\/.* into main.*; kit: merged aludel\/.*--buttons into buttons .*pushed/.test(event.text)));
 }));

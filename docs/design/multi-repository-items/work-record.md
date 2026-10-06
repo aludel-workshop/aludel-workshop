@@ -267,6 +267,48 @@ Code's repository panel listing the set and its access (§1) isn't an action yet
   - `tests/review-modal-browser.mjs` gains a kit repository in the project's settings and a report in two repositories. It checks the grouped tree, a kit file's diff (read through the host's clone, made on first use) and a primary file's diff, with axe, and the whole journey passes.
   - Affected server tests: 48 tests, 47 passing, 0 failing.
 
+**#5: close-out of the set, together or not at all.** `server/set-close-out.mjs`, driven by `closeOut` in `server/agent-work.mjs`. For an item that reports other repositories:
+1. **Fetch:** each reported branch is fetched from its repository's remote and must still be at the reported commit.
+2. **Sync:** each line in Aludel's copy is brought level with its remote first.
+   - Missing or behind: it takes the remote's tip, fast-forwarding a clean checked-out line.
+   - Ahead, diverged, or dirty while checked out: close-out waits.
+3. **Plan:** every merge is planned with the same rules as the project's own (`planMerge`, now taking any repository and line). A conflict anywhere sends it back.
+4. **References** (built in, data only): each repository's pin files are read at their planned tips. Every entry `{ branch, commit }` must be on that line of its repository as it will be after the merge.
+5. **Project checks** (Q2):
+   - Each command runs in `docker run --network none --read-only --cap-drop ALL --user node`, with no credentials, over a workspace holding the project's files at the merged commit and each other repository as a git clone with its lines at their merged tips.
+   - The image is `node:24-bookworm` by default, because it has git; `MACHINE_CHECK_IMAGE` overrides it.
+   - A failure stops close-out with the check's last lines.
+6. **Push**, referenced repositories first and the project's own last. Each push is `--atomic` with a lease on the tip the plan was made from.
+   - If a later push fails, the earlier ones are pushed back over what was just pushed, again with a lease, and nothing is applied here.
+7. **Apply**, in one step with the records: the project's main and each line in Aludel's copies. The owner's `layer-base` beside the portal is that copy, so a pin resolves right after close-out.
+8. The item records each repository's merge and whether it was pushed. The log names every repository.
+
+**Further details:**
+- **Server:** the close route passes each repository's remote (installation token for GitHub URLs) and the project's own.
+- **Deviation from the spec, said plainly:** a single-repository item keeps today's path (merge here, then Code's sync pushes) rather than the new order. That limits this change to sets. Moving single items to push-first is a follow-up, not done here.
+- **Aludel's check:** `apps/portal/tools/check-reviewed-digests.mjs`. For each template pin, the pinned API handler and every listed reviewed path present at the pin must have its digest in `config/layer-reviewed-sources.json`.
+  - Passes on the current pins (7 templates, 7 files).
+  - With the Design handler's digests removed from a copy of the config, it names the file and exits 1.
+
+**Checks:**
+- `tests/agent-work.test.mjs` (#5) runs on a two-repository project that isn't Aludel. It covers:
+  - a pin to a commit on another line, refused with nothing moved here or on GitHub;
+  - a failing project check, refused with its output;
+  - the project's own push failing after the kit's went through, with the kit put back and nothing applied;
+  - the set closing together: the kit line pushed, main pushed, both copies here moved, the pin naming the merged commit, and the check seeing the merged kit.
+- `tests/set-close-out.test.mjs`: line sync (behind, missing, ahead, diverged, dirty) and pin reading.
+- Affected set: 59 tests, 58 passing, 0 failing, without the Docker-only files.
+
+**Not proven here:** the real sealed container (no Docker in this item container). It runs on the owner's machine at the first close-out of a set, which first pulls `node:24-bookworm`.
+
+**Aludel's values for Settings › Repositories** (the owner enters them once #2 is accepted):
+- `layer-base`:
+  - URL `https://github.com/aludel-workshop/layer-base.git`, folder `layer-base`;
+  - lines `main, pages, markdown, data, vision, design, code`.
+- `aludel-workshop`:
+  - pin `apps/portal/config/layer-templates.json` → `layer-base` at `templates.*`;
+  - check "Reviewed digests": `node apps/portal/tools/check-reviewed-digests.mjs`.
+
 ## Process note (three lines)
 
 - **Changed:** the spec is generic from the start, after the owner's steer. Aludel and `layer-base` appear only as the first project's values, and the end-to-end journey uses a fixture that isn't Aludel.

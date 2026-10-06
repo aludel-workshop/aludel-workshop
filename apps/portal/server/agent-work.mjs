@@ -10,6 +10,7 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { getUser, isMember, requireMember } from './accounts.mjs';
 import { gitWithToken } from './git-repository.mjs';
+import { checkReferences, fetchReported, pushPlans, runProjectChecks, syncLine } from './set-close-out.mjs';
 import { applyWrites, callOperation, draftChanges, draftOverlay, handlerCatalogs, layerApi, stageOperation } from './layer-api.mjs';
 import { layerCatalog } from './layer-contract.mjs';
 import { layerPackageForProject } from './layer-package.mjs';
@@ -632,8 +633,8 @@ export function agentWork({ db, know, catalogs = null, repositoriesOf = () => []
     const repo = code && repository(projectId);
     return Boolean(repo && repo.has(['merge-base', '--is-ancestor', code.commit, `refs/heads/${repo.target}`]));
   }
-  function planMerge(user, projectId, item, code) {
-    const repo = repository(projectId);
+  // W-33: any repository's line merges the same way; `repo` is that repository's copy here, with `target` its line.
+  function planMerge(user, projectId, item, code, repo = repository(projectId)) {
     if (!repo) fail(`This project has no repository with a main branch for Aludel to merge ${code.branch} into.`, 409);
     const { git, has, target } = repo;
     if (!has(['cat-file', '-e', `${code.commit}^{commit}`])) fail(`Aludel doesn't have ${code.branch} at ${code.commit.slice(0, 7)}. Push it to the project's GitHub repository, then close out.`, 409);
@@ -740,9 +741,48 @@ export function agentWork({ db, know, catalogs = null, repositoriesOf = () => []
     const diff = repo.git(['diff', '--no-color', '-M', '-U3', base, commit, '--', ...(entry.from ? [entry.from] : []), entry.path], { maxBuffer: 8 * diffLimit });
     return diff.length > diffLimit ? { ...entry, diff: null, tooLarge: true } : { ...entry, diff, tooLarge: false };
   }
+  // W-33 #5: plans the item's branches in the project's other repositories against the project's own plan, checks the
+  // planned set (pins, then the project's own checks), and pushes it. Nothing here moves a ref in Aludel's copies except
+  // bringing a line level with its remote first.
+  function planOthers(user, projectId, item, code, primaryPlan, { remotes = {}, runCheck } = {}) {
+    const set = repositoriesOf(projectId), primaryKey = set.find(repo => repo.primary)?.key || null;
+    const copies = new Map();
+    const copy = key => {
+      if (key === primaryKey) return primaryPlan || repository(projectId);
+      if (!copies.has(key)) copies.set(key, companionRepository(projectId, key, remotes.companions?.[key] || null));
+      return copies.get(key);
+    };
+    const steps = code.repositories.map(entry => {
+      const remote = remotes.companions?.[entry.repository] || null, handle = copy(entry.repository);
+      fetchReported(handle, remote, entry, `refs/aludel/work/${item.id}--${entry.line}`);
+      syncLine(handle, remote, entry.repository, entry.line);
+      const plan = planMerge(user, projectId, item, { ...entry, branch: entry.branch }, { ...handle, target: entry.line });
+      return { repository: entry.repository, line: entry.line, branch: entry.branch, handle, remote, plan };
+    });
+    // Each line's tip once the set merges: planned where the item changes it, as it is otherwise.
+    const tip = (key, line) => {
+      if (key === primaryKey && primaryPlan && line === primaryPlan.target) return primaryPlan.to;
+      const step = steps.find(entry => entry.repository === key && entry.line === line);
+      if (step) return step.plan.to;
+      const handle = copy(key);
+      if (key !== primaryKey) syncLine(handle, remotes.companions?.[key] || null, key, line);
+      return handle.git(['rev-parse', `refs/heads/${line}`]);
+    };
+    checkReferences(set, tip, copy);
+    runProjectChecks(set, { tip }, copy, runCheck);
+    // Referenced repositories go first, so whatever names their commits never lands before them; the project's own goes last.
+    const referenced = new Set(set.flatMap(repo => (repo.references || []).map(reference => reference.repository)));
+    const order = [...steps].sort((a, b) => Number(!referenced.has(a.repository)) - Number(!referenced.has(b.repository)));
+    const own = primaryPlan && remotes.primary ? [{ repository: primaryKey, line: primaryPlan.target, handle: primaryPlan, remote: remotes.primary, plan: primaryPlan }] : [];
+    const pushed = pushPlans([...order, ...own]);
+    for (const step of steps) step.pushed = pushed.includes(step);
+    return steps;
+  }
   // A4: close-out. Every action reviewed; the record changeset applies once, in one transaction, under each layer's API
   // checks it was staged with, after confirming nothing it changes moved since; the code merges into main in the same step.
-  function closeOut(user, projectId, workId) {
+  // W-33 #5: options.remotes gives the remotes of an item's other repositories ({ primary, companions: { key: remote } }), and
+  // options.runCheck runs one project check (the sealed container by default).
+  function closeOut(user, projectId, workId, options = {}) {
     const item = goalItem(projectId, workId);
     if (item.board !== 'review') fail(`Move ${item.ref} to review first.`, 409);
     const wrapUp = wrapUpOf(actionRows(projectId, workId));
@@ -753,14 +793,15 @@ export function agentWork({ db, know, catalogs = null, repositoriesOf = () => []
     if (undecided.length) fail(`Create or dismiss the ${undecided.length} proposed item${undecided.length === 1 ? '' : 's'} first.`, 409);
     if (wrapUp) return endNotDone(user, projectId, item, wrapUp);
     const code = goalOf(item).code || null;
-    // W-33: until close-out handles the set (#5), an item with branches in other repositories doesn't close with only one.
-    if (code?.repositories?.length) fail(`${item.ref} changes ${code.repositories.map(entry => entry.repository).join(', ')} too, and close-out can't merge several repositories yet.`, 409);
     const groups = changeset(projectId, workId);
     for (const group of groups) for (const change of group.changes) {
       const current = know.get(projectId, change.id);
       if (change.op === 'create' ? current : current?.revision !== change.baseRevision) fail(`A ${change.kind.replace(/_/g, ' ')} this item changes was changed since it was staged. Send its action back to restage.`, 409);
     }
     const plan = code ? planMerge(user, projectId, item, code) : null;
+    // W-33: the item's branches in other repositories: fetched, their lines level with their remotes, planned, the whole set
+    // checked, then pushed (referenced repositories first, the project's own last) before anything moves here.
+    const others = code?.repositories?.length ? planOthers(user, projectId, item, code, plan, options) : [];
     const author = user.name, rationale = `Closed ${item.ref}: ${item.title}`;
     const own = !db.isTransaction;
     if (own) db.exec('BEGIN IMMEDIATE');
@@ -772,14 +813,20 @@ export function agentWork({ db, know, catalogs = null, repositoriesOf = () => []
         applied += group.changes.length;
       }
       if (plan) applyMerge(plan);
+      for (const other of others) applyMerge(other.plan);
       if (own) db.exec('COMMIT');
     } catch (error) { if (own) db.exec('ROLLBACK'); throw error; }
     const by = { kind: 'person', id: user.id };
     const merged = plan ? { into: plan.target, commit: plan.to, mode: plan.mode } : null;
-    saveGoal(projectId, item, { closedAt: now(), applied, code: code ? { ...code, merged } : null }, `${user.name} closed it`, by);
+    const closedCode = code ? { ...code, merged, ...(others.length ? { repositories: code.repositories.map(entry => {
+      const other = others.find(candidate => candidate.repository === entry.repository && candidate.line === entry.line);
+      return { ...entry, merged: other ? { into: entry.line, commit: other.plan.to, mode: other.plan.mode, pushed: other.pushed } : null }; }) } : {}) } : null;
+    saveGoal(projectId, item, { closedAt: now(), applied, code: closedCode }, `${user.name} closed it`, by);
     setState(projectId, goalItem(projectId, workId), 'done', 'Closed', by);
-    const codeText = !plan ? '' : plan.mode === 'already' ? `; ${code.branch} was already in ${plan.target}`
-      : `; merged ${code.branch} into ${plan.target}${plan.mode === 'merge commit' ? ` with a merge commit (${plan.to.slice(0, 7)})` : ` (${plan.to.slice(0, 7)})`}`;
+    const mergedText = (branch, into, step) => step.mode === 'already' ? `${branch} was already in ${into}`
+      : `merged ${branch} into ${into}${step.mode === 'merge commit' ? ` with a merge commit (${step.to.slice(0, 7)})` : ` (${step.to.slice(0, 7)})`}`;
+    const codeText = (plan ? `; ${mergedText(code.branch, plan.target, plan)}` : '')
+      + others.map(other => `; ${other.repository}: ${mergedText(other.branch, other.line, other.plan)}${other.pushed ? ', pushed' : ''}`).join('');
     record(projectId, workId, { kind: 'log', author: { kind: 'person', id: user.id, name: user.name },
       text: `Closed: applied ${applied} record change${applied === 1 ? '' : 's'}${codeText}` });
     emit(projectId, workId, { type: 'item' });
