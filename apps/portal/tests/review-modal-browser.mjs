@@ -263,7 +263,7 @@ try {
   await page.setViewportSize({ width: 1440, height: 1000 });
 
   assert.deepEqual(errors, []);
-  console.log('PASS review modal: an action in review says what it changed and opens the review modal (from its card, its details or a link); Records shows Previous beside Proposed, only changed fields until asked, a new record with nothing before; Files shows a tree of the reported code beside each file's diff, follows a newer report and says why when it can't read it; nothing to show says so; the preview handed over sits beside it, ready, stale, unreachable or none; a flag needs a note, and approve needs no preview; Escape closes; axe at 1440 and 390 px.');
+  console.log('PASS review modal: an action in review says what it changed and opens the review modal (from its card, its details or a link); Records shows Previous beside Proposed, only changed fields until asked, a new record with nothing before; Files shows a tree of the reported code beside each file diff, follows a newer report and says why when it cannot read it; nothing to show says so; the preview handed over sits beside it, ready, stale, unreachable or none; a flag needs a note, and approve needs no preview; Escape closes; axe at 1440 and 390 px.');
   await holdForPreview({ port, path: `/p/${project.slug}/work/item/${encodeURIComponent(workId)}?review=1`, account: { email: 'owner@example.com', password } });
 } catch (error) {
   for (const open of browser.contexts().flatMap(context => context.pages())) await open.screenshot({ path: dest + 'failure.png', fullPage: true }).catch(() => {});
