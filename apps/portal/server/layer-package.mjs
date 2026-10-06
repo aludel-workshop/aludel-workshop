@@ -29,7 +29,10 @@ const configured = (key, template = null) => {
 // JOURNEYS-01 J8: the pin a template is at now, for an installed layer's template update.
 export const templatePin = (key, template) => configured(key, template);
 const git = (repo, ...args) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8', maxBuffer: 1024 * 1024 }).trimEnd();
-const projectRoot = (projectId,instanceId) => join(resolve(process.env.MACHINE_DATA_DIR || join(portal, '.data')), 'layer-repos', createHash('sha256').update(projectId).digest('hex').slice(0, 20), instanceId);
+// A test that reaches here without its own data directory would fill the real one (TEST-ISOLATION-01), so refuse instead.
+const underTest = () => Boolean(process.env.NODE_TEST_CONTEXT) || /\.test\.mjs$/.test(process.argv[1] || '');
+const dataRoot = () => { if (!process.env.MACHINE_DATA_DIR && underTest()) throw new Error('Tests must set MACHINE_DATA_DIR; run them through npm test scripts (tests/isolate-data.mjs) or set it in the test.'); return resolve(process.env.MACHINE_DATA_DIR || join(portal, '.data')); };
+const projectRoot = (projectId,instanceId) => join(dataRoot(), 'layer-repos', createHash('sha256').update(projectId).digest('hex').slice(0, 20), instanceId);
 const content = (repo, commit, path, root = '') => {
   if (typeof path !== 'string' || !/^(?:knowledge|ui)\/[a-z][a-z0-9-]*\.(?:md|ts|scss)$/.test(path)) throw new Error(`Invalid layer package path: ${path}`);
   return execFileSync('git', ['-C', repo, 'show', `${commit}:${root}${path}`], { encoding: 'utf8', maxBuffer: 1024 * 1024 });

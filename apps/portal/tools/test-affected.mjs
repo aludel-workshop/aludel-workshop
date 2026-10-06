@@ -96,5 +96,5 @@ if (args.includes('--list') || !selected.length) process.exit(0);
 const env = { ...process.env, ...(args.includes('--standard') ? {} : { MACHINE_LAYER_TEMPLATES_ENABLED: '1' }) };
 const concurrency = option('--concurrency');
 if (concurrency !== null && !/^[1-9]\d*$/.test(concurrency)) { console.error('--concurrency takes a whole number.'); process.exit(2); }
-const run = spawnSync(process.execPath, ['--test', '--test-timeout=300000', ...(concurrency ? [`--test-concurrency=${concurrency}`] : []), ...selected.map(([test]) => show(test))], { cwd: portal, env, stdio: 'inherit' });
+const run = spawnSync(process.execPath, ['--import', './tests/isolate-data.mjs', '--test', '--test-timeout=300000', ...(concurrency ? [`--test-concurrency=${concurrency}`] : []), ...selected.map(([test]) => show(test))], { cwd: portal, env, stdio: 'inherit' });
 process.exit(run.status ?? 1);
