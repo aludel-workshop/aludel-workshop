@@ -82,3 +82,50 @@ export function recordDiff(previous: Record<string, unknown> | null | undefined,
     return [{ key, label: label(key), changed, rows: diffRows(a, b) }];
   });
 }
+
+// W-27 #5: a git unified diff as the same aligned rows, with each side's line numbers; each hunk opens with its @@ line.
+export type CodeRow = DiffRow & { oldNo?: number | null; newNo?: number | null; hunk?: string };
+export function unifiedRows(diff: string): CodeRow[] {
+  const rows: CodeRow[] = [];
+  let oldNo = 0, newNo = 0, removed: [string, number][] = [], added: [string, number][] = [];
+  const flush = () => {
+    for (let p = 0; p < Math.max(removed.length, added.length); p++) {
+      const before = removed[p] ?? null, after = added[p] ?? null;
+      rows.push({ kind: before && after ? 'changed' : before ? 'removed' : 'added', previous: before?.[0] ?? null, proposed: after?.[0] ?? null, oldNo: before?.[1] ?? null, newNo: after?.[1] ?? null });
+    }
+    removed = []; added = [];
+  };
+  for (const line of diff.split('\n')) {
+    const hunk = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
+    if (hunk) { flush(); oldNo = Number(hunk[1]); newNo = Number(hunk[2]); rows.push({ kind: 'gap', previous: null, proposed: null, hunk: line }); continue; }
+    if (!rows.length || line === '' || line.startsWith('\\')) continue; // the file header, the trailing newline, "\ No newline at end of file"
+    if (line[0] === '-') removed.push([line.slice(1), oldNo++]);
+    else if (line[0] === '+') added.push([line.slice(1), newNo++]);
+    else { flush(); rows.push({ kind: 'same', previous: line.slice(1), proposed: line.slice(1), oldNo: oldNo++, newNo: newNo++ }); }
+  }
+  flush();
+  return rows;
+}
+
+// The changed files as a folder tree; a folder holding one folder and nothing else is shown joined ("src/layers").
+export type FileEntry = { path: string; from: string | null; status: string; added: number; removed: number; binary: boolean };
+export type TreeNode = { name: string; path: string; file: FileEntry | null; children: TreeNode[] };
+export function fileTree(files: FileEntry[]): TreeNode[] {
+  const root: TreeNode = { name: '', path: '', file: null, children: [] };
+  for (const file of [...files].sort((a, b) => a.path.localeCompare(b.path))) {
+    let node = root; const parts = file.path.split('/');
+    parts.forEach((part, index) => {
+      const path = parts.slice(0, index + 1).join('/'), last = index === parts.length - 1;
+      let child = node.children.find(entry => entry.name === part && Boolean(entry.file) === last);
+      if (!child) node.children.push(child = { name: part, path, file: last ? file : null, children: [] });
+      node = child;
+    });
+  }
+  const join = (node: TreeNode): TreeNode => {
+    let current = { ...node, children: node.children.map(join) };
+    while (!current.file && current.children.length === 1 && !current.children[0].file) { const only = current.children[0]; current = { ...only, name: `${current.name}/${only.name}` }; }
+    return current;
+  };
+  const sorted = (nodes: TreeNode[]): TreeNode[] => nodes.map(node => ({ ...node, children: sorted(node.children) })).sort((a, b) => Number(Boolean(a.file)) - Number(Boolean(b.file)) || a.name.localeCompare(b.name));
+  return sorted(root.children.map(join));
+}

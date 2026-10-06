@@ -63,18 +63,54 @@
 .rm-gap{display:block;width:100%;border:0;border-top:1px dashed var(--machine-line);border-bottom:1px dashed var(--machine-line);background:var(--machine-panel);padding:4px 10px;font:inherit;font-family:system-ui,sans-serif;font-size:12.5px;color:var(--machine-muted);text-align:left;cursor:pointer;min-height:26px}
 .rm-gap:hover{color:var(--machine-accent)}
 .rm-note{display:flex;align-items:center;gap:6px;margin:4px 0 0;font-size:13.5px;color:var(--machine-muted)}
-.rm-files{padding:14px 16px}
-.rm-files h3{margin:0 0 10px;font-size:15px;font-weight:500;text-transform:none;letter-spacing:0}
-.rm-files code{font-size:12.5px;background:var(--machine-line);padding:1px 6px;border-radius:4px}
-.rm-files ul{list-style:none;margin:0;padding:0;display:grid;gap:4px;font-size:14px}
-.rm-files li{display:flex;align-items:center;gap:8px}
+/* Files (W-27 #5): the changed files as a tree beside the picked file's diff, with each side's line numbers. */
+.rm-files{display:grid;grid-template-columns:280px minmax(0,1fr);min-height:100%}
+.rm-files>.rm-unread,.rm-files>.rm-reading{grid-column:1/-1;align-self:start;margin:14px 16px 0}
+.rm-tree{padding:12px;border-right:1px solid var(--machine-line);background:var(--mat-sys-surface,#fff);overflow:auto}
+.rm-treehead{margin:0 0 8px;font-size:13px;color:var(--machine-muted)}
+.rm-treehead code,.rm-reported code,.rm-note code{font-size:12px;background:var(--machine-line);padding:1px 5px;border-radius:4px}
+.rm-tree ul{list-style:none;margin:0;padding:0}
+.rm-tree ul ul{padding-left:14px}
+.rm-tree summary{display:flex;align-items:center;gap:4px;padding:4px 2px;font-size:13.5px;font-weight:500;cursor:pointer;min-height:24px}
+.rm-tree summary mat-icon{width:16px;height:16px;font-size:16px;color:var(--machine-muted)}
+.rm-file{display:flex;align-items:center;gap:6px;width:100%;border:0;border-radius:6px;background:none;padding:5px 6px;font:inherit;font-size:13.5px;color:inherit;text-align:left;cursor:pointer;min-height:28px}
+.rm-file[aria-current=true]{background:var(--mat-sys-primary-container);color:var(--mat-sys-on-primary-container)}
+.rm-fname{flex:1;min-width:0;font-family:ui-monospace,monospace;font-size:12.5px;overflow-wrap:anywhere}
+.rm-dot{flex:none;width:8px;height:8px;border-radius:50%;padding:0;min-width:0}
+.rm-counts{flex:none;font-family:ui-monospace,monospace;font-size:12px}
+.rm-plus{color:#18794e}.rm-minus{color:#b42318}
+.rm-diff{min-width:0;padding:14px 16px}
+.rm-diffhead h3{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0;font-size:14px;font-weight:500;text-transform:none;letter-spacing:0}
+.rm-moved{margin:4px 0 0;font-size:13px;color:var(--machine-muted)}
+.rm-diffhead{margin-bottom:10px}
+.rm-codecols{grid-template-columns:3.2em minmax(0,1fr) 3.2em minmax(0,1fr)}
+.rm-codecols span:first-child{grid-column:1/3}.rm-codecols span:last-child{grid-column:3/5}
+.rm-code{border:1px solid var(--machine-line);border-radius:10px;background:var(--mat-sys-surface,#fff);overflow:hidden;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;line-height:1.5}
+.rm-crow{display:grid;grid-template-columns:3.2em minmax(0,1fr) 3.2em minmax(0,1fr)}
+.rm-crow>span{padding:0 8px;white-space:pre-wrap;overflow-wrap:anywhere;min-height:1.5em}
+.rm-no{text-align:right;color:var(--machine-muted);user-select:none;padding:0 6px 0 0 !important}
+.rm-crow .rm-prev{border-right:1px solid var(--machine-line)}
+.rm-crow.rm-changed .rm-prev,.rm-crow.rm-removed .rm-prev{background:#fde8e6}
+.rm-crow.rm-changed .rm-next,.rm-crow.rm-added .rm-next{background:#e3f4e8}
+.rm-hunk{padding:3px 10px;background:var(--machine-panel);color:var(--machine-muted);border-top:1px solid var(--machine-line);border-bottom:1px solid var(--machine-line);overflow-wrap:anywhere}
+.rm-hunk:first-child{border-top:0}
+.rm-problem{display:grid;justify-items:start;gap:8px;padding:12px 14px;border:1px solid var(--lay-bad-ink);border-radius:10px;background:var(--lay-bad-bg);color:var(--lay-bad-ink)}
+.rm-problem p{margin:0}
+.rm-reported{margin:10px 0 0;font-size:14px}
+.rm-plain{list-style:none;padding:0;display:grid;gap:4px;font-size:14px}
+.rm-plain li{display:flex;align-items:center;gap:8px}
 .rm-path{font-family:ui-monospace,monospace;font-size:13px;overflow-wrap:anywhere}
 .rm-empty{display:grid;justify-items:center;gap:8px;padding:48px 24px;text-align:center;color:var(--machine-muted)}
 .rm-empty mat-icon{width:36px;height:36px;font-size:36px}
 .rm-empty p{max-width:46ch;margin:0}
-@media(max-width:1000px){.rm-body{display:block;overflow:auto}.rm-main{border-right:0;border-bottom:1px solid var(--machine-line);overflow:visible}.rm-side{display:block}.rm-sidebody{overflow:visible}.rm-records{grid-template-columns:minmax(0,1fr)}.rm-list{border-right:0;border-bottom:1px solid var(--machine-line)}}
+@media(max-width:1000px){.rm-body{display:block;overflow:auto}.rm-files{grid-template-columns:minmax(0,1fr)}.rm-tree{border-right:0;border-bottom:1px solid var(--machine-line)}.rm-main{border-right:0;border-bottom:1px solid var(--machine-line);overflow:visible}.rm-side{display:block}.rm-sidebody{overflow:visible}.rm-records{grid-template-columns:minmax(0,1fr)}.rm-list{border-right:0;border-bottom:1px solid var(--machine-line)}}
 /* A phone: full screen, and Previous above Proposed in one column (an unchanged line once). */
 @media(max-width:640px){.rm{width:100vw;height:100dvh;margin:0;border-radius:0}.rm-newtab{margin-left:0}
   .rm-cols{display:none}.rm-row{grid-template-columns:minmax(0,1fr)}.rm-prev{border-right:0}.rm-row.rm-same .rm-prev{display:none}
   .rm-row.rm-changed .rm-prev::before,.rm-row.rm-removed .rm-prev::before{content:'− ';font-weight:700}.rm-row.rm-changed .rm-next::before,.rm-row.rm-added .rm-next::before{content:'+ ';font-weight:700}
-  .rm-row.rm-added .rm-prev,.rm-row.rm-removed .rm-next{display:none}}
+  .rm-row.rm-added .rm-prev,.rm-row.rm-removed .rm-next{display:none}
+  .rm-codecols{display:none}.rm-crow{grid-template-columns:3.2em minmax(0,1fr)}.rm-crow .rm-prev{border-right:0}
+  .rm-crow.rm-same>span:nth-child(-n+2),.rm-crow.rm-added>span:nth-child(-n+2),.rm-crow.rm-removed>span:nth-child(n+3){display:none}
+  .rm-crow.rm-changed .rm-prev::before,.rm-crow.rm-removed .rm-prev::before{content:'− ';font-weight:700}.rm-crow.rm-changed .rm-next::before,.rm-crow.rm-added .rm-next::before{content:'+ ';font-weight:700}}
+.rm-dot.rm-op-create{background:#18794e}.rm-dot.rm-op-update{background:#b7791f}.rm-dot.rm-op-delete{background:#b42318}
+.rm-file[aria-current=true] .rm-plus,.rm-file[aria-current=true] .rm-minus{color:inherit}

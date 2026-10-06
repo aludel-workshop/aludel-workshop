@@ -1,7 +1,9 @@
 // W-27 (A7): an action in review opens one review modal, and what it shows matches what the action changed. Follows the
 // Pages flows W-27 #1 staged ("Review a code action's files"; the walked half of "Review a UI action by walking it" comes with
 // #6) and the Action review page: the card says what changed and offers Review; the modal shows Records (Previous beside
-// Proposed, unchanged fields hidden and long runs folded), Files, or says there's nothing to show; the side panel keeps
+// Proposed, unchanged fields hidden and long runs folded), Files (W-27 #5: a tree of the changed files beside each one's diff
+// against the item's base, read from the project's repository; following a newer report; saying why when it can't read the
+// commit), or says there's nothing to show; the side panel keeps
 // W-25's preview states (ready, stale, unreachable, none) and the decision (a flag needs a note). Opens from a link
 // (?review=N); Escape closes it. A scripted local agent (no model) works the items through the editor API.
 // Screens and axe at 1440 and 390 px.
@@ -9,8 +11,8 @@
 // (PLAYWRIGHT_MODULE and CHROMIUM_PATH when not in an item container; see browser-support.mjs).
 // `npm run preview -- review-modal` keeps the portal running afterwards, on the item with its #1 open, for a person to look at.
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { execFileSync, spawn } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -39,6 +41,19 @@ const { token } = flows.saveDraft(null, { profile: 'planner' });
 flows.saveDraft(token, { name: 'Tool Share', pitch: 'Help neighbours share tools. Borrow a drill in minutes.' });
 const project = flows.claimDraft(token, owner, owner).project;
 know.ensureDesign(project.id);
+// W-27 #5: the project's repository, where the item's branch has two commits: the map, then a fix to it.
+const git = (cwd, ...args) => execFileSync('git', ['-c', 'user.name=Charles', '-c', 'user.email=owner@example.com', ...args], { cwd, encoding: 'utf8' }).trim();
+const repo = join(root, 'project'); git(root, 'init', '-q', '-b', 'main', repo);
+mkdirSync(join(repo, 'src')); writeFileSync(join(repo, 'src/list.ts'), 'export function list(tools) {\n  return tools.sort(byName);\n}\n');
+git(repo, 'add', '.'); git(repo, 'commit', '-qm', 'start'); git(repo, 'checkout', '-qb', 'aludel/w-2');
+writeFileSync(join(repo, 'src/list.ts'), 'export function list(tools, here) {\n  return tools.sort(byDistance(here));\n}\n');
+writeFileSync(join(repo, 'src/map.ts'), 'export function pins(tools) {\n  return tools.map(tool => tool.place);\n}\n');
+git(repo, 'add', '.'); git(repo, 'commit', '-qm', 'map');
+const first = git(repo, 'rev-parse', 'HEAD');
+writeFileSync(join(repo, 'src/map.ts'), 'export function pins(tools) {\n  return tools.filter(tool => tool.place).map(tool => tool.place);\n}\n');
+git(repo, 'commit', '-qam', 'skip tools without a place');
+const second = git(repo, 'rev-parse', 'HEAD'); git(repo, 'checkout', '-q', 'main');
+db.prepare('UPDATE project_setup SET workspace_path = ? WHERE project_id = ?').run(repo, project.id);
 db.close();
 
 const freePort = async wanted => { const probe = createServer(); await new Promise(resolve => probe.listen(wanted, '127.0.0.1', resolve)); const found = probe.address().port; await new Promise(resolve => probe.close(resolve)); return found; };
@@ -155,17 +170,31 @@ try {
   await agent('/actions/1', { state: 'review', summary: 'The map sits under the filters.' });
 
   // Files, and a preview handed over: #2 reported code and a link to the build, its commit and what to try.
-  const first = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', second = 'f0e1d2c3b4a5968778695a4b3c2d1e0f12345678';
   await agent('/code', { branch: 'aludel/w-2', commit: first, files: [{ path: 'src/map.ts', status: 'added' }, { path: 'src/list.ts', status: 'modified' }] });
   const built = `${portal}/p/${project.slug}/work`;
   await agent('/actions/2', { state: 'review', summary: 'The map sits beside the list.', preview: { url: built, try: 'Open the board and drag a card across.' } });
   await card(2).locator('.wg-changed', { hasText: '2 files · a preview to open' }).waitFor();
   dialog = await openReview(2);
-  await dialog.locator('.rm-files li', { hasText: 'src/map.ts' }).getByText('New').waitFor();
-  await dialog.locator('.rm-files li', { hasText: 'src/list.ts' }).getByText('Changed').waitFor();
+  // Files: the tree, the first file's diff Before beside After with line numbers, and another file picked from the tree.
+  const tree = dialog.getByRole('navigation', { name: 'Files it changed' });
+  await tree.getByText(`2 files on aludel/w-2 at ${first.slice(0, 7)}`).waitFor();
+  await tree.locator('summary', { hasText: 'src' }).waitFor();
+  assert.deepEqual(await tree.locator('.rm-fname').allInnerTexts(), ['list.ts', 'map.ts']);
+  assert.equal(await tree.getByRole('button', { name: /list\.ts/ }).getAttribute('aria-current'), 'true', 'the first file opens');
+  const changes = dialog.getByRole('region', { name: 'Changes to src/list.ts' });
+  await changes.locator('.rm-crow.rm-changed', { hasText: 'byDistance(here)' }).waitFor();
+  const changed = changes.locator('.rm-crow.rm-changed').first();
+  assert.deepEqual((await changed.locator('.rm-no').allInnerTexts()), ['1', '1']);
+  assert.match(await changed.locator('.rm-prev').innerText(), /function list\(tools\) \{/);
+  assert.match(await changed.locator('.rm-next').innerText(), /function list\(tools, here\) \{/);
+  await changes.locator('.rm-hunk', { hasText: '@@ -1,3 +1,3 @@' }).waitFor();
+  await tree.getByRole('button', { name: /map\.ts/ }).click();
+  const added = dialog.getByRole('region', { name: 'Changes to src/map.ts' });
+  await added.locator('.rm-crow.rm-added').first().waitFor();
+  assert.equal(await added.locator('.rm-crow.rm-added').count(), 3);
   const side = dialog.getByRole('complementary', { name: 'Decision' });
   await side.getByText('Try: Open the board and drag a card across.').waitFor();
-  assert.match(await side.locator('.rm-meta').innerText(), /^At a1b2c3d · from Charles's local agent · \d{2}:\d{2}$/);
+  assert.match(await side.locator('.rm-meta').innerText(), new RegExp(`^At ${first.slice(0, 7)} · from Charles's local agent · \\d{2}:\\d{2}$`));
   const link = side.getByRole('link', { name: 'Preview #2 (opens in a new tab)' });
   assert.equal(await link.getAttribute('href'), built);
   assert.equal(await link.getAttribute('target'), '_blank');
@@ -176,7 +205,12 @@ try {
   await tab.waitForLoadState(); assert.equal(tab.url(), built); await tab.locator('aludel-work-board').waitFor(); await tab.close();
   // Stale: newer code is reported, so the preview says which build it shows.
   await agent('/code', { branch: 'aludel/w-2', commit: second, files: [{ path: 'src/map.ts', status: 'added' }, { path: 'src/list.ts', status: 'modified' }] });
-  await side.getByText('Older build: it shows a1b2c3d, but f0e1d2c was reported since. Ask for a fresh one.').waitFor();
+  await side.getByText(`Older build: it shows ${first.slice(0, 7)}, but ${second.slice(0, 7)} was reported since. Ask for a fresh one.`).waitFor();
+  // The Files view follows the newer report.
+  await tree.getByText(`2 files on aludel/w-2 at ${second.slice(0, 7)}`).waitFor();
+  await tree.getByRole('button', { name: /map\.ts/ }).click();
+  await dialog.getByRole('region', { name: 'Changes to src/map.ts' }).locator('.rm-crow', { hasText: 'filter(tool => tool.place)' }).waitFor();
+  await shot('04b-files-newer'); await audit('files newer');
   await dialog.getByRole('button', { name: 'Close' }).click();
   await dialog.waitFor({ state: 'detached' });
 
@@ -188,6 +222,16 @@ try {
   await dialog.waitFor({ state: 'detached' });
   await state(3, 'Done');
   await assert.rejects(agent('/actions/3', { preview: null }), /#3 is done; its preview can't change/, 'the preview stays as it was reviewed');
+
+  // A reported commit Aludel can't read (not in the repository, and no GitHub to fetch from): it says why, with Retry and
+  // the files as the agent reported them.
+  await agent('/code', { branch: 'aludel/w-2', commit: 'abcdef1234567', files: [{ path: 'src/map.ts', status: 'added' }] });
+  dialog = await openReview(2);
+  await dialog.getByRole('alert').getByText(/Aludel doesn't have abcdef1 yet, and this project has no GitHub repository/).waitFor();
+  await dialog.locator('.rm-plain li', { hasText: 'src/map.ts' }).waitFor();
+  await shot('05a-files-unreadable'); await audit('files unreadable');
+  await page.keyboard.press('Escape'); await dialog.waitFor({ state: 'detached' });
+  await agent('/code', { branch: 'aludel/w-2', commit: second, files: [{ path: 'src/map.ts', status: 'added' }, { path: 'src/list.ts', status: 'modified' }] });
 
   // Nothing to show: #4 staged nothing and gave no preview.
   await agent('/actions/4', { state: 'review', summary: 'Agreed: OpenStreetMap tiles.' });
@@ -213,12 +257,13 @@ try {
   await shot('06-phone-records'); await audit('phone records');
   await page.keyboard.press('Escape'); await dialog.waitFor({ state: 'detached' });
   dialog = await openReview(2);
+  await dialog.locator('.rm-crow').first().waitFor();
   await shot('07-phone-files'); await audit('phone files');
   await page.keyboard.press('Escape'); await dialog.waitFor({ state: 'detached' });
   await page.setViewportSize({ width: 1440, height: 1000 });
 
   assert.deepEqual(errors, []);
-  console.log('PASS review modal: an action in review says what it changed and opens the review modal (from its card, its details or a link); Records shows Previous beside Proposed, only changed fields until asked, a new record with nothing before; Files lists the reported code; nothing to show says so; the preview handed over sits beside it, ready, stale, unreachable or none; a flag needs a note, and approve needs no preview; Escape closes; axe at 1440 and 390 px.');
+  console.log('PASS review modal: an action in review says what it changed and opens the review modal (from its card, its details or a link); Records shows Previous beside Proposed, only changed fields until asked, a new record with nothing before; Files shows a tree of the reported code beside each file's diff, follows a newer report and says why when it can't read it; nothing to show says so; the preview handed over sits beside it, ready, stale, unreachable or none; a flag needs a note, and approve needs no preview; Escape closes; axe at 1440 and 390 px.');
   await holdForPreview({ port, path: `/p/${project.slug}/work/item/${encodeURIComponent(workId)}?review=1`, account: { email: 'owner@example.com', password } });
 } catch (error) {
   for (const open of browser.contexts().flatMap(context => context.pages())) await open.screenshot({ path: dest + 'failure.png', fullPage: true }).catch(() => {});

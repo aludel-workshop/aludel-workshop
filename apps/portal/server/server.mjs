@@ -1197,7 +1197,7 @@ async function api(request, response, url) {
     return swept;
   };
   // AGENT-WORK-01 A1: goal items. People drive them here; their local agent works on them through /api/editor/goals.
-  const goalRoute = /^\/api\/projects\/([^/]+)\/goals(?:\/([^/]+)(?:\/(define|move|claim|assign|container|connections|actions|events|answer|review|proposals|end|close|stream|read|previews)(?:\/([^/]+))?)?)?$/.exec(url.pathname);
+  const goalRoute = /^\/api\/projects\/([^/]+)\/goals(?:\/([^/]+)(?:\/(define|move|claim|assign|container|connections|actions|events|answer|review|proposals|end|close|stream|read|previews|files)(?:\/([^/]+))?)?)?$/.exec(url.pathname);
   if (goalRoute) {
     const [, rawProject, rawWork, operation, rawSub] = goalRoute;
     const projectId = decodeURIComponent(rawProject), workId = rawWork ? decodeURIComponent(rawWork) : null, sub = rawSub ? decodeURIComponent(rawSub) : null;
@@ -1211,6 +1211,13 @@ async function api(request, response, url) {
     if (operation === 'stream' && method === 'GET') return streamGoal(request, response, projectId, workId);
     if (operation === 'read' && method === 'GET') return done(200, { result: goals.readLayer(projectId, workId, url.searchParams.get('layer'), { operationId: url.searchParams.get('operationId'), id: url.searchParams.get('id') }) });
     if (operation === 'actions' && sub && method === 'DELETE') return done(200, goals.dropAction(user, projectId, workId, Number(sub)));
+    // W-27 #5: what the item's code changed (its files, or one file's diff with ?path=), read from the project's repository,
+    // fetching the item's branch from GitHub when Aludel doesn't have the reported commit yet.
+    if (operation === 'files' && !sub && method === 'GET') {
+      const binding = github.status(user.id, projectId, null).repository;
+      const remote = binding?.status === 'ready' ? { url: binding.clone_url, token: await github.installationTokenForRepository(projectId, binding.name) } : null;
+      return done(200, goals.codeFiles(projectId, workId, remote, url.searchParams.get('path')));
+    }
     // W-27 #2: a member opens an action's tunnelled preview: a one-time link that lets this browser in (members only).
     if (operation === 'previews' && sub && method === 'POST') {
       const [tunnel] = tunnels.find({ projectId, workId, action: Number(sub) });

@@ -621,6 +621,47 @@ export function agentWork({ db, know, catalogs = null }) {
     if (!tip.startsWith(code.commit)) fail(`${code.branch} is at ${tip.slice(0, 7)} on GitHub, but ${code.commit.slice(0, 7)} was reported. Report the code again so what merges is what was reviewed.`, 409);
     return tip;
   }
+  // W-27 #5: what an item's code changed, at the reported commit against its base: the files (with line counts), or one
+  // file's diff. The commit comes from the project's repository, fetched from GitHub when Aludel doesn't have it yet.
+  const diffLimit = 400_000;
+  function codeFiles(projectId, workId, remote, path = null) {
+    const item = goalItem(projectId, workId), code = goalOf(item).code;
+    if (!code) fail(`${item.ref} has no code reported yet.`, 404);
+    const repo = repository(projectId);
+    if (!repo) fail('This project has no repository to read the code from.', 409);
+    const short = code.commit.slice(0, 7), present = sha => repo.has(['cat-file', '-e', `${sha}^{commit}`]);
+    if (!present(code.commit)) {
+      if (!remote) fail(`Aludel doesn't have ${short} yet, and this project has no GitHub repository to fetch ${code.branch} from.`, 409);
+      const args = ['fetch', '--no-tags', '--quiet', remote.url, `+refs/heads/${code.branch}:refs/aludel/work/${workId}`];
+      const fetched = remote.token ? gitWithToken(repo.workspace, args, remote.token).status === 0 : repo.has(args);
+      if (!fetched) fail(`Aludel couldn't fetch ${code.branch} from GitHub. The agent pushes it with its report; ask it to report again.`, 409);
+      if (!present(code.commit)) fail(`${code.branch} on GitHub doesn't contain ${short}. Ask the agent to report its code again.`, 409);
+    }
+    const base = code.base && present(code.base) ? repo.git(['rev-parse', code.base]) : repo.git(['merge-base', `refs/heads/${repo.target}`, code.commit]);
+    const commit = repo.git(['rev-parse', code.commit]);
+    // -z keeps any path intact; a rename has its old and new path.
+    const fields = repo.git(['diff', '--name-status', '-z', '-M', base, commit]).split('\0').filter(Boolean);
+    const files = [];
+    for (let at = 0; at < fields.length;) {
+      const letter = fields[at++][0];
+      const from = letter === 'R' || letter === 'C' ? fields[at++] : null, file = fields[at++];
+      files.push({ path: file, from, status: { A: 'added', D: 'deleted', R: 'renamed', C: 'added' }[letter] || 'modified', added: 0, removed: 0, binary: false });
+    }
+    const counts = repo.git(['diff', '--numstat', '-z', '-M', base, commit]).split('\0');
+    for (let at = 0; at < counts.length;) {
+      const head = counts[at++]; if (!head) continue;
+      const [added, removed, inline] = head.split('\t');
+      const file = inline || (at++, counts[at++]); // a rename: "a\tb\t" then old\0new
+      const entry = files.find(candidate => candidate.path === file); if (!entry) continue;
+      if (added === '-') entry.binary = true; else { entry.added = Number(added); entry.removed = Number(removed); }
+    }
+    if (path === null) return { branch: code.branch, commit, base, files };
+    const entry = files.find(candidate => candidate.path === path);
+    if (!entry) fail(`${path} isn't one of the files ${item.ref} changed.`, 404);
+    if (entry.binary) return { ...entry, diff: null, tooLarge: false };
+    const diff = repo.git(['diff', '--no-color', '-M', '-U3', base, commit, '--', ...(entry.from ? [entry.from] : []), entry.path], { maxBuffer: 8 * diffLimit });
+    return diff.length > diffLimit ? { ...entry, diff: null, tooLarge: true } : { ...entry, diff, tooLarge: false };
+  }
   // A4: close-out. Every action reviewed; the record changeset applies once, in one transaction, under each layer's API
   // checks it was staged with, after confirming nothing it changes moved since; the code merges into main in the same step.
   function closeOut(user, projectId, workId) {
@@ -769,5 +810,5 @@ export function agentWork({ db, know, catalogs = null }) {
     return () => bus.off(key, listener);
   }
 
-  return { createGoal, view, define, move, claim, assign, assertPerformer, addAction, updateAction, post, answer, stage, recordCode, review, proposeItems, decideProposal, describeOperation, dropAction, endAsNotDone, fetchCode, closeOut, notePush, changeset, stackMap, readLayer, goals, subscribe };
+  return { createGoal, view, define, move, claim, assign, assertPerformer, addAction, updateAction, post, answer, stage, recordCode, review, proposeItems, decideProposal, describeOperation, dropAction, endAsNotDone, fetchCode, codeFiles, closeOut, notePush, changeset, stackMap, readLayer, goals, subscribe };
 }

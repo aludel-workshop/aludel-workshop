@@ -764,3 +764,25 @@ Authorization: the owner created W-27 from [a7-brief.md](a7-brief.md), approved 
   - Ending the item closes the preview, and the client stops on its own.
 - **Not proved yet:** a browser inside the portal's frame (partitioned cookies in Chromium, and the walk script reaching the modal). That's #6's journey. `--tunnel` itself was run only against the owner's portal, which runs `main` and refused it with the new message.
 - **Checks for #2 (agent-run):** `preview-tunnel.test.mjs` passes. Templates gate: 354 pass, 4 fail, 10 skipped. Three failures are the known ones (two Docker-only, plus the worker-token test, which fails on `main`). The fourth, the security-audit test, failed with the load average at 24 just after the container restarted. It passed when run alone, as it did in W-25.
+
+### W-27 #5: Files view, a tree and diffs (2026-10-06)
+
+- **`codeFiles` in `server/agent-work.mjs`**, served by `GET /api/projects/:p/goals/:id/files[?path=]` (members). It reads the reported commit from the project's repository. When the commit is missing, it fetches the item's branch from GitHub, as close-out does (`refs/aludel/work/<id>`).
+  - **Base:** the reported base, or else the merge base with `main`. Later commits on `main` don't show as the item's changes.
+  - **Files:** status (added, modified, deleted, renamed, with the old path), line counts, and binaries marked.
+  - **One file:** its unified diff, only for a path the item changed. A file over 400 KB says it's too large.
+  - **Errors** say what to do next: no code reported; no repository; a commit Aludel doesn't have and no GitHub to fetch it from; a fetch that failed; a branch that doesn't contain the commit.
+- **Files view in the modal:**
+  - **Tree:** the changed files under their folders, with a single-child folder chain shown joined (`src/layers`). Each file has a colored status dot and +/− counts.
+  - **Diff:** the first file opens, and picking another loads its diff. Before sits beside After, with each side's line numbers, hunk headers, and a changed line paired with its replacement. On a phone it's one column, marked − and +.
+  - **Binaries, too-large files and pure moves** each say what they are.
+  - **Newer report:** the view rereads when newer code is reported.
+  - **Unreadable commit:** the view says why, offers Retry, and lists the files the agent reported.
+- **Checks:**
+  - `tests/code-files.test.mjs`: a real repository, with every kind of change, the merge base and the reported base, a path the item didn't change, and a commit Aludel lacks.
+  - The `review-modal` journey: #2 now has a real repository with two commits, so its Files view shows the tree, the diff, picking a file, following the newer report, and the unreadable case. Axe passes at 1440 and 390 px.
+  - The first run caught the green +3 failing contrast on the selected file's highlight. Counts now take the row's color when selected.
+- **Checks for #5:** `code-files.test.mjs` passes, and so do the `review-modal` and `agent-work` journeys. Templates gate: 354 pass, 5 fail, 10 skipped.
+  - **Three known failures:** the two Docker-only tests and the worker-token test.
+  - **Security audit:** failed again at a load average around 17 and passed alone. It now has three under-load failures across W-25 and W-27, so it's a flaky test, not this change.
+  - **Shebang test:** #2 committed `tools/preview-tunnel.mjs` (it has a shebang) without the executable bit. Fixed here; the test passes alone. #2's gate run was cut short by a restart, and my rerun of only its failures missed this. The lesson: run the whole gate after a restart, not only the failures.

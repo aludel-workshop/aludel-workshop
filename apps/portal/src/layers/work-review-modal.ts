@@ -1,9 +1,10 @@
-import { Component, ElementRef, afterNextRender, computed, inject, input, output, signal, viewChild } from '@angular/core';
+import { Component, ElementRef, afterNextRender, computed, effect, inject, input, output, signal, untracked, viewChild } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { ProjectContext, layerLabel } from './context';
 import type { GoalAction, GoalView } from './work-goal';
-import { DiffRow, fold, recordDiff } from './review-diff';
+import { CodeRow, DiffRow, FileEntry, TreeNode, fileTree, fold, recordDiff, unifiedRows } from './review-diff';
 
 // W-27 (A7, DEC-070): one review modal for every action in review, as the a0/v2 prototype drew it and Pages' "Action review"
 // page specs it. The preview matches what the action changed: Records (any layer) shows each staged record Previous beside
@@ -33,8 +34,10 @@ export function changedLine(view: GoalView, action: GoalAction, layerName: (key:
 // The item's reported code belongs to its Code actions (the code is the item's, so every Code action reviews the same files).
 const codeOf = (view: GoalView, action: GoalAction) => Boolean(view.code && action.layer === 'platform');
 
+const firstFile = (nodes: TreeNode[]): FileEntry | null => { for (const node of nodes) { const found = node.file || firstFile(node.children); if (found) return found; } return null; };
+
 @Component({
-  selector: 'aludel-work-review-modal', standalone: true, imports: [FormsModule, MatIconModule],
+  selector: 'aludel-work-review-modal', standalone: true, imports: [FormsModule, MatIconModule, NgTemplateOutlet],
   styleUrl: './work-review-modal.css',
   template: `
   <dialog #dialog class="rm" [attr.aria-labelledby]="'rm-title'" (close)="closed.emit()">
@@ -100,9 +103,57 @@ const codeOf = (view: GoalView, action: GoalAction) => Boolean(view.code && acti
           }
           @case ('files') {
             <div class="rm-files">
-              @if (view().code; as code) {
-                <h3>{{ code.files.length }} file{{ code.files.length === 1 ? '' : 's' }} on <code>{{ code.branch }}</code> at <code>{{ code.commit.slice(0, 7) }}</code></h3>
-                <ul>@for (file of code.files; track file.path) { <li><span [class]="'rm-op rm-op-' + fileOp(file.status)">{{ fileLabel[file.status] || 'Changed' }}</span><span class="rm-path">{{ file.path }}</span></li> }</ul>
+              @switch (listing().state) {
+                @case ('ready') {
+                  <nav class="rm-tree" aria-label="Files it changed">
+                    <p class="rm-treehead">{{ listing().data!.files.length }} file{{ listing().data!.files.length === 1 ? '' : 's' }} on <code>{{ listing().data!.branch }}</code> at <code>{{ listing().data!.commit.slice(0, 7) }}</code></p>
+                    <ng-container *ngTemplateOutlet="treeLevel; context: { $implicit: tree() }" />
+                  </nav>
+                  <section class="rm-diff" [attr.aria-label]="pickedPath() ? 'Changes to ' + pickedPath() : 'Changes'">
+                    @if (diffState(); as d) {
+                      <header class="rm-diffhead">
+                        <h3><span [class]="'rm-op rm-op-' + fileOp(d.file.status)">{{ fileLabel[d.file.status] || 'Changed' }}</span><span class="rm-path">{{ d.file.path }}</span>
+                          @if (!d.file.binary) { <span class="rm-counts"><span class="rm-plus">+{{ d.file.added }}</span> <span class="rm-minus">−{{ d.file.removed }}</span></span> }</h3>
+                        @if (d.file.from) { <p class="rm-moved">Moved from <span class="rm-path">{{ d.file.from }}</span></p> }
+                      </header>
+                      @switch (d.state) {
+                        @case ('loading') { <p class="rm-note" role="status">Reading the diff…</p> }
+                        @case ('error') { <div class="rm-problem" role="alert"><p>{{ d.error }}</p><button type="button" class="lay-button small" (click)="loadDiff(d.file.path, true)">Retry</button></div> }
+                        @default {
+                          @if (d.file.binary) { <p class="rm-note"><mat-icon aria-hidden="true">image</mat-icon>A binary file: there are no lines to compare.</p> }
+                          @else if (d.tooLarge) { <p class="rm-note"><mat-icon aria-hidden="true">description</mat-icon>Too large to show here. Read it on <code>{{ listing().data!.branch }}</code>.</p> }
+                          @else if (!d.rows.length) { <p class="rm-note"><mat-icon aria-hidden="true">description</mat-icon>{{ d.file.status === 'renamed' ? 'Moved, with no line changes.' : 'No line changes.' }}</p> }
+                          @else {
+                            <div class="rm-cols rm-codecols" aria-hidden="true"><span>Before</span><span>After</span></div>
+                            <div class="rm-code">
+                              @for (row of d.rows; track $index) {
+                                @if (row.kind === 'gap') { <div class="rm-hunk">{{ row.hunk }}</div> }
+                                @else {
+                                  <div [class]="'rm-crow rm-' + row.kind">
+                                    <span class="rm-no" aria-hidden="true">{{ row.oldNo }}</span>
+                                    <span class="rm-prev">@if (row.previous !== null) { @if (row.kind !== 'same') { <span class="visually-hidden">Removed line {{ row.oldNo }}: </span> }{{ row.previous }} }</span>
+                                    <span class="rm-no" aria-hidden="true">{{ row.newNo }}</span>
+                                    <span class="rm-next">@if (row.proposed !== null) { @if (row.kind !== 'same') { <span class="visually-hidden">Added line {{ row.newNo }}: </span> }{{ row.proposed }} }</span>
+                                  </div>
+                                }
+                              }
+                            </div>
+                          }
+                        }
+                      }
+                    }
+                  </section>
+                }
+                @case ('error') {
+                  <div class="rm-unread">
+                  <div class="rm-problem" role="alert"><p>{{ listing().error }}</p><button type="button" class="lay-button small" (click)="loadFiles()">Retry</button></div>
+                  @if (view().code; as code) {
+                    <p class="rm-reported">What the agent reported: {{ code.files.length }} file{{ code.files.length === 1 ? '' : 's' }} on <code>{{ code.branch }}</code> at <code>{{ code.commit.slice(0, 7) }}</code></p>
+                    <ul class="rm-plain">@for (file of code.files; track file.path) { <li><span [class]="'rm-op rm-op-' + fileOp(file.status)">{{ fileLabel[file.status] || 'Changed' }}</span><span class="rm-path">{{ file.path }}</span></li> }</ul>
+                  }
+                  </div>
+                }
+                @default { <p class="rm-note rm-reading" role="status">Reading the code…</p> }
               }
             </div>
           }
@@ -137,7 +188,19 @@ const codeOf = (view: GoalView, action: GoalAction) => Boolean(view.code && acti
         </form>
       </aside>
     </div>
-  </dialog>`
+  </dialog>
+  <ng-template #treeLevel let-nodes>
+    <ul>@for (node of nodes; track node.path) {
+      <li>@if (node.file; as file) {
+        <button type="button" class="rm-file" [attr.aria-current]="pickedPath() === file.path ? 'true' : null" (click)="pickFile(file.path)">
+          <span [class]="'rm-dot rm-op-' + fileOp(file.status)" aria-hidden="true"></span><span class="rm-fname">{{ node.name }}</span><span class="visually-hidden">, {{ fileLabel[file.status] || 'Changed' }}</span>
+          @if (!file.binary) { <span class="rm-counts"><span aria-hidden="true"><span class="rm-plus">+{{ file.added }}</span> <span class="rm-minus">−{{ file.removed }}</span></span><span class="visually-hidden">, {{ file.added }} added, {{ file.removed }} removed</span></span> }
+        </button>
+      } @else {
+        <details open><summary><mat-icon aria-hidden="true">folder</mat-icon>{{ node.name }}</summary><ng-container *ngTemplateOutlet="treeLevel; context: { $implicit: node.children }" /></details>
+      }</li>
+    }</ul>
+  </ng-template>`
 })
 export class WorkReviewModalComponent {
   readonly ctx = inject(ProjectContext);
@@ -171,8 +234,37 @@ export class WorkReviewModalComponent {
     const all = recordDiff(change.op === 'create' ? null : change.before, change.op === 'delete' ? null : change.after);
     return change.op === 'update' && !this.showSame() ? all.filter(field => field.changed) : all; });
 
+  // Files (W-27 #5): read when the tab first shows, again when newer code is reported; each file's diff when it's picked.
+  readonly listing = signal<{ state: 'idle' | 'loading' | 'ready' | 'error'; error?: string; data?: { branch: string; commit: string; base: string; files: FileEntry[] } }>({ state: 'idle' });
+  readonly tree = computed(() => fileTree(this.listing().data?.files || []));
+  readonly pickedPath = signal<string | null>(null);
+  private readonly diffs = signal<Record<string, { state: 'loading' | 'ready' | 'error'; error?: string; rows: CodeRow[]; tooLarge: boolean }>>({});
+  readonly diffState = computed(() => { const path = this.pickedPath(), file = this.listing().data?.files.find(entry => entry.path === path); if (!file) return null;
+    return { file, ...(this.diffs()[file.path] || { state: 'loading' as const, rows: [], tooLarge: false }) }; });
+  private filesPath(query = '') { return `/api/projects/${encodeURIComponent(this.ctx.projectId())}/goals/${encodeURIComponent(this.view().item.id)}/files${query}`; }
+  loadFiles() {
+    this.listing.set({ state: 'loading' }); this.diffs.set({});
+    this.ctx.api<{ branch: string; commit: string; base: string; files: FileEntry[] }>(this.filesPath()).then(data => {
+      this.listing.set({ state: 'ready', data });
+      const first = firstFile(this.tree()); const keep = data.files.some(file => file.path === this.pickedPath());
+      if (!keep) this.pickedPath.set(first?.path || null);
+      if (this.pickedPath()) this.loadDiff(this.pickedPath()!);
+    }, (error: Error) => this.listing.set({ state: 'error', error: error.message || "The code couldn't be read." }));
+  }
+  pickFile(path: string) { this.pickedPath.set(path); this.loadDiff(path); }
+  loadDiff(path: string, again = false) {
+    const known = this.diffs()[path]; if (known && known.state !== 'error' && !again) return;
+    this.diffs.update(map => ({ ...map, [path]: { state: 'loading', rows: [], tooLarge: false } }));
+    this.ctx.api<{ diff: string | null; tooLarge: boolean }>(this.filesPath('?path=' + encodeURIComponent(path))).then(
+      value => this.diffs.update(map => ({ ...map, [path]: { state: 'ready', rows: value.diff ? unifiedRows(value.diff) : [], tooLarge: value.tooLarge } })),
+      (error: Error) => this.diffs.update(map => ({ ...map, [path]: { state: 'error', error: error.message || "The diff couldn't be read.", rows: [], tooLarge: false } })));
+  }
+
   constructor() {
     afterNextRender(() => { this.dialog().nativeElement.showModal(); this.checkReach(); });
+    effect(() => { const reported = this.view().code?.commit; const shown = this.current() === 'files';
+      untracked(() => { const listed = this.listing();
+        if (shown && (listed.state === 'idle' || (listed.data && reported && !listed.data.commit.startsWith(reported)))) this.loadFiles(); }); });
   }
   close() { this.dialog().nativeElement.close(); }
   choose(key: ViewKey) { this.chosen.set(key); }
