@@ -988,3 +988,8 @@ Authorization: the owner created W-29 from W-27 #8's proposal, started it in the
   2. Chromium pauses resize and animation callbacks in an off-screen cross-origin frame, so the stage now also reports its height at once after a draw.
   3. A fresh portal can take more than 30 s to build Design's views on first open.
 - **Trust note:** a stage URL is addressed by the kit's 80-bit content digest and isn't behind a session, because the layer origin gets no portal cookie (as with views). Only members can learn a digest, from the members-only route. Kit content is design tokens and contracts; template content can't run (checked on save, and blocked by the stage's CSP).
+- **W29-F2. The tunnel can't carry a preview of the portal's own layer views (2026-10-06).**
+  - Through the W-27 tunnel, the kept `design-kit` portal got the `review-<id>` host and answered "Review preview unavailable" (checked with curl and that Host header).
+  - Its layer views and the kit stage also load from `i-….layers` origins, which the tunnel doesn't carry.
+  - So #5 is handed over as a forwarded link (`localhost:4390`, with `*.layers.localhost:4390` beside it), with a checklist ticked by hand. The live walk in the modal, part of W-27's pending proof, can't happen for #5.
+  - Proposed as an item from #5: "Tunnelled previews of the portal itself, layer views included".
