@@ -397,11 +397,13 @@ Moves defer to the server's existing rules in `move()`, so a refused drag to Don
 - **F27. An agent can't create work items.** The MCP tools cover the agent's own item (`define_work`, `add_action`, `post_message`, `ask`). `createGoal` is reachable only from a portal session (`POST /api/projects/:id/goals`). Every follow-up this attempt surfaced has to wait for the owner to type it in: the Pages personas change (F17), the item environment (F26), one surface (F25), git identity at setup (F11), the Pages review walker pulled forward (F21). The next step is for an agent to propose an item. The owner creates it from the proposal, or it arrives as a Draft the owner keeps or dismisses, matching how DEC-057 follow-ups work.
 - **F28. There's no way to end an item as failed.** Close-out needs the item In review with every action approved (`server/agent-work.mjs:471`). It then applies every staged record and merges the code, so it can only succeed. Archive refuses an item that's in progress (`server/knowledge.mjs:1404`). `move` can't leave In progress except to In review. So W-8 can't be ended from the portal. Needed: a person's "Close as not done" that records why, discards the staged changeset (or keeps it as a draft for a retry, as J6 does for runs), merges nothing, and moves the item to Done marked "not done".
 
+- **F29. The container can push but can't open a pull request.** Pushes work through VS Code's git credential helper. There's no `gh` CLI and no token the agent may use for the GitHub API. So landing work outside close-out, which is the only route while F28 stands, needs the person to open the PR in the browser.
+
 ### Attempt 1 closed as failed (2026-10-06)
 
 Owner: "think we've got enough out of these notes to close out and mark this first attempt failed, with the work record as the output."
 
-- **Output:** this record, findings F1–F28. The item branch `aludel/w-8` now differs from `main` only in this file and in the process change below. The board code was reverted on the branch (`1a9eee3`). The draft is kept on the container's local branch `w-8-attempt-1-board` (`58b50d6`), which isn't pushed. W-8's six staged Pages records were never applied.
+- **Output:** this record, findings F1–F28. The item branch `aludel/w-8` now differs from `main` only in this file and in the process change below. The board code was reverted on the branch (`1a9eee3`). The draft is kept on `w-8-attempt-1-board` (`58b50d6`), pushed to GitHub on 2026-10-06 at the owner's request. W-8's six staged Pages records were never applied.
 - **Not done:** the board (#2) was written but never built or seen (F22), and #3–#5 never started. Because of F28, W-8 stays In progress in the portal until there's a way to end it, or the owner chooses another route.
 - **Experiment, untested:** the `Monitor` watcher for person events (F25) started after the owner's last answer. No portal action has arrived through it yet, so whether it works is unknown.
 
