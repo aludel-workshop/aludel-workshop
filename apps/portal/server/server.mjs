@@ -1207,7 +1207,11 @@ async function api(request, response, url) {
     const done = (status, value) => json(response, status, value, { 'cache-control': 'no-store' });
     if (!workId && method === 'GET') return done(200, { goals: goals.goals(projectId), stack: goals.stackMap(projectId) });
     if (!workId && method === 'POST') return done(201, goals.createGoal(user, projectId, await readJson(request)));
-    if (!operation && method === 'GET') return done(200, goals.view(projectId, workId));
+    // W-27 #6: each action's tunnelled preview, if one is open, and whether its container is connected right now.
+    const withTunnels = view => { const open = tunnels.find({ projectId, workId });
+      return { ...view, actions: view.actions.map(action => { const tunnel = open.find(entry => entry.action === action.number);
+        return { ...action, tunnel: tunnel ? { url: tunnel.url, connected: tunnel.connected } : null }; }) }; };
+    if (!operation && method === 'GET') return done(200, withTunnels(goals.view(projectId, workId)));
     if (operation === 'stream' && method === 'GET') return streamGoal(request, response, projectId, workId);
     if (operation === 'read' && method === 'GET') return done(200, { result: goals.readLayer(projectId, workId, url.searchParams.get('layer'), { operationId: url.searchParams.get('operationId'), id: url.searchParams.get('id') }) });
     if (operation === 'actions' && sub && method === 'DELETE') return done(200, goals.dropAction(user, projectId, workId, Number(sub)));
@@ -1236,7 +1240,7 @@ async function api(request, response, url) {
     if (operation === 'events' && !sub) return done(201, goals.post(person, projectId, workId, input));
     if (operation === 'answer' && sub) return done(200, goals.answer(user, projectId, workId, sub, input));
     if (operation === 'review' && sub) return done(200, goals.review(user, projectId, workId, Number(sub), input));
-    if (operation === 'walk' && sub) return done(200, goals.walk(user, projectId, workId, Number(sub), input));
+    if (operation === 'walk' && sub) return done(200, withTunnels(goals.walk(user, projectId, workId, Number(sub), input)));
     if (operation === 'proposals' && sub) return done(200, goals.decideProposal(user, projectId, workId, sub, input));
     if (operation === 'end' && !sub) { const ended = goals.endAsNotDone(user, projectId, workId, input); sweepClosedVolumes(projectId, workId); return done(200, ended); }
     // The containers waiting to connect to this item, and connecting one (its person, signed in here).

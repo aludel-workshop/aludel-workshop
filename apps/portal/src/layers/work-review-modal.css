@@ -99,11 +99,41 @@
 .rm-reported{margin:10px 0 0;font-size:14px}
 .rm-plain{list-style:none;padding:0;display:grid;gap:4px;font-size:14px}
 .rm-plain li{display:flex;align-items:center;gap:8px}
+/* Live build (W-27 #6): the agent's running build in a frame, under an address bar, as a0/v2 shot 10 drew it. */
+.rm-live{display:flex;flex-direction:column;height:100%;padding:12px;box-sizing:border-box;gap:8px}
+.rm-addr{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
+.rm-build{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;background:var(--machine-waiting-bg);color:#6b4500;font-size:13px;font-weight:600}
+.rm-build mat-icon{width:16px;height:16px;font-size:16px}
+.rm-url{flex:1;min-width:120px;padding:4px 12px;border:1px solid var(--machine-line);border-radius:999px;background:var(--mat-sys-surface,#fff);font-family:ui-monospace,monospace;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rm-frame{flex:1;width:100%;min-height:360px;border:1px solid var(--machine-line);border-radius:10px;background:#fff}
+.rm-livedown{margin:8px 0}
+/* The checklist: one step at a time (As, When, Expect), Back, progress, Looks good. */
+.rm-check{margin:0 0 16px;padding:0 0 14px;border-bottom:1px solid var(--machine-line)}
+.rm-steptitle{margin:0 0 8px;font-size:17px;font-weight:600;line-height:1.35}
+.rm-stepdl{display:grid;gap:4px;margin:0 0 8px}
+.rm-stepdl div{display:grid;grid-template-columns:64px 1fr;gap:8px;font-size:14px}
+.rm-stepdl dt{color:var(--machine-muted)}.rm-stepdl dd{margin:0}
+.rm-hint,.rm-walked{display:flex;align-items:center;gap:6px;margin:0 0 8px;font-size:13.5px;color:var(--machine-muted)}
+.rm-walked{color:var(--lay-ok-ink);font-weight:500}
+.rm-hint mat-icon,.rm-walked mat-icon{flex:none;width:18px;height:18px;font-size:18px}
+.rm-link{border:0;background:none;padding:4px;font:inherit;font-size:13.5px;color:var(--machine-accent);text-decoration:underline;cursor:pointer;min-height:24px}
+.rm-cant{display:block;margin:0 0 6px;padding-left:0}
+.rm-stepnav{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:6px}
+.rm-progress{display:flex;flex:1 1 80px;gap:4px;list-style:none;margin:0;padding:0}
+.rm-progress li{flex:1}
+.rm-progress button{display:block;width:100%;height:24px;border:0;background:none;padding:9px 0;cursor:pointer}
+.rm-progress button::before{content:'';display:block;height:6px;border-radius:3px;background:var(--machine-line)}
+.rm-progress button.rm-done::before{background:var(--lay-ok-ink)}
+.rm-progress button[aria-current=step]::before{outline:2px solid var(--machine-accent);outline-offset:1px}
+.rm-skip{display:grid;gap:6px;margin:0 0 8px}
+.rm-skip label{font-size:13px;font-weight:600}
+.rm-input{width:100%;box-sizing:border-box;border:1px solid var(--machine-line);border-radius:8px;padding:7px 10px;font:inherit}
+.rm-left{margin:6px 0 0;font-size:13px;color:var(--machine-muted);text-align:right}
 .rm-path{font-family:ui-monospace,monospace;font-size:13px;overflow-wrap:anywhere}
 .rm-empty{display:grid;justify-items:center;gap:8px;padding:48px 24px;text-align:center;color:var(--machine-muted)}
 .rm-empty mat-icon{width:36px;height:36px;font-size:36px}
 .rm-empty p{max-width:46ch;margin:0}
-@media(max-width:1000px){.rm-body{display:block;overflow:auto}.rm-files{grid-template-columns:minmax(0,1fr)}.rm-tree{border-right:0;border-bottom:1px solid var(--machine-line)}.rm-main{border-right:0;border-bottom:1px solid var(--machine-line);overflow:visible}.rm-side{display:block}.rm-sidebody{overflow:visible}.rm-records{grid-template-columns:minmax(0,1fr)}.rm-list{border-right:0;border-bottom:1px solid var(--machine-line)}}
+@media(max-width:1000px){.rm-body{display:block;overflow:auto}.rm-live{height:auto}.rm-frame{flex:none;height:60dvh}.rm-files{grid-template-columns:minmax(0,1fr)}.rm-tree{border-right:0;border-bottom:1px solid var(--machine-line)}.rm-main{border-right:0;border-bottom:1px solid var(--machine-line);overflow:visible}.rm-side{display:block}.rm-sidebody{overflow:visible}.rm-records{grid-template-columns:minmax(0,1fr)}.rm-list{border-right:0;border-bottom:1px solid var(--machine-line)}}
 /* A phone: full screen, and Previous above Proposed in one column (an unchanged line once). */
 @media(max-width:640px){.rm{width:100vw;height:100dvh;margin:0;border-radius:0}.rm-newtab{margin-left:0}
   .rm-cols{display:none}.rm-row{grid-template-columns:minmax(0,1fr)}.rm-prev{border-right:0}.rm-row.rm-same .rm-prev{display:none}

@@ -1,16 +1,20 @@
-import { Component, ElementRef, afterNextRender, computed, effect, inject, input, output, signal, untracked, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, afterNextRender, computed, effect, inject, input, output, signal, untracked, viewChild } from '@angular/core';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { ProjectContext, layerLabel } from './context';
-import type { GoalAction, GoalView } from './work-goal';
+import type { GoalAction, GoalStep, GoalView } from './work-goal';
 import { CodeRow, DiffRow, FileEntry, TreeNode, fileTree, fold, recordDiff, unifiedRows } from './review-diff';
 
 // W-27 (A7, DEC-070): one review modal for every action in review, as the a0/v2 prototype drew it and Pages' "Action review"
 // page specs it. The preview matches what the action changed: Records (any layer) shows each staged record Previous beside
-// Proposed; Files lists the code it reported. The side panel carries the summary, the handed-over preview and the decision.
+// Proposed; Files shows the code it reported; Live build (W-27 #6) frames the build the agent's container runs, through its
+// tunnel. The side panel carries the checklist (walked in the live build, as J6 does), the summary, the preview and the decision.
 type Change = { id: string; kind: string; op: 'create' | 'update' | 'delete'; layer: string; baseRevision?: number | null; before?: Record<string, unknown> | null; after?: Record<string, unknown> | null };
-type ViewKey = 'records' | 'files';
+type ViewKey = 'live' | 'records' | 'files';
+type Walk = { aludelWalk: 1; kind: 'page' | 'action'; path: string; method?: string; page?: string };
+const routeOf = (path: string | null | undefined) => (path || '').split(/[?#]/)[0].replace(/\/+$/, '') || '/';
 export type ReviewDecision = { verdict: 'approve' } | { verdict: 'flag'; note: string };
 
 export const opLabel: Record<string, string> = { create: 'New', update: 'Changed', delete: 'Removed' };
@@ -28,7 +32,9 @@ export function changedLine(view: GoalView, action: GoalAction, layerName: (key:
   const parts: string[] = [];
   if (records.length) { const layers = [...new Set(records)]; parts.push(`${records.length} record${records.length === 1 ? '' : 's'} in ${layers.map(layerName).join(' and ')}`); }
   if (codeOf(view, action)) parts.push(`${view.code!.files.length} file${view.code!.files.length === 1 ? '' : 's'}`);
-  if (action.preview?.url) parts.push('a preview to open');
+  const steps = action.preview?.steps?.length || 0;
+  if (action.tunnel) parts.push('live build'); else if (action.preview?.url) parts.push('a preview to open');
+  if (steps) parts.push(`${steps} step${steps === 1 ? '' : 's'} to try`);
   return parts.join(' · ') || 'Nothing staged; read its summary';
 }
 // The item's reported code belongs to its Code actions (the code is the item's, so every Code action reviews the same files).
@@ -53,11 +59,24 @@ const firstFile = (nodes: TreeNode[]): FileEntry | null => { for (const node of 
           }
         </div>
       }
-      @if (action().preview?.url; as url) { <a class="lay-button ghost small rm-newtab" [href]="url" target="_blank" rel="noopener noreferrer"><mat-icon aria-hidden="true">open_in_new</mat-icon>Open in a new tab</a> }
+      @if (action().tunnel) { <button type="button" class="lay-button ghost small rm-newtab" (click)="openTab()"><mat-icon aria-hidden="true">open_in_new</mat-icon>Open in a new tab</button> }
+      @else if (action().preview?.url; as url) { <a class="lay-button ghost small rm-newtab" [href]="url" target="_blank" rel="noopener noreferrer"><mat-icon aria-hidden="true">open_in_new</mat-icon>Open in a new tab</a> }
     </header>
     <div class="rm-body">
       <section class="rm-main" id="rm-pane" [attr.role]="views().length > 1 ? 'tabpanel' : null" [attr.aria-labelledby]="views().length > 1 ? 'rm-tab-' + current() : 'rm-title'">
         @switch (current()) {
+          @case ('live') {
+            <div class="rm-live">
+              <div class="rm-addr"><span class="rm-build"><mat-icon aria-hidden="true">deployed_code</mat-icon>Preview build of {{ view().item.ref }}</span>
+                <span class="rm-url" aria-label="Page showing">{{ livePath() }}</span>
+                <button type="button" class="lay-button ghost small" (click)="openLive()"><mat-icon aria-hidden="true">refresh</mat-icon>Reload</button></div>
+              @switch (live().state) {
+                @case ('ready') { <iframe #frame class="rm-frame" [src]="live().src!" [title]="'Live build for #' + action().number" sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-modals"></iframe> }
+                @case ('down') { <div class="rm-problem rm-livedown" role="alert"><p>{{ live().error }}</p><button type="button" class="lay-button small" (click)="openLive()">Try again</button></div> }
+                @default { <p class="rm-note rm-reading" role="status">Starting the preview…</p> }
+              }
+            </div>
+          }
           @case ('records') {
             <div class="rm-records">
               <nav class="rm-list" aria-label="Records it staged">
@@ -164,6 +183,36 @@ const firstFile = (nodes: TreeNode[]): FileEntry | null => { for (const node of 
       </section>
       <aside class="rm-side" aria-label="Decision">
         <div class="rm-sidebody">
+          @if (steps().length) {
+            <section class="rm-check" aria-labelledby="rm-check-title">
+              <h3 id="rm-check-title">What to try · step {{ at() + 1 }} of {{ steps().length }}</h3>
+              @if (stepAt(); as s) {
+                <p class="rm-steptitle">{{ s.when }}</p>
+                <dl class="rm-stepdl">
+                  @if (s.as) { <div><dt>As</dt><dd>{{ s.as }}</dd></div> }
+                  <div><dt>Expect</dt><dd>{{ s.expect }}</dd></div>
+                </dl>
+                @if (walkOf(s); as w) {
+                  <p class="rm-walked" role="status"><mat-icon aria-hidden="true">{{ w.how === 'reason' ? 'block' : 'check_circle' }}</mat-icon>{{ w.how === 'walked' ? 'Walked in the live build' : w.how === 'checked' ? 'Looks good' : 'Skipped: ' + w.reason }}
+                    <button type="button" class="rm-link" (click)="walkStep(s, null)">Undo</button></p>
+                } @else if (s.path && live().state === 'ready') { <p class="rm-hint"><mat-icon aria-hidden="true">touch_app</mat-icon>Do it in the live build; that ticks it and moves on.</p> }
+                @if (!walkOf(s) && !skipping()) { <button type="button" class="rm-link rm-cant" (click)="startSkip()">Can't walk it? Say why</button> }
+                @if (skipping()) {
+                  <form class="rm-skip" (ngSubmit)="skip(s)"><label for="rm-reason">Why can't it be walked?</label>
+                    <input id="rm-reason" name="reason" class="rm-input" [(ngModel)]="reason" placeholder="Say what stops it">
+                    <div class="rm-buttons"><button type="button" class="lay-button ghost small" (click)="skipping.set(false)">Cancel</button><button type="submit" class="lay-button small" [disabled]="!reason.trim()">Skip this step</button></div></form>
+                }
+                <div class="rm-stepnav">
+                  <button type="button" class="lay-button ghost small" [disabled]="at() === 0" (click)="at.set(at() - 1)"><mat-icon aria-hidden="true">arrow_back</mat-icon>Back</button>
+                  <ol class="rm-progress" aria-label="Steps">@for (entry of steps(); track entry.id; let i = $index) {
+                    <li><button type="button" [class.rm-done]="walkOf(entry)" [attr.aria-current]="i === at() ? 'step' : null" (click)="at.set(i)" [attr.aria-label]="'Step ' + (i + 1) + (walkOf(entry) ? ', done' : ', to walk')"></button></li> }</ol>
+                  @if (!walkOf(s)) {
+                    <button type="button" class="lay-button small" [disabled]="walking()" (click)="walkStep(s, 'checked')"><mat-icon aria-hidden="true">check</mat-icon>Looks good</button>
+                  } @else if (at() < steps().length - 1) { <button type="button" class="lay-button ghost small" (click)="at.set(at() + 1)">Next<mat-icon aria-hidden="true">arrow_forward</mat-icon></button> }
+                </div>
+              }
+            </section>
+          }
           <h3>Summary</h3>
           <p class="rm-summary">{{ action().summary || 'The agent gave no summary.' }}</p>
           <h3>Preview</h3>
@@ -172,8 +221,9 @@ const firstFile = (nodes: TreeNode[]): FileEntry | null => { for (const node of 
               <p class="rm-meta">@if (action().preview!.commit) { At <code>{{ action().preview!.commit!.slice(0, 7) }}</code> · }from {{ action().preview!.by?.name || 'the agent' }} · <time [attr.datetime]="action().preview!.at">{{ when(action().preview!.at) }}</time></p>
               @if (action().preview!.try) { <p class="rm-try"><strong>Try:</strong> {{ action().preview!.try }}</p> }
               @if (action().preview!.stale) { <p class="rm-previewnote" role="status"><mat-icon aria-hidden="true">history</mat-icon>Older build: it shows {{ action().preview!.commit!.slice(0, 7) }}, but {{ view().code?.commit?.slice(0, 7) }} was reported since. Ask for a fresh one.</p> }
-              @if (reach() === 'down') { <p class="rm-previewnote" role="status"><mat-icon aria-hidden="true">link_off</mat-icon>This browser can't reach it. The agent's container may have stopped, or the port isn't forwarded to this machine. Ask the agent to run it again.</p> }
-              <a class="lay-button small" [href]="url" target="_blank" rel="noopener noreferrer" [attr.aria-label]="'Preview #' + action().number + ' (opens in a new tab)'"><mat-icon aria-hidden="true">open_in_new</mat-icon>Preview</a>
+              @if (action().tunnel && !action().tunnel!.connected) { <p class="rm-previewnote" role="status"><mat-icon aria-hidden="true">link_off</mat-icon>The agent's container isn't connected, so the live build can't show. Ask the agent to run the preview again.</p> }
+              @if (!action().tunnel && reach() === 'down') { <p class="rm-previewnote" role="status"><mat-icon aria-hidden="true">link_off</mat-icon>This browser can't reach it. The agent's container may have stopped, or the port isn't forwarded to this machine. Ask the agent to run it again.</p> }
+              @if (!action().tunnel) { <a class="lay-button small" [href]="url" target="_blank" rel="noopener noreferrer" [attr.aria-label]="'Preview #' + action().number + ' (opens in a new tab)'"><mat-icon aria-hidden="true">open_in_new</mat-icon>Preview</a> }
             </div>
           } @else if (action().preview?.none) { <p class="rm-none"><mat-icon aria-hidden="true">visibility_off</mat-icon>No preview: {{ action().preview!.none }}</p> }
           @else { <p class="rm-none lay-muted"><mat-icon aria-hidden="true">visibility_off</mat-icon>No preview: the agent didn't hand one over.</p> }
@@ -183,8 +233,9 @@ const firstFile = (nodes: TreeNode[]): FileEntry | null => { for (const node of 
           <textarea id="rm-note" name="note" rows="3" [(ngModel)]="note" placeholder="What should change? It goes to the agent with the flag."></textarea>
           <div class="rm-buttons">
             <button type="submit" class="lay-button ghost" [disabled]="!note.trim() || busy()"><mat-icon aria-hidden="true">flag</mat-icon>Flag</button>
-            <button type="button" class="lay-button" [disabled]="busy()" (click)="decide('approve')"><mat-icon aria-hidden="true">check</mat-icon>Approve #{{ action().number }}</button>
+            <button type="button" class="lay-button" [disabled]="busy() || left() > 0" (click)="decide('approve')"><mat-icon aria-hidden="true">check</mat-icon>Approve #{{ action().number }}</button>
           </div>
+          @if (left() > 0) { <p class="rm-left" role="status">{{ left() }} step{{ left() === 1 ? '' : 's' }} left to walk before you can approve.</p> }
         </form>
       </aside>
     </div>
@@ -209,6 +260,8 @@ export class WorkReviewModalComponent {
   // The page records the decision through its own write (so errors show where every other write's do) and says if it took.
   readonly submit = input.required<(decision: ReviewDecision) => Promise<boolean>>();
   readonly closed = output<void>();
+  // A step walked here answers with the item's new view, so the page shows it without waiting for its stream.
+  readonly updated = output<GoalView>();
   readonly opLabel = opLabel; readonly fileLabel = fileLabel; readonly fileOp = fileOp; readonly kindName = kindName; readonly changeName = changeName;
   private readonly dialog = viewChild.required<ElementRef<HTMLDialogElement>>('dialog');
   readonly chosen = signal<ViewKey | null>(null);
@@ -225,6 +278,7 @@ export class WorkReviewModalComponent {
     return out; });
   // Only the views this action has, in the order the spec opens them: Files for reported code, then Records.
   readonly views = computed(() => { const out: { key: ViewKey; label: string; count: number }[] = [];
+    if (this.action().tunnel) out.push({ key: 'live', label: 'Live build', count: this.steps().length });
     if (codeOf(this.view(), this.action())) out.push({ key: 'files', label: 'Files', count: this.view().code!.files.length });
     if (this.changes().length) out.push({ key: 'records', label: 'Records', count: this.changes().length });
     return out; });
@@ -260,8 +314,70 @@ export class WorkReviewModalComponent {
       (error: Error) => this.diffs.update(map => ({ ...map, [path]: { state: 'error', error: error.message || "The diff couldn't be read.", rows: [], tooLarge: false } })));
   }
 
+  // Live build (W-27 #6): the portal gives this member a one-time link into the tunnel; the walk script in the build says
+  // which page shows and what it did, and a step whose page or request that matches is walked.
+  private readonly sanitizer = inject(DomSanitizer);
+  private readonly frame = viewChild<ElementRef<HTMLIFrameElement>>('frame');
+  readonly live = signal<{ state: 'idle' | 'opening' | 'ready' | 'down'; src?: SafeResourceUrl; origin?: string; error?: string }>({ state: 'idle' });
+  readonly livePath = signal('/');
+  openLive() {
+    const preview = this.action().preview, tunnel = this.action().tunnel; if (!tunnel) return;
+    const start = preview?.url && new URL(preview.url).origin === new URL(tunnel.url).origin ? new URL(preview.url) : null;
+    const path = start ? start.pathname + start.search : '/';
+    this.live.set({ state: 'opening' }); this.livePath.set(path);
+    this.ctx.api<{ open: string; connected: boolean }>(`/api/projects/${encodeURIComponent(this.ctx.projectId())}/goals/${encodeURIComponent(this.view().item.id)}/previews/${this.action().number}`, 'POST', { path }).then(value => {
+      const open = new URL(value.open);
+      // Only the tunnel's own origin goes in the frame.
+      if (open.origin !== new URL(tunnel.url).origin) throw new Error('The preview link came back for another address.');
+      if (!value.connected) { this.live.set({ state: 'down', error: "The agent's container isn't connected, so the live build can't show. Ask the agent to run the preview again." }); return; }
+      this.live.set({ state: 'ready', src: this.sanitizer.bypassSecurityTrustResourceUrl(open.href), origin: open.origin });
+    }).catch((error: Error) => this.live.set({ state: 'down', error: error.message || "The live build couldn't open." }));
+  }
+  // A new tab can't use the frame's access, so it gets its own one-time link, at the page the frame shows. The tab opens
+  // at the click (so it isn't blocked as a pop-up) and goes to the link once the portal answers.
+  openTab() {
+    const tab = window.open('', '_blank'); if (!tab) return;
+    tab.opener = null;
+    this.ctx.api<{ open: string }>(`/api/projects/${encodeURIComponent(this.ctx.projectId())}/goals/${encodeURIComponent(this.view().item.id)}/previews/${this.action().number}`, 'POST', { path: this.livePath() })
+      .then(value => { tab.location.href = value.open; }, (error: Error) => { tab.close(); this.live.set({ state: 'down', error: error.message || "The live build couldn't open." }); });
+  }
+  // The checklist: its steps, this person's walk of them, the one showing, and how many are left before Approve.
+  readonly steps = computed<GoalStep[]>(() => this.action().preview?.steps || []);
+  readonly at = signal(0);
+  readonly stepAt = computed(() => this.steps()[this.at()] || null);
+  readonly left = computed(() => this.steps().filter(step => !this.walkOf(step)).length);
+  readonly walking = signal(false);
+  readonly skipping = signal(false); reason = '';
+  walkOf(step: GoalStep) { return this.action().preview?.walk?.[step.id] || null; }
+  startSkip() { this.reason = ''; this.skipping.set(true); setTimeout(() => document.getElementById('rm-reason')?.focus()); }
+  skip(step: GoalStep) { const reason = this.reason.trim(); if (reason) void this.walkStep(step, 'reason', reason).then(() => this.skipping.set(false)); }
+  async walkStep(step: GoalStep, how: 'walked' | 'checked' | 'reason' | null, reason?: string) {
+    this.walking.set(true);
+    // Through the shell's write, so a refused step shows where every other write's error does.
+    await this.ctx.write(async () => {
+      const view = await this.ctx.api<GoalView>(`/api/projects/${encodeURIComponent(this.ctx.projectId())}/goals/${encodeURIComponent(this.view().item.id)}/walk/${this.action().number}`, 'POST', { step: step.id, how, ...(reason ? { reason } : {}) });
+      this.updated.emit(view);
+      // Done with this step: on to the next one still to walk.
+      if (how && this.stepAt()?.id === step.id) { const steps = this.steps(), after = steps.findIndex((entry, index) => index > this.at() && entry.id !== step.id && !view.actions.find(a => a.number === this.action().number)?.preview?.walk?.[entry.id]);
+        if (after >= 0) this.at.set(after); }
+    }).finally(() => this.walking.set(false));
+  }
+  private readonly listener = (event: MessageEvent) => {
+    const data = event.data as Walk, frame = this.frame()?.nativeElement, origin = this.live().origin;
+    if (!data || data.aludelWalk !== 1 || !frame || event.source !== frame.contentWindow || event.origin !== origin) return;
+    if (data.kind === 'page') this.livePath.set(data.path);
+    for (const step of this.steps()) {
+      if (this.walkOf(step) || !step.path || routeOf(step.path) !== routeOf(data.path)) continue;
+      if (data.kind === 'page' ? !step.method : step.method === String(data.method).toUpperCase()) void this.walkStep(step, 'walked');
+    }
+  };
+
   constructor() {
-    afterNextRender(() => { this.dialog().nativeElement.showModal(); this.checkReach(); });
+    afterNextRender(() => { this.dialog().nativeElement.showModal(); this.checkReach();
+      const first = this.steps().findIndex(step => !this.walkOf(step)); if (first > 0) this.at.set(first); });
+    window.addEventListener('message', this.listener);
+    inject(DestroyRef).onDestroy(() => window.removeEventListener('message', this.listener));
+    effect(() => { const shown = this.current() === 'live'; untracked(() => { if (shown && this.live().state === 'idle') this.openLive(); }); });
     effect(() => { const reported = this.view().code?.commit; const shown = this.current() === 'files';
       untracked(() => { const listed = this.listing();
         if (shown && (listed.state === 'idle' || (listed.data && reported && !listed.data.commit.startsWith(reported)))) this.loadFiles(); }); });
@@ -284,7 +400,7 @@ export class WorkReviewModalComponent {
   // W-25: the link may be a port only this machine forwards, so the portal can't tell whether it answers; an opaque no-cors
   // request from this browser can (it fails only when nothing answers).
   private checkReach() {
-    const url = this.action().preview?.url; if (!url) return;
+    const url = this.action().preview?.url; if (!url || this.action().tunnel) return;
     this.reach.set('checking');
     void fetch(url, { mode: 'no-cors', cache: 'no-store', signal: AbortSignal.timeout(5000) }).then(() => 'ok' as const, () => 'down' as const).then(state => this.reach.set(state));
   }

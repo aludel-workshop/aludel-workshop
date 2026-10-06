@@ -25,6 +25,20 @@ import { openDatabase } from '../server/storage.mjs';
 import { initWorkflow } from '../server/workflow.mjs';
 import { chromium } from './browser-support.mjs';
 import { holdForPreview } from './portal-support.mjs';
+import { createServer as createHttpServer } from 'node:http';
+import { runTunnel } from '../tools/preview-tunnel.mjs';
+
+// W-27 #6: the build an agent runs in its container: a list, a map, and Borrow (a request the checklist can tick).
+const agentBuild = createHttpServer((request, response) => {
+  const page = (title, body) => { const html = `<!doctype html><html lang="en"><head><title>${title}</title></head><body><main>${body}</main></body></html>`;
+    response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); response.end(html); };
+  if (request.method === 'POST' && request.url === '/api/borrow') { response.writeHead(200, { 'content-type': 'application/json' }); return response.end('{"until":"Friday"}'); }
+  if (request.url === '/map') return page('Map', `<h1>Tools on a map</h1><button id="borrow">Borrow the drill</button><p id="out" role="status"></p>
+<script>document.getElementById('borrow').onclick = () => fetch('/api/borrow', { method: 'POST' }).then(() => { document.getElementById('out').textContent = 'Yours until Friday'; });</script>`);
+  return page('Tools', '<h1>Tools near you</h1><a href="/map">See them on a map</a>');
+});
+await new Promise(resolve => agentBuild.listen(0, '127.0.0.1', resolve));
+const tunnelStop = new AbortController();
 
 const dest = 'test-results/review-modal/';
 mkdirSync(dest, { recursive: true });
@@ -109,12 +123,12 @@ try {
   const workId = await newItem('Show tools near me'), agent = agentFor(workId);
   await agent('/define', { brief: 'A map of tools to borrow nearby, beside the list.', actions: [
     { layer: 'pages', goal: 'Add the map to the tool list' }, { layer: 'platform', goal: 'Show the map beside the list' },
-    { layer: 'platform', goal: 'Pin each tool on the map' }, { goal: 'Agree the map provider' }] });
+    { layer: 'platform', goal: 'Pin each tool on the map' }, { goal: 'Agree the map provider' }, { layer: 'platform', goal: 'Borrow from the map' }, { layer: 'platform', goal: 'Borrow again (left for a person to walk)' }] });
   await page.goto(`${portal}/p/${project.slug}/work/item/${encodeURIComponent(workId)}`);
   await main.getByRole('button', { name: 'Start work' }).click();
   await main.locator('.wg-board-progress').waitFor();
   await page.locator('.wg-live.on').waitFor();
-  for (const number of [1, 2, 3, 4]) await agent(`/actions/${number}`, { state: 'working' });
+  for (const number of [1, 2, 3, 4, 5, 6]) await agent(`/actions/${number}`, { state: 'working' });
 
   // Records: #1 changes the page (a new section, a reworded one) and adds a flow.
   const live = (await agent(`/read?layer=pages&operationId=getPage&id=${pageId}`)).result.data.sections;
@@ -243,6 +257,54 @@ try {
   await dialog.getByRole('button', { name: 'Approve #4' }).click();
   await state(4, 'Done');
 
+  // W-27 #6, the flow "Review a UI action by walking it": #5's build runs in the agent's container and comes through its
+  // tunnel; the review opens on it live, with the checklist beside it. Walking a step's page or doing its request ticks it.
+  const tunnelLines = [];
+  const opened = await runTunnel({ config: { url: portal, token: editorToken }, item: workId, action: 5, port: agentBuild.address().port, pool: 4, log: line => tunnelLines.push(line), signal: tunnelStop.signal });
+  for (const deadline = Date.now() + 5000; !tunnelLines.length && Date.now() < deadline;) await new Promise(resolve => setTimeout(resolve, 50));
+  await agent('/actions/5', { state: 'review', summary: 'Borrow straight from the map.', preview: { url: opened.url + '/', try: 'Borrow a drill from the map.', steps: [
+    { as: 'neighbour', when: 'Open the map from the list', expect: 'The tools show on a map', path: '/map' },
+    { as: 'neighbour', when: 'Press Borrow the drill', expect: 'It says the drill is yours until Friday', path: '/api/borrow', method: 'POST' },
+    { when: 'Turn location off', expect: 'The list asks where you are' }] } });
+  await card(5).locator('.wg-changed', { hasText: 'live build · 3 steps to try' }).waitFor();
+  dialog = await openReview(5);
+  assert.equal(await dialog.getByRole('tab', { name: /Live build/ }).getAttribute('aria-selected'), 'true', 'a UI action opens on its live build');
+  const frame = dialog.frameLocator('.rm-frame');
+  await frame.getByRole('heading', { name: 'Tools near you' }).waitFor();
+  const check = dialog.getByRole('region', { name: /What to try/ });
+  await check.getByText('What to try · step 1 of 3').waitFor();
+  await check.getByText('Open the map from the list').waitFor();
+  assert.equal(await dialog.getByRole('button', { name: 'Approve #5' }).isEnabled(), false, 'P3: Approve waits for the walk');
+  await dialog.getByText('3 steps left to walk before you can approve.').waitFor();
+  await shot('08-live-build'); await audit('live build');
+  // Walk step 1 by doing it in the build: the page it reaches ticks it, and the checklist moves on.
+  await frame.getByRole('link', { name: 'See them on a map' }).click();
+  await frame.getByRole('heading', { name: 'Tools on a map' }).waitFor();
+  await check.getByText('What to try · step 2 of 3').waitFor();
+  assert.equal(await dialog.locator('.rm-url').innerText(), '/map');
+  // Step 2: the request it makes ticks it.
+  await frame.getByRole('button', { name: 'Borrow the drill' }).click();
+  await frame.getByText('Yours until Friday').waitFor();
+  await check.getByText('What to try · step 3 of 3').waitFor();
+  // Step 3 can't be walked in a preview: a reason stands in for it.
+  await check.getByRole('button', { name: "Can't walk it? Say why" }).click();
+  await check.getByLabel("Why can't it be walked?").fill('The preview has no location to turn off');
+  await check.getByRole('button', { name: 'Skip this step' }).click();
+  await check.getByText('Skipped: The preview has no location to turn off').waitFor();
+  const walked = (await agent('')).actions[4].preview.walk;
+  assert.deepEqual(Object.fromEntries(Object.entries(walked).map(([id, step]) => [id, step.how])), { s1: 'walked', s2: 'walked', s3: 'reason' });
+  await shot('09-live-walked'); await audit('live walked');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await check.scrollIntoViewIfNeeded(); await shot('10-phone-live'); await audit('phone live');
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  // Open in a new tab: its own way in, at the page the frame shows.
+  const [liveTab] = await Promise.all([context.waitForEvent('page'), dialog.getByRole('button', { name: 'Open in a new tab' }).click()]);
+  await liveTab.getByRole('heading', { name: 'Tools on a map' }).waitFor();
+  assert.equal(new URL(liveTab.url()).pathname, '/map'); await liveTab.close();
+  await dialog.getByRole('button', { name: 'Approve #5' }).click();
+  await dialog.waitFor({ state: 'detached' });
+  await state(5, 'Done');
+
   // The action's details offer the same review.
   await card(1).getByRole('button', { name: 'Details and log' }).click();
   await page.locator('.wg-side').getByRole('button', { name: 'Review #1' }).click();
@@ -263,12 +325,19 @@ try {
   await page.setViewportSize({ width: 1440, height: 1000 });
 
   assert.deepEqual(errors, []);
-  console.log('PASS review modal: an action in review says what it changed and opens the review modal (from its card, its details or a link); Records shows Previous beside Proposed, only changed fields until asked, a new record with nothing before; Files shows a tree of the reported code beside each file diff, follows a newer report and says why when it cannot read it; nothing to show says so; the preview handed over sits beside it, ready, stale, unreachable or none; a flag needs a note, and approve needs no preview; Escape closes; axe at 1440 and 390 px.');
-  await holdForPreview({ port, path: `/p/${project.slug}/work/item/${encodeURIComponent(workId)}?review=1`, account: { email: 'owner@example.com', password } });
+  console.log('PASS review modal: an action in review says what it changed and opens the review modal (from its card, its details or a link); Records shows Previous beside Proposed, only changed fields until asked, a new record with nothing before; Files shows a tree of the reported code beside each file diff, follows a newer report and says why when it cannot read it; nothing to show says so; the preview handed over sits beside it, ready, stale, unreachable or none; a flag needs a note, and approve needs no preview; Escape closes; a UI action opens on its live build through the tunnel, and walking its checklist in the build (a page reached, a request made, a reason for the rest) unlocks Approve; axe at 1440 and 390 px.');
+  // Kept for a person (npm run preview -- review-modal): #6 waits in review on the same live build, with its checklist to walk.
+  const kept = await runTunnel({ config: { url: portal, token: editorToken }, item: workId, action: 6, port: agentBuild.address().port, pool: 4, log: () => {}, signal: tunnelStop.signal });
+  await agent('/actions/6', { state: 'review', summary: 'Borrow straight from the map, for you to walk.', preview: { url: kept.url + '/', try: 'Walk the checklist in the live build.', steps: [
+    { as: 'neighbour', when: 'Open the map from the list', expect: 'The tools show on a map', path: '/map' },
+    { as: 'neighbour', when: 'Press Borrow the drill', expect: 'It says the drill is yours until Friday', path: '/api/borrow', method: 'POST' },
+    { when: 'Turn location off', expect: 'The list asks where you are' }] } });
+  await holdForPreview({ port, path: `/p/${project.slug}/work/item/${encodeURIComponent(workId)}?review=6`, account: { email: 'owner@example.com', password } });
 } catch (error) {
   for (const open of browser.contexts().flatMap(context => context.pages())) await open.screenshot({ path: dest + 'failure.png', fullPage: true }).catch(() => {});
   throw error;
 } finally {
+  tunnelStop.abort(); agentBuild.closeAllConnections(); agentBuild.close();
   await browser.close(); server.kill();
   if (server.exitCode === null && server.signalCode === null) await new Promise(resolve => server.once('exit', resolve));
   rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });

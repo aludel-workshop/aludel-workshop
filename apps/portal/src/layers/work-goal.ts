@@ -15,9 +15,13 @@ type GoalAuthor = { kind: 'person' | 'agent'; id: string; name: string };
 export type GoalEvent = { id: number; action: number | null; kind: 'message' | 'log' | 'steer' | 'flag' | 'question' | 'allow' | 'approval'; author: GoalAuthor | null; text: string;
   options?: string[]; at: string; resolvedAt: string | null; resolution: { text?: string; allow?: boolean; note?: string; by?: { id: string; name: string } } | null };
 export type GoalAction = { id: string; number: number; phase: number; layer: string | null; goal: string; after: number[]; state: 'proposed' | 'todo' | 'working' | 'review' | 'done';
-  summary: string; addedBy: GoalAuthor | null; updatedAt: string; needs: GoalEvent[]; blocked: string | null; kind: 'wrap-up' | null; proposals: GoalProposal[]; preview?: GoalPreview | null };
+  summary: string; addedBy: GoalAuthor | null; updatedAt: string; needs: GoalEvent[]; blocked: string | null; kind: 'wrap-up' | null; proposals: GoalProposal[]; preview?: GoalPreview | null;
+  tunnel?: { url: string; connected: boolean } | null };
 // W-25: what an action hands over to look at with its review: a link the agent serves (and the commit it shows), or why there's none.
-export type GoalPreview = { url?: string; commit?: string | null; try?: string; none?: string; stale?: boolean; by: GoalAuthor | null; at: string };
+export type GoalPreview = { url?: string; commit?: string | null; try?: string; none?: string; stale?: boolean; by: GoalAuthor | null; at: string; steps?: GoalStep[]; walk?: Record<string, GoalWalk> };
+// W-27 #3: the checklist handed over with a preview, and the person's walk of it.
+export type GoalStep = { id: string; as: string | null; when: string; expect: string; path: string | null; method: string | null };
+export type GoalWalk = { how: 'walked' | 'checked' | 'reason'; reason?: string; at: string; by: { id: string; name: string } };
 // W-8 attempt 2, E3: an item an action proposed (a follow-up, or what comes first after a wrap-up), decided by a person.
 export type GoalProposal = { id: string; action: number; position: number; title: string; brief: string; why: string; after: string[]; author: GoalAuthor | null;
   state: 'proposed' | 'created' | 'dismissed'; createdWorkId: string | null; created: { ref: string; title: string } | null };
@@ -226,7 +230,7 @@ const actionIcon: Record<string, string> = { proposed: 'add_task', todo: 'radio_
           <button type="submit" class="wg-send" [disabled]="!steerDraft.trim()" aria-label="Send"><mat-icon aria-hidden="true">send</mat-icon></button></form>
       </aside>
     </div>
-    @if (reviewing(); as action) { <aludel-work-review-modal [action]="action" [view]="goal" [submit]="decide" (closed)="closeReview()" /> }
+    @if (reviewing(); as action) { <aludel-work-review-modal [action]="action" [view]="goal" [submit]="decide" (closed)="closeReview()" (updated)="view.set($event)" /> }
   }
   @if (!view()) { @if (failed()) { <h1 tabindex="-1">Work item not found</h1><p><a [href]="ctx.link('work')" (click)="ctx.go(ctx.link('work'), $event)">Back to the board</a></p> }
   @else { <p class="lay-muted" role="status">Loading…</p> } }`

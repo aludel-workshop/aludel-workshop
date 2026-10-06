@@ -796,3 +796,24 @@ Authorization: the owner created W-27 from [a7-brief.md](a7-brief.md), approved 
 - **Flag.** A flag logs the walk so far for the agent ("Walk so far on #1: 2 of 3 steps walked; not walked: step 3").
 - **Agent tool.** `update_action`'s preview schema describes `steps`, and `--tunnel`.
 - **Checks:** `tests/review-checklist.test.mjs` passes. `test:affected` (the owner asked to skip the full gate until the item's end while they troubleshoot it): 84 pass, 4 fail, 4 skipped. The 4 are the known ones: the two Docker-only tests, the worker-token test, and the security audit under load.
+
+### W-27 #6: Live build view with the checklist (2026-10-06)
+
+- **Live build view.** An action with an open tunnel opens on Live build. The goal view now carries each action's `tunnel` (url, connected), and so does the walk route's answer, so the page keeps it after a step is ticked.
+  - **Entry:** the modal asks the portal for the member's one-time link (`POST …/previews/:n`, at the handed-over path) and frames it.
+  - **Frame:** sandboxed with scripts, forms, same origin, pop-ups and modals, but no top navigation. It takes only the tunnel's own origin.
+  - **Address bar:** "Preview build of W-n", the page showing (from the walk script), and Reload.
+  - **Not connected:** the modal says the agent's container isn't connected and offers Try again.
+  - **Open in a new tab:** gets its own one-time link, at the page the frame shows. The tab opens at the click, so it isn't blocked as a pop-up. For tunnelled builds, the plain W-25 link is hidden, because it can't get in on its own.
+- **Checklist panel** (a0/v2 shots 10 and 19):
+  - "What to try · step n of N", the step's When as its title, then As and Expect.
+  - "Do it in the live build; that ticks it and moves on".
+  - "Can't walk it? Say why" takes a reason. A done step shows how it was done, with Undo.
+  - Back, a progress bar (each segment jumps to its step), Looks good, and Next on a done step.
+  - Approve stays disabled with "N steps left to walk before you can approve". The server enforces the same (P3, #3).
+- **Walking.** The walk script's messages are taken only from the frame's window and the tunnel's origin. Reaching a step's page ticks a page step; making the step's method and path request ticks an action step. Each tick is recorded as walked through `POST …/walk/:n`, and the panel moves to the next step still to walk.
+- **Journey (`review-modal`).**
+  - #5's build runs behind the real tunnel client. The journey walks the frame: the link to /map ticks step 1, Borrow's POST ticks step 2, and a reason covers step 3. The server's walk is checked (`walked`, `walked`, `reason`), Open in a new tab lands on /map, and Approve unlocks. Screens 08–10 and axe at 1440 and 390 px.
+  - This is the first browser proof that the tunnel's partitioned cookies work inside the portal's cross-site frame in Chromium, which #2 had left open.
+  - The kept preview (`npm run preview -- review-modal`) now opens on #6, which waits in review on the same live build for a person to walk.
+- **Checks:** typecheck, build, the `review-modal` and `agent-work` journeys pass. `test:affected` shows only the known 4 failures.
