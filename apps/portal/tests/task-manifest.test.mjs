@@ -17,6 +17,8 @@ test('task compiler binds an explicit output adapter to exact inputs', () => {
   assert.equal(card.outputs[0].kind, 'security_finding_report');
   assert.equal(card.capabilities.repository, 'read-only pinned commit');
   assert.throws(() => compileTaskManifest({ ...base, sources: [] }), /pinned project revision/);
+  // W-8 F10: the error names what's missing.
+  assert.throws(() => compileTaskManifest({ ...base, repository: {}, guidance: { ...base.guidance, profile: null } }), /missing pinned inputs: agent profile revision, repository commit\./);
   assert.throws(() => compileTaskManifest({ ...base, guidance: { ...base.guidance, action: { ...base.guidance.action, id: 'platform.deploy', tools: ['read', 'code'] } } }), /no task output adapter/);
   assert.throws(() => compileTaskManifest({ ...base, guidance: { ...base.guidance, action: { ...base.guidance.action, changes: ['Code › all'] } } }), /no task output adapter/);
 });

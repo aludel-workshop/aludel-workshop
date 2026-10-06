@@ -149,7 +149,7 @@ export function runPure(source, call, args, { bytes = 1048576, timeout = 3000, h
 }
 
 // Host catalogs a layer's rules may check against, as the API asks for them: a list, or the keys of a map.
-const handlerCatalogs = (api, catalogs) => Object.fromEntries(api.catalogNames.map(name => {
+export const handlerCatalogs = (api, catalogs) => Object.fromEntries(api.catalogNames.map(name => {
   const value = catalogs?.[name];
   return [name, Array.isArray(value) ? value.filter(entry => typeof entry === 'string') : value && typeof value === 'object' ? Object.keys(value) : []];
 }));

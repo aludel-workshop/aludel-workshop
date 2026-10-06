@@ -17,7 +17,7 @@ type Draft = { title: string; brief: string; assignee: string; state: string; pr
   } @else {
   <div class="wc-screen" [class.wc-inline]="embedded()" [class.wc-expanded]="expanded()">
   <section class="wc-composer" [attr.role]="embedded() ? 'region' : 'dialog'" [attr.aria-modal]="embedded() ? null : 'true'" [attr.aria-labelledby]="fieldId('heading')" [cdkTrapFocus]="!embedded()" [cdkTrapFocusAutoCapture]="!embedded()">
-    <header class="wc-header"><div class="wc-context"><span class="wc-project">{{ projectName() }}</span><span class="wc-divider"></span><mat-icon aria-hidden="true">checklist</mat-icon><h2 [id]="fieldId('heading')">{{ embedded() ? 'Suggested task' : 'Create task' }}</h2><span class="wc-divider"></span><span>{{ layerName(role()) }}</span></div>
+    <header class="wc-header"><div class="wc-context"><span class="wc-project">{{ projectName() }}</span><span class="wc-divider"></span><mat-icon aria-hidden="true">checklist</mat-icon><h2 [id]="fieldId('heading')">{{ proposal() ? 'Proposed item' : embedded() ? 'Suggested task' : 'Create task' }}</h2>@if (!proposal()) { <span class="wc-divider"></span><span>{{ layerName(role()) }}</span> }</div>
       @if (!embedded()) { <div class="wc-actions"><button type="button" aria-label="Minimize draft" (click)="remember(); minimized.set(true)"><mat-icon>remove</mat-icon></button><button type="button" [attr.aria-label]="expanded() ? 'Collapse composer' : 'Expand composer'" (click)="expanded.set(!expanded())"><mat-icon>open_in_full</mat-icon></button><button type="button" aria-label="Close composer" (click)="close()"><mat-icon>close</mat-icon></button></div> }
     </header>
     <form (ngSubmit)="create()"><fieldset [disabled]="saving()">
@@ -26,13 +26,13 @@ type Draft = { title: string; brief: string; assignee: string; state: string; pr
       <label class="wc-sr" [for]="fieldId('title')">Title</label><input [id]="fieldId('title')" name="title" class="wc-title" [(ngModel)]="title" (ngModelChange)="remember()" maxlength="160" placeholder="What needs to be done?" required cdkFocusInitial>
       <label class="wc-sr" [for]="fieldId('description')">Description</label><textarea [id]="fieldId('description')" name="brief" class="wc-description" [(ngModel)]="brief" (ngModelChange)="remember()" maxlength="2000" placeholder="Add a description…"></textarea>
       <div class="wc-metadata">
-        @if (!layer()) { <label class="wc-meta"><span class="wc-sr">Layer</span><select aria-label="Layer" name="role" [ngModel]="role()" (ngModelChange)="changeRole($event)"><option value="goal">Goal across layers</option>@for (key of layerKeys(); track key) { <option [value]="key">{{ layerName(key) }}</option> }</select></label> }
+        @if (!layer() && !proposal()) { <label class="wc-meta"><span class="wc-sr">Layer</span><select aria-label="Layer" name="role" [ngModel]="role()" (ngModelChange)="changeRole($event)"><option value="goal">Goal across layers</option>@for (key of layerKeys(); track key) { <option [value]="key">{{ layerName(key) }}</option> }</select></label> }
         @if (!scope() && !goal()) { <label class="wc-meta"><span class="wc-sr">Action</span><select aria-label="Action" name="action" [ngModel]="selectedAction()?.id || ''" (ngModelChange)="action.set($event); remember()">@for (entry of actions(); track entry.id) { <option [value]="entry.id">{{ entry.name }}</option> }</select></label> }
         @if (!goal()) { <label class="wc-meta"><mat-icon aria-hidden="true">person</mat-icon><span class="wc-sr">Assignee</span><select aria-label="Assignee" name="assignee" [(ngModel)]="assignee" (ngModelChange)="remember()"><option value="">{{ scope() ? 'Layer default' : 'Action default' }}</option><option value="unassigned">Unassigned</option>@for (member of ctx.data()?.members || []; track member.id) { <option [value]="'person:' + member.id">{{ member.id === ctx.me() ? 'You' : member.name }}</option> }@for (profile of ctx.data()?.profiles || []; track profile.id) { @if (profile.active) { <option [value]="'agent:' + profile.id">{{ profile.name }} (agent)</option> } }</select></label> }
         <label class="wc-meta"><mat-icon aria-hidden="true">flag</mat-icon><span class="wc-sr">Priority</span><select aria-label="Priority" name="priority" [(ngModel)]="priority" (ngModelChange)="remember()">@for (entry of priorities; track entry) { <option [value]="entry">{{ entry }}</option> }</select></label>
         @if (!goal()) { <label class="wc-meta"><mat-icon aria-hidden="true">view_kanban</mat-icon><span class="wc-sr">Place in</span><select aria-label="Place in" name="state" [(ngModel)]="state" (ngModelChange)="remember()"><option value="ready">Queue</option><option value="suggested">Backlog</option></select></label> }
       </div>
-      @if (goal()) { <p class="wc-hint">A goal is worked across layers. Write what should be true when it's done; its actions are defined next, by you or the agent that works it.</p> } @else {
+      @if (goal()) { @if (!proposal()) { <p class="wc-hint">A goal is worked across layers. Write what should be true when it's done; its actions are defined next, by you or the agent that works it.</p> } } @else {
       <section class="wc-review" [attr.aria-labelledby]="fieldId('review-title')"><div class="wc-sectionhead"><h3 [id]="fieldId('review-title')">Acceptance criteria</h3><span>Optional</span></div>
         @for (criterion of criteria; track $index; let i = $index) { <div class="wc-criterion"><mat-icon aria-hidden="true">checklist</mat-icon><label class="wc-sr" [for]="fieldId('criterion-' + i)">Criterion {{ i + 1 }}</label><input [id]="fieldId('criterion-' + i)" [name]="'criterion-' + i" [ngModel]="criterion" (ngModelChange)="criteria[i] = $event; remember()" maxlength="300" placeholder="What must be true?"><button type="button" [attr.aria-label]="'Remove criterion ' + (i + 1)" (click)="criteria.splice(i, 1); remember()"><mat-icon>close</mat-icon></button></div> }
         @for (ref of linked; track ref.id) { <div class="wc-claim"><mat-icon aria-hidden="true">route</mat-icon><div><strong>{{ journey(ref.id)?.title || ref.id }}</strong><span class="wc-tag">Revision {{ ref.revision }}</span><p>{{ journey(ref.id)?.persona }} · {{ stepNames(ref) }}</p></div><button type="button" [attr.aria-label]="'Remove journey ' + ref.id" (click)="removeJourney(ref.id)"><mat-icon>close</mat-icon></button></div> }
@@ -52,7 +52,7 @@ type Draft = { title: string; brief: string; assignee: string; state: string; pr
       @if (targets().length && !goal()) { <details class="wc-context-details"><summary>Link project context</summary><label>Target record<select aria-label="Target record" name="target" [(ngModel)]="target" (ngModelChange)="remember()"><option value="">No linked record</option>@for (entry of targets(); track entry.id) { <option [value]="entry.id">{{ entry.label }}</option> }</select></label></details> }
       @if (error()) { <p class="wc-error" role="alert">{{ error() }} Your draft is intact.</p> }
     </div>
-    <footer class="wc-footer"><div>@if (!embedded()) { <label><input name="another" type="checkbox" [(ngModel)]="another">Create another</label> }<p>Creates work. Doesn’t start an agent.</p></div><div><button type="button" class="wc-quiet" (click)="embedded() ? dismissed.emit() : close()">{{ embedded() ? 'Dismiss suggestion' : 'Cancel' }}</button><button type="submit" class="wc-primary" [disabled]="saving() || !title.trim() || (!scope() && !goal() && !selectedAction()) || (specify && !journeyTitle.trim())">{{ saving() ? 'Saving…' : embedded() ? 'Create task' : specify ? 'Create Specify task' : goal() ? 'Create goal' : 'Create' }}</button></div></footer>
+    <footer class="wc-footer"><div>@if (!embedded()) { <label><input name="another" type="checkbox" [(ngModel)]="another">Create another</label> }<p>Creates work. Doesn’t start an agent.</p></div><div><button type="button" class="wc-quiet" (click)="embedded() ? dismissed.emit() : close()">{{ proposal() ? 'Dismiss' : embedded() ? 'Dismiss suggestion' : 'Cancel' }}</button><button type="submit" class="wc-primary" [disabled]="saving() || !title.trim() || (!scope() && !goal() && !selectedAction()) || (specify && !journeyTitle.trim())">{{ saving() ? 'Saving…' : proposal() ? 'Create item' : embedded() ? 'Create task' : specify ? 'Create Specify task' : goal() ? 'Create goal' : 'Create' }}</button></div></footer>
     </fieldset></form>
   </section></div> }
   `
@@ -62,14 +62,16 @@ export class WorkCreateComponent {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   readonly embedded = input(false);
   readonly followUp = input<{ workId: string; entry: RunFollowUp } | null>(null);
-  readonly confirmed = output<WorkItem>(); readonly dismissed = output<void>();
+  // W-8 attempt 2, E3: an item a goal item's action proposed; created, it is a goal item of its own.
+  readonly proposal = input<{ workId: string; entry: { id: string; title: string; brief: string } } | null>(null);
+  readonly confirmed = output<WorkItem>(); readonly dismissed = output<void>(); readonly proposed = output<void>();
   private readonly fieldPrefix = `wc-${crypto.randomUUID()}`;
   fieldId(name: string) { return `${this.fieldPrefix}-${name}`; }
   private focusField(name: string) { this.host.nativeElement.querySelector<HTMLElement>(`[name="${name}"]`)?.focus(); }
   readonly layer = input<string | null>(null); readonly preset = input<string | null>(null);
   readonly priorities = priorityOrder; readonly role = signal('product'); readonly action = signal('product.define');
   readonly layerKeys = computed(() => [...new Set([...this.ctx.layerInstances().filter(entry => entry.enabled && entry.workScope).map(entry => entry.key), ...(this.ctx.data()?.layerActions || []).map(entry => entry.layer)])]);
-  readonly goal = computed(() => this.role() === 'goal' && !this.layer() && !this.followUp());
+  readonly goal = computed(() => Boolean(this.proposal()) || (this.role() === 'goal' && !this.layer() && !this.followUp()));
   readonly scope = computed(() => this.ctx.layerInstances().find(entry => entry.key === this.role())?.workScope || null);
   readonly actions = computed(() => (this.ctx.data()?.layerActions || []).filter(entry => entry.layer === this.role()));
   readonly selectedAction = computed<LayerWorkAction | null>(() => this.actions().find(entry => entry.id === this.action()) || this.actions()[0] || null);
@@ -80,9 +82,9 @@ export class WorkCreateComponent {
   filtered() { const term = this.search.trim().toLowerCase(); return this.journeys().filter(e => `${e.title} ${e.persona}`.toLowerCase().includes(term)); }
   title = ''; brief = ''; target = ''; assignee = ''; state = 'ready'; priority = 'medium'; criteria: string[] = []; linked: LinkedJourney[] = []; selected = new Map<string, string[]>(); search = ''; specify = false; journeyTitle = ''; another = false;
   private activeDraftKey = '';
-  constructor() { effect(() => { const key = this.layer(), preset = this.preset(), followUp = this.followUp(), project = this.ctx.projectId(); if (!project) return; untracked(() => { if (this.activeDraftKey !== this.draftKey()) { this.activeDraftKey = this.draftKey(); this.title = ''; this.brief = ''; this.criteria = []; this.linked = []; this.journeys.set([]); this.specify = false; this.target = ''; this.assignee = ''; this.priority = 'medium'; this.state = 'ready'; this.journeyTitle = ''; this.error.set(''); this.picker.set(false); this.minimized.set(false); this.role.set(key || 'product'); this.action.set(preset || 'product.define'); if (followUp) { this.title = followUp.entry.title; this.brief = followUp.entry.brief; this.state = 'suggested'; } this.restore(); } if (key) this.role.set(key); if (preset) this.action.set(preset); }); }); }
+  constructor() { effect(() => { const key = this.layer(), preset = this.preset(), followUp = this.followUp(), proposal = this.proposal(), project = this.ctx.projectId(); if (!project) return; untracked(() => { if (this.activeDraftKey !== this.draftKey()) { this.activeDraftKey = this.draftKey(); this.title = ''; this.brief = ''; this.criteria = []; this.linked = []; this.journeys.set([]); this.specify = false; this.target = ''; this.assignee = ''; this.priority = 'medium'; this.state = 'ready'; this.journeyTitle = ''; this.error.set(''); this.picker.set(false); this.minimized.set(false); this.role.set(key || 'product'); this.action.set(preset || 'product.define'); if (followUp) { this.title = followUp.entry.title; this.brief = followUp.entry.brief; this.state = 'suggested'; } if (proposal) { this.title = proposal.entry.title; this.brief = proposal.entry.brief; } this.restore(); } if (key) this.role.set(key); if (preset) this.action.set(preset); }); }); }
   projectName() { return this.ctx.session()?.projects.find(entry => entry.id === this.ctx.projectId())?.name || ''; }
-  private draftKey() { return `aludel-task-draft:${this.ctx.me()}:${this.ctx.projectId()}:${this.layer() || 'work'}:${this.preset() || ''}${this.followUp() ? ':follow-up:' + this.followUp()!.entry.id : ''}`; }
+  private draftKey() { return `aludel-task-draft:${this.ctx.me()}:${this.ctx.projectId()}:${this.layer() || 'work'}:${this.preset() || ''}${this.followUp() ? ':follow-up:' + this.followUp()!.entry.id : ''}${this.proposal() ? ':proposal:' + this.proposal()!.entry.id : ''}`; }
   private restore() { try { const draft = JSON.parse(sessionStorage.getItem(this.draftKey()) || 'null') as Draft | null; if (draft) { const { role, action, ...fields } = draft; Object.assign(this, fields); if (!this.layer()) this.role.set(role); this.action.set(action); if (this.linked.length) void this.loadJourneys(); } } catch { sessionStorage.removeItem(this.draftKey()); } }
   remember() { const draft: Draft = { title: this.title, brief: this.brief, target: this.target, assignee: this.assignee, state: this.state, priority: this.priority, role: this.role(), action: this.action(), criteria: this.criteria, linked: this.linked, specify: this.specify, journeyTitle: this.journeyTitle }; sessionStorage.setItem(this.draftKey(), JSON.stringify(draft)); }
   changeRole(key: string) { this.role.set(key); this.action.set(this.actions()[0]?.id || ''); this.linked = []; this.specify = false; this.picker.set(false); this.remember(); }
@@ -111,7 +113,10 @@ export class WorkCreateComponent {
     let created: WorkItem | undefined;
     const ok = await this.ctx.write(async () => {
       const base = { title: this.title.trim(), priority: this.priority, state: this.state, ...assignment };
-      if (this.goal()) {
+      if (this.proposal()) {
+        const proposal = this.proposal()!;
+        await this.ctx.api(`/api/projects/${encodeURIComponent(this.ctx.projectId())}/goals/${encodeURIComponent(proposal.workId)}/proposals/${encodeURIComponent(proposal.entry.id)}`, 'POST', { decision: 'create', task: { title: this.title.trim(), brief: this.brief.trim(), priority: this.priority } });
+      } else if (this.goal()) {
         // AGENT-WORK-01 A3: a goal item starts as a Draft; its actions are defined on its page.
         created = (await this.ctx.api<{ item: WorkItem }>(`/api/projects/${encodeURIComponent(this.ctx.projectId())}/goals`, 'POST', { title: this.title.trim(), brief: this.brief.trim(), priority: this.priority })).item;
       } else if (this.followUp()) {
@@ -121,11 +126,12 @@ export class WorkCreateComponent {
         const journeyId = this.journeyTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 64) || `journey-${crypto.randomUUID().slice(0, 8)}`;
         const result = await this.ctx.api<{ specify: WorkItem }>(`/api/projects/${encodeURIComponent(this.ctx.projectId())}/work/specify`, 'POST', { ...base, brief: this.brief.trim(), checks: this.criteria.map(text => text.trim()), claims: this.linked.map((ref, i) => ({ id: `journey-${i + 1}`, kind: 'journey', journey: ref.id, revision: ref.revision, steps: ref.steps })), journey: { id: journeyId, title: this.journeyTitle.trim() } }); created = result.specify;
       } else created = await this.ctx.api<WorkItem>(`/api/projects/${encodeURIComponent(this.ctx.projectId())}/work`, 'POST', { ...base, ...(this.scope() ? { layer: this.role() } : { action: this.selectedAction()!.id }), suggestion: this.brief.trim(), targets: this.target ? [{ id: this.target }] : [], checks: this.criteria.map(text => text.trim()), claims: this.linked.map(ref => ({ id: `journey-${this.linked.indexOf(ref) + 1}`, kind: 'journey', journey: ref.id, revision: ref.revision, steps: ref.steps })) });
-    }, this.goal() ? 'Goal created.' : 'Task created.');
+    }, this.proposal() ? 'Item created.' : this.goal() ? 'Goal created.' : 'Task created.');
     this.saving.set(false);
     if (!ok) { this.error.set(this.ctx.error() || 'Could not save the task.'); return; }
     sessionStorage.removeItem(this.draftKey());
     if (this.followUp() && created) { this.confirmed.emit(created); return; }
+    if (this.proposal()) { this.proposed.emit(); return; }
     if (this.another) { this.title = ''; this.brief = ''; this.criteria = []; this.linked = []; this.specify = false; this.target = ''; this.journeyTitle = ''; this.picker.set(false); this.focusField('title'); }
     else if (created) this.ctx.go(this.ctx.link('work', 'item', created.id));
   }

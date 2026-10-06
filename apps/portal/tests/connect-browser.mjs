@@ -251,8 +251,18 @@ try {
   assert.equal(await asHost('/api/editor/goals', { authorization: `Bearer ${boxToken}` }), 200);
   assert.equal(await asHost('/api/session'), 421);
   assert.equal(await asHost('/api/editor/tools/editor-mcp.mjs'), 200, 'the tools are served for container setup');
+  // W-8 attempt 2, E1: it commits as its person (F11), and gets the layer templates its branch pins from the portal, with
+  // no GitHub access of its own (F22). The catalog stands in for the app's apps/portal/config/layer-templates.json.
+  assert.match(git(box, 'config', 'user.email'), /^\d+\+[\w-]+@users\.noreply\.github\.com$/, 'their GitHub noreply address');
+  assert.ok(git(box, 'config', 'user.name'));
+  const pinned = JSON.parse(readFileSync(join(portalDir, 'config/layer-templates.json'), 'utf8'));
+  writeFileSync(join(box, 'catalog.json'), JSON.stringify({ repo: 'layer-base', templates: { pages: pinned.templates.pages, base: pinned.templates.base } }));
+  const templates = () => execFileSync(process.execPath, [join(portalDir, 'tools/aludel.mjs'), 'templates', 'catalog.json'], { cwd: box, env: boxEnv, encoding: 'utf8' });
+  assert.match(templates(), /Layer templates cloned into .*layer-base from Aludel/);
+  assert.equal(git(join(box, 'layer-base'), 'rev-parse', 'pages'), pinned.templates.pages.commit, 'the pinned commit, as its branch');
+  assert.match(templates(), /already has every pinned template/, 'a second run fetches nothing');
   assert.deepEqual(errors, []);
-  console.log('PASS connect: start choice, working style, GitHub sign-in on the fake, repository list, master refused, monorepo code paths suggested and edited, layers, one .aludel/ commit pushed with the chosen paths, their AGENTS.md untouched and no starter docs, Code reads apps/web, a goal item closes out from GitHub onto a main that moved there, an item container’s branch and link, and the container connecting itself to its one item; axe at 1440 and 390 px.');
+  console.log('PASS connect: start choice, working style, GitHub sign-in on the fake, repository list, master refused, monorepo code paths suggested and edited, layers, one .aludel/ commit pushed with the chosen paths, their AGENTS.md untouched and no starter docs, Code reads apps/web, a goal item closes out from GitHub onto a main that moved there, an item container’s branch and link, the container connecting itself to its one item, committing as its person and fetching its pinned layer templates from Aludel; axe at 1440 and 390 px.');
 } catch (error) {
   console.error(serverLog.split('\n').slice(-30).join('\n'));
   throw error;

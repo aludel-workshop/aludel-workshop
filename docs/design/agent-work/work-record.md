@@ -435,3 +435,107 @@ Owner: "think we've got enough out of these notes to close out and mark this fir
    - *Applied:* the traceability and reviewability rule, in the operating procedure §6 and the work-record template. Before closing a slice, mark each owner requirement as built, deviated or deferred. Before a dogfood or trial, check that every action kind can be reviewed as specified and that the environment can build and check the change.
    - *Tested:* only retrospectively. Applied to A4, it would have flagged F21 (the G2 requirement) as deviated, and F22 before the dogfood. It hasn't yet been applied going forward.
    - *Hypothesis:* the person-event watcher makes the two-surface problem bearable until push events exist.
+
+## Attempt 2 prerequisites (2026-10-05, Claude, local session)
+
+Owner, after reading attempt 1: "our highest priority is first: a session can actually make changes (with the git credentials, layer-base etc), second; we can end as failed, third; it can create follow up actions. my best case for if the next session fails, is for it to be able to mark itself unable to complete task, but propose the work items that need to happen first before it is revisited (with dependencies?)". On the shape of ending as failed: "rather than a rigid 'propose not done' … when orchestrator sees action failure, it evaluates: is there going to be a way to fix and still complete, or does task run need to be aborted? if so, it could add action to clean up/post hoc, and that could propose work items: which should be the same as work items proposed for successes … then you can review, add whatever you want, and when done instead of doing approve and merge, it has you confirm ending failed. we already have mockups for what that proposed action review looks like, thats what we should be building." Also: old volume cleanup is high priority; git identity is per person.
+
+**Authorized:** "merge w-8. start work yourself on your proposed changes." W-8 was merged as PR #7. Scope: local repository edits, checks and local previews on `claude/item-environment`, covering:
+- **E1, a session can make changes:**
+  - the item container gets the pinned `layer-base` commits from the portal, with no GitHub credentials;
+  - git identity per person, applied when the container connects (F11);
+  - `report_code` opens or updates the item's pull request through the portal's GitHub App (F29);
+  - the A8 test clears `ALUDEL_CONTAINER` (F23);
+  - a timeout says the portal isn't answering (F12).
+- **E2, volume cleanup:** an item's container volume is removed when the item closes.
+- **E3, ending as failed, with follow-ups:**
+  - the orchestrator adds a wrap-up action that proposes work items;
+  - the proposals are reviewed in the suggested-task stack built for J8;
+  - close-out becomes "confirm ending as not done".
+
+Not authorized: changes to `layer-base` or GitHub settings, opening real pull requests outside a test fake, or deleting volumes other than through the built path.
+
+**Readiness:**
+- `layer-base` is already on GitHub, and private. All seven pinned commits are there, checked with `git branch -r --contains` against `origin`. F22's "publish" is done. What's missing is the container getting it: a private clone needs credentials the container may not have, and a headless runtime (A2) has none. So the portal serves the pinned commits as a git bundle, as the worker's `layer-bundle` already does. This differs from the owner's F22 answer ("the container setup clones it beside the app"); the reason is credentials.
+- Volumes are per item, not per action (named `aludel-<project>-<ref>-<base>`, `server/server.mjs:1236`), so cleanup belongs to item close. One volume measured 662 MB (`docker system df -v`, W-8's).
+- The "proposed action review" mockup is the J8 suggested-task stack. It's built on the old run path: `work_follow_ups` (`server/layer-scope.mjs:26`), the composer stack, and the reason in the sidebar ([J8 record](../journeys/task-create/work-record.md#suggested-task-review-implementation-and-closeout--2026-10-03), [screen](../journeys/task-create/review-evidence/01-stack-desktop.png)). E3 wires goal items to it. Proposals' dependencies map onto items' existing `blocks` links (`server/knowledge.mjs:1375`); an earlier draft of this note said items had none, which was wrong.
+- Process check (operating procedure §6, applied forward for the first time): E1's acceptance is that a fresh container built from `.devcontainer/` can build the portal and run the templates gate. That is checked by building the image and running the setup in it, not by reading the script.
+
+### Built (2026-10-05)
+
+**E1, a session can make changes.**
+- **Templates:** the portal serves the layer templates an item's branch pins as a Git bundle (`GET /api/editor/templates`, `server/item-environment.mjs`). The bundle is made in a scratch repository that borrows `layer-base`'s objects, so the person's checkout never gets temporary refs. `aludel templates` fetches it into `./layer-base`, and the setup runs it after connecting.
+- **Git identity (F11):** connecting sets the clone's `user.name` and `user.email` to the person's. The email is their GitHub noreply address (`<id>+<login>@users.noreply.github.com`) when they signed in with GitHub, otherwise their portal email.
+- **F23:** the A8 test clears `ALUDEL_CONTAINER`.
+- **F12:** a timeout now says that Aludel didn't answer within 8 s, may be busy, and to retry; a refused connection says so separately.
+- **Deferred, F29 (opening pull requests):** the GitHub App has `contents`, `metadata` and `administration`, but not `pull_requests`. Adding it is a GitHub settings change, which wasn't authorized. With E3, a PR isn't needed to land or keep work: close-out merges, and an item ended as not done keeps its branch on GitHub.
+
+**E2, volume cleanup.** At close-out (either ending) and at each Open in a container, Aludel removes the container volumes of the project's closed or archived items, with their stopped containers (`sweepItemVolumes`). A volume whose container is still running (its window is open) is kept and noted on the item; it goes at a later sweep. Open items' volumes are never touched, because they may hold unpushed work.
+
+**E3, ending as not done, with proposed items.**
+- **Wrap-up action:** `add_action` with `wrapUp` and a reason. It always waits for its person's approval ("End this item as not done?"), waits on nothing itself, and is the only action that has to be reviewed.
+- **Proposals:** `propose_items` works from any working action (follow-ups after a success, or what comes first after a wrap-up). Each proposal has a title, brief and why, and `after` gives the order. They're decided in the J8 composer stack, which gained a proposal mode that creates a Draft goal item. Dependencies become `blocks` links whichever order the items are created in.
+- **Close-out:** it refuses while proposals are undecided. With a wrap-up it becomes "End as not done", with a confirm step. It applies nothing and merges nothing; the staged changeset stays unapplied on the item, and the outcome and reason are recorded.
+- **MCP:** the instructions now tell the orchestrator to judge fix-or-wrap-up when an action fails.
+- **Restart effect:** additive only. It adds a `work_goal_proposals` table and a `kind` column on `work_goal_actions`. No existing data changes.
+
+**Checks (agent-run, 2026-10-05):**
+- New `tests/item-environment.test.mjs` (bundle, identity, sweep) and the E3 test in `tests/agent-work.test.mjs`: pass. The full `agent-work.test.mjs` passes (6, with 2 skipped because templates were off).
+- The `connect` journey covers the container committing as its person and `aludel templates` fetching the pinned commits. The `agent-work` journey walks E3 end to end: wrap-up approved, proposals edited, created and dismissed, the blocking link checked, the ending confirmed. Both pass, with axe at 1440 and 390 px, and the screens were looked at.
+- `test:affected`: 77 pass, 1 fail, 3 skipped. The failure is `security-audit-worker`, whose restarted portal must answer within 8 s. It failed on `main` too while the machine was loaded, and it passes when the machine is idle.
+- **The acceptance check (operating procedure §6), in a container built from `.devcontainer/Dockerfile`, on a fresh clone with only the bundle-served `layer-base`:**
+  - the image build was fully cached (4 s);
+  - fetching the templates took 0 s, and `npm ci` took 31 s;
+  - `npm run build` passed in 35 s, and so did `npm run typecheck`;
+  - `test:server:templates`: 343 pass, 3 fail, 10 skipped.
+  - In attempt 1, none of these could run (F22).
+- `test:server:templates` on the host: 351 pass, 0 fail, 7 skipped.
+- **F30, the three container failures:** all three need Docker. Two are the layer-test sandbox (`runner ENOENT`) and one is a candidate preview build. The item container has no Docker. Giving it the host's Docker socket would make the container root-equivalent on the person's machine, so that is the owner's decision. Until then, those tests run on the host.
+- **Not checked:** a real item container through VS Code (the Dev Containers link, Connect, then `aludel templates` against the live portal), and a live volume sweep. Both wait for the owner's next dogfood.
+
+**Round note.** *Changed:* item containers get templates and identity; closed items' volumes are swept; items can end as not done with proposed items. *Checked:* unit tests, both journeys, and the build plus gate inside the container image. *Waits on the owner:* restart the portal on this branch; decide F30 (Docker in item containers); try attempt 2 of W-8 (or close W-8 the new way, which needs its agent to add a wrap-up).
+
+### Small findings from attempt 1 (2026-10-05)
+
+Owner: "think you can knock out all those smaller ones. medium ones turned into a task for future work. … knock it out." Decisions on F8, F9 and F13 are recorded as DEC-068. Authorized on `claude/item-environment`:
+- F4: the editor API accepts W-n wherever it takes an item.
+- F5: no legacy "blocked" status on goal items.
+- F7/F18: `describe_operation` returns an operation's request schema and the host catalogs it uses.
+- F10: name the missing pinned input.
+- F14: editor writes return a short acknowledgement.
+- F24: a person drops a to-do action.
+- F19: a Board page type.
+- A person-side "End as not done".
+
+Medium findings (F15, F1, F3) are recorded below as future work, not built.
+
+**Built (2026-10-05).**
+- **F4:** the editor API resolves W-n to the item wherever it takes an item, so `work_view("W-8")` works.
+- **F5:** goal items carry no layer-action migration, so no misleading "blocked".
+- **F7/F18:** `describe_operation(layer, operationId)` returns the operation's request body schema, the component schemas it refers to, and the values of the host catalogs it checks (`pageTypes`, `routeIcons`). `stack_map` stays a summary.
+- **F10:** the task manifest names each missing pinned input.
+- **F14:** editor writes (define, add or update an action, post, report code) answer with the item's id, ref, board and status, each action's number, goal and state, the open needs, and what the call added. Reads stay whole.
+- **F19:** a Board page type: search, then four columns of cards.
+- **F24:** a person removes a to-do action from the item page; actions after it stop waiting on it.
+- **Person ending:** on an item in progress or in review, "End as not done…" asks why and ends it. The wrap-up is recorded with that reason, open needs are withdrawn, and the item closes as not done, once any proposed items are decided.
+
+**Checks:**
+- `agent-work.test.mjs`: 7 pass, 3 skipped without templates. The F7 test passes with templates.
+- `task-manifest.test.mjs` passes.
+- The `agent-work` journey adds a third item: the agent defines it by its number with a short reply, one to-do action is removed, and the person ends it with a reason. axe passes at 1440 and 390 px, and the screens were looked at.
+- The `connect` journey passes, and `test:affected` passes: 275 pass, 0 fail.
+- `test:server:templates`: 353 pass, 0 fail, 7 skipped.
+
+### Future work from attempt 1 (medium findings, not built)
+
+To pick up as one packet, or as goal items once the portal is running this branch:
+1. **F15, action descriptions.** An action has a short title and a description: schema, `define_work`, `add_action`, `update_action`, item page and peek. Today action 1's detail lives only in this record.
+2. **F1, the container's first message.** The Dev Containers link can't carry a prompt. When connecting, setup could leave the item's start instruction where Claude Code reads it first: a session-start hook in the container's user settings, or a line `aludel connect` prints for the person to paste. The aim is that the agent knows its item and its role without being told.
+3. **F3, `.aludel/AGENTS.md` in an app repository.** The Code template's agent guide is written for a layer repository: charter, layer contract, `node --test`, "Aludel turns the branch into a merge request". In an app repository it should say that `.aludel/` is the Code layer's installed package, and that work comes through the Aludel tools. This is a change to `layer-base`'s `code` branch and a new pin, which needs the owner's go to edit `layer-base`.
+
+DEC-068 settles F8, F9 and F13:
+- **F8:** journeys belong to Code when they're Code's work, with an optional binding to Pages flows that one side may cede.
+- **F9:** briefs describe the app layers they expect to touch without fencing the work to them.
+- **F13:** Code owns code, including Aludel's.
+
+Following from these: F17's Pages-owned personas is the same rule (open, with the Pages layer). The orchestrator protocol's "one action per layer change" stands; a portal code change is a Code (`platform`) action, as W-8 #2 was filed.

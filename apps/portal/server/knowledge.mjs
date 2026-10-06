@@ -1201,7 +1201,8 @@ export function knowledge({ db, catalogs, packs, agentDefaults = catalogs.agentD
     if (ownerInstance && item.layer_instance_id !== ownerInstance) return null;
     const workTargets = parse(item.targets_json, []);
     if (workTargets.some(target => target.layerInstanceId && ['page_map','page','flow'].includes(target.kind) && target.layerInstanceId !== pagesInstanceId(db, item.project_id))) return null;
-    const migration = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_work_migration'").get()
+    // W-8 F5: the layer-action migration maps historical layer items; a goal item has no layer action to map.
+    const migration = item.work_scope !== 'goal' && db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'layer_work_migration'").get()
       ? db.prepare('SELECT action_id AS actionId, action_revision AS actionRevision, disposition, reason FROM layer_work_migration WHERE project_id = ? AND work_id = ?').get(item.project_id, item.id) : null;
     return { id: item.id, number: item.number, ref: `W-${item.number}`, layer: item.layer, layerInstanceId: item.layer_instance_id || null, type: item.type, action: item.action || null, scope: item.work_scope === 'layer' ? 'layer' : item.work_scope === 'goal' ? 'goal' : 'action', title: item.title, state: item.state, board: boardStatus(item.state),
       status: migration?.disposition === 'blocked' && item.state !== 'done' ? 'blocked' : statusOf(item.state, context), migration, priority: priorities.includes(item.priority) ? item.priority : 'medium',

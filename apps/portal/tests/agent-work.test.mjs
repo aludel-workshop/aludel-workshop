@@ -277,7 +277,8 @@ test('A8: a checkout is connected once; the page assigns the item; Claude Code s
     // Its origin stands in for the project's GitHub repository (CW-1: code is reported by pushing there).
     const github = join(root, 'github.git');
     execFileSync('git', ['init', '-q', '--bare', '-b', 'main', github]); git('remote', 'add', 'origin', github); git('push', '-q', 'origin', 'main');
-    const env = { ...process.env, ALUDEL_EDITOR_CONFIG: join(root, 'editor.json') };
+    // A person's own checkout, even when these tests run inside an item container (W-8 F23).
+    const env = { ...process.env, ALUDEL_EDITOR_CONFIG: join(root, 'editor.json') }; delete env.ALUDEL_CONTAINER;
     const cli = (...args) => spawnSync(process.execPath, [new URL('../tools/aludel.mjs', import.meta.url).pathname, ...args], { cwd: checkout, env, input: apiToken + '\n', encoding: 'utf8', timeout: 8000 });
 
     assert.match(cli('list').stderr, /Pair first/);
@@ -463,4 +464,85 @@ test('A4: close-out applies the staged changes of every layer at once, and refus
   work.updateAction(agent, id, second, 1, { state: 'review' }); work.review(ada, id, second, 1, { verdict: 'approve' }); work.move(ada, id, second, 'review');
   assert.throws(() => work.closeOut(ada, id, second), /was changed since it was staged/);
   assert.equal(know.get(id, slogan.id).text, 'Borrow, never buy.', 'nothing applied');
+}));
+
+test('E3: an action that fails can end the item as not done: a wrap-up proposes what comes first, and close-out applies and merges nothing', () => fixture(({ know, work, ada, ben, id }) => {
+  const [first, second] = work.stackMap(id).map(layer => layer.key);
+  const agent = { kind: 'agent', id: ada.id, name: "Ada's local agent" };
+  const workId = work.createGoal(ada, id, { title: 'Kanban board', brief: 'a board' }).item.id;
+  work.define(agent, id, workId, { brief: 'A board for every item.', actions: [{ layer: first, goal: 'Spec the board' }, { layer: second, goal: 'Build the board', after: [1] }] });
+  work.claim(ada, id, workId); work.move(ada, id, workId, 'progress');
+  work.updateAction(agent, id, workId, 1, { state: 'working' });
+  assert.throws(() => work.addAction(agent, id, workId, { goal: 'Wrap up', wrapUp: true }), /Say why/);
+
+  // #1 fails: the agent judges it can't be fixed this time, and proposes ending as not done. Its person approves.
+  let view = work.addAction(agent, id, workId, { goal: 'Wrap up and propose what comes first', wrapUp: true, reason: "The container can't build the portal" });
+  const wrap = view.actions.at(-1);
+  assert.deepEqual([wrap.number, wrap.kind, wrap.state, view.ending], [3, 'wrap-up', 'proposed', null], 'nothing ends until its person approves');
+  assert.throws(() => work.addAction(agent, id, workId, { goal: 'Again', wrapUp: true, reason: 'twice' }), /already has a wrap-up/);
+  work.answer(ada, id, workId, view.needs.find(need => need.kind === 'approval').id, { allow: true });
+  view = work.view(id, workId);
+  assert.deepEqual(view.ending, { kind: 'not-done', action: 3, reason: "The container can't build the portal" });
+  assert.equal(view.actions.find(action => action.number === 3).blocked, null, 'a wrap-up waits on nothing');
+
+  // It proposes the prerequisites and the retry; the retry comes after both.
+  assert.throws(() => work.proposeItems(agent, id, workId, 3, { items: [{ title: 'x', why: 'y' }] }), /working/);
+  work.updateAction(agent, id, workId, 3, { state: 'working' });
+  assert.throws(() => work.proposeItems(agent, id, workId, 3, { items: [{ title: 'Retry', why: 'later', after: [0] }] }), /earlier item/);
+  work.proposeItems(agent, id, workId, 3, { items: [{ title: 'Fetch templates in the container', why: 'The build needs layer-base', brief: 'Serve them' },
+    { title: 'Personas in Pages', why: 'Flows need a persona' }, { title: 'Kanban board, again', why: 'The retry', after: [0, 1] }] });
+  view = work.updateAction(agent, id, workId, 3, { state: 'review', summary: 'Ended: the container cannot build the portal.' });
+  const proposals = view.actions.find(action => action.number === 3).proposals;
+  assert.deepEqual(proposals.map(proposal => [proposal.position, proposal.state]), [[0, 'proposed'], [1, 'proposed'], [2, 'proposed']]);
+  assert.deepEqual(proposals[2].after, [proposals[0].id, proposals[1].id]);
+
+  // Only the wrap-up is reviewed; #1 and #2 stay as they were.
+  work.move(ada, id, workId, 'review');
+  work.review(ada, id, workId, 3, { verdict: 'approve' });
+  assert.throws(() => work.closeOut(ada, id, workId), /3 proposed items first/);
+  // Created out of order, the dependencies still become blocking links; an edited title is kept; one is dismissed.
+  assert.throws(() => work.decideProposal(ben, id, workId, proposals[0].id, { decision: 'create' }), status(404), 'members only');
+  const retry = know.workById(id, work.decideProposal(ada, id, workId, proposals[2].id, { decision: 'create', task: { title: 'Kanban board (attempt 2)' } })
+    .actions.find(action => action.number === 3).proposals[2].createdWorkId);
+  assert.deepEqual([retry.title, retry.scope, retry.board], ['Kanban board (attempt 2)', 'goal', 'draft']);
+  const templatesItem = know.workById(id, work.decideProposal(ada, id, workId, proposals[0].id, { decision: 'create' }).actions.find(action => action.number === 3).proposals[0].createdWorkId);
+  work.decideProposal(ada, id, workId, proposals[1].id, { decision: 'dismiss' });
+  assert.throws(() => work.decideProposal(ada, id, workId, proposals[1].id, { decision: 'create' }), status(409));
+  assert.deepEqual(know.workById(id, templatesItem.id).blocks, [retry.id], 'the prerequisite blocks the retry');
+  assert.deepEqual(know.workList(id).find(item => item.id === retry.id).blockedBy, [templatesItem.id]);
+  assert.match(work.view(id, retry.id).events.map(event => event.text).join('\n'), /Proposed in W-\d+ #3: The retry/, 'it says where it came from');
+
+  const ended = work.closeOut(ada, id, workId);
+  assert.deepEqual([ended.item.board, ended.outcome.kind, ended.outcome.reason, ended.merged], ['done', 'not-done', 'Ended: the container cannot build the portal.', null]);
+  assert.deepEqual(ended.actions.map(action => action.state), ['working', 'todo', 'done'], 'the abandoned actions are left as they were');
+  assert.match(ended.events.at(-1).text, new RegExp(`Ended as not done: 0 staged record changes not applied; continued in ${templatesItem.ref}, ${retry.ref}`));
+}));
+
+test('W-8 small findings: a to-do action is dropped (F24); a person ends an item as not done themself; goal items carry no legacy status (F5)', () => fixture(({ know, work, ada, id }) => {
+  const [first, second] = work.stackMap(id).map(layer => layer.key);
+  const agent = { kind: 'agent', id: ada.id, name: "Ada's local agent" };
+  const workId = work.createGoal(ada, id, { title: 'Board', brief: 'b' }).item.id;
+  work.define(agent, id, workId, { brief: 'A board.', actions: [{ layer: first, goal: 'Spec it' }, { layer: second, goal: 'Tasks tab' }, { layer: second, goal: 'Build it', after: [2] }] });
+  work.claim(ada, id, workId); work.move(ada, id, workId, 'progress');
+  assert.notEqual(know.workById(id, workId).status, 'blocked');
+  assert.equal(know.workById(id, workId).migration, null, 'no layer-action migration on a goal item');
+  work.updateAction(agent, id, workId, 1, { state: 'working' });
+  assert.throws(() => work.dropAction(ada, id, workId, 1), /has started/);
+  let view = work.dropAction(ada, id, workId, 2);
+  assert.deepEqual(view.actions.map(action => [action.number, action.after]), [[1, []], [3, []]], '#3 no longer waits on the dropped #2');
+  work.post(agent, id, workId, { kind: 'question', action: 1, text: 'Which columns?' });
+  assert.throws(() => work.endAsNotDone(ada, id, workId, {}), /Reason is required/);
+  view = work.endAsNotDone(ada, id, workId, { reason: "The container can't build the portal." });
+  assert.deepEqual([view.item.board, view.outcome.kind, view.outcome.reason, view.needs.length], ['done', 'not-done', "The container can't build the portal.", 0], 'its open question is withdrawn');
+  assert.equal(view.actions.at(-1).kind, 'wrap-up');
+  assert.throws(() => work.endAsNotDone(ada, id, workId, { reason: 'again' }), status(409));
+}));
+
+test('W-8 F7/F18: an operation is described with its body schema and the host catalogs it checks', { skip: !templates && 'needs layer templates' }, () => fixture(({ work, id }) => {
+  const described = work.describeOperation(id, 'pages', 'createFlow');
+  assert.equal(described.writes, 'flow');
+  assert.deepEqual(described.body.required, ['flow']);
+  assert.ok(described.schemas.Flow, 'the schemas it refers to come with it');
+  assert.ok(described.catalogs.pageTypes.includes('board'), 'with the catalogs it checks (F19: a Board page type)');
+  assert.throws(() => work.describeOperation(id, 'pages', 'nope'), /stack_map lists them/);
 }));
