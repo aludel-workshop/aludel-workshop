@@ -315,7 +315,7 @@ async function acceptCandidate(user, projectId, candidateId, commit) {
   return { status: 200, body: { candidate: { id: candidateId, commit: candidate.commit, state: 'accepted' }, work: accepted } };
 }
 
-const editor = editorBridge({ db, know, projectSetup: (user, id) => flows.projectSetup(user, id), previewStatus: id => previews.status(id) });
+const editor = editorBridge({ db, know, pool, projectSetup: (user, id) => flows.projectSetup(user, id), previewStatus: id => previews.status(id) });
 // LAY-04: routines that are due create work, and each layer's gaps become backlog items (DEC-041). At start-up, then every ten minutes.
 function tickRoutines() {
   for (const projectId of layerProjects()) {

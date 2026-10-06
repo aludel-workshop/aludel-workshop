@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { getUser, requireMember } from './accounts.mjs';
 import { compileTaskManifest } from './task-manifest.mjs';
 import { gitIdentity } from './item-environment.mjs';
+import { library } from './library.mjs';
 
 const sha = value => createHash('sha256').update(value).digest('hex');
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
@@ -32,7 +33,7 @@ export function initEditorBridge(db) {
     project_id TEXT NOT NULL REFERENCES projects(id), work_id TEXT NOT NULL, created_at TEXT NOT NULL, expires_at TEXT NOT NULL, approved_by TEXT)`);
 }
 
-export function editorBridge({ db, know, projectSetup, previewStatus }) {
+export function editorBridge({ db, know, pool = library({ db, know }), projectSetup, previewStatus }) {
   const project = projectId => db.prepare('SELECT id, slug, name, description FROM projects WHERE id = ?').get(projectId);
   const tokenRow = (user, projectId) => db.prepare('SELECT created_at, expires_at, checkout_json FROM editor_tokens WHERE user_id = ? AND project_id = ? AND work_id IS NULL').get(user.id, projectId);
   function issue(user, projectId) {
@@ -162,23 +163,25 @@ export function editorBridge({ db, know, projectSetup, previewStatus }) {
     checkTask(user, projectId, row.work_id);
     return { digest, ...JSON.parse(row.content_json) };
   }
+  // Any Library entry: a record (by revision), a Knowledge doc (k:…) or a work item. Records keep their old shape.
   function record(projectId, id, revision = null) {
     const current = know.get(projectId, id);
-    if (!current) fail('Record not found.', 404);
+    if (!current) {
+      if (revision !== null && (!Number.isInteger(revision) || revision < 1)) fail('Revision not found.', 404);
+      return pool.read(projectId, null, id, revision);
+    }
     if (revision === null) return current;
     if (!Number.isInteger(revision) || revision < 1 || revision > current.revision) fail('Revision not found.', 404);
     const data = know.revisionData(id, revision);
     if (!data) fail('Revision not found.', 404);
     return { id, kind: current.kind, revision, data, currentRevision: current.revision };
   }
+  // W-10: the Library's search, the same one every portal search uses.
   function search(projectId, query) {
-    const needle = String(query || '').trim().toLowerCase();
+    const needle = String(query || '').trim();
     if (needle.length < 2 || needle.length > 100) fail('Search for 2 to 100 characters.');
-    const kinds = ['brief_claim', 'story', 'spec', 'page', 'doc', 'research', 'source', 'finding', 'insight', 'data_object', 'data_operation', 'component', 'project'];
-    return kinds.flatMap(kind => know.list(projectId, kind)).filter(entry => {
-      const value = [entry.title, entry.name, entry.label, entry.text, entry.description, entry.body, entry.summary].filter(Boolean).join(' ').toLowerCase();
-      return value.includes(needle);
-    }).slice(0, 30).map(entry => ({ id: entry.id, kind: entry.kind, revision: entry.revision, title: entry.title || entry.name || entry.label || entry.text?.slice(0, 100) || entry.id }));
+    return pool.search(projectId, null, { q: needle, limit: 30 }).results.map(entry => ({ id: entry.ref, kind: entry.kind, source: entry.source, layer: entry.layer.key,
+      revision: entry.revision, title: entry.title, ...(entry.path ? { path: entry.path } : {}), ...(entry.heading ? { heading: entry.heading } : {}), excerpt: entry.excerpt }));
   }
   function environment(user, projectId) {
     const setup = projectSetup(user, projectId);

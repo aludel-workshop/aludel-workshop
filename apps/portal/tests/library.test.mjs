@@ -51,10 +51,10 @@ test('T03-G1: outputs, Knowledge and research are one searchable pool, each entr
   assert.equal(read.data.name, 'Account');
   assert.equal(read.currentRevision, read.revision);
 
-  // Knowledge: every layer's charter is an entry, readable with its content.
-  const charter = pool.search(id, ada.id, { layer: 'product', source: 'knowledge' }).results.find(entry => entry.ref === 'k:product:identity');
+  // Knowledge: every layer's charter is an entry, readable with its content (kept in the database, or at the layer's pin).
+  const charter = pool.search(id, ada.id, { layer: 'product', source: 'knowledge' }).results.find(entry => ['k:product:identity', 'k:product:knowledge/charter.md'].includes(entry.ref));
   assert.ok(charter, 'Vision charter is published');
-  assert.match(pool.read(id, ada.id, 'k:product:identity').content, /# /);
+  assert.match(pool.read(id, ada.id, charter.ref).content, /# /);
 
   // Research stays the Library's own content.
   const survey = pool.search(id, ada.id, { q: 'thirteen minutes' }).results;

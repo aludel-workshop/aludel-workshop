@@ -116,3 +116,52 @@ A query of one word or several matches all of them (AND). A quoted query is a ph
 ## Readiness
 
 Ready to build once the spec is approved: every source and caller is located in code, and FTS5 is confirmed available. There's one unknown, `layer_documents` content not covered by `layerDocs`, which the build checks first and reports.
+
+## #2 build: the Library holds everything; agents search it (2026-10-06)
+
+The owner approved the spec without changing either open point, so the defaults stand: the Sources page stays out, and the top bar keeps grouped results inline.
+
+**What was built:**
+- **`server/library.mjs`** owns an FTS5 index, `library_index`, kept in parts with fingerprints in `library_index_parts`:
+  - each layer's files;
+  - records;
+  - each layer's Knowledge;
+  - the Library's own records;
+  - Work.
+
+  A part is rebuilt only when its fingerprint changes, and that check runs at search time.
+- **Knowledge.** A layer installed from a repository is read through the new `layerDocs.indexable`. It's the same set the Knowledge tab shows, read with one `git cat-file --batch`. A layer without a repository keeps `layer_documents`.
+- **Work.** Work items come in with their brief, actions and thread; status logs are left out.
+- **Sections.** Docs are split by heading, and front matter is skipped.
+- **Ranking:** results come in this order:
+  1. The entry the query names: its title or file name, or, for an ID, a heading or bold lead.
+  2. Every word in its title, path or a heading.
+  3. Every word in the body.
+
+  `bm25` breaks ties within each tier.
+- **New refs:**
+  - `k:<layer>:<path>`, for a doc at the layer's pin. Its revision is the number of commits that changed it.
+  - A work item's id, read with its content.
+- **Callers on the Library:**
+  - `search_knowledge` and `read_record` in the editor bridge;
+  - the Symphony worker's `knowledgeSearch`. Older bundles keep their kind scope, now as a `kinds` filter, and the legacy fallback is gone.
+
+  The MCP tool descriptions now say what they cover.
+
+**Change from the spec:** results don't carry an `href`. The client already builds links from an entry's kind and ref (`ctx.recordHref`, the Library entry page), so #3 builds them there, adding a Knowledge doc's heading anchor. A server-side href would duplicate the client's routing.
+
+**Left out on purpose:** record kinds that are configuration, not knowledge, and that no layer publishes (`agent_profile`, `project_instructions`, `routine`, `role`, `work_action`, `evidence_link`). Records of a disabled layer stay hidden, as DEC-059 has it.
+
+**Checks:** `tests/library-search.test.mjs` passes five tests; `library` and `editor-bridge` pass with templates on and off.
+- **Body text:** vision section, persona, flow, brand asset and token set.
+- **Freshness:** the index keeps up after an edit, and the last word matches as a prefix.
+- **Work:** an item is found by its brief, by a thread message and by its W-number, and reads like any entry.
+- **Contract:** every installed output and every Knowledge doc a tab lists is in the Library.
+- **Repository docs:** on fixture copies, `status`, `operating procedure` and `DEC-062` each put the right doc first, and front matter isn't searchable. Revisions read as they were, a moved pin re-reads the docs, and `search_knowledge` returns them.
+- **Static check:** no server module has its own text search.
+
+**Process finding:** `npm run test:affected` (27 files, run in parallel) was killed with exit 137 in this container, with swap at 7.4 of 8 GB. Applied now: `test-affected.mjs --concurrency <n>` passes Node's `--test-concurrency` through, and AGENTS.md mentions it. Its test is the rerun below: the same 27 files at concurrency 3 in this container.
+
+**Development tier** (templates on, the 27 affected files at concurrency 3): 163 of 171 passed and 4 failed.
+- **Fixed:** `symphony-proposals` "a cited Knowledge revision gates acceptance". With a repository, Vision's charter is `k:product:knowledge/charter.md`, as its Knowledge tab shows it. The test now takes either ref, and in the repository case the charter changes through a Knowledge save that moves the pin. It passes with templates on and off.
+- **Also failing on the unchanged base:** the other three (`runner ENOENT` twice, and a worker run that fails to start). They were run on `6a3e964` in a scratch worktree with the same result: the known Docker-only F30 failures, and this container has no Docker.

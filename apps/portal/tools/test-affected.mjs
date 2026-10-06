@@ -9,11 +9,12 @@
 // against apps/portal, where spawned processes run. A file that changed outside apps/portal (other than
 // docs) can't be traced, so the script says to run the full suite.
 //
-//   node tools/test-affected.mjs [--base <ref> | --files a,b] [--list] [--standard]
+//   node tools/test-affected.mjs [--base <ref> | --files a,b] [--list] [--standard] [--concurrency <n>]
 //     --base      compare with this ref (default: the merge base with origin/main); uncommitted and untracked files count
 //     --list      print the selection and why, without running it
 //     --files     suppose only these files (relative to apps/portal) changed, instead of reading git
 //     --standard  run with layer templates off (default: on, as the launcher runs)
+//     --concurrency  run at most n test files at once (default: Node's, one per CPU); lower it where memory is short
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
@@ -93,5 +94,7 @@ for (const [test, chain] of selected) console.log(`  ${show(test)}${chain.length
 if (args.includes('--list') || !selected.length) process.exit(0);
 
 const env = { ...process.env, ...(args.includes('--standard') ? {} : { MACHINE_LAYER_TEMPLATES_ENABLED: '1' }) };
-const run = spawnSync(process.execPath, ['--test', '--test-timeout=300000', ...selected.map(([test]) => show(test))], { cwd: portal, env, stdio: 'inherit' });
+const concurrency = option('--concurrency');
+if (concurrency !== null && !/^[1-9]\d*$/.test(concurrency)) { console.error('--concurrency takes a whole number.'); process.exit(2); }
+const run = spawnSync(process.execPath, ['--test', '--test-timeout=300000', ...(concurrency ? [`--test-concurrency=${concurrency}`] : []), ...selected.map(([test]) => show(test))], { cwd: portal, env, stdio: 'inherit' });
 process.exit(run.status ?? 1);

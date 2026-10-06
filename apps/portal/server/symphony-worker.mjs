@@ -363,7 +363,7 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
   // DEC-059: a layer-scoped run reads other layers through the Library: every installed layer's outputs and Knowledge,
   // and research. Kinds no layer publishes (project docs) keep the older record path.
   const pool = library({ db, know });
-  const libraryRef = id => typeof id === 'string' && id.startsWith('k:');
+  const libraryRef = id => typeof id === 'string' && (id.startsWith('k:') || id.startsWith('wrk-'));
   const currentRevision = (projectId, id) => libraryRef(id) || !know.get(projectId, id) ? pool.read(projectId, null, id).currentRevision : know.get(projectId, id)?.revision;
   const publishedKind = (projectId, kind) => !!kind && (libraryKinds.includes(kind) ||
     db.prepare('SELECT output_kinds_json AS outputs FROM layer_definitions d JOIN layer_instances i ON i.project_id = d.project_id AND i.layer_key = d.layer_key WHERE d.project_id = ? AND i.enabled = 1').all(projectId)
@@ -378,26 +378,16 @@ export function symphonyWorker({ db, know, candidates = null, workspaceRoot = nu
     const bundle=activeBundle(scope, digest);
     return { kinds: scopedKinds(bundle).map(kind => ({ kind, count: know.list(scope.projectId, kind).length })) };
   }
+  // W-10: the Library's search. A layer-scoped run reads project-wide; an older bundle only the kinds it was given.
   function knowledgeSearch(scope, digest, query, kind = null, cursor = 0) {
     const bundle=activeBundle(scope, digest);
     const allowed=scopedKinds(bundle);
     const needle = String(query || '').trim().toLowerCase();
     if (needle.length < 2 || needle.length > 100 || !Number.isInteger(cursor) || cursor < 0 || cursor > 10000 ||
         kind && !allowed.includes(kind)) fail('Invalid knowledge search.');
-    if (bundle.guidance?.layerScope) {
-      const found = pool.search(scope.projectId, null, { q: needle, kind, cursor, limit: 20 });
-      const published = new Set(found.results.map(entry => entry.ref));
-      const legacy = cursor ? [] : (kind ? [kind] : allowed).filter(value => !publishedKind(scope.projectId, value)).flatMap(value => know.list(scope.projectId, value))
-        .filter(record => !published.has(record.id) && [record.title, record.name, record.text, record.body, record.summary].filter(Boolean).join(' ').toLowerCase().includes(needle)).slice(0, 20);
-      return { results: [...found.results.map(entry => ({ id: entry.ref, kind: entry.kind, revision: entry.revision, summary: entry.title, layer: entry.layer.key, source: entry.source, excerpt: entry.excerpt })),
-        ...legacy.map(record => ({ id: record.id, kind: record.kind, revision: record.revision, summary: String(record.title || record.name || '').slice(0, 200) }))], nextCursor: found.nextCursor };
-    }
-    const kinds = kind ? [kind] : allowed;
-    const matches = kinds.flatMap(value => know.list(scope.projectId, value)).filter(record =>
-      [record.title, record.name, record.label, record.text, record.description, record.body, record.summary, record.sentence]
-        .filter(Boolean).join(' ').toLowerCase().includes(needle)).sort((a, b) => a.id.localeCompare(b.id));
-    return { results: matches.slice(cursor, cursor + 20).map(record => ({ id: record.id, kind: record.kind, revision: record.revision, summary: String(record.title || record.name || record.label || record.text || record.description || record.sentence || '').slice(0, 200) })),
-      nextCursor: matches.length > cursor + 20 ? cursor + 20 : null };
+    const found = pool.search(scope.projectId, null, { q: needle, kind, kinds: bundle.guidance?.layerScope ? null : allowed, cursor, limit: 20 });
+    return { results: found.results.map(entry => ({ id: entry.ref, kind: entry.kind, revision: entry.revision, summary: entry.title, layer: entry.layer.key, source: entry.source,
+      ...(entry.heading ? { heading: entry.heading } : {}), excerpt: entry.excerpt })), nextCursor: found.nextCursor };
   }
   function knowledgeRead(scope, digest, id, revision = null) {
     const bundle=activeBundle(scope, digest);

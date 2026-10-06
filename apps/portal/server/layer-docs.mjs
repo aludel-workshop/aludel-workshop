@@ -51,12 +51,29 @@ function commitFiles(repo, base, files, message, author) {
     return git(repo, ['commit-tree', git(repo, ['write-tree'], { env }), '-p', base, '-m', message], { env });
   } finally { rmSync(scratch, { recursive: true, force: true }); }
 }
+// Many paths at one commit in one process: each one's content, or null where it doesn't exist.
+function catFiles(repo, commit, paths) {
+  if (!paths.length) return [];
+  const out = execFileSync('git', ['-C', repo, 'cat-file', '--batch'], { input: paths.map(path => `${commit}:${path}\n`).join(''), maxBuffer: 256 * 1024 * 1024 });
+  const contents = []; let at = 0;
+  for (let index = 0; index < paths.length; index++) {
+    const end = out.indexOf(10, at);
+    const header = out.subarray(at, end).toString('utf8').split(' ');
+    at = end + 1;
+    if (header[1] !== 'blob') { contents.push(null); continue; }
+    const size = Number(header[2]);
+    contents.push(out.subarray(at, at + size).toString('utf8'));
+    at += size + 1;
+  }
+  return contents;
+}
 const show = (repo, commit, path) => { try { return git(repo, ['show', `${commit}:${path}`]); } catch { return null; } };
 
 export function layerDocs({ db, onSpecChange = () => {}, revisionOf = () => null }) {
   const member = (projectId, userId) => db.prepare('SELECT role FROM project_members WHERE user_id = ? AND project_id = ?').get(userId, projectId)?.role || fail('Project not found.', 404);
   const editor = (projectId, userId) => member(projectId, userId) === 'owner' || fail('Only the project owner edits a layer\'s docs.', 403);
   const custom = (projectId, key) => { const definition = projectLayerDefinition(db, projectId, key); return definition && !definition.builtIn ? definition : null; };
+  const owner = projectId => db.prepare("SELECT user_id FROM project_members WHERE project_id = ? AND role = 'owner' ORDER BY rowid LIMIT 1").get(projectId)?.user_id;
   const author = userId => db.prepare('SELECT display_name FROM users WHERE id = ?').get(userId)?.display_name || 'Owner';
   const current = (projectId, key) => { const { repo, commit } = layerBinding(db, projectId, key); return { repo, commit, ...packageAt(repo, commit, key) }; };
 
@@ -97,6 +114,35 @@ export function layerDocs({ db, onSpecChange = () => {}, revisionOf = () => null
     const report = check(projectId, pkg, docs.filter(doc => doc.exists !== false));
     for (const doc of docs) { const found = report.docs.find(item => item.path === doc.path); if (found) Object.assign(doc, { onMap: found.onMap, broken: found.broken.length, refresh: found.refresh }); }
     return { commit: pkg.commit, docs, checks: report.checks, ...(declared ? { repositoryDocs: { map: declared.map ? `/${declared.map}` : null, sources: declared.sources || null } } : {}) };
+  }
+
+  // W-10: every doc Knowledge shows (charter, docs, each part's doc, tab docs that exist, repository docs), with its
+  // content at the pin, for the Library's index. One `git cat-file` reads them all; no checks run.
+  function indexable(projectId, key) {
+    const pkg = current(projectId, key);
+    const { manifest } = pkg;
+    const tabs = [...(manifest.tabs || []), ...(manifest.editorAdapter === 'markdown-editor' ? [{ key: 'files', label: 'Files' }] : [])];
+    const own = [...new Set([manifest.knowledge.charter, ...manifest.knowledge.documents, ...tabs.map(tab => `knowledge/tab-${tab.key}.md`)])];
+    const paths = [...own.map(path => ({ path, where: pkg.root + path })), ...repositoryDocs(pkg).map(path => ({ path: `/${path}`, where: path }))];
+    const contents = catFiles(pkg.repo, pkg.commit, paths.map(entry => entry.where));
+    const tabTitle = Object.fromEntries(tabs.map(tab => [`knowledge/tab-${tab.key}.md`, tab.label]));
+    const docs = [];
+    paths.forEach(({ path }, index) => {
+      let content = contents[index];
+      if (path === manifest.knowledge.charter && custom(projectId, key)) content = read(projectId, owner(projectId), key, path).content || null;
+      if (content === null) return;
+      const heading = content.match(/^#\s+(.+)$/m)?.[1]?.trim();
+      const title = path === manifest.knowledge.charter ? 'Charter' : tabTitle[path] || heading || (path.startsWith('/') ? path.slice(1) : path.slice(10, -3).replaceAll('-', ' '));
+      docs.push({ path, title, group: path.startsWith('/') ? 'In the repository' : path === manifest.knowledge.charter ? null : /-method\.md$/.test(path) ? 'Methods' : 'Docs', content });
+    });
+    return { commit: pkg.commit, docs };
+  }
+  // How many commits up to the pin changed a doc: its revision, for a Library pin. `revision` reads it as it was then.
+  function revisions(projectId, key, path) {
+    const pkg = current(projectId, key);
+    const where = located(pkg, path);
+    const out = git(pkg.repo, ['log', '--format=%H', '--reverse', pkg.commit, '--', where]);
+    return { commits: out ? out.split('\n') : [], pkg };
   }
 
   // Generic doc checks (doc-checks.mjs) for one layer at its pin: links resolve in the repository, sections with recorded
@@ -198,5 +244,5 @@ export function layerDocs({ db, onSpecChange = () => {}, revisionOf = () => null
     return { commit: next, changed: true };
   }
 
-  return { list, read, history, save, saveInformation };
+  return { list, indexable, revisions, read, history, save, saveInformation };
 }
