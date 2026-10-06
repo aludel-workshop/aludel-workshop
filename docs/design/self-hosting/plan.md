@@ -1,5 +1,13 @@
 # W-9 action 3: plan for managing Aludel from inside the portal
 
+## Owner answers at the Assess gate (2026-10-06, chat)
+
+- **Decisions aren't a record kind.** Each decision is supporting information on the knowledge it shapes, like a note. I2 becomes *decision notes on records*: a dated note with its source (for example DEC-062) on the claim, page, component or item it constrains. Decisions about how we work become notes in the operating rules (Code Knowledge). Open questions become needs on items. **Q1 is closed; this replaces the I2 row below.**
+- **The roadmap is redone, not migrated.** It's out of date. A new item re-plans it in Vision. `docs/roadmap.md` and `docs/execution-plan.md` are archived. **Q2 is closed.**
+- **No fixed date, and sooner is better** (the owner would prefer tomorrow). The cutover needs only what the owner and agents can't work without: I1 search, I14 questions in the portal, I5 backlog, then I6 cutover. Everything else (decision notes, `the-machine`, Vision, roadmap, Pages, Design, Data) runs **as portal-managed items during the trial**. The fallback log shows what was missed. **Q3 is closed; the date and the before/after split below are superseded by this.**
+- **New finding (F-W9-1): the orchestrator's questions have to reach the owner in the portal.** I asked Q1 to Q3 in an item message and in this file. They should have been portal questions the owner answers there. An `ask` tool exists, but only on an action. The orchestrator didn't use it, and nothing points it there. There's also no place for a question about the gate or the whole item. New item I14: *orchestrator questions in the portal*. Before the cutover, because managing from the portal fails if questions arrive anywhere else.
+
+
 Item W-9, action 3, 2026-10-06. Built from [the inventory](inventory.md) (where each source should go) and [the readiness probe](readiness.md) (what the portal can hold today). The owner reviews this at the Assess gate; action 4 then proposes the items below.
 
 ## Target
