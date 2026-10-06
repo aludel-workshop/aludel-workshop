@@ -363,3 +363,34 @@ Owner approved action 1. The gate cleared, which made #2 and #3 workable. Built 
 - `goals()` now also returns each goal's action `layers` (`server/agent-work.mjs`), with an assertion in `tests/agent-work.test.mjs`.
 
 Moves defer to the server's existing rules in `move()`, so a refused drag to Done shows the server's message. Legacy (non-goal) items show in their derived column and move from their own page. Checked: `ngc` typecheck (the only error is the missing synced Pages UI, F22), and `agent-work.test.mjs` with `ALUDEL_CONTAINER` unset (5 pass). Not checked: the build, any browser view, axe, 390 px, or the templates gate, all blocked by F22. The unused `WorkCardComponent` in `work-shared.ts` is left in place for now.
+- **F22, owner answer (2026-10-06, on W-8 #2):** "Publish layer-base to GitHub, and the container setup clones it beside the app." Publishing is an owner action, because `layer-base` exists only on the owner's machine and it's a GitHub write. The container side widens into F26.
+- **F24. Actions can be changed but never removed or merged.** `updateAction` (`server/agent-work.mjs:266`) changes goal, summary, layer, `after` and phase. No operation removes an action, and `define` refuses once the item has started. W-8 #4 ("Use the board as each layer's Tasks tab") turned out to be mostly done by #2, because `layer-tasks.ts` already embeds the board with `[layer]`. After Start, the only choices are to keep #4 or retitle it as a check.
+- **F25. Working an item takes both surfaces at once (owner, 2026-10-06):** "this back and forth is rather awkward, i have to work in both surfaces simultaneously … i would love to be able to just work in either or: here in vscode, i could answer the questions, click review links etc., without ever having to go back to the portal. or on the flip, if im managing stuff from the portal, then the container could be almost silent … the whole interaction should feel exactly like if it was running remote, except its talking to this local container with you in it."
+
+  Today:
+  - The agent's API can only be polled. The item page's event stream (`streamGoal`, `server/server.mjs:342`) needs a portal session, and the editor routes have none.
+  - Answers, approvals and flags reach the agent only when it calls `work_view` or the person says so in chat (F16).
+  - Questions reach the person only on the item page.
+
+  Applied now as an experiment: the agent runs a Claude Code `Monitor` on a poller (`aludel-client` every 10 s, one line per person-authored event on W-8). Portal actions then wake the agent in VS Code with no relay. Limits: the watch expires after 30 minutes and has to be re-armed, it polls rather than streams, and it only covers this item.
+
+  The owner's either/or implies three pieces:
+  1. **Portal → agent:** the editor API gets the item's event stream, and the MCP turns person events into prompts.
+  2. **VS Code → portal:** a question appears in the chat, the person's answer there resolves the need (recorded as answered in VS Code, by the person), and review links open in VS Code's browser.
+  3. **A silent container:** a headless Claude (Agent SDK) in the container, subscribed to the item, with no VS Code window. That is A2's orchestrator runtime hosted locally. "Local or remote" then means only where the runtime runs, which is the owner's framing.
+
+  Open question for the owner: should an answer typed in VS Code count as the person's answer? An approval of the agent's own action should stay a person's click.
+- **F26. The agent session should be built around an environment, not one repository (owner, 2026-10-06):** "right now code has a single repo attached. it really needs to allow multiple … if we have e.g. repos for design, then you need to be able to touch that too, right? its almost like this agent session should not be oriented around a single repo, but around an enviroment that lets the agent work across the whole ecosystem."
+
+  Today:
+  - Code binds one repository (EX-02A).
+  - Each installed layer is its own repository forked from `layer-base` (DEC-055/057/059).
+  - Go creates one branch and opens one clone (`cloneInVolume`).
+  - `report_code` and close-out handle one branch.
+
+  The direction:
+  - The item container is the project's environment: every repository the project owns (app repositories and layer repositories) is checked out on the item's branch, beside one another.
+  - Report and close-out treat the item's code as a set of branches.
+  - Layer data still changes only through layer APIs. A layer's repository holds its code, and its outputs are records or repository files (DEC-059).
+
+  This overlaps PLATFORM-PIPELINE-01 (owner-owned repositories) and COLLAB-WORK-01 §3 (one environment definition). F22 is its first concrete case: the app can't build without a second repository.
