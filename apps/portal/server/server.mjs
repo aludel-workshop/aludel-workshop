@@ -615,10 +615,12 @@ async function api(request, response, url) {
       const done = (status, value) => json(response, status, value, { 'cache-control': 'no-store' });
       const agent = { kind: 'agent', id: editorUser.id, name: `${editorUser.name}'s local agent` };
       if (path[0] === 'stack' && path.length === 1 && request.method === 'GET') return done(200, { layers: goals.stackMap(projectId) });
+      if (path[0] === 'stack' && path.length === 3 && request.method === 'GET') return done(200, goals.describeOperation(projectId, path[1], path[2]));
       if (path.length === 1 && request.method === 'GET')
         return done(200, { goals: goals.goals(projectId, url.searchParams.get('claimable') && !scope ? { claimableBy: editorUser.id } : { assignedTo: editorUser.id }).filter(item => !scope || item.id === scope) });
       if (path[0] !== 'goals' || path.length < 2) return json(response, 404, { error: 'Not found.' });
-      const workId = path[1];
+      // W-8 F4: an item by its id or its number (W-12), as people say it.
+      const workId = /^w-\d+$/i.test(path[1]) ? (know.workList(projectId).find(item => item.scope === 'goal' && item.ref.toLowerCase() === path[1].toLowerCase())?.id || path[1]) : path[1];
       if (scope && workId !== scope) return json(response, 404, { error: 'Task not found.' });
       // The token's person claims through their own CLI (`aludel claim`); their agent's tools never offer it. The item page
       // assigns instead (people, or later remote agents).
@@ -635,12 +637,16 @@ async function api(request, response, url) {
         return done(200, { result: goals.readLayer(projectId, workId, url.searchParams.get('layer'), { operationId: url.searchParams.get('operationId'), id: url.searchParams.get('id') }) });
       if (request.method !== 'POST') return json(response, 405, { error: 'Method not allowed.' });
       const input = await readJson(request);
-      if (operation === 'define' && !sub) return done(200, goals.define(agent, projectId, workId, input));
-      if (operation === 'actions' && !sub) return done(201, goals.addAction(agent, projectId, workId, input));
-      if (operation === 'actions' && sub) return done(200, goals.updateAction(agent, projectId, workId, Number(sub), input));
-      if (operation === 'events' && !sub) return done(201, goals.post(agent, projectId, workId, input));
+      // W-8 F14: a write answers with what it changed and where the item stands, not the whole item again (work_view reads it).
+      const brief = (view, extra = {}) => ({ item: { id: view.item.id, ref: view.item.ref, board: view.item.board, status: view.item.status }, ...extra,
+        actions: view.actions.map(action => ({ number: action.number, goal: action.goal, state: action.state, ...(action.blocked ? { blocked: action.blocked } : {}), ...(action.needs.length ? { needs: action.needs.length } : {}) })),
+        needs: view.needs.map(need => ({ id: need.id, action: need.action, kind: need.kind, text: need.text })) });
+      if (operation === 'define' && !sub) return done(200, brief(goals.define(agent, projectId, workId, input)));
+      if (operation === 'actions' && !sub) { const view = goals.addAction(agent, projectId, workId, input); return done(201, brief(view, { added: view.actions.at(-1).number })); }
+      if (operation === 'actions' && sub) return done(200, brief(goals.updateAction(agent, projectId, workId, Number(sub), input)));
+      if (operation === 'events' && !sub) { const { id, ...view } = goals.post(agent, projectId, workId, input); return done(201, brief(view, { id })); }
       if (operation === 'stage' && !sub) return done(201, goals.stage(agent, projectId, workId, input));
-      if (operation === 'code' && !sub) return done(200, goals.recordCode(agent, projectId, workId, input));
+      if (operation === 'code' && !sub) { const view = goals.recordCode(agent, projectId, workId, input); return done(200, brief(view, { code: view.code })); }
       return json(response, 404, { error: 'Not found.' });
     }
     if (path[0] === 'checkout' && path.length === 1 && request.method === 'POST')
@@ -1180,7 +1186,7 @@ async function api(request, response, url) {
     return swept;
   };
   // AGENT-WORK-01 A1: goal items. People drive them here; their local agent works on them through /api/editor/goals.
-  const goalRoute = /^\/api\/projects\/([^/]+)\/goals(?:\/([^/]+)(?:\/(define|move|claim|assign|container|connections|actions|events|answer|review|proposals|close|stream|read)(?:\/([^/]+))?)?)?$/.exec(url.pathname);
+  const goalRoute = /^\/api\/projects\/([^/]+)\/goals(?:\/([^/]+)(?:\/(define|move|claim|assign|container|connections|actions|events|answer|review|proposals|end|close|stream|read)(?:\/([^/]+))?)?)?$/.exec(url.pathname);
   if (goalRoute) {
     const [, rawProject, rawWork, operation, rawSub] = goalRoute;
     const projectId = decodeURIComponent(rawProject), workId = rawWork ? decodeURIComponent(rawWork) : null, sub = rawSub ? decodeURIComponent(rawSub) : null;
@@ -1193,6 +1199,7 @@ async function api(request, response, url) {
     if (!operation && method === 'GET') return done(200, goals.view(projectId, workId));
     if (operation === 'stream' && method === 'GET') return streamGoal(request, response, projectId, workId);
     if (operation === 'read' && method === 'GET') return done(200, { result: goals.readLayer(projectId, workId, url.searchParams.get('layer'), { operationId: url.searchParams.get('operationId'), id: url.searchParams.get('id') }) });
+    if (operation === 'actions' && sub && method === 'DELETE') return done(200, goals.dropAction(user, projectId, workId, Number(sub)));
     if (method !== 'POST' && !(operation === 'actions' && sub && method === 'PATCH') && !(operation === 'connections' && !sub && method === 'GET')) return json(response, 405, { error: 'Method not allowed.' });
     const input = method === 'GET' ? {} : await readJson(request);
     if (operation === 'define' && !sub) return done(200, goals.define(person, projectId, workId, input));
@@ -1205,6 +1212,7 @@ async function api(request, response, url) {
     if (operation === 'answer' && sub) return done(200, goals.answer(user, projectId, workId, sub, input));
     if (operation === 'review' && sub) return done(200, goals.review(user, projectId, workId, Number(sub), input));
     if (operation === 'proposals' && sub) return done(200, goals.decideProposal(user, projectId, workId, sub, input));
+    if (operation === 'end' && !sub) { const ended = goals.endAsNotDone(user, projectId, workId, input); sweepClosedVolumes(projectId, workId); return done(200, ended); }
     // The containers waiting to connect to this item, and connecting one (its person, signed in here).
     if (operation === 'connections') {
       const item = goals.view(projectId, workId).item;

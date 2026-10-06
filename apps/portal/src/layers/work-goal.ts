@@ -96,6 +96,16 @@ const actionIcon: Record<string, string> = { proposed: 'add_task', todo: 'radio_
               <div class="wg-row wg-end"><button type="button" class="lay-button wg-go" (click)="close()"><mat-icon aria-hidden="true">done_all</mat-icon>{{ goal.code && !goal.code.inRepository ? 'Close out and merge' : 'Close out' }}</button></div>
             </div>
           }
+          @if ((goal.item.board === 'progress' || goal.item.board === 'review') && !goal.ending) {
+            @if (ending()) {
+              <form class="wg-close wg-close-notdone" (ngSubmit)="end()" aria-labelledby="wg-end-title"><h2 id="wg-end-title"><mat-icon aria-hidden="true">cancel</mat-icon>End {{ goal.item.ref }} as not done</h2>
+                <p>Nothing staged applies and nothing merges@if (goal.code) {; <code>{{ goal.code.branch }}</code> stays on GitHub}. What it still waits on is withdrawn.</p>
+                <label class="wg-flaglabel" for="wg-end-reason">Why can't it be finished?</label>
+                <textarea class="wg-input" id="wg-end-reason" name="endReason" rows="2" [(ngModel)]="endReason" placeholder="What stopped it, and what has to happen first"></textarea>
+                <div class="wg-row wg-end"><button type="button" class="lay-button ghost small" (click)="ending.set(false)">Cancel</button><button type="submit" class="lay-button danger" [disabled]="!endReason.trim()"><mat-icon aria-hidden="true">cancel</mat-icon>End as not done</button></div>
+              </form>
+            } @else { <div class="wg-row wg-end"><button type="button" class="wg-link" (click)="startEnd()"><mat-icon aria-hidden="true">cancel</mat-icon>End as not done…</button></div> }
+          }
           @if (goal.item.board === 'done') { <p class="wg-hint wg-closed"><mat-icon aria-hidden="true">{{ goal.outcome ? 'cancel' : 'task_alt' }}</mat-icon>{{ goal.outcome ? 'Ended as not done: ' + goal.outcome.reason : 'Closed.' }} {{ closedText() }}</p> }
         </section>
 
@@ -142,6 +152,7 @@ const actionIcon: Record<string, string> = { proposed: 'add_task', todo: 'radio_
                 <div class="wg-tools">
                   <button type="button" class="wg-link" (click)="select(action.number)" [attr.aria-pressed]="selected() === action.number"><mat-icon aria-hidden="true">forum</mat-icon>Details and log</button>
                   @if (open() && action.state !== 'done') { <button type="button" class="wg-link" (click)="editGoal(action)"><mat-icon aria-hidden="true">edit</mat-icon>Edit goal</button> }
+                  @if (open() && action.state === 'todo') { <button type="button" class="wg-link" (click)="drop(action)" [attr.aria-label]="'Remove #' + action.number"><mat-icon aria-hidden="true">delete</mat-icon>Remove</button> }
                 </div>
                 @if (action.proposals.length) {
                   <div class="wg-proposals" role="group" [attr.aria-label]="'Items #' + action.number + ' proposes'">
@@ -261,6 +272,10 @@ export class WorkGoalComponent {
   readonly changedLayers = computed(() => (this.view()?.changeset || []).map(group => this.layerName(group.layer)).join(' and '));
   readonly closedText = computed(() => [...(this.view()?.events || [])].reverse().find(event => event.kind === 'log' && /^(Closed|Ended as not done): /.test(event.text))?.text.replace(/^(?:Closed|Ended as not done): (.)/, (_, first: string) => first.toUpperCase()) || '');
   readonly confirmEnd = signal(false);
+  readonly ending = signal(false); endReason = '';
+  startEnd() { this.endReason = ''; this.ending.set(true); setTimeout(() => document.getElementById('wg-end-reason')?.focus()); }
+  end() { const reason = this.endReason.trim(); if (!reason) return; void this.act(() => this.ctx.api(this.path('/end'), 'POST', { reason }), 'Ended as not done.').then(ok => { if (ok) this.ending.set(false); }); }
+  drop(action: GoalAction) { void this.act(() => this.ctx.api(this.path(`/actions/${action.number}`), 'DELETE'), `Removed #${action.number}.`); }
   // The items created from this item's proposals, by ref, for the ending's note.
   readonly continued = computed(() => (this.view()?.actions || []).flatMap(action => action.proposals).flatMap(proposal => proposal.created ? [proposal.created.ref] : []));
   afterNames(action: GoalAction, proposal: GoalProposal) { return proposal.after.map(id => action.proposals.find(other => other.id === id)?.title || 'an earlier item').join(' and '); }

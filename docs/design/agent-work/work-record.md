@@ -494,3 +494,48 @@ Not authorized: changes to `layer-base` or GitHub settings, opening real pull re
 - **Not checked:** a real item container through VS Code (the Dev Containers link, Connect, then `aludel templates` against the live portal), and a live volume sweep. Both wait for the owner's next dogfood.
 
 **Round note.** *Changed:* item containers get templates and identity; closed items' volumes are swept; items can end as not done with proposed items. *Checked:* unit tests, both journeys, and the build plus gate inside the container image. *Waits on the owner:* restart the portal on this branch; decide F30 (Docker in item containers); try attempt 2 of W-8 (or close W-8 the new way, which needs its agent to add a wrap-up).
+
+### Small findings from attempt 1 (2026-10-05)
+
+Owner: "think you can knock out all those smaller ones. medium ones turned into a task for future work. … knock it out." Decisions on F8, F9 and F13 are recorded as DEC-068. Authorized on `claude/item-environment`:
+- F4: the editor API accepts W-n wherever it takes an item.
+- F5: no legacy "blocked" status on goal items.
+- F7/F18: `describe_operation` returns an operation's request schema and the host catalogs it uses.
+- F10: name the missing pinned input.
+- F14: editor writes return a short acknowledgement.
+- F24: a person drops a to-do action.
+- F19: a Board page type.
+- A person-side "End as not done".
+
+Medium findings (F15, F1, F3) are recorded below as future work, not built.
+
+**Built (2026-10-05).**
+- **F4:** the editor API resolves W-n to the item wherever it takes an item, so `work_view("W-8")` works.
+- **F5:** goal items carry no layer-action migration, so no misleading "blocked".
+- **F7/F18:** `describe_operation(layer, operationId)` returns the operation's request body schema, the component schemas it refers to, and the values of the host catalogs it checks (`pageTypes`, `routeIcons`). `stack_map` stays a summary.
+- **F10:** the task manifest names each missing pinned input.
+- **F14:** editor writes (define, add or update an action, post, report code) answer with the item's id, ref, board and status, each action's number, goal and state, the open needs, and what the call added. Reads stay whole.
+- **F19:** a Board page type: search, then four columns of cards.
+- **F24:** a person removes a to-do action from the item page; actions after it stop waiting on it.
+- **Person ending:** on an item in progress or in review, "End as not done…" asks why and ends it. The wrap-up is recorded with that reason, open needs are withdrawn, and the item closes as not done, once any proposed items are decided.
+
+**Checks:**
+- `agent-work.test.mjs`: 7 pass, 3 skipped without templates. The F7 test passes with templates.
+- `task-manifest.test.mjs` passes.
+- The `agent-work` journey adds a third item: the agent defines it by its number with a short reply, one to-do action is removed, and the person ends it with a reason. axe passes at 1440 and 390 px, and the screens were looked at.
+- The `connect` journey passes, and `test:affected` passes: 275 pass, 0 fail.
+- `test:server:templates`: 353 pass, 0 fail, 7 skipped.
+
+### Future work from attempt 1 (medium findings, not built)
+
+To pick up as one packet, or as goal items once the portal is running this branch:
+1. **F15, action descriptions.** An action has a short title and a description: schema, `define_work`, `add_action`, `update_action`, item page and peek. Today action 1's detail lives only in this record.
+2. **F1, the container's first message.** The Dev Containers link can't carry a prompt. When connecting, setup could leave the item's start instruction where Claude Code reads it first: a session-start hook in the container's user settings, or a line `aludel connect` prints for the person to paste. The aim is that the agent knows its item and its role without being told.
+3. **F3, `.aludel/AGENTS.md` in an app repository.** The Code template's agent guide is written for a layer repository: charter, layer contract, `node --test`, "Aludel turns the branch into a merge request". In an app repository it should say that `.aludel/` is the Code layer's installed package, and that work comes through the Aludel tools. This is a change to `layer-base`'s `code` branch and a new pin, which needs the owner's go to edit `layer-base`.
+
+DEC-068 settles F8, F9 and F13:
+- **F8:** journeys belong to Code when they're Code's work, with an optional binding to Pages flows that one side may cede.
+- **F9:** briefs describe the app layers they expect to touch without fencing the work to them.
+- **F13:** Code owns code, including Aludel's.
+
+Following from these: F17's Pages-owned personas is the same rule (open, with the Pages layer). The orchestrator protocol's "one action per layer change" stands; a portal code change is a Code (`platform`) action, as W-8 #2 was filed.

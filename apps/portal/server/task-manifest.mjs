@@ -7,11 +7,17 @@ const summary = record => String(record.summary || record.description || record.
 
 // DEC-057: a layer-scoped task is guided by its layer's pinned charter and Knowledge, not an action. The host
 // adapters named in changes bound what it may write; follow-ups carry anything else to the owning layer's review.
+// W-8 F10: say which pinned inputs are missing, not only that some are.
+function missing(inputs) {
+  const absent = Object.entries(inputs).filter(([, present]) => !present).map(([name]) => name);
+  if (absent.length) fail(`The task is missing pinned inputs: ${absent.join(', ')}.`);
+}
 function compileLayerTask(bundle) {
   const { project, work, guidance, sources, repository, instructionPins, layerPackage } = bundle;
   const scope = guidance.layerScope;
-  if (!project?.id || !work?.id || !guidance?.profile?.revision || !/^[a-f0-9]{40}$/.test(repository?.commit || '') ||
-      !scope?.key || scope.key !== work.layer || !layerPackage || layerPackage.commit !== scope.commit || bundle.layerApi && bundle.layerApi.commit !== scope.commit) fail('The task is missing pinned inputs.');
+  missing({ project: project?.id, 'work item': work?.id, 'agent profile revision': guidance?.profile?.revision, 'repository commit': /^[a-f0-9]{40}$/.test(repository?.commit || ''),
+    'layer scope': scope?.key && scope.key === work?.layer, 'layer package at the scope commit': layerPackage && layerPackage.commit === scope?.commit,
+    'layer API at the scope commit': !bundle.layerApi || bundle.layerApi.commit === scope?.commit });
   const pinned = (target, list) => {
     const source = sources.find(record => record.id === target.id && record.kind === target.kind);
     if (!source?.revision) fail('A task target has no pinned project revision.');
@@ -75,8 +81,8 @@ export function compileTaskManifest(bundle) {
   if (bundle.guidance?.layerScope) return compileLayerTask(bundle);
   const { project, work, guidance, sources, repository, instructionPins } = bundle;
   const person = bundle.performer?.kind === 'person';
-  if (!project?.id || !work?.id || !guidance?.role?.revision || !guidance?.action?.revision || (!person && !guidance?.profile?.revision) ||
-      (!person && !/^[a-f0-9]{40}$/.test(repository?.commit || ''))) fail('The task is missing pinned inputs.');
+  missing({ project: project?.id, 'work item': work?.id, 'role revision': guidance?.role?.revision, 'action revision': guidance?.action?.revision,
+    'agent profile revision': person || guidance?.profile?.revision, 'repository commit': person || /^[a-f0-9]{40}$/.test(repository?.commit || '') });
   const action = guidance.action;
   const coding = action.id === 'platform.implement' && action.tools?.includes('code') && action.changes?.some(value => value.startsWith('Code › '));
   const audit = action.id === 'platform.security' && action.tools?.includes('read') && !action.changes?.length;

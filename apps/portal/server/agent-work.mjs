@@ -10,7 +10,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { getUser, isMember, requireMember } from './accounts.mjs';
 import { gitWithToken } from './git-repository.mjs';
-import { applyWrites, callOperation, draftChanges, draftOverlay, layerApi, stageOperation } from './layer-api.mjs';
+import { applyWrites, callOperation, draftChanges, draftOverlay, handlerCatalogs, layerApi, stageOperation } from './layer-api.mjs';
 import { layerCatalog } from './layer-contract.mjs';
 import { layerPackageForProject } from './layer-package.mjs';
 import { projectLayerDefinition } from './layer-registry.mjs';
@@ -421,6 +421,45 @@ export function agentWork({ db, know, catalogs = null }) {
     emit(projectId, workId, { type: 'action', number: action.number });
     return view(projectId, workId);
   }
+  // W-8 F24: a person drops an action that hasn't started (one that turned out unneeded, or done by another); actions that
+  // came after it no longer wait on it. Started work stays, so its log and staged changes keep their action.
+  function dropAction(user, projectId, workId, number) {
+    requireMember(db, user, projectId);
+    const item = goalItem(projectId, workId);
+    if (item.board === 'done') fail(`${item.ref} is closed.`, 409);
+    const actions = actionRows(projectId, workId);
+    const action = actions.find(entry => entry.number === Number(number)) || fail('Action not found.', 404);
+    if (action.state !== 'todo') fail(action.state === 'proposed' ? `Decline #${action.number} instead.` : `#${action.number} has started; only an action still to do can be dropped.`, 409);
+    transaction(() => {
+      db.prepare('DELETE FROM work_goal_actions WHERE id = ? AND project_id = ?').run(action.id, projectId);
+      for (const other of actions.filter(entry => entry.after.includes(action.number)))
+        db.prepare('UPDATE work_goal_actions SET after_json = ?, updated_at = ? WHERE id = ? AND project_id = ?').run(JSON.stringify(other.after.filter(n => n !== action.number)), now(), other.id, projectId);
+    });
+    record(projectId, workId, { kind: 'log', action: action.number, author: { kind: 'person', id: user.id, name: user.name }, text: `Dropped #${action.number}: ${action.goal}` });
+    emit(projectId, workId, { type: 'item' });
+    return view(projectId, workId);
+  }
+  // A person ends an item as not done themself, with the reason, whether or not its agent proposed a wrap-up: the wrap-up is
+  // recorded as done with that reason, what the item still waits on is withdrawn, and close-out ends it (proposals first).
+  function endAsNotDone(user, projectId, workId, input = {}) {
+    requireMember(db, user, projectId);
+    const item = goalItem(projectId, workId);
+    if (!['progress', 'review'].includes(item.board)) fail(`Only an item in progress or in review can end as not done.`, 409);
+    const reason = clean(input.reason, 1000, 'Reason', true);
+    const undecided = proposalRows(projectId, workId).filter(proposal => proposal.state === 'proposed');
+    if (undecided.length) fail(`Create or dismiss the ${undecided.length} proposed item${undecided.length === 1 ? '' : 's'} first.`, 409);
+    const actions = actionRows(projectId, workId), person = { kind: 'person', id: user.id, name: user.name };
+    const existing = actions.find(action => action.kind === 'wrap-up'), at = now();
+    transaction(() => {
+      if (existing) db.prepare("UPDATE work_goal_actions SET state = 'done', summary = ?, updated_at = ? WHERE id = ? AND project_id = ?").run(existing.summary && existing.state !== 'proposed' ? existing.summary : reason, at, existing.id, projectId);
+      else db.prepare("INSERT INTO work_goal_actions VALUES (?, ?, ?, ?, ?, ?, ?, '[]', 'done', ?, ?, ?, ?, 'wrap-up')")
+        .run(`act-${randomBytes(4).toString('hex')}`, projectId, workId, (actions.at(-1)?.number || 0) + 1, Math.max(1, phasesOf(projectId, workId).length), null, 'Wrap up: end as not done', reason, JSON.stringify(person), at, at);
+      for (const need of openNeeds(projectId, workId))
+        db.prepare('UPDATE work_goal_events SET resolved_at = ?, resolution_json = ? WHERE id = ? AND project_id = ?').run(at, JSON.stringify({ text: 'Withdrawn: the item ended as not done', by: { id: user.id, name: user.name } }), need.id, projectId);
+      if (item.board === 'progress') setState(projectId, item, 'review', 'Ending as not done', byOf(person));
+    });
+    return closeOut(user, projectId, workId);
+  }
   // E3: an action proposes work items: follow-ups after a success, or what has to happen first after a wrap-up. Each names
   // why, and may come after others in the same list (by index). A new list replaces the action's undecided proposals.
   function proposeItems(actor, projectId, workId, number, input = {}) {
@@ -653,6 +692,24 @@ export function agentWork({ db, know, catalogs = null }) {
         charter: charter ? charter.split(/\n\s*\n/).find(part => part.trim() && !part.trim().startsWith('#'))?.trim().slice(0, 1200) || null : null, operations };
     });
   }
+  // W-8 F7/F18: one operation as an agent needs it before staging: its request body schema (with the schemas it refers to)
+  // and the host catalogs its rules check values against (page types, icons), so nobody reads the server to learn a shape.
+  function describeOperation(projectId, layer, operationId) {
+    const key = checkLayer(projectId, layer) || fail('Name the layer.');
+    const api = layerApi(db, projectId, key) || fail(`The ${key} layer publishes no API.`, 409);
+    const operation = api.operations.get(operationId) || fail(`The ${key} API has no operation ${operationId}; stack_map lists them.`, 404);
+    const body = api.spec.paths[operation.path]?.[operation.method.toLowerCase()]?.requestBody?.content?.['application/json']?.schema || null;
+    const schemas = {};
+    const collect = value => {
+      if (!value || typeof value !== 'object') return;
+      const name = typeof value.$ref === 'string' && /^#\/components\/schemas\/(.+)$/.exec(value.$ref)?.[1];
+      if (name && !schemas[name] && api.spec.components.schemas[name]) { schemas[name] = api.spec.components.schemas[name]; collect(schemas[name]); }
+      for (const child of Object.values(value)) collect(child);
+    };
+    collect(body);
+    return { layer: key, operationId, method: operation.method, summary: operation.summary, description: operation.description, reads: Boolean(operation.read), writes: operation.output,
+      elevated: operation.access === 'elevated', needsId: operation.needsId, parentField: operation.parentField, body, schemas, catalogs: handlerCatalogs(api, catalogs || know.catalogs) };
+  }
   function readLayer(projectId, workId, layer, input = {}) {
     if (workId) goalItem(projectId, workId);
     const api = layerApi(db, projectId, checkLayer(projectId, layer) || fail('Name the layer to read.')) || fail(`The ${layer} layer publishes no API.`, 409);
@@ -677,5 +734,5 @@ export function agentWork({ db, know, catalogs = null }) {
     return () => bus.off(key, listener);
   }
 
-  return { createGoal, view, define, move, claim, assign, assertPerformer, addAction, updateAction, post, answer, stage, recordCode, review, proposeItems, decideProposal, fetchCode, closeOut, notePush, changeset, stackMap, readLayer, goals, subscribe };
+  return { createGoal, view, define, move, claim, assign, assertPerformer, addAction, updateAction, post, answer, stage, recordCode, review, proposeItems, decideProposal, describeOperation, dropAction, endAsNotDone, fetchCode, closeOut, notePush, changeset, stackMap, readLayer, goals, subscribe };
 }

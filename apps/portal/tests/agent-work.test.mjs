@@ -517,3 +517,32 @@ test('E3: an action that fails can end the item as not done: a wrap-up proposes 
   assert.deepEqual(ended.actions.map(action => action.state), ['working', 'todo', 'done'], 'the abandoned actions are left as they were');
   assert.match(ended.events.at(-1).text, new RegExp(`Ended as not done: 0 staged record changes not applied; continued in ${templatesItem.ref}, ${retry.ref}`));
 }));
+
+test('W-8 small findings: a to-do action is dropped (F24); a person ends an item as not done themself; goal items carry no legacy status (F5)', () => fixture(({ know, work, ada, id }) => {
+  const [first, second] = work.stackMap(id).map(layer => layer.key);
+  const agent = { kind: 'agent', id: ada.id, name: "Ada's local agent" };
+  const workId = work.createGoal(ada, id, { title: 'Board', brief: 'b' }).item.id;
+  work.define(agent, id, workId, { brief: 'A board.', actions: [{ layer: first, goal: 'Spec it' }, { layer: second, goal: 'Tasks tab' }, { layer: second, goal: 'Build it', after: [2] }] });
+  work.claim(ada, id, workId); work.move(ada, id, workId, 'progress');
+  assert.notEqual(know.workById(id, workId).status, 'blocked');
+  assert.equal(know.workById(id, workId).migration, null, 'no layer-action migration on a goal item');
+  work.updateAction(agent, id, workId, 1, { state: 'working' });
+  assert.throws(() => work.dropAction(ada, id, workId, 1), /has started/);
+  let view = work.dropAction(ada, id, workId, 2);
+  assert.deepEqual(view.actions.map(action => [action.number, action.after]), [[1, []], [3, []]], '#3 no longer waits on the dropped #2');
+  work.post(agent, id, workId, { kind: 'question', action: 1, text: 'Which columns?' });
+  assert.throws(() => work.endAsNotDone(ada, id, workId, {}), /Reason is required/);
+  view = work.endAsNotDone(ada, id, workId, { reason: "The container can't build the portal." });
+  assert.deepEqual([view.item.board, view.outcome.kind, view.outcome.reason, view.needs.length], ['done', 'not-done', "The container can't build the portal.", 0], 'its open question is withdrawn');
+  assert.equal(view.actions.at(-1).kind, 'wrap-up');
+  assert.throws(() => work.endAsNotDone(ada, id, workId, { reason: 'again' }), status(409));
+}));
+
+test('W-8 F7/F18: an operation is described with its body schema and the host catalogs it checks', { skip: !templates && 'needs layer templates' }, () => fixture(({ work, id }) => {
+  const described = work.describeOperation(id, 'pages', 'createFlow');
+  assert.equal(described.writes, 'flow');
+  assert.deepEqual(described.body.required, ['flow']);
+  assert.ok(described.schemas.Flow, 'the schemas it refers to come with it');
+  assert.ok(described.catalogs.pageTypes.includes('board'), 'with the catalogs it checks (F19: a Board page type)');
+  assert.throws(() => work.describeOperation(id, 'pages', 'nope'), /stack_map lists them/);
+}));

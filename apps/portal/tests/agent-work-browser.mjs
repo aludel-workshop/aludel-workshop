@@ -299,8 +299,31 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload(); await main.getByRole('heading', { name: 'Kanban board' }).waitFor();
   await shot('11-ended-phone'); await audit('ended, phone');
+
+  // W-8 F24 and a person's own ending: drop an action that isn't needed, then end the item as not done with a reason.
+  // F4 and F14 on the way: the agent names the item by its number, and a write answers briefly.
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const third = (await (await context.request.post(goalsApi, { data: { title: 'Tasks tab', brief: 'Each layer shows its items.' } })).json()).item;
+  assert.ok((await context.request.post(`${goalsApi}/${third.id}/assign`, { data: { assignee: { kind: 'person', id: owner.id } } })).ok());
+  const byRef = await context.request.fetch(`${portal}/api/editor/goals/${third.ref}/define`, { method: 'POST', headers: { authorization: `Bearer ${editorToken}` },
+    data: { brief: 'Each layer shows its items.', actions: [{ layer: 'pages', goal: 'Spec the tab' }, { layer: 'pages', goal: 'Build the tab', after: [1] }] } });
+  assert.ok(byRef.ok(), 'the item by its number (F4)');
+  const reply = await byRef.json();
+  assert.deepEqual([reply.item.ref, reply.actions.length, 'events' in reply, 'brief' in reply], [third.ref, 2, false, false], 'a short reply (F14)');
+  assert.ok((await context.request.post(`${goalsApi}/${third.id}/move`, { data: { to: 'progress' } })).ok());
+  await page.goto(`${portal}/p/${project.slug}/work/item/${encodeURIComponent(third.id)}`);
+  await main.getByRole('heading', { name: 'Tasks tab' }).waitFor();
+  await main.getByRole('button', { name: 'Remove #2' }).click();
+  await card(2).waitFor({ state: 'detached' });
+  await main.getByRole('button', { name: 'End as not done…' }).click();
+  await main.getByLabel("Why can't it be finished?").fill('The board already embeds per layer; nothing is left to do here.');
+  await shot('12-end-yourself'); await audit('end it yourself');
+  await main.locator('form.wg-close-notdone').getByRole('button', { name: 'End as not done' }).click();
+  await main.locator('.wg-board-done').waitFor();
+  await main.getByText(/Ended as not done: The board already embeds per layer/).waitFor();
+  await shot('13-ended-yourself'); await audit('ended yourself');
   assert.deepEqual(errors, []);
-  console.log('PASS goal item page: create, define, agent phases it with a review gate, assign yourself (agents wait on A2), Open in a container (refused without a GitHub repository) or your checkout, start, live question and approval on their actions, answer, staged changeset by layer, reported code, details and log, steer, per-action review with a flag the agent addresses, gate held and cleared, move to review, close-out that merges the branch into main; and an item ended as not done: wrap-up approved, its proposed items edited, created and dismissed, dependencies as blocking links, the ending confirmed; axe at 1440 and 390 px.');
+  console.log('PASS goal item page: create, define, agent phases it with a review gate, assign yourself (agents wait on A2), Open in a container (refused without a GitHub repository) or your checkout, start, live question and approval on their actions, answer, staged changeset by layer, reported code, details and log, steer, per-action review with a flag the agent addresses, gate held and cleared, move to review, close-out that merges the branch into main; and an item ended as not done: wrap-up approved, its proposed items edited, created and dismissed, dependencies as blocking links, the ending confirmed; a to-do action removed and an item ended by its person with a reason; the item by its number and a short reply to an agent write; axe at 1440 and 390 px.');
 } catch (error) {
   for (const open of browser.contexts().flatMap(context => context.pages())) await open.screenshot({ path: dest + 'failure.png', fullPage: true }).catch(() => {});
   console.error(serverLog.split('\n').filter(line => /error/i.test(line) && !/ExperimentalWarning/.test(line)).slice(-10).join('\n'));

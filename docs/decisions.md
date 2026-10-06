@@ -2,7 +2,7 @@
 id: decisions-001
 kind: decision-register
 status: active
-updated: 2026-10-02
+updated: 2026-10-05
 ---
 
 # Decision inbox
@@ -10,6 +10,11 @@ updated: 2026-10-02
 This is the seed of the portal's decision workflow. Confirmed owner answers and proposed defaults are distinct. No unanswered question silently becomes an owner decision.
 
 ## Confirmed
+
+2026-10-05 — **DEC-068: every layer works without the others; a brief describes layers but doesn't fence them; Code owns code.** The owner, on W-8's open questions (F8, F9, F13): "every layer should be able to operate without the others. journeys, for example - if its part of our code work, there should be a representation in code. then if pages also deals with it, we could set up a binding, even ceding from the code side so it isn't duplicated. brief should absolutely describe the app layers, but not constrain to say "only work in these". f13: … code owns the code. and aludels codebase is owned by the code layer in the aludel app."
+(1) A layer keeps its own representation of whatever its work depends on (Code's journeys; Pages' personas, F17). Where another layer covers the same concept, a binding links them, and one side may cede authority so it isn't duplicated (the layer-connections direction).
+(2) A goal item's brief describes the app layers it expects to touch. It doesn't restrict the work to them: actions can name any layer.
+(3) Code changes belong to the Code layer, including Aludel's own codebase, which the Code layer of the Aludel Workshop project owns. Work is not a separate code layer.
 
 2026-10-05 — **DEC-067: projects can start by connecting an existing repository; the built-in Aludel project retires.** The owner, in chat: "like the onboarding suggestion. agree we can't assume what the app looks like. built in aludel project exists: thats trying to implement exactly what we have here. probably fine to get rid of that, right, and just let us use this new method? other suggestions fine."
 (1) New project offers two starts: start a new app (today's onboarding), or connect an existing repository. The second skips the recipe, look, features, stack and skeleton steps.
