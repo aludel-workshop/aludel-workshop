@@ -5,6 +5,7 @@
 // board as a layer's Tasks tab. Screens and axe at 1440 and 390 px.
 // Usage: npm run build, then MACHINE_LAYER_TEMPLATES_ENABLED=1 node tests/work-board-browser.mjs
 // (PLAYWRIGHT_MODULE and CHROMIUM_PATH when not in an item container; see browser-support.mjs).
+// JOURNEY_KEEP=1 (and JOURNEY_PORT=<port>) keeps the portal running afterwards for a person to look at.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
@@ -37,7 +38,7 @@ const project = flows.claimDraft(token, owner, owner).project;
 know.ensureDesign(project.id);
 db.close();
 
-const probe = createServer(); await new Promise(resolve => probe.listen(0, '127.0.0.1', resolve));
+const probe = createServer(); await new Promise(resolve => probe.listen(Number(process.env.JOURNEY_PORT || 0), '127.0.0.1', resolve));
 const port = probe.address().port; await new Promise(resolve => probe.close(resolve));
 const server = spawn(process.execPath, ['server/server.mjs'], { env: { ...process.env, MACHINE_DATA_DIR: root, MACHINE_PORT: String(port), MACHINE_LAYER_TEMPLATES_ENABLED: '1', MACHINE_PREVIEW_RUNTIME: 'process' }, stdio: ['ignore', 'pipe', 'pipe'] });
 let serverLog = ''; server.stdout.on('data', chunk => serverLog += chunk); server.stderr.on('data', chunk => serverLog += chunk);
@@ -230,6 +231,11 @@ try {
   assert.equal(await peek.count(), 0, 'Escape closes the peek');
 
   assert.deepEqual(errors, []);
+  if (process.env.JOURNEY_KEEP) {
+    // A person's preview (F32): the portal stays up in the state the walk left it, until this process is stopped.
+    console.log(`Preview: http://localhost:${port}/p/${project.slug}/work (sign in as owner@example.com, ${password}). Ctrl+C to stop.`);
+    await new Promise(resolve => process.once('SIGINT', resolve).once('SIGTERM', resolve));
+  }
   console.log('PASS work board: five status columns, cards (priority, layers, assignee, progress, needs, live), create → define → Ready → confirmed start → review → close-out to Done, the peek, a rough note asked to define first, an unassigned start claimed, a refused drag to Done, Needs you / layer / assignee filters, the Pages Tasks tab as the same board, axe at 1440 and 390 px.');
 } finally {
   await browser.close(); server.kill();

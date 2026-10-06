@@ -597,3 +597,36 @@ Owner, in the item container's Claude Code chat: "alright, lets try this task ag
 ### Findings (attempt 2)
 
 - **F31. The browser journeys couldn't find the container's browser.** The image installs Playwright globally with its headless shell under `/opt/playwright` (`PLAYWRIGHT_BROWSERS_PATH`). Every journey, though, defaults `PLAYWRIGHT_MODULE` to `/tmp/app-builder-…` and `CHROMIUM_PATH` to one of two other machines' paths (`/opt/pw-browsers/chromium`, `/home/henry/.cache/…`). The E1 acceptance check ran the build and the server gate in the image, but no journey. **Applied now:** `tests/browser-support.mjs` falls back to the global Playwright and the headless shell under `PLAYWRIGHT_BROWSERS_PATH`, so every journey runs in an item container with no settings. Explicit settings still win, so other machines are unaffected.
+- **F32. The person approves actions they can't see (owner, 2026-10-06, on approving #2 and #3):** "a bit of a sham since i cant actually preview anything, but that's where we are at right now." The board is built and checked in the container, but its screens (`test-results/`) and any portal it runs stay inside the container. The item page has no link to a preview, and the review shows the agent's summary only. This is the same gap as F21 (Pages review walker) and A7, now for a UI change in Code. **Applied now, as an experiment:** a journey can stay up afterwards (`JOURNEY_KEEP=1 JOURNEY_PORT=<port>`, in `tests/work-board-browser.mjs`). The portal it seeded keeps running in the state the walk left it, VS Code forwards the port, and the agent posts the link in the item's thread. Untested: whether forwarding reaches the owner's browser (it answers inside the container). **Durable fix (proposed):** an action that changes UI hands over a preview link with its review, shown on the action, as A7's review action and CW's review previews intend.
+- **F33. Two Work journeys already failed on `main`.** `layer-scope-browser` waits for a "Create task in Code" button that no source has any more. `journey-work-browser` expects `journeys-unchanged` passed and gets `not-run`, most likely the Docker-only sandbox (F30). Both fail the same way on a clean `main` worktree in this container, so they aren't W-8's. They're left for their owners (JOURNEYS-01, J8); W-8's evidence names them instead of claiming "existing journeys pass".
+
+### W-8 attempt 2: built and agent-checked (2026-10-06)
+
+**Requirement traceability (operating procedure §6), against W-8's brief:**
+
+| Requirement | Status | Evidence |
+|---|---|---|
+| Five columns from status; batches, Next, Queue/Backlog gone | Built | `work-board.ts`. The journey asserts no Batch/Queue/Backlog/Next text. The composer's "Place in" is now Draft/Ready. |
+| Card: title and number, priority, layers, assignee (local/remote), progress, needs-you, live dot, routine origin | Built | Journey `01-board`. "Remote" shows an agent's name; agents wait on A2. |
+| Filters: Needs you, layer, assignee | Built | Journey, each filter asserted. |
+| Peek: fields, actions and states, Move to, Open item | Built | `02-peek`, `09-phone-peek`. A fixed side panel; full screen on phones; Escape closes it and returns focus to the card. |
+| Ready needs a defined item | Built | Server `move()` and a board dialog (`05-define-first`). Defining moves an item to Ready itself, so Move to › Ready applies to an item moved back to Draft. |
+| In progress asks to confirm the start | Built | `03-confirm-start`. With nobody assigned, "Claim and start". |
+| Done only through close-out, never by dragging | Built | The prototype's dialog with Open item (`04-refused-drag`), and the server refuses as well. |
+| Each layer's Tasks tab is the same board | Built | The journey's Pages Tasks step (`07-pages-tasks`) and `layer-bar`. |
+| Create task and routines keep working | Built | `task-create`, `suggested-task` and `layer-bar` journeys pass. Routine items show on the board. |
+| 390 px: columns stack, no sideways scroll | Built | `08-phone`, asserted. |
+| Done when: browser journey at 1440 and 390 with axe clean | Built | `tests/work-board-browser.mjs`: PASS. |
+| Done when: existing Work and Tasks journeys pass | Deviated | `agent-work`, `layer-bar`, `suggested-task` and `task-create` pass. `layer-scope` and `journey-work` fail identically on `main` (F33, proposed as an item). |
+| Done when: templates gate green | Deviated (environment) | In the item container: 347 pass, 3 fail, 10 skipped. The 3 are the Docker-only tests (F30), the same three as the E1 image check. A host run is needed for a fully green gate. |
+| The person can see it before approving | Gap | F32. A kept preview was offered after #2 and #3 were approved. |
+
+**Checks (agent-run, in W-8's item container):** `npm run typecheck` and `npm run build` pass. `agent-work.test.mjs`: 10 pass (move-rule cases added). Journeys: `work-board` passes, plus the four above. The screens were looked at, and three defects were fixed because of it: cards overflowed their columns, the peek squeezed the columns to about 125 px, and a Done drop showed only a banner.
+
+#### Retrospective (attempt 2)
+
+1. **What made it harder or slower than necessary?** *Observed:* the journeys couldn't find the container's browser (F31). Two Work journeys were already red on `main` (F33), which took a `main` worktree run to prove. Screenshot checks found three layout defects that a passing journey didn't: assertions check behaviour, not layout. *Agent slips:* two wrong guesses about the UI's wording ("1 need you", "Charles, local"). Both were cheap because the journey ran in seconds.
+2. **What would make the next equivalent task easier?** A preview link on UI actions (F32, proposed). A journey runner that finds the browser everywhere (F31, applied). Journeys kept green on `main`, so "still passes" is a cheap claim (F33, proposed).
+3. **What changes the roadmap, packets or process?** The E1 prerequisites held in a live container: the build, the gate and the journeys all ran here, which they couldn't in attempt 1. Reviewability is the next gap, not buildability. F32 moves A7's preview-on-review ahead of more local polish.
+4. **Questions created or resolved:** *Resolved:* the item container can build, test and commit (F22 closed in practice). *Open:* does a VS Code forwarded port reach the owner's browser (F32 experiment)? Docker in item containers (F30) still decides whether the gate can be green in a container.
+5. **Process change applied, how it was tested, what's still a hypothesis:** *Applied:* F31 (journeys find the container's Playwright), tested by running five journeys in the container with no settings. *Applied, as an experiment:* F32's kept preview, tested only from inside the container (HTTP 200 on 4390). *Hypothesis:* that a preview before approval changes what the owner approves.
