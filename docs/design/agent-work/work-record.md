@@ -818,3 +818,60 @@ Authorization: the owner created W-27 from [a7-brief.md](a7-brief.md), approved 
   - The kept preview (`npm run preview -- review-modal`) now opens on #6, which waits in review on the same live build for a person to walk.
 - **Checks:** typecheck, build, the `review-modal` and `agent-work` journeys pass. `test:affected` shows only the known 4 failures.
 - **W27-F2. The item went back to Ready without a log line (2026-10-06).** After #6 moved to working (18:59), the portal was unreachable for a while; the owner was troubleshooting the gate. When it answered again, W-27 showed `board: ready`, `status: queued`, and nothing in its log said why. Every action kept its state. While the item is Ready, `report_code` is refused ("Start W-27 before reporting code"). So #6 waited, committed locally, until the owner started the item again. Possibly the same family as W10-F1 (answering a question moved an item to Ready). Every state change should leave a log line saying who or what made it.
+
+### W-27 close-out: A7 part 1 (2026-10-06)
+
+**Prototype interactions (from [a7-brief.md](a7-brief.md)), marked as the operating procedure's slice close asks:**
+
+| Interaction | Status | Where |
+|---|---|---|
+| One review modal for every action in review, from its card and its details | Built | #4; `?review=N` opens it from a link |
+| Records (any layer): Previous beside Proposed | Built | #4: field by field, changed fields only until asked, long runs folded |
+| Code without UI: the files, a tree, each file's diff against the item's base | Built | #5 |
+| Code that builds UI: the live build in the modal, as in J6 (a0/v2) | Built | #2 tunnel, #6 view; the walk script ticks the checklist |
+| The checklist (journey or "try" steps) handed over with the preview, ticked by walking | Built, deviated | #3, #6. The agent's own steps only; Code's journey steps aren't pulled in automatically yet (the agent copies them into `steps`) |
+| Approve after walking every changed step, a reason standing in (P3) | Built | #3 server, #6 UI |
+| W-25's link as Open in a new tab | Built, deviated | A plain link for forwarded previews; for tunnelled builds it mints its own way in |
+| Steps with New, Changed, Same and Removed badges; Highlight changes; walking by clicking inside the pages; pinned notes; round 2 (pages-review/v1) | Deferred | The follow-up item proposed by #8 (the Pages flow walker) |
+| View source and the kit drawer (P6) | Deferred | The follow-up (Design's HTML kit) |
+| Built view beside Mockup | Deferred | The follow-up (needs the kit's mockups) |
+| Kit fidelity spike (G3) | Deferred | The follow-up's first action |
+| Tunnel: members only, separate subdomain, no portal cookies, closes with the item | Built | #2; `preview-tunnel.test.mjs` |
+
+**Done when, as the owner chose on #7:**
+- The tunnel and modal are built, with server tests, the browser journeys, and axe at 1440 and 390 px.
+- **The templates gate:** run once at the end, as the owner asked while troubleshooting it. The result is below.
+- **The owner's live reviews** (a Code action by its files, a UI action until its checklist is ticked) are **pending until W-27 is on `main`**. The owner's portal runs `main` and only the owner runs it, so the reviews happen on the next item.
+- **Proof in seeded portals.** The `review-modal` journey reviews a Code action by its files (#2: tree, diffs, newer report, unreadable case) and walks a UI action live until its checklist was ticked (#5). The kept preview holds a sixth action for a person to walk. The owner approved #4 and #5 from summaries; the forwarded preview links didn't reach them (W27-F1).
+
+#### Retrospective (W-27)
+
+1. **What made it harder, slower or more error-prone?**
+   - *Observed:*
+     - Three container or portal restarts mid-item. Each cut a background gate run short, and one left the item back in Ready without a log line (W27-F2).
+     - The full gate takes about 25 minutes and fails four tests that have nothing to do with the work (two Docker-only tests, the worker-token test, and the security audit under load). Every run needed triage.
+     - The forwarded preview link didn't reach the owner (W27-F1), so two approvals went on summaries alone.
+   - *My own slips:*
+     - I shipped a journey that didn't parse, after a wording-only edit.
+     - #2's script went in without its executable bit. I reran only the failures after a restart, which missed it.
+2. **What would make the next one easier?**
+   - Run the whole gate, not only its failures, after a restart.
+   - `node --check` every edited test.
+   - Quarantine or fix the four known failures, so the gate is green on `main` and a red result means something.
+   - Use `--tunnel` previews (now built) instead of forwarded ports, once W-27 is on `main`.
+3. **What changes the roadmap, packets or process?**
+   - The tunnel makes agent previews reach the person without Docker or a portal build, so PP-01D (portal-built previews of Aludel) is no longer what review previews wait on.
+   - The owner's live proof of new review UI can only happen after merge, because the live portal runs `main`. Items that change the review UI should plan their live proof on the next item. This applies the standing live-portal rule, and the owner chose it on #7.
+4. **Questions created, resolved or newly important:**
+   - *Resolved:* how the proof runs (the owner on #7). Whether partitioned cookies work in the portal's cross-site frame: yes in Chromium, proven by the journey.
+   - *Open:* W27-F2's cause (blocks nothing now, but item state can change silently). Whether Code's journey steps should feed the checklist automatically (a follow-up).
+   - *Newly important:* a gate the owner can trust (the owner is troubleshooting it now).
+5. **Process change applied, how it was tested, what's still a hypothesis:**
+   - *Applied and tested:*
+     - Definition-time naming of left-out prototype interactions (the split and P3 were put to the owner when the item was defined, and the owner accepted).
+     - Slice-close traceability: the table above.
+     - `--tunnel` previews: the journey and server tests.
+   - *Applied, not yet tested by the owner:* tunnelled previews in the owner's own portal (after merge).
+   - *Hypothesis:* that live walking in the modal changes what the owner approves. It's tested by the next item's reviews.
+
+**Final gate (the one full run at the end, as the owner asked):** `test:server:templates`: 370 tests, 356 pass, 4 fail, 10 skipped. The 4 are the known ones: two Docker-only layer tests (`runner ENOENT`, F30), the worker-token test (also fails on `main`), and the security audit (fails under load, passes alone). No new failures.
