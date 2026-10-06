@@ -903,3 +903,14 @@ Authorization: the owner created W-29 from W-27 #8's proposal, started it in the
   - *Code explorer* (`pag-5badb7d6`), as far as the binding reaches: the kit filter (All, Bound, Drifted, Unbound); Implements <element> with the drift state and its Work; the prop map; Not bound.
 - **Checked:** both records passed the Pages API's checks when staged. Sections trace to kit-contract.md K2, K3, K6 and B1–B6, and what's kept from today's tab was read from `src/layers/design-components.ts`.
 - **Waits on the owner:** the phase 1 gate (#1–#3).
+
+### W-29 #2 revised after review; review gaps found (2026-10-06)
+
+- **Owner on #2's binding:** "bindings happen at the project level, we already have a system in place for that … it shouldn't need the actual code itself to have tags. should have rules for drift as part of it as well."
+  - B1–B6 now use the existing binding record: Design's `kit` and a new Code `ui` facet; the binding's `correspondence` pairs them by concept key, confirmed in Library › Bindings; Code's adapter converts; the binding's `policy` holds the drift rules.
+  - The `@kit` tags are withdrawn. #3's two staged records still describe them and will be corrected once #2 is approved.
+- **W29-F1. Spec and spike actions review as a blank page.** The review modal shows reported files only on Code actions (`work-review-modal.ts` `codeOf`), and it has no document view. #1 and #2 (Design actions whose output is documents) showed "staged no records and reported no code". Proposed as a follow-up item from #2 ("Review shows docs and every action's files").
+- **Process change applied:** I handed over #1 and #2 with "no preview" without checking what the modal would show for a non-Code action. Until the follow-up lands:
+  - an action whose output is a document puts its substance in its summary and its thread message;
+  - I check the modal's view rules (`views()`) before handing over an action of a kind it hasn't shown before.
+  - *Hypothesis until #2's re-review:* that a summary is enough to approve a spec in the meantime.

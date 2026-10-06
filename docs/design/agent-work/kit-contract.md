@@ -8,15 +8,15 @@ Sources:
 - the layer contract's facets, bindings and drift (`layer-base/docs/layer-contract.md`);
 - Design's records (`apps/portal/server/design.mjs`);
 - Code's unit indexer (`server/code-units.mjs`);
-- the binding core (`server/bindings.mjs`).
+- the binding core (`server/bindings.mjs`: correspondence, policy and adapters).
 
 ## What the spike changed
 
 The generator reproduced Design's records faithfully. Biome still diverged, because its look is written in its code. So the kit's value rests on two things:
 - Design holding the whole look. Contracts need enough to draw every component, including app-specific ones.
-- Code's binding surfacing every place where the code and Design disagree.
+- The project's binding between Design and Code surfacing every place where they disagree, under its own drift rules.
 
-Hence the contract additions (K3, K4) and drift as a first-class, measured state (B3).
+Hence the contract additions (K3, K4), and Code's binding as an ordinary project binding with drift rules (B1–B6).
 
 ## The kit (Design)
 
@@ -58,40 +58,49 @@ The Angular `kit-render.ts` stops drawing Design's demos. Pages' spec view keeps
 
 ## Code's binding (DEC-070 (2))
 
-**B1. A binding is declared where the code is.** A UI component says which kit element it implements, in either of two ways:
-- *An app's own component:* a doc tag on its class, `/** @kit biome-button */`. The Code indexer records it on that `code_unit` as `kit: { element }`. It's read at the indexed commit, like the rest of the unit.
-- *A library component used directly* (the scaffold uses Angular Material's `button[matButton]` without a wrapper): Design's contract already names it in `binding.selector`. Code observes where that selector is used in templates and counts those usages as bound to the contract.
+*Revised 2026-10-06 after the owner's review of #2: "bindings happen at the project level, we already have a system in place for that. theres some representation in design, another representation in code: a binding says how each relate to each other, the rules for authority, conversion, all that. it shouldn't need the actual code itself to have tags. should have rules for drift as part of it as well." The first draft's `@kit` tags and drift states outside the binding are withdrawn.*
 
-Nothing is declared in the portal, because Code observes code (its charter). A person or agent changes a binding by changing the tag in the code.
+The binding is an ordinary project-level binding record (LAYER-BINDINGS-01, `server/bindings.mjs`, Library › Bindings). Design and Code each keep their own representation, and the binding holds everything that relates them. Nothing is declared in the code.
 
-**B2. One project binding for the design system.**
-- Design's `kit` facet is the authority. Code gains a `ui` facet: `code_unit` entries whose kind is `component`, shape `aludel.code-ui`, role replica. Pages' `kit` facet stays a replica, as today.
-- This is the binding the layer contract already describes ("the app's design system"). Code needs no adapter: it never copies Design's records, it only points at them. The binding compares what each side publishes.
+**B1. Two representations, one binding.**
+- *Design:* the `kit` facet (tokens, component contracts, brand), shape `aludel.design-kit`, as declared today.
+- *Code:* a new `ui` facet, holding the UI components Code already indexes (`code_unit` entries whose kind is `component`) with what the indexer reads from each: its selector, inputs and their types, and outputs. Shape `aludel.code-ui`, roles replica or authority. This is Code's own description of its components, kept whether or not a binding exists (DEC-068 (1)).
+- *The binding:* "Design system", with Design's `kit` as the authority, Code's `ui` as a replica, and Pages' `kit` as a replica, as today.
 
-**B3. Drift is measured per bound component, statically, at each indexed commit.**
+**B2. Correspondence: which Code component is which Design component.** This is the binding's `correspondence`. Each entry has a concept key (the component's name, for example `button`) and the ref on each side (`cmp-…` in Design, the `code_unit` in Code).
+- Entries are matched automatically by concept key: Code's adapter derives the key from the component's name or selector, and Design's from the contract name.
+- A person confirms or corrects a match in Library › Bindings, and can mark a Code component as not part of the design system.
+- A library component used directly (Angular Material's `button[matButton]`, which the scaffold uses without a wrapper) corresponds through the selector the contract's `binding` already names. Code's adapter finds its usages in templates.
 
-| State | When |
-|---|---|
-| In sync | The element exists in the kit, and the contract's props match the component's inputs (by name; variant options by value where the input's type lists them) |
-| Contract changed | Design's contract changed since the last agreed sync (binding baseline). Code hasn't followed. |
-| Code drifted | The component changed since the last agreed sync, and its inputs now differ from the contract (a prop added, removed or renamed) |
-| Unknown element | `@kit` names an element the kit doesn't have |
-| Unbound | A UI component with no `@kit` tag. Listed, not an error: not every component is a design-system part. |
+**B3. Conversion: Code's adapter.** Code owns an adapter that reads `aludel.design-kit` (layer contract, "Using another layer's output"):
+- *Mechanical part:*
+  - maps a contract's props to a component's inputs (by name, and a variant's options to the input's union type);
+  - maps its slots to content projection;
+  - publishes, for each corresponding pair, the comparable form both sides are checked in.
+- *Soft part (agent):* what can't be mapped mechanically, such as a component with a `template` and no inputs that say the same thing, or a renamed prop. It works as Work in Code.
+- The reverse direction (code to Design) is the same adapter read the other way. It drafts contract changes, which only ever arrive as **adopt** Work for a person to review (K5).
 
-*Look drift* (computed colours, type and corners of a bound component compared with its kit element, which is what the spike saw by eye) needs a running build. It is proposed as a follow-up, using W-27's tunnelled preview. #6 measures the static states above.
+**B4. Authority and drift rules are the binding's `policy`.** Default policy, set when the binding is proposed and changeable in Library › Bindings:
+- *Design (authority) changed* (added, changed, removed): **propagate**. The binding raises rectify Work in Code with the contract diff, for example "make `ButtonComponent` follow Button r3".
+- *Code changed outside the binding* (drift), per event:
+  - an added component is **assessed**;
+  - a changed one is **assessed**;
+  - a removed one is **rectified**.
+  
+  An assessment is decided as **adopt** (the code's change becomes a contract change, as Design Work) or **rectify** (Code Work to follow the contract).
+- *First reconcile of an existing app:* Code components with no contract raise adopt Work to create the contract, with a `template` drafted by the adapter's soft part. That's how Biome's option tile and world map would enter Design, reviewed, never applied automatically.
+- Authority can move. For example, a project can make Code the authority for implementation details by ceding them through a refacet. That's the binding system's existing transfer and refacet, nothing new.
 
-**B4. Responses** (the binding's drift policy, settable per project):
-- *Contract changed* propagates as **rectify** Work in Code: "make `ButtonComponent` follow Button r3", with the contract diff.
-- *Code drifted* is **assessed** by default. The owner decides:
-  - **adopt** stages the code's props into the contract, as Design Work;
-  - **rectify** raises Code Work to change the code back.
-- *First reconcile of an existing app:* a bound component whose element has no contract raises **adopt** Work to create the contract, with a `template` drafted from the component. A person reviews it; it isn't applied automatically, as K5 requires. This is how Biome's option tile and world map would enter Design.
-
-**B5. Design's `binding` field.** A contract's `binding` (library, selector, prop map) stays: it says how this stack builds the component by default, and the scaffold uses it. "Built" status comes from Code: a contract is *built* when at least one Code component or selector usage is bound to it and in sync. Otherwise it's *specified*, with the drift state shown.
+**B5. Status.** The binding's evaluation (`evaluate`) gives each correspondence entry a status: in sync, authority changed, drifted, unmatched, or conflict. That status is what people see. A contract is *built* when a Code entry corresponds to it in sync. Design's `binding` field (library, selector, prop map) stays as the stack's default for the scaffold and the selector match in B2.
 
 **B6. Where people see it** (specs in #3):
-- *Design › Components:* each component shows its Code bindings and their drift state.
-- *Code:* the units Explorer shows a UI component's kit element, its state and the open Work, with a filter for drifted and unbound components.
+- *Library › Bindings:* the correspondence, the policy and the Work, as for every binding.
+- *Design › Components:* each component shows its Code counterpart and status, from the binding.
+- *Code's Explorer:* a UI component shows its Design counterpart and status, from the binding, with a filter for drifted and unmatched components.
+
+Neither layer declares the binding. Each reads it.
+
+*Look drift* (a corresponding pair's computed colours, type and corners compared on a running build) is proposed as a follow-up. #6 compares the published shapes.
 
 ## Not in this item
 
@@ -106,5 +115,4 @@ Proposed separately: look drift from a running build (B3), and kit fonts (the sp
 ## Open for the owner at the gate
 
 - **K1, serving vs storing:** the kit is served from Design's records, plus a copy in the generated repository. The alternative is Design committing `kit.js` to its own repository for each revision. Default: served.
-- **B1, `@kit` doc tags vs a `.aludel/kit-bindings.json` map:** tags keep the binding beside the code. A map works for code that can't carry comments. Default: tags, with the map as a fallback.
-- **B4, default drift response:** assess, so the owner decides each case. Default: assess.
+- **B4, default drift policy:** assess code-side additions and changes, rectify removals, and propagate Design's changes as rectify Work. It's set per project in the binding.
