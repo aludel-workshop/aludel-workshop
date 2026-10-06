@@ -993,3 +993,10 @@ Authorization: the owner created W-29 from W-27 #8's proposal, started it in the
   - Its layer views and the kit stage also load from `i-….layers` origins, which the tunnel doesn't carry.
   - So #5 is handed over as a forwarded link (`localhost:4390`, with `*.layers.localhost:4390` beside it), with a checklist ticked by hand. The live walk in the modal, part of W-27's pending proof, can't happen for #5.
   - Proposed as an item from #5: "Tunnelled previews of the portal itself, layer views included".
+- **#5 reworked after the owner's flag (2026-10-06).** Owner: "am i hearing that this is using a project level kit? that is not what we are looking for. our whole desired interaction is information at the layer level, bound to other layers. design should have its own kit."
+  - The kit was already made by Design's handler from Design's records, but four project-level things had crept in. Now:
+    1. The tab says "Drawn by Design's kit".
+    2. The kit's name and element prefix come from Design's own brand-name asset, falling back to `kit-`. `kitSource` and `publish` take no project facts. A template test checks that project facts change nothing.
+    3. The scaffold's copy of `kit.js` into the app repository (#4, K1) goes to the new action #8, because #4 can't be reopened. Code gets Design's kit only through the binding.
+    4. The route stays: it's the Design instance's own API.
+  - `design` is now `02e2726`. Template tests: 15 pass. Design host tests: 9 pass. The `design-kit` journey passes.

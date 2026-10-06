@@ -87,7 +87,7 @@ try {
   await button.waitFor({ timeout: 180000 }); // a fresh portal builds Design's views on first open
   assert.match(stage().url(), /^http:\/\/i-[0-9a-f]{32}\.layers\.localhost:\d+\/published\/[0-9a-f]{20}\/stage\.html\?src=kit\.js$/);
   assert.equal(await button.locator('button').innerText(), 'Continue', 'the contract\'s demo label');
-  await ui.getByText(/Drawn by this project's kit/).waitFor();
+  await ui.getByText(/Drawn by Design's kit/).waitFor();
   await shot('01-button');
 
   // A prop and a state reach the stage; All variants draws each variant in each state.
@@ -167,7 +167,7 @@ try {
   await page.setViewportSize({ width: 1440, height: 1000 });
 
   assert.deepEqual(errors, [], 'no page errors');
-  console.log('PASS design kit: the Components tab draws each component from kit.js on a stage on the Design instance\'s origin; a prop, a state, All variants and dark mode reach it; a card and a page scaffold show their demo children; a component the kit can\'t draw says so, takes a template and draws, and a template that would run something is refused; Copy tag gives the element\'s HTML; axe on the page and in the stage at 1440 and 390 px.');
+  console.log('PASS design kit: the Components tab draws each component from kit.js on a stage on the Design instance\'s origin, named from Design\'s own brand name; a prop, a state, All variants and dark mode reach it; a card and a page scaffold show their demo children; a component the kit can\'t draw says so, takes a template and draws, and a template that would run something is refused; Copy tag gives the element\'s HTML; axe on the page and in the stage at 1440 and 390 px.');
   await holdForPreview({ port, path: tab(idOf('Button')), account: { email: 'owner@example.com', password } });
 } catch (error) {
   failed = true;
