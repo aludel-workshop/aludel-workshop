@@ -546,3 +546,28 @@ test('W-8 F7/F18: an operation is described with its body schema and the host ca
   assert.ok(described.catalogs.pageTypes.includes('board'), 'with the catalogs it checks (F19: a Board page type)');
   assert.throws(() => work.describeOperation(id, 'pages', 'nope'), /stack_map lists them/);
 }));
+
+test('W-8 F34: an action added to an item in review sends it back to In progress; a person can take it back, or remove a to-do action', () => fixture(({ work, ada, id }) => {
+  const [first] = work.stackMap(id).map(layer => layer.key);
+  const agent = { kind: 'agent', id: ada.id, name: "Ada's local agent" };
+  const workId = work.createGoal(ada, id, { title: 'Board', brief: 'b' }).item.id;
+  work.define(agent, id, workId, { brief: 'A board.', actions: [{ layer: first, goal: 'Build it' }] });
+  work.claim(ada, id, workId); work.move(ada, id, workId, 'progress');
+  work.updateAction(agent, id, workId, 1, { state: 'working' }); work.updateAction(agent, id, workId, 1, { state: 'review' });
+  work.review(ada, id, workId, 1, { verdict: 'approve' });
+  work.move(ada, id, workId, 'review');
+  // The agent proposes #2 while the item is in review; approving it sends the item back, so #2 can be worked.
+  let view = work.addAction(agent, id, workId, { goal: 'Align the spec', reason: 'Three details no longer match' });
+  assert.equal(view.item.board, 'review', 'a proposal alone changes nothing');
+  work.answer(ada, id, workId, view.needs[0].id, { allow: true });
+  assert.equal(work.view(id, workId).item.board, 'progress');
+  work.updateAction(agent, id, workId, 2, { state: 'working' });
+  work.updateAction(agent, id, workId, 2, { state: 'review' }); work.review(ada, id, workId, 2, { verdict: 'approve' });
+  // A person's own action added in review does the same; or they take the item back themselves, or remove the action.
+  work.move(ada, id, workId, 'review');
+  assert.equal(work.addAction(ada, id, workId, { goal: 'One more check' }).item.board, 'progress');
+  assert.throws(() => work.move(ada, id, workId, 'review'), /#3 is not ready/);
+  view = work.dropAction(ada, id, workId, 3);
+  assert.equal(work.move(ada, id, workId, 'review').item.board, 'review', 'with it removed, the item goes to review');
+  assert.equal(work.move(ada, id, workId, 'progress').item.board, 'progress', 'Back to In progress');
+}));

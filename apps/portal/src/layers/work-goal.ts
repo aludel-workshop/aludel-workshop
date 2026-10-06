@@ -93,7 +93,7 @@ const actionIcon: Record<string, string> = { proposed: 'add_task', todo: 'radio_
               <h2 id="wg-close-title"><mat-icon aria-hidden="true">task_alt</mat-icon>Ready to close out</h2>
               <p>Closing @if (goal.code && !goal.code.inRepository) { merges <code>{{ goal.code.branch }}</code> ({{ goal.code.commit.slice(0, 7) }}) into {{ goal.code.target || 'main' }} and }applies {{ recordCount() }} staged record change{{ recordCount() === 1 ? '' : 's' }}@if (goal.changeset.length) { in {{ changedLayers() }} } at once.@if (!goal.changeset.length && !goal.code) { Nothing is staged; it closes as done. }</p>
               @if (goal.code?.inRepository) { <p class="wg-hint"><mat-icon aria-hidden="true">check_circle</mat-icon>{{ goal.code!.branch }} at {{ goal.code!.commit.slice(0, 7) }} is already in {{ goal.code!.target || 'main' }}.</p> }
-              <div class="wg-row wg-end"><button type="button" class="lay-button wg-go" (click)="close()"><mat-icon aria-hidden="true">done_all</mat-icon>{{ goal.code && !goal.code.inRepository ? 'Close out and merge' : 'Close out' }}</button></div>
+              <div class="wg-row wg-end"><button type="button" class="lay-button ghost small" (click)="move('progress')"><mat-icon aria-hidden="true">undo</mat-icon>Back to In progress</button><button type="button" class="lay-button wg-go" (click)="close()"><mat-icon aria-hidden="true">done_all</mat-icon>{{ goal.code && !goal.code.inRepository ? 'Close out and merge' : 'Close out' }}</button></div>
             </div>
           }
           @if ((goal.item.board === 'progress' || goal.item.board === 'review') && !goal.ending) {
@@ -152,7 +152,7 @@ const actionIcon: Record<string, string> = { proposed: 'add_task', todo: 'radio_
                 <div class="wg-tools">
                   <button type="button" class="wg-link" (click)="select(action.number)" [attr.aria-pressed]="selected() === action.number"><mat-icon aria-hidden="true">forum</mat-icon>Details and log</button>
                   @if (open() && action.state !== 'done') { <button type="button" class="wg-link" (click)="editGoal(action)"><mat-icon aria-hidden="true">edit</mat-icon>Edit goal</button> }
-                  @if (open() && action.state === 'todo') { <button type="button" class="wg-link" (click)="drop(action)" [attr.aria-label]="'Remove #' + action.number"><mat-icon aria-hidden="true">delete</mat-icon>Remove</button> }
+                  @if ((open() || goal.item.board === 'review') && action.state === 'todo') { <button type="button" class="wg-link" (click)="drop(action)" [attr.aria-label]="'Remove #' + action.number"><mat-icon aria-hidden="true">delete</mat-icon>Remove</button> }
                 </div>
                 @if (action.proposals.length) {
                   <div class="wg-proposals" role="group" [attr.aria-label]="'Items #' + action.number + ' proposes'">
@@ -380,7 +380,7 @@ export class WorkGoalComponent {
   }
   folderName(path: string) { return path.split('/').filter(Boolean).at(-1) || path; }
   loadCheckout() { const id = this.ctx.projectId(); if (id && this.mine()) void this.ctx.api<{ checkout: { path: string; distro: string | null } | null }>(`/api/projects/${encodeURIComponent(id)}/editor`).then(value => this.checkout.set(value.checkout), () => this.checkout.set(null)); }
-  move(to: string) { void this.act(() => this.ctx.api(this.path('/move'), 'POST', { to }), to === 'progress' ? 'Started.' : 'Moved to review.'); }
+  move(to: string) { const back = to === 'progress' && this.view()?.item.board === 'review'; void this.act(() => this.ctx.api(this.path('/move'), 'POST', { to }), back ? 'Back in progress.' : to === 'progress' ? 'Started.' : 'Moved to review.'); }
   priority(level: string) { void this.ctx.write(() => this.ctx.updateWork(this.id(), { priority: level }), `Now ${priorityLabel[level]} priority.`).then(() => this.load()); }
   steer() {
     const text = this.steerDraft.trim(); if (!text) return;
