@@ -921,3 +921,38 @@ Authorization: the owner created W-29 from W-27 #8's proposal, started it in the
   - Design components' *Built in Code* shows the binding's pairs and status, with Open binding.
   - Code explorer's filter is All, Paired, Drifted and Unpaired. Its side panel shows the Design counterpart, the prop map from Code's adapter, and Unpaired linking to Library › Bindings.
 - **Checked:** both updates passed the Pages API checks. Neither record mentions tags.
+
+### W-29 #4: Design generates kit.js (2026-10-06)
+
+- **Shipping (owner on #4):** the template commits travel as a one-off git bundle, `tools/w-29-layer-base.bundle`. FW-11 (items working across every repository) is high priority and is proposed from #4 as its own item.
+- **Design template** (`layer-base`):
+  - `main` `a574a8f`: the contract gains `api.publishes`.
+  - `design` `574e23f`, merged with `main`:
+    - component contracts gain `demo` (values, and children for slots, dropped when they no longer fit) and `template` (HTML and CSS, token variables only, nothing that runs or loads);
+    - the 15 starter components get demos;
+    - `publish('kit.js')` and `kitSource` generate the kit, with `tokenVariables` ported from the portal.
+  - Template tests: 15 pass.
+- **Host:**
+  - `api.publishes` is validated (`layer-package.mjs`).
+  - `publishLayerFile` and `publishedLayerFile` (`layer-api.mjs`) keep each version in `layer_publications` by its content digest.
+  - `GET /api/projects/:p/layers/:key/publish[/:digest]/kit.js` is for members only; a version with a digest is immutable.
+  - The scaffold writes `design/kit.js`.
+  - The design pin is `574e23f`; its reviewed digest is added and the old ones are kept.
+- **Checked:**
+  - `typecheck-layer-ui` at `574e23f`: 6 files.
+  - Design suites, templates on: 15 pass, including 3 new ones:
+    - publish, with a digest per version and pinned versions still readable;
+    - the handler's token variables equal the portal's in light and dark;
+    - demo and template through Design's API, and the kit draws the template.
+  - The seeded kit rendered in Chromium: 15 of 15 elements defined, each demo drawn, no script errors, light and dark, no horizontal scroll at 390 px.
+  - That check found the scaffold overflowing a narrow cell; fixed in `574e23f`.
+- **At close-out (the bundle step, until FW-11):** in your `layer-base`, run:
+
+  ```sh
+  git fetch <aludel-workshop>/tools/w-29-layer-base.bundle 'refs/heads/*:refs/remotes/w29/*'
+  git merge-base --is-ancestor main w29/main && git update-ref refs/heads/main w29/main   # or `git merge --ff-only w29/main` with main checked out
+  git merge-base --is-ancestor design w29/design && git update-ref refs/heads/design w29/design
+  git push origin main design
+  ```
+
+  The pin names `574e23f`, so it resolves once `design` is pushed.

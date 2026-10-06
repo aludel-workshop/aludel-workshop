@@ -168,6 +168,10 @@ function readPackage(repo, commit, key) {
   // T03-DESIGN-SEED: host events the handler's seed(event, context) answers.
   if (manifest.api?.seeds !== undefined && (!Array.isArray(manifest.api.seeds) || !manifest.api.seeds.every(event => ['install', 'look'].includes(event))))
     throw new Error('Invalid layer seed events.');
+  // W-29 (DEC-070): files the handler's publish(path, context) makes from the layer's records, such as Design's kit.js.
+  if (manifest.api?.publishes !== undefined && (!Array.isArray(manifest.api.publishes) || manifest.api.publishes.length > 8
+    || !manifest.api.publishes.every(path => typeof path === 'string' && /^[a-z][a-z0-9-]*\.(?:js|css|json)$/.test(path))))
+    throw new Error('Invalid layer published files.');
   fileOutputs(manifest);
   // LAYER-BINDINGS-01: the facets the layer maintains and the binding roles each supports.
   validateFacets(manifest);

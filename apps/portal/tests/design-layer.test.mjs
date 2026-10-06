@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { createUser, initAccounts } from '../server/accounts.mjs';
 import { initKnowledge, knowledge } from '../server/knowledge.mjs';
-import { applyOperation, callOperation, initLayerApi, layerApi } from '../server/layer-api.mjs';
+import { applyOperation, callOperation, initLayerApi, layerApi, publishedLayerFile, publishLayerFile, runPure } from '../server/layer-api.mjs';
 import { initLayerContract, layerInstanceId, updateLayerInstance } from '../server/layer-contract.mjs';
 import { layerHostCalls, layerPackageForProject } from '../server/layer-package.mjs';
 import { frameAllows, hostRecordFeatures } from '../server/layer-ui.mjs';
@@ -18,6 +18,7 @@ import { ensureProductWorkspace } from '../server/product-workspace.mjs';
 import { openSecretStore } from '../server/secret-store.mjs';
 import { openDatabase } from '../server/storage.mjs';
 import { initWorkflow } from '../server/workflow.mjs';
+import { tokenVariables } from '../src/design-tokens.js';
 
 const catalogs = loadCatalogs(new URL('../config', import.meta.url).pathname);
 const kitKinds = ['design_tokens', 'component', 'brand_asset'];
@@ -157,4 +158,45 @@ test('a new project\'s kit is seeded by the Design template, and a Look & feel c
   applyOperation({ db, know, api: layerApi(db, id, 'design'), projectId: id, operationId: 'setTokens', body: { fromLook: false }, author: owner.name });
   flow.saveDesign(owner, id, { feel: 'sleek-saas', theme: 'light', accent: '#2e7d5b' });
   assert.equal(know.list(id, 'design_tokens')[0].palettes[0].seed, '#b3261e', 'an edited token set stays as edited');
+}));
+
+// W-29 (DEC-070; kit-contract.md K1): Design publishes kit.js from its records; the host keeps each version by digest.
+test('Design publishes kit.js from its own records, each version kept by its digest', () => fixture(({ db, know, owner, id }) => {
+  const api = layerApi(db, id, 'design');
+  assert.deepEqual(api.publishes, ['kit.js']);
+  const project = { name: 'Tool Share', slug: 'tool-share' };
+  const first = publishLayerFile({ db, api, projectId: id, path: 'kit.js', project });
+  assert.match(first.type, /^text\/javascript/);
+  assert.match(first.digest, /^[0-9a-f]{20}$/);
+  assert.ok(first.body.includes('"tag":"tool-button"') && first.body.includes('"tag":"tool-page-scaffold"'), 'one element per seeded contract, named for the project');
+  assert.equal(publishLayerFile({ db, api, projectId: id, path: 'kit.js', project }).digest, first.digest, 'the same records give the same version');
+  assert.throws(() => publishLayerFile({ db, api, projectId: id, path: 'other.js', project }), /publishes no other.js/);
+  const tokens = know.list(id, 'design_tokens', { layer: 'design' })[0];
+  applyOperation({ db, know, api, projectId: id, operationId: 'setTokens', body: { corners: { ...tokens.corners, medium: 20 } }, author: owner.name });
+  const second = publishLayerFile({ db, api, projectId: id, path: 'kit.js', project });
+  assert.notEqual(second.digest, first.digest, 'a new Design revision is a new kit');
+  assert.equal(publishedLayerFile(db, id, 'design', 'kit.js', first.digest).body, first.body, 'a pinned version still reads');
+  assert.equal(publishedLayerFile(db, id, 'design', 'kit.js', '0'.repeat(20)), null);
+}));
+
+test('the kit\'s token variables are the generated app\'s: Design\'s handler and the portal compute the same values', () => fixture(({ db, know, id }) => {
+  const api = layerApi(db, id, 'design');
+  const tokens = know.list(id, 'design_tokens', { layer: 'design' })[0];
+  const data = Object.fromEntries(Object.entries(tokens).filter(([key]) => !['id', 'kind', 'revision', 'layer', 'title'].includes(key)));
+  for (const mode of ['light', 'dark']) assert.deepEqual(runPure(api.source, 'tokenVariables', [data, mode]), tokenVariables(data, mode), mode);
+}));
+
+test('a contract keeps a demo and a template through Design\'s API, and the kit draws the template', () => fixture(({ db, know, owner, id }) => {
+  const api = layerApi(db, id, 'design');
+  const created = applyOperation({ db, know, api, projectId: id, operationId: 'createComponent', author: owner.name, body: { component: { name: 'World map', group: 'Other',
+    props: [{ key: 'title', kind: 'text', default: 'My world' }], demo: { props: { title: 'Mossbank' } },
+    template: { html: '<section><h2>{{title}}</h2></section>', css: 'section{background:var(--mat-sys-surface-container);font:var(--mat-sys-title-large)}' } } } });
+  const map = know.list(id, 'component', { layer: 'design' }).find(component => component.name === 'World map');
+  assert.ok(created && map, 'created');
+  assert.deepEqual(map.demo, { props: { title: 'Mossbank' }, slots: {} });
+  assert.match(map.template.html, /\{\{title\}\}/);
+  assert.throws(() => applyOperation({ db, know, api, projectId: id, operationId: 'updateComponent', id: map.id, author: owner.name, body: { changes: { template: { html: '<script>x()</script>', css: '' } } } }),
+    /run or load/);
+  const kit = publishLayerFile({ db, api, projectId: id, path: 'kit.js', project: { name: 'Tool Share', slug: 'tool-share' } });
+  assert.ok(kit.body.includes('"tag":"tool-world-map"') && kit.body.includes('{{title}}'));
 }));

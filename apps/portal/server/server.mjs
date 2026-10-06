@@ -48,7 +48,7 @@ import { initPagesCodeObservations, codeRouteObservations, recordCodeRouteObserv
 import { initActionMigration, migrateActionProject, layerActionSettings, setActionAssignee, setProjectWorkStyle, setLayerActionGrant, setActionMethod } from './lat08-migration.mjs';
 import { readActionSource, readAttemptSource, checkPinnedActionEffect } from './code-action-gateway.mjs';
 import { decideFollowUp, hasElevated, initLayerScope, layerAccess, requireElevated, setLayerDefaultAssignee, setLayerElevated } from './layer-scope.mjs';
-import { applyOperation, kindOwners, layerApi, layerApiForKind, recordOperations } from './layer-api.mjs';
+import { applyOperation, kindOwners, layerApi, layerApiForKind, publishedLayerFile, publishLayerFile, recordOperations } from './layer-api.mjs';
 import { frameAllows, frameLabel, hostRecordFeatures, layerUi } from './layer-ui.mjs';
 import { ensureProjectRepositoryLayers, layerHostCalls, layerInstallWaiting } from './layer-package.mjs';
 import { codeRepository, codeSync, githubTokenFor, initCodeRepository } from './code-repository.mjs';
@@ -411,6 +411,9 @@ function scaffoldSetup(user, projectId) {
   const brandUploads = new Map(flows.projectAssets(projectId, 'brand').map(asset => [asset.id, asset]));
   const designSystem = { tokens: know.list(projectId, 'design_tokens', { layer: 'design' })[0] || null,
     components: know.list(projectId, 'component', { layer: 'design' }).map(component => ({ ...component, status: componentStatus(component) })), brand: know.list(projectId, 'brand_asset', { layer: 'design' }).map(asset => ({ ...asset, upload: asset.assetId ? brandUploads.get(asset.assetId) || null : null })) };
+  // W-29 (kit-contract.md K1): the generated app keeps Design's kit beside its tokens, when Design publishes one.
+  const designApi = layerApi(db, projectId, 'design');
+  if (designApi?.publishes.includes('kit.js') && designSystem.tokens) designSystem.kit = publishLayerFile({ db, api: designApi, projectId, path: 'kit.js', project: { name: setup.project.name, slug: setup.project.slug } }).body;
   return { ...setup, data: { objects: know.list(projectId, 'data_object'), operations: know.list(projectId, 'data_operation') }, agents: know.agentExport(projectId), designSystem,
     pageRecords: know.list(projectId, 'page') };
 }
@@ -1105,6 +1108,21 @@ async function api(request, response, url) {
         message: typeof input.message === 'string' ? input.message : null }), { 'cache-control': 'no-store' });
     }
     return json(response, 405, { error: 'Method not allowed.' });
+  }
+  // W-29 (DEC-070): a file a layer publishes from its records, such as Design's kit.js. Without a digest it answers with the
+  // current version's digest and body; with one, that version, which never changes, so it may be cached for good.
+  const layerPublishRoute = /^\/api\/projects\/([^/]+)\/layers\/([^/]+)\/publish\/(?:([0-9a-f]{20})\/)?([a-z][a-z0-9-]*\.(?:js|css|json))$/.exec(url.pathname);
+  if (layerPublishRoute && request.method === 'GET') {
+    const [projectId, layerKey, digest, path] = layerPublishRoute.slice(1).map(value => value && decodeURIComponent(value));
+    requireMember(db, user, projectId);
+    const api = layerApi(db, projectId, layerKey);
+    if (!api) return json(response, 404, { error: 'This layer publishes no files.' });
+    const project = db.prepare('SELECT name, slug FROM projects WHERE id = ?').get(projectId);
+    const file = digest ? publishedLayerFile(db, projectId, layerKey, path, digest) : publishLayerFile({ db, api, projectId, path, project: { name: project.name, slug: project.slug } });
+    if (!file) return json(response, 404, { error: 'No such version of this file.' });
+    response.writeHead(200, { 'content-type': file.type, 'x-aludel-digest': file.digest, 'x-content-type-options': 'nosniff',
+      'cache-control': digest ? 'private, max-age=31536000, immutable' : 'no-store' });
+    return response.end(file.body);
   }
   // PAGES-API-01: a layer's API. GET returns its OpenAPI document; POST calls one operation and applies it at once.
   const layerApiRoute = /^\/api\/projects\/([^/]+)\/layers\/([^/]+)\/api(?:\/([A-Za-z][A-Za-z0-9]*))?$/.exec(url.pathname);

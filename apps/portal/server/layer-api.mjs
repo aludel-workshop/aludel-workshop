@@ -86,7 +86,7 @@ function compile(key, repo, commit, manifest) {
   const catalogNames = spec['x-aludel-catalogs'] || [];
   if (!Array.isArray(catalogNames) || !catalogNames.every(name => /^[a-zA-Z][a-zA-Z0-9]*$/.test(name))) fail('The layer API names invalid host catalogs.', 500);
   const api = { key, commit, spec, source, digest: createHash('sha256').update(source).digest('hex'), handlerPath: manifest.api.handler, operations, records, catalogNames, outputs: manifest.outputs,
-    seeds: manifest.api.seeds || [] };
+    seeds: manifest.api.seeds || [], publishes: manifest.api.publishes || [] };
   cache.set(cacheKey, api);
   return api;
 }
@@ -270,6 +270,25 @@ export function seedLayer({ db, know, api, projectId, event, project }) {
   return applyAsAludel(db, know, api, projectId, writes, references, records, write => typeof write.note === 'string' ? write.note.slice(0, 300) : null);
 }
 
+// W-29 (DEC-070, kit-contract.md K1): a file the layer publishes from its records (`api.publishes`), made by the handler's
+// publish(path, { records, project }). The same records give the same file, so its content digest names that version. Each
+// version is kept, so a page that pinned a digest keeps working after Design changes; the records stay the only source.
+const publishedTypes = { js: 'text/javascript; charset=utf-8', css: 'text/css; charset=utf-8', json: 'application/json; charset=utf-8' };
+export function publishLayerFile({ db, api, projectId, path, project }) {
+  if (!api.publishes.includes(path)) fail(`The ${api.key} layer publishes no ${path}.`, 404);
+  const records = Object.fromEntries([...api.records.keys()].map(kind => [kind, recordsOf(db, api, projectId, kind, null)]));
+  const result = handle(api, 'publish', [path, { records, project }]);
+  if (typeof result?.body !== 'string' || result.body.length > 2 * 1048576) fail('The layer published an invalid file.', 500);
+  const digest = createHash('sha256').update(result.body).digest('hex').slice(0, 20);
+  db.prepare('INSERT OR IGNORE INTO layer_publications (project_id, layer_key, path, digest, body, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(projectId, api.key, path, digest, result.body, now());
+  return { path, digest, type: publishedTypes[path.split('.').pop()], body: result.body };
+}
+export function publishedLayerFile(db, projectId, key, path, digest) {
+  const row = db.prepare('SELECT body FROM layer_publications WHERE project_id = ? AND layer_key = ? AND path = ? AND digest = ?').get(projectId, key, path, digest);
+  return row ? { path, digest, type: publishedTypes[path.split('.').pop()], body: row.body } : null;
+}
+
 // LAYER-BINDINGS-01: an active binding imports another layer's entries into this layer's facet through the adapter this
 // layer declares (`adapters`) and implements as the handler's `adapt`. The host checks the writes like an operation's and
 // applies them as Aludel; the rationale names the binding.
@@ -340,6 +359,9 @@ export function applyWrites(know, projectId, writes, references, { layer, author
 // ---- Staged runs: an agent's calls build a draft that review shows and acceptance commits ----
 
 export function initLayerApi(db) {
+  db.exec(`CREATE TABLE IF NOT EXISTS layer_publications (
+    project_id TEXT NOT NULL, layer_key TEXT NOT NULL, path TEXT NOT NULL, digest TEXT NOT NULL, body TEXT NOT NULL, created_at TEXT NOT NULL,
+    PRIMARY KEY(project_id, layer_key, path, digest))`);
   db.exec(`CREATE TABLE IF NOT EXISTS layer_run_drafts (
     attempt_id TEXT NOT NULL, seq INTEGER NOT NULL, project_id TEXT NOT NULL, layer_key TEXT NOT NULL, operation_id TEXT NOT NULL,
     input_json TEXT NOT NULL, writes_json TEXT NOT NULL, references_json TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(attempt_id, seq))`);
