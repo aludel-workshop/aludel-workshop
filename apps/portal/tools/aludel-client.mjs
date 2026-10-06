@@ -190,3 +190,75 @@ export async function fetchTemplates(cwd, catalogPath, config = loadConfig()) {
   if (missing.length) throw new Error(`Still missing ${missing.map(pin => pin.branch).join(', ')} after fetching from Aludel.`);
   return { target, fetched: pins.length, fresh };
 }
+
+// W-33 (MULTI-REPO-ITEMS-01): the project's other repositories, side by side with this checkout at the folders its settings
+// name. Git reaches them with the person's own credentials (in an item container, the helper VS Code forwards), never
+// Aludel's, and no credential is written anywhere: the remotes are the plain clone URLs.
+const quietGit = (cwd, args, timeout = 300000) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout,
+  env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } }).trim();
+const gitSaid = error => String(error.stderr || error.message).trim().split('\n').slice(-2).join(' ');
+function companionFolder(top, repo) {
+  const target = resolve(top, repo.path);
+  if (target === top || !target.startsWith(top + '/')) throw new Error(`${repo.key}'s folder ${repo.path} isn't inside this checkout.`);
+  return target;
+}
+export function checkoutRepositories(cwd, repositories) {
+  const top = quietGit(cwd, ['rev-parse', '--show-toplevel']);
+  const identity = ['user.name', 'user.email'].map(key => { try { return [key, quietGit(top, ['config', key])]; } catch { return null; } }).filter(Boolean);
+  const done = [];
+  for (const repo of repositories.filter(entry => !entry.primary)) {
+    const target = companionFolder(top, repo), [line] = repo.lines;
+    let state;
+    try {
+      if (!existsSync(join(target, '.git'))) {
+        mkdirSync(dirname(target), { recursive: true });
+        quietGit(top, ['clone', '--quiet', '--no-tags', '--branch', line, repo.url, target]);
+        state = 'cloned';
+      } else {
+        let origin = null;
+        try { origin = quietGit(target, ['remote', 'get-url', 'origin']); } catch { /* none yet, as a folder from the old template bundle */ }
+        if (origin && origin !== repo.url) throw new Error(`its origin is ${origin}, not ${repo.url}. Point it there (git -C ${repo.path} remote set-url origin ${repo.url}) or move it aside.`);
+        if (!origin) quietGit(target, ['remote', 'add', 'origin', repo.url]);
+        quietGit(target, ['fetch', '--quiet', '--no-tags', '--prune', 'origin']);
+        state = 'updated';
+      }
+    } catch (error) { done.push({ key: repo.key, path: repo.path, state: 'failed', detail: error.stderr ? gitSaid(error) : error.message }); continue; }
+    for (const [key, value] of identity) quietGit(target, ['config', key, value]);
+    const missing = repo.lines.filter(name => { try { quietGit(target, ['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${name}`]); return false; } catch { return true; } });
+    done.push({ key: repo.key, path: repo.path, state, missing });
+  }
+  return done;
+}
+export async function fetchRepositories(cwd, config = loadConfig()) {
+  const { repositories } = await request(config, '/repositories');
+  return checkoutRepositories(cwd, repositories);
+}
+// The item's branch on one line of a repository: aludel/w-n on its default line, aludel/w-n--<line> on any other, so both
+// can exist in one repository and the item is still read from the name. Made from origin's line, or taken up from origin
+// when it's there already (a container opened again). Switching needs a clean folder.
+export function lineBranch(ref, repo, line) {
+  const base = `aludel/${String(ref).toLowerCase().replace(/[^a-z0-9-]+/g, '-')}`;
+  return line === repo.lines[0] ? base : `${base}--${line.replace(/[^A-Za-z0-9._-]+/g, '-')}`;
+}
+export function startLine(cwd, repositories, key, line) {
+  const top = quietGit(cwd, ['rev-parse', '--show-toplevel']);
+  const ref = branchItem(top);
+  if (!ref) throw new Error('This checkout is not on an item’s branch; start the item first.');
+  const repo = repositories.find(entry => entry.key === key);
+  if (!repo) throw new Error(`${key} isn't one of the project's repositories (${repositories.map(entry => entry.key).join(', ')}).`);
+  if (repo.primary) throw new Error(`${key} is this checkout; start_work puts it on the item's branch.`);
+  if (!repo.lines.includes(line)) throw new Error(`${line} isn't one of ${key}'s lines (${repo.lines.join(', ')}). Lines are set in the project's settings.`);
+  const target = companionFolder(top, repo);
+  if (!existsSync(join(target, '.git'))) throw new Error(`${key} isn't checked out at ${repo.path} yet. Run: aludel repositories`);
+  const git = args => quietGit(target, args);
+  const has = name => { try { git(['rev-parse', '--verify', '--quiet', name]); return true; } catch { return false; } };
+  const branch = lineBranch(ref, repo, line);
+  if (git(['rev-parse', '--abbrev-ref', 'HEAD']) === branch) return { repository: key, line, branch, path: repo.path, created: false };
+  if (git(['status', '--porcelain'])) throw new Error(`${repo.path} has uncommitted changes. Commit or stash them before switching it to ${branch}.`);
+  try { git(['fetch', '--quiet', '--no-tags', 'origin', `+refs/heads/${line}:refs/remotes/origin/${line}`]); } catch (error) { throw new Error(`Couldn't fetch ${line} of ${key}: ${gitSaid(error)}`); }
+  try { git(['fetch', '--quiet', '--no-tags', 'origin', `+refs/heads/${branch}:refs/remotes/origin/${branch}`]); } catch { /* not on origin yet */ }
+  if (has(`refs/heads/${branch}`)) { git(['checkout', '--quiet', branch]); return { repository: key, line, branch, path: repo.path, created: false }; }
+  const from = has(`refs/remotes/origin/${branch}`) ? `origin/${branch}` : `origin/${line}`;
+  git(['checkout', '--quiet', '--no-track', '-b', branch, from]);
+  return { repository: key, line, branch, path: repo.path, created: from === `origin/${line}`, from };
+}

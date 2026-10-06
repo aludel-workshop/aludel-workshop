@@ -8,6 +8,9 @@
 //                                                           the item's page beside the code it shows); no token to copy
 //   aludel templates [catalog]                              in an item container: the layer templates its branch pins, from
 //                                                           Aludel (no GitHub access needed)
+//   aludel repositories                                     the project's other repositories, cloned or updated beside this
+//                                                           checkout at the folders its settings name (your own git access)
+//   aludel line <repository> <line>                         put one of them on the item's branch for that line
 //   node apps/portal/tools/aludel.mjs list                   your goal items, and the open ones you could claim
 //   node apps/portal/tools/aludel.mjs claim W-12             claim it and connect Claude Code in this folder to Aludel
 //   node apps/portal/tools/aludel.mjs status W-12            where it stands: actions, what waits on you, the changeset
@@ -15,7 +18,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
-import { checkoutInfo, configPath, connectContainer, fetchTemplates, inContainer, pushReport, loadConfig, pair, request } from './aludel-client.mjs';
+import { checkoutInfo, configPath, connectContainer, fetchRepositories, fetchTemplates, inContainer, pushReport, loadConfig, pair, request, startLine } from './aludel-client.mjs';
 
 const adapter = new URL('./editor-mcp.mjs', import.meta.url).pathname;
 const out = text => process.stdout.write(text + '\n');
@@ -67,6 +70,17 @@ try {
   } else if (command === 'templates') {
     const done = await fetchTemplates(process.cwd(), arg || 'apps/portal/config/layer-templates.json');
     out(done.fetched ? `Layer templates ${done.fresh ? 'cloned into' : 'updated in'} ${done.target} from Aludel.` : `${done.target} already has every pinned template.`);
+  } else if (command === 'repositories') {
+    const done = await fetchRepositories(process.cwd());
+    if (!done.length) out('This project has no other repositories in its settings.');
+    for (const repo of done) out(repo.state === 'failed' ? `${repo.key}: couldn't check it out at ${repo.path}: ${repo.detail}`
+      : `${repo.key}: ${repo.state} at ${repo.path}${repo.missing.length ? ` (origin has no ${repo.missing.join(', ')})` : ''}`);
+    if (done.some(repo => repo.state === 'failed')) process.exitCode = 1;
+  } else if (command === 'line') {
+    const [, , , key, line] = process.argv;
+    if (!key || !line) throw new Error('Usage: aludel line <repository> <line>, for example aludel line layer-base design');
+    const done = startLine(process.cwd(), (await request(loadConfig(), '/repositories')).repositories, key, line);
+    out(`${done.path} is on ${done.branch}${done.created ? `, made from origin/${line}` : ''}. Commit there; report_code pushes it.`);
   } else if (command === 'list') {
     const config = loadConfig();
     const { goals } = await request(config, '/goals?claimable=1');
@@ -105,7 +119,7 @@ try {
     const left = view.actions.filter(action => !['review', 'done', 'proposed'].includes(action.state));
     out(left.length ? `Still open: #${left.map(action => action.number).join(', #')}.` : `Every action is ready for review; move ${item.ref} to review on its page.`);
   } else {
-    out('Usage: aludel connect | templates [catalog] | pair [origin] | list | claim W-n | status W-n | submit W-n');
+    out('Usage: aludel connect | templates [catalog] | repositories | line <repository> <line> | pair [origin] | list | claim W-n | status W-n | submit W-n');
     if (command && command !== 'help') process.exitCode = 1;
   }
 } catch (error) {

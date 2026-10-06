@@ -218,6 +218,27 @@ Code's repository panel listing the set and its access (§1) isn't an action yet
   - Aludel's own set (`layer-base` with its seven lines, the `layer-templates.json` pins and the digest check) is entered on the owner's portal once #2 is accepted. That's an owner settings action on the live portal.
   - The container side is #8.
 
+**#8: every repository in the item container.**
+- **`aludel repositories`** (`checkoutRepositories` in `tools/aludel-client.mjs`) reads the set from the portal and puts each companion beside the checkout at its folder:
+  - cloned on its default line, or fetched if it's already there;
+  - a folder with no remote (from the old bundle) is adopted, and one whose origin points elsewhere is left alone, with the reason;
+  - each clone gets the person's git identity from the primary;
+  - a line origin doesn't have is reported.
+  The remote is always the plain URL; git uses the person's own access.
+- **`aludel line <repository> <line>`** and the MCP tool **`start_line`** (`startLine`):
+  - put a companion on `aludel/w-n` (its default line) or `aludel/w-n--<line>`;
+  - the branch is made from origin's line, or taken up from origin when the item already pushed it;
+  - switching needs a clean folder.
+- **Setup:** `.devcontainer/aludel-setup.sh` runs `aludel repositories` after connecting. `aludel templates` stays until #6 retires it (Q3), because the live portal has no repositories list until W-33 merges.
+- **Checks:**
+  - `tests/repository-checkout.test.mjs`: 5 tests passing.
+  - The affected set without the three Docker-only files: 53 tests, 52 passing, 0 failing.
+- **Live proof (2026-10-06, this item container):**
+  - With Aludel's values (`layer-base` at `layer-base`, its seven lines), the bundle-made `./layer-base` was adopted with origin `https://github.com/aludel-workshop/layer-base.git`, and every line was fetched.
+  - `startLine` made `aludel/w-33--design` from `origin/design`, and a real `git push` created it on GitHub at `550f846`, the Design template's tip, with no new commits.
+  - The push went through VS Code's forwarded helper. `layer-base/.git/config` holds only the plain URL.
+  - The live portal couldn't serve the list for this, since it runs `main`; the values were passed directly. The client-to-portal path is covered by the server route and #6's journey.
+
 ## Process note (three lines)
 
 - **Changed:** the spec is generic from the start, after the owner's steer. Aludel and `layer-base` appear only as the first project's values, and the end-to-end journey uses a fixture that isn't Aludel.

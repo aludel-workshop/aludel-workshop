@@ -1,7 +1,7 @@
 // A small stdio MCP adapter for Aludel's editor API. It reads project context, and (AGENT-WORK-01) lets your local agent work a
 // goal item you have claimed: define it, add and move actions, talk in its thread, and stage changes through each layer's API.
 import readline from 'node:readline';
-import { branchItem, checkoutInfo, configPath, inContainer, loadConfig, pair, pushReport, request, startBranch } from './aludel-client.mjs';
+import { branchItem, checkoutInfo, configPath, inContainer, loadConfig, pair, pushReport, request, startBranch, startLine } from './aludel-client.mjs';
 
 let config;
 const names = {
@@ -23,6 +23,9 @@ const names = {
       const view = await request(config, goal({ workId: id }));
       return { started: startBranch(process.cwd(), view.item.ref), item: view };
     } },
+  start_line: { description: 'Put one of the project\u2019s other repositories (checked out beside this one; `aludel repositories` fetches them) on the item\u2019s branch for one of its lines, to change it as part of the item: aludel/w-n on its default line, aludel/w-n--<line> on another. Commit there; report_code reports and pushes it with the rest.',
+    schema: { type: 'object', properties: { repository: { type: 'string', description: 'Its key in the project\u2019s settings, such as layer-base.' }, line: { type: 'string', description: 'One of its lines, such as design.' } }, required: ['repository', 'line'] },
+    run: async a => startLine(process.cwd(), (await request(config, '/repositories')).repositories, a.repository, a.line) },
   work_view: { description: 'Read a goal item (by id or number, such as W-12): its brief, phases, actions (with what blocks each), open needs, recent thread and staged changeset.',
     schema: { type: 'object', properties: { workId: { type: 'string' } }, required: ['workId'] }, path: a => goal(a) },
   stack_map: { description: 'List the project\u2019s layers: what each owns, its charter and the operations its API offers.', schema: { type: 'object', properties: {} }, path: () => '/stack' },
