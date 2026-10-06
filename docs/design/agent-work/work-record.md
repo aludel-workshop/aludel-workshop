@@ -289,3 +289,149 @@ Owner, before the dogfood: "the work style, claude or local? thats supposed to b
   - The MCP instructions say to stop after `define_work` until the person starts the item. The server already refuses actions before Start.
   - The journey checks the assigned Draft (`01e-draft-assigned`).
 - **Not checked:** the links on the owner's machine. That covers whether the prompt is filled in or sent (the extension stores it as the conversation's initial prompt, so probably filled in), and which window wins when several are open. The owner tries this at the dogfood's start.
+
+## Dogfood: W-8 "kanban board" in an item container (2026-10-05)
+
+Owner, in the container's Claude Code chat: "make sure you log all findings as you go, this is as much about improving the work process as it is about creating the board." Authorized: this findings log on `aludel/w-8`, plus read-only use of the Aludel tools. Defining or starting W-8 is not yet authorized. The agent is Claude Code (Opus 5.5) in the item container for W-8 (`wrk-720c8d53`), connected as XTMC-ZN6J.
+
+### Findings
+
+Each finding is agent-observed unless marked otherwise.
+
+- **F1. The container opens with no prompt.** The owner's first message was "hey, tell me what you see". Open in VS Code carries `prompt=Work on W-n…`. The container link (`cloneInVolume`) can't carry one, so nothing tells the agent which item it has or that it should orchestrate it. The agent found its item from three places: the branch name `aludel/w-8`, the MCP server's instructions ("For a goal item assigned to your person, you are its orchestrator…"), and `assigned_tasks`.
+- **F2. What the agent knows about Aludel comes from this repository, not from the platform.** This applies to what Aludel is, the layers, how packets and records work, and status. It comes from `AGENTS.md` and `docs/`, which exist only because Aludel builds itself. A connected product repository would have none of that. Its agent would get the MCP instructions (generic, about 15 lines) and `task_context`. Measured on W-8, `task_context` holds the brief, two docs (Design direction, Accessibility baseline), a single line of project guidance, `principles: []`, `role: null` and `action: null`.
+- **F3. `.aludel/AGENTS.md` is written for a layer repository, not an app repository.** It says to read `knowledge/charter.md` and `docs/layer-contract.md`, to run `node --test tests/*.test.mjs`, and that "Aludel turns the branch into a merge request". In a connected app repository, `.aludel/` is the Code layer's installed files, so an agent reading it would follow the wrong instructions. The root `AGENTS.md` doesn't point at it.
+- **F4. `work_view("W-8")` returns "Task not found".** The internal id `wrk-720c8d53` works. `start_work` accepts W-n, so `work_view` should too.
+- **F5. W-8 and W-7 show `status: blocked`, with migration "No checked, installed layer action maps this historical item."** W-8 was created today, so it isn't historical. Not yet tested: whether this stops `define_work` or Start. W-7 was supposed to be archived before this run, but it is still assigned.
+- **F6. The item log shows four container opens before the connect.** Two of them say "Moved aludel/w-8 up to main". The owner may have retried during setup. Not investigated.
+- **F7. The layer APIs as an agent sees them (`stack_map`):**
+  - Work isn't listed.
+  - Code and Data have `operations: []`, so the 2,507 Code units aren't reachable through the tools, and `search_knowledge` returns nothing for "work board" or "Kanban".
+  - Vision and Design have `charter: null`.
+  - Operations come with ids and summaries only, with no body schema. An agent can't learn a flow's shape before it stages one.
+- **F8. Pages is empty for this project.** `listPages` and `listFlows` both return `[]`. Code has its own `journey` output (in `.aludel/outputs/journeys.json`). So "user journeys" have two possible homes, and nothing tells an agent which one a flow belongs in.
+- **F9. W-8's brief changes a page but names no layers.** There's no target and no Pages flow for the board. The orchestrator protocol says "one action per layer change", so defining it means deciding whether a Pages flow and spec come first. The brief cites `docs/design/agent-work/ecosystem/v1`, which is a repository file. The project's Pages layer has no record of it.
+- **F10. `task_context` says `taskOpen.available: false`, "The task is missing pinned inputs."** It doesn't say which inputs.
+- **F11. The container has no git identity.** The first `git commit` fails with "Author identity unknown". The image and `aludel-setup.sh` set neither `user.name` nor `user.email`, so `report_code` can't succeed until someone sets them by hand. The setup could take the identity from the connecting person.
+- **F12. The portal stopped answering for about a minute, and `start_work` failed with only "The operation was aborted due to timeout".** Every endpoint went silent at once, including the static `/api/editor/tools/aludel.mjs`: curl got no response in 27 s. Then the portal recovered, answering `/stack` in 12 ms, and a retry of `start_work` succeeded. That suggests the portal's event loop was blocked, not a network fault; the cause wasn't found. The client's 8 s timeout (`aludel-client.mjs:39`) has no retry and its error gives no hint, so an agent can't tell "portal busy" from "portal down".
+- **F13. It isn't clear which layer an action that changes the portal's code belongs to.** Work isn't in `stack_map` (F7). The only code layer is Code (`platform`), whose charter says "Nobody does their coding here". The W-8 build actions were filed under `platform`. Layer keys aren't layer names either (`platform` is Code, `product` is Vision), and the agent has to work that out from `stack_map`.
+- **F5, update.** `define_work` succeeded and moved W-8 to Ready. The item still reports `status: blocked`, with the migration reason, so the field is shown but enforced nowhere this far. Start hasn't been tried yet.
+- **F11, proposed fix (owner asked, 2026-10-05: "could we pass that when setting up the container?").** Yes. The portal already stores each person's `email` and `display_name` (`server/accounts.mjs:14`). The connect poll that hands the container its token could also return the assignee's name and email, and `connectContainer` would set them as the clone's `user.name` and `user.email` (repository-local, in the volume). Open question: the portal email may not be the one GitHub knows the person by, so commits may not link to their GitHub profile. A GitHub noreply address or an identity setting on the person would fix that. The fix is outside W-8's scope; it waits on the owner.
+
+### W-8 defined (2026-10-05)
+
+Owner: "go ahead and set up w-8, lets test this all." `start_work` (after F12) kept `aludel/w-8`. `define_work` produced two phases:
+1. **Spec the board in Pages** (gated). Action 1 (`pages`) records a Work board page and the move flow, with its branches, from the ecosystem prototype.
+2. **Build the board.** Actions 2–5 (`platform`): the board UI, the move rules, the per-layer Tasks tab, and the acceptance journeys and gates.
+
+The item moved to Ready. The build actions show "Waits for the review gate after Spec the board in Pages". Next, the owner checks the item and presses Start.
+- **F14. Every write returns the whole item.** `post_message` and `define_work` each echo the whole item, including the full brief twice and the entire thread. That's about 10 KB per call, and it grows with the thread, filling the agent's context with text it already has. Returning a short acknowledgement (event id and new state) would be enough.
+- **F15. Actions have only a `goal`, with no title and description (owner, 2026-10-05: "actions need a title and description, those long titles are a little ridiculous").** `define_work`, `add_action` and `update_action` take one `goal` string, and the item page shows it as the title. The agent retitled the five actions to short goals through the same editor endpoint. Action 1's detail now lives only here, because there's nowhere else to put it: draw on prototype shots 01–06 and 17–18; the flow includes the define-first branch and the refused-drag-to-Done branch; log any gaps in the Pages API. Fix: add a `description` to actions (schema, MCP tools, item page, peek).
+- **F16. The agent can't start an action, and nothing tells it when the item starts.** `update_action` → working is refused with "Start W-8 before working on its actions." (`server/agent-work.mjs:286`). That's correct, because Start belongs to the person. Start is the board move Ready → In progress (`server/agent-work.mjs:181`). It needs Ready and an assignee, sets the state to `claimed` with `startedAt`, logs "Moved to In progress", and pushes the change to the item page's event stream. The MCP has no subscription, so a local agent finds out only by polling `work_view`, or when the person says so in chat.
+- **F5, resolved by reading the code.** `move` never reads `status` or `migration`, so the "blocked" label doesn't block Start. It is misleading text on a goal item.
+- **F17. A Pages flow needs a persona from Vision, and this project has none.** Learned from a test, not the API: `createFlow` takes `{ flow: { title, persona, steps } }` (`tests/overlap-work.test.mjs:64`). Vision's `listPersonas`, Pages' `listKitItems`, `listPages` and `listFlows` all return `[]`. So action 1 also needs a Vision write (a "Project owner" persona), which a `pages` action may not be allowed to stage. Its shape is still unknown, and it isn't clear whether that write belongs in the action or in its own `product` action.
+- **F17, owner ruling (2026-10-05): "a layer should never need another layer. if personas are a part of pages work, it should have a local representation of personas. then that could be bound to the info from vision. so we need to edit the way pages work."** Today a flow and its steps can carry a `persona` id that points at a Vision record (`server/knowledge.mjs:339`, `pages-flow-work.mjs:16`), and Code's journeys enforce one persona each (`server/journeys.mjs:41`). The direction: Pages owns its own persona records, which can be bound to Vision's through the Library. The precedent is Pages' own copy of the app kit (`kit_item`, "Pages' copy of the app kit"), and the direction fits DEC-055/057/059 (layers read each other only through the Library). Not done here: the change is to the Pages layer itself, outside W-8. The persona is optional on a flow, so W-8's flows were staged without one.
+- **F18. An agent finds a record's shape by reading the server, not the API.** To stage two pages and four flows, the agent read `server/knowledge.mjs` (the page, flow and section validators), `server/onboarding.mjs` and `config/page-types.json` plus `config/starter-kit.json` (for `pageType` and `icon`, which come from catalogs the API never lists). A remote agent wouldn't have the server source. The bodies are also inconsistent: create takes `{ page: {...} }`, but update takes `{ changes: {...} }`, found when the first update failed with "changes is required.". This sharpens F7: each operation needs a body schema and its catalogs.
+- **F19. Pages has no "board" page type.** The types are dashboard, feed, list, gallery, detail, content, messages, form and settings. The Work board was recorded as `list`, with a note.
+- **F20. Flows can't branch, so each side path became its own flow, as A7 prescribes.** W-8 action 1 produced four flows: "Move an item across the board" (7 steps), "Move a rough note to Ready", "Start an item nobody is assigned to" and "Try to drag an item to Done". All four have no persona (F17), and the Map placement wasn't set.
+
+**W-8 action 1, staged (2026-10-05).** Pages `pag-60d70f32` "Work board" (sections: Filters, Columns, Card, and Peek leading to the item) and `pag-e3341df1` "Work item", recorded only as far as the flows reach it. Flows `flw-6fa9b6ba`, `flw-8b7a07b7`, `flw-8f8b4cba` and `flw-dbf45e5a`. Nothing applies until close-out.
+- **F21. Reviewing a Pages action is a plain list of changes, not the walkable flow preview the owner specified (owner, 2026-10-05: "i know i specified the review modal having interactive flow/page preview, what happened to that?").** This is the most serious gap so far. Where it was specified:
+  - G2 (this record, "Required for the Pages review action"): Pages review should look like Pages' flow previewer, with mockups walked as a flow and a clean Previous vs Proposed comparison.
+  - The plan's A7: the flow walker from `pages-review/v1`, with flag-and-say review.
+  - A4: "its journeys on the combined preview".
+
+  What was built: A4's per-action review lists the staged records with Approve or Flag (`src/layers/work-goal.ts:135`, `:160`). The J6 review with a walked preview (`src/layers/work-review.ts`) still exists, but only on the old person-run path; goal actions don't use it.
+
+  How it slipped:
+  1. **The dogfood was ordered before A7.** A7 also waits on D4, the HTML kit decision. Nobody checked that the dogfood's first action would be a Pages action, whose review depends on A7.
+  2. **A4's deviations don't mention it.** They list "previews of the local branch", but not that the review shows records as a list, without J6's preview or a Previous/Proposed comparison. The downgrade went unreported.
+  3. **A4's exit check tested the mechanics, not the accepted prototype.** It checked flag, gate and close-out, not the review the owner had accepted, even though the plan's process note says prototype walkthroughs become acceptance.
+
+  Process fix to apply: before closing a slice, list every owner requirement (G and F rows) that the slice touches and mark each as built, deviated (said plainly), or deferred (to a named slice). Before a dogfood or trial, check that every kind of action it will produce can be reviewed as specified.
+
+**Owner, 2026-10-05:** waits for A7 for the Pages review walker rather than pulling it forward. Approved action 1 "just to see what happens". For F11, set this clone's git identity by hand (repository-local) to `henrydker`.
+- **F12, again.** A second stall came about a minute after the owner approved action 1: `/goals` timed out after 8 s at 23:50, then answered again.
+- **F22. The item container can't build the portal or run the templates gate.** `prebuild` and `pretypecheck` run `tools/sync-layer-template.mjs`, which compiles the Pages UI from a pinned commit (`ceeb9d4`) of the sibling repository `../layer-base` (`config/layer-templates.json`). The container clones only `aludel-workshop`. `git ls-remote https://github.com/aludel-workshop/layer-base.git` hung, apparently waiting for credentials, so it's private or doesn't exist. As a result `npm run build`, `npm run typecheck`, every browser journey, and `test:server:templates` (AGENTS.md's required gate) all fail here. `npx ngc -p tsconfig.app.json --noEmit` works around the typecheck: its only error is the missing `src/installed/pages`. COLLAB-WORK-01 §3 ("one environment definition for people and cloud agents") assumed the repository is self-sufficient, and it isn't. Fix candidates: publish `layer-base` to GitHub (already the status file's next step) and have `aludel-setup.sh` clone it as a sibling; or have the portal serve the pinned template, as it already serves the Aludel tools.
+- **F23. The A8 test fails inside an item container.** `tests/agent-work.test.mjs` "A8: a checkout is connected once…" expects `pair` to write `.mcp.json`. The container's `ALUDEL_CONTAINER=1` makes `pair` skip that file on purpose (item-container build), so the test inherits the container's environment. With `env -u ALUDEL_CONTAINER` it passes (5 pass, 2 skipped because templates are off). The test should clear that variable for its child processes.
+
+### W-8 action 2, first pass (2026-10-05)
+
+Owner approved action 1. The gate cleared, which made #2 and #3 workable. Built on `aludel/w-8`:
+- `src/layers/work-board.ts` is rewritten as the Kanban board: five columns from `item.board`, cards, filters, peek, drag, and the define/start dialogs.
+- Board styles are added to `src/styles.scss`.
+- `goals()` now also returns each goal's action `layers` (`server/agent-work.mjs`), with an assertion in `tests/agent-work.test.mjs`.
+
+Moves defer to the server's existing rules in `move()`, so a refused drag to Done shows the server's message. Legacy (non-goal) items show in their derived column and move from their own page. Checked: `ngc` typecheck (the only error is the missing synced Pages UI, F22), and `agent-work.test.mjs` with `ALUDEL_CONTAINER` unset (5 pass). Not checked: the build, any browser view, axe, 390 px, or the templates gate, all blocked by F22. The unused `WorkCardComponent` in `work-shared.ts` is left in place for now.
+- **F22, owner answer (2026-10-06, on W-8 #2):** "Publish layer-base to GitHub, and the container setup clones it beside the app." Publishing is an owner action, because `layer-base` exists only on the owner's machine and it's a GitHub write. The container side widens into F26.
+- **F24. Actions can be changed but never removed or merged.** `updateAction` (`server/agent-work.mjs:266`) changes goal, summary, layer, `after` and phase. No operation removes an action, and `define` refuses once the item has started. W-8 #4 ("Use the board as each layer's Tasks tab") turned out to be mostly done by #2, because `layer-tasks.ts` already embeds the board with `[layer]`. After Start, the only choices are to keep #4 or retitle it as a check.
+- **F25. Working an item takes both surfaces at once (owner, 2026-10-06):** "this back and forth is rather awkward, i have to work in both surfaces simultaneously … i would love to be able to just work in either or: here in vscode, i could answer the questions, click review links etc., without ever having to go back to the portal. or on the flip, if im managing stuff from the portal, then the container could be almost silent … the whole interaction should feel exactly like if it was running remote, except its talking to this local container with you in it."
+
+  Today:
+  - The agent's API can only be polled. The item page's event stream (`streamGoal`, `server/server.mjs:342`) needs a portal session, and the editor routes have none.
+  - Answers, approvals and flags reach the agent only when it calls `work_view` or the person says so in chat (F16).
+  - Questions reach the person only on the item page.
+
+  Applied now as an experiment: the agent runs a Claude Code `Monitor` on a poller (`aludel-client` every 10 s, one line per person-authored event on W-8). Portal actions then wake the agent in VS Code with no relay. Limits: the watch expires after 30 minutes and has to be re-armed, it polls rather than streams, and it only covers this item.
+
+  The owner's either/or implies three pieces:
+  1. **Portal → agent:** the editor API gets the item's event stream, and the MCP turns person events into prompts.
+  2. **VS Code → portal:** a question appears in the chat, the person's answer there resolves the need (recorded as answered in VS Code, by the person), and review links open in VS Code's browser.
+  3. **A silent container:** a headless Claude (Agent SDK) in the container, subscribed to the item, with no VS Code window. That is A2's orchestrator runtime hosted locally. "Local or remote" then means only where the runtime runs, which is the owner's framing.
+
+  Open question for the owner: should an answer typed in VS Code count as the person's answer? An approval of the agent's own action should stay a person's click.
+- **F26. The agent session should be built around an environment, not one repository (owner, 2026-10-06):** "right now code has a single repo attached. it really needs to allow multiple … if we have e.g. repos for design, then you need to be able to touch that too, right? its almost like this agent session should not be oriented around a single repo, but around an enviroment that lets the agent work across the whole ecosystem."
+
+  Today:
+  - Code binds one repository (EX-02A).
+  - Each installed layer is its own repository forked from `layer-base` (DEC-055/057/059).
+  - Go creates one branch and opens one clone (`cloneInVolume`).
+  - `report_code` and close-out handle one branch.
+
+  The direction:
+  - The item container is the project's environment: every repository the project owns (app repositories and layer repositories) is checked out on the item's branch, beside one another.
+  - Report and close-out treat the item's code as a set of branches.
+  - Layer data still changes only through layer APIs. A layer's repository holds its code, and its outputs are records or repository files (DEC-059).
+
+  This overlaps PLATFORM-PIPELINE-01 (owner-owned repositories) and COLLAB-WORK-01 §3 (one environment definition). F22 is its first concrete case: the app can't build without a second repository.
+- **F27. An agent can't create work items.** The MCP tools cover the agent's own item (`define_work`, `add_action`, `post_message`, `ask`). `createGoal` is reachable only from a portal session (`POST /api/projects/:id/goals`). Every follow-up this attempt surfaced has to wait for the owner to type it in: the Pages personas change (F17), the item environment (F26), one surface (F25), git identity at setup (F11), the Pages review walker pulled forward (F21). The next step is for an agent to propose an item. The owner creates it from the proposal, or it arrives as a Draft the owner keeps or dismisses, matching how DEC-057 follow-ups work.
+- **F28. There's no way to end an item as failed.** Close-out needs the item In review with every action approved (`server/agent-work.mjs:471`). It then applies every staged record and merges the code, so it can only succeed. Archive refuses an item that's in progress (`server/knowledge.mjs:1404`). `move` can't leave In progress except to In review. So W-8 can't be ended from the portal. Needed: a person's "Close as not done" that records why, discards the staged changeset (or keeps it as a draft for a retry, as J6 does for runs), merges nothing, and moves the item to Done marked "not done".
+
+- **F29. The container can push but can't open a pull request.** Pushes work through VS Code's git credential helper. There's no `gh` CLI and no token the agent may use for the GitHub API. So landing work outside close-out, which is the only route while F28 stands, needs the person to open the PR in the browser.
+
+### Attempt 1 closed as failed (2026-10-06)
+
+Owner: "think we've got enough out of these notes to close out and mark this first attempt failed, with the work record as the output."
+
+- **Output:** this record, findings F1–F28. The item branch `aludel/w-8` now differs from `main` only in this file and in the process change below. The board code was reverted on the branch (`1a9eee3`). The draft is kept on `w-8-attempt-1-board` (`58b50d6`), pushed to GitHub on 2026-10-06 at the owner's request. W-8's six staged Pages records were never applied.
+- **Not done:** the board (#2) was written but never built or seen (F22), and #3–#5 never started. Because of F28, W-8 stays In progress in the portal until there's a way to end it, or the owner chooses another route.
+- **Experiment, untested:** the `Monitor` watcher for person events (F25) started after the owner's last answer. No portal action has arrived through it yet, so whether it works is unknown.
+
+#### Retrospective
+
+1. **What made the work harder, slower or more error-prone than necessary?**
+   - *Observed:*
+     - The agent started with no prompt and no project context (F1, F2), and records have no schema, so the server source had to be read (F7, F18).
+     - The portal stalled twice (F12).
+     - The container can't build the app (F22). It has no git identity (F11) and leaks its environment into tests (F23).
+     - Every call returns about 10 KB (F14).
+     - The owner had to work in two surfaces, relaying answers by hand (F16, F25).
+   - *Agent mistake:* a malformed `git revert` was followed by an `--amend` that renamed the wrong commit. Caught by checking the log, and fixed.
+2. **What would make the next equivalent task easier?**
+   - An agent briefing served by the platform: protocol, layer charters, operation schemas with an example record (F2, F7, F18).
+   - An item environment holding every project repository, which can build and run the gates (F22, F26).
+   - Events pushed to the agent, and answers taken from either surface (F25).
+   - Action descriptions (F15), a way to end an item as failed (F28), and agent-proposed items (F27).
+3. **What changes the roadmap, downstream packets, architecture or process?**
+   - The dogfood ran before the pieces it depends on: A7 for Pages review (F21), the multi-repository environment (F22, F26), and push events (F25). The item container is really A2's runtime hosted locally (F25), which argues for building A2's event and runtime contract before more local polish.
+   - Layers must not depend on one another, so Pages needs its own personas (F17).
+   - The environment direction (F26) folds into PLATFORM-PIPELINE-01 and COLLAB-WORK-01 §3.
+4. **Questions created, resolved or made newly important:**
+   - Does an answer typed in VS Code count as the person's (F25)? This blocks the one-surface design.
+   - What does a failed item do with its staged changes: discard them, or keep them as a draft for a retry (F28)?
+   - Who publishes `layer-base` to GitHub, and when? It's an owner action and blocks every container build (F22).
+   - Resolved: the "blocked" status doesn't block anything (F5). The owner waits for A7 rather than pulling the walker forward (F21).
+5. **Which process change was applied now, how was it tested, and what is still a hypothesis?**
+   - *Applied:* the traceability and reviewability rule, in the operating procedure §6 and the work-record template. Before closing a slice, mark each owner requirement as built, deviated or deferred. Before a dogfood or trial, check that every action kind can be reviewed as specified and that the environment can build and check the change.
+   - *Tested:* only retrospectively. Applied to A4, it would have flagged F21 (the G2 requirement) as deviated, and F22 before the dogfood. It hasn't yet been applied going forward.
+   - *Hypothesis:* the person-event watcher makes the two-surface problem bearable until push events exist.
