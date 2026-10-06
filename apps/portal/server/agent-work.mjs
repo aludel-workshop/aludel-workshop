@@ -308,6 +308,50 @@ export function agentWork({ db, know, catalogs = null }) {
     return view(projectId, workId);
   }
 
+  // W-27 #3: the checklist an agent hands over with its preview: steps to try, each As / When / Expect, and optionally the
+  // page path reaching it (or the method and path doing it) so walking the live build ticks it. Ids are the steps' order.
+  function checkSteps(input) {
+    if (input === undefined || input === null) return [];
+    if (!Array.isArray(input)) fail('Give the checklist as a list of steps.');
+    if (input.length > 20) fail('Keep the checklist to 20 steps; split the action if it needs more.');
+    return input.map((step, index) => {
+      if (!step || typeof step !== 'object') fail(`Step ${index + 1} needs When and Expect.`);
+      const path = step.path ? clean(step.path, 300, `Step ${index + 1}'s path`) : null;
+      if (path && !/^\/(?!\/)/.test(path)) fail(`Step ${index + 1}'s path is a path in the preview, starting with /.`);
+      const method = step.method ? clean(step.method, 10, `Step ${index + 1}'s method`).toUpperCase() : null;
+      if (method && (!path || !['POST', 'PUT', 'PATCH', 'DELETE'].includes(method))) fail(`Step ${index + 1}: a method needs a path, and is POST, PUT, PATCH or DELETE.`);
+      return { id: `s${index + 1}`, as: clean(step.as, 100, `Step ${index + 1}'s As`) || null, when: clean(step.when, 300, `Step ${index + 1}'s When`, true),
+        expect: clean(step.expect, 300, `Step ${index + 1}'s Expect`, true), path, method };
+    });
+  }
+  const walkLeft = preview => (preview?.steps || []).filter(step => !preview.walk?.[step.id]);
+  const walkSummary = preview => {
+    const steps = preview?.steps || [], walk = preview?.walk || {};
+    const done = steps.filter(step => walk[step.id]?.how !== 'reason' && walk[step.id]).length;
+    const skipped = steps.filter(step => walk[step.id]?.how === 'reason').map(step => `step ${step.id.slice(1)} (${walk[step.id].reason})`);
+    const left = walkLeft(preview).map(step => step.id.slice(1));
+    return `${done} of ${steps.length} step${steps.length === 1 ? '' : 's'} walked` + (skipped.length ? `; skipped with a reason: ${skipped.join(', ')}` : '') + (left.length ? `; not walked: step ${left.join(', ')}` : '');
+  };
+  // A person records one step of an action's walk: walked in the live build (the walk script told the page), checked by hand
+  // (Looks good), or skipped with a reason; or clears it. The walk belongs to the preview handed over: a new one starts afresh.
+  function walk(user, projectId, workId, number, input = {}) {
+    requireMember(db, user, projectId);
+    const item = goalItem(projectId, workId);
+    const action = actionRows(projectId, workId).find(entry => entry.number === Number(number)) || fail('Action not found.', 404);
+    if (action.state !== 'review') fail(`#${action.number} isn't ready for review.`, 409);
+    const preview = action.preview;
+    const step = (preview?.steps || []).find(entry => entry.id === input.step) || fail(`#${action.number}'s checklist has no step ${input.step}.`, 404);
+    const walkNow = { ...(preview.walk || {}) };
+    if (input.how === null) delete walkNow[step.id];
+    else {
+      if (!['walked', 'checked', 'reason'].includes(input.how)) fail('A step is walked, checked, or skipped with a reason.');
+      const reason = input.how === 'reason' ? clean(input.reason, 300, 'Why it can\'t be walked', true) : null;
+      walkNow[step.id] = { how: input.how, ...(reason ? { reason } : {}), at: now(), by: { id: user.id, name: user.name } };
+    }
+    db.prepare('UPDATE work_goal_actions SET preview_json = ?, updated_at = ? WHERE id = ? AND project_id = ?').run(JSON.stringify({ ...preview, walk: walkNow }), now(), action.id, projectId);
+    emit(projectId, workId, { type: 'action', number: action.number });
+    return view(projectId, item.id);
+  }
   const agentMoves = { todo: ['working'], working: ['review', 'todo'], review: ['working'], proposed: [] };
   // W-25: a preview handed over with an action ({ url, commit, try }), or why there is none ({ none }); null removes it. The
   // commit defaults to the item's reported code, so the page can tell when newer code makes the preview stale.
@@ -321,7 +365,7 @@ export function agentWork({ db, know, catalogs = null }) {
     if (!['http:', 'https:'].includes(parsed.protocol)) fail('Give the preview as a full http or https link.');
     const commit = input.commit ? clean(input.commit, 64, 'Commit') : goalOf(item).code?.commit || null;
     if (commit && !/^[0-9a-f]{7,64}$/.test(commit)) fail('Give the preview\'s commit as a hex hash.');
-    return { url: parsed.href, commit, try: clean(input.try, 2000, 'What to try') || '', by, at };
+    return { url: parsed.href, commit, try: clean(input.try, 2000, 'What to try') || '', steps: checkSteps(input.steps), by, at };
   }
   function updateAction(actor, projectId, workId, number, input = {}) {
     const item = goalItem(projectId, workId);
@@ -444,6 +488,9 @@ export function agentWork({ db, know, catalogs = null }) {
     if (action.state !== 'review') fail(`#${action.number} isn't ready for review.`, 409);
     const person = { kind: 'person', id: user.id, name: user.name };
     if (input.verdict === 'approve') {
+      // P3 (W-27 #3): with a checklist, every step is walked, checked by hand, or skipped with a reason first.
+      const left = walkLeft(action.preview);
+      if (left.length) fail(`Walk #${action.number}'s checklist first: step ${left.map(step => step.id.slice(1)).join(', ').replace(/, (\d+)$/, ' and $1')} left, or say why one can't be walked.`, 409);
       db.prepare("UPDATE work_goal_actions SET state = 'done', updated_at = ? WHERE id = ? AND project_id = ?").run(now(), action.id, projectId);
       record(projectId, workId, { kind: 'log', action: action.number, author: person, text: `Approved #${action.number}` });
     } else if (input.verdict === 'flag') {
@@ -451,6 +498,7 @@ export function agentWork({ db, know, catalogs = null }) {
       db.prepare("UPDATE work_goal_actions SET state = 'working', updated_at = ? WHERE id = ? AND project_id = ?").run(now(), action.id, projectId);
       if (item.board === 'review') setState(projectId, item, 'claimed', `Flagged #${action.number}`, byOf(person));
       record(projectId, workId, { kind: 'flag', action: action.number, author: person, text: note });
+      if (action.preview?.steps?.length) record(projectId, workId, { kind: 'log', action: action.number, author: person, text: `Walk so far on #${action.number}: ${walkSummary(action.preview)}` });
     } else fail('Approve it, or flag it with a note.');
     emit(projectId, workId, { type: 'action', number: action.number });
     return view(projectId, workId);
@@ -810,5 +858,5 @@ export function agentWork({ db, know, catalogs = null }) {
     return () => bus.off(key, listener);
   }
 
-  return { createGoal, view, define, move, claim, assign, assertPerformer, addAction, updateAction, post, answer, stage, recordCode, review, proposeItems, decideProposal, describeOperation, dropAction, endAsNotDone, fetchCode, codeFiles, closeOut, notePush, changeset, stackMap, readLayer, goals, subscribe };
+  return { createGoal, view, define, move, claim, assign, assertPerformer, addAction, updateAction, post, answer, stage, recordCode, review, proposeItems, decideProposal, describeOperation, dropAction, endAsNotDone, fetchCode, codeFiles, walk, closeOut, notePush, changeset, stackMap, readLayer, goals, subscribe };
 }

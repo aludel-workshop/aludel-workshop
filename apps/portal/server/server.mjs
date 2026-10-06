@@ -1197,7 +1197,7 @@ async function api(request, response, url) {
     return swept;
   };
   // AGENT-WORK-01 A1: goal items. People drive them here; their local agent works on them through /api/editor/goals.
-  const goalRoute = /^\/api\/projects\/([^/]+)\/goals(?:\/([^/]+)(?:\/(define|move|claim|assign|container|connections|actions|events|answer|review|proposals|end|close|stream|read|previews|files)(?:\/([^/]+))?)?)?$/.exec(url.pathname);
+  const goalRoute = /^\/api\/projects\/([^/]+)\/goals(?:\/([^/]+)(?:\/(define|move|claim|assign|container|connections|actions|events|answer|review|proposals|end|close|stream|read|previews|files|walk)(?:\/([^/]+))?)?)?$/.exec(url.pathname);
   if (goalRoute) {
     const [, rawProject, rawWork, operation, rawSub] = goalRoute;
     const projectId = decodeURIComponent(rawProject), workId = rawWork ? decodeURIComponent(rawWork) : null, sub = rawSub ? decodeURIComponent(rawSub) : null;
@@ -1236,6 +1236,7 @@ async function api(request, response, url) {
     if (operation === 'events' && !sub) return done(201, goals.post(person, projectId, workId, input));
     if (operation === 'answer' && sub) return done(200, goals.answer(user, projectId, workId, sub, input));
     if (operation === 'review' && sub) return done(200, goals.review(user, projectId, workId, Number(sub), input));
+    if (operation === 'walk' && sub) return done(200, goals.walk(user, projectId, workId, Number(sub), input));
     if (operation === 'proposals' && sub) return done(200, goals.decideProposal(user, projectId, workId, sub, input));
     if (operation === 'end' && !sub) { const ended = goals.endAsNotDone(user, projectId, workId, input); sweepClosedVolumes(projectId, workId); return done(200, ended); }
     // The containers waiting to connect to this item, and connecting one (its person, signed in here).

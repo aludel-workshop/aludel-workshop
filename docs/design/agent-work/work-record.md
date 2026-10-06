@@ -787,3 +787,12 @@ Authorization: the owner created W-27 from [a7-brief.md](a7-brief.md), approved 
   - **Security audit:** failed again at a load average around 17 and passed alone. It now has three under-load failures across W-25 and W-27, so it's a flaky test, not this change.
   - **Shebang test:** #2 committed `tools/preview-tunnel.mjs` (it has a shebang) without the executable bit. Fixed here; the test passes alone. #2's gate run was cut short by a restart, and my rerun of only its failures missed this. The lesson: run the whole gate after a restart, not only the failures.
 - **Slip in #5's commit (486d6d4):** after the journey's last passing run, I edited its PASS sentence and added an apostrophe inside a single-quoted string. The committed journey wouldn't parse. `npm run preview` caught it. Fixed in the next commit, and the journey passes again. Lesson: re-run (or at least `node --check`) a test after any edit to it, even a wording-only one.
+
+### W-27 #3: the checklist on the action (2026-10-06)
+
+- **Handover.** The checklist comes with the preview: `preview.steps`, up to 20, each with As, When, Expect, and optionally `path` (reaching that page ticks the step) or `method` + `path` (doing that request ticks it). Steps get ids `s1…sN`. Bad steps are refused as they're handed over.
+- **Walk.** Each step's walk is stored on the same preview: walked (the walk script told the page), checked (Looks good), or a reason. A new handover starts a fresh walk, which is round 2. A person records a step with `POST /api/projects/:p/goals/:id/walk/:n {step, how, reason}` (members only). `how: null` clears a step. A done action's walk stays as it was reviewed.
+- **P3.** Approve refuses while steps are left ("Walk #1's checklist first: step 3 left, or say why one can't be walked."). With no checklist, Approve never depends on the preview.
+- **Flag.** A flag logs the walk so far for the agent ("Walk so far on #1: 2 of 3 steps walked; not walked: step 3").
+- **Agent tool.** `update_action`'s preview schema describes `steps`, and `--tunnel`.
+- **Checks:** `tests/review-checklist.test.mjs` passes. `test:affected` (the owner asked to skip the full gate until the item's end while they troubleshoot it): 84 pass, 4 fail, 4 skipped. The 4 are the known ones: the two Docker-only tests, the worker-token test, and the security audit under load.
