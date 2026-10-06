@@ -638,3 +638,17 @@ Owner, in the item container's Claude Code chat: "alright, lets try this task ag
     - In review, close-out has a **Back to In progress** button (`move` from review to progress).
     - Remove shows for a `todo` action in review.
     - Checked by a server test of W-8's exact sequence (`agent-work.test.mjs`, F34), and by the `agent-work` journey.
+
+## W-25 "Preview button on actions", in an item container (2026-10-06)
+
+Owner, in W-25's item container chat: "lets get started", then "go" after starting W-25 from the portal (05:48). **Authorized:** W-25's own scope, as its brief and three actions state: local edits on `aludel/w-25`, checks, local previews (a kept portal in this container, forwarded by VS Code), Aludel tool calls on W-25, and commits reported with `report_code`. Not authorized: changes to `layer-base`, GitHub settings, other items, or previews exposed beyond the owner's own forwarded port. The agent is Claude Code (Opus 5.5) in W-25's item container (`ALUDEL_CONTAINER=1`).
+
+**Where the plan came from:** no single document. F32's durable fix (above), A4's "journeys on the combined preview" and A8's "same previews" (both recorded as not built), and the a0/v2 prototype's Review on a Code action ("Walk both journeys on the preview build").
+
+**Readiness:**
+- The Work item page spec (`pag-e3341df1`, from W-8) covers only the brief and close-out. Action review isn't specified, so #1 extends that page rather than adding a new one.
+- Goal actions today carry a state and a summary only (`server/agent-work.mjs`); the item carries one code report (branch, commit, files). That is enough to tell a preview is stale: its commit isn't the reported one.
+- J6's candidate previews (`server/review-previews.mjs`) build a layer-branch candidate in Docker from `.aludel/review.json`. A goal item's code is a pushed branch, Aludel's repository has no build recipe, and the item container has no Docker (F30). So W-25 hands over a preview the agent's container serves, and a portal-built preview of the item's branch stays a follow-up (PP-01D).
+- *Verdict:* ready for #1 (spec). #2 and #3 wait on its review gate.
+
+**Process note (W-25 intake):** the owner had to say "somewhere in our docs" because W-25 was created from F32 with no link to where the plan lived. The brief now names its sources. Proposed for items made from a finding: the brief links the finding and the plan sections it continues. This isn't applied to the proposal tooling yet; it's checked when the next follow-up item is created.
