@@ -707,3 +707,31 @@ Authorization: the owner's message "d4: designs html kit is fully internal, then
 - **Process change (definition time).** F21's rule checks owner requirements when a slice closes. W-25 passed that check, because A7 was excluded when the item was defined: its "Not in scope" line was accurate, and the owner approved it. Later the owner still expected the modal. [The operating procedure](../process/operating-procedure.md) now says: when defining an item, name any accepted prototype interaction on the same surface that it leaves out, as a choice in the start message. Applied in this brief: its prototype-interaction table and its "Choices for the owner to check". It's a hypothesis whether this prevents the next mismatch, and it's tested when A7's definition is reviewed.
 
 **Round note.** *Changed:* DEC-070, the A7 brief, the plan's D4 and A7, the operating procedure, and F35. *Checked:* that the brief's sources exist: the walker and walk script (`work-review.ts`, `review-walk.mjs`), `frame-src` limited to the app origin (`server/server.mjs`), no `Dockerfile` in Aludel's repository, and W-25's preview field. *Waits on the owner:* creating the A7 item from the brief; and restarting the portal to get W-25.
+
+## W-27 "Review modal" (A7 part 1), in an item container (2026-10-06)
+
+Authorization: the owner created W-27 from [a7-brief.md](a7-brief.md), approved its definition ("sounds good, go"), started it and approved #1. Scope: as defined on the item. It's A7 part 1: the review modal, Records, Files, the preview tunnel and the live build with its checklist. The Design kit and the Pages walker go to a follow-up item, proposed by #8. Built on `aludel/w-27`, from `main` at a193f8c.
+
+- **#1 (Pages, approved).** Spec only. The new page "Action review" (`pag-c958b4ce`) is the modal. The Work item card's review becomes a one-line "what changed" plus Review. The flow "Review a UI action on its preview" becomes "Review a UI action by walking it", and a new flow "Review a code action's files" is added. The definition used the operating procedure's new definition-time rule: the split and P3 were named as choices in the start message, and the owner accepted them.
+
+### W-27 #4: review modal with Records (2026-10-06)
+
+- `src/layers/work-review-modal.ts` and `.css`: one modal for every action in review, a native `<dialog>` (focus trap, Escape, inert page).
+  - **Header:** Close, the action, its layer, and tabs for only the views it has. Open in a new tab appears when there's a preview link.
+  - **Records:** the staged records by layer, marked New, Changed or Removed. The picked record shows Previous (with its revision) beside Proposed, field by field. An update shows only changed fields until "Show unchanged fields" is ticked. Long unchanged runs fold to "N unchanged lines: show".
+  - **Files (interim):** the reported files with their status. #5 replaces it with the tree and diffs.
+  - **Empty state:** an action with nothing to show says so.
+  - **Side panel:** the summary; W-25's preview states (ready, stale, unreachable, none), moved here from the card; a note; Flag (needs the note); Approve.
+  - **Phone:** full screen, with Previous above Proposed marked − and +.
+- `src/layers/review-diff.ts`: a record's fields become readable lines (YAML-like, with empty values and nested `id`s left out). A line diff then pairs them into aligned rows.
+- **Work item page:** the card in review shows "2 records in Pages · a preview to open" and Review #n. Approve and Flag left the card. The action's details also offer Review. `?review=N` opens the modal directly, so a link can be handed over. W-25's preview block and its CSS are gone from the page.
+- **Journeys:**
+  - `tests/action-preview-browser.mjs` became `tests/review-modal-browser.mjs` (screens in `test-results/review-modal/`). It keeps W-25's four preview states, and adds Records against a live Pages page made by an earlier closed item, Files, the empty state, the details entry, `?review=N`, Escape, and 390 px. `npm run preview -- review-modal` replaces `-- action-preview`.
+  - `agent-work-browser.mjs` now reviews through the modal.
+- **Found and fixed while testing.** After a flag, the action leaves review, so Angular destroys the modal without a `close` event. The page kept the action's number, and the modal reopened by itself when the agent handed the action back. Now a decision that succeeds clears the number.
+- **Limitation.** The code is the item's, not one action's, so every Code action's review shows the item's reported files. A per-action file list would need each report tied to an action. Not proposed yet; it waits to see whether the owner finds this confusing in #5.
+- **Checks (agent-run, in W-27's item container):**
+  - Typecheck and build pass.
+  - The `review-modal`, `agent-work` and `work-board` journeys pass.
+  - Templates gate, run alone: 354 pass, 3 fail, 10 skipped. The 3 failures match W-25's: two Docker-only layer tests (`runner ENOENT`, F30) and the worker-token test, which also fails on `main`. The two Docker tests also failed here with this change stashed.
+  - The first gate run caught two icons missing from the font subset (`add_circle`, `remove_circle`). fontTools isn't in the container, so the modal uses `add` and `delete`, which are in the subset.

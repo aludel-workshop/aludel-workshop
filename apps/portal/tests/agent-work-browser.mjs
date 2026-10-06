@@ -70,6 +70,14 @@ try {
   const main = page.locator('aludel-work-goal');
   const card = number => main.locator('article.wg-action').filter({ has: page.locator(`h4:has-text("#${number}")`) });
   const state = (number, text) => card(number).locator('.wg-state', { hasText: text }).waitFor();
+  // W-27: approve an action in its review modal (optionally checking a record it staged is listed there).
+  const approveReview = async (number, record) => {
+    await card(number).getByRole('button', { name: `Review #${number}` }).click();
+    const modal = page.getByRole('dialog', { name: new RegExp(`Review #${number}`) });
+    if (record) await modal.locator('.rm-name', { hasText: record }).waitFor();
+    await modal.getByRole('button', { name: `Approve #${number}` }).click();
+    await modal.waitFor({ state: 'detached' });
+  };
 
   // Create a goal from the Work composer.
   await page.goto(`${portal}/p/${project.slug}/work/create`);
@@ -193,27 +201,31 @@ try {
   await page.locator('.wg-events').getByText('Steer: Keep the slogan under six words').waitFor();
 
   // A4: review #1 on its own. A flag needs a note and sends it back to the agent, who addresses it; then approve it.
-  await card(1).locator('.wg-review').waitFor();
+  // W-27: the review opens in the review modal, where Flag and Approve live.
+  await card(1).locator('.wg-review').getByText('1 record in Design').waitFor();
+  await card(1).getByRole('button', { name: 'Review #1' }).click();
+  const modal = page.getByRole('dialog', { name: /Review #1/ });
+  await modal.locator('.rm-name', { hasText: 'Slogan' }).waitFor();
   await shot('04-review-action'); await audit('review action');
-  await card(1).getByRole('button', { name: 'Flag' }).click();
-  assert.equal(await card(1).getByRole('button', { name: 'Send to the agent' }).isEnabled(), false, 'a flag needs a note');
-  await card(1).getByLabel('What should change?').fill('Use the street name, not "your street"');
-  await card(1).getByRole('button', { name: 'Send to the agent' }).click();
+  assert.equal(await modal.getByRole('button', { name: 'Flag' }).isEnabled(), false, 'a flag needs a note');
+  await modal.getByLabel(/^Note/).fill('Use the street name, not "your street"');
+  await modal.getByRole('button', { name: 'Flag' }).click();
+  await modal.waitFor({ state: 'detached' });
   await state(1, 'Working');
   await page.locator('.wg-events').getByText('Flagged #1: Use the street name').waitFor();
   assert.ok((await agent('')).events.some(event => event.kind === 'flag' && event.action === 1), 'the agent reads the flag');
   await agent('/events', { kind: 'message', action: 1, text: 'Addressed your note: the slogan now names the street.' });
   await agent('/actions/1', { state: 'review', summary: 'The slogan names the street.' });
-  await card(1).getByRole('button', { name: 'Approve' }).click();
+  await approveReview(1);
   await state(1, 'Done');
   await main.locator('.wg-gate', { hasText: 'Review gate cleared' }).waitFor();
   await agent('/actions/2', { state: 'working' });
   await agent('/stage', { action: 2, operationId: 'createActivity', body: { activity: { title: 'Join Tool Share' } } });
   await agent('/actions/2', { state: 'review', summary: 'Added the activity.' });
-  await card(2).locator('.wg-review').getByText('Join Tool Share').waitFor();
-  await card(2).getByRole('button', { name: 'Approve' }).click();
+  await card(2).locator('.wg-review').getByText('1 record in Vision').waitFor();
+  await approveReview(2, 'Join Tool Share');
   await agent('/actions/3', { state: 'working' }); await agent('/actions/3', { state: 'review', summary: 'No overflow at 390 px.' });
-  await card(3).getByRole('button', { name: 'Approve' }).click();
+  await approveReview(3);
   await state(3, 'Done');
   // A8: code committed in the person's checkout shows beside the staged records.
   await agent('/code', { branch: 'aludel/w-8', commit: branchCommit, base: git(repo, 'rev-parse', 'main~1'), files: [{ path: 'src/pages/sign-up.html', status: 'added' }, { path: 'server/routes.mjs', status: 'modified' }] });
@@ -282,7 +294,7 @@ try {
   await stack.locator('.wg-decided', { hasText: 'Dismissed' }).waitFor();
   await proposal(0).getByRole('button', { name: 'Create item' }).click();
   await stack.locator('.wg-decided', { hasText: 'Serve layer templates' }).waitFor();
-  await card(2).getByRole('button', { name: 'Approve' }).click();
+  await approveReview(2);
   await main.getByText('The wrap-up is ready for review.').waitFor();
   await main.getByRole('button', { name: 'Move to review' }).click();
   await main.getByRole('heading', { name: 'Ready to end as not done' }).waitFor();

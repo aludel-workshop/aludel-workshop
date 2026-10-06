@@ -104,8 +104,6 @@
 .wg-changes h3 code{font-size:12.5px;background:var(--machine-line);padding:1px 6px;border-radius:4px;text-transform:none;letter-spacing:0}
 .wg-path{font-family:ui-monospace,monospace;font-size:13px;overflow-wrap:anywhere}
 .wg-review{margin-top:10px;padding:10px 12px;border:1px solid #f3d27a;border-radius:10px;background:#fffaeb}
-.wg-reviewlist{list-style:none;margin:8px 0;padding:0;display:grid;gap:4px;font-size:14px}
-.wg-reviewlist .lay-chip{margin-left:8px}
 .wg-flaglabel{display:block;font-size:13px;font-weight:600;margin:8px 0 4px}
 .wg-close{margin-top:14px;padding:12px 14px;border:1px solid var(--lay-ok-ink);border-radius:10px;background:var(--lay-ok-bg)}
 .wg-close h2{display:flex;align-items:center;gap:8px;margin:0 0 6px;font-size:16px}
@@ -122,15 +120,6 @@
 .wg-why{margin:0;font-size:14px}
 .wg-after{display:inline-flex;align-items:center;gap:3px;margin-left:8px;color:var(--machine-muted);font-size:13px}
 .wg-decided{display:flex;align-items:center;gap:8px;margin:0;font-size:14px;flex-wrap:wrap}
-/* W-25: an action's preview, in its review and in its details. */
-.wg-preview{margin:8px 0;padding:8px 10px;border:1px solid var(--machine-line);border-radius:8px;background:var(--mat-sys-surface,#fff);display:grid;gap:6px}
-.wg-preview .wg-row{flex-wrap:wrap;align-items:center;gap:6px 10px}
-.wg-preview a.lay-button{text-decoration:none;display:inline-flex;align-items:center;gap:6px}
-.wg-preview-warn{border-color:#d9a21b}
-.wg-previewmeta{font-size:13px;color:var(--machine-muted)}
-.wg-previewmeta code{font-size:12.5px}
-.wg-try{margin:0;font-size:14px}
-.wg-previewnote{display:flex;align-items:flex-start;gap:6px;margin:0;font-size:13.5px;color:#7a4b00}
-.wg-previewnote mat-icon,.wg-previewnone mat-icon{flex:none;font-size:18px;width:18px;height:18px}
-.wg-previewnone{display:flex;align-items:center;gap:6px;margin:8px 0}
-.wg-side .wg-preview,.wg-side .wg-previewnone{margin:10px 16px}
+/* W-27 (A7): an action in review says what it changed and opens the review modal. */
+.wg-changed{flex:1 1 200px;font-size:14px;color:var(--machine-muted)}
+.wg-sidereview{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 16px}
