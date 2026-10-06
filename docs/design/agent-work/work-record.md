@@ -895,3 +895,11 @@ Authorization: the owner created W-29 from W-27 #8's proposal, started it in the
   - The owner chose this project's records as the spike's stand-in (on #1), so the spike's verdict stands.
 - **Checked:** the spec against the layer contract's facets and drift rules (`layer-base` design, code and pages manifests), `cleanComponent`, the binding core's drift responses, and the code-unit indexer's component detection. It names three defaults for the owner (K1 serving, B1 tags, B4 assess).
 - **Waits on the owner:** the phase 1 gate.
+
+### W-29 #3: Pages specs for the kit demos and the binding view (2026-10-06)
+
+- **Changed (staged, applies at close-out):** two Pages records.
+  - *Design components* (`pag-575d9da5`): the tree with a can't-draw mark; the demo from kit.js in a sandboxed frame (demo values, states, light and dark, live props, Copy tag); Can't draw with Add a template; the contract with Demo and Template; Built in Code with drift states.
+  - *Code explorer* (`pag-5badb7d6`), as far as the binding reaches: the kit filter (All, Bound, Drifted, Unbound); Implements <element> with the drift state and its Work; the prop map; Not bound.
+- **Checked:** both records passed the Pages API's checks when staged. Sections trace to kit-contract.md K2, K3, K6 and B1–B6, and what's kept from today's tab was read from `src/layers/design-components.ts`.
+- **Waits on the owner:** the phase 1 gate (#1–#3).
