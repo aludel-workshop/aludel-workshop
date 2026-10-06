@@ -946,6 +946,7 @@ Authorization: the owner created W-29 from W-27 #8's proposal, started it in the
     - demo and template through Design's API, and the kit draws the template.
   - The seeded kit rendered in Chromium: 15 of 15 elements defined, each demo drawn, no script errors, light and dark, no horizontal scroll at 390 px.
   - That check found the scaffold overflowing a narrow cell; fixed in `574e23f`.
+  - `npm run test:affected` (templates on), at the final pin: 299 tests, 286 pass, 3 fail, 10 skipped. The 3 failures are W-27's known ones: two Docker-only template-update tests (`runner ENOENT`, F30) and the worker-token test. An earlier run that straddled a pin change showed 5 other failures (`editor-bridge`, `entry-roles`); both files pass at the final pin (8 of 8).
 - **At close-out (the bundle step, until FW-11):** in your `layer-base`, run:
 
   ```sh
