@@ -656,3 +656,43 @@ Owner, in W-25's item container chat: "lets get started", then "go" after starti
 ### W-25 findings
 
 - **W25-F1. A restart of the owner's machine stopped everything at once (owner, 2026-10-06: "my computer restarted, including both the local session here, and the aludel server. a break we should account for").** About 06:08, during #2. The commits survived (the container's volume). The Claude Code session came back with its conversation. Running processes didn't: the kept preview, test portals and their layer builds. The owner moved W-25 back to Ready while recovering, which the agent first read as an unlogged move. The owner then started it again (06:24). It wasn't a server fault: the agent asked on #2, and the answer is on the item. **What it means for W-25:** a handed-over preview is a process in the container, so a break leaves a link that answers nothing. The spec's *unreachable* state covers what the person sees. **Applied now:** the agent's instructions say that after a break it reads `work_view` again before acting and runs its previews again. **Not done:** previews that come back by themselves after a restart. That needs a supervisor in the container or the portal-built preview (PP-01D), which is the follow-up.
+
+### W-25 built and agent-checked (2026-10-06)
+
+- **#1 (Pages, approved):** the Work item page (`pag-e3341df1`) gained *Action review* and *Action preview*, with four states. Plus the flow `flw-ea072b6c` "Review a UI action on its preview". Staged; it applies at close-out.
+- **#2 (Code):** goal actions carry `preview`, which is either `{ url, commit, try }` or `{ none }`.
+  - It's set by `update_action` (MCP and the person's route). The commit defaults to the reported code.
+  - Only http and https links are accepted, and the preview is fixed once the action is done.
+  - It's `stale` in the view once the reported commit differs.
+  - `npm run preview -- <journey>` (`tools/journey-preview.mjs`) runs a journey that calls `holdForPreview` (`tests/portal-support.mjs`) in the background and prints its link; `-- stop` ends it. This replaces W-8's ad hoc `JOURNEY_KEEP` block.
+  - The agent instructions and [local-work.md](local-work.md) step 6 say that a UI change hands over a preview. W25-F1 adds: after a break, re-read the item and run the previews again.
+- **#3 (Code):** one preview block (`src/layers/work-goal.ts`, an `ng-template`) appears on the action's review and in its details.
+  - Preview is a link that opens in a new tab, with the commit, who handed it over, when, and *Try:*.
+  - *Stale* names both commits. *Unreachable* comes from an opaque `no-cors` request in the person's browser, so it works for a port only their machine forwards; a link that was down is tried again on each refresh.
+  - *None* gives the agent's reason, or says it gave none.
+  - New journey `tests/action-preview-browser.mjs` (screens in `test-results/action-preview/`).
+
+| Requirement (brief, #1 spec) | Status | Evidence |
+|---|---|---|
+| The agent attaches a link, its commit and what to try; the portal keeps it on the action | Built | `agent-work.test.mjs` W-25 model test; stdio test hands one over through `update_action` |
+| Preview button on the card and in its review; opens in a new tab | Built | Journey: `01-ready`; the tab opens the link and the board loads there |
+| The same review in the action's details | Built (preview block only) | `02-details`. The changes list and Approve/Flag stay on the card, as before W-25. |
+| Stale once newer code is reported; a fresh one clears it | Built | `03-stale`, asserted |
+| Unreachable from this browser, with the link kept | Built | `04-unreachable-and-none`, a closed port |
+| None, with the agent's reason or none given | Built | `04-unreachable-and-none` |
+| Approve doesn't depend on opening it | Built | #2 approved with its preview down; a flag keeps the preview until a new one |
+| A repeatable kept preview for the item-container agent | Built | `npm run preview -- work-board` and `-- action-preview`, run here |
+| The person opens #3's own preview before approving | Waits on the owner | The link is in W-25's thread. The owner's portal runs `main`, so the button on W-25 itself arrives with the merge; the preview shows the build on a seeded item. |
+| 1440 and 390 px, axe | Built | The journey's five audits |
+
+**Checks (agent-run, in W-25's item container):** typecheck and build pass. `action-preview`, `agent-work` and `work-board` journeys pass. `agent-work.test.mjs`: 9 pass, 3 skip without templates. Templates gate, run alone: 349 pass, 3 fail, 10 skipped. The 3 match W-8's container run: two Docker-only layer tests (`runner ENOENT`, F30) and the worker-token test, which also fails on `main`. The security-audit test failed once in `test:affected` while leftover layer builds had load at 22; it passed alone and in the gate.
+
+**F32:** the lasting fix is built. It closes once the owner has opened a forwarded preview from the item. That proof is the open check below.
+
+#### Retrospective (W-25)
+
+1. **What made it harder or slower?** *Observed:* the plan was spread across F32, A4, A8 and a prototype, so the item started with a search. The machine restarted mid-#2 (W25-F1), which looked like an unlogged state change until the owner answered. My own parallel test runs left layer builds that pushed load to 22 and made a startup-timed test fail. The positional `INSERT … VALUES` into `work_goal_actions` turned a one-column addition into three edits.
+2. **What would make the next one easier?** Briefs that link the finding and plan sections they continue (applied in W-25's own brief; proposed for items made from findings). Run the full gate alone, not alongside journeys. Name the columns in action inserts the next time that table changes.
+3. **What changes the roadmap, packets or process?** Reviewability now has a mechanism, but its reach depends on VS Code forwarding: untested until the owner opens the link. Previews die with the container (W25-F1). A portal-built preview of the item's branch (PP-01D) is the durable follow-up, and it would also survive restarts.
+4. **Questions created or resolved:** *Resolved:* the preview opens in a new tab (owner approved #1 as specified). *Open:* does the forwarded port reach the owner's browser? It decides whether F32 closes.
+5. **Process change applied, how it was tested, what's still a hypothesis:** *Applied and tested:* the preview handover (model, stdio and browser tests); `npm run preview` (run for two journeys); restart guidance (in the instructions only; untested until the next break). *Hypothesis:* a preview before approval changes what the owner approves. That's tested when the owner opens #3's.

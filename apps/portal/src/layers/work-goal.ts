@@ -1,4 +1,5 @@
 import { Component, DestroyRef, ElementRef, afterRenderEffect, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
@@ -14,7 +15,9 @@ type GoalAuthor = { kind: 'person' | 'agent'; id: string; name: string };
 export type GoalEvent = { id: number; action: number | null; kind: 'message' | 'log' | 'steer' | 'flag' | 'question' | 'allow' | 'approval'; author: GoalAuthor | null; text: string;
   options?: string[]; at: string; resolvedAt: string | null; resolution: { text?: string; allow?: boolean; note?: string; by?: { id: string; name: string } } | null };
 export type GoalAction = { id: string; number: number; phase: number; layer: string | null; goal: string; after: number[]; state: 'proposed' | 'todo' | 'working' | 'review' | 'done';
-  summary: string; addedBy: GoalAuthor | null; updatedAt: string; needs: GoalEvent[]; blocked: string | null; kind: 'wrap-up' | null; proposals: GoalProposal[] };
+  summary: string; addedBy: GoalAuthor | null; updatedAt: string; needs: GoalEvent[]; blocked: string | null; kind: 'wrap-up' | null; proposals: GoalProposal[]; preview?: GoalPreview | null };
+// W-25: what an action hands over to look at with its review: a link the agent serves (and the commit it shows), or why there's none.
+export type GoalPreview = { url?: string; commit?: string | null; try?: string; none?: string; stale?: boolean; by: GoalAuthor | null; at: string };
 // W-8 attempt 2, E3: an item an action proposed (a follow-up, or what comes first after a wrap-up), decided by a person.
 export type GoalProposal = { id: string; action: number; position: number; title: string; brief: string; why: string; after: string[]; author: GoalAuthor | null;
   state: 'proposed' | 'created' | 'dismissed'; createdWorkId: string | null; created: { ref: string; title: string } | null };
@@ -29,7 +32,7 @@ const actionLabel: Record<string, string> = { proposed: 'New: needs your approva
 const actionIcon: Record<string, string> = { proposed: 'add_task', todo: 'radio_button_unchecked', working: 'progress_activity', review: 'rate_review', done: 'check_circle' };
 
 @Component({
-  selector: 'aludel-work-goal', standalone: true, imports: [FormsModule, MatIconModule, MatMenuModule, MatTooltipModule, AssigneeComponent, PriorityComponent, WorkCreateComponent],
+  selector: 'aludel-work-goal', standalone: true, imports: [FormsModule, NgTemplateOutlet, MatIconModule, MatMenuModule, MatTooltipModule, AssigneeComponent, PriorityComponent, WorkCreateComponent],
   styleUrl: './work-goal.css',
   template: `
   @if (view(); as goal) {
@@ -173,6 +176,7 @@ const actionIcon: Record<string, string> = { proposed: 'add_task', todo: 'radio_
                     @if (changesOf(action.number).length) { <ul class="wg-reviewlist">@for (change of changesOf(action.number); track change.id) { <li><span [class]="'wg-op wg-op-' + change.op">{{ opLabel[change.op] }}</span>{{ kindName(change.kind) }} <strong>{{ changeName(change) }}</strong>@if (change.layer) { <span [class]="'lay-chip lay-l-' + change.layer">{{ layerName(change.layer) }}</span> }</li> }</ul> }
                     @else if (goal.code && action.layer === 'platform') { <p class="small">Its code is on <code>{{ goal.code.branch }}</code> ({{ goal.code.files.length }} files), listed under Changes.</p> }
                     @else { <p class="small lay-muted">No staged record changes; read its summary and log.</p> }
+                    <ng-container *ngTemplateOutlet="previewBlock; context: { $implicit: action }" />
                     @if (flagging() === action.number) {
                       <form (ngSubmit)="flag(action)"><label class="wg-flaglabel" [for]="'flag-' + action.number">What should change?</label>
                         <textarea class="wg-input" [id]="'flag-' + action.number" name="flagNote" rows="2" [(ngModel)]="flagDraft" placeholder="Say what you want different"></textarea>
@@ -215,7 +219,8 @@ const actionIcon: Record<string, string> = { proposed: 'add_task', todo: 'radio_
         <header><h2 id="wg-thread"><i [class]="'wg-live' + (live() ? ' on' : '')" [attr.aria-label]="live() ? 'Live' : 'Not live'" role="img"></i>{{ selectedAction() ? '#' + selectedAction()!.number + ' details and log' : 'Thread' }}</h2>
           @if (selectedAction(); as action) { <button type="button" class="wg-link" (click)="select(null)"><mat-icon aria-hidden="true">arrow_back</mat-icon>All activity</button> }
           @else { <p class="small lay-muted">Everything said and done on this item, by you and the agent working it.</p> }</header>
-        @if (selectedAction(); as action) { <p class="wg-sidegoal">{{ action.goal }}</p> }
+        @if (selectedAction(); as action) { <p class="wg-sidegoal">{{ action.goal }}</p>
+          @if (action.preview || action.state === 'review') { <ng-container *ngTemplateOutlet="previewBlock; context: { $implicit: action }" /> } }
         <ol #events class="wg-events" aria-live="polite" (scroll)="following = atEnd($any($event.target))">
           @for (event of shownEvents(); track event.id) {
             <li [class]="'wg-ev wg-ev-' + event.kind" [class.wg-ev-open]="!event.resolvedAt && ['question', 'allow', 'approval'].includes(event.kind)">
@@ -230,8 +235,24 @@ const actionIcon: Record<string, string> = { proposed: 'add_task', todo: 'radio_
           <button type="submit" class="wg-send" [disabled]="!steerDraft.trim()" aria-label="Send"><mat-icon aria-hidden="true">send</mat-icon></button></form>
       </aside>
     </div>
-  } @else if (failed()) { <h1 tabindex="-1">Work item not found</h1><p><a [href]="ctx.link('work')" (click)="ctx.go(ctx.link('work'), $event)">Back to the board</a></p> }
-  @else { <p class="lay-muted" role="status">Loading…</p> }`
+  }
+  <!-- W-25: an action's preview, in its review on the card and in its details: ready, stale, unreachable or none. -->
+  <ng-template #previewBlock let-action>
+    @if (action.preview?.url; as url) {
+      <div class="wg-preview" [class.wg-preview-warn]="action.preview.stale || reach()[url] === 'down'" role="group" [attr.aria-label]="'Preview of #' + action.number">
+        <div class="wg-row">
+          <a class="lay-button small" [href]="url" target="_blank" rel="noopener noreferrer" [attr.aria-label]="'Preview #' + action.number + ' (opens in a new tab)'"><mat-icon aria-hidden="true">open_in_new</mat-icon>Preview</a>
+          <span class="wg-previewmeta">@if (action.preview.commit) { At <code>{{ action.preview.commit.slice(0, 7) }}</code> · }from {{ action.preview.by?.name || 'the agent' }} · <time [attr.datetime]="action.preview.at">{{ when(action.preview.at) }}</time></span>
+        </div>
+        @if (action.preview.try) { <p class="wg-try"><strong>Try:</strong> {{ action.preview.try }}</p> }
+        @if (action.preview.stale) { <p class="wg-previewnote" role="status"><mat-icon aria-hidden="true">history</mat-icon>Older build: it shows {{ action.preview.commit.slice(0, 7) }}, but {{ view()?.code?.commit?.slice(0, 7) }} was reported since. Ask for a fresh one.</p> }
+        @if (reach()[url] === 'down') { <p class="wg-previewnote" role="status"><mat-icon aria-hidden="true">link_off</mat-icon>This browser can't reach it. The agent's container may have stopped, or the port isn't forwarded to this machine. Ask the agent to run it again.</p> }
+      </div>
+    } @else if (action.preview?.none) { <p class="wg-previewnone small"><mat-icon aria-hidden="true">visibility_off</mat-icon>No preview: {{ action.preview.none }}</p> }
+    @else { <p class="wg-previewnone small lay-muted"><mat-icon aria-hidden="true">visibility_off</mat-icon>No preview: the agent didn't hand one over.</p> }
+  </ng-template>
+  @if (!view()) { @if (failed()) { <h1 tabindex="-1">Work item not found</h1><p><a [href]="ctx.link('work')" (click)="ctx.go(ctx.link('work'), $event)">Back to the board</a></p> }
+  @else { <p class="lay-muted" role="status">Loading…</p> } }`
 })
 export class WorkGoalComponent {
   readonly ctx = inject(ProjectContext);
@@ -280,6 +301,18 @@ export class WorkGoalComponent {
   readonly continued = computed(() => (this.view()?.actions || []).flatMap(action => action.proposals).flatMap(proposal => proposal.created ? [proposal.created.ref] : []));
   afterNames(action: GoalAction, proposal: GoalProposal) { return proposal.after.map(id => action.proposals.find(other => other.id === id)?.title || 'an earlier item').join(' and '); }
   dismiss(proposal: GoalProposal) { void this.act(() => this.ctx.api(this.path(`/proposals/${encodeURIComponent(proposal.id)}`), 'POST', { decision: 'dismiss' }), 'Dismissed.'); }
+  // W-25: whether each handed-over preview answers from this browser. The link may be a port only this machine forwards, so
+  // the portal can't tell; an opaque no-cors request can (it fails only when nothing answers).
+  readonly reach = signal<Record<string, 'checking' | 'ok' | 'down'>>({});
+  private checkPreviews(view: GoalView) {
+    for (const url of new Set(view.actions.filter(action => action.state !== 'done').map(action => action.preview?.url).filter((url): url is string => Boolean(url)))) {
+      const known = this.reach()[url];
+      if (known === 'checking' || known === 'ok') continue; // a link that was down is tried again on each refresh
+      if (!known) this.reach.update(map => ({ ...map, [url]: 'checking' }));
+      void fetch(url, { mode: 'no-cors', cache: 'no-store', signal: AbortSignal.timeout(5000) })
+        .then(() => 'ok' as const, () => 'down' as const).then(state => this.reach.update(map => ({ ...map, [url]: state })));
+    }
+  }
   readonly selectedAction = computed(() => this.view()?.actions.find(action => action.number === this.selected()) || null);
   readonly shownEvents = computed(() => { const events = this.view()?.events || []; const number = this.selected(); return number === null ? events : events.filter(event => event.action === number); });
 
@@ -297,7 +330,7 @@ export class WorkGoalComponent {
   private base() { return `/api/projects/${encodeURIComponent(this.ctx.projectId())}/goals`; }
   private path(rest = '') { return `${this.base()}/${encodeURIComponent(this.id())}${rest}`; }
   async load() {
-    try { const view = await this.ctx.api<GoalView>(this.path()); const first = !this.view(); this.view.set(view); if (first) this.loadCheckout(); if (!view.brief && !view.item.assignee && !this.editingBrief() && ['draft', 'ready'].includes(view.item.board)) this.editBrief(); }
+    try { const view = await this.ctx.api<GoalView>(this.path()); const first = !this.view(); this.view.set(view); this.checkPreviews(view); if (first) this.loadCheckout(); if (!view.brief && !view.item.assignee && !this.editingBrief() && ['draft', 'ready'].includes(view.item.board)) this.editBrief(); }
     catch { if (!this.view()) this.failed.set(true); }
     if (!this.stackKeys().length) void this.ctx.api<{ stack: { key: string }[] }>(this.base()).then(value => this.stackKeys.set(value.stack.map(layer => layer.key)), () => {});
   }
