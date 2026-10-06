@@ -1,199 +1,183 @@
-import { Component, computed, effect, inject, input, signal } from '@angular/core';
+import { Component, computed, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { Assignee, ProjectContext, WorkItem, priorityOrder } from './context';
-import { AvatarComponent, PriorityComponent, RoleChipComponent } from './work-shared';
-import type { GoalView } from './work-goal';
+import { Assignee, Batch, ProjectContext, WorkItem, priorityOrder } from './context';
+import { AvatarComponent, WorkCardComponent, agentRunnable, isRunning, tokens, elapsed } from './work-shared';
 
-type Column = 'draft' | 'ready' | 'progress' | 'review' | 'done';
-// GET …/goals: each goal item's action counts by state, open needs and the layers its actions name.
-type GoalSummary = { id: string; defined: boolean; actions: Record<string, number>; needs: number; layers: string[] };
-type Ask = { kind: 'define' | 'start'; item: WorkItem };
-
-const columns: [Column, string][] = [['draft', 'Draft'], ['ready', 'Ready'], ['progress', 'In progress'], ['review', 'In review'], ['done', 'Done']];
 const byPriority = (a: WorkItem, b: WorkItem) => priorityOrder.indexOf(a.priority) - priorityOrder.indexOf(b.priority) || a.number - b.number;
+// items are what this board shows; batchItems are everything in the lane, which Go and Next act on.
+interface Lane { key: string; who: Assignee; title: string; items: WorkItem[]; batchItems: WorkItem[]; batch: Batch | null; }
 
-// Work › Board (AGENT-WORK-01 A6, W-8): one Kanban board, five columns derived from each item's status. Moves are the
-// server's rules (Ready needs a defined item, In progress an assignee and a confirmed start; Done only from close-out),
-// so a refused move says why and changes nothing. Clicking a card opens its peek; Move to there is the keyboard
-// alternative to dragging. A layer's Tasks tab renders this same board with [layer], showing only that layer's items.
+// Work › Board (WORK-UX-01): batches are what's being worked on now, one per assignee; agent results stay in their batch
+// until someone clears them. Everything else waits in Queue or Backlog, highest priority first; Done keeps the history.
+// A layer's Tasks tab renders this same board with [layer], showing only that layer's items (CUSTOM-LAYER-01).
 @Component({
-  selector: 'aludel-work-board', standalone: true, imports: [FormsModule, MatIconModule, MatTooltipModule, AvatarComponent, PriorityComponent, RoleChipComponent],
+  selector: 'aludel-work-board', standalone: true, imports: [FormsModule, MatIconModule, MatTooltipModule, AvatarComponent, WorkCardComponent],
   template: `
-  <div class="lay-kb-bar">
-    <div class="lay-kb-filters" role="group" aria-label="Filter the board">
-      <button type="button" class="lay-kb-needs" [attr.aria-pressed]="needsOnly()" (click)="needsOnly.set(!needsOnly())"><mat-icon aria-hidden="true">front_hand</mat-icon>Needs you · {{ needsCount() }}</button>
-      @if (!layer()) { <label>Layer <select [ngModel]="layerFilter()" (ngModelChange)="layerFilter.set($event)"><option value="">All</option>@for (entry of layerOptions(); track entry.key) { <option [value]="entry.key">{{ entry.name }}</option> }</select></label> }
-      <label>Assignee <select [ngModel]="ctx.boardFilter() || ''" (ngModelChange)="ctx.boardFilter.set($event || null)"><option value="">Anyone</option><option value="none">Unassigned</option>
-        @for (who of people(); track who.id) { <option [value]="who.id">{{ ctx.whoName(who) }}</option> }</select></label>
-    </div>
-    <a class="lay-button small" [href]="createLink()" (click)="ctx.go(createLink(), $event)"><mat-icon aria-hidden="true">add</mat-icon>Create task</a>
-  </div>
-  <div class="lay-kb-wrap" [class.lay-kb-peeking]="!!peekItem()">
-    <div class="lay-kb">
-      @for (col of columns; track col[0]) {
-        <section class="lay-kb-col" [class.lay-kb-over]="over() === col[0]" [attr.aria-labelledby]="'kb-' + col[0]" [attr.data-col]="col[0]"
-          (dragover)="dragOver($event, col[0])" (dragleave)="over.set(null)" (drop)="drop($event, col[0])">
-          <h2 class="lay-kb-head" [id]="'kb-' + col[0]"><span [class]="'lay-kb-label lay-kb-' + col[0]">{{ col[1] }}</span><span class="lay-kb-n">{{ byColumn()[col[0]].length }}</span></h2>
-          @for (item of byColumn()[col[0]]; track item.id) {
-            <article class="lay-kb-card" [class.lay-kb-sel]="peekId() === item.id" [attr.data-ref]="item.ref" [attr.draggable]="item.scope === 'goal'" (dragstart)="dragStart($event, item)" (dragend)="over.set(null)">
-              <div class="lay-kb-top"><span class="lay-kb-ref">{{ item.ref }}</span>@if (live(item)) { <span class="lay-kb-live" role="img" aria-label="Work is running"></span> }</div>
-              <button type="button" class="lay-kb-title" [class.lay-kb-rough]="rough(item)" (click)="peek(item)" [attr.aria-expanded]="peekId() === item.id">{{ item.title }}</button>
-              <div class="lay-kb-row"><aludel-priority [value]="item.priority" [text]="true" />
-                @for (key of layersOf(item); track key) { <aludel-role-chip [layer]="key" [action]="item.scope === 'goal' ? null : item.action" /> }
-                @if (needsOf(item); as n) { <span class="lay-kb-needbadge" role="img" [attr.aria-label]="n + ' need' + (n === 1 ? 's' : '') + ' you'"><mat-icon aria-hidden="true">front_hand</mat-icon>{{ n }}</span> }</div>
-              <div class="lay-kb-foot">
-                @if (item.assignee; as who) { <span class="lay-kb-who"><aludel-avatar [who]="who" size="sm" />{{ whoLabel(who) }}</span> } @else { <span>Unassigned</span> }
-                @if (progressOf(item); as p) { <span class="lay-kb-prog" role="img" [attr.aria-label]="p.done + ' of ' + p.total + ' actions done'"><i [style.width.%]="100 * p.done / p.total"></i></span><span>{{ p.done }}/{{ p.total }}</span> }
-                @if (item.context?.routine) { <span class="lay-kb-from"><mat-icon aria-hidden="true">autorenew</mat-icon>Routine</span> }
-              </div>
-            </article>
-          } @empty { <p class="lay-kb-empty">{{ col[0] === 'draft' && !filtersOn() ? 'Nothing here. Create a task.' : 'Nothing here.' }}</p> }
-        </section>
-      }
-    </div>
-    @if (peekItem(); as item) {
-      <aside class="lay-kb-peek" aria-labelledby="kb-peek-h">
-        <div class="lay-row"><span [class]="'lay-kb-label lay-kb-' + item.board">{{ label(item.board) }}</span><span class="lay-kb-ref">{{ item.ref }}</span>
-          <button type="button" class="lay-button ghost small lay-kb-close" (click)="closePeek()" aria-label="Close the peek"><mat-icon aria-hidden="true">close</mat-icon></button></div>
-        <h2 id="kb-peek-h" tabindex="-1">{{ item.title }}</h2>
-        <dl>
-          <dt>Priority</dt><dd><aludel-priority [value]="item.priority" [text]="true" /></dd>
-          <dt>Assignee</dt><dd>{{ item.assignee ? whoLabel(item.assignee) : 'Unassigned' }}</dd>
-          @if (layersOf(item).length) { <dt>Layers</dt><dd class="lay-row lay-wrap">@for (key of layersOf(item); track key) { <aludel-role-chip [layer]="key" /> }</dd> }
-          @if (item.scope === 'goal' && item.board !== 'done') {
-            <dt><label for="kb-move">Move to</label></dt>
-            <dd><select id="kb-move" [ngModel]="item.board" (ngModelChange)="move(item, $event)">@for (col of columns; track col[0]) { <option [value]="col[0]">{{ col[1] }}</option> }</select></dd>
-          }
-        </dl>
-        @if (item.scope === 'goal') {
-          @if (peekView(); as view) {
-            @if (view.actions.length) {
-              <h3>Actions</h3>
-              <ol class="lay-kb-actions">@for (action of view.actions; track action.id) { @if (action.state !== 'proposed') {
-                <li><mat-icon aria-hidden="true">{{ actionIcon[action.state] }}</mat-icon><span>#{{ action.number }} {{ action.goal }}</span><span class="lay-muted small">{{ actionState(action) }}</span></li> } }</ol>
-            } @else { <p class="lay-muted small">No actions yet: define it on its page.</p> }
-            @if (view.needs.length) { <p class="small"><mat-icon aria-hidden="true" class="lay-kb-inline">front_hand</mat-icon>{{ view.needs.length }} thing{{ view.needs.length === 1 ? '' : 's' }} need{{ view.needs.length === 1 ? 's' : '' }} you on this item.</p> }
-          } @else { <p class="lay-muted small">Loading…</p> }
-        } @else { <p class="lay-muted small">This item moves from its own page.</p> }
-        <a class="lay-button" [href]="ctx.link('work', 'item', item.id)" (click)="ctx.go(ctx.link('work', 'item', item.id), $event)"><mat-icon aria-hidden="true">open_in_new</mat-icon>Open item</a>
-      </aside>
+  <div class="lay-section-head"><h2>Batches</h2><div class="lay-row lay-wrap"><span class="lay-muted small">Agent results stay in their batch until you clear them</span><a class="lay-button small" [href]="createLink()" (click)="ctx.go(createLink(), $event)"><mat-icon aria-hidden="true">add</mat-icon>Create task</a></div></div>
+  <p class="lay-muted small">Symphony workers: {{ ctx.data()?.workerPool?.free || 0 }} free of {{ ctx.data()?.workerPool?.capacity || 0 }} online slots · {{ ctx.data()?.workerPool?.queued || 0 }} queued batches. Capacity and host health are in <a [href]="ctx.link('deploy', 'agents')" (click)="ctx.go(ctx.link('deploy', 'agents'), $event)">Deploy</a>.</p>
+  <div class="lay-lanes">
+    @for (lane of lanes(); track lane.key) {
+      <section class="lay-lane" [class.lay-lane-running]="running(lane)" [attr.aria-label]="lane.title" [id]="'lane-' + lane.key">
+        <div class="lay-lane-head"><aludel-avatar [who]="lane.who" size="lg" />
+          <div class="lay-lane-who"><strong>{{ lane.title }}</strong><small>{{ laneNote(lane) }}</small></div>
+          <div class="lay-lane-right">
+            @if (!running(lane) && lane.batch?.state !== 'queued') {
+              <span class="lay-nextsplit"><button type="button" (click)="next(lane)" [matTooltip]="'Adds the next ' + count(lane) + ' queued, unblocked items for ' + lane.title.replace('Your batch', 'you') + ' in ' + milestone() + ', highest priority first'"><mat-icon aria-hidden="true">playlist_add</mat-icon>Next</button>
+                @if (editing() === lane.key) { <label class="visually-hidden" [for]="'n-' + lane.key">How many</label><input type="number" [id]="'n-' + lane.key" min="1" max="25" [ngModel]="count(lane)" (ngModelChange)="setCount(lane, $event)" (blur)="editing.set('')" (keydown.enter)="editing.set('')"> }
+                @else { <button type="button" class="lay-nextsplit-n" (click)="editCount(lane)" [attr.aria-label]="'Change how many: ' + count(lane)">{{ count(lane) }}</button> }</span>
+            }
+            @if (lane.batch?.state === 'queued' && lane.batch; as batch) {
+              <span class="lay-chip lay-plain">Queued · {{ batch.requestedSlots }} worker{{ batch.requestedSlots === 1 ? '' : 's' }}</span>
+              <button type="button" class="lay-button ghost small" (click)="stopBatch(batch)">Cancel</button>
+            } @else if (running(lane) && lane.batch; as batch) {
+              <div class="lay-ticker"><strong>{{ elapsedFor(batch) }}</strong> active<br>{{ tokenText(batch) }} tokens</div>
+              @if (batch.state === 'running') { <button type="button" class="lay-button ghost small" (click)="stopBatch(batch)"><mat-icon aria-hidden="true">pause</mat-icon>Stop run</button> }
+            } @else if (lane.who.kind === 'agent' && waiting(lane) && lane.batch; as batch) {
+              <label class="small">Workers <input type="number" min="1" [max]="maxSlots(lane)" [ngModel]="slots(lane)" (ngModelChange)="setSlots(lane, $event)" style="width:3.5rem"></label>
+              <button type="button" class="lay-button small" (click)="go(batch, lane)" [disabled]="!canGo(lane)" [matTooltip]="canGo(lane) ? 'Authorize now; queue until all requested workers are free' : 'This batch needs a supported profile and adapted actions'">
+                <mat-icon aria-hidden="true">play_arrow</mat-icon>Go: {{ waiting(lane) }} item{{ waiting(lane) === 1 ? '' : 's' }}</button>
+            }
+          </div>
+        </div>
+        @if (running(lane)) { <p class="lay-lock-note"><mat-icon aria-hidden="true">lock</mat-icon>Locked in while it runs. Hover an item to skip or stop it.</p> }
+        @if (lane.batch; as batch) { @if (batch.note && !running(lane)) { <p class="lay-lock-note lay-lock-warn"><mat-icon aria-hidden="true">info</mat-icon>{{ batch.ref }}: {{ batch.note }}</p> } }
+        @if (layer() && otherLayers(lane); as others) { <p class="lay-lock-note"><mat-icon aria-hidden="true">layers</mat-icon>This batch also holds {{ others }} item{{ others === 1 ? '' : 's' }} from other layers. Go runs the whole batch; <a [href]="ctx.link('work')" (click)="ctx.go(ctx.link('work'), $event)">see it in Work</a>.</p> }
+        @if (lane.who.kind === 'agent' && !canGo(lane) && waiting(lane) && !running(lane) && lane.batch?.state !== 'queued') { <p class="lay-lock-note lay-lock-warn"><mat-icon aria-hidden="true">info</mat-icon>This task needs a supported profile and Symphony action adapter.</p> }
+        @if (lane.items.length) { <ol class="lay-stack">@for (item of lane.items; track item.id) { <li><aludel-work-card [item]="item" /></li> }</ol> }
+        @else { <p class="lay-lane-empty">Empty. Press Next, or stage items from the queue.</p> }
+        @if (lane.batchItems.length > lane.items.length && !lane.items.length) { <p class="lay-muted small">No {{ layerName() }} items; {{ lane.batchItems.length }} from other layers.</p> }
+      </section>
     }
   </div>
-  @if (ask(); as a) {
-    <div class="lay-kb-scrim" (click)="ask.set(null)"></div>
-    <div class="lay-kb-dialog" role="dialog" aria-modal="true" aria-labelledby="kb-ask-h" (keydown.escape)="ask.set(null)">
-      @if (a.kind === 'define') {
-        <h2 id="kb-ask-h">{{ a.item.ref }} is still a rough note</h2>
-        <p>Ready means someone can start it. Define it first: a brief and at least one action, written by you or your agent on its page.</p>
-        <div class="lay-row lay-wrap"><a class="lay-button" [href]="ctx.link('work', 'item', a.item.id)" (click)="ask.set(null); ctx.go(ctx.link('work', 'item', a.item.id), $event)">Open item to define it</a>
-          <button type="button" class="lay-button ghost" (click)="ask.set(null)">Cancel</button></div>
-      } @else {
-        <h2 id="kb-ask-h">Start {{ a.item.ref }}?</h2>
-        @if (a.item.assignee) {
-          <p>{{ whoLabel(a.item.assignee) }} starts on its actions. Its assignee stays once it has started.</p>
-          <div class="lay-row lay-wrap"><button type="button" class="lay-button" (click)="start(a.item, false)">Start</button><button type="button" class="lay-button ghost" (click)="ask.set(null)">Cancel</button></div>
-        } @else {
-          <p>Nobody is assigned. Claim it to work on it with your own agent. Sending it to an agent arrives with the remote runtime (A2).</p>
-          <div class="lay-row lay-wrap"><button type="button" class="lay-button" (click)="start(a.item, true)">Claim and start</button><button type="button" class="lay-button ghost" (click)="ask.set(null)">Cancel</button></div>
-        }
+
+  <div class="lay-stack-head">
+    <div class="lay-subtabs" role="tablist" aria-label="Items">
+      @for (tab of tabs; track tab[0]) {
+        <button type="button" role="tab" [id]="'sub-' + tab[0]" [attr.aria-selected]="sub() === tab[0]" [attr.tabindex]="sub() === tab[0] ? 0 : -1" (click)="sub.set(tab[0])" (keydown)="keys($event)">
+          {{ tab[1] }}<span class="lay-subtab-n">{{ counts()[tab[0]] }}</span></button>
       }
     </div>
+    <div class="lay-filters" role="group" aria-label="Filter by assignee"><span class="lay-muted small">Assignee</span>
+      <button type="button" class="lay-filter-all" [attr.aria-pressed]="!ctx.boardFilter()" (click)="ctx.boardFilter.set(null)">All</button>
+      @for (who of people(); track who.id) {
+        <button type="button" class="lay-filter" [class.lay-filter-bot]="who.kind === 'agent'" [attr.aria-pressed]="ctx.boardFilter() === who.id" (click)="toggleFilter(who.id)"
+          [matTooltip]="ctx.whoName(who)" [attr.aria-label]="ctx.whoName(who)"><aludel-avatar [who]="who" size="md" /></button>
+      }
+      <span class="lay-sortnote"><mat-icon aria-hidden="true">sort</mat-icon>Highest priority first</span>
+    </div>
+  </div>
+  <p class="lay-muted small lay-stack-hint">{{ hint[sub()] }}</p>
+  <div role="tabpanel" [attr.aria-labelledby]="'sub-' + sub()">
+    @if (list().length) { <ol class="lay-stack">@for (item of list(); track item.id) { <li><aludel-work-card [item]="item" /></li> }</ol> }
+    @else { <p class="lay-empty">{{ empty[sub()] }}</p> }
+  </div>
+  @if (sub() === 'done' && finished().length) {
+    <details class="lay-log-list"><summary>Earlier batches · {{ finished().length }}</summary><ul class="small lay-plain-list">
+      @for (batch of finished(); track batch.id) { <li>{{ batch.ref }} · {{ ctx.whoName({ kind: 'agent', id: batch.profileId }) }} · {{ batch.state === 'done' ? 'finished' : 'stopped' }} {{ when(batch.finishedAt) }} · {{ batch.items.length }} items · {{ batch.usage.input + batch.usage.output }} tokens{{ batch.note ? ' · ' + batch.note : '' }}</li> }</ul></details>
   }`
 })
 export class WorkBoardComponent {
   readonly ctx = inject(ProjectContext);
   readonly layer = input<string | null>(null);
-  readonly columns = columns;
+  readonly layerName = computed(() => this.ctx.layerInstances().find(entry => entry.key === this.layer())?.name || this.layer() || '');
   readonly createLink = computed(() => this.layer() ? this.ctx.link(this.layer()!, 'tasks', 'create') : this.ctx.link('work', 'create'));
-  readonly needsOnly = signal(false);
-  readonly layerFilter = signal('');
-  readonly over = signal<Column | null>(null);
-  readonly peekId = signal<string | null>(null);
-  readonly peekView = signal<GoalView | null>(null);
-  readonly ask = signal<Ask | null>(null);
-  private readonly summaries = signal<Map<string, GoalSummary>>(new Map());
-  private dragging: WorkItem | null = null;
-
-  constructor() {
-    // Goal summaries follow every reload of the project snapshot, so counts change with the cards.
-    effect(() => { if (this.ctx.data()) void this.loadSummaries(); });
-  }
-  private base() { return `/api/projects/${encodeURIComponent(this.ctx.projectId())}/goals`; }
-  private async loadSummaries() {
-    try { const { goals } = await this.ctx.api<{ goals: GoalSummary[] }>(this.base()); this.summaries.set(new Map(goals.map(goal => [goal.id, goal]))); }
-    catch { /* The board still shows every item; goal counts fill in on the next reload. */ }
-    const id = this.peekId(); if (id && this.ctx.workById().get(id)?.scope === 'goal') void this.loadPeek(id);
-  }
-
-  readonly layerOptions = computed(() => this.ctx.layerInstances().map(entry => ({ key: entry.key, name: entry.name })));
+  readonly tabs: [string, string][] = [['queue', 'Queue'], ['backlog', 'Backlog'], ['done', 'Done']];
+  readonly sub = signal('queue');
+  readonly hint: Record<string, string> = { queue: 'Staging puts an item in its assignee\'s batch: yours, or that agent\'s.', backlog: 'Gaps the layers found and work nobody has queued yet. Queue what you want done.', done: 'Completed runs awaiting review and accepted work. Review is still required before changes apply.' };
+  readonly empty: Record<string, string> = { queue: 'Nothing queued. Queue items from the backlog.', backlog: 'Nothing in the backlog.', done: 'Nothing done yet.' };
+  private readonly allWork = computed(() => this.ctx.data()?.work || []);
+  private readonly work = computed(() => { const layer = this.layer(); return layer ? this.allWork().filter(item => item.layer === layer) : this.allWork(); });
+  private readonly filtered = computed(() => { const who = this.ctx.boardFilter(); return who ? this.work().filter(item => item.assignee?.id === who) : this.work(); });
+  readonly counts = computed(() => ({ queue: this.filtered().filter(item => item.status === 'queued').length, backlog: this.filtered().filter(item => item.status === 'backlog').length, done: this.filtered().filter(item => ['review', 'done'].includes(item.status)).length } as Record<string, number>));
+  readonly list = computed(() => {
+    const status = this.sub() === 'queue' ? 'queued' : this.sub();
+    const items = this.filtered().filter(item => status === 'done' ? ['review', 'done'].includes(item.status) : item.status === status);
+    return status === 'done' ? items.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) : items.sort(byPriority);
+  });
   readonly people = computed<Assignee[]>(() => [...(this.ctx.data()?.members || []).map(member => ({ kind: 'person' as const, id: member.id })),
     ...(this.ctx.data()?.profiles || []).filter(profile => profile.active).map(profile => ({ kind: 'agent' as const, id: profile.id }))]);
-  layersOf(item: WorkItem) { return item.scope === 'goal' ? this.summaries().get(item.id)?.layers || [] : [item.layer]; }
-  needsOf(item: WorkItem) { return item.scope === 'goal' ? this.summaries().get(item.id)?.needs || 0 : item.status === 'needs' ? 1 : 0; }
-  progressOf(item: WorkItem) {
-    const counts = item.scope === 'goal' ? this.summaries().get(item.id)?.actions : null;
-    if (!counts) return null;
-    const total = Object.values(counts).reduce((sum, n) => sum + n, 0);
-    return total ? { done: counts['done'] || 0, total } : null;
-  }
-  live(item: WorkItem) { return item.scope === 'goal' ? Boolean(this.summaries().get(item.id)?.actions['working']) : item.status === 'working'; }
-  rough(item: WorkItem) { return item.scope === 'goal' && item.board === 'draft' && !this.summaries().get(item.id)?.defined; }
-  whoLabel(who: Assignee) { return who.kind === 'person' ? `${this.ctx.whoName(who)}, local` : this.ctx.whoName(who); }
-  label(board: string | undefined) { return columns.find(col => col[0] === board)?.[1] || ''; }
-
-  private readonly shown = computed(() => {
-    const layer = this.layer() || this.layerFilter(), who = this.ctx.boardFilter(), needs = this.needsOnly();
-    return (this.ctx.data()?.work || []).filter(item => (!layer || this.layersOf(item).includes(layer) || (item.scope !== 'goal' && item.layer === layer))
-      && (!who || (who === 'none' ? !item.assignee : item.assignee?.id === who)) && (!needs || this.needsOf(item) > 0));
+  readonly finished = computed(() => { const ids = new Set(this.work().map(item => item.id));
+    return (this.ctx.data()?.batches || []).filter(batch => (batch.state === 'done' || batch.state === 'stopped') && (!this.layer() || batch.items.some(id => ids.has(id)))); });
+  // One lane per assignee: you first, then other people with staged work, then each agent profile with a batch.
+  readonly lanes = computed<Lane[]>(() => {
+    const data = this.ctx.data(); if (!data) return [];
+    const me = this.ctx.me();
+    const inLane = (item: WorkItem) => ['staged', 'working', 'needs', 'review'].includes(item.status) && (item.assignee?.kind === 'agent' ? Boolean(item.context?.batch) : true);
+    const lanes: Lane[] = [];
+    const people = [me, ...data.members.map(member => member.id).filter(id => id !== me)];
+    for (const id of people) {
+      const batchItems = this.allWork().filter(item => item.assignee?.kind === 'person' && item.assignee.id === id && inLane(item)).sort(byPriority);
+      const items = this.shown(batchItems);
+      if (id === me || items.length) lanes.push({ key: id === me ? 'me' : id, who: { kind: 'person', id }, title: id === me ? 'Your batch' : `${this.ctx.whoName({ kind: 'person', id })}'s batch`, items, batchItems, batch: null });
+    }
+    for (const profile of data.profiles) {
+      const batchItems = this.allWork().filter(item => item.assignee?.kind === 'agent' && item.assignee.id === profile.id && inLane(item)).sort(byPriority);
+      const items = this.shown(batchItems);
+      // Every active agent has a lane, so Next can fill it (ROADMAP-01).
+      if (!items.length && !profile.active) continue;
+      const batches = data.batches.filter(batch => batch.profileId === profile.id);
+      const batch = batches.find(isRunningBatch) || batches.find(entry => entry.state === 'queued') || batches.find(entry => entry.state === 'draft') || batches.find(entry => batchItems.some(item => item.context?.batch === entry.id)) || null;
+      lanes.push({ key: profile.id, who: { kind: 'agent', id: profile.id }, title: profile.name, items, batchItems, batch });
+    }
+    const who = this.ctx.boardFilter();
+    return who ? lanes.filter(lane => lane.who.id === who) : lanes;
   });
-  readonly filtersOn = computed(() => this.needsOnly() || Boolean(this.layerFilter()) || Boolean(this.ctx.boardFilter()));
-  readonly needsCount = computed(() => (this.ctx.data()?.work || []).filter(item => (!this.layer() || this.layersOf(item).includes(this.layer()!)) && this.needsOf(item) > 0).length);
-  readonly byColumn = computed(() => {
-    const out: Record<Column, WorkItem[]> = { draft: [], ready: [], progress: [], review: [], done: [] };
-    for (const item of this.shown()) out[(item.board || 'draft') as Column]?.push(item);
-    for (const key of ['draft', 'ready', 'progress', 'review'] as Column[]) out[key].sort(byPriority);
-    out.done.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-    return out;
-  });
-  readonly peekItem = computed(() => { const id = this.peekId(); return id ? this.ctx.workById().get(id) || null : null; });
+  private shown(items: WorkItem[]) { const layer = this.layer(); return layer ? items.filter(item => item.layer === layer) : items; }
+  otherLayers(lane: Lane) { return lane.items.length ? lane.batchItems.length - lane.items.length : 0; }
 
-  peek(item: WorkItem) {
-    if (this.peekId() === item.id) return this.closePeek();
-    this.peekId.set(item.id); this.peekView.set(null);
-    if (item.scope === 'goal') void this.loadPeek(item.id);
-    setTimeout(() => document.getElementById('kb-peek-h')?.focus());
+  // Next (ROADMAP-01, DEC-043): a fixed rule on the server; the number is per lane and remembered while you stay.
+  readonly editing = signal('');
+  private readonly slotCounts = signal<Record<string, number>>({});
+  maxSlots(lane: Lane) { return Math.max(1, Math.min(this.ctx.data()?.workerPool?.configured || 1, this.waiting(lane))); }
+  slots(lane: Lane) { return Math.min(this.slotCounts()[lane.key] || 1, this.maxSlots(lane)); }
+  setSlots(lane: Lane, value: number) { const max = this.maxSlots(lane); this.slotCounts.set({ ...this.slotCounts(), [lane.key]: Math.max(1, Math.min(max, Math.round(Number(value) || 1))) }); }
+  private readonly nextCounts = signal<Record<string, number>>({});
+  readonly milestone = computed(() => this.ctx.currentMilestone()?.label || 'the current milestone');
+  count(lane: Lane) { return this.nextCounts()[lane.key] || 5; }
+  setCount(lane: Lane, value: number) { const n = Math.max(1, Math.min(25, Math.round(Number(value) || 5))); this.nextCounts.set({ ...this.nextCounts(), [lane.key]: n }); }
+  editCount(lane: Lane) { this.editing.set(lane.key); setTimeout(() => (document.getElementById('n-' + lane.key) as HTMLInputElement | null)?.select()); }
+  next(lane: Lane) {
+    let added = 0;
+    void this.ctx.write(async () => { added = (await this.ctx.next(lane.who, this.count(lane), this.layer())).added.length; })
+      .then(ok => { if (ok) this.ctx.notice.set(added ? `Added ${added} item${added === 1 ? '' : 's'} to ${lane.key === 'me' ? 'your batch' : lane.title}.` : `Nothing is ready for ${lane.key === 'me' ? 'you' : lane.title} in ${this.milestone()}.`); });
   }
-  closePeek() { this.peekId.set(null); this.peekView.set(null); }
-  private async loadPeek(id: string) {
-    try { const view = await this.ctx.api<GoalView>(`${this.base()}/${encodeURIComponent(id)}`); if (this.peekId() === id) this.peekView.set(view); } catch { /* The peek keeps its fields. */ }
+  running(lane: Lane) { return isRunning(lane.batch); }
+  waiting(lane: Lane) { return lane.batchItems.filter(item => item.state === 'ready' && item.context?.batch === lane.batch?.id).length; }
+  laneNote(lane: Lane) {
+    if (lane.who.kind === 'person') return lane.key === 'me' ? 'Your work, highest priority first' : 'Their work, highest priority first';
+    const batch = lane.batch;
+    if (!batch) return '';
+    const state = batch.state === 'draft' ? 'Staged, not started' : batch.state === 'queued' ? this.queueReason(lane) : batch.state === 'running' ? 'Running' : batch.state === 'stopping' ? 'Stopping after the current item' : this.waiting(lane) ? 'Ready to run again' : 'Finished: clear each item to close it';
+    return `${batch.ref} · ${state}`;
   }
-  readonly actionIcon: Record<string, string> = { todo: 'radio_button_unchecked', working: 'pending', review: 'rate_review', done: 'check_circle', proposed: 'add_circle' };
-  actionState(action: GoalView['actions'][number]) { return action.needs.length ? 'Needs you' : { todo: action.blocked ? 'Waiting' : 'To do', working: 'Working', review: 'In review', done: 'Done', proposed: 'Proposed' }[action.state]; }
-
-  // A move asks first where the board's rules call for it; everything else goes straight to the server, which has the final word.
-  move(item: WorkItem, to: Column) {
-    if (!item || item.board === to) return;
-    if (to === 'ready' && item.board === 'draft' && !this.summaries().get(item.id)?.defined) return this.ask.set({ kind: 'define', item });
-    if (to === 'progress' && item.board === 'ready') return this.ask.set({ kind: 'start', item });
-    void this.ctx.write(() => this.ctx.api(`${this.base()}/${encodeURIComponent(item.id)}/move`, 'POST', { to }), `${item.ref} moved to ${this.label(to)}.`);
+  queueReason(lane: Lane) {
+    const batch = lane.batch;
+    if (!batch) return 'Queued';
+    const pool = this.ctx.data()?.workerPool;
+    if (!pool?.online) return `Queued for ${batch.requestedSlots} workers; waiting for Symphony host`;
+    const profile = this.ctx.profileById().get(batch.profileId || '');
+    if ((profile?.model || (profile?.effort || 'medium') !== 'medium') && !pool.profileOverrides) return 'Queued; waiting for host support for this profile’s model and effort';
+    return `Queued for ${batch.requestedSlots} workers; ${pool.free} free`;
   }
-  start(item: WorkItem, claim: boolean) {
-    this.ask.set(null);
-    void this.ctx.write(async () => {
-      if (claim) await this.ctx.api(`${this.base()}/${encodeURIComponent(item.id)}/claim`, 'POST', {});
-      await this.ctx.api(`${this.base()}/${encodeURIComponent(item.id)}/move`, 'POST', { to: 'progress' });
-    }, `${item.ref} started.`);
+  elapsedFor(batch: Batch) { return elapsed(batch.startedAt || undefined, this.ctx.now()); }
+  tokenText(batch: Batch) { return tokens(batch.usage.input + batch.usage.output); }
+  canGo(lane: Lane) {
+    const items = lane.batchItems.filter(item => item.state === 'ready' && item.context?.batch === lane.batch?.id);
+    if (!items.length) return false;
+    return Boolean(lane.batch && ['draft', 'stopped'].includes(lane.batch.state) && lane.who.id && this.ctx.data()?.symphonyProfiles?.includes(lane.who.id) && items.every(item => agentRunnable(item, this.ctx)));
   }
-  dragStart(event: DragEvent, item: WorkItem) {
-    if (item.scope !== 'goal') return event.preventDefault();
-    this.dragging = item; event.dataTransfer?.setData('text/plain', item.ref); if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
-  }
-  dragOver(event: DragEvent, col: Column) { if (!this.dragging) return; event.preventDefault(); this.over.set(col); }
-  drop(event: DragEvent, col: Column) {
-    event.preventDefault(); this.over.set(null);
-    const item = this.dragging; this.dragging = null;
-    if (item) this.move(item, col);
+  go(batch: Batch, lane: Lane) { void this.ctx.write(() => this.ctx.api(`/api/projects/${encodeURIComponent(this.ctx.projectId())}/batches/start`, 'POST', { batchId: batch.id, requestedSlots: this.slots(lane) }), `${batch.ref} authorized. It starts when its workers are free.`); }
+  stopBatch(batch: Batch) { void this.ctx.write(() => this.ctx.api(`/api/projects/${encodeURIComponent(this.ctx.projectId())}/batches/stop`, 'POST', { batchId: batch.id }), batch.state === 'queued' ? 'Queued batch canceled.' : 'Stopping after the current item.'); }
+  toggleFilter(id: string | null) { this.ctx.boardFilter.set(this.ctx.boardFilter() === id ? null : id); }
+  when(at: string | null) { return at ? new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''; }
+  keys(event: KeyboardEvent) {
+    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+    const keys = this.tabs.map(tab => tab[0]);
+    const next = keys[(keys.indexOf(this.sub()) + (event.key === 'ArrowRight' ? 1 : keys.length - 1)) % keys.length];
+    this.sub.set(next);
+    setTimeout(() => document.getElementById(`sub-${next}`)?.focus());
   }
 }
+const isRunningBatch = (batch: Batch) => batch.state === 'running' || batch.state === 'stopping';
