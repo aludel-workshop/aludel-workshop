@@ -164,16 +164,15 @@ test('a new project\'s kit is seeded by the Design template, and a Look & feel c
 test('Design publishes kit.js from its own records, each version kept by its digest', () => fixture(({ db, know, owner, id }) => {
   const api = layerApi(db, id, 'design');
   assert.deepEqual(api.publishes, ['kit.js']);
-  const project = { name: 'Tool Share', slug: 'tool-share' };
-  const first = publishLayerFile({ db, api, projectId: id, path: 'kit.js', project });
+  const first = publishLayerFile({ db, api, projectId: id, path: 'kit.js' });
   assert.match(first.type, /^text\/javascript/);
   assert.match(first.digest, /^[0-9a-f]{20}$/);
-  assert.ok(first.body.includes('"tag":"tool-button"') && first.body.includes('"tag":"tool-page-scaffold"'), 'one element per seeded contract, named for the project');
-  assert.equal(publishLayerFile({ db, api, projectId: id, path: 'kit.js', project }).digest, first.digest, 'the same records give the same version');
-  assert.throws(() => publishLayerFile({ db, api, projectId: id, path: 'other.js', project }), /publishes no other.js/);
+  assert.ok(first.body.includes('"tag":"tool-button"') && first.body.includes('"tag":"tool-page-scaffold"'), 'one element per seeded contract, named from Design\'s brand name');
+  assert.equal(publishLayerFile({ db, api, projectId: id, path: 'kit.js' }).digest, first.digest, 'the same records give the same version');
+  assert.throws(() => publishLayerFile({ db, api, projectId: id, path: 'other.js' }), /publishes no other.js/);
   const tokens = know.list(id, 'design_tokens', { layer: 'design' })[0];
   applyOperation({ db, know, api, projectId: id, operationId: 'setTokens', body: { corners: { ...tokens.corners, medium: 20 } }, author: owner.name });
-  const second = publishLayerFile({ db, api, projectId: id, path: 'kit.js', project });
+  const second = publishLayerFile({ db, api, projectId: id, path: 'kit.js' });
   assert.notEqual(second.digest, first.digest, 'a new Design revision is a new kit');
   assert.equal(publishedLayerFile(db, id, 'design', 'kit.js', first.digest).body, first.body, 'a pinned version still reads');
   assert.equal(publishedLayerFile(db, id, 'design', 'kit.js', '0'.repeat(20)), null);
@@ -197,6 +196,6 @@ test('a contract keeps a demo and a template through Design\'s API, and the kit 
   assert.match(map.template.html, /\{\{title\}\}/);
   assert.throws(() => applyOperation({ db, know, api, projectId: id, operationId: 'updateComponent', id: map.id, author: owner.name, body: { changes: { template: { html: '<script>x()</script>', css: '' } } } }),
     /run or load/);
-  const kit = publishLayerFile({ db, api, projectId: id, path: 'kit.js', project: { name: 'Tool Share', slug: 'tool-share' } });
+  const kit = publishLayerFile({ db, api, projectId: id, path: 'kit.js' });
   assert.ok(kit.body.includes('"tag":"tool-world-map"') && kit.body.includes('{{title}}'));
 }));

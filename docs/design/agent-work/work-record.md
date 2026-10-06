@@ -1000,3 +1000,18 @@ Authorization: the owner created W-29 from W-27 #8's proposal, started it in the
     3. The scaffold's copy of `kit.js` into the app repository (#4, K1) goes to the new action #8, because #4 can't be reopened. Code gets Design's kit only through the binding.
     4. The route stays: it's the Design instance's own API.
   - `design` is now `02e2726`. Template tests: 15 pass. Design host tests: 9 pass. The `design-kit` journey passes.
+
+### W-29 #8: the scaffold stops copying Design's kit into the app (2026-10-06)
+
+Added after the owner's flag on #5, because #4 can't be reopened.
+- **Changed:**
+  - The scaffold no longer writes `design/kit.js` (`server.mjs` `scaffoldSetup`, `design.mjs` `designFiles`).
+  - `publishLayerFile` passes the handler the layer's records only. The publish route no longer reads the project.
+  - Contract (`layer-base` `main` `ad913ef`, merged into `design` `15e3d97`): a published file gets the layer's records and nothing else.
+  - `kit-contract.md` K1 is revised: the kit is Design's own, and reaches other layers only through bindings.
+  - The design pin moves to `15e3d97`. The handler is unchanged, so its digest stays. The bundle and patch are regenerated (`main` `ad913ef`, `design` `15e3d97`).
+- **Checked:**
+  - The scaffold test now asserts there's no `design/kit.js`.
+  - Design suites pass with templates on (15) and off (6).
+  - The build passes.
+- **Raised, not changed:** the scaffold also writes `design/tokens.json` and `design/components.json` from Design's records (DESIGN-UX-01). That's the same layer-to-code shortcut. It's left for the owner to decide, since it predates this item and the generated app's styles depend on it.

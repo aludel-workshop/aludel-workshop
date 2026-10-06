@@ -1,28 +1,31 @@
 # W-29: the layer-base changes inside tools/w-29-layer-base.bundle, for reading in review.
 # The bundle is what ships; this file is a copy of its changes and is never applied.
 
-# ---- main: fee5f30..a574a8f
+# ---- main: fee5f30..ad913ef
+# ad913ef Contract: a published file gets the layer's records only, no project facts (W-29 #8)
 # a574a8f Contract: published files (api.publishes), a file the layer makes from its records (W-29, DEC-070)
 diff --git a/docs/layer-contract.md b/docs/layer-contract.md
-index dbb980b..9972f13 100644
+index dbb980b..a0ec4f1 100644
 --- a/docs/layer-contract.md
 +++ b/docs/layer-contract.md
 @@ -42,6 +42,7 @@ Either way, every entry is published to the Library with the layer instance that
  - `x-aludel-catalogs: [names]` at the document root asks for host catalogs, as lists, in `context.catalogs`.
  - `run` returns `{ writes: [{ op: create | update | delete, kind, id, baseRevision, data }], references: [[id, [kinds]]] }`. Updates and deletes may touch only records the host passed in; creates choose a fresh ID.
  - **Seeds** (`api.seeds` in `layer.json`, for example `["install", "look"]`): the handler may export `seed(event, context)` for the host events it declares. `install` runs once for a new instance; `look` runs when the project's Look & feel changes. `context.project` holds the project facts the host shares with every layer (`name`, `description`, `look: { feel, label, accent, font, radius }`), and `context.records` holds this instance's records of every output kind. Seed returns writes like `run`, each with an optional `note` that becomes its rationale. The host checks them like an operation's and applies them as Aludel. A layer's starter content belongs here, not in the host.
-+- **Published files** (`api.publishes` in `layer.json`, for example `["kit.js"]`, at most eight `.js`, `.css` or `.json` names): the handler may export `publish(path, context)`, which makes that file from the layer's records alone. `context.records` holds this instance's records of every output kind, and `context.project` holds `{ name, slug }`. It returns `{ type, body }`, and the same records must give the same body. The host serves the file to project members at `/api/projects/<project>/layers/<layer>/publish/<path>`, names each version by its content digest, and keeps every version at `…/publish/<digest>/<path>`, so a page that pins one keeps working. Design publishes its HTML kit this way (DEC-070).
++- **Published files** (`api.publishes` in `layer.json`, for example `["kit.js"]`, at most eight `.js`, `.css` or `.json` names): the handler may export `publish(path, context)`, which makes that file from the layer's own records alone. `context.records` holds this instance's records of every output kind, and nothing else: no project facts, because the file is this layer's output and reaches another layer only through a binding. It returns `{ type, body }`, and the same records must give the same body. The host serves the file to project members at `/api/projects/<project>/layers/<layer>/publish/<path>`, names each version by its content digest, and keeps every version at `…/publish/<digest>/<path>`, so a page that pins one keeps working. Design publishes its HTML kit this way (DEC-070).
  
  ## Using another layer's output
  
 
-# ---- design: 550f846..02e2726 (includes the merge of main)
+# ---- design: 550f846..15e3d97 (includes the merges of main)
+# 15e3d97 Merge branch 'main' into design
+# ad913ef Contract: a published file gets the layer's records only, no project facts (W-29 #8)
 # 02e2726 Design: the Components tab draws demos from kit.js on a stage (W-29 #5)
 # 574e23f Design: the scaffold and nav list fit a narrow container (W-29)
 # 836e4e7 Design: a demo drops what no longer fits instead of blocking a contract change (W-29)
+# a574a8f Contract: published files (api.publishes), a file the layer makes from its records (W-29, DEC-070)
 # 0934676 Merge branch 'main' into design
 # ccb3cb5 Design: kit.js from the records; contracts gain demo and template; starter demos (W-29, DEC-070)
-# a574a8f Contract: published files (api.publishes), a file the layer makes from its records (W-29, DEC-070)
 diff --git a/api/openapi.json b/api/openapi.json
 index cd34b69..a37e310 100644
 --- a/api/openapi.json

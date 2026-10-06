@@ -270,14 +270,15 @@ export function seedLayer({ db, know, api, projectId, event, project }) {
   return applyAsAludel(db, know, api, projectId, writes, references, records, write => typeof write.note === 'string' ? write.note.slice(0, 300) : null);
 }
 
-// W-29 (DEC-070, kit-contract.md K1): a file the layer publishes from its records (`api.publishes`), made by the handler's
-// publish(path, { records, project }). The same records give the same file, so its content digest names that version. Each
+// W-29 (DEC-070, kit-contract.md K1): a file the layer publishes from its own records (`api.publishes`), made by the
+// handler's publish(path, { records }). It gets nothing else (no project facts): it is the layer's own output, and reaches
+// another layer only through a binding. The same records give the same file, so its content digest names that version. Each
 // version is kept, so a page that pinned a digest keeps working after Design changes; the records stay the only source.
 const publishedTypes = { js: 'text/javascript; charset=utf-8', css: 'text/css; charset=utf-8', json: 'application/json; charset=utf-8' };
-export function publishLayerFile({ db, api, projectId, path, project }) {
+export function publishLayerFile({ db, api, projectId, path }) {
   if (!api.publishes.includes(path)) fail(`The ${api.key} layer publishes no ${path}.`, 404);
   const records = Object.fromEntries([...api.records.keys()].map(kind => [kind, recordsOf(db, api, projectId, kind, null)]));
-  const result = handle(api, 'publish', [path, { records, project }]);
+  const result = handle(api, 'publish', [path, { records }]);
   if (typeof result?.body !== 'string' || result.body.length > 2 * 1048576) fail('The layer published an invalid file.', 500);
   const digest = createHash('sha256').update(result.body).digest('hex').slice(0, 20);
   db.prepare('INSERT OR IGNORE INTO layer_publications (project_id, layer_key, path, digest, body, created_at) VALUES (?, ?, ?, ?, ?, ?)')

@@ -411,9 +411,6 @@ function scaffoldSetup(user, projectId) {
   const brandUploads = new Map(flows.projectAssets(projectId, 'brand').map(asset => [asset.id, asset]));
   const designSystem = { tokens: know.list(projectId, 'design_tokens', { layer: 'design' })[0] || null,
     components: know.list(projectId, 'component', { layer: 'design' }).map(component => ({ ...component, status: componentStatus(component) })), brand: know.list(projectId, 'brand_asset', { layer: 'design' }).map(asset => ({ ...asset, upload: asset.assetId ? brandUploads.get(asset.assetId) || null : null })) };
-  // W-29 (kit-contract.md K1): the generated app keeps Design's kit beside its tokens, when Design publishes one.
-  const designApi = layerApi(db, projectId, 'design');
-  if (designApi?.publishes.includes('kit.js') && designSystem.tokens) designSystem.kit = publishLayerFile({ db, api: designApi, projectId, path: 'kit.js', project: { name: setup.project.name, slug: setup.project.slug } }).body;
   return { ...setup, data: { objects: know.list(projectId, 'data_object'), operations: know.list(projectId, 'data_operation') }, agents: know.agentExport(projectId), designSystem,
     pageRecords: know.list(projectId, 'page') };
 }
@@ -1117,8 +1114,7 @@ async function api(request, response, url) {
     requireMember(db, user, projectId);
     const api = layerApi(db, projectId, layerKey);
     if (!api) return json(response, 404, { error: 'This layer publishes no files.' });
-    const project = db.prepare('SELECT name, slug FROM projects WHERE id = ?').get(projectId);
-    const file = digest ? publishedLayerFile(db, projectId, layerKey, path, digest) : publishLayerFile({ db, api, projectId, path, project: { name: project.name, slug: project.slug } });
+    const file = digest ? publishedLayerFile(db, projectId, layerKey, path, digest) : publishLayerFile({ db, api, projectId, path });
     // The stage (a page on the layer instance's origin that loads this version and shows what its parent posts) for a .js file.
     if (stage) {
       if (!file || !path.endsWith('.js')) return json(response, 404, { error: 'Only a published script has a stage.' });

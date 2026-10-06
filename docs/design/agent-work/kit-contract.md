@@ -20,11 +20,11 @@ Hence the contract additions (K3, K4), and Code's binding as an ordinary project
 
 ## The kit (Design)
 
-**K1. One kit per Design revision, computed, addressed by digest.**
-- The kit is a pure function of Design's `kit` facet: the token set, the component contracts and the brand. A revision of any of them is a new kit.
-- It is served from Design's API as `kit.js`, at a URL carrying the facet's content digest, so any page can pin it. A `latest` alias redirects to the current digest.
-- The generated app gets the same file as `design/kit.js` beside `design/tokens.json` (`designFiles`), so the code has its reference in the repository too.
-- Nothing is stored that the records can't recompute, so the kit never drifts from Design.
+**K1. One kit per Design revision, computed, addressed by digest. It is Design's own.**
+- The kit is a pure function of Design's own records: the token set, the component contracts and the brand. A revision of any of them is a new kit. It takes no project facts. Its name and element prefix come from Design's brand-name asset.
+- It is served from Design's API as `kit.js`, at a URL carrying its content digest, so any page can pin it. Each version is kept, and Design's Components tab shows the current one on a stage on the Design instance's own origin (#5).
+- It reaches another layer only through a binding. Code gets it through the project's design-system binding, into Code's own representation (B1–B3), and Pages through its own kit's adapter.
+- *Revised 2026-10-06 (owner on #5):* "our whole desired interaction is information at the layer level, bound to other layers. design should have its own kit." The first version also had the scaffold copy `kit.js` into the generated app's repository. That host shortcut is removed (#8).
 
 **K2. Elements.**
 - *Names:* each contract becomes the custom element `<prefix>-<name>`. The prefix is the project's slug, for example `biome-button` (`kit-` in the spike).
@@ -114,5 +114,5 @@ Proposed separately: look drift from a running build (B3), and kit fonts (the sp
 
 ## Open for the owner at the gate
 
-- **K1, serving vs storing:** the kit is served from Design's records, plus a copy in the generated repository. The alternative is Design committing `kit.js` to its own repository for each revision. Default: served.
+- **K1, serving vs storing:** decided. The kit is served from Design's records, and nothing else copies it.
 - **B4, default drift policy:** assess code-side additions and changes, rectify removals, and propagate Design's changes as rectify Work. It's set per project in the binding.

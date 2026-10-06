@@ -170,6 +170,7 @@ test('the scaffold builds styles, token files and brand from the Design layer, a
   assert.match(files['src/styles.scss'], new RegExp(`--mat-sys-primary: light-dark\\(${roleColor(tokens, 'primary')}`));
   assert.match(files['src/styles.scss'], /--mat-sys-level3: 0 4px 8px/);
   assert.ok(JSON.parse(files['design/tokens.json']).color['on-primary']);
+  assert.equal(files['design/kit.js'], undefined, 'Design\'s kit reaches the code only through a binding (W-29 #8)');
   assert.equal(JSON.parse(files['design/components.json']).components.find(component => component.name === 'Nav item').status, 'built');
   assert.match(files['public/favicon.svg'], /<svg[^>]+>.*TS<\/text><\/svg>/);
   assert.match(files['index.html'], /<title>Tool Share<\/title>/);
