@@ -111,7 +111,7 @@ initLayerDiscovery(db);
 const secrets = openSecretStore(dataDirectory);
 const topology = hostTopology(process.env, port);
 // A layer's views may embed their own project's running app (the Pages Built view), never the portal.
-const views = layerUi({ dataDirectory, layerOrigin: topology.layerOrigin, portalOrigin: topology.portalOrigin, portalOrigins: topology.portalOrigins, appOriginFor: label => {
+const views = layerUi({ dataDirectory, layerOrigin: topology.layerOrigin, portalOrigin: topology.portalOrigin, portalOrigins: topology.portalOrigins, layerOriginsPattern: topology.layerOrigins, appOriginFor: label => {
   const instance = db.prepare("SELECT project_id FROM layer_instances WHERE 'i-' || replace(instance_id, '-', '') = ?").get(label);
   const row = instance && db.prepare('SELECT slug FROM projects WHERE id = ?').get(instance.project_id);
   return row ? topology.appOrigin(row.slug) : null; } });
@@ -1111,14 +1111,20 @@ async function api(request, response, url) {
   }
   // W-29 (DEC-070): a file a layer publishes from its records, such as Design's kit.js. Without a digest it answers with the
   // current version's digest and body; with one, that version, which never changes, so it may be cached for good.
-  const layerPublishRoute = /^\/api\/projects\/([^/]+)\/layers\/([^/]+)\/publish\/(?:([0-9a-f]{20})\/)?([a-z][a-z0-9-]*\.(?:js|css|json))$/.exec(url.pathname);
+  const layerPublishRoute = /^\/api\/projects\/([^/]+)\/layers\/([^/]+)\/publish\/(?:([0-9a-f]{20})\/)?([a-z][a-z0-9-]*\.(?:js|css|json))(\/stage)?$/.exec(url.pathname);
   if (layerPublishRoute && request.method === 'GET') {
-    const [projectId, layerKey, digest, path] = layerPublishRoute.slice(1).map(value => value && decodeURIComponent(value));
+    const [projectId, layerKey, digest, path, stage] = layerPublishRoute.slice(1).map(value => value && decodeURIComponent(value));
     requireMember(db, user, projectId);
     const api = layerApi(db, projectId, layerKey);
     if (!api) return json(response, 404, { error: 'This layer publishes no files.' });
     const project = db.prepare('SELECT name, slug FROM projects WHERE id = ?').get(projectId);
     const file = digest ? publishedLayerFile(db, projectId, layerKey, path, digest) : publishLayerFile({ db, api, projectId, path, project: { name: project.name, slug: project.slug } });
+    // The stage (a page on the layer instance's origin that loads this version and shows what its parent posts) for a .js file.
+    if (stage) {
+      if (!file || !path.endsWith('.js')) return json(response, 404, { error: 'Only a published script has a stage.' });
+      const instance = db.prepare('SELECT instance_id FROM layer_instances WHERE project_id = ? AND layer_key = ?').get(projectId, layerKey);
+      return json(response, 200, { path, digest: file.digest, stage: `${topology.layerOrigin(frameLabel(instance.instance_id))}/published/${file.digest}/stage.html?src=${encodeURIComponent(path)}` }, { 'cache-control': 'no-store' });
+    }
     if (!file) return json(response, 404, { error: 'No such version of this file.' });
     response.writeHead(200, { 'content-type': file.type, 'x-aludel-digest': file.digest, 'x-content-type-options': 'nosniff',
       'cache-control': digest ? 'private, max-age=31536000, immutable' : 'no-store' });
@@ -2023,7 +2029,15 @@ function requestProject(request, target) {
 async function handle(request, response, target) {
   {
     if (target.kind === 'app') return await serveApp(request, response, target.slug);
-    if (target.kind === 'layers') return views.serve(request, response, new URL(request.url, `http://${host}:${port}`).pathname, target.label);
+    if (target.kind === 'layers') {
+      const pathname = new URL(request.url, `http://${host}:${port}`).pathname;
+      // W-29: a published file's stage, for the project that owns this layer instance.
+      if (pathname.startsWith('/published/')) return views.servePublished(request, response, pathname, target.label, (label, name, digest) => {
+        const instance = db.prepare("SELECT project_id, layer_key FROM layer_instances WHERE 'i-' || replace(instance_id, '-', '') = ?").get(label);
+        return instance ? publishedLayerFile(db, instance.project_id, instance.layer_key, name, digest) : null;
+      });
+      return views.serve(request, response, pathname, target.label);
+    }
     if (target.kind !== 'portal') return appPage(response, 421, 'Unknown address', 'This host is not served by Aludel.');
     const url = new URL(request.url, `http://${host}:${port}`);
     if (url.pathname.startsWith('/api/')) await api(request, response, url);

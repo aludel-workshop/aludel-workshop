@@ -32,7 +32,10 @@ export interface SlotSpec { name: string; accepts: string[]; anything?: boolean;
 export interface Part { part: string; tokens: string[]; note: string; }
 export interface Binding { library: string; selector: string; map: { prop: string; code: string }[]; }
 export interface DesignComponent extends RecordBase { name: string; group: string; purpose: string; note: string; props: PropSpec[]; slots: SlotSpec[]; anatomy: Part[]; a11y: string[];
-  binding: Binding | null; preview: string | null; origin: string; status: 'needed' | 'specified' | 'built'; history: Revision[]; }
+  binding: Binding | null; preview: string | null; origin: string; status: 'needed' | 'specified' | 'built'; history: Revision[];
+  // W-29 (DEC-070): what a demo of it shows, and how the kit draws a component the preview catalog can't.
+  demo?: ComponentDemo; template?: { html: string; css: string }; }
+export interface ComponentDemo { props: Record<string, string | boolean>; slots: Record<string, { component: string; props: Record<string, string | boolean> }[]>; }
 export interface BrandAsset extends RecordBase { name: string; type: 'image' | 'text' | 'mark' | 'banner'; key: string | null; text: string; assetId: string | null;
   mark: { text: string; background: string; foreground: string } | null; banner: { width: number; height: number; headline: string; subline: string; background: string; accent: string } | null;
   notes: string; starter: boolean; template: string | null; history: Revision[]; }

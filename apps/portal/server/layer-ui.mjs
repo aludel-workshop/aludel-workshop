@@ -22,7 +22,7 @@ const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; ch
 // Each instance's views are served from `i-<instance>.layers.<base>`: a real origin of their own, so a nested app preview
 // keeps its origin and one layer's browser storage never meets another's; the portal's session cookie is host-only.
 export const frameLabel = instanceId => `i-${String(instanceId).replace(/-/g, '')}`;
-export function layerUi({ dataDirectory, layerOrigin, portalOrigin, portalOrigins = [portalOrigin], appOriginFor = () => null }) {
+export function layerUi({ dataDirectory, layerOrigin, portalOrigin, portalOrigins = [portalOrigin], layerOriginsPattern = null, appOriginFor = () => null }) {
   const cacheRoot = resolve(dataDirectory, 'layer-ui');
   const sources = new Map();
   const viewsDigest = (repo, commit, ui, root = '') => {
@@ -82,11 +82,33 @@ export function layerUi({ dataDirectory, layerOrigin, portalOrigin, portalOrigin
     // Sandboxed even when opened directly; no network, forms or top navigation; may embed only its own project's app.
     const app = appOriginFor(label);
     if (ext === '.html') headers['content-security-policy'] = `sandbox allow-scripts allow-forms allow-same-origin allow-downloads; default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; ` +
-      `font-src 'self'; img-src blob: data:; connect-src 'none'; form-action 'none'; base-uri 'none'; frame-src ${app || "'none'"}; frame-ancestors ${portalOrigins.join(' ')}`;
+      `font-src 'self'; img-src blob: data:; connect-src 'none'; form-action 'none'; base-uri 'none'; frame-src 'self'${app ? ` ${app}` : ''}; frame-ancestors ${portalOrigins.join(' ')}`;
     response.writeHead(200, headers);
     response.end(body);
   }
-  return { status, settle, serve, buildKey };
+  // W-29 (DEC-070): a stage for a file the layer published, on the layer instance's own origin, so the portal (or the layer's
+  // own views) can frame it under the same sandbox as the views. The digest names one version of the file; the stage loads it
+  // and nothing else, with no network. `file` is { body, type } for this instance's project, or null.
+  function servePublished(request, response, pathname, label, fileFor) {
+    const match = /^\/published\/([0-9a-f]{20})\/(stage\.html|[a-z][a-z0-9-]*\.js)$/.exec(pathname);
+    const url = new URL(request.url, 'http://x');
+    const name = match?.[2] === 'stage.html' ? url.searchParams.get('src') || '' : match?.[2];
+    const file = match && request.method === 'GET' && /^[a-z][a-z0-9-]*\.js$/.test(name || '') ? fileFor(label, name, match[1]) : null;
+    if (!file) { response.writeHead(404, { 'content-type': 'text/plain' }); return response.end('Not found'); }
+    const ancestors = `${portalOrigins.join(' ')} ${layerOriginsPattern || ''}`.trim();
+    if (match[2] !== 'stage.html') {
+      response.writeHead(200, { 'content-type': file.type, 'x-content-type-options': 'nosniff', 'cross-origin-resource-policy': 'same-origin', 'cache-control': 'private, max-age=31536000, immutable' });
+      return response.end(file.body);
+    }
+    const body = `<!doctype html>\n<html lang="en" data-kit-stage><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Stage</title>`
+      + `<style>body{margin:0;padding:16px;background:var(--mat-sys-surface,#fff);color:var(--mat-sys-on-surface,#111);font:var(--mat-sys-body-medium,14px system-ui)}`
+      + `.stage-grid{display:grid;gap:12px 16px;align-items:center}.stage-label{font:var(--mat-sys-label-medium,12px system-ui);color:var(--mat-sys-on-surface-variant,#555)}</style>`
+      + `<script src="${name}"></script></head><body></body></html>\n`;
+    response.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'x-content-type-options': 'nosniff', 'cache-control': 'no-cache',
+      'content-security-policy': `sandbox allow-scripts allow-same-origin; default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'; frame-src 'none'; frame-ancestors ${ancestors}` });
+    return response.end(body);
+  }
+  return { status, settle, serve, servePublished, buildKey };
 }
 
 // Host features a layer's views may ask for by name (`hostCalls` in layer.json), each fixed to its routes here. A layer
@@ -123,7 +145,9 @@ export function frameAllows({ key, projectId, method, pathname, features = [] })
   if (method === 'POST' && rest === '/roles/propose') return true;
   // Reads, plus this layer's own Knowledge docs (T03-CODE: Code's Overview counts the app's docs and their checks).
   if (method === 'GET' && (rest === '/roles' || rest === '/knowledge' || rest === '/layer-instances' || rest === '/library' || rest === '/library/entry' || /^\/assets\/[^/]+$/.test(rest)
-    || rest === `/layers/${key}/api` || rest === `/layers/${key}/files` || rest === `/layers/${key}/knowledge/docs`)) return true;
+    || rest === `/layers/${key}/api` || rest === `/layers/${key}/files` || rest === `/layers/${key}/knowledge/docs`
+    // W-29: the files this layer publishes from its records, and where its stage shows them.
+    || new RegExp(`^/layers/${key}/publish/[a-z][a-z0-9-]*\\.(?:js|css|json)(?:/stage)?$`).test(rest))) return true;
   if (/^\/records(?:\/[^/]+)?$/.test(rest)) return ['POST', 'PUT', 'DELETE'].includes(method);
   if (method === 'POST' && new RegExp(`^/layers/${key}/api/[A-Za-z][A-Za-z0-9]*$`).test(rest)) return true;
   if (method === 'POST' && rest === '/work') return true;

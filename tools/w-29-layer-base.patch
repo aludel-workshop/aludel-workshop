@@ -1,4 +1,4 @@
-# W-29 #4: the layer-base changes inside tools/w-29-layer-base.bundle, for reading in review.
+# W-29: the layer-base changes inside tools/w-29-layer-base.bundle, for reading in review.
 # The bundle is what ships; this file is a copy of its changes and is never applied.
 
 # ---- main: fee5f30..a574a8f
@@ -16,7 +16,8 @@ index dbb980b..9972f13 100644
  ## Using another layer's output
  
 
-# ---- design: 550f846..574e23f (includes the merge of main)
+# ---- design: 550f846..236570a (includes the merge of main)
+# 236570a Design: the Components tab draws demos from kit.js on a stage (W-29 #5)
 # 574e23f Design: the scaffold and nav list fit a narrow container (W-29)
 # 836e4e7 Design: a demo drops what no longer fits instead of blocking a contract change (W-29)
 # 0934676 Merge branch 'main' into design
@@ -129,7 +130,7 @@ index b971dd2..1e69fcf 100644
    },
    "hostCalls": [
 diff --git a/server/design-api.mjs b/server/design-api.mjs
-index a230a25..92a989e 100644
+index a230a25..878f4a2 100644
 --- a/server/design-api.mjs
 +++ b/server/design-api.mjs
 @@ -140,7 +140,51 @@ function cleanComponent(data) {
@@ -234,7 +235,7 @@ index a230a25..92a989e 100644
      }
    }
    if (!(records.brand_asset || []).length) {
-@@ -427,3 +491,206 @@ export function seed(event, { project = {}, records = {} } = {}) {
+@@ -427,3 +491,238 @@ export function seed(event, { project = {}, records = {} } = {}) {
    }
    return { writes, references };
  }
@@ -432,6 +433,38 @@ index a230a25..92a989e 100644
 +  return element;
 +}
 +window.aludelKit = Object.freeze({ ...${JSON.stringify(kit)}, elements, demo });
++// A stage (a page marked data-kit-stage, framed by Design's Components tab) draws what its parent posts: a tree of this kit's
++// elements and plain div or span layout, the theme's variables (a token draft included) and light or dark. Nothing else.
++if (document.documentElement.hasAttribute('data-kit-stage') && window.parent !== window) {
++  const tags = new Set(elements.map(entry => entry.tag));
++  const build = node => {
++    if (typeof node === 'string') return document.createTextNode(node);
++    if (!node || !(tags.has(node.tag) || node.tag === 'div' || node.tag === 'span')) return document.createTextNode('');
++    const element = document.createElement(node.tag);
++    for (const [key, value] of Object.entries(node.attrs || {})) if (/^[a-z][a-z0-9-]*$/.test(key) && !key.startsWith('on') && key !== 'style') element.setAttribute(key, String(value));
++    if (node.columns) element.style.gridTemplateColumns = 'repeat(' + Math.min(12, Math.max(1, Number(node.columns) || 1)) + ', auto)';
++    for (const child of node.children || []) element.append(build(child));
++    return element;
++  };
++  const post = message => window.parent.postMessage(message, '*');
++  const size = () => post({ type: 'kit-stage-size', height: Math.ceil(document.documentElement.scrollHeight) });
++  addEventListener('message', event => {
++    if (event.source !== window.parent || event.data?.type !== 'kit-stage') return;
++    const root = document.documentElement;
++    root.setAttribute('data-theme', event.data.mode === 'dark' ? 'dark' : 'light');
++    root.removeAttribute('style');
++    for (const [name, value] of Object.entries(event.data.vars || {})) if (/^--[a-z0-9-]+$/.test(name)) root.style.setProperty(name, String(value));
++    document.body.replaceChildren(build(event.data.tree));
++    // Say how tall it is after each draw too, at once (reading the height lays it out) and once painted: an off-screen frame
++    // gets no resize or animation callbacks until it is scrolled into view.
++    size(); requestAnimationFrame(() => requestAnimationFrame(size));
++  });
++  const start = () => {
++    const watch = new ResizeObserver(size); watch.observe(document.body); watch.observe(document.documentElement);
++    post({ type: 'kit-stage-ready', prefix: ${JSON.stringify(prefix)}, elements: elements.map(entry => ({ id: entry.id, tag: entry.tag, name: entry.name, drawn: Boolean(entry.kind || entry.template) })) });
++  };
++  if (document.body) start(); else addEventListener('DOMContentLoaded', start);
++}
 +})();
 +`;
 +}
@@ -525,3 +558,247 @@ index 9cc6cb3..04a5950 100644
 +  assert.ok(kitSource(drawless).includes("can't draw this yet"), 'a contract with no preview or template draws as a labelled box');
 +  assert.throws(() => kitSource({ records: {}, project: {} }), /no token set/);
 +});
+diff --git a/ui/design-components.ts b/ui/design-components.ts
+index a0e0b2e..50ae484 100644
+--- a/ui/design-components.ts
++++ b/ui/design-components.ts
+@@ -1,16 +1,18 @@
+-import { Component, computed, inject, signal } from '@angular/core';
++import { Component, DestroyRef, ElementRef, computed, effect, inject, signal, viewChild } from '@angular/core';
+ import { FormsModule } from '@angular/forms';
+ import { MatIconModule } from '@angular/material/icon';
+-import { ComponentRenderComponent, ThemeScopeDirective } from '@aludel/host/app-kit';
++import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+ import { DesignComponent, ProjectContext, PropSpec, lines } from '@aludel/host/context';
+ import { LayerRoles, RoleNoteComponent } from '@aludel/host/roles';
+ import { DesignState } from './design-state';
+ 
+ type Props = Record<string, string | boolean>;
+ interface Instance { props: Props; children: Props[] }
++// W-29 (DEC-070): what the kit's stage draws. A kit element or plain layout, with attributes and children.
++interface StageNode { tag: string; attrs?: Record<string, string>; columns?: number; children?: (StageNode | string)[] }
+ const groups = ['Actions', 'Containment', 'Navigation', 'Selection', 'Text inputs', 'Lists', 'Feedback', 'Layouts', 'Other'];
+ const previewKinds = ['button', 'icon-button', 'fab', 'card', 'chip', 'switch', 'text-field', 'list', 'list-item', 'nav-list', 'nav-item', 'toolbar', 'nav-bar', 'dialog', 'scaffold'];
+-const statesFor = ['button', 'icon-button', 'fab'];
++const statesFor = ['button', 'icon-button', 'fab', 'chip', 'list-item', 'nav-item'];
+ export const statusLabel: Record<string, string> = { needed: 'Needed', specified: 'Specified', built: 'Built' };
+ // Icons a contract can offer (kept in the font subset).
+ export const componentIcons = [{ icon: 'arrow_forward' }, { icon: 'close' }, { icon: 'more_vert' }, { icon: 'home' }, { icon: 'inventory_2' }, { icon: 'chat' }, { icon: 'person' }, { icon: 'settings' },
+@@ -18,7 +20,7 @@ export const componentIcons = [{ icon: 'arrow_forward' }, { icon: 'close' }, { i
+ 
+ @Component({
+   selector: 'aludel-design-components', standalone: true,
+-  imports: [FormsModule, MatIconModule, ThemeScopeDirective, ComponentRenderComponent, RoleNoteComponent],
++  imports: [FormsModule, MatIconModule, RoleNoteComponent],
+   template: `
+   @if (component(); as c) {
+   <div class="lay-ds-editor lay-ds-three">
+@@ -38,30 +40,32 @@ export const componentIcons = [{ icon: 'arrow_forward' }, { icon: 'close' }, { i
+ 
+     <section class="lay-ds-preview" aria-label="Component preview">
+       <div class="lay-ds-bar"><strong>{{ c.name }}</strong><span [class]="'lay-chip lay-ds-chip-' + c.status">{{ statusLabel[c.status] }}</span><span class="lay-push"></span>
+-        @if (c.preview && c.status === 'built' && variantProp(c)) { <div class="lay-ds-seg" role="group" aria-label="Show"><button type="button" [attr.aria-pressed]="!grid()" (click)="grid.set(false)">One</button><button type="button" [attr.aria-pressed]="grid()" (click)="grid.set(true)">All variants</button></div> }
++        @if (c.status !== 'needed' && !cantDraw(c) && variantProp(c)) { <div class="lay-ds-seg" role="group" aria-label="Show"><button type="button" [attr.aria-pressed]="!grid()" (click)="grid.set(false)">One</button><button type="button" [attr.aria-pressed]="grid()" (click)="grid.set(true)">All variants</button></div> }
+         <div class="lay-ds-seg" role="group" aria-label="Mode"><button type="button" [attr.aria-pressed]="ds.mode() === 'light'" (click)="ds.mode.set('light')" aria-label="Light"><mat-icon aria-hidden="true">light_mode</mat-icon></button><button type="button" [attr.aria-pressed]="ds.mode() === 'dark'" (click)="ds.mode.set('dark')" aria-label="Dark"><mat-icon aria-hidden="true">dark_mode</mat-icon></button></div>
+       </div>
+       <div class="lay-ds-cstage">
+-        <div class="lay-ds-canvas lay-ds-ccanvas" [aludelTheme]="ds.vars()">
+-          @if (c.status === 'built' && c.preview) {
+-            @if (grid() && variantProp(c); as vp) {
+-              <div class="lay-ds-vgrid" [style.grid-template-columns]="'auto repeat(' + gridStates(c).length + ', auto)'">
+-                <span></span>@for (s of gridStates(c); track s) { <span class="lay-ds-vh">{{ s }}</span> }
+-                @for (v of vp.options; track v) { <span class="lay-ds-vh">{{ v }}</span>@for (s of gridStates(c); track s) { <aludel-ds-render [kind]="c.preview" [props]="withProp(instance(c).props, vp.key, v)" [children]="instance(c).children" [state]="s" /> } }
+-              </div>
+-            } @else {
+-              <aludel-ds-render [kind]="c.preview" [props]="instance(c).props" [children]="instance(c).children" [state]="state()" [selectedChild]="child()" (childSelect)="child.set($event)" />
+-            }
+-          } @else if (c.status === 'needed') {
++        @if (c.status === 'needed') {
++          <div class="lay-ds-canvas lay-ds-ccanvas">
+             <div class="lay-ds-placeholder"><div class="lay-ds-skel"><i></i><i></i><i></i></div><strong>{{ c.name }} isn't specified yet</strong><span>{{ c.purpose || 'Add what it is for, its properties and parts, and references for whoever designs it.' }}</span>
+               @if (layerRoles.editable(c.id)) { <button type="button" class="lay-button small" (click)="startEdit(c)"><mat-icon aria-hidden="true">edit</mat-icon>Specify it</button> }</div>
+-          } @else {
+-            <div class="lay-ds-wireframe">@for (slot of c.slots; track slot.name) { <div><strong>{{ slot.name }}</strong><small>accepts {{ acceptsText(slot) }}</small></div> } @empty { @for (part of c.anatomy; track part.part) { <div><strong>{{ part.part }}</strong><small>{{ part.tokens.join(' · ') || part.note }}</small></div> } }</div>
+-            <p class="lay-ds-note lay-ds-small">Specified, not built: drawn from the contract. Building it becomes a work item.</p>
+-          }
+-        </div>
++          </div>
++        } @else if (cantDraw(c)) {
++          <div class="lay-ds-canvas lay-ds-ccanvas"><div class="lay-ds-placeholder" role="note"><strong>No way to draw it yet</strong>
++            <span>The kit draws a component from its preview kind or from a template. {{ c.name }} has neither, so pages that use it show a labelled box.</span>
++            @if (layerRoles.editable(c.id)) { <button type="button" class="lay-button small" (click)="startEdit(c, 'template')">Add a template</button> }</div></div>
++        } @else if (kitError()) {
++          <div class="lay-ds-canvas lay-ds-ccanvas"><div class="lay-ds-placeholder" role="alert"><strong>The kit couldn't load</strong><span>{{ kitError() }}</span>
++            <button type="button" class="lay-button small" (click)="loadKit()">Retry</button></div></div>
++        }
++        <!-- One stage for every component: it stays loaded and is told what to draw, and reloads only for a new kit. -->
++        @if (kit(); as k) {
++          <iframe #stage class="lay-ds-stage" [class.lay-ds-hidden]="c.status === 'needed' || cantDraw(c) || !!kitError()" [src]="k.url" sandbox="allow-scripts allow-same-origin"
++            [title]="c.name + ', drawn by the kit'" [style.height.px]="stageHeight()"></iframe>
++        } @else if (!kitError() && c.status !== 'needed' && !cantDraw(c)) { <div class="lay-ds-canvas lay-ds-ccanvas"><div class="lay-ds-skel" aria-label="Loading the kit"><i></i><i></i><i></i></div></div> }
+       </div>
+-      <div class="lay-ds-foot"><mat-icon aria-hidden="true">info</mat-icon><small>{{ c.status === 'built' ? (hasChildren(c) ? 'Click a nested item to set its own properties.' : 'Rendered with ' + (c.binding?.library || 'the stack') + ' in this project\\'s theme, including unsaved token changes.') : 'Not built yet.' }}</small></div>
++      <div class="lay-ds-foot"><mat-icon aria-hidden="true">info</mat-icon><small>@if (kit(); as k) { Drawn by this project's kit, <code>kit.js · {{ k.digest.slice(0, 7) }}</code>, in its theme@if (ds.dirty()) { with your unsaved token changes}. } @else { The kit draws each component from Design's records. }
++        @if (hasChildren(c)) { Pick a nested item in Slots to set its own properties. }</small>
++        @if (kit() && c.status !== 'needed' && !cantDraw(c) && !grid()) { <button type="button" class="lay-button ghost small lay-push" (click)="copyTag(c)">Copy tag</button> }</div>
+     </section>
+ 
+     <aside class="lay-ds-side" aria-label="Properties and contract">
+@@ -76,6 +80,10 @@ export const componentIcons = [{ icon: 'arrow_forward' }, { icon: 'close' }, { i
+           <label>Slots <small>one per line: name, accepted components separated by | (or "anything"), min, max</small><textarea name="slots" rows="3" class="lay-mono" [(ngModel)]="d.slots" placeholder="items, Nav item, 1, 7"></textarea></label>
+           <label>Anatomy <small>one per line: part, tokens separated by |, note</small><textarea name="anatomy" rows="4" class="lay-mono" [(ngModel)]="d.anatomy" placeholder="Container, color.primary|corner.full"></textarea></label>
+           <label>Accessibility <small>one note per line</small><textarea name="a11y" rows="3" [(ngModel)]="d.a11y"></textarea></label>
++          <label>Demo <small>what a demo shows, one per line: property: value. Separate from the defaults a real element starts with.</small><textarea name="demo" rows="3" class="lay-mono" [(ngModel)]="d.demo" placeholder="label: Continue"></textarea></label>
++          <fieldset class="lay-ds-fieldset"><legend>Template <small>for a component the kit has no preview kind for</small></legend>
++            <label>HTML <small>&lt;slot&gt; for slots, {{ '{{' }}property{{ '}}' }} for a property</small><textarea id="ds-template" name="templateHtml" rows="4" class="lay-mono" [(ngModel)]="d.templateHtml" placeholder="<section><h2>{{ '{{' }}title{{ '}}' }}</h2><slot></slot></section>"></textarea></label>
++            <label>CSS <small>token variables only, such as var(--mat-sys-primary)</small><textarea name="templateCss" rows="4" class="lay-mono" [(ngModel)]="d.templateCss" placeholder="section{background:var(--mat-sys-surface-container)}"></textarea></label></fieldset>
+           <fieldset class="lay-ds-fieldset"><legend>Built with (Platform)</legend>
+             <label>Library<input name="library" [(ngModel)]="d.library" placeholder="Angular Material 22"></label>
+             <label>Selector<input name="selector" [(ngModel)]="d.selector" placeholder="mat-card"></label>
+@@ -105,7 +113,7 @@ export const componentIcons = [{ icon: 'arrow_forward' }, { icon: 'close' }, { i
+             }
+           </div>
+         } @empty { <p class="lay-muted small">None yet.</p> }
+-        @if (c.status === 'built' && statesFor.includes(c.preview || '') && child() === null) {
++        @if (c.status !== 'needed' && statesFor.includes(c.preview || '') && child() === null) {
+           <h3>State</h3><div class="lay-ds-pills">@for (s of ['enabled', 'hover', 'focus', 'pressed', 'disabled']; track s) { <button type="button" [attr.aria-pressed]="state() === s" (click)="state.set(s)">{{ s }}</button> }</div>
+         }
+         @if (child() === null && c.slots.length) {
+@@ -158,11 +166,88 @@ export class DesignComponentsComponent {
+   readonly state = signal('enabled');
+   readonly child = signal<number | null>(null);
+   readonly instances = signal<Record<string, Instance>>({});
+-  readonly editDraft = signal<{ name: string; group: string; purpose: string; props: string; slots: string; anatomy: string; a11y: string; library: string; selector: string; map: string; preview: string; why: string } | null>(null);
++  readonly editDraft = signal<{ name: string; group: string; purpose: string; props: string; slots: string; anatomy: string; a11y: string; library: string; selector: string; map: string; preview: string; why: string;
++    demo: string; templateHtml: string; templateCss: string } | null>(null);
+   newName = '';
+   refPick = '';
+ 
+   readonly all = computed(() => this.ctx.data()?.components || []);
++
++  // ---- The kit's stage (W-29, DEC-070): Design's kit.js for the saved records, on this layer's own origin ----
++  private readonly sanitizer = inject(DomSanitizer);
++  readonly stage = viewChild<ElementRef<HTMLIFrameElement>>('stage');
++  readonly kit = signal<{ digest: string; url: SafeResourceUrl } | null>(null);
++  readonly kitError = signal('');
++  readonly stageTags = signal<Map<string, string> | null>(null);
++  readonly stageHeight = signal(240);
++  // The saved records the kit is made from; a new revision of any of them is a new kit.
++  private readonly kitKey = computed(() => { const tokens = (this.ctx.data() as unknown as { tokens?: { revision: number } | null } | null)?.tokens;
++    return `${tokens?.revision || 0}:${this.all().map(entry => `${entry.id}@${entry.revision}`).join(',')}`; });
++  loadKit() {
++    this.kitError.set('');
++    this.ctx.api<{ digest: string; stage: string }>(`/api/projects/${encodeURIComponent(this.ctx.projectId())}/layers/design/publish/kit.js/stage`).then(result => {
++      if (this.kit()?.digest === result.digest) return;
++      this.stageTags.set(null);
++      this.kit.set({ digest: result.digest, url: this.sanitizer.bypassSecurityTrustResourceUrl(result.stage) });
++    }, (error: Error) => this.kitError.set(error.message || 'Try again in a moment.'));
++  }
++  cantDraw(c: DesignComponent) { return c.status !== 'needed' && !(c.preview && previewKinds.includes(c.preview)) && !c.template; }
++  private tagOf(id: string | undefined) { return id ? this.stageTags()?.get(id) || null : null; }
++  private attrs(contract: DesignComponent | null, values: Props, state = 'enabled') {
++    const out: Record<string, string> = {};
++    for (const prop of contract?.props || []) { const value = values[prop.key]; if (value === true) out[prop.key] = ''; else if (typeof value === 'string' && value !== '') out[prop.key] = value; }
++    if (state !== 'enabled') out['state'] = state;
++    if (state === 'disabled' && contract?.props.some(prop => prop.key === 'disabled')) out['disabled'] = '';
++    return out;
++  }
++  // A contract's demo children for its slots, nested as far as their own demos go.
++  private demoChildren(contract: DesignComponent | null, skip: string | null, depth = 0): StageNode[] {
++    if (!contract?.demo || depth > 2) return [];
++    return Object.entries(contract.demo.slots).filter(([name]) => name !== skip).flatMap(([name, list]) => list.flatMap((child): StageNode[] => {
++      const kid = this.ctx.componentById().get(child.component) || null, tag = this.tagOf(child.component);
++      return tag ? [{ tag, attrs: { ...this.attrs(kid, { ...this.defaults(kid), ...(kid?.demo?.props || {}), ...child.props }), slot: name }, children: this.demoChildren(kid, null, depth + 1) }] : [];
++    }));
++  }
++  private node(c: DesignComponent, props: Props, state: string): StageNode | null {
++    const tag = this.tagOf(c.id); if (!tag) return null;
++    const first = this.hasChildren(c) ? c.slots[0] : null, kid = first ? this.childContract(c) : null, kidTag = this.tagOf(kid?.id);
++    const editable = first && kidTag ? this.instance(c).children.map(values => ({ tag: kidTag, attrs: { ...this.attrs(kid, values), slot: first.name }, children: this.demoChildren(kid, null, 1) })) : [];
++    return { tag, attrs: this.attrs(c, props, state), children: [...editable, ...this.demoChildren(c, first?.name || null)] };
++  }
++  readonly stageTree = computed<StageNode | null>(() => {
++    const c = this.component(); if (!c || !this.stageTags() || c.status === 'needed' || this.cantDraw(c)) return null;
++    const inst = this.instance(c), vp = this.variantProp(c);
++    if (this.grid() && vp) {
++      const states = this.gridStates(c), label = (text: string): StageNode => ({ tag: 'span', attrs: { class: 'stage-label' }, children: [text] });
++      return { tag: 'div', attrs: { class: 'stage-grid' }, columns: states.length + 1, children: [label(''), ...states.map(label),
++        ...vp.options.flatMap(option => [label(option), ...states.map(state => this.node(c, { ...inst.props, [vp.key]: option }, state)).filter((n): n is StageNode => Boolean(n))])] };
++    }
++    return this.node(c, inst.props, this.state());
++  });
++  private readonly destroyRef = inject(DestroyRef);
++  constructor() {
++    effect(() => { this.kitKey(); this.loadKit(); });
++    const listen = (event: MessageEvent) => {
++      if (event.source !== this.stage()?.nativeElement.contentWindow) return;
++      if (event.data?.type === 'kit-stage-ready') this.stageTags.set(new Map((event.data.elements as { id: string; tag: string }[]).map(entry => [entry.id, entry.tag])));
++      if (event.data?.type === 'kit-stage-size') this.stageHeight.set(Math.min(1200, Math.max(120, Number(event.data.height) || 0)));
++    };
++    window.addEventListener('message', listen);
++    this.destroyRef.onDestroy(() => window.removeEventListener('message', listen));
++    effect(() => {
++      const tree = this.stageTree(), frame = this.stage()?.nativeElement.contentWindow;
++      if (tree && frame) frame.postMessage({ type: 'kit-stage', tree, vars: this.ds.vars(), mode: this.ds.mode() }, '*');
++    });
++  }
++  // The element as HTML, with what the panel has set: what a page or a mockup would write.
++  copyTag(c: DesignComponent) {
++    const tree = this.node(c, this.instance(c).props, 'enabled'); if (!tree) return;
++    const html = (node: StageNode | string, indent = ''): string => typeof node === 'string' ? node
++      : `${indent}<${node.tag}${Object.entries(node.attrs || {}).map(([k, v]) => v === '' ? ` ${k}` : ` ${k}="${v.replace(/"/g, '&quot;')}"`).join('')}>`
++        + `${(node.children || []).length ? `\n${(node.children || []).map(child => html(child, indent + '  ')).join('\n')}\n${indent}` : ''}</${node.tag}>`;
++    const text = html(tree);
++    void (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(() => this.ctx.notice.set('Copied the tag.'), () => this.ctx.notice.set(`Couldn't copy here. The tag: ${text}`));
++  }
+   readonly component = computed(() => { const id = this.ctx.segments()[2]; return this.all().find(entry => entry.id === id) || this.all()[0] || null; });
+   readonly tree = computed(() => groups.map(name => {
+     const items: { component: DesignComponent; depth: number }[] = [];
+@@ -188,6 +273,9 @@ export class DesignComponentsComponent {
+     const existing = this.instances()[c.id];
+     if (existing) return existing;
+     const kid = this.childContract(c);
++    // A contract's demo, when it has one, is what its demo shows (W-29); otherwise sample children as before.
++    const demoKids = c.demo?.slots[c.slots[0]?.name || '']?.filter(child => child.component === kid?.id);
++    if (c.demo && (demoKids?.length || !kid)) return { props: { ...this.defaults(c), ...c.demo.props }, children: (demoKids || []).map(child => ({ ...this.defaults(kid), ...(kid?.demo?.props || {}), ...child.props })) };
+     const count = Math.min(Math.max(c.slots[0]?.min || 0, { card: 2, dialog: 2, 'nav-list': 4, 'nav-bar': 4, list: 3, toolbar: 1 }[c.preview || ''] ?? 0), c.slots[0]?.max ?? 10);
+     const names = ['Priya Raman', 'Marco Bianchi', 'Aiyana Ross', 'Sam Okafor'];
+     const children = kid ? Array.from({ length: count }, (_, i) => {
+@@ -233,9 +321,11 @@ export class DesignComponentsComponent {
+     const group = this.component()?.group || 'Other';
+     void this.ctx.write(async () => { const made = await this.ctx.record('component', { name, group }, null, 'Added as needed') as { id: string }; this.newName = ''; setTimeout(() => this.select(made.id)); }, `${name} added. It's needed until someone specifies it.`);
+   }
+-  startEdit(c: DesignComponent) {
++  startEdit(c: DesignComponent, focus: 'template' | null = null) {
+     const name = (id: string) => this.ctx.componentById().get(id)?.name || id;
++    if (focus) setTimeout(() => document.getElementById('ds-template')?.focus());
+     this.editDraft.set({ name: c.name, group: c.group, purpose: c.purpose, why: '',
++      demo: Object.entries(c.demo?.props || {}).map(([key, value]) => `${key}: ${value}`).join('\n'), templateHtml: c.template?.html || '', templateCss: c.template?.css || '',
+       props: c.props.map(prop => [prop.key, prop.kind, prop.options.join('|'), String(prop.default)].join(', ')).join('\n'),
+       slots: c.slots.map(slot => [slot.name, slot.anything ? 'anything' : slot.accepts.map(name).join('|'), slot.min, slot.max ?? ''].join(', ')).join('\n'),
+       anatomy: c.anatomy.map(part => [part.part, part.tokens.join('|'), part.note].join(', ').replace(/, $/, '')).join('\n'),
+@@ -251,7 +341,11 @@ export class DesignComponentsComponent {
+       return { name, anything, accepts: anything ? [] : accepts.split('|').map(item => byName.get(item.trim().toLowerCase())).filter(Boolean), min: Number(min) || 0, max: max === '' ? null : Number(max) }; });
+     const anatomy = lines(d.anatomy).map(line => { const [part, tokens = '', ...note] = cells(line); return { part, tokens: tokens.split('|').map(item => item.trim()).filter(Boolean), note: note.join(', ') }; });
+     const binding = d.library.trim() || d.selector.trim() ? { library: d.library, selector: d.selector, map: lines(d.map).map(line => { const at = line.indexOf(':'); return { prop: line.slice(0, at).trim(), code: line.slice(at + 1).trim() }; }).filter(entry => entry.prop && entry.code) } : null;
+-    void this.ctx.write(async () => { await this.ctx.change(c.id, { name: d.name, group: d.group, purpose: d.purpose, props, slots, anatomy, a11y: lines(d.a11y), binding, preview: d.preview || null }, c.revision, d.why.trim() || 'Contract changed'); this.editDraft.set(null); this.instances.update(all => { const next = { ...all }; delete next[c.id]; return next; }); }, 'Saved as a new revision.');
++    const booleans = new Set(props.filter(prop => prop.kind === 'boolean').map(prop => prop.key));
++    const demo = { props: Object.fromEntries(lines(d.demo).map(line => { const at = line.indexOf(':'); const key = line.slice(0, at).trim(), value = line.slice(at + 1).trim();
++      return [key, booleans.has(key) ? value === 'true' : value]; }).filter(([key]) => key)), slots: c.demo?.slots || {} };
++    const template = d.templateHtml.trim() ? { html: d.templateHtml, css: d.templateCss } : null;
++    void this.ctx.write(async () => { await this.ctx.change(c.id, { name: d.name, group: d.group, purpose: d.purpose, props, slots, anatomy, a11y: lines(d.a11y), binding, preview: d.preview || null, demo, template }, c.revision, d.why.trim() || 'Contract changed'); this.editDraft.set(null); this.instances.update(all => { const next = { ...all }; delete next[c.id]; return next; }); }, 'Saved as a new revision.');
+   }
+   remove(c: DesignComponent) {
+     if (!confirm(`Delete ${c.name}? Components that accept it will stop accepting it.`)) return;
+diff --git a/ui/design.scss b/ui/design.scss
+index 28d7696..a23abe9 100644
+--- a/ui/design.scss
++++ b/ui/design.scss
+@@ -342,3 +342,7 @@
+   .lay-ds-preview{min-height:620px}.lay-ds-pal{grid-template-columns:minmax(0,1fr)}.lay-ds-box{font-size:9.5px}.lay-ds-k{font-size:7.5px}.lay-ds-roles,.lay-ds-surfaces{grid-template-columns:repeat(2,minmax(0,1fr))}
+   .lay-ds-typewrap,.lay-ds-two,.lay-ds-motion,.lay-ds-motion2,.lay-ds-app{grid-template-columns:minmax(0,1fr)}.lay-ds-app>.lay-ds-appnav{display:none}.lay-ds-ctx,.lay-ds-grid3{grid-template-columns:minmax(0,1fr)}
+   .lay-ds-rcard,.lay-ds-rfield,.lay-ds-rlist,.lay-ds-rtop,.lay-ds-rbar,.lay-ds-rnav{width:min(300px,70vw)}.lay-ds-ccanvas{min-width:0;padding:18px}.lay-ds-stage{padding:10px}.lay-ds-canvas{padding:18px 14px 26px}}
++
++// W-29 (DEC-070): the kit's stage, framed from this layer's own origin.
++.lay-ds-stage { display: block; width: 100%; border: 0; border-radius: 12px; background: transparent; min-height: 120px; }
++.lay-ds-hidden { display: none; }

@@ -957,3 +957,34 @@ Authorization: the owner created W-29 from W-27 #8's proposal, started it in the
   ```
 
   The pin names `574e23f`, so it resolves once `design` is pushed.
+
+### W-29 #5: the Components tab draws from kit.js (2026-10-06)
+
+- **Changed:**
+  - *Design template* (`design` `236570a`, one commit on #4's `574e23f`):
+    - The Components tab draws every component on one *stage*: a frame on the Design instance's own origin that loads the kit by digest.
+    - The tab posts the component, its props (the contract's demo first), its slot children, the state, All variants, light or dark, and any unsaved token draft.
+    - `kit.js` answers on a page marked `data-kit-stage`: it builds only kit elements and plain `div`/`span` layout, takes messages only from its parent, and reports its height after each draw and on resize.
+    - New in the tab: a can't-draw state with Add a template (it opens the template field); Copy tag; Demo and Template in Edit contract.
+    - The Angular renderer no longer draws Design's demos.
+  - *Host:*
+    - `GET …/layers/:key/publish/:path/stage` gives the digest and stage URL. A layer frame may read its own layer's published files and stage.
+    - The layers host serves `/published/<digest>/stage.html` and the file, for the instance's own project, under the views' sandbox CSP.
+    - Layer views may frame their own origin (`frame-src 'self'`).
+    - `DesignComponent` gains `demo` and `template` in the host SDK.
+  - The pin and the handler's reviewed digest follow; #4's unshipped digest is replaced. The bundle and `tools/w-29-layer-base.patch` are regenerated.
+- **Checked:**
+  - New journey `design-kit` (`tests/design-kit-browser.mjs`) passes:
+    - the stage loads from the instance origin by digest, and the Button draws its demo label;
+    - a prop edit and the hover state reach the stage; All variants draws 25 elements; dark mode reaches it;
+    - the card shows its two demo actions, and the page scaffold shows a nav list with its items and a card;
+    - a component with no preview says it can't be drawn, takes a template and draws, and a template with an event handler is refused with the reason;
+    - Copy tag gives `<tool-button … label="Continue">`;
+    - the stage frame always shows all it draws;
+    - axe passes on the page, in Design's view and in the stage, at 1440 and 390 px.
+  - Template tests: 15 pass. `typecheck-layer-ui` at `236570a`: 6 files.
+- **Found while checking:**
+  1. Template views run inside their own frame, so the journey reaches the tab through it. Portal notices show outside it.
+  2. Chromium pauses resize and animation callbacks in an off-screen cross-origin frame, so the stage now also reports its height at once after a draw.
+  3. A fresh portal can take more than 30 s to build Design's views on first open.
+- **Trust note:** a stage URL is addressed by the kit's 80-bit content digest and isn't behind a session, because the layer origin gets no portal cookie (as with views). Only members can learn a digest, from the members-only route. Kit content is design tokens and contracts; template content can't run (checked on save, and blocked by the stage's CSP).
