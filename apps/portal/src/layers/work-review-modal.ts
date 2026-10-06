@@ -31,7 +31,7 @@ export function changedLine(view: GoalView, action: GoalAction, layerName: (key:
   const records = view.changeset.flatMap(group => group.changes.filter(change => change.action === action.number).map(() => group.layer));
   const parts: string[] = [];
   if (records.length) { const layers = [...new Set(records)]; parts.push(`${records.length} record${records.length === 1 ? '' : 's'} in ${layers.map(layerName).join(' and ')}`); }
-  if (codeOf(view, action)) parts.push(`${view.code!.files.length} file${view.code!.files.length === 1 ? '' : 's'}`);
+  if (codeOf(view, action)) { const count = codeCount(view); parts.push(`${count} file${count === 1 ? '' : 's'}`); }
   const steps = action.preview?.steps?.length || 0;
   if (action.tunnel) parts.push('live build'); else if (action.preview?.url) parts.push('a preview to open');
   if (steps) parts.push(`${steps} step${steps === 1 ? '' : 's'} to try`);
@@ -39,6 +39,11 @@ export function changedLine(view: GoalView, action: GoalAction, layerName: (key:
 }
 // The item's reported code belongs to its Code actions (the code is the item's, so every Code action reviews the same files).
 const codeOf = (view: GoalView, action: GoalAction) => Boolean(view.code && action.layer === 'platform');
+// W-33: every file the item's code changed, in the project's own repository and in the others it reported.
+const codeCount = (view: GoalView) => (view.code?.files.length || 0) + (view.code?.repositories || []).reduce((sum, entry) => sum + entry.files.length, 0);
+// One repository's listing in Files: the project's own, or another one's branch for a line.
+type FileSource = { repository: string | null; line: string | null; other: boolean; branch: string; commit: string; files: FileEntry[] };
+type ShownFile = FileEntry & { real: string; source: FileSource };
 
 const firstFile = (nodes: TreeNode[]): FileEntry | null => { for (const node of nodes) { const found = node.file || firstFile(node.children); if (found) return found; } return null; };
 
@@ -125,7 +130,12 @@ const firstFile = (nodes: TreeNode[]): FileEntry | null => { for (const node of 
               @switch (listing().state) {
                 @case ('ready') {
                   <nav class="rm-tree" aria-label="Files it changed">
-                    <p class="rm-treehead">{{ listing().data!.files.length }} file{{ listing().data!.files.length === 1 ? '' : 's' }} on <code>{{ listing().data!.branch }}</code> at <code>{{ listing().data!.commit.slice(0, 7) }}</code></p>
+                    @if (listing().data!.sources.length > 1) {
+                      <p class="rm-treehead">{{ listing().data!.files.length }} file{{ listing().data!.files.length === 1 ? '' : 's' }} in {{ listing().data!.sources.length }} repositories</p>
+                      <ul class="rm-sources">@for (source of listing().data!.sources; track $index) { <li><strong>{{ sourceLabel(source) }}</strong>: <code>{{ source.branch }}</code> at <code>{{ source.commit.slice(0, 7) }}</code></li> }</ul>
+                    } @else {
+                      <p class="rm-treehead">{{ listing().data!.files.length }} file{{ listing().data!.files.length === 1 ? '' : 's' }} on <code>{{ listing().data!.branch }}</code> at <code>{{ listing().data!.commit.slice(0, 7) }}</code></p>
+                    }
                     <ng-container *ngTemplateOutlet="treeLevel; context: { $implicit: tree() }" />
                   </nav>
                   <section class="rm-diff" [attr.aria-label]="pickedPath() ? 'Changes to ' + pickedPath() : 'Changes'">
@@ -140,7 +150,7 @@ const firstFile = (nodes: TreeNode[]): FileEntry | null => { for (const node of 
                         @case ('error') { <div class="rm-problem" role="alert"><p>{{ d.error }}</p><button type="button" class="lay-button small" (click)="loadDiff(d.file.path, true)">Retry</button></div> }
                         @default {
                           @if (d.file.binary) { <p class="rm-note"><mat-icon aria-hidden="true">image</mat-icon>A binary file: there are no lines to compare.</p> }
-                          @else if (d.tooLarge) { <p class="rm-note"><mat-icon aria-hidden="true">description</mat-icon>Too large to show here. Read it on <code>{{ listing().data!.branch }}</code>.</p> }
+                          @else if (d.tooLarge) { <p class="rm-note"><mat-icon aria-hidden="true">description</mat-icon>Too large to show here. Read it on <code>{{ $any(d.file).source?.branch || listing().data!.branch }}</code>.</p> }
                           @else if (!d.rows.length) { <p class="rm-note"><mat-icon aria-hidden="true">description</mat-icon>{{ d.file.status === 'renamed' ? 'Moved, with no line changes.' : 'No line changes.' }}</p> }
                           @else {
                             <div class="rm-cols rm-codecols" aria-hidden="true"><span>Before</span><span>After</span></div>
@@ -169,6 +179,10 @@ const firstFile = (nodes: TreeNode[]): FileEntry | null => { for (const node of 
                   @if (view().code; as code) {
                     <p class="rm-reported">What the agent reported: {{ code.files.length }} file{{ code.files.length === 1 ? '' : 's' }} on <code>{{ code.branch }}</code> at <code>{{ code.commit.slice(0, 7) }}</code></p>
                     <ul class="rm-plain">@for (file of code.files; track file.path) { <li><span [class]="'rm-op rm-op-' + fileOp(file.status)">{{ fileLabel[file.status] || 'Changed' }}</span><span class="rm-path">{{ file.path }}</span></li> }</ul>
+                    @for (other of code.repositories || []; track other.repository + other.line) {
+                      <p class="rm-reported">And in {{ other.repository }}: {{ other.files.length }} file{{ other.files.length === 1 ? '' : 's' }} on <code>{{ other.branch }}</code> at <code>{{ other.commit.slice(0, 7) }}</code></p>
+                      <ul class="rm-plain">@for (file of other.files; track file.path) { <li><span [class]="'rm-op rm-op-' + fileOp(file.status)">{{ fileLabel[file.status] || 'Changed' }}</span><span class="rm-path">{{ file.path }}</span></li> }</ul>
+                    }
                   }
                   </div>
                 }
@@ -279,7 +293,7 @@ export class WorkReviewModalComponent {
   // Only the views this action has, in the order the spec opens them: Files for reported code, then Records.
   readonly views = computed(() => { const out: { key: ViewKey; label: string; count: number }[] = [];
     if (this.action().tunnel) out.push({ key: 'live', label: 'Live build', count: this.steps().length });
-    if (codeOf(this.view(), this.action())) out.push({ key: 'files', label: 'Files', count: this.view().code!.files.length });
+    if (codeOf(this.view(), this.action())) out.push({ key: 'files', label: 'Files', count: codeCount(this.view()) });
     if (this.changes().length) out.push({ key: 'records', label: 'Records', count: this.changes().length });
     return out; });
   readonly current = computed<ViewKey | null>(() => { const keys = this.views().map(entry => entry.key); const chosen = this.chosen(); return chosen && keys.includes(chosen) ? chosen : keys[0] || null; });
@@ -289,16 +303,28 @@ export class WorkReviewModalComponent {
     return change.op === 'update' && !this.showSame() ? all.filter(field => field.changed) : all; });
 
   // Files (W-27 #5): read when the tab first shows, again when newer code is reported; each file's diff when it's picked.
-  readonly listing = signal<{ state: 'idle' | 'loading' | 'ready' | 'error'; error?: string; data?: { branch: string; commit: string; base: string; files: FileEntry[] } }>({ state: 'idle' });
+  readonly listing = signal<{ state: 'idle' | 'loading' | 'ready' | 'error'; error?: string; data?: { branch: string; commit: string; sources: FileSource[]; files: ShownFile[] } }>({ state: 'idle' });
   readonly tree = computed(() => fileTree(this.listing().data?.files || []));
   readonly pickedPath = signal<string | null>(null);
   private readonly diffs = signal<Record<string, { state: 'loading' | 'ready' | 'error'; error?: string; rows: CodeRow[]; tooLarge: boolean }>>({});
   readonly diffState = computed(() => { const path = this.pickedPath(), file = this.listing().data?.files.find(entry => entry.path === path); if (!file) return null;
     return { file, ...(this.diffs()[file.path] || { state: 'loading' as const, rows: [], tooLarge: false }) }; });
   private filesPath(query = '') { return `/api/projects/${encodeURIComponent(this.ctx.projectId())}/goals/${encodeURIComponent(this.view().item.id)}/files${query}`; }
+  // W-33: with branches in other repositories, each one is read too, and the tree has a folder per repository.
   loadFiles() {
     this.listing.set({ state: 'loading' }); this.diffs.set({});
-    this.ctx.api<{ branch: string; commit: string; base: string; files: FileEntry[] }>(this.filesPath()).then(data => {
+    type Listed = { repository: string | null; line: string | null; branch: string; commit: string; files: FileEntry[] };
+    const others = this.view().code?.repositories || [];
+    const reads: Promise<FileSource>[] = [
+      this.ctx.api<Listed>(this.filesPath()).then(value => ({ ...value, other: false })),
+      ...others.map(entry => this.ctx.api<Listed>(this.filesPath(`?repository=${encodeURIComponent(entry.repository)}&line=${encodeURIComponent(entry.line)}`)).then(value => ({ ...value, other: true })))
+    ];
+    Promise.all(reads).then(listed => {
+      const sources = listed.filter(source => source.other || source.files.length || !others.length);
+      const several = sources.length > 1;
+      const files: ShownFile[] = sources.flatMap(source => source.files.map(file => ({ ...file, real: file.path, source,
+        path: several ? `${this.sourceLabel(source)}/${file.path}` : file.path, from: file.from && several ? `${this.sourceLabel(source)}/${file.from}` : file.from })));
+      const data = { branch: listed[0].branch, commit: listed[0].commit, sources, files };
       this.listing.set({ state: 'ready', data });
       const first = firstFile(this.tree()); const keep = data.files.some(file => file.path === this.pickedPath());
       if (!keep) this.pickedPath.set(first?.path || null);
@@ -306,10 +332,13 @@ export class WorkReviewModalComponent {
     }, (error: Error) => this.listing.set({ state: 'error', error: error.message || "The code couldn't be read." }));
   }
   pickFile(path: string) { this.pickedPath.set(path); this.loadDiff(path); }
+  sourceLabel(source: FileSource) { return source.other ? `${source.repository} (${(source.line || '').replace(/\//g, '-')})` : source.repository || 'This project'; }
   loadDiff(path: string, again = false) {
     const known = this.diffs()[path]; if (known && known.state !== 'error' && !again) return;
     this.diffs.update(map => ({ ...map, [path]: { state: 'loading', rows: [], tooLarge: false } }));
-    this.ctx.api<{ diff: string | null; tooLarge: boolean }>(this.filesPath('?path=' + encodeURIComponent(path))).then(
+    const shown = this.listing().data?.files.find(entry => entry.path === path);
+    const where = shown?.source.other ? `&repository=${encodeURIComponent(shown.source.repository || '')}&line=${encodeURIComponent(shown.source.line || '')}` : '';
+    this.ctx.api<{ diff: string | null; tooLarge: boolean }>(this.filesPath('?path=' + encodeURIComponent(shown?.real || path) + where)).then(
       value => this.diffs.update(map => ({ ...map, [path]: { state: 'ready', rows: value.diff ? unifiedRows(value.diff) : [], tooLarge: value.tooLarge } })),
       (error: Error) => this.diffs.update(map => ({ ...map, [path]: { state: 'error', error: error.message || "The diff couldn't be read.", rows: [], tooLarge: false } })));
   }
@@ -378,9 +407,11 @@ export class WorkReviewModalComponent {
     window.addEventListener('message', this.listener);
     inject(DestroyRef).onDestroy(() => window.removeEventListener('message', this.listener));
     effect(() => { const shown = this.current() === 'live'; untracked(() => { if (shown && this.live().state === 'idle') this.openLive(); }); });
-    effect(() => { const reported = this.view().code?.commit; const shown = this.current() === 'files';
+    // Every reported commit, the other repositories' included, so newer code in any of them reads the files again.
+    effect(() => { const code = this.view().code; const reported = code ? [code.commit, ...(code.repositories || []).map(entry => entry.commit)].join(' ') : ''; const shown = this.current() === 'files';
       untracked(() => { const listed = this.listing();
-        if (shown && (listed.state === 'idle' || (listed.data && reported && !listed.data.commit.startsWith(reported)))) this.loadFiles(); }); });
+        const read = listed.data ? [listed.data.commit, ...listed.data.sources.filter(source => source.other).map(source => source.commit)].join(' ') : '';
+        if (shown && (listed.state === 'idle' || (listed.data && reported && read !== reported))) this.loadFiles(); }); });
   }
   close() { this.dialog().nativeElement.close(); }
   choose(key: ViewKey) { this.chosen.set(key); }

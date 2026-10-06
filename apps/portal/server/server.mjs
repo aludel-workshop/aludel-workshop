@@ -63,7 +63,7 @@ import { commitWorkspace, gitWithToken, initializeAndPush, inspectGitRepository,
 import { getProjectBrand, updateProjectBrand } from './project-brand.mjs';
 import { ensureProductWorkspace, getProductWorkspace, saveProductRecord } from './product-workspace.mjs';
 import { sweepItemVolumes, templateBundle } from './item-environment.mjs';
-import { initProjectRepositories, projectRepositories } from './project-repositories.mjs';
+import { githubName, initProjectRepositories, projectRepositories } from './project-repositories.mjs';
 import { previewTunnels, tunnelProtocol } from './preview-tunnels.mjs';
 
 const portalRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
@@ -212,6 +212,13 @@ const codeRepo = codeRepository({ db, units });
 const codeRelease = codeReleases({ db, releasesOf: projectId => codeRepo.releases(projectId) });
 // W-33: the repositories a project owns, kept in its settings; companions are checked with the project's installation token.
 const repositories = projectRepositories({ db, tokenFor: (projectId, remote) => githubTokenFor(github)(projectId, remote) });
+// A companion's remote for the host: its URL, with the installation token when it's on GitHub (none for a local URL).
+async function companionRemote(projectId, key) {
+  const repo = repositories.get(projectId, key);
+  if (!repo || repo.primary) return null;
+  const named = githubName(repo.url);
+  return { url: repo.url, token: named ? await githubTokenFor(github)(projectId, named) : null };
+}
 // The Code repository stays in sync with the project's GitHub repository (the existing repository binding, not a second one).
 // Git talks to GitHub with a fresh installation token only; what goes wrong is shown on the layer, never thrown at the person.
 const remotes = layerRemotes({ db,
@@ -1223,9 +1230,13 @@ async function api(request, response, url) {
     // W-27 #5: what the item's code changed (its files, or one file's diff with ?path=), read from the project's repository,
     // fetching the item's branch from GitHub when Aludel doesn't have the reported commit yet.
     if (operation === 'files' && !sub && method === 'GET') {
-      const binding = github.status(user.id, projectId, null).repository;
-      const remote = binding?.status === 'ready' ? { url: binding.clone_url, token: await github.installationTokenForRepository(projectId, binding.name) } : null;
-      return done(200, goals.codeFiles(projectId, workId, remote, url.searchParams.get('path')));
+      // W-33: ?repository=<key>&line=<line> reads the item's branch in one of the project's other repositories instead.
+      const key = url.searchParams.get('repository');
+      const remote = key ? await companionRemote(projectId, key) : await (async () => {
+        const binding = github.status(user.id, projectId, null).repository;
+        return binding?.status === 'ready' ? { url: binding.clone_url, token: await github.installationTokenForRepository(projectId, binding.name) } : null;
+      })();
+      return done(200, goals.codeFiles(projectId, workId, remote, url.searchParams.get('path'), key, url.searchParams.get('line')));
     }
     // W-27 #2: a member opens an action's tunnelled preview: a one-time link that lets this browser in (members only).
     if (operation === 'previews' && sub && method === 'POST') {

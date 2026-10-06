@@ -253,6 +253,20 @@ Code's repository panel listing the set and its access (§1) isn't an action yet
   - `tests/repository-checkout.test.mjs`: 1 new test.
   - The affected set (12 files without the Docker-only three): 59 tests, 58 passing, 0 failing.
 
+**#4: each repository's files in the review modal.**
+- **Server:** `codeFiles` takes `?repository=<key>&line=<line>` to read the item's branch in another repository from the host's own copy at `<workspace>/<folder>`.
+  - The copy is cloned on first use with its URL and the project's installation token (none for a local URL).
+  - The diff base is the reported base, or the merge base with that line.
+  - The listing now names its repository and line.
+- **Modal:** Files reads every reported repository.
+  - With more than one, the tree has a folder per repository (the line in brackets for another repository), and the head says "N files in M repositories", listing each branch and commit.
+  - A file's diff comes from its own repository. The card and the tab count every repository's files.
+  - Files reloads when any reported commit changes, and the "can't read" fallback lists every repository's reported files.
+  - A single repository looks exactly as before.
+- **Checks:**
+  - `tests/review-modal-browser.mjs` gains a kit repository in the project's settings and a report in two repositories. It checks the grouped tree, a kit file's diff (read through the host's clone, made on first use) and a primary file's diff, with axe, and the whole journey passes.
+  - Affected server tests: 48 tests, 47 passing, 0 failing.
+
 ## Process note (three lines)
 
 - **Changed:** the spec is generic from the start, after the owner's steer. Aludel and `layer-base` appear only as the first project's values, and the end-to-end journey uses a fixture that isn't Aludel.

@@ -6,8 +6,8 @@
 import { execFileSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { EventEmitter } from 'node:events';
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { getUser, isMember, requireMember } from './accounts.mjs';
 import { gitWithToken } from './git-repository.mjs';
 import { applyWrites, callOperation, draftChanges, draftOverlay, handlerCatalogs, layerApi, stageOperation } from './layer-api.mjs';
@@ -610,6 +610,24 @@ export function agentWork({ db, know, catalogs = null, repositoriesOf = () => []
     const target = ['main', 'master'].find(name => has(['rev-parse', '--verify', '--quiet', `refs/heads/${name}`]));
     return target ? { workspace, git, has, target } : null;
   }
+  // W-33: one of the project's other repositories, as the host keeps it: a clone at its folder beside the project's own
+  // (for Aludel, the owner's layer-base). Made on first use from its URL with the token the caller brings.
+  function companionRepository(projectId, key, remote = null) {
+    const primary = repository(projectId);
+    if (!primary) fail('This project has no repository to read the code from.', 409);
+    const entry = repositoriesOf(projectId).find(candidate => candidate.key === key && !candidate.primary);
+    if (!entry) fail(`${key} isn't one of this project's other repositories.`, 404);
+    const workspace = join(primary.workspace, entry.path);
+    if (!existsSync(join(workspace, '.git'))) {
+      if (!remote) fail(`Aludel has no copy of ${key} at ${entry.path} yet, and no way to fetch it.`, 409);
+      mkdirSync(dirname(workspace), { recursive: true });
+      const cloned = gitWithToken(dirname(workspace), ['clone', '--quiet', '--no-tags', remote.url, workspace], remote.token || '');
+      if (cloned.status !== 0) fail(`Aludel couldn't clone ${key}: ${String(cloned.stderr || '').trim().split('\n').pop()}`, 409);
+    }
+    const git = (args, options = {}) => execFileSync('git', args, { cwd: workspace, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 30000, ...options }).trim();
+    const has = args => { try { git(args); return true; } catch { return false; } };
+    return { workspace, git, has, target: entry.lines[0], entry };
+  }
   function codeMerged(projectId, code) {
     const repo = code && repository(projectId);
     return Boolean(repo && repo.has(['merge-base', '--is-ancestor', code.commit, `refs/heads/${repo.target}`]));
@@ -677,20 +695,26 @@ export function agentWork({ db, know, catalogs = null, repositoriesOf = () => []
   // W-27 #5: what an item's code changed, at the reported commit against its base: the files (with line counts), or one
   // file's diff. The commit comes from the project's repository, fetched from GitHub when Aludel doesn't have it yet.
   const diffLimit = 400_000;
-  function codeFiles(projectId, workId, remote, path = null) {
-    const item = goalItem(projectId, workId), code = goalOf(item).code;
-    if (!code) fail(`${item.ref} has no code reported yet.`, 404);
-    const repo = repository(projectId);
+  function codeFiles(projectId, workId, remote, path = null, repositoryKey = null, lineKey = null) {
+    const item = goalItem(projectId, workId), reported = goalOf(item).code;
+    if (!reported) fail(`${item.ref} has no code reported yet.`, 404);
+    // W-33: the project's own repository by default; another one's branch for a line with ?repository=<key>&line=<line>.
+    const other = repositoryKey ? (reported.repositories || []).filter(entry => entry.repository === repositoryKey) : [];
+    if (repositoryKey && !other.length) fail(`${item.ref} reported nothing in ${repositoryKey}.`, 404);
+    const code = repositoryKey ? (other.find(entry => entry.line === lineKey) || other[0]) : reported;
+    const repo = repositoryKey ? companionRepository(projectId, repositoryKey, remote) : repository(projectId);
     if (!repo) fail('This project has no repository to read the code from.', 409);
+    const workRef = repositoryKey ? `refs/aludel/work/${workId}--${code.line}` : `refs/aludel/work/${workId}`;
     const short = code.commit.slice(0, 7), present = sha => repo.has(['cat-file', '-e', `${sha}^{commit}`]);
     if (!present(code.commit)) {
       if (!remote) fail(`Aludel doesn't have ${short} yet, and this project has no GitHub repository to fetch ${code.branch} from.`, 409);
-      const args = ['fetch', '--no-tags', '--quiet', remote.url, `+refs/heads/${code.branch}:refs/aludel/work/${workId}`];
+      const args = ['fetch', '--no-tags', '--quiet', remote.url, `+refs/heads/${code.branch}:${workRef}`];
       const fetched = remote.token ? gitWithToken(repo.workspace, args, remote.token).status === 0 : repo.has(args);
       if (!fetched) fail(`Aludel couldn't fetch ${code.branch} from GitHub. The agent pushes it with its report; ask it to report again.`, 409);
       if (!present(code.commit)) fail(`${code.branch} on GitHub doesn't contain ${short}. Ask the agent to report its code again.`, 409);
     }
-    const base = code.base && present(code.base) ? repo.git(['rev-parse', code.base]) : repo.git(['merge-base', `refs/heads/${repo.target}`, code.commit]);
+    const lineRef = repositoryKey ? (repo.has(['rev-parse', '--verify', '--quiet', `refs/heads/${code.line}`]) ? `refs/heads/${code.line}` : `refs/remotes/origin/${code.line}`) : `refs/heads/${repo.target}`;
+    const base = code.base && present(code.base) ? repo.git(['rev-parse', code.base]) : repo.git(['merge-base', lineRef, code.commit]);
     const commit = repo.git(['rev-parse', code.commit]);
     // -z keeps any path intact; a rename has its old and new path.
     const fields = repo.git(['diff', '--name-status', '-z', '-M', base, commit]).split('\0').filter(Boolean);
@@ -708,7 +732,8 @@ export function agentWork({ db, know, catalogs = null, repositoriesOf = () => []
       const entry = files.find(candidate => candidate.path === file); if (!entry) continue;
       if (added === '-') entry.binary = true; else { entry.added = Number(added); entry.removed = Number(removed); }
     }
-    if (path === null) return { branch: code.branch, commit, base, files };
+    const where = repositoryKey ? { repository: repositoryKey, line: code.line } : { repository: repositoriesOf(projectId)[0]?.key || null, line: repo.target };
+    if (path === null) return { ...where, branch: code.branch, commit, base, files };
     const entry = files.find(candidate => candidate.path === path);
     if (!entry) fail(`${path} isn't one of the files ${item.ref} changed.`, 404);
     if (entry.binary) return { ...entry, diff: null, tooLarge: false };

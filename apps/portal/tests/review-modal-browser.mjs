@@ -67,6 +67,13 @@ const first = git(repo, 'rev-parse', 'HEAD');
 writeFileSync(join(repo, 'src/map.ts'), 'export function pins(tools) {\n  return tools.filter(tool => tool.place).map(tool => tool.place);\n}\n');
 git(repo, 'commit', '-qam', 'skip tools without a place');
 const second = git(repo, 'rev-parse', 'HEAD'); git(repo, 'checkout', '-q', 'main');
+// W-33 #4: another repository the project owns (a kit), where the item has its branch on the kit's buttons line.
+const kitWork = join(root, 'kit-work'), kitBare = join(root, 'kit.git'); git(root, 'init', '-q', '-b', 'main', kitWork);
+writeFileSync(join(kitWork, 'tokens.css'), ':root{--gap:8px}\n'); git(kitWork, 'add', '.'); git(kitWork, 'commit', '-qm', 'kit');
+git(kitWork, 'checkout', '-qb', 'buttons'); git(kitWork, 'checkout', '-qb', 'aludel/w-2--buttons');
+writeFileSync(join(kitWork, 'button.css'), '.button{padding:var(--gap)}\n.button.map{gap:4px}\n'); git(kitWork, 'add', '.'); git(kitWork, 'commit', '-qm', 'map button');
+const kitCommit = git(kitWork, 'rev-parse', 'HEAD'), kitBase = git(kitWork, 'rev-parse', 'buttons');
+execFileSync('git', ['clone', '-q', '--bare', kitWork, kitBare]);
 db.prepare('UPDATE project_setup SET workspace_path = ? WHERE project_id = ?').run(repo, project.id);
 db.close();
 
@@ -247,6 +254,33 @@ try {
   await page.keyboard.press('Escape'); await dialog.waitFor({ state: 'detached' });
   await agent('/code', { branch: 'aludel/w-2', commit: second, files: [{ path: 'src/map.ts', status: 'added' }, { path: 'src/list.ts', status: 'modified' }] });
 
+  // W-33 #4: code in two repositories. The kit is one of the project's repositories (its settings); the item reports its
+  // branch on the kit's buttons line with this one. Files has a folder per repository, and a kit file's diff reads from the
+  // host's own copy of the kit, cloned on first use.
+  const kitSet = await context.request.put(`${portal}/api/projects/${project.id}/code/repositories`, { data: { key: 'kit', url: `file://${kitBare}`, path: 'vendor/kit', lines: ['main', 'buttons'] } });
+  assert.ok(kitSet.ok(), await kitSet.text());
+  // The kit's item branch is named for the item, as the agent's tools name it (aludel/w-n--<line>).
+  const kitBranch = `aludel/${(await agent('')).item.ref.toLowerCase()}--buttons`;
+  git(kitBare, 'branch', '-m', 'aludel/w-2--buttons', kitBranch);
+  const reportSet = () => agent('/code', { branch: 'aludel/w-2', commit: second, files: [{ path: 'src/map.ts', status: 'added' }, { path: 'src/list.ts', status: 'modified' }],
+    repositories: [{ repository: 'kit', line: 'buttons', branch: kitBranch, commit: kitCommit, base: kitBase, files: [{ path: 'button.css', status: 'added' }] }] });
+  await reportSet();
+  await card(2).locator('.wg-changed', { hasText: '3 files' }).waitFor();
+  dialog = await openReview(2);
+  const sets = dialog.getByRole('navigation', { name: 'Files it changed' });
+  await sets.getByText('3 files in 2 repositories').waitFor();
+  assert.match(await sets.locator('.rm-sources').innerText(), new RegExp(`kit \\(buttons\\): ${kitBranch} at ${kitCommit.slice(0, 7)}`));
+  await sets.locator('summary', { hasText: 'kit (buttons)' }).waitFor();
+  await sets.getByRole('button', { name: /button\.css/ }).click();
+  const kitDiff = dialog.getByRole('region', { name: 'Changes to kit (buttons)/button.css' });
+  await kitDiff.locator('.rm-crow.rm-added', { hasText: '.button.map{gap:4px}' }).waitFor();
+  assert.equal(await kitDiff.locator('.rm-crow.rm-added').count(), 2);
+  await sets.getByRole('button', { name: /list\.ts/ }).click();
+  await dialog.getByRole('region', { name: /Changes to .*src\/list\.ts/ }).locator('.rm-crow.rm-changed', { hasText: 'byDistance(here)' }).waitFor();
+  await shot('05b-files-two-repositories'); await audit('files in two repositories');
+  await page.keyboard.press('Escape'); await dialog.waitFor({ state: 'detached' });
+  await agent('/code', { branch: 'aludel/w-2', commit: second, files: [{ path: 'src/map.ts', status: 'added' }, { path: 'src/list.ts', status: 'modified' }] });
+
   // Nothing to show: #4 staged nothing and gave no preview.
   await agent('/actions/4', { state: 'review', summary: 'Agreed: OpenStreetMap tiles.' });
   await card(4).locator('.wg-changed', { hasText: 'Nothing staged; read its summary' }).waitFor();
@@ -332,6 +366,7 @@ try {
     { as: 'neighbour', when: 'Open the map from the list', expect: 'The tools show on a map', path: '/map' },
     { as: 'neighbour', when: 'Press Borrow the drill', expect: 'It says the drill is yours until Friday', path: '/api/borrow', method: 'POST' },
     { when: 'Turn location off', expect: 'The list asks where you are' }] } });
+  await reportSet(); // #2's Files shows both repositories for a person too
   await holdForPreview({ port, path: `/p/${project.slug}/work/item/${encodeURIComponent(workId)}?review=6`, account: { email: 'owner@example.com', password } });
 } catch (error) {
   for (const open of browser.contexts().flatMap(context => context.pages())) await open.screenshot({ path: dest + 'failure.png', fullPage: true }).catch(() => {});
