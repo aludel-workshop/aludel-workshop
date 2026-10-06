@@ -18,7 +18,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
-import { checkoutInfo, configPath, connectContainer, fetchRepositories, fetchTemplates, inContainer, pushReport, loadConfig, pair, request, startLine } from './aludel-client.mjs';
+import { checkoutInfo, configPath, connectContainer, fetchRepositories, fetchTemplates, inContainer, pushReportSet, loadConfig, pair, request, startLine } from './aludel-client.mjs';
 
 const adapter = new URL('./editor-mcp.mjs', import.meta.url).pathname;
 const out = text => process.stdout.write(text + '\n');
@@ -113,9 +113,10 @@ try {
   } else if (command === 'submit') {
     const config = loadConfig();
     const item = await find(config, arg);
-    const report = pushReport(process.cwd());
+    const report = await pushReportSet(process.cwd(), config);
     const view = await request(config, `/goals/${encodeURIComponent(item.id)}/code`, report);
     out(`Pushed ${report.branch} and reported it at ${report.commit.slice(0, 7)} (${report.files.length} files) to ${item.ref}.`);
+    for (const other of report.repositories || []) out(`  and ${other.repository} ${other.branch} at ${other.commit.slice(0, 7)} (${other.files.length} files)`);
     const left = view.actions.filter(action => !['review', 'done', 'proposed'].includes(action.state));
     out(left.length ? `Still open: #${left.map(action => action.number).join(', #')}.` : `Every action is ready for review; move ${item.ref} to review on its page.`);
   } else {

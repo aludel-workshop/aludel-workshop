@@ -262,3 +262,52 @@ export function startLine(cwd, repositories, key, line) {
   git(['checkout', '--quiet', '--no-track', '-b', branch, from]);
   return { repository: key, line, branch, path: repo.path, created: from === `origin/${line}`, from };
 }
+// W-33 #3: the item's branches in the project's other repositories that have work of their own (commits beyond their
+// line), each pushed to its origin like this checkout's, then reported with it. A companion with uncommitted changes on an
+// item branch stops the report, as this checkout's do.
+export function companionReports(cwd, repositories) {
+  const top = quietGit(cwd, ['rev-parse', '--show-toplevel']);
+  const ref = branchItem(top);
+  if (!ref) return [];
+  const reports = [];
+  for (const repo of repositories.filter(entry => !entry.primary)) {
+    const target = companionFolder(top, repo);
+    if (!existsSync(join(target, '.git'))) continue;
+    const git = args => quietGit(target, args);
+    const lines = new Map(repo.lines.map(line => [lineBranch(ref, repo, line), line]));
+    const branches = git(['for-each-ref', '--format=%(refname:short)', 'refs/heads/aludel/']).split('\n').filter(name => lines.has(name));
+    for (const branch of branches) {
+      const line = lines.get(branch);
+      let from;
+      try { from = git(['merge-base', branch, `refs/remotes/origin/${line}`]); } catch { throw new Error(`${repo.key} has no origin/${line} to compare ${branch} with. Run: aludel repositories`); }
+      const commit = git(['rev-parse', branch]);
+      // Uncommitted changes on an item branch stop the report even before its first commit, so work is never left out unnoticed.
+      if (git(['rev-parse', '--abbrev-ref', 'HEAD']) === branch) {
+        const dirty = git(['status', '--porcelain']).split('\n').filter(Boolean).length;
+        if (dirty) throw new Error(`Commit or stash the ${dirty} uncommitted change${dirty === 1 ? '' : 's'} in ${repo.path} first; only committed work is reported.`);
+      }
+      if (commit === from) continue; // no work of its own
+      try { git(['push', '--quiet', '--force-with-lease', 'origin', `refs/heads/${branch}:refs/heads/${branch}`]); }
+      catch (error) {
+        const said = gitSaid(error);
+        throw new Error(`Couldn't push ${branch} in ${repo.path}: ${said}${/stale info|rejected/.test(said) ? ' (someone else pushed to it: fetch and look before pushing again)' : ''}`);
+      }
+      const statuses = { A: 'added', M: 'modified', D: 'deleted', R: 'renamed' };
+      const files = git(['diff', '--name-status', '--find-renames', `${from}..${commit}`]).split('\n').filter(Boolean).map(entry => {
+        const [code, ...paths] = entry.split('\t');
+        return { path: paths.at(-1), status: statuses[code[0]] || 'modified' };
+      });
+      reports.push({ repository: repo.key, line, branch, commit, base: from, files });
+    }
+  }
+  return reports;
+}
+// The whole report: this checkout's branch, and the item's branches in the other repositories. A portal from before
+// W-33 has no repositories list; the report is then this checkout's alone, as before.
+export async function pushReportSet(cwd, config, base = null) {
+  let repositories = [];
+  try { repositories = (await request(config, '/repositories')).repositories; }
+  catch (error) { if (error.message !== 'Not found.') throw error; }
+  const others = companionReports(cwd, repositories);
+  return { ...pushReport(cwd, base), ...(others.length ? { repositories: others } : {}) };
+}

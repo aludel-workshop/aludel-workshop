@@ -139,7 +139,7 @@ function createWorkspace(setup, user) {
   commitWorkspace({ repository: setup.workspacePath, profile: projectGitProfile, message: `chore: start ${setup.project.name} with Aludel`, ...commitIdentity(user) });
 }
 const know = knowledge({ db, catalogs, packs: catalogs.packs });
-const goals = agentWork({ db, know, catalogs });
+const goals = agentWork({ db, know, catalogs, repositoriesOf: projectId => repositories.list(projectId) });
 const pool = library({ db, know });
 const bindingStore = bindingRecords({ db });
 const bindings = bindingRoutines({ db, know, pool, store: bindingStore });

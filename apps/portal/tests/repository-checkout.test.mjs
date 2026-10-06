@@ -6,7 +6,7 @@ import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { checkoutRepositories, lineBranch, startLine } from '../tools/aludel-client.mjs';
+import { checkoutRepositories, companionReports, lineBranch, startLine } from '../tools/aludel-client.mjs';
 
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 const commit = (cwd, message) => git(cwd, '-c', 'user.name=t', '-c', 'user.email=t@example.test', 'commit', '--quiet', '--allow-empty', '-m', message);
@@ -95,4 +95,20 @@ test('starting a line refuses what it can’t do safely', () => {
   writeFileSync(join(app, 'vendor/kit/wip.txt'), 'x');
   assert.throws(() => startLine(app, repositories, 'kit', 'buttons'), /uncommitted changes/);
   assert.throws(() => checkoutRepositories(app, [repositories[0], { ...repositories[1], path: '../outside' }])[0].state === 'x', /isn't inside this checkout/);
+});
+
+test('W-33 #3: the item’s branches with work of their own are pushed and reported, with their files; others aren’t', () => {
+  const { app, kit, repositories } = fixture();
+  checkoutRepositories(app, repositories);
+  const folder = join(app, 'vendor/kit');
+  assert.deepEqual(companionReports(app, repositories), [], 'nothing until a line has work');
+  startLine(app, repositories, 'kit', 'buttons');
+  assert.deepEqual(companionReports(app, repositories), [], 'a fresh line branch has no work of its own');
+  writeFileSync(join(folder, 'button.css'), '.b{}'); git(folder, 'add', '.');
+  assert.throws(() => companionReports(app, repositories), /uncommitted change in vendor\/kit/);
+  commit(folder, 'a button');
+  const [report] = companionReports(app, repositories);
+  assert.deepEqual({ ...report, commit: undefined, base: undefined }, { repository: 'kit', line: 'buttons', branch: 'aludel/w-7--buttons', commit: undefined, base: undefined, files: [{ path: 'button.css', status: 'added' }] });
+  assert.equal(report.commit, git(kit, 'rev-parse', 'aludel/w-7--buttons'), 'pushed to origin');
+  assert.equal(report.base, git(kit, 'rev-parse', 'buttons'));
 });

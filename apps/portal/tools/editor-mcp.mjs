@@ -1,7 +1,7 @@
 // A small stdio MCP adapter for Aludel's editor API. It reads project context, and (AGENT-WORK-01) lets your local agent work a
 // goal item you have claimed: define it, add and move actions, talk in its thread, and stage changes through each layer's API.
 import readline from 'node:readline';
-import { branchItem, checkoutInfo, configPath, inContainer, loadConfig, pair, pushReport, request, startBranch, startLine } from './aludel-client.mjs';
+import { branchItem, checkoutInfo, configPath, inContainer, loadConfig, pair, pushReportSet, request, startBranch, startLine } from './aludel-client.mjs';
 
 let config;
 const names = {
@@ -65,9 +65,9 @@ const names = {
   stage_change: { description: 'Stage a write through a layer\u2019s API under a working action. The layer checks it now; nothing applies until your person closes the item.',
     schema: { type: 'object', properties: { workId: { type: 'string' }, action: { type: 'integer', minimum: 1 }, layer: { type: 'string' }, operationId: { type: 'string' }, id: { type: 'string' }, body: { type: 'object' } }, required: ['workId', 'action', 'operationId'] },
     post: a => [goal(a, '/stage'), pick(a, ['action', 'layer', 'operationId', 'id', 'body'])] },
-  report_code: { description: 'After committing code for the item on a branch in this checkout, push the branch to origin and report the branch, commit and changed files (read from git here) so your person can review them. Commit first; uncommitted changes are not reported, and main is refused.',
+  report_code: { description: 'After committing code for the item on a branch in this checkout, push the branch to origin and report the branch, commit and changed files (read from git here) so your person can review them. The item\u2019s branches in the project\u2019s other repositories (start_line) that have commits of their own are pushed and reported with it. Commit first; uncommitted changes are not reported, and main is refused.',
     schema: { type: 'object', properties: { workId: { type: 'string' }, base: { type: 'string', description: 'Commit the work started from; defaults to the merge base with main.' } }, required: ['workId'] },
-    post: a => [goal(a, '/code'), pushReport(process.cwd(), a.base || null)] },
+    run: async a => request(config, goal(a, '/code'), await pushReportSet(process.cwd(), config, a.base || null)) },
   changeset: { description: 'List the item\u2019s staged changes, grouped by layer.', schema: { type: 'object', properties: { workId: { type: 'string' } }, required: ['workId'] }, path: a => goal(a, '/changeset') }
 };
 function goal(args, rest = '') { return '/goals/' + encodeURIComponent(args.workId) + rest; }

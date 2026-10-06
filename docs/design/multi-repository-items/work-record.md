@@ -239,6 +239,20 @@ Code's repository panel listing the set and its access (§1) isn't an action yet
   - The push went through VS Code's forwarded helper. `layer-base/.git/config` holds only the plain URL.
   - The live portal couldn't serve the list for this, since it runs `main`; the values were passed directly. The client-to-portal path is covered by the server route and #6's journey.
 
+**#3: code reported as a set.**
+- **Client:** `report_code` and `aludel submit` push and report the item's branches in the other repositories with this checkout's (`companionReports` and `pushReportSet` in `tools/aludel-client.mjs`).
+  - A branch is reported only when it has commits beyond its line. Each entry has its repository, line, branch, commit, base and files.
+  - Uncommitted changes on an item branch stop the report even before that branch's first commit. That ordering came from a test failure; at first such changes were skipped silently.
+  - A portal from before W-33, without the repositories list, gets this checkout's report alone, as before.
+- **Server:** `recordCode` keeps the top-level shape for this checkout, so older reports read unchanged, and adds `code.repositories`.
+  - Each entry must be another repository in the project's settings, one of its lines, and the item's own branch name for that line (`itemLineBranch`).
+  - Each repository and line is reported once. The log line names every branch.
+- **Guard until #5:** close-out refuses an item that reports other repositories, rather than merging only this checkout.
+- **Checks:**
+  - `tests/agent-work.test.mjs`: 2 new tests.
+  - `tests/repository-checkout.test.mjs`: 1 new test.
+  - The affected set (12 files without the Docker-only three): 59 tests, 58 passing, 0 failing.
+
 ## Process note (three lines)
 
 - **Changed:** the spec is generic from the start, after the owner's steer. Aludel and `layer-base` appear only as the first project's values, and the end-to-end journey uses a fixture that isn't Aludel.

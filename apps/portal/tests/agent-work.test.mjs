@@ -623,3 +623,43 @@ test('W-25: an action hands over a preview with its review; newer code makes it 
   assert.throws(() => work.updateAction(agent, id, workId, 1, { preview: null }), status(409));
   assert.equal(work.view(id, workId).actions[0].preview.commit, 'bbbbbbb');
 }));
+
+test('W-33 #3: code is reported as a set, with the item’s branches in the project’s other repositories', () => fixture(({ db, know, ada, id }) => {
+  const set = [{ key: 'tool-share', primary: true, lines: ['main'] }, { key: 'kit', primary: false, lines: ['main', 'buttons'] }];
+  const work = agentWork({ db, know, repositoriesOf: () => set });
+  const [first] = work.stackMap(id).map(layer => layer.key);
+  const agent = { kind: 'agent', id: ada.id, name: "Ada's local agent" };
+  const workId = work.createGoal(ada, id, { title: 'Kit', brief: 'b' }).item.id;
+  const ref = work.view(id, workId).item.ref.toLowerCase();
+  work.define(agent, id, workId, { brief: 'A kit.', actions: [{ layer: first, goal: 'Build it' }] });
+  work.claim(ada, id, workId); work.move(ada, id, workId, 'progress');
+  const other = { repository: 'kit', line: 'buttons', branch: `aludel/${ref}--buttons`, commit: 'c'.repeat(40), base: 'd'.repeat(40), files: [{ path: 'button.css', status: 'added' }] };
+  const view = work.recordCode(agent, id, workId, { branch: `aludel/${ref}`, commit: 'a'.repeat(40), files: [], repositories: [other] });
+  assert.deepEqual(view.code.repositories, [other]);
+  assert.ok(view.events.some(event => event.text.includes(`kit aludel/${ref}--buttons at ccccccc (1 file)`)), 'the log names the other branch');
+  // Only the project's other repositories, their lines, and the item's own branch name for that line.
+  const bad = change => () => work.recordCode(agent, id, workId, { branch: `aludel/${ref}`, commit: 'a'.repeat(40), repositories: [{ ...other, ...change }] });
+  assert.throws(bad({ repository: 'tool-share' }), /isn't one of this project's other repositories/);
+  assert.throws(bad({ repository: 'elsewhere' }), /isn't one of this project's other repositories/);
+  assert.throws(bad({ line: 'forms' }), /isn't one of kit's lines/);
+  assert.throws(bad({ branch: 'aludel/w-999--buttons' }), new RegExp(`is aludel/${ref}--buttons`));
+  assert.throws(bad({ commit: 'zz' }), /hex/);
+  assert.throws(() => work.recordCode(agent, id, workId, { branch: `aludel/${ref}`, commit: 'a'.repeat(40), repositories: [other, other] }), /once/);
+  // A report without other repositories is the old shape, unchanged.
+  assert.equal(work.recordCode(agent, id, workId, { branch: `aludel/${ref}`, commit: 'b'.repeat(40) }).code.repositories, undefined);
+}));
+
+test('W-33 #3: until close-out handles the set, an item with other repositories’ branches is refused rather than half merged', () => fixture(({ db, know, ada, id }) => {
+  const work = agentWork({ db, know, repositoriesOf: () => [{ key: 'tool-share', primary: true, lines: ['main'] }, { key: 'kit', primary: false, lines: ['main'] }] });
+  const [first] = work.stackMap(id).map(layer => layer.key);
+  const agent = { kind: 'agent', id: ada.id, name: "Ada's local agent" };
+  const workId = work.createGoal(ada, id, { title: 'Kit', brief: 'b' }).item.id;
+  const ref = work.view(id, workId).item.ref.toLowerCase();
+  work.define(agent, id, workId, { brief: 'A kit.', actions: [{ layer: first, goal: 'Build it' }] });
+  work.claim(ada, id, workId); work.move(ada, id, workId, 'progress');
+  work.recordCode(agent, id, workId, { branch: `aludel/${ref}`, commit: 'a'.repeat(40), repositories: [{ repository: 'kit', line: 'main', branch: `aludel/${ref}`, commit: 'c'.repeat(40) }] });
+  work.updateAction(agent, id, workId, 1, { state: 'working' }); work.updateAction(agent, id, workId, 1, { state: 'review', summary: 'Built.' });
+  work.updateAction(ada, id, workId, 1, { state: 'done' });
+  work.move(ada, id, workId, 'review');
+  assert.throws(() => work.closeOut(ada, id, workId), /changes kit too/);
+}));

@@ -32,6 +32,11 @@ const eventKinds = ['message', 'log', 'steer', 'flag', ...needKinds];
 // The changeset of a goal item is staged under this key in layer_run_drafts.
 export const changesetKey = workId => `goal-${workId}`;
 
+// W-33: an item's branch on one line of a repository, as the item tools name it (tools/aludel-client.mjs lineBranch).
+export function itemLineBranch(ref, repo, line) {
+  const base = `aludel/${String(ref).toLowerCase().replace(/[^a-z0-9-]+/g, '-')}`;
+  return line === repo.lines[0] ? base : `${base}--${line.replace(/[^A-Za-z0-9._-]+/g, '-')}`;
+}
 export function initAgentWork(db) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS work_goal_phases (
@@ -70,7 +75,7 @@ export function initAgentWork(db) {
 }
 
 // actor: { kind: 'person' | 'agent', id, name }. A person's local CLI agent acts as an agent on that person's behalf.
-export function agentWork({ db, know, catalogs = null }) {
+export function agentWork({ db, know, catalogs = null, repositoriesOf = () => [] }) {
   const bus = new EventEmitter();
   bus.setMaxListeners(200);
   const emit = (projectId, workId, change) => bus.emit(`${projectId}:${workId}`, { at: now(), ...change });
@@ -723,6 +728,8 @@ export function agentWork({ db, know, catalogs = null }) {
     if (undecided.length) fail(`Create or dismiss the ${undecided.length} proposed item${undecided.length === 1 ? '' : 's'} first.`, 409);
     if (wrapUp) return endNotDone(user, projectId, item, wrapUp);
     const code = goalOf(item).code || null;
+    // W-33: until close-out handles the set (#5), an item with branches in other repositories doesn't close with only one.
+    if (code?.repositories?.length) fail(`${item.ref} changes ${code.repositories.map(entry => entry.repository).join(', ')} too, and close-out can't merge several repositories yet.`, 409);
     const groups = changeset(projectId, workId);
     for (const group of groups) for (const change of group.changes) {
       const current = know.get(projectId, change.id);
@@ -784,10 +791,30 @@ export function agentWork({ db, know, catalogs = null }) {
     if (!/^[0-9a-f]{7,64}$/.test(commit)) fail('Give the commit as a hex hash.');
     const base = input.base ? clean(input.base, 64, 'Base commit') : null;
     if (base && !/^[0-9a-f]{7,64}$/.test(base)) fail('Give the base as a hex hash.');
-    const files = (Array.isArray(input.files) ? input.files : []).slice(0, 500).map(file => ({ path: clean(file?.path, 400, 'File path', true), status: ['added', 'modified', 'deleted', 'renamed'].includes(file?.status) ? file.status : 'modified' }));
-    const code = { branch, commit, base, files, at: now() };
-    saveGoal(projectId, item, { code }, `${actor.name} reported ${branch} at ${commit.slice(0, 7)}`, byOf(actor));
-    record(projectId, workId, { kind: 'log', author: actor, text: `Code on ${branch} at ${commit.slice(0, 7)}: ${files.length} file${files.length === 1 ? '' : 's'} changed` });
+    const fileList = list => (Array.isArray(list) ? list : []).slice(0, 500).map(file => ({ path: clean(file?.path, 400, 'File path', true), status: ['added', 'modified', 'deleted', 'renamed'].includes(file?.status) ? file.status : 'modified' }));
+    const files = fileList(input.files);
+    // W-33: the item's branches in the project's other repositories, one per line it changed. Each must be a repository in
+    // the project's settings, one of its lines, and the item's own branch name for that line.
+    const set = repositoriesOf(projectId);
+    const reported = Array.isArray(input.repositories) ? input.repositories : [];
+    if (reported.length > 20) fail('Report up to 20 branches in other repositories.');
+    const repositories = reported.map(entry => {
+      const repo = set.find(candidate => candidate.key === entry?.repository && !candidate.primary);
+      if (!repo) fail(`${entry?.repository || 'That'} isn't one of this project's other repositories. They're listed in its settings.`);
+      if (!repo.lines.includes(entry.line)) fail(`${entry.line} isn't one of ${repo.key}'s lines (${repo.lines.join(', ')}).`);
+      const expected = itemLineBranch(item.ref, repo, entry.line);
+      if (entry.branch !== expected) fail(`${repo.key}'s branch for ${entry.line} in ${item.ref} is ${expected}, not ${entry.branch}.`);
+      const sha = clean(entry.commit, 64, 'Commit', true);
+      if (!/^[0-9a-f]{7,64}$/.test(sha)) fail('Give each commit as a hex hash.');
+      const from = entry.base ? clean(entry.base, 64, 'Base commit') : null;
+      if (from && !/^[0-9a-f]{7,64}$/.test(from)) fail('Give each base as a hex hash.');
+      return { repository: repo.key, line: entry.line, branch: expected, commit: sha, base: from, files: fileList(entry.files) };
+    });
+    if (new Set(repositories.map(entry => `${entry.repository} ${entry.line}`)).size !== repositories.length) fail('Report each repository\u2019s line once.');
+    const code = { branch, commit, base, files, ...(repositories.length ? { repositories } : {}), at: now() };
+    const elsewhere = repositories.map(entry => `${entry.repository} ${entry.branch} at ${entry.commit.slice(0, 7)} (${entry.files.length} file${entry.files.length === 1 ? '' : 's'})`);
+    saveGoal(projectId, item, { code }, `${actor.name} reported ${branch} at ${commit.slice(0, 7)}${elsewhere.length ? ` and ${elsewhere.length} other branch${elsewhere.length === 1 ? '' : 'es'}` : ''}`, byOf(actor));
+    record(projectId, workId, { kind: 'log', author: actor, text: `Code on ${branch} at ${commit.slice(0, 7)}: ${files.length} file${files.length === 1 ? '' : 's'} changed${elsewhere.length ? `; ${elsewhere.join('; ')}` : ''}` });
     emit(projectId, workId, { type: 'item' });
     return view(projectId, workId);
   }
