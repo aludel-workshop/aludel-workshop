@@ -2,9 +2,21 @@
 // Run through tools/browser-checks.sh library (build first). Screenshots go to MACHINE_DATA_DIR/library-shots.
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
-import { mkdirSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { mkdirSync, mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { chromium } from './browser-support.mjs';
+import { holdForPreview, waitForPortal } from './portal-support.mjs';
 
+// Under `npm run preview -- library` (JOURNEY_PORT) the journey starts its own portal, kept up after the walk.
+let portalProcess = null;
+if (process.env.JOURNEY_PORT) {
+  const root = mkdtempSync(join(tmpdir(), 'aludel-library-preview-'));
+  portalProcess = spawn(process.execPath, ['server/server.mjs'], { env: { ...process.env, MACHINE_DATA_DIR: root, MACHINE_PORT: process.env.JOURNEY_PORT, MACHINE_PREVIEW_RUNTIME: 'process' }, stdio: ['ignore', 'pipe', 'pipe'] });
+  process.env.MACHINE_PORT = process.env.JOURNEY_PORT;
+  await waitForPortal(portalProcess, `http://127.0.0.1:${process.env.JOURNEY_PORT}`);
+}
 const origin = `http://aludel.localhost:${process.env.MACHINE_PORT || 4318}`;
 const out = process.env.LIBRARY_SHOTS || `${process.env.MACHINE_DATA_DIR || '/tmp'}/library-shots`;
 mkdirSync(out, { recursive: true });
@@ -39,7 +51,8 @@ try {
   await page.getByRole('textbox', { name: 'Elevator pitch' }).fill('Neighbours lend and borrow tools.');
   await page.getByRole('button', { name: /Continue/i }).first().click();
   await page.getByRole('button', { name: 'Start with no layers' }).click();
-  await request('POST', '/api/accounts', { name: 'Library tester', email: `lib-${randomBytes(6).toString('hex')}@example.test`, password: randomBytes(18).toString('hex') });
+  const account = { email: `lib-${randomBytes(6).toString('hex')}@example.test`, password: randomBytes(18).toString('hex') };
+  await request('POST', '/api/accounts', { name: 'Library tester', ...account });
   const project = (await request('GET', '/api/session')).projects.find(value => value.name === name);
   for (const key of ['product', 'pages', 'data']) await request('PUT', `/api/projects/${project.id}/layer-instances/${key}`, { enabled: true });
   await request('POST', `/api/projects/${project.id}/records`, { kind: 'source', data: { type: 'note', title: 'Tool survey', body: 'Most drills are used for thirteen minutes.' } });
@@ -140,6 +153,8 @@ try {
 
   assert.deepEqual(errors, [], 'no page errors');
   console.log('PASS library: pool, filters, search, entry, top bar, doc sections, narrow and axe');
+  await holdForPreview({ port: process.env.MACHINE_PORT || 4318, path: `${base}/library`, account });
 } finally {
   await browser.close();
+  portalProcess?.kill();
 }

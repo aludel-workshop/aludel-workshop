@@ -187,3 +187,5 @@ The owner approved the spec without changing either open point, so the defaults 
 - **Defect screenshots found:** the opened heading sat under the sticky top bar, so the scroll margin is now 96 px and the journey asserts it.
 - **Other journeys:** `data-layer` and `design-layer` pass. `vision-layer` failed once, on a disabled "Add activity" button before any search step, then passed twice with no change. It also passes on the unchanged base, so it's flaky under load and not caused by W-10.
 - **Server tests:** typecheck passes (warnings only, all already there); `library-search` and `library` pass with templates on and off.
+
+**Preview:** `library-browser` now keeps its portal up under `npm run preview -- library`. With `JOURNEY_PORT` set it starts its own portal on disposable data, as the preview-ready journeys do, and it calls `holdForPreview` after its PASS line. It still passes under `browser-checks.sh`. The editor MCP this container connected to doesn't offer `update_action`'s `preview` field yet; it comes with W-25 on `main`. So the preview link went in the item's thread.
