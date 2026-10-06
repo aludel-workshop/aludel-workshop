@@ -2,7 +2,7 @@
 id: decisions-001
 kind: decision-register
 status: active
-updated: 2026-10-05
+updated: 2026-10-06
 ---
 
 # Decision inbox
@@ -10,6 +10,11 @@ updated: 2026-10-05
 This is the seed of the portal's decision workflow. Confirmed owner answers and proposed defaults are distinct. No unanswered question silently becomes an owner decision.
 
 ## Confirmed
+
+2026-10-06 — **DEC-069: Work is a layer whose items are records staged like any other; layer-base is managed as part of the main repository.** The owner, reviewing W-9: "work should be a layer, and the proposed actions shouldnt be actually created until the work item is signed off, same as any other record change. layer base, we want to manage it just as if its a part of the main repo. any code repos can have work done on them as long as they're following spec."
+(1) Work is a layer. An action whose output is work items names the Work layer (W-9's P2).
+(2) An item proposed by an action is a staged Work record. It applies when its item is signed off at close-out, as any other record change does, including an item ending as not done. Deciding a proposal (edit, keep, dismiss) shapes the staged record; it doesn't create the item. This supersedes AGENT-WORK-01 E3's "Create item", which creates at decision time.
+(3) `layer-base` is managed as if it were part of the main repository. Agent work may change it under the same spec and review as the app's code (pins in `config/layer-templates.json`, reviewed digests, template journeys), with no separate authorization. The same holds for any code repository the project owns, as long as the work follows spec. This makes F3 and P3 ordinary Code work.
 
 2026-10-05 — **DEC-068: every layer works without the others; a brief describes layers but doesn't fence them; Code owns code.** The owner, on W-8's open questions (F8, F9, F13): "every layer should be able to operate without the others. journeys, for example - if its part of our code work, there should be a representation in code. then if pages also deals with it, we could set up a binding, even ceding from the code side so it isn't duplicated. brief should absolutely describe the app layers, but not constrain to say "only work in these". f13: … code owns the code. and aludels codebase is owned by the code layer in the aludel app."
 (1) A layer keeps its own representation of whatever its work depends on (Code's journeys; Pages' personas, F17). Where another layer covers the same concept, a binding links them, and one side may cede authority so it isn't duplicated (the layer-connections direction).

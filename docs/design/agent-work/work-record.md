@@ -539,3 +539,47 @@ DEC-068 settles F8, F9 and F13:
 - **F13:** Code owns code, including Aludel's.
 
 Following from these: F17's Pages-owned personas is the same rule (open, with the Pages layer). The orchestrator protocol's "one action per layer change" stands; a portal code change is a Code (`platform`) action, as W-8 #2 was filed.
+
+## Review of W-9 "evaluate transition to managing Aludel within the app" (2026-10-06)
+
+W-9 is the first item to run the whole loop from an item container. Read from the live portal data and the merged branch.
+- **Checked:**
+  - The container connected in about a minute.
+  - The agent defined two phases with a gate after the assessment, and reported code three times. Close-out fast-forwarded `main` to `318781a` and pushed it.
+  - 15 proposals became W-10 to W-24, and their dependencies became `blocks` links. W-13 is blocked by W-10, W-11 and W-12; W-14 is blocked by W-13.
+  - At close-out the volume sweep kept W-9's volume, because its container was still running, and noted that on the item.
+- **Not checked:** the volume being removed after the window closes. W-8 is still Ready, so its volume stays.
+
+**Findings.**
+- **G1, the 10-item proposal limit (W-9's P5).** It forced a second action (#5), which needed approval, just to propose 5 more items. `after` can't name items from another list, so the agent wrote cross-list dependencies into the briefs.
+- **G2, "Approved #n" means two things in the thread:** approving a new action, and approving an action's review.
+- **G3, questions arrived outside the portal (owner, F-W9-1).** This is the one-surface problem (F25); W-11 tracks it.
+- **G4, W-9's P1 to P3,** gathered into W-24:
+  - **P1:** an assessment can't stage a sample without it applying at close-out.
+  - **P2:** Work isn't a layer an action can name.
+  - **P3:** Vision and Design have untyped record schemas.
+
+**Owner rulings (DEC-069):** Work is a layer; proposed items are staged Work records that apply at sign-off; `layer-base` and any owned code repository take work under the same spec. Not started: these are recorded for the portal.
+
+### Future work (to bring into the portal)
+
+Each entry is written to become a work item. Where an item already exists in Aludel Workshop, it's named.
+
+| # | Work | Why | Depends on | Existing item |
+|---|---|---|---|---|
+| FW-1 | **Work as a layer.** Give Work a layer definition and API (records: work items; operations: propose, edit, dismiss) so actions can name it and agents stage items through it like any layer. | DEC-069 (1), W-9 P2 | | W-24 (P2) |
+| FW-2 | **Proposed items apply at sign-off.** Proposals become staged Work records in the item's changeset. The review stack edits and dismisses them; close-out (done or not done) creates them with their `blocks` links, in one transaction with the other records. Replace E3's create-on-decide. | DEC-069 (2) | FW-1 | |
+| FW-3 | **No proposal limit per list, and `after` across lists.** Raise or remove the 10-item limit; let `after` name any of the item's proposals or already-created items. | G1 (P5) | FW-2 if done after it | W-24 |
+| FW-4 | **Distinct thread wording:** "Approved adding #n" for a new action, "Approved #n's review" for a review. | G2 | | |
+| FW-5 | **Withdraw a staged change** (`withdraw_change`), so an assessment can probe a destination with a real write and leave nothing behind. | W-9 P1 | | W-24 |
+| FW-6 | **Typed record schemas for Vision and Design** in `layer-base`, with new pins, reviewed digests and template journeys, so `describe_operation` gives agents real shapes. | W-9 P3, F7/F18; DEC-069 (3) | | W-24 (P3) |
+| FW-7 | **`.aludel/AGENTS.md` for app repositories** (F3): the Code template's guide says `.aludel/` is the Code layer's installed package and that work comes through the Aludel tools. A `layer-base` `code` branch change and a new pin. | F3; DEC-069 (3) | | |
+| FW-8 | **Action titles and descriptions** (F15): schema, `define_work`, `add_action` and `update_action`, the item page and the peek. | F15 | | |
+| FW-9 | **The container's first message** (F1): when the container connects, leave the start instruction where Claude Code reads it first (a session-start hook in the container's settings), so the agent knows its item and role unprompted. | F1 | | |
+| FW-10 | **Questions and answers on one surface** (F25, F16): push events to the agent, answers taken from either surface, review links that open in VS Code. | F25, G3 | | W-11 |
+| FW-11 | **The item environment across repositories** (F26): every repository the project owns, checked out side by side on the item's branch; report and close-out handle a set of branches. With DEC-069 (3) this includes `layer-base`, which today is served read-only as a bundle. | F26, F22 | | (PLATFORM-PIPELINE-01) |
+| FW-12 | **Pages keeps its own personas** (F17, DEC-068), bound to Vision's through the Library. | F17 | | |
+
+**Decisions waiting on the owner:**
+- **F30:** Docker inside item containers. Mounting the host's socket makes the container root-equivalent on the person's machine. Three Docker-only tests can't run in a container until this is decided.
+- **F29:** pull requests from Aludel. This needs the GitHub App's `pull_requests` permission, a GitHub settings change. Close-out makes it unnecessary for now.
