@@ -11,7 +11,7 @@
     "serve": "node server/server.mjs",
     "start": "npm run build && node server/server.mjs",
     "reset-owner": "node server/server.mjs --reset-owner",
-    "test:server": "node --test --test-timeout=300000 tests/*.test.mjs",
+    "test:server": "node --import ./tests/isolate-data.mjs --test --test-timeout=300000 tests/*.test.mjs",
     "build": "vite build",
     "typecheck": "ngc -p tsconfig.app.json --noEmit",
     "storybook": "storybook dev -p 6006 --no-open --disable-telemetry",
@@ -20,7 +20,7 @@
     "prebuild": "npm run sync:layers",
     "pretypecheck": "npm run sync:layers",
     "predev": "npm run sync:layers",
-    "test:server:templates": "MACHINE_LAYER_TEMPLATES_ENABLED=1 node --test --test-timeout=300000 tests/*.test.mjs",
+    "test:server:templates": "MACHINE_LAYER_TEMPLATES_ENABLED=1 node --import ./tests/isolate-data.mjs --test --test-timeout=300000 tests/*.test.mjs",
     "test:affected": "node tools/test-affected.mjs",
     "preview": "node tools/journey-preview.mjs"
   },

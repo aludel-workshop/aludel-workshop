@@ -20,6 +20,9 @@ if (manifest.key !== key || !manifest.ui?.entry || !Array.isArray(manifest.ui.fi
 for (const name of readdirSync(portal).filter(name => name.startsWith('.layer-ui-src-')))
   try { if (Date.now() - statSync(join(portal, name)).mtimeMs > 10 * 60 * 1000) rmSync(join(portal, name), { recursive: true, force: true }); } catch { /* another build's, or already gone */ }
 const scratch = mkdtempSync(join(portal, '.layer-ui-src-'));
+// A build outlives a portal or test that exits mid-build, holding about a gigabyte until it finishes (TEST-ISOLATION-01): stop when the parent goes.
+const parent = process.ppid;
+setInterval(() => { if (process.ppid !== parent) { rmSync(scratch, { recursive: true, force: true }); process.exit(1); } }, 1000).unref();
 try {
   const ui = join(scratch, 'ui');
   mkdirSync(ui);
