@@ -1,0 +1,14 @@
+<!doctype html>
+<!-- Every kit element at its contract's defaults: what Design's Components tab would show. -->
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Kit demos</title>
+<script src="../out/kit.js"></script></head>
+<body style="padding:24px"><div id="d" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:24px"></div>
+<script>
+for (const e of window.aludelKit.elements) {
+  const box = document.createElement('section');
+  box.innerHTML = `<h2 style="font:var(--mat-sys-title-small);margin:0 0 8px">${e.name} <code style="font-size:11px">&lt;${e.tag}&gt;</code></h2>`;
+  const el = document.createElement(e.tag);
+  for (const [key, value] of Object.entries(e.demo)) el.setAttribute(key, value);
+  box.append(el); document.getElementById('d').append(box);
+}
+</script></body></html>

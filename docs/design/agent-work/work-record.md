@@ -875,3 +875,14 @@ Authorization: the owner created W-27 from [a7-brief.md](a7-brief.md), approved 
    - *Hypothesis:* that live walking in the modal changes what the owner approves. It's tested by the next item's reviews.
 
 **Final gate (the one full run at the end, as the owner asked):** `test:server:templates`: 370 tests, 356 pass, 4 fail, 10 skipped. The 4 are the known ones: two Docker-only layer tests (`runner ENOENT`, F30), the worker-token test (also fails on `main`), and the security audit (fails under load, passes alone). No new failures.
+
+## W-29 "Design HTML kit, spike first" (A7 part 2a), in an item container (2026-10-06)
+
+Authorization: the owner created W-29 from W-27 #8's proposal, started it in the portal after its definition (7 actions in 3 phases), and said "go" in chat. Scope: as defined on the item. Phase 1 (gated) is the kit fidelity spike (#1), the kit contract and Code's binding (#2), and the Pages specs (#3). Phase 2 is kit.js generation (#4), Components tab demos (#5) and the binding (#6). #7 is close-out. Built on `aludel/w-29`, from `main` at 4bf3cbd. `tools/branch-handoffs.sh` shows no newer branch carrying this packet.
+
+### W-29 #1: kit fidelity spike (G3)
+
+- **Changed:** `kit-spike/generate-kit.mjs` generates a framework-free `kit.js` (tokens as CSS variables, one custom element per contract) from a Design revision. Biome's setup and world screens were rebuilt from it and captured beside the recorded ones. [Result and verdict](kit-spike/README.md).
+- **Checked:** the kit and the three pages run with no script errors at 1280 and 390 px. The setup screen's structure rebuilds; the world map has no element. The look diverges in colour, type and shape, and three components have no contract.
+- **Verdict:** the generator holds. Biome's look lives in its code, not its Design records, so fidelity depends on the binding's drift handling (adopt writes back to Design). #2 takes three contract additions from this.
+- **Waits on the owner:** Biome's own Design records (asked on #1). The spike used this project's seed, which Biome's primary colour suggests it shares. The export could reverse the verdict.

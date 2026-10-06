@@ -1,0 +1,20 @@
+<!doctype html>
+<!-- Biome's populated world (docs/evidence/biome-review/populated-biome.png), rebuilt from kit elements and plain layout only. -->
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Biome world, from the kit</title>
+<script src="../out/kit.js"></script></head>
+<body>
+<div style="position:relative;height:900px;overflow:hidden">
+  <kit-world-map style="position:absolute;inset:0;display:grid;place-items:center;border:2px dashed #b3261e;color:#b3261e;font:14px system-ui">World map: no Design contract, so no kit element</kit-world-map>
+  <div style="position:absolute;left:24px;right:24px;top:24px">
+    <kit-card variant="Filled"><kit-top-app-bar title="Mossbank · Spring · Day 1"><strong slot="leading" style="font:var(--mat-sys-headline-medium);padding-right:24px">biome</strong><kit-button slot="actions" variant="Outlined" label="Settings"></kit-button></kit-top-app-bar></kit-card>
+  </div>
+  <div style="position:absolute;left:24px;bottom:24px;width:270px">
+    <kit-card variant="Filled" headline="Life in Mossbank" supporting="Starter landscape · synthetic species">
+      <kit-list><kit-list-item leading="None" headline="Rabbit" supporting="12"></kit-list-item><kit-list-item leading="None" headline="Deer" supporting="6"></kit-list-item><kit-list-item leading="None" headline="Fox" supporting="2"></kit-list-item></kit-list>
+    </kit-card>
+  </div>
+  <div style="position:absolute;right:24px;bottom:24px;display:flex;align-items:center;gap:8px;background:var(--mat-sys-surface);border-radius:12px;padding:8px">
+    <kit-icon-button icon="arrow_back" label="Scroll left"></kit-icon-button><span style="font:var(--mat-sys-body-small)">Scroll to explore</span><kit-icon-button icon="arrow_forward" label="Scroll right"></kit-icon-button>
+  </div>
+</div>
+</body></html>

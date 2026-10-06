@@ -1,0 +1,57 @@
+{
+  "setup": {
+    "used": [
+      "kit-button",
+      "kit-card",
+      "kit-text-field",
+      "kit-list-item"
+    ],
+    "undefined": [],
+    "errors": []
+  },
+  "world": {
+    "used": [
+      "kit-card",
+      "kit-top-app-bar",
+      "kit-button",
+      "kit-list",
+      "kit-list-item",
+      "kit-icon-button"
+    ],
+    "undefined": [
+      "kit-world-map"
+    ],
+    "errors": []
+  },
+  "setup-390": {
+    "used": [
+      "kit-button",
+      "kit-card",
+      "kit-text-field",
+      "kit-list-item"
+    ],
+    "undefined": [],
+    "errors": []
+  },
+  "demos": {
+    "used": [
+      "kit-button",
+      "kit-icon-button",
+      "kit-floating-action-button",
+      "kit-card",
+      "kit-dialog",
+      "kit-chip",
+      "kit-switch",
+      "kit-text-field",
+      "kit-list",
+      "kit-list-item",
+      "kit-nav-list",
+      "kit-nav-item",
+      "kit-top-app-bar",
+      "kit-navigation-bar",
+      "kit-page-scaffold"
+    ],
+    "undefined": [],
+    "errors": []
+  }
+}

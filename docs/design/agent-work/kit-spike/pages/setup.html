@@ -1,0 +1,23 @@
+<!doctype html>
+<!-- Biome's initial setup (docs/evidence/biome-review/initial-setup.png), rebuilt from kit elements and plain layout only. -->
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Biome setup, from the kit</title>
+<script src="../out/kit.js"></script></head>
+<body>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:28px clamp(16px,6vw,78px)">
+  <strong style="font:var(--mat-sys-headline-medium)">biome</strong>
+  <kit-button variant="Outlined" label="My world"></kit-button>
+</div>
+<div style="display:grid;place-items:center;padding:56px 0 24px">
+  <kit-card variant="Outlined" style="width:min(450px,calc(100vw - 32px))">
+    <div style="display:grid;gap:16px;padding:20px">
+      <span style="font:var(--mat-sys-label-small);text-transform:uppercase;letter-spacing:2px;color:var(--mat-sys-on-surface-variant)">Your first biome</span>
+      <span style="font:var(--mat-sys-headline-large)">A place for life to begin.</span>
+      <span style="font:var(--mat-sys-body-large);color:var(--mat-sys-on-surface-variant)">Hi Demo newcomer. Start with a temperate world of grasslands, woodland, and water.</span>
+      <kit-text-field variant="Outlined" label="World name" value="My first biome" hint=""></kit-text-field>
+      <kit-list-item leading="Icon" icon="eco" headline="Temperate woodland" supporting="Rabbits, deer, and foxes · Spring"></kit-list-item>
+      <kit-button full label="Create my world"></kit-button>
+    </div>
+  </kit-card>
+</div>
+<p style="text-align:center;font:var(--mat-sys-body-small);color:var(--mat-sys-on-surface-variant)">Small worlds. Endless possibilities.</p>
+</body></html>
