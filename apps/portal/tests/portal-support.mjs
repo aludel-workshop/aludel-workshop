@@ -19,3 +19,12 @@ export async function stopPortal(child) {
   const timer = setTimeout(() => child.kill('SIGKILL'), 5000);
   try { await exited; } finally { clearTimeout(timer); }
 }
+
+// W-25: a journey run for a person to look at (`npm run preview -- <journey>`) keeps its portal up in the state the walk
+// left it. It prints one `Preview: <link>` line, which tools/journey-preview.mjs reads, and waits until it is stopped.
+export async function holdForPreview({ port, path = '/', account = null }) {
+  if (!process.env.JOURNEY_KEEP) return;
+  const sign = account ? ` (sign in as ${account.email}, ${account.password})` : '';
+  console.log(`Preview: http://localhost:${port}${path}${sign}. Stop it with npm run preview -- stop.`);
+  await new Promise(resolve => process.once('SIGINT', resolve).once('SIGTERM', resolve));
+}

@@ -5,7 +5,7 @@
 // board as a layer's Tasks tab. Screens and axe at 1440 and 390 px.
 // Usage: npm run build, then MACHINE_LAYER_TEMPLATES_ENABLED=1 node tests/work-board-browser.mjs
 // (PLAYWRIGHT_MODULE and CHROMIUM_PATH when not in an item container; see browser-support.mjs).
-// JOURNEY_KEEP=1 (and JOURNEY_PORT=<port>) keeps the portal running afterwards for a person to look at.
+// `npm run preview -- work-board` keeps the portal running afterwards for a person to look at (W-25).
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
@@ -20,6 +20,7 @@ import { openSecretStore } from '../server/secret-store.mjs';
 import { openDatabase } from '../server/storage.mjs';
 import { initWorkflow } from '../server/workflow.mjs';
 import { chromium } from './browser-support.mjs';
+import { holdForPreview } from './portal-support.mjs';
 
 const dest = 'test-results/work-board/';
 mkdirSync(dest, { recursive: true });
@@ -231,12 +232,8 @@ try {
   assert.equal(await peek.count(), 0, 'Escape closes the peek');
 
   assert.deepEqual(errors, []);
-  if (process.env.JOURNEY_KEEP) {
-    // A person's preview (F32): the portal stays up in the state the walk left it, until this process is stopped.
-    console.log(`Preview: http://localhost:${port}/p/${project.slug}/work (sign in as owner@example.com, ${password}). Ctrl+C to stop.`);
-    await new Promise(resolve => process.once('SIGINT', resolve).once('SIGTERM', resolve));
-  }
   console.log('PASS work board: five status columns, cards (priority, layers, assignee, progress, needs, live), create → define → Ready → confirmed start → review → close-out to Done, the peek, a rough note asked to define first, an unassigned start claimed, a refused drag to Done, Needs you / layer / assignee filters, the Pages Tasks tab as the same board, axe at 1440 and 390 px.');
+  await holdForPreview({ port, path: `/p/${project.slug}/work`, account: { email: 'owner@example.com', password } });
 } finally {
   await browser.close(); server.kill();
   if (server.exitCode === null && server.signalCode === null) await new Promise(resolve => server.once('exit', resolve));

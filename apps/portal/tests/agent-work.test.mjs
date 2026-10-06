@@ -243,6 +243,11 @@ test('a person drives a goal item in the portal while their local agent works it
     assert.equal((await fetch(origin + '/api/editor/tasks', { method: 'POST', headers: editor })).status, 405, 'other editor routes stay read only');
     const thread = (await portal('/' + workId)).body.events.map(event => event.text);
     assert.ok(thread.includes('Answered: Yes') && thread.includes('Keep it short'));
+    // W-25: the agent hands over a preview through the tool; the page reads it on the action.
+    const [handed] = await call([['update_action', { workId, number: 1, state: 'review', preview: { url: 'http://localhost:4390/p/tool-share/work', try: 'Open the sign-up flow' } }]]);
+    assert.equal(handed.actions[0].state, 'review');
+    const shown = (await portal('/' + workId)).body.actions[0].preview;
+    assert.deepEqual([shown.url, shown.try, shown.stale], ['http://localhost:4390/p/tool-share/work', 'Open the sign-up flow', false]);
   } finally {
     stream.abort();
     await stopPortal(server);
@@ -581,4 +586,40 @@ test('W-8 F34: an action added to an item in review sends it back to In progress
   view = work.dropAction(ada, id, workId, 3);
   assert.equal(work.move(ada, id, workId, 'review').item.board, 'review', 'with it removed, the item goes to review');
   assert.equal(work.move(ada, id, workId, 'progress').item.board, 'progress', 'Back to In progress');
+}));
+
+test('W-25: an action hands over a preview with its review; newer code makes it stale; it can say why there is none', () => fixture(({ work, ada, id }) => {
+  const [first] = work.stackMap(id).map(layer => layer.key);
+  const agent = { kind: 'agent', id: ada.id, name: "Ada's local agent" };
+  const workId = work.createGoal(ada, id, { title: 'Board', brief: 'b' }).item.id;
+  work.define(agent, id, workId, { brief: 'A board.', actions: [{ layer: first, goal: 'Build it' }, { layer: first, goal: 'Document it' }] });
+  work.claim(ada, id, workId); work.move(ada, id, workId, 'progress');
+  work.recordCode(agent, id, workId, { branch: 'aludel/w-1', commit: 'a'.repeat(40) });
+  work.updateAction(agent, id, workId, 1, { state: 'working' });
+  assert.throws(() => work.updateAction(agent, id, workId, 1, { preview: { url: 'javascript:alert(1)' } }), /http or https/);
+  assert.throws(() => work.updateAction(agent, id, workId, 1, { preview: { url: 'localhost:4390' } }), /http or https/);
+  assert.throws(() => work.updateAction(agent, id, workId, 1, { preview: { url: 'http://localhost:4390/', commit: 'not-hex' } }), /hex/);
+  let view = work.updateAction(agent, id, workId, 1, { state: 'review', summary: 'Built.', preview: { url: 'http://localhost:4390/p/tool-share/work', try: 'Drag a card to Done.' } });
+  let [built, docs] = view.actions;
+  assert.equal(built.preview.url, 'http://localhost:4390/p/tool-share/work');
+  assert.equal(built.preview.commit, 'a'.repeat(40), 'the commit defaults to the reported code');
+  assert.equal(built.preview.try, 'Drag a card to Done.');
+  assert.equal(built.preview.by.name, "Ada's local agent");
+  assert.equal(built.preview.stale, false);
+  assert.equal(docs.preview, null, 'an action with nothing handed over has no preview');
+  assert.ok(view.events.some(event => event.text === 'Handed over a preview of #1 at aaaaaaa'));
+  // Newer code makes it stale; a fresh preview at the new commit isn't.
+  work.recordCode(agent, id, workId, { branch: 'aludel/w-1', commit: 'b'.repeat(40) });
+  assert.equal(work.view(id, workId).actions[0].preview.stale, true);
+  assert.equal(work.updateAction(agent, id, workId, 1, { preview: { url: 'http://localhost:4390/p/tool-share/work', commit: 'bbbbbbb' } }).actions[0].preview.stale, false, 'an abbreviated commit matches');
+  // An action can say why there's no preview, and a preview can be removed.
+  work.updateAction(agent, id, workId, 2, { state: 'working' });
+  [, docs] = work.updateAction(agent, id, workId, 2, { preview: { none: 'Only Markdown changed.' } }).actions;
+  assert.equal(docs.preview.none, 'Only Markdown changed.');
+  assert.equal(docs.preview.stale, undefined);
+  assert.equal(work.updateAction(agent, id, workId, 2, { preview: null }).actions[1].preview, null);
+  // Once approved, the preview stays as it was reviewed.
+  work.review(ada, id, workId, 1, { verdict: 'approve' });
+  assert.throws(() => work.updateAction(agent, id, workId, 1, { preview: null }), status(409));
+  assert.equal(work.view(id, workId).actions[0].preview.commit, 'bbbbbbb');
 }));

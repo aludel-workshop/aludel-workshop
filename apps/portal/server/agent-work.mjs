@@ -64,6 +64,9 @@ export function initAgentWork(db) {
   `);
   // E3: a wrap-up action ends its item as not done (the orchestrator decided it can't be finished this time).
   if (!db.prepare('PRAGMA table_info(work_goal_actions)').all().some(column => column.name === 'kind')) db.exec('ALTER TABLE work_goal_actions ADD COLUMN kind TEXT');
+  // W-25: what an action hands over to look at with its review: a preview link (from wherever the agent serves it), the
+  // commit it shows and what to try, or why there is none.
+  if (!db.prepare('PRAGMA table_info(work_goal_actions)').all().some(column => column.name === 'preview_json')) db.exec('ALTER TABLE work_goal_actions ADD COLUMN preview_json TEXT');
 }
 
 // actor: { kind: 'person' | 'agent', id, name }. A person's local CLI agent acts as an agent on that person's behalf.
@@ -95,7 +98,7 @@ export function agentWork({ db, know, catalogs = null }) {
     .map(row => ({ number: row.number, title: row.title, gated: Boolean(row.gated) }));
   const actionRows = (projectId, workId) => db.prepare('SELECT * FROM work_goal_actions WHERE project_id = ? AND work_id = ? ORDER BY number').all(projectId, workId)
     .map(row => ({ id: row.id, number: row.number, phase: row.phase, layer: row.layer, goal: row.goal, after: parse(row.after_json, []), state: row.state,
-      summary: row.summary || '', addedBy: parse(row.added_by_json, null), updatedAt: row.updated_at, kind: row.kind || null }));
+      summary: row.summary || '', addedBy: parse(row.added_by_json, null), updatedAt: row.updated_at, kind: row.kind || null, preview: parse(row.preview_json, null) }));
   const proposalRow = row => ({ id: row.id, action: row.action_number, position: row.position, title: row.title, brief: row.brief, why: row.why,
     after: parse(row.after_json, []), author: parse(row.author_json, null), state: row.state, createdWorkId: row.created_work_id, decided: parse(row.decided_json, null) });
   const proposalRows = (projectId, workId) => db.prepare('SELECT * FROM work_goal_proposals WHERE project_id = ? AND work_id = ? ORDER BY action_number, position').all(projectId, workId).map(proposalRow);
@@ -117,13 +120,16 @@ export function agentWork({ db, know, catalogs = null }) {
     return waiting.length ? `Waits for #${waiting.map(other => other.number).join(', #')}` : null;
   }
 
+  // Stale once the item's reported code isn't the commit the preview shows (either may be abbreviated).
+  const previewView = (preview, code) => preview && preview.url
+    ? { ...preview, stale: Boolean(preview.commit && code?.commit && !code.commit.startsWith(preview.commit) && !preview.commit.startsWith(code.commit)) } : preview;
   function view(projectId, workId) {
     const item = goalItem(projectId, workId);
     const phases = phasesOf(projectId, workId), actions = actionRows(projectId, workId), needs = openNeeds(projectId, workId), proposals = proposalRows(projectId, workId);
     const wrapUp = wrapUpOf(actions);
     const events = db.prepare('SELECT * FROM (SELECT * FROM work_goal_events WHERE project_id = ? AND work_id = ? ORDER BY id DESC LIMIT 300) ORDER BY id').all(projectId, workId).map(eventRow);
     return { item, brief: goalOf(item).brief, defined: Boolean(goalOf(item).defined), performer: goalOf(item).performer || null, code: goalOf(item).code ? { ...goalOf(item).code, inRepository: Boolean(goalOf(item).code.merged) || codeMerged(projectId, goalOf(item).code), target: goalOf(item).code.merged?.into || repository(projectId)?.target || null } : null, phases,
-      actions: actions.map(action => ({ ...action, needs: needs.filter(need => need.action === action.number), blocked: ['todo', 'proposed'].includes(action.state) ? blockedReason(action, actions, phases) : null,
+      actions: actions.map(action => ({ ...action, preview: previewView(action.preview, goalOf(item).code), needs: needs.filter(need => need.action === action.number), blocked: ['todo', 'proposed'].includes(action.state) ? blockedReason(action, actions, phases) : null,
         proposals: proposals.filter(proposal => proposal.action === action.number).map(proposal => {
           const created = proposal.createdWorkId ? know.workById(projectId, proposal.createdWorkId) : null;
           return { ...proposal, created: created ? { ref: created.ref, title: created.title } : null };
@@ -177,7 +183,7 @@ export function agentWork({ db, know, catalogs = null }) {
       db.prepare('DELETE FROM work_goal_actions WHERE project_id = ? AND work_id = ?').run(projectId, workId);
       phases.forEach((phase, index) => db.prepare('INSERT INTO work_goal_phases VALUES (?, ?, ?, ?, ?)')
         .run(projectId, workId, index + 1, clean(phase.title, 80, 'Phase title', true), phase.gated ? 1 : 0));
-      for (const row of rows) db.prepare('INSERT INTO work_goal_actions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)')
+      for (const row of rows) db.prepare('INSERT INTO work_goal_actions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)')
         .run(`act-${randomBytes(4).toString('hex')}`, projectId, workId, row.number, row.phase, row.layer, row.goal, JSON.stringify(row.after), 'todo', null, JSON.stringify(actor), at, at);
     });
     saveGoal(projectId, item, { brief, defined: true }, `${actor.name} defined it: ${rows.length} action${rows.length === 1 ? '' : 's'}`, byOf(actor));
@@ -293,7 +299,7 @@ export function agentWork({ db, know, catalogs = null }) {
     // Once work has started, an agent's new action waits for a person's approval; a person's own is approved by adding it.
     const needsApproval = actor.kind === 'agent' && !['draft', 'ready'].includes(item.board);
     const at = now();
-    db.prepare('INSERT INTO work_goal_actions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    db.prepare('INSERT INTO work_goal_actions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)')
       .run(`act-${randomBytes(4).toString('hex')}`, projectId, workId, number, wrapUp ? Math.max(1, phases.length) : phase, checkLayer(projectId, input.layer), goal, JSON.stringify(wrapUp ? [] : after), needsApproval ? 'proposed' : 'todo',
         wrapUp ? clean(input.reason, 1000, 'Reason') : null, JSON.stringify(actor), at, at, wrapUp ? 'wrap-up' : null);
     if (needsApproval) record(projectId, workId, { kind: 'approval', action: number, author: actor, text: (wrapUp ? 'End as not done: ' : '') + (clean(input.reason, 1000, 'Reason') || `New action: ${goal}`) });
@@ -303,6 +309,20 @@ export function agentWork({ db, know, catalogs = null }) {
   }
 
   const agentMoves = { todo: ['working'], working: ['review', 'todo'], review: ['working'], proposed: [] };
+  // W-25: a preview handed over with an action ({ url, commit, try }), or why there is none ({ none }); null removes it. The
+  // commit defaults to the item's reported code, so the page can tell when newer code makes the preview stale.
+  function checkPreview(input, item, actor) {
+    if (input === null) return null;
+    if (!input || typeof input !== 'object' || Array.isArray(input)) fail('A preview is { url, commit, try } or { none }.');
+    const by = { kind: actor.kind, id: actor.id, name: actor.name }, at = now();
+    if (input.none !== undefined) return { none: clean(input.none, 400, 'Why there is no preview', true), by, at };
+    const url = clean(input.url, 500, 'Preview link', true);
+    let parsed; try { parsed = new URL(url); } catch { fail('Give the preview as a full http or https link.'); }
+    if (!['http:', 'https:'].includes(parsed.protocol)) fail('Give the preview as a full http or https link.');
+    const commit = input.commit ? clean(input.commit, 64, 'Commit') : goalOf(item).code?.commit || null;
+    if (commit && !/^[0-9a-f]{7,64}$/.test(commit)) fail('Give the preview\'s commit as a hex hash.');
+    return { url: parsed.href, commit, try: clean(input.try, 2000, 'What to try') || '', by, at };
+  }
   function updateAction(actor, projectId, workId, number, input = {}) {
     const item = goalItem(projectId, workId);
     const actions = actionRows(projectId, workId), phases = phasesOf(projectId, workId);
@@ -312,6 +332,10 @@ export function agentWork({ db, know, catalogs = null }) {
     if (input.summary !== undefined) next.summary = clean(input.summary, 4000, 'Summary');
     if (input.layer !== undefined) next.layer = checkLayer(projectId, input.layer);
     if (input.after !== undefined) next.after = checkAfter(input.after, action.number, new Set(actions.map(entry => entry.number)));
+    if (input.preview !== undefined) {
+      if (['done', 'proposed'].includes(action.state)) fail(`#${action.number} is ${action.state === 'done' ? 'done' : 'waiting for approval'}; its preview can't change.`, 409);
+      next.preview = checkPreview(input.preview, item, actor);
+    }
     if (input.phase !== undefined) {
       const phase = Number(input.phase);
       if (!Number.isInteger(phase) || phase < 1 || phase > phases.length) fail(`#${action.number} names a phase that doesn't exist.`);
@@ -329,9 +353,11 @@ export function agentWork({ db, know, catalogs = null }) {
       }
       next.state = input.state;
     }
-    db.prepare('UPDATE work_goal_actions SET goal = ?, summary = ?, layer = ?, after_json = ?, phase = ?, state = ?, updated_at = ? WHERE id = ? AND project_id = ?')
-      .run(next.goal, next.summary || null, next.layer, JSON.stringify(next.after), next.phase, next.state, now(), action.id, projectId);
+    db.prepare('UPDATE work_goal_actions SET goal = ?, summary = ?, layer = ?, after_json = ?, phase = ?, state = ?, preview_json = ?, updated_at = ? WHERE id = ? AND project_id = ?')
+      .run(next.goal, next.summary || null, next.layer, JSON.stringify(next.after), next.phase, next.state, next.preview ? JSON.stringify(next.preview) : null, now(), action.id, projectId);
     const changed = ['goal', 'summary', 'layer', 'after', 'phase', 'state'].filter(key => JSON.stringify(next[key]) !== JSON.stringify(action[key]));
+    if (input.preview !== undefined) record(projectId, workId, { kind: 'log', action: action.number, author: actor,
+      text: !next.preview ? `Removed #${action.number}'s preview` : next.preview.none ? `No preview for #${action.number}: ${next.preview.none}` : `Handed over a preview of #${action.number}${next.preview.commit ? ` at ${next.preview.commit.slice(0, 7)}` : ''}` });
     if (changed.length) record(projectId, workId, { kind: 'log', action: action.number, author: actor,
       text: changed.includes('state') ? `#${action.number}: ${{ todo: 'to do', working: 'working', review: 'ready for review', done: 'done' }[next.state]}` : `Changed #${action.number}'s ${changed.join(', ')}` });
     emit(projectId, workId, { type: 'action', number: action.number });
@@ -460,7 +486,7 @@ export function agentWork({ db, know, catalogs = null }) {
     const existing = actions.find(action => action.kind === 'wrap-up'), at = now();
     transaction(() => {
       if (existing) db.prepare("UPDATE work_goal_actions SET state = 'done', summary = ?, updated_at = ? WHERE id = ? AND project_id = ?").run(existing.summary && existing.state !== 'proposed' ? existing.summary : reason, at, existing.id, projectId);
-      else db.prepare("INSERT INTO work_goal_actions VALUES (?, ?, ?, ?, ?, ?, ?, '[]', 'done', ?, ?, ?, ?, 'wrap-up')")
+      else db.prepare("INSERT INTO work_goal_actions VALUES (?, ?, ?, ?, ?, ?, ?, '[]', 'done', ?, ?, ?, ?, 'wrap-up', NULL)")
         .run(`act-${randomBytes(4).toString('hex')}`, projectId, workId, (actions.at(-1)?.number || 0) + 1, Math.max(1, phasesOf(projectId, workId).length), null, 'Wrap up: end as not done', reason, JSON.stringify(person), at, at);
       for (const need of openNeeds(projectId, workId))
         db.prepare('UPDATE work_goal_events SET resolved_at = ?, resolution_json = ? WHERE id = ? AND project_id = ?').run(at, JSON.stringify({ text: 'Withdrawn: the item ended as not done', by: { id: user.id, name: user.name } }), need.id, projectId);
