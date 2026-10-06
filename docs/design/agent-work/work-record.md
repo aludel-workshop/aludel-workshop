@@ -577,7 +577,7 @@ Each entry is written to become a work item. Where an item already exists in Alu
 | FW-8 | **Action titles and descriptions** (F15): schema, `define_work`, `add_action` and `update_action`, the item page and the peek. | F15 | | |
 | FW-9 | **The container's first message** (F1): when the container connects, leave the start instruction where Claude Code reads it first (a session-start hook in the container's settings), so the agent knows its item and role unprompted. | F1 | | |
 | FW-10 | **Questions and answers on one surface** (F25, F16): push events to the agent, answers taken from either surface, review links that open in VS Code. | F25, G3 | | W-11 |
-| FW-11 | **The item environment across repositories** (F26): every repository the project owns, checked out side by side on the item's branch; report and close-out handle a set of branches. With DEC-069 (3) this includes `layer-base`, which today is served read-only as a bundle. | F26, F22 | | (PLATFORM-PIPELINE-01) |
+| FW-11 | **The item environment across repositories** (F26): every repository the project owns, checked out side by side on the item's branch; report and close-out handle a set of branches. With DEC-069 (3) this includes `layer-base`, which today is served read-only as a bundle. | F26, F22 | | W-33, [MULTI-REPO-ITEMS-01](../multi-repository-items/work-record.md) |
 | FW-12 | **Pages keeps its own personas** (F17, DEC-068), bound to Vision's through the Library. | F17 | | |
 
 **Decisions waiting on the owner:**
