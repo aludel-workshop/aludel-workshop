@@ -914,3 +914,10 @@ Authorization: the owner created W-29 from W-27 #8's proposal, started it in the
   - an action whose output is a document puts its substance in its summary and its thread message;
   - I check the modal's view rules (`views()`) before handing over an action of a kind it hasn't shown before.
   - *Hypothesis until #2's re-review:* that a summary is enough to approve a spec in the meantime.
+
+### W-29 #3 corrected after the flag (2026-10-06)
+
+- **Changed:** both staged records now read the project's Design system binding; the `@kit` tags are gone.
+  - Design components' *Built in Code* shows the binding's pairs and status, with Open binding.
+  - Code explorer's filter is All, Paired, Drifted and Unpaired. Its side panel shows the Design counterpart, the prop map from Code's adapter, and Unpaired linking to Library › Bindings.
+- **Checked:** both updates passed the Pages API checks. Neither record mentions tags.
