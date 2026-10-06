@@ -43,6 +43,7 @@ Copy only applicable fields into a task record. Combine sections for small chang
 ## Handoff and learning
 
 - Task outcome and observed checks:
+- Owner requirements touched: each built, deviated (said plainly) or deferred (to a named slice):
 - Avoidable friction or rework observed:
 - What would make the next equivalent task easier:
 - Process change applied now and evidence it helped:

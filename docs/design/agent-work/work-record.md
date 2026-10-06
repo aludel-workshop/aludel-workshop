@@ -394,3 +394,42 @@ Moves defer to the server's existing rules in `move()`, so a refused drag to Don
   - Layer data still changes only through layer APIs. A layer's repository holds its code, and its outputs are records or repository files (DEC-059).
 
   This overlaps PLATFORM-PIPELINE-01 (owner-owned repositories) and COLLAB-WORK-01 §3 (one environment definition). F22 is its first concrete case: the app can't build without a second repository.
+- **F27. An agent can't create work items.** The MCP tools cover the agent's own item (`define_work`, `add_action`, `post_message`, `ask`). `createGoal` is reachable only from a portal session (`POST /api/projects/:id/goals`). Every follow-up this attempt surfaced has to wait for the owner to type it in: the Pages personas change (F17), the item environment (F26), one surface (F25), git identity at setup (F11), the Pages review walker pulled forward (F21). The next step is for an agent to propose an item. The owner creates it from the proposal, or it arrives as a Draft the owner keeps or dismisses, matching how DEC-057 follow-ups work.
+- **F28. There's no way to end an item as failed.** Close-out needs the item In review with every action approved (`server/agent-work.mjs:471`). It then applies every staged record and merges the code, so it can only succeed. Archive refuses an item that's in progress (`server/knowledge.mjs:1404`). `move` can't leave In progress except to In review. So W-8 can't be ended from the portal. Needed: a person's "Close as not done" that records why, discards the staged changeset (or keeps it as a draft for a retry, as J6 does for runs), merges nothing, and moves the item to Done marked "not done".
+
+### Attempt 1 closed as failed (2026-10-06)
+
+Owner: "think we've got enough out of these notes to close out and mark this first attempt failed, with the work record as the output."
+
+- **Output:** this record, findings F1–F28. The item branch `aludel/w-8` now differs from `main` only in this file and in the process change below. The board code was reverted on the branch (`1a9eee3`). The draft is kept on the container's local branch `w-8-attempt-1-board` (`58b50d6`), which isn't pushed. W-8's six staged Pages records were never applied.
+- **Not done:** the board (#2) was written but never built or seen (F22), and #3–#5 never started. Because of F28, W-8 stays In progress in the portal until there's a way to end it, or the owner chooses another route.
+- **Experiment, untested:** the `Monitor` watcher for person events (F25) started after the owner's last answer. No portal action has arrived through it yet, so whether it works is unknown.
+
+#### Retrospective
+
+1. **What made the work harder, slower or more error-prone than necessary?**
+   - *Observed:*
+     - The agent started with no prompt and no project context (F1, F2), and records have no schema, so the server source had to be read (F7, F18).
+     - The portal stalled twice (F12).
+     - The container can't build the app (F22). It has no git identity (F11) and leaks its environment into tests (F23).
+     - Every call returns about 10 KB (F14).
+     - The owner had to work in two surfaces, relaying answers by hand (F16, F25).
+   - *Agent mistake:* a malformed `git revert` was followed by an `--amend` that renamed the wrong commit. Caught by checking the log, and fixed.
+2. **What would make the next equivalent task easier?**
+   - An agent briefing served by the platform: protocol, layer charters, operation schemas with an example record (F2, F7, F18).
+   - An item environment holding every project repository, which can build and run the gates (F22, F26).
+   - Events pushed to the agent, and answers taken from either surface (F25).
+   - Action descriptions (F15), a way to end an item as failed (F28), and agent-proposed items (F27).
+3. **What changes the roadmap, downstream packets, architecture or process?**
+   - The dogfood ran before the pieces it depends on: A7 for Pages review (F21), the multi-repository environment (F22, F26), and push events (F25). The item container is really A2's runtime hosted locally (F25), which argues for building A2's event and runtime contract before more local polish.
+   - Layers must not depend on one another, so Pages needs its own personas (F17).
+   - The environment direction (F26) folds into PLATFORM-PIPELINE-01 and COLLAB-WORK-01 §3.
+4. **Questions created, resolved or made newly important:**
+   - Does an answer typed in VS Code count as the person's (F25)? This blocks the one-surface design.
+   - What does a failed item do with its staged changes: discard them, or keep them as a draft for a retry (F28)?
+   - Who publishes `layer-base` to GitHub, and when? It's an owner action and blocks every container build (F22).
+   - Resolved: the "blocked" status doesn't block anything (F5). The owner waits for A7 rather than pulling the walker forward (F21).
+5. **Which process change was applied now, how was it tested, and what is still a hypothesis?**
+   - *Applied:* the traceability and reviewability rule, in the operating procedure §6 and the work-record template. Before closing a slice, mark each owner requirement as built, deviated or deferred. Before a dogfood or trial, check that every action kind can be reviewed as specified and that the environment can build and check the change.
+   - *Tested:* only retrospectively. Applied to A4, it would have flagged F21 (the G2 requirement) as deviated, and F22 before the dogfood. It hasn't yet been applied going forward.
+   - *Hypothesis:* the person-event watcher makes the two-surface problem bearable until push events exist.
