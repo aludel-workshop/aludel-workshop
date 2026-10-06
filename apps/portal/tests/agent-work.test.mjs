@@ -67,12 +67,20 @@ test('a goal item is defined in phases, starts deliberately, and gates later act
   assert.match(defined.actions[2].blocked, /review gate after Specify/);
 
   assert.throws(() => work.move(ada, id, workId, 'progress'), /Choose who works/, 'starting needs someone on it');
+  // W-8, the board's move rules: Draft ⇄ Ready; Ready → In progress only; nothing skips a column or drags to Done.
+  assert.throws(() => work.move(ada, id, workId, 'review'), /Only an item in progress/, 'Ready can\'t skip to review');
+  assert.throws(() => work.move(ada, id, workId, 'done'), /closes from the item/, 'nothing reaches Done by moving');
+  assert.equal(work.move(ada, id, workId, 'draft').item.board, 'draft', 'a Ready item goes back to Draft');
+  assert.throws(() => work.move(ada, id, workId, 'progress'), /Only a Ready item can start/, 'Draft can\'t skip to In progress');
+  assert.equal(work.move(ada, id, workId, 'ready').item.board, 'ready', 'a defined Draft moves to Ready');
   assert.throws(() => work.claim(ben, id, workId), status(404), 'only members see the item');
   work.claim(ada, id, workId);
   assert.throws(() => work.assertPerformer(ben, id, workId), status(404));
   assert.throws(() => work.updateAction(agent, id, workId, 1, { state: 'working' }), /Start/, 'nothing works before Start');
   const started = work.move(ada, id, workId, 'progress');
   assert.equal(started.item.board, 'progress');
+  assert.throws(() => work.move(ada, id, workId, 'draft'), /has started/, 'a started item can\'t go back to Draft');
+  assert.throws(() => work.move(ada, id, workId, 'ready'), /can't move back to Ready/);
   assert.equal(started.performer, 'local');
 
   // The gate holds phase 2 back; phase 1's actions run side by side.

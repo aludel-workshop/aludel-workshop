@@ -62,7 +62,7 @@ export class WorkLayerComponent {
   readonly tabs: [string, string, string][] = [['board', 'Board', 'view_kanban'], ['items', 'Items', 'task_alt'], ['projects', 'Projects', 'deployed_code_history'], ['team', 'Team', 'group'], ['routines', 'Routines', 'event_repeat']];
   readonly heading: Record<string, string> = { board: 'Board', items: 'Items', projects: 'Projects', roles: 'Roles', team: 'Team', agents: 'Team', routines: 'Routines' };
   readonly lead: Record<string, string> = {
-    board: 'Batches are what\'s being worked on now, by you and by agents. Next fills a batch from the current milestone.',
+    board: 'Every item, by where it is: Draft, Ready, In progress, In review and Done. Click a card to peek; Done comes from close-out.',
     routines: 'Each run creates an ordinary item, assigned like any other by its action. A routine never opens a second item while its last one is open.'
   };
   readonly layerLabel = layerLabel;

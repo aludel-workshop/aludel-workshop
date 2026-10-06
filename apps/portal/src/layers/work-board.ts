@@ -9,7 +9,7 @@ import type { GoalView } from './work-goal';
 type Column = 'draft' | 'ready' | 'progress' | 'review' | 'done';
 // GET …/goals: each goal item's action counts by state, open needs and the layers its actions name.
 type GoalSummary = { id: string; defined: boolean; actions: Record<string, number>; needs: number; layers: string[] };
-type Ask = { kind: 'define' | 'start'; item: WorkItem };
+type Ask = { kind: 'define' | 'start' | 'done'; item: WorkItem };
 
 const columns: [Column, string][] = [['draft', 'Draft'], ['ready', 'Ready'], ['progress', 'In progress'], ['review', 'In review'], ['done', 'Done']];
 const byPriority = (a: WorkItem, b: WorkItem) => priorityOrder.indexOf(a.priority) - priorityOrder.indexOf(b.priority) || a.number - b.number;
@@ -30,7 +30,7 @@ const byPriority = (a: WorkItem, b: WorkItem) => priorityOrder.indexOf(a.priorit
     </div>
     <a class="lay-button small" [href]="createLink()" (click)="ctx.go(createLink(), $event)"><mat-icon aria-hidden="true">add</mat-icon>Create task</a>
   </div>
-  <div class="lay-kb-wrap" [class.lay-kb-peeking]="!!peekItem()">
+  <div class="lay-kb-wrap">
     <div class="lay-kb">
       @for (col of columns; track col[0]) {
         <section class="lay-kb-col" [class.lay-kb-over]="over() === col[0]" [attr.aria-labelledby]="'kb-' + col[0]" [attr.data-col]="col[0]"
@@ -41,7 +41,7 @@ const byPriority = (a: WorkItem, b: WorkItem) => priorityOrder.indexOf(a.priorit
               <div class="lay-kb-top"><span class="lay-kb-ref">{{ item.ref }}</span>@if (live(item)) { <span class="lay-kb-live" role="img" aria-label="Work is running"></span> }</div>
               <button type="button" class="lay-kb-title" [class.lay-kb-rough]="rough(item)" (click)="peek(item)" [attr.aria-expanded]="peekId() === item.id">{{ item.title }}</button>
               <div class="lay-kb-row"><aludel-priority [value]="item.priority" [text]="true" />
-                @for (key of layersOf(item); track key) { <aludel-role-chip [layer]="key" [action]="item.scope === 'goal' ? null : item.action" /> }
+                @for (key of layersOf(item); track key) { <aludel-role-chip [layer]="key" /> }
                 @if (needsOf(item); as n) { <span class="lay-kb-needbadge" role="img" [attr.aria-label]="n + ' need' + (n === 1 ? 's' : '') + ' you'"><mat-icon aria-hidden="true">front_hand</mat-icon>{{ n }}</span> }</div>
               <div class="lay-kb-foot">
                 @if (item.assignee; as who) { <span class="lay-kb-who"><aludel-avatar [who]="who" size="sm" />{{ whoLabel(who) }}</span> } @else { <span>Unassigned</span> }
@@ -54,14 +54,14 @@ const byPriority = (a: WorkItem, b: WorkItem) => priorityOrder.indexOf(a.priorit
       }
     </div>
     @if (peekItem(); as item) {
-      <aside class="lay-kb-peek" aria-labelledby="kb-peek-h">
+      <aside class="lay-kb-peek" aria-labelledby="kb-peek-h" (keydown.escape)="closePeek()">
         <div class="lay-row"><span [class]="'lay-kb-label lay-kb-' + item.board">{{ label(item.board) }}</span><span class="lay-kb-ref">{{ item.ref }}</span>
           <button type="button" class="lay-button ghost small lay-kb-close" (click)="closePeek()" aria-label="Close the peek"><mat-icon aria-hidden="true">close</mat-icon></button></div>
         <h2 id="kb-peek-h" tabindex="-1">{{ item.title }}</h2>
         <dl>
           <dt>Priority</dt><dd><aludel-priority [value]="item.priority" [text]="true" /></dd>
           <dt>Assignee</dt><dd>{{ item.assignee ? whoLabel(item.assignee) : 'Unassigned' }}</dd>
-          @if (layersOf(item).length) { <dt>Layers</dt><dd class="lay-row lay-wrap">@for (key of layersOf(item); track key) { <aludel-role-chip [layer]="key" /> }</dd> }
+          @if (layersOf(item).length) { <dt>Layers</dt><dd class="lay-row lay-wrap">@for (key of layersOf(item); track key) { <aludel-role-chip [layer]="key" [action]="item.scope === 'goal' ? null : item.action" /> }</dd> }
           @if (item.scope === 'goal' && item.board !== 'done') {
             <dt><label for="kb-move">Move to</label></dt>
             <dd><select id="kb-move" [ngModel]="item.board" (ngModelChange)="move(item, $event)">@for (col of columns; track col[0]) { <option [value]="col[0]">{{ col[1] }}</option> }</select></dd>
@@ -89,10 +89,15 @@ const byPriority = (a: WorkItem, b: WorkItem) => priorityOrder.indexOf(a.priorit
         <p>Ready means someone can start it. Define it first: a brief and at least one action, written by you or your agent on its page.</p>
         <div class="lay-row lay-wrap"><a class="lay-button" [href]="ctx.link('work', 'item', a.item.id)" (click)="ask.set(null); ctx.go(ctx.link('work', 'item', a.item.id), $event)">Open item to define it</a>
           <button type="button" class="lay-button ghost" (click)="ask.set(null)">Cancel</button></div>
+      } @else if (a.kind === 'done') {
+        <h2 id="kb-ask-h">{{ a.item.ref }} closes from the item</h2>
+        <p>An item reaches Done when its actions are reviewed and it's closed out, so the board can't skip there. Open the item to see what's left.</p>
+        <div class="lay-row lay-wrap"><a class="lay-button" [href]="ctx.link('work', 'item', a.item.id)" (click)="ask.set(null); ctx.go(ctx.link('work', 'item', a.item.id), $event)"><mat-icon aria-hidden="true">open_in_new</mat-icon>Open item</a>
+          <button type="button" class="lay-button ghost" (click)="ask.set(null)">Cancel</button></div>
       } @else {
         <h2 id="kb-ask-h">Start {{ a.item.ref }}?</h2>
         @if (a.item.assignee) {
-          <p>{{ whoLabel(a.item.assignee) }} starts on its actions. Its assignee stays once it has started.</p>
+          <p>{{ startLine(a.item.assignee) }} Its assignee stays once it has started.</p>
           <div class="lay-row lay-wrap"><button type="button" class="lay-button" (click)="start(a.item, false)">Start</button><button type="button" class="lay-button ghost" (click)="ask.set(null)">Cancel</button></div>
         } @else {
           <p>Nobody is assigned. Claim it to work on it with your own agent. Sending it to an agent arrives with the remote runtime (A2).</p>
@@ -141,6 +146,7 @@ export class WorkBoardComponent {
   live(item: WorkItem) { return item.scope === 'goal' ? Boolean(this.summaries().get(item.id)?.actions['working']) : item.status === 'working'; }
   rough(item: WorkItem) { return item.scope === 'goal' && item.board === 'draft' && !this.summaries().get(item.id)?.defined; }
   whoLabel(who: Assignee) { return who.kind === 'person' ? `${this.ctx.whoName(who)}, local` : this.ctx.whoName(who); }
+  startLine(who: Assignee) { return who.kind === 'person' && who.id === this.ctx.me() ? 'You work on it with your own agent.' : `${this.whoLabel(who)} starts on its actions.`; }
   label(board: string | undefined) { return columns.find(col => col[0] === board)?.[1] || ''; }
 
   private readonly shown = computed(() => {
@@ -163,9 +169,12 @@ export class WorkBoardComponent {
     if (this.peekId() === item.id) return this.closePeek();
     this.peekId.set(item.id); this.peekView.set(null);
     if (item.scope === 'goal') void this.loadPeek(item.id);
-    setTimeout(() => document.getElementById('kb-peek-h')?.focus());
+    setTimeout(() => document.getElementById('kb-peek-h')?.focus({ preventScroll: true }));
   }
-  closePeek() { this.peekId.set(null); this.peekView.set(null); }
+  closePeek() {
+    const ref = this.peekItem()?.ref; this.peekId.set(null); this.peekView.set(null);
+    if (ref) setTimeout(() => (document.querySelector(`.lay-kb-card[data-ref="${ref}"] .lay-kb-title`) as HTMLElement | null)?.focus({ preventScroll: true }));
+  }
   private async loadPeek(id: string) {
     try { const view = await this.ctx.api<GoalView>(`${this.base()}/${encodeURIComponent(id)}`); if (this.peekId() === id) this.peekView.set(view); } catch { /* The peek keeps its fields. */ }
   }
@@ -177,6 +186,7 @@ export class WorkBoardComponent {
     if (!item || item.board === to) return;
     if (to === 'ready' && item.board === 'draft' && !this.summaries().get(item.id)?.defined) return this.ask.set({ kind: 'define', item });
     if (to === 'progress' && item.board === 'ready') return this.ask.set({ kind: 'start', item });
+    if (to === 'done') return this.ask.set({ kind: 'done', item });
     void this.ctx.write(() => this.ctx.api(`${this.base()}/${encodeURIComponent(item.id)}/move`, 'POST', { to }), `${item.ref} moved to ${this.label(to)}.`);
   }
   start(item: WorkItem, claim: boolean) {
