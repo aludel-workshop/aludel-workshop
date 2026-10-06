@@ -212,10 +212,21 @@ export const dataStatusLabel: Record<string, string> = { proposed: 'Proposed', c
 export const unitStateLabel: Record<string, string> = { healthy: 'Healthy', suspect: 'Suspect', untraced: 'Untraced', dead: 'Unused' };
 
 // One project's state for every layer component. Layers never fetch on their own; they call api() then reload().
-export type LibrarySource = 'output' | 'knowledge' | 'library';
+export type LibrarySource = 'output' | 'knowledge' | 'library' | 'work';
+// W-10: a search result; `heading` and `anchor` are the section the match is in, `path` a Knowledge doc's path.
 export type LibraryEntry = { ref: string; source: LibrarySource; layer: { key: string; name: string; instanceId: string | null }; kind: string; title: string;
-  revision: number; updatedAt: string | null; excerpt: string };
-export type LibraryRead = Omit<LibraryEntry, 'excerpt' | 'updatedAt'> & { currentRevision: number; content?: string; data?: Record<string, unknown> };
+  revision: number | null; updatedAt: string | null; excerpt: string; heading?: string | null; anchor?: string | null; path?: string; state?: string };
+export type LibraryRead = Omit<LibraryEntry, 'excerpt' | 'updatedAt'> & { currentRevision: number | null; content?: string; data?: Record<string, unknown> };
+// What a result is, in words: a work item, a repository doc, a charter, or the record kind.
+export const libraryKindLabel = (entry: Pick<LibraryEntry, 'kind' | 'source'>) => {
+  const words = entry.source === 'work' ? 'work item' : entry.kind === 'In the repository' ? 'repository doc' : entry.kind.replaceAll('_', ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+};
+// The output kinds recordHref opens in their own layer; anything else opens on its Library entry page.
+const openableKinds = new Set(['page', 'flow', 'brief_claim', 'insight', 'source', 'finding', 'project', 'phase', 'activity', 'spec', 'data_object', 'data_operation',
+  'doc', 'component', 'brand_asset', 'design_tokens', 'research', 'vision_section', 'persona', 'access_rule', 'code_unit', 'story']);
+// The id the doc view gives a heading, as the Library's index names sections (server/library.mjs headingAnchor).
+export const headingAnchor = (heading: string) => heading.toLowerCase().replace(/[`*_~[\]()]/g, '').replace(/[^\p{L}\p{N}\s-]/gu, '').trim().replace(/\s+/g, '-');
 
 @Injectable()
 export class ProjectContext {
@@ -229,6 +240,9 @@ export class ProjectContext {
   readonly error = signal('');
   readonly notice = signal('');
   readonly path = signal(location.pathname);
+  // What follows the path in the address: a section to open (#anchor) and a query (?q=, for the Library).
+  readonly fragment = signal(decodeURIComponent(location.hash.slice(1)));
+  readonly query = signal(location.search);
   readonly segments = computed(() => this.path().split('/').filter(Boolean).slice(2).map(decodeURIComponent));
   readonly slug = computed(() => decodeURIComponent(this.path().split('/')[2] || ''));
   readonly projectId = computed(() => this.session()?.projects.find(project => project.slug === this.slug())?.id || '');
@@ -301,6 +315,13 @@ export class ProjectContext {
   readonly suspectUnits = computed(() => (this.data()?.code.units || []).filter(unit => unit.state === 'suspect'));
 
   // Where a record lives, for links from Work and Platform › Code.
+  // Where a Library entry opens: a Knowledge doc at its section, a work item, a record in its layer, else its Library page.
+  entryHref(entry: LibraryEntry) {
+    if (entry.source === 'knowledge' && entry.path) return this.link(entry.layer.key, 'knowledge', 'doc', entry.path.replace(/^knowledge\//, '').replace(/\.md$/, '')) + (entry.anchor ? `#${entry.anchor}` : '');
+    if (entry.source === 'work') return this.link('work', 'items', entry.ref);
+    if (entry.source !== 'knowledge' && openableKinds.has(entry.kind)) return this.recordHref(entry.kind, entry.ref);
+    return this.link('library', 'entry', entry.ref);
+  }
   recordHref(kind: string, id: string) {
     if (kind === 'page') return this.link('pages', 'page', id);
     if (kind === 'flow') return this.link('pages', 'flows', id);
@@ -416,7 +437,8 @@ export class ProjectContext {
     event?.preventDefault();
     if (!path.startsWith('/p/')) { location.assign(path); return; }
     history.pushState({}, '', path);
-    this.path.set(path);
+    const url = new URL(path, location.origin);
+    this.path.set(url.pathname); this.fragment.set(decodeURIComponent(url.hash.slice(1))); this.query.set(url.search);
     this.error.set(''); this.notice.set('');
     window.scrollTo(0, 0);
     setTimeout(() => document.querySelector<HTMLElement>('.lay-main h1')?.focus({ preventScroll: true }), 30);
@@ -439,7 +461,7 @@ export class ProjectContext {
 
   // Evidence and documents write through here too.
   // DEC-059: the Library pools every installed layer's outputs and Knowledge with its own research and documents.
-  librarySearch(query: { q?: string; layer?: string; kind?: string; source?: string; cursor?: number }) {
+  librarySearch(query: { q?: string; layer?: string; kind?: string; source?: string; cursor?: number; limit?: number }) {
     const params = new URLSearchParams(Object.entries(query).filter(([, value]) => value !== undefined && value !== '').map(([key, value]) => [key, String(value)]));
     return this.api<{ results: LibraryEntry[]; total: number; nextCursor: number | null }>(`/api/projects/${encodeURIComponent(this.projectId())}/library?${params}`);
   }

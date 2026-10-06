@@ -170,10 +170,14 @@ test('W-10: repository docs are in the Library, and the doc a query names comes 
   assert.equal(found[0].path, '/docs/design/process/operating-procedure.md');
 }, { templates: true }));
 
-// The rule, checked: no server module keeps its own text search over a copy of the knowledge.
+// The rule, checked: nothing keeps its own text search over a copy of the knowledge. Pickers and navigation filters
+// (a file tree, the token and icon pickers, the journey picker, a layer's information tree) filter what is on screen.
 test('W-10: only the Library searches', () => {
-  const server = join(portalRoot, 'server');
-  const own = readdirSync(server).filter(name => name.endsWith('.mjs') && name !== 'library.mjs')
-    .filter(name => /\.includes\((needle|term|q|query)\)/.test(readFileSync(join(server, name), 'utf8')));
+  const allowed = new Set(['src/layers/code.ts', 'src/layers/design-tokens.ts', 'src/layers/layer-manage.ts', 'src/layers/work-create.ts', 'src/layers/layer-knowledge.ts']);
+  const files = dir => readdirSync(join(portalRoot, dir), { withFileTypes: true }).flatMap(entry => entry.isDirectory() ? files(`${dir}/${entry.name}`) : [`${dir}/${entry.name}`]);
+  const own = [...files('server'), ...files('src')].filter(path => /\.(mjs|ts)$/.test(path) && path !== 'server/library.mjs' && !allowed.has(path))
+    .filter(path => /\.includes\((needle|term|q|query)\)/.test(readFileSync(join(portalRoot, path), 'utf8')));
   assert.deepEqual(own, []);
+  // The one exception inside Knowledge is its information tree; its docs come from the Library.
+  assert.match(readFileSync(join(portalRoot, 'src/layers/layer-knowledge.ts'), 'utf8'), /librarySearch\(\{ q, layer: key, source: 'knowledge'/);
 });

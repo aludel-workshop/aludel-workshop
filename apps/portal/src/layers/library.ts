@@ -1,7 +1,7 @@
 import { Component, ElementRef, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
-import { Finding, Insight, LibraryEntry, LibraryRead, ProjectContext, Region, Source, layerLabel, sourceTypeIcon } from './context';
+import { Finding, Insight, LibraryEntry, LibraryRead, ProjectContext, Region, Source, layerLabel, libraryKindLabel, sourceTypeIcon } from './context';
 import { DocsComponent } from './doc-view';
 import { LibraryBindingsComponent } from './library-bindings';
 import { FindingComponent } from './evidence';
@@ -64,7 +64,7 @@ const layerOf: Record<string, string> = { brief_claim: 'product', persona: 'prod
       <p class="lay-eyebrow lay-layer"><mat-icon aria-hidden="true">local_library</mat-icon><a [href]="ctx.link('library', 'layers')" (click)="ctx.go(ctx.link('library', 'layers'), $event)">Library</a> · Layers</p>
       @if (entry(); as e) {
         <h1 tabindex="-1">{{ e.title }}</h1>
-        <p class="lay-muted">{{ e.layer.name }} · {{ kindLabel(e.kind) }} · {{ sourceLabel[e.source] }} · revision {{ e.revision }}
+        <p class="lay-muted">{{ e.layer.name }} · {{ kindLabel(e) }} · {{ sourceLabel[e.source] }}@if (e.revision !== null) { · revision {{ e.revision }} }
           @if (e.currentRevision !== e.revision) { <span class="lay-muted"> (current is {{ e.currentRevision }})</span> }
           @if (e.source === 'output' && ctx.recordHref(e.kind, e.ref); as href) { · <a [href]="href" (click)="ctx.go(href, $event)">Open in {{ e.layer.name }}</a> }</p>
         @if (e.content !== undefined) {
@@ -151,14 +151,14 @@ const layerOf: Record<string, string> = { brief_claim: 'product', persona: 'prod
         <p class="lay-muted">Everything every layer has published: its outputs and its Knowledge (charter, methods, policies), with the Library's own research and documents. Layers and agents read each other here.</p>
         <div class="lay-toolbar">
           <label class="lay-search2"><mat-icon aria-hidden="true">search</mat-icon><span class="visually-hidden">Search the Library</span><input type="search" [ngModel]="lq()" (ngModelChange)="lq.set($event)" placeholder="Search every layer"></label>
-          <label>Layer<select [ngModel]="llayer()" (ngModelChange)="llayer.set($event)"><option value="">Any layer</option>@for (entry of installed(); track entry.key) { <option [value]="entry.key">{{ entry.name }}</option> }<option value="library">Library</option></select></label>
-          <label>Show<select [ngModel]="lsource()" (ngModelChange)="lsource.set($event)"><option value="">Everything</option><option value="output">Outputs</option><option value="knowledge">Knowledge</option><option value="library">Research and documents</option></select></label>
+          <label>Layer<select [ngModel]="llayer()" (ngModelChange)="llayer.set($event)"><option value="">Any layer</option>@for (entry of installed(); track entry.key) { <option [value]="entry.key">{{ entry.name }}</option> }<option value="library">Library</option><option value="work">Work</option></select></label>
+          <label>Show<select [ngModel]="lsource()" (ngModelChange)="lsource.set($event)"><option value="">Everything</option><option value="output">Outputs</option><option value="knowledge">Knowledge</option><option value="work">Work items</option><option value="library">Research and documents</option></select></label>
           <span class="lay-muted small" role="status">{{ found().total }} {{ found().total === 1 ? 'entry' : 'entries' }}</span>
         </div>
         <div class="lay-card lay-flush">
           @for (e of found().results; track e.ref) {
             <a class="lay-insrow" [href]="entryLink(e)" (click)="ctx.go(entryLink(e), $event)"><strong>{{ e.title }}</strong>
-              <span class="lay-meta3"><span>{{ e.layer.name }}</span><span>{{ kindLabel(e.kind) }}</span><span>{{ sourceLabel[e.source] }}</span><span>rev {{ e.revision }}</span></span>
+              <span class="lay-meta3"><span>{{ e.layer.name }}</span><span>{{ kindLabel(e) }}</span><span>{{ sourceLabel[e.source] }}</span>@if (e.heading) { <span>{{ e.heading }}</span> }@if (e.revision !== null) { <span>rev {{ e.revision }}</span> }</span>
               @if (lq().trim().length > 1 && e.excerpt) { <small class="lay-muted">{{ e.excerpt }}</small> }</a>
           } @empty { <p class="lay-muted lay-pad">{{ searchError() || 'Nothing matches.' }}</p> }
           @if (found().nextCursor !== null) { <button type="button" class="lay-link-button lay-pad" (click)="more()">Show more</button> }
@@ -213,12 +213,17 @@ export class LibraryComponent {
   readonly layers = ['product', 'design', 'pages', 'data', 'work'];
   readonly view = computed(() => { const segment = this.ctx.segments()[1] || 'insights'; return ['insight', 'source', 'sources', 'docs', 'layers', 'bindings', 'entry'].includes(segment) ? segment : 'insights'; });
   // Layers: the pooled index, searched on the server as filters change.
-  readonly sourceLabel: Record<string, string> = { output: 'Output', knowledge: 'Knowledge', library: 'Library' };
+  readonly sourceLabel: Record<string, string> = { output: 'Output', knowledge: 'Knowledge', library: 'Library', work: 'Work' };
   readonly installed = computed(() => this.ctx.layerInstances().filter(layer => layer.enabled));
   readonly lq = signal(''); readonly llayer = signal(''); readonly lsource = signal('');
   readonly found = signal<{ results: LibraryEntry[]; total: number; nextCursor: number | null }>({ results: [], total: 0, nextCursor: null });
   readonly searchError = signal('');
   private searchSeq = 0;
+  // The top bar's "See all" opens this view with its query.
+  private readonly queryEffect = effect(() => {
+    const q = new URLSearchParams(this.ctx.query()).get('q');
+    if (this.view() === 'layers' && q) untracked(() => { this.lq.set(q); this.llayer.set(''); this.lsource.set(''); });
+  });
   private readonly searchEffect = effect(onCleanup => {
     if (this.view() !== 'layers' || !this.ctx.projectId()) return;
     const q = this.lq().trim(), layer = this.llayer(), source = this.lsource();
@@ -234,8 +239,8 @@ export class LibraryComponent {
     }, (error: Error) => { if (seq === this.searchSeq) { this.searchError.set(error.message); this.found.set({ results: [], total: 0, nextCursor: null }); } });
   }
   more() { const q = this.lq().trim(); this.runSearch({ q: q.length > 1 ? q : '', layer: this.llayer(), source: this.lsource() }, true); }
-  entryLink(entry: LibraryEntry) { return this.ctx.link('library', 'entry', entry.ref); }
-  kindLabel(kind: string) { return kind.replaceAll('_', ' '); }
+  entryLink(entry: LibraryEntry) { return this.ctx.entryHref(entry); }
+  kindLabel(entry: Pick<LibraryEntry, 'kind' | 'source'>) { return libraryKindLabel(entry); }
   readonly entry = signal<LibraryRead | null>(null);
   readonly entryError = signal('');
   private readonly entryEffect = effect(() => {
@@ -253,11 +258,22 @@ export class LibraryComponent {
   readonly source = computed(() => this.view() === 'source' ? this.ctx.sourceById().get(this.ctx.segments()[2] || '') || null : null);
   readonly q = signal(''); readonly layer = signal(''); readonly tag = signal(''); readonly sort = signal('used');
   readonly tags = computed(() => [...new Set((this.ctx.data()?.insights || []).flatMap(insight => insight.tags))].sort());
+  // W-10: the search is the Library's (insights and findings are its own content); an insight shows when it or one of its findings matches.
+  readonly researchHits = signal<Set<string> | null>(null);
+  private researchSeq = 0;
+  private readonly researchEffect = effect(onCleanup => {
+    const term = this.q().trim();
+    if (term.length < 2 || !this.ctx.projectId()) { this.researchHits.set(null); return; }
+    const seq = ++this.researchSeq;
+    const timer = setTimeout(() => untracked(() => this.ctx.librarySearch({ q: term, source: 'library', limit: 100 })
+      .then(result => { if (seq === this.researchSeq) this.researchHits.set(new Set(result.results.map(entry => entry.ref))); }, () => { if (seq === this.researchSeq) this.researchHits.set(new Set()); })), 200);
+    onCleanup(() => clearTimeout(timer));
+  });
   readonly insights = computed(() => {
-    const term = this.q().trim().toLowerCase();
+    const hits = this.researchHits();
     const rank: Record<string, number> = { strong: 0, moderate: 1, weak: 2 };
     const list = (this.ctx.data()?.insights || []).filter(insight => {
-      if (term && !(insight.text.toLowerCase().includes(term) || insight.tags.some(entry => entry.includes(term)) || insight.findings.some(id => this.ctx.findingById().get(id)?.text.toLowerCase().includes(term)))) return false;
+      if (hits && !(hits.has(insight.id) || insight.findings.some(id => hits.has(id)))) return false;
       if (this.layer() && !this.ctx.usedIn(insight.id).some(link => layerOf[this.ctx.refInfo(link.recordId)?.kind || ''] === this.layer())) return false;
       return !this.tag() || insight.tags.includes(this.tag());
     });

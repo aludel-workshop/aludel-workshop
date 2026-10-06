@@ -1,8 +1,8 @@
 import { NgTemplateOutlet } from '@angular/common';
-import { Component, computed, effect, inject, input, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
-import { ProjectContext } from './context';
+import { LibraryEntry, ProjectContext, headingAnchor } from './context';
 import { setupProgress } from './layer-nav';
 import { renderMarkdown } from './markdown-layer';
 
@@ -91,8 +91,8 @@ function collapse(lines: DiffLine[]): DiffLine[] {
         <input type="search" [placeholder]="'Search ' + s.layer.name + ' knowledge'" [ngModel]="query()" (ngModelChange)="query.set($event)"></label>
       @if (query().trim()) {
         <ul class="kn-results" aria-label="Search results">
-          @for (hit of results(); track hit.link) { <li><a [href]="hit.href" (click)="nav($event, hit.kind, hit.key)">{{ hit.title }}<small>{{ hit.where }}</small></a></li> }
-          @empty { <li class="lay-muted small">Nothing matches.</li> }
+          @for (hit of results(); track hit.link) { <li><a [href]="hit.href" (click)="menu.set(false); ctx.go(hit.href, $event)">{{ hit.title }}<small>{{ hit.where }}</small></a></li> }
+          @empty { <li class="lay-muted small">{{ query().trim().length > 1 && docHits() === null ? 'Searching…' : 'Nothing matches.' }}</li> }
         </ul>
       } @else {
         <h2 class="kn-sec">Docs</h2>
@@ -405,10 +405,33 @@ export class LayerKnowledgeComponent {
     if (kind === 'binding' && b) return [['kn-what', 'What it binds'], ...(b.effects?.length ? [['kn-changes', 'What changes'] as [string, string]] : []), ...(b.events?.length ? [['kn-activity', 'Activity'] as [string, string]] : [])];
     return [];
   });
+  // W-10: docs are found by the Library's search (this layer's Knowledge, body text included, opening at the matching
+  // section); the information tree is filtered here, as navigation.
+  readonly docHits = signal<LibraryEntry[] | null>(null);
+  private docSeq = 0;
+  private readonly docSearch = effect(onCleanup => {
+    const q = this.query().trim(), key = this.layerKey();
+    this.docHits.set(null);
+    if (q.length < 2 || !key || !this.ctx.projectId()) return;
+    const seq = ++this.docSeq;
+    const timer = setTimeout(() => untracked(() => this.ctx.librarySearch({ q, layer: key, source: 'knowledge', limit: 20 })
+      .then(result => { if (seq === this.docSeq) this.docHits.set(result.results); }, () => { if (seq === this.docSeq) this.docHits.set([]); })), 200);
+    onCleanup(() => clearTimeout(timer));
+  });
+  // A link to a doc's section (#anchor) scrolls to that heading once the doc is shown.
+  private readonly toSection = effect(() => {
+    const anchor = this.ctx.fragment(), doc = this.doc();
+    if (!anchor || !doc?.exists) return;
+    setTimeout(() => {
+      const heading = [...document.querySelectorAll<HTMLElement>('.kn-md h1, .kn-md h2, .kn-md h3, .kn-md h4, .kn-md h5, .kn-md h6')].find(element => headingAnchor(element.textContent || '') === anchor);
+      if (!heading) return;
+      heading.tabIndex = -1; heading.classList.add('kn-target'); heading.scrollIntoView({ block: 'start' }); heading.focus({ preventScroll: true });
+    });
+  });
   readonly results = computed(() => {
     const q = this.query().trim().toLowerCase();
     if (!q) return [];
-    const docs = (this.site()?.docs || []).filter(doc => doc.title.toLowerCase().includes(q)).map(doc => ({ kind: 'doc', key: docName(doc.path), title: doc.title, where: doc.group || 'Docs', link: `d:${doc.path}`, href: this.link('doc', docName(doc.path)) }));
+    const docs = (this.docHits() || []).map(entry => ({ kind: 'doc', key: entry.ref, title: entry.title, where: [entry.heading, entry.excerpt].filter(Boolean).join(' · ') || 'Docs', link: entry.ref, href: this.ctx.entryHref(entry) }));
     const nodes = this.allNodes().filter(node => `${node.title} ${node.intent}`.toLowerCase().includes(q)).map(node => ({ kind: 'node', key: node.key, title: node.title, where: 'Information', link: `n:${node.key}`, href: this.link('node', node.key) }));
     return [...docs, ...nodes];
   });

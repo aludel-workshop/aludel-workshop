@@ -165,3 +165,25 @@ The owner approved the spec without changing either open point, so the defaults 
 **Development tier** (templates on, the 27 affected files at concurrency 3): 163 of 171 passed and 4 failed.
 - **Fixed:** `symphony-proposals` "a cited Knowledge revision gates acceptance". With a repository, Vision's charter is `k:product:knowledge/charter.md`, as its Knowledge tab shows it. The test now takes either ref, and in the repository case the charter changes through a Knowledge save that moves the pin. It passes with templates on and off.
 - **Also failing on the unchanged base:** the other three (`runner ENOENT` twice, and a worker run that fails to start). They were run on `6a3e964` in a scratch worktree with the same result: the known Docker-only F30 failures, and this container has no Docker.
+
+## #3 build: every portal search box on the Library (2026-10-06)
+
+**What was built:**
+- **Top bar** ("Search every layer"): calls the Library's search, with a 200 ms debounce instead of filtering the browser's copy of `ctx.data()`.
+  - Results are grouped by layer in the order of each group's best match, up to five per group, each with its kind, the matching section and an excerpt.
+  - "See all N in the Library" opens Library › Layers with `?q=`.
+- **Library › Layers:** a Work filter (layer and source), section headings, revisions only where an entry has one, and each row opens where the entry lives (`ctx.entryHref`) instead of always on the Library entry page.
+- **Library › Research:** the insight search uses the Library (`source=library`); an insight shows when it or one of its findings matches.
+- **A layer's Knowledge tab:** the doc search uses the Library (that layer's Knowledge, body text included) and opens a doc at the matching section. Filtering the information tree stays, because it's navigation.
+- **Links and sections:** links carry `#anchor`. `ctx.go` keeps the fragment and query apart from the path, and the doc view scrolls to and highlights the heading with that anchor. `headingAnchor` is the same rule on server and client. Angular strips `id` from `innerHTML`, so the heading is found by its text.
+
+**Checks:**
+- **Static rule:** it now covers `src/` too. Pickers and navigation filters are named as allowed: the Code file finder, the token, icon and journey pickers, and a layer's information tree.
+- **`library-browser`** (templates on) passes. New steps:
+  - top bar at 1440 and 390 wide: body text, a work item found by its brief, excerpts, no horizontal scroll, axe on the top bar;
+  - "See all" opens Library › Layers with the query, and the work item opens from there;
+  - a Vision charter section found from the top bar opens at that heading, below the sticky bar, with axe.
+- **Defect the journey found:** "See all" cleared the query before building its link.
+- **Defect screenshots found:** the opened heading sat under the sticky top bar, so the scroll margin is now 96 px and the journey asserts it.
+- **Other journeys:** `data-layer` and `design-layer` pass. `vision-layer` failed once, on a disabled "Add activity" button before any search step, then passed twice with no change. It also passes on the unchanged base, so it's flaky under load and not caused by W-10.
+- **Server tests:** typecheck passes (warnings only, all already there); `library-search` and `library` pass with templates on and off.

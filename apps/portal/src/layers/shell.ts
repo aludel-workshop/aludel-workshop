@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, OnInit, computed, effect, inject, input, signal } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { Session } from '../onboarding-model';
@@ -6,7 +6,7 @@ import { contrastText, readableAccent } from '../color';
 import { DomSanitizer } from '@angular/platform-browser';
 import { personAvatar } from '../avatars';
 import { AvatarEditorComponent } from './avatar-editor';
-import { PersonAvatar, ProjectContext, dataStatusLabel, phaseName, sectionTitle, statusLabel, unitStateLabel, workStatusLabel } from './context';
+import { LibraryEntry, PersonAvatar, ProjectContext, libraryKindLabel } from './context';
 import { DesignLayerComponent } from './design';
 import { PagesLayerComponent } from '../installed/pages/pages';
 import { LayerFrameComponent } from './layer-frame';
@@ -84,12 +84,13 @@ const localLayers = [{ id: 'product', icon: 'lightbulb', label: 'Vision' }, { id
           <mat-icon aria-hidden="true">search</mat-icon>
           <label class="visually-hidden" for="lay-q">Search every layer</label>
           <input id="lay-q" type="search" [(ngModel)]="query" (ngModelChange)="q.set($event)" placeholder="Search stories, pages, data, code, work…" autocomplete="off">
-          @if (q().trim()) {
-            <div class="lay-results">
+          @if (q().trim().length > 1) {
+            <div class="lay-results" aria-label="Search results">
               @for (group of results(); track group.label) {
                 <h3>{{ group.label }}</h3>
-                @for (hit of group.hits; track hit.href) { <a [href]="hit.href" (click)="query = ''; q.set(''); ctx.go(hit.href, $event)"><span>{{ hit.text }}</span><small>{{ hit.sub }}</small></a> }
-              } @empty { <p class="lay-muted">Nothing matches.</p> }
+                @for (hit of group.hits; track hit.ref) { <a [href]="hit.href" (click)="clearSearch(); ctx.go(hit.href, $event)"><span class="lay-hit"><span>{{ hit.text }}</span>@if (hit.excerpt) { <small class="lay-hit-excerpt">{{ hit.excerpt }}</small> }</span><small>{{ hit.sub }}</small></a> }
+              } @empty { <p class="lay-muted">{{ searching() ? 'Searching…' : searchError() || 'Nothing matches.' }}</p> }
+              @if (found().total) { <a class="lay-results-all" [href]="allHref()" (click)="ctx.go(allHref(), $event); clearSearch()">See all {{ found().total }} in the Library</a> }
             </div>
           }
         </div>
@@ -205,29 +206,35 @@ export class ProjectShellComponent implements OnInit {
   readonly currentPhase = computed(() => this.ctx.layerInstances().some(layer => layer.key === 'product' && layer.enabled) ? this.ctx.data()?.phases.find(phase => phase.current)?.label || '' : '');
   readonly activeLayerCount = computed(() => this.ctx.layerInstances().filter(layer => layer.enabled).length);
   // Milestones replaced phases in the language (ROADMAP-01).
-  readonly results = computed(() => {
-    const term = this.q().trim().toLowerCase(); const data = this.ctx.data();
-    if (!term || !data) return [];
-    const groups = [
-      { label: 'Brief', hits: data.claims.map(claim => ({ text: claim.text, sub: sectionTitle(claim.section), href: this.ctx.link('product', 'brief', claim.id) })) },
-      { label: 'Library', hits: [...data.insights.map(insight => ({ text: insight.text, sub: 'Insight', href: this.ctx.link('library', 'insight', insight.id) })), ...data.sources.map(source => ({ text: source.title, sub: source.type, href: this.ctx.link('library', 'source', source.id) }))] },
-      { label: 'Projects', hits: data.projects.map(project => ({ text: `${project.ref} ${project.title}`, sub: phaseName(project.milestone), href: this.ctx.link('work', 'projects', project.id) })) },
-      { label: 'Story map', hits: data.stories.map(story => ({ text: `${story.ref} ${story.title}`, sub: statusLabel[story.status], href: this.ctx.link('product', 'map', story.id) })) },
-      { label: 'Documents', hits: data.docs.map(doc => ({ text: doc.title, sub: doc.form === 'generated' ? 'Generated' : 'Written', href: this.ctx.link('product', 'docs', doc.id) })) },
-      { label: 'Pages', hits: data.pages.map(page => ({ text: `${page.label} page`, sub: page.origin, href: this.ctx.link('pages', 'page', page.id) })) },
-      { label: 'Data', hits: [...data.objects.map(object => ({ text: `${object.name} object`, sub: dataStatusLabel[object.status], href: this.ctx.link('data', 'objects', object.id) })),
-        ...data.operations.map(op => ({ text: `${op.method} ${op.path}`, sub: `${op.operationId} · ${op.summary}`, href: this.ctx.link('data', 'api', op.id) }))] },
-      { label: 'Code', hits: data.code.units.filter(unit => unit.kind !== 'const').map(unit => ({ text: unit.symbol, sub: `${unit.path} · ${unitStateLabel[unit.state]}`, href: this.ctx.link('platform', 'explorer', unit.id) })) },
-      { label: 'Work', hits: data.work.map(item => ({ text: `${item.ref} ${item.title}`, sub: workStatusLabel[item.status], href: this.ctx.link('work', 'items', item.id) })) }
-    ];
-    const ownerByGroup: Record<string, string> = { Brief: 'product', Projects: 'product', 'Story map': 'product', Documents: 'product', Pages: 'pages', Data: 'data', Code: 'platform' };
-    const active = new Set(this.ctx.layerInstances().filter(item => item.enabled).map(item => item.key));
-    return groups.filter(group => !ownerByGroup[group.label] || active.has(ownerByGroup[group.label]))
-      .map(group => ({ ...group, hits: group.hits.filter(hit => `${hit.text} ${hit.sub}`.toLowerCase().includes(term)).slice(0, 5) })).filter(group => group.hits.length);
+  // W-10: the top bar is the Library's search, grouped by layer in the order of the best match in each.
+  readonly found = signal<{ results: LibraryEntry[]; total: number }>({ results: [], total: 0 });
+  readonly searching = signal(false);
+  readonly searchError = signal('');
+  private searchSeq = 0;
+  private readonly searchEffect = effect(onCleanup => {
+    const term = this.q().trim();
+    if (term.length < 2 || !this.ctx.projectId()) { this.found.set({ results: [], total: 0 }); return; }
+    this.searching.set(true);
+    const seq = ++this.searchSeq;
+    const timer = setTimeout(() => untracked(() => this.ctx.librarySearch({ q: term }).then(result => {
+      if (seq !== this.searchSeq) return;
+      this.searching.set(false); this.searchError.set(''); this.found.set(result);
+    }, (error: Error) => { if (seq === this.searchSeq) { this.searching.set(false); this.searchError.set(error.message); this.found.set({ results: [], total: 0 }); } })), 200);
+    onCleanup(() => clearTimeout(timer));
   });
+  readonly results = computed(() => {
+    const groups = new Map<string, { label: string; hits: { ref: string; text: string; sub: string; excerpt: string; href: string }[] }>();
+    for (const entry of this.found().results) {
+      const group = groups.get(entry.layer.name) || groups.set(entry.layer.name, { label: entry.layer.name, hits: [] }).get(entry.layer.name)!;
+      if (group.hits.length < 5) group.hits.push({ ref: entry.ref, text: entry.title, sub: [libraryKindLabel(entry), entry.heading].filter(Boolean).join(' › '), excerpt: entry.excerpt, href: this.ctx.entryHref(entry) });
+    }
+    return [...groups.values()];
+  });
+  allHref() { return `${this.ctx.link('library', 'layers')}?q=${encodeURIComponent(this.q().trim())}`; }
+  clearSearch() { this.query = ''; this.q.set(''); }
 
   constructor() {
-    window.addEventListener('popstate', () => this.ctx.path.set(location.pathname));
+    window.addEventListener('popstate', () => { this.ctx.path.set(location.pathname); this.ctx.fragment.set(decodeURIComponent(location.hash.slice(1))); this.ctx.query.set(location.search); });
     // Operations, Knowledge and Setup links from before the layer bar open their new places.
     effect(() => { const next = this.localLayer() ? legacyLayerPath(this.ctx.segments()) : null; if (next) { const path = this.ctx.link(...next); history.replaceState({}, '', path); this.ctx.path.set(path); } });
     effect(() => { if (this.ctx.segments()[0] === 'product') { const path = this.ctx.link(...this.ctx.segments()); history.replaceState({}, '', path); this.ctx.path.set(path); } });
