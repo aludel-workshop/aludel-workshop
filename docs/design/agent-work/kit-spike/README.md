@@ -11,7 +11,7 @@
 
 Rerun: `node generate-kit.mjs [design.json] && node capture.mjs`.
 
-**Input (limitation):** Biome's own Design records aren't reachable from the item container, so the owner was asked on #1. The stand-in is the Aludel template seed with the sleek-saas Look. These are this project's records, unchanged since seeding. Biome's primary colour on screen (#2f45b8) matches sleek-saas's accent (#3047b9), so Biome most likely started from the same records. If Biome's records were edited, rerun with the export. Only the colour, type and shape rows below could change.
+**Input (limitation):** Biome's own Design records aren't reachable from the item container, so the owner was asked on #1. The stand-in is the Aludel template seed with the sleek-saas Look. These are this project's records, unchanged since seeding. Biome's primary colour on screen (#2f45b8) matches sleek-saas's accent (#3047b9), so Biome most likely started from the same records. If Biome's records were edited, rerun with the export. Only the colour, type and shape rows below could change. *The owner chose this stand-in on #1 (2026-10-06: "Use this project's records for the spike").*
 
 ## Result
 

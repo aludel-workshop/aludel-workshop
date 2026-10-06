@@ -886,3 +886,12 @@ Authorization: the owner created W-29 from W-27 #8's proposal, started it in the
 - **Checked:** the kit and the three pages run with no script errors at 1280 and 390 px. The setup screen's structure rebuilds; the world map has no element. The look diverges in colour, type and shape, and three components have no contract.
 - **Verdict:** the generator holds. Biome's look lives in its code, not its Design records, so fidelity depends on the binding's drift handling (adopt writes back to Design). #2 takes three contract additions from this.
 - **Waits on the owner:** Biome's own Design records (asked on #1). The spike used this project's seed, which Biome's primary colour suggests it shares. The export could reverse the verdict.
+
+### W-29 #2: kit contract and Code's binding (2026-10-06)
+
+- **Changed:** [kit-contract.md](kit-contract.md) specifies the kit and Code's binding:
+  - K1–K6: one kit per Design revision, served by digest and copied into the generated repository; elements, attributes, slots and states; contract `demo` and `template`; tokens only; demos.
+  - B1–B6: an `@kit` tag on the component, or a library selector; Code's `ui` facet as a replica in the design-system binding; static drift states; responses (rectify, assess, adopt).
+  - The owner chose this project's records as the spike's stand-in (on #1), so the spike's verdict stands.
+- **Checked:** the spec against the layer contract's facets and drift rules (`layer-base` design, code and pages manifests), `cleanComponent`, the binding core's drift responses, and the code-unit indexer's component detection. It names three defaults for the owner (K1 serving, B1 tags, B4 assess).
+- **Waits on the owner:** the phase 1 gate.
