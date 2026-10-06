@@ -63,6 +63,7 @@ import { commitWorkspace, gitWithToken, initializeAndPush, inspectGitRepository,
 import { getProjectBrand, updateProjectBrand } from './project-brand.mjs';
 import { ensureProductWorkspace, getProductWorkspace, saveProductRecord } from './product-workspace.mjs';
 import { sweepItemVolumes, templateBundle } from './item-environment.mjs';
+import { initProjectRepositories, projectRepositories } from './project-repositories.mjs';
 import { previewTunnels, tunnelProtocol } from './preview-tunnels.mjs';
 
 const portalRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
@@ -206,9 +207,11 @@ for (const projectId of layerProjects()) for (const layer of projectLayerDefinit
 const units = codeUnits({ db });
 const ops = platformOps({ db, backupRoot: join(dataDirectory, 'backups') });
 // T03-CODE: when Code is installed from its template, its repository is the project's own and its outputs live there.
-initCodeRepository(db); initLayerRemotes(db);
+initCodeRepository(db); initLayerRemotes(db); initProjectRepositories(db);
 const codeRepo = codeRepository({ db, units });
 const codeRelease = codeReleases({ db, releasesOf: projectId => codeRepo.releases(projectId) });
+// W-33: the repositories a project owns, kept in its settings; companions are checked with the project's installation token.
+const repositories = projectRepositories({ db, tokenFor: (projectId, remote) => githubTokenFor(github)(projectId, remote) });
 // The Code repository stays in sync with the project's GitHub repository (the existing repository binding, not a second one).
 // Git talks to GitHub with a fresh installation token only; what goes wrong is shown on the layer, never thrown at the person.
 const remotes = layerRemotes({ db,
@@ -672,6 +675,8 @@ async function api(request, response, url) {
     }
     if (path[0] === 'search' && path.length === 1) return json(response, 200, { results: editor.search(projectId, url.searchParams.get('q')) }, { 'cache-control': 'no-store' });
     if (path[0] === 'environment' && path.length === 1) return json(response, 200, editor.environment(editorUser, projectId), { 'cache-control': 'no-store' });
+    // W-33: the repositories an item container checks out beside the project's own, with their lines. URLs only, never a token.
+    if (path[0] === 'repositories' && path.length === 1) return json(response, 200, { repositories: repositories.list(projectId).map(({ access, ...repo }) => ({ ...repo, access: access.state })) }, { 'cache-control': 'no-store' });
     return json(response, 404, { error: 'Not found.' });
   }
   // Symphony host credentials have no browser/session authority. Pool requests resolve their pinned profile per attempt.
@@ -1561,6 +1566,15 @@ async function api(request, response, url) {
       }
     }
     // PLATFORM-UX-01: Code reads the repository; it never edits code. Starter docs fill only missing files.
+    // W-33: the project's repositories. Everyone in the project reads them; the owner adds, changes, checks and removes them.
+    if (section === 'code' && (item === 'repositories' || item === 'repositories-check')) {
+      const owner = () => { if (db.prepare('SELECT role FROM project_members WHERE project_id = ? AND user_id = ?').get(projectId, user.id)?.role !== 'owner') throw Object.assign(new Error('Project owner required.'), { status: 403 }); };
+      if (item === 'repositories' && method === 'GET') return json(response, 200, { repositories: repositories.list(projectId) }, { 'cache-control': 'no-store' });
+      if (item === 'repositories' && method === 'PUT') { owner(); const saved = repositories.save(projectId, await readJson(request)); return json(response, 200, saved.primary ? saved : await repositories.check(projectId, saved.key)); }
+      if (item === 'repositories' && method === 'DELETE') { owner(); return json(response, 200, repositories.remove(projectId, String(url.searchParams.get('key') || ''))); }
+      if (item === 'repositories-check' && method === 'POST') { owner(); return json(response, 200, await repositories.check(projectId, String((await readJson(request)).key || ''))); }
+      return json(response, 405, { error: 'Method not allowed.' });
+    }
     if (section === 'code' && item !== 'index') {
       const workspace = flows.projectSetup(user, projectId).workspacePath;
       if (item === 'files' && method === 'GET') { const files = trackedFiles(workspace); return json(response, 200, { files, stack: readStack(workspace, files) }); }

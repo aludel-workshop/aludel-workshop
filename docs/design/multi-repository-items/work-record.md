@@ -1,7 +1,7 @@
 ---
 id: MULTI-REPO-ITEMS-01
 kind: work-record
-status: spec-in-review
+status: building
 updated: 2026-10-06
 item: W-33
 depends_on: [COLLAB-WORK-01, AGENT-WORK-01]
@@ -172,6 +172,51 @@ Code's repository panel listing the set and its access (§1) isn't an action yet
 - **Q1:** Is the repository set declared in the primary repository's `.aludel/repositories.json`, with the host keeping only access state per repository? *Recommended.* The alternative is portal settings only, which aren't portable between instances.
 - **Q2:** Close-out runs built-in reference checks on the host, plus project-declared check commands in a sealed container. *Recommended.* The alternative is reference checks only, leaving the digest check to the test gate.
 - **Q3:** Is the bundle kept only as a read-only fallback for headless sessions? *Recommended.* The alternative is removing it, so headless sessions can't build templates until A2 has credentials.
+
+## Review / acceptance record
+
+- **Spec (#1, `7bf82ef`):** approved by the owner on 2026-10-06, with these answers in the portal:
+  - **Q1, portal settings only** (overrides the recommendation). The set lives in the portal (`project_repositories`), not in `.aludel/repositories.json`.
+    - Consequence: another instance doesn't learn the set from a clone; it's set up there in settings.
+    - Adding a repository is a settings change by the owner, not item work.
+    - Design §1 stands otherwise. The container reads the set from the portal (`GET /api/editor/repositories`).
+  - **Q2, as recommended:** reference checks on the host, plus project checks in a sealed container.
+  - **Q3, remove the bundle** (overrides the recommendation).
+    - `GET /api/editor/templates` and `aludel templates` go in #6.
+    - Consequence: a headless session (A2) can't check out companions until it has credentials of its own. A2's design has to bring them.
+    - The Symphony worker's `layer-bundle` is a different path, and this answer doesn't cover it.
+- **Re-cut after Q1:**
+  - #2 became "Keep the project's repositories in its settings".
+  - The container checkout moved to a new #8. It was added after #2, so the portal lists #3 after #2, but #8 is done before #3.
+  - The page is in project Settings, not in Code: with templates on, Code's UI comes from `layer-base`'s `code` branch, and the set is host settings rather than a Code record.
+
+## Built
+
+**#2: the project's repositories in its settings.**
+- **Store:** `server/project-repositories.mjs`.
+  - The primary follows the project's repository binding (its key, URL and default line) and keeps only its own pins and checks.
+  - Companions have a key, URL, folder, lines, pins and checks.
+  - Each has an access state from its last check: `ready`, `no-access`, `missing-lines`, `unchecked`, or `local` for a project without GitHub.
+- **Access check:** `git ls-remote` with the project's installation token, for GitHub URLs only. A token that can't be had is `no-access` without any git call.
+- **Validation:**
+  - refuses URLs with credentials, folders outside the project or overlapping another, and branch names git refuses;
+  - refuses pins into an unknown repository, and removing a repository something pins into;
+  - the primary can't be removed.
+- **API:**
+  - `GET|PUT|DELETE /api/projects/:id/code/repositories` and `POST …/repositories-check`. Writes are owner-only.
+  - `GET /api/editor/repositories` lists the set for item containers, with URLs and access state only.
+- **Settings › Repositories** (`src/layers/project-repositories.ts`): the set with access chips, add and edit (pins and close-out checks included), check access, and remove.
+- **Checks:**
+  - `tests/project-repositories.test.mjs`: 5 tests passing.
+  - `tests/project-repositories-browser.mjs`: passing. It covers a fresh project that isn't Aludel, two companions from bare repositories (one reachable, one missing a line), refusal of a URL with credentials, pins and a check on the primary, removal refused while pinned, 390px, and axe.
+  - `npm run typecheck` is clean.
+  - `npm run test:affected -- --concurrency 3`: everything passed except 4 tests.
+    - 3 fail the same way on `main` (`4bf3cbd`, checked in a separate worktree) with `runner ENOENT`: `layer-source.mjs` runs combined layer tests with `docker run`, and this item container has no Docker. They aren't caused by this change.
+    - `security-audit-worker` failed under load and passes alone.
+    - For Q2, close-out's sealed project checks reuse the same `docker run --network none --read-only` pattern on the host. Like those 3, they can only run where Docker is.
+- **Not here yet:**
+  - Aludel's own set (`layer-base` with its seven lines, the `layer-templates.json` pins and the digest check) is entered on the owner's portal once #2 is accepted. That's an owner settings action on the live portal.
+  - The container side is #8.
 
 ## Process note (three lines)
 

@@ -22,6 +22,7 @@ import { MarkdownLayerComponent } from './markdown-layer';
 import { LayerTasksComponent } from './layer-tasks';
 import { LayerManageComponent } from './layer-manage';
 import { LayerKnowledgeComponent } from './layer-knowledge';
+import { ProjectRepositoriesComponent } from './project-repositories';
 import { activeOutputTab, layerColourStyle, layerOutputTabs, layerSpaces, legacyLayerPath, setupProgress } from './layer-nav';
 
 // The rail can shrink to icons (CUSTOM-LAYER-01) so a layer's own sidebars don't stack beside a wide one.
@@ -33,7 +34,7 @@ const localLayers = [{ id: 'product', icon: 'lightbulb', label: 'Vision' }, { id
 // LAY-02: every project's workspace at /p/<slug>/<layer>/<tab>/<id>. The layer comes first (DEC-036).
 @Component({
   selector: 'aludel-project-shell', standalone: true,
-  imports: [FormsModule, MatIconModule, LayerFrameComponent, AvatarEditorComponent, HomeLayerComponent, ProductLayerComponent, DesignLayerComponent, PagesLayerComponent, DataLayerComponent, CodeLayerComponent, DeployLayerComponent, WorkLayerComponent, LibraryComponent, EvidencePanelComponent, MarkdownLayerComponent, LayerTasksComponent, LayerKnowledgeComponent, LayerManageComponent],
+  imports: [FormsModule, MatIconModule, LayerFrameComponent, AvatarEditorComponent, HomeLayerComponent, ProductLayerComponent, DesignLayerComponent, PagesLayerComponent, DataLayerComponent, CodeLayerComponent, DeployLayerComponent, WorkLayerComponent, LibraryComponent, EvidencePanelComponent, MarkdownLayerComponent, LayerTasksComponent, LayerKnowledgeComponent, LayerManageComponent, ProjectRepositoriesComponent],
   providers: [ProjectContext],
   template: `
   <a class="skip-link" href="#lay-main">Skip to content</a>
@@ -150,7 +151,8 @@ const localLayers = [{ id: 'product', icon: 'lightbulb', label: 'Vision' }, { id
                 <section class="lay-card"><h2>Work style</h2><p>New layers use this style to seed action defaults. Existing assignments stay as they are.</p>
                 <label for="project-work-style">Style</label><select id="project-work-style" [value]="ctx.setup()?.workStyle || 'planner'" (change)="saveWorkStyle($event)">
                   <option value="dreamer">Dreamer</option><option value="planner">Planner</option><option value="tinkerer">Tinkerer</option></select>
-                <p class="lay-muted">Set each action’s default assignee in its layer’s Operations tab. Work shows tasks and assignments across layers.</p></section></div>
+                <p class="lay-muted">Set each action’s default assignee in its layer’s Operations tab. Work shows tasks and assignments across layers.</p></section>
+                <aludel-project-repositories class="lay-wide" /></div>
             }
             @case ('account') {
               <p class="lay-eyebrow">Account</p><h1 tabindex="-1">{{ user()?.name }}</h1>
