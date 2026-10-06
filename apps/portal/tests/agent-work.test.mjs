@@ -67,12 +67,20 @@ test('a goal item is defined in phases, starts deliberately, and gates later act
   assert.match(defined.actions[2].blocked, /review gate after Specify/);
 
   assert.throws(() => work.move(ada, id, workId, 'progress'), /Choose who works/, 'starting needs someone on it');
+  // W-8, the board's move rules: Draft ⇄ Ready; Ready → In progress only; nothing skips a column or drags to Done.
+  assert.throws(() => work.move(ada, id, workId, 'review'), /Only an item in progress/, 'Ready can\'t skip to review');
+  assert.throws(() => work.move(ada, id, workId, 'done'), /closes from the item/, 'nothing reaches Done by moving');
+  assert.equal(work.move(ada, id, workId, 'draft').item.board, 'draft', 'a Ready item goes back to Draft');
+  assert.throws(() => work.move(ada, id, workId, 'progress'), /Only a Ready item can start/, 'Draft can\'t skip to In progress');
+  assert.equal(work.move(ada, id, workId, 'ready').item.board, 'ready', 'a defined Draft moves to Ready');
   assert.throws(() => work.claim(ben, id, workId), status(404), 'only members see the item');
   work.claim(ada, id, workId);
   assert.throws(() => work.assertPerformer(ben, id, workId), status(404));
   assert.throws(() => work.updateAction(agent, id, workId, 1, { state: 'working' }), /Start/, 'nothing works before Start');
   const started = work.move(ada, id, workId, 'progress');
   assert.equal(started.item.board, 'progress');
+  assert.throws(() => work.move(ada, id, workId, 'draft'), /has started/, 'a started item can\'t go back to Draft');
+  assert.throws(() => work.move(ada, id, workId, 'ready'), /can't move back to Ready/);
   assert.equal(started.performer, 'local');
 
   // The gate holds phase 2 back; phase 1's actions run side by side.
@@ -116,6 +124,9 @@ test('a goal item is defined in phases, starts deliberately, and gates later act
 
   const listed = work.goals(id, { assignedTo: ada.id });
   assert.deepEqual(listed.map(item => [item.ref, item.board]), [[ref, 'progress']]);
+  const named = [...new Set(work.view(id, workId).actions.filter(action => action.state !== 'proposed' && action.layer).map(action => action.layer))].sort();
+  assert.ok(named.length, 'the fixture names at least one layer');
+  assert.deepEqual(listed[0].layers, named, 'the board card shows the layers its actions name');
   assert.equal(know.workList(id).find(item => item.id === workId).board, 'progress', 'every item carries its board column');
   assert.ok(work.view(id, workId).events.some(event => event.text === 'Answered: Yes'), 'the thread keeps the answer');
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM layer_work_items WHERE project_id = ? AND work_scope = ?').get(id, 'goal').n, 1);

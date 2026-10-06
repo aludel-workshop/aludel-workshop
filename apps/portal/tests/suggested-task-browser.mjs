@@ -151,10 +151,10 @@ try{
  await page.evaluate(readFileSync('node_modules/axe-core/axe.min.js','utf8'));assert.deepEqual(await page.evaluate(async()=>(await window.axe.run(document.querySelector('.wr'),{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}})).violations.map(v=>({id:v.id,targets:v.nodes.map(n=>n.target)}))),[]);
 
  await page.goto(`${portal}/p/${project.slug}/pages/tasks/board`);
- await page.getByRole('tab',{name:/Backlog/}).click();
- await page.getByRole('group',{name:'Filter by assignee'}).getByRole('button',{name:'All',exact:true}).click();
- await page.getByText(created.title,{exact:true}).waitFor();
- await page.reload();await page.getByRole('tab',{name:/Backlog/}).click();await page.getByText(created.title,{exact:true}).waitFor();
+ // W-8: placed in Draft, it shows in the Board's Draft column (the Backlog tab and its assignee buttons went with the old board).
+ const draftCol=page.locator('aludel-work-board .lay-kb-col[data-col="draft"]');
+ await draftCol.getByText(created.title,{exact:true}).waitFor();
+ await page.reload();await draftCol.getByText(created.title,{exact:true}).waitFor();
  await page.screenshot({path:out+'/05-pages-backlog.png'});
  }
  assert.deepEqual(errors,[]);

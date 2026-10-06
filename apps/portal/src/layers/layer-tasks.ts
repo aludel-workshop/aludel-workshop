@@ -9,7 +9,7 @@ import { WorkCreateComponent } from './work-create';
 import { pollLiveBatches } from './work-shared';
 
 // CUSTOM-LAYER-01 Tasks: the Work layer's own pieces, scoped to one layer, so a task looks and behaves the same in both
-// places. Board is Work's board (batches, cards, Queue/Backlog/Done); Actions is the Work › Roles composition; Routines
+// places. Board is Work's Kanban board filtered to this layer (W-8); Actions is the Work › Roles composition; Routines
 // is a list with a page per routine. A left sidebar, like Manage's, picks the section so there is no second tab row.
 @Component({
   selector: 'aludel-layer-tasks', standalone: true, imports: [MatIconModule, WorkBoardComponent, WorkCreateComponent, LayerAccessComponent, LayerActionsComponent, LayerRoutinesComponent],

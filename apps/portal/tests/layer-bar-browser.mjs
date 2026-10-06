@@ -74,8 +74,8 @@ try {
   // DEC-057: a layer-scoped Pages (its template publishes an API) shows Access instead of an action list.
   const scoped = Boolean((await request('GET', `/api/projects/${project.id}/layer-instances`)).layers.find(entry => entry.key === 'pages')?.workScope);
   assert.deepEqual(sectionNames, ['Board', scoped ? 'Access' : 'Actions', 'Routines', 'All work']);
-  await page.locator('aludel-layer-tasks aludel-work-board .lay-lanes').waitFor();
-  await page.locator('.lay-lane', { hasText: 'Your batch' }).waitFor();
+  await page.locator('aludel-layer-tasks aludel-work-board .lay-kb').waitFor();
+  await page.locator('aludel-layer-tasks .lay-kb-col[data-col="draft"]').waitFor();
   await shot('02-pages-tasks');
   await audit('Pages tasks');
 
@@ -92,7 +92,7 @@ try {
   await page.getByRole('button', { name: 'Create', exact: true }).click();
   await page.waitForURL(/\/work\/item\//);
   await page.goto(origin + base + '/pages/tasks');
-  const card = page.locator('aludel-work-card', { hasText: 'Check the checkout flow' });
+  const card = page.locator('aludel-layer-tasks .lay-kb-card', { hasText: 'Check the checkout flow' });
   await card.waitFor();
   if (scoped) {
     await tasksNav.getByRole('link', { name: /^Access/ }).click();
