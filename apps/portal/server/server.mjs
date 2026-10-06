@@ -62,6 +62,7 @@ import { loadGitHubVendorConfig } from './github-vendor-config.mjs';
 import { commitWorkspace, gitWithToken, initializeAndPush, inspectGitRepository, loadGitProfile, pushWorkspace } from './git-repository.mjs';
 import { getProjectBrand, updateProjectBrand } from './project-brand.mjs';
 import { ensureProductWorkspace, getProductWorkspace, saveProductRecord } from './product-workspace.mjs';
+import { sweepItemVolumes, templateBundle } from './item-environment.mjs';
 
 const portalRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const repositoryRoot = resolve(portalRoot, '../..');
@@ -604,6 +605,12 @@ async function api(request, response, url) {
     // An item container's token is for its one item, and stops when the item closes.
     if (scope && goals.view(projectId, scope).item.board === 'done') return json(response, 401, { error: 'This item is closed; its container is done.' });
     const path = url.pathname.slice('/api/editor/'.length).split('/').map(decodeURIComponent);
+    // W-8 attempt 2, E1: the layer templates an item container's branch pins (`aludel templates`), as a Git bundle.
+    if (path[0] === 'templates' && path.length === 1 && request.method === 'GET') {
+      const body = templateBundle(url.searchParams.getAll('pin').map(value => { const [branch, commit] = value.split('@'); return { branch, commit }; }));
+      response.writeHead(200, { 'content-type': 'application/octet-stream', 'content-length': body.length, 'cache-control': 'no-store' });
+      return response.end(body);
+    }
     if (path[0] === 'goals' || path[0] === 'stack') {
       const done = (status, value) => json(response, status, value, { 'cache-control': 'no-store' });
       const agent = { kind: 'agent', id: editorUser.id, name: `${editorUser.name}'s local agent` };
@@ -617,7 +624,11 @@ async function api(request, response, url) {
       // assigns instead (people, or later remote agents).
       if (path[2] === 'claim' && path.length === 3 && request.method === 'POST') return done(200, goals.claim(editorUser, projectId, workId));
       goals.assertPerformer(editorUser, projectId, workId);
-      const [operation, sub] = path.slice(2);
+      const [operation, sub, part] = path.slice(2);
+      // E3: an action's proposed work items (goals/:id/actions/:n/proposals).
+      if (operation === 'actions' && sub && part === 'proposals' && path.length === 5 && request.method === 'POST')
+        return done(201, { proposals: goals.proposeItems(agent, projectId, workId, Number(sub), await readJson(request)).actions.find(action => action.number === Number(sub)).proposals }); // F14: just what changed
+      if (path.length > 4) return json(response, 404, { error: 'Not found.' });
       if (request.method === 'GET' && !operation) return done(200, goals.view(projectId, workId));
       if (request.method === 'GET' && operation === 'changeset' && !sub) return done(200, { changeset: goals.changeset(projectId, workId) });
       if (request.method === 'GET' && operation === 'read' && !sub)
@@ -1159,8 +1170,17 @@ async function api(request, response, url) {
     const result = await acceptCandidate(user, projectId, candidateId, input.commit);
     return json(response, result.status, result.body, { 'cache-control': 'no-store' });
   }
+  // W-8 attempt 2, E2: closed items' container volumes go (archived items count as closed), noted on the item that closed.
+  const sweepClosedVolumes = (projectId, workId = null) => {
+    const slug = db.prepare('SELECT slug FROM projects WHERE id = ?').get(projectId)?.slug || 'project';
+    const open = new Set(know.workList(projectId).filter(item => item.state !== 'done').map(item => item.ref));
+    const swept = sweepItemVolumes(slug, ref => !open.has(ref));
+    if (workId && swept.removed.length) goals.notePush(projectId, workId, `Removed ${swept.removed.length === 1 ? 'its container volume' : `${swept.removed.length} container volumes`} (${swept.removed.join(', ')})`);
+    if (workId && swept.kept.length) goals.notePush(projectId, workId, `Kept ${swept.kept.map(entry => `${entry.volume}: ${entry.reason}`).join('; ')}. It goes at the next close-out or Open in a container once that's stopped.`);
+    return swept;
+  };
   // AGENT-WORK-01 A1: goal items. People drive them here; their local agent works on them through /api/editor/goals.
-  const goalRoute = /^\/api\/projects\/([^/]+)\/goals(?:\/([^/]+)(?:\/(define|move|claim|assign|container|connections|actions|events|answer|review|close|stream|read)(?:\/([^/]+))?)?)?$/.exec(url.pathname);
+  const goalRoute = /^\/api\/projects\/([^/]+)\/goals(?:\/([^/]+)(?:\/(define|move|claim|assign|container|connections|actions|events|answer|review|proposals|close|stream|read)(?:\/([^/]+))?)?)?$/.exec(url.pathname);
   if (goalRoute) {
     const [, rawProject, rawWork, operation, rawSub] = goalRoute;
     const projectId = decodeURIComponent(rawProject), workId = rawWork ? decodeURIComponent(rawWork) : null, sub = rawSub ? decodeURIComponent(rawSub) : null;
@@ -1184,6 +1204,7 @@ async function api(request, response, url) {
     if (operation === 'events' && !sub) return done(201, goals.post(person, projectId, workId, input));
     if (operation === 'answer' && sub) return done(200, goals.answer(user, projectId, workId, sub, input));
     if (operation === 'review' && sub) return done(200, goals.review(user, projectId, workId, Number(sub), input));
+    if (operation === 'proposals' && sub) return done(200, goals.decideProposal(user, projectId, workId, sub, input));
     // The containers waiting to connect to this item, and connecting one (its person, signed in here).
     if (operation === 'connections') {
       const item = goals.view(projectId, workId).item;
@@ -1228,6 +1249,7 @@ async function api(request, response, url) {
       }
       goals.notePush(projectId, workId, created ? `Made ${branch} on GitHub from main, for an item container` : caughtUp ? `Moved ${branch} up to main on GitHub (it had no work yet) and opened it in an item container` : `Opened ${branch} in an item container`);
       const slug = db.prepare('SELECT slug FROM projects WHERE id = ?').get(projectId)?.slug || 'project';
+      sweepClosedVolumes(projectId);
       // Dev Containers checks the url with `git ls-remote` as given, so it is the plain repository: the clone starts on main
       // and switches to the item's branch once its person connects it from this item.
       // Dev Containers reuses a volume that exists instead of cloning again. The volume is named for the commit the item's
@@ -1241,6 +1263,8 @@ async function api(request, response, url) {
     if (operation === 'close' && !sub) {
       // CW-1: the reported branch comes from the project's GitHub repository, then close-out merges it into main and a
       // project with a GitHub repository gets main pushed there too, as the build does (through Code's sync when it has one).
+      // E3: ending as not done merges nothing, so GitHub isn't involved.
+      if (goals.view(projectId, workId).ending) { const ended = goals.closeOut(user, projectId, workId); sweepClosedVolumes(projectId, workId); return done(200, ended); }
       const binding = github.status(user.id, projectId, null).repository;
       const ready = binding?.status === 'ready';
       const token = ready && goals.view(projectId, workId).code ? await github.installationTokenForRepository(projectId, binding.name) : null;
@@ -1253,6 +1277,7 @@ async function api(request, response, url) {
         if (before?.state !== 'in-sync') throw Object.assign(new Error(`Close-out waits until main matches GitHub: ${before?.detail || before?.state || 'Code has no remote'}.`), { status: 409 });
       }
       const closed = goals.closeOut(user, projectId, workId);
+      sweepClosedVolumes(projectId, workId);
       if (closed.merged && code) {
         const after = await syncCode(projectId);
         goals.notePush(projectId, workId, after.remote?.state === 'in-sync' && after.remote.remoteCommit === closed.merged.commit ? `Pushed ${closed.merged.into} to GitHub (${binding.owner}/${binding.name})`

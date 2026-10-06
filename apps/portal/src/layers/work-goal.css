@@ -112,3 +112,13 @@
 .wg-close p{margin:0 0 6px}
 .wg-closed{margin-top:12px}
 .wg-ev-flag p{background:#fde8e6;border:1px solid #f4b8b0}
+/* W-8 attempt 2, E3: ending as not done, and the items an action proposes. */
+.wg-close-notdone{border-color:var(--lay-bad-ink);background:var(--lay-bad-bg)}
+.wg-confirm{margin-right:auto;font-weight:600}
+.wg-wrapup{display:inline-flex;align-items:center;gap:4px;font-weight:600;color:var(--lay-bad-ink)}
+.wg-proposals{margin-top:10px;padding:10px 12px;border:1px solid var(--machine-line);border-radius:10px;display:grid;gap:10px}
+.wg-proposals .wg-needhead{flex-wrap:wrap}
+.wg-proposal{display:grid;gap:6px}
+.wg-why{margin:0;font-size:14px}
+.wg-after{display:inline-flex;align-items:center;gap:3px;margin-left:8px;color:var(--machine-muted);font-size:13px}
+.wg-decided{display:flex;align-items:center;gap:8px;margin:0;font-size:14px;flex-wrap:wrap}

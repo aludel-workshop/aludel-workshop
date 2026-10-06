@@ -6,6 +6,8 @@
 //                                                           the repository) and connect Claude Code in this folder to Aludel
 //   aludel connect                                          in an item container: connect it to its item (press Connect on
 //                                                           the item's page beside the code it shows); no token to copy
+//   aludel templates [catalog]                              in an item container: the layer templates its branch pins, from
+//                                                           Aludel (no GitHub access needed)
 //   node apps/portal/tools/aludel.mjs list                   your goal items, and the open ones you could claim
 //   node apps/portal/tools/aludel.mjs claim W-12             claim it and connect Claude Code in this folder to Aludel
 //   node apps/portal/tools/aludel.mjs status W-12            where it stands: actions, what waits on you, the changeset
@@ -13,7 +15,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
-import { checkoutInfo, configPath, connectContainer, inContainer, pushReport, loadConfig, pair, request } from './aludel-client.mjs';
+import { checkoutInfo, configPath, connectContainer, fetchTemplates, inContainer, pushReport, loadConfig, pair, request } from './aludel-client.mjs';
 
 const adapter = new URL('./editor-mcp.mjs', import.meta.url).pathname;
 const out = text => process.stdout.write(text + '\n');
@@ -62,6 +64,9 @@ try {
       out(`  ${asked.verifyUrl}`);
     } });
     out(`Connected to ${done.item.ref}${done.started ? `, on ${done.started.branch}` : ''}. Claude Code here can work on it: ask it to start.`);
+  } else if (command === 'templates') {
+    const done = await fetchTemplates(process.cwd(), arg || 'apps/portal/config/layer-templates.json');
+    out(done.fetched ? `Layer templates ${done.fresh ? 'cloned into' : 'updated in'} ${done.target} from Aludel.` : `${done.target} already has every pinned template.`);
   } else if (command === 'list') {
     const config = loadConfig();
     const { goals } = await request(config, '/goals?claimable=1');
@@ -100,7 +105,7 @@ try {
     const left = view.actions.filter(action => !['review', 'done', 'proposed'].includes(action.state));
     out(left.length ? `Still open: #${left.map(action => action.number).join(', #')}.` : `Every action is ready for review; move ${item.ref} to review on its page.`);
   } else {
-    out('Usage: aludel connect | pair [origin] | list | claim W-n | status W-n | submit W-n');
+    out('Usage: aludel connect | templates [catalog] | pair [origin] | list | claim W-n | status W-n | submit W-n');
     if (command && command !== 'help') process.exitCode = 1;
   }
 } catch (error) {

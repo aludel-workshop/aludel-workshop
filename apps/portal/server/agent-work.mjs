@@ -53,7 +53,17 @@ export function initAgentWork(db) {
     CREATE TABLE IF NOT EXISTS work_goal_staged (
       project_id TEXT NOT NULL, work_id TEXT NOT NULL, seq INTEGER NOT NULL, action_number INTEGER NOT NULL, PRIMARY KEY(work_id, seq)
     );
+    -- W-8 attempt 2, E3: work items an action proposes (follow-ups, or what has to happen before a retry), each decided by a
+    -- person; after_json names other proposals of the same item that come first, and becomes their items' blocking links.
+    CREATE TABLE IF NOT EXISTS work_goal_proposals (
+      id TEXT PRIMARY KEY, project_id TEXT NOT NULL, work_id TEXT NOT NULL, action_number INTEGER NOT NULL, position INTEGER NOT NULL,
+      title TEXT NOT NULL, brief TEXT NOT NULL, why TEXT NOT NULL, after_json TEXT NOT NULL, author_json TEXT NOT NULL,
+      state TEXT NOT NULL CHECK(state IN ('proposed', 'created', 'dismissed')), created_work_id TEXT, decided_json TEXT, created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_goal_proposals ON work_goal_proposals(work_id, action_number, position);
   `);
+  // E3: a wrap-up action ends its item as not done (the orchestrator decided it can't be finished this time).
+  if (!db.prepare('PRAGMA table_info(work_goal_actions)').all().some(column => column.name === 'kind')) db.exec('ALTER TABLE work_goal_actions ADD COLUMN kind TEXT');
 }
 
 // actor: { kind: 'person' | 'agent', id, name }. A person's local CLI agent acts as an agent on that person's behalf.
@@ -85,7 +95,12 @@ export function agentWork({ db, know, catalogs = null }) {
     .map(row => ({ number: row.number, title: row.title, gated: Boolean(row.gated) }));
   const actionRows = (projectId, workId) => db.prepare('SELECT * FROM work_goal_actions WHERE project_id = ? AND work_id = ? ORDER BY number').all(projectId, workId)
     .map(row => ({ id: row.id, number: row.number, phase: row.phase, layer: row.layer, goal: row.goal, after: parse(row.after_json, []), state: row.state,
-      summary: row.summary || '', addedBy: parse(row.added_by_json, null), updatedAt: row.updated_at }));
+      summary: row.summary || '', addedBy: parse(row.added_by_json, null), updatedAt: row.updated_at, kind: row.kind || null }));
+  const proposalRow = row => ({ id: row.id, action: row.action_number, position: row.position, title: row.title, brief: row.brief, why: row.why,
+    after: parse(row.after_json, []), author: parse(row.author_json, null), state: row.state, createdWorkId: row.created_work_id, decided: parse(row.decided_json, null) });
+  const proposalRows = (projectId, workId) => db.prepare('SELECT * FROM work_goal_proposals WHERE project_id = ? AND work_id = ? ORDER BY action_number, position').all(projectId, workId).map(proposalRow);
+  // The item's wrap-up action, once it isn't waiting for approval: the item then ends as not done.
+  const wrapUpOf = actions => actions.find(action => action.kind === 'wrap-up' && action.state !== 'proposed') || null;
   const eventRow = row => ({ id: row.id, action: row.action_number, kind: row.kind, author: parse(row.author_json, null), ...parse(row.body_json, {}),
     at: row.created_at, resolvedAt: row.resolved_at, resolution: parse(row.resolution_json, null) });
   const openNeeds = (projectId, workId) => db.prepare(`SELECT * FROM work_goal_events WHERE project_id = ? AND work_id = ? AND resolved_at IS NULL AND kind IN (${needKinds.map(() => '?').join(',')}) ORDER BY id`)
@@ -93,6 +108,7 @@ export function agentWork({ db, know, catalogs = null }) {
 
   // Why an action can't start yet: a review gate above it that isn't cleared, or an "after" action not yet handed over.
   function blockedReason(action, actions, phases) {
+    if (action.kind === 'wrap-up') return null; // it ends the item; nothing it would wait for is going to finish
     for (const phase of phases.filter(entry => entry.gated && entry.number < action.phase)) {
       const open = actions.filter(other => other.phase <= phase.number && other.state !== 'proposed' && other.state !== 'done');
       if (open.length) return `Waits for the review gate after ${phase.title}`;
@@ -103,10 +119,16 @@ export function agentWork({ db, know, catalogs = null }) {
 
   function view(projectId, workId) {
     const item = goalItem(projectId, workId);
-    const phases = phasesOf(projectId, workId), actions = actionRows(projectId, workId), needs = openNeeds(projectId, workId);
+    const phases = phasesOf(projectId, workId), actions = actionRows(projectId, workId), needs = openNeeds(projectId, workId), proposals = proposalRows(projectId, workId);
+    const wrapUp = wrapUpOf(actions);
     const events = db.prepare('SELECT * FROM (SELECT * FROM work_goal_events WHERE project_id = ? AND work_id = ? ORDER BY id DESC LIMIT 300) ORDER BY id').all(projectId, workId).map(eventRow);
     return { item, brief: goalOf(item).brief, defined: Boolean(goalOf(item).defined), performer: goalOf(item).performer || null, code: goalOf(item).code ? { ...goalOf(item).code, inRepository: Boolean(goalOf(item).code.merged) || codeMerged(projectId, goalOf(item).code), target: goalOf(item).code.merged?.into || repository(projectId)?.target || null } : null, phases,
-      actions: actions.map(action => ({ ...action, needs: needs.filter(need => need.action === action.number), blocked: ['todo', 'proposed'].includes(action.state) ? blockedReason(action, actions, phases) : null })),
+      actions: actions.map(action => ({ ...action, needs: needs.filter(need => need.action === action.number), blocked: ['todo', 'proposed'].includes(action.state) ? blockedReason(action, actions, phases) : null,
+        proposals: proposals.filter(proposal => proposal.action === action.number).map(proposal => {
+          const created = proposal.createdWorkId ? know.workById(projectId, proposal.createdWorkId) : null;
+          return { ...proposal, created: created ? { ref: created.ref, title: created.title } : null };
+        }) })),
+      ending: wrapUp ? { kind: 'not-done', action: wrapUp.number, reason: wrapUp.summary } : null, outcome: goalOf(item).outcome || null,
       needs, events, changeset: changeset(projectId, workId) };
   }
 
@@ -155,7 +177,7 @@ export function agentWork({ db, know, catalogs = null }) {
       db.prepare('DELETE FROM work_goal_actions WHERE project_id = ? AND work_id = ?').run(projectId, workId);
       phases.forEach((phase, index) => db.prepare('INSERT INTO work_goal_phases VALUES (?, ?, ?, ?, ?)')
         .run(projectId, workId, index + 1, clean(phase.title, 80, 'Phase title', true), phase.gated ? 1 : 0));
-      for (const row of rows) db.prepare('INSERT INTO work_goal_actions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      for (const row of rows) db.prepare('INSERT INTO work_goal_actions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)')
         .run(`act-${randomBytes(4).toString('hex')}`, projectId, workId, row.number, row.phase, row.layer, row.goal, JSON.stringify(row.after), 'todo', null, JSON.stringify(actor), at, at);
     });
     saveGoal(projectId, item, { brief, defined: true }, `${actor.name} defined it: ${rows.length} action${rows.length === 1 ? '' : 's'}`, byOf(actor));
@@ -186,7 +208,9 @@ export function agentWork({ db, know, catalogs = null }) {
     } else if (to === 'review') {
       if (item.board !== 'progress') fail(`Only an item in progress can go to review.`, 409);
       const actions = actionRows(projectId, workId).filter(action => action.state !== 'proposed');
-      const left = actions.filter(action => !['review', 'done'].includes(action.state));
+      // Ending as not done, only the wrap-up is reviewed; the rest stays as it was left.
+      const wrapUp = wrapUpOf(actions);
+      const left = (wrapUp ? [wrapUp] : actions).filter(action => !['review', 'done'].includes(action.state));
       if (left.length) fail(`#${left.map(action => action.number).join(', #')} ${left.length === 1 ? 'is' : 'are'} not ready for review yet.`, 409);
       if (openNeeds(projectId, workId).length) fail('Answer what the item is waiting on first.', 409);
       setState(projectId, item, 'review', 'Ready for review', by);
@@ -250,13 +274,21 @@ export function agentWork({ db, know, catalogs = null }) {
     if (!Number.isInteger(phase) || phase < 1 || phase > Math.max(1, phases.length)) fail(`#${number} names a phase that doesn't exist.`);
     const goal = clean(input.goal, 1000, `#${number}'s goal`, true);
     const after = checkAfter(input.after, number, new Set(actions.map(action => action.number)));
+    // E3: a wrap-up action ends the item as not done. The working agent decides the item can't be finished this time, says
+    // why, and its person approves; the wrap-up then proposes what has to happen first, and close-out applies and merges nothing.
+    const wrapUp = input.wrapUp === true;
+    if (wrapUp) {
+      if (item.board !== 'progress') fail(`Only an item in progress can be wrapped up as not done.`, 409);
+      if (actions.some(action => action.kind === 'wrap-up')) fail(`${item.ref} already has a wrap-up action.`, 409);
+      if (!clean(input.reason, 1000, 'Reason')) fail('Say why the item can\'t be finished.');
+    }
     // Once work has started, an agent's new action waits for a person's approval; a person's own is approved by adding it.
     const needsApproval = actor.kind === 'agent' && !['draft', 'ready'].includes(item.board);
     const at = now();
-    db.prepare('INSERT INTO work_goal_actions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-      .run(`act-${randomBytes(4).toString('hex')}`, projectId, workId, number, phase, checkLayer(projectId, input.layer), goal, JSON.stringify(after), needsApproval ? 'proposed' : 'todo',
-        null, JSON.stringify(actor), at, at);
-    if (needsApproval) record(projectId, workId, { kind: 'approval', action: number, author: actor, text: clean(input.reason, 1000, 'Reason') || `New action: ${goal}` });
+    db.prepare('INSERT INTO work_goal_actions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(`act-${randomBytes(4).toString('hex')}`, projectId, workId, number, wrapUp ? Math.max(1, phases.length) : phase, checkLayer(projectId, input.layer), goal, JSON.stringify(wrapUp ? [] : after), needsApproval ? 'proposed' : 'todo',
+        wrapUp ? clean(input.reason, 1000, 'Reason') : null, JSON.stringify(actor), at, at, wrapUp ? 'wrap-up' : null);
+    if (needsApproval) record(projectId, workId, { kind: 'approval', action: number, author: actor, text: (wrapUp ? 'End as not done: ' : '') + (clean(input.reason, 1000, 'Reason') || `New action: ${goal}`) });
     else record(projectId, workId, { kind: 'log', action: number, author: actor, text: `Added #${number}` });
     emit(projectId, workId, { type: 'action', number });
     return view(projectId, workId);
@@ -389,6 +421,57 @@ export function agentWork({ db, know, catalogs = null }) {
     emit(projectId, workId, { type: 'action', number: action.number });
     return view(projectId, workId);
   }
+  // E3: an action proposes work items: follow-ups after a success, or what has to happen first after a wrap-up. Each names
+  // why, and may come after others in the same list (by index). A new list replaces the action's undecided proposals.
+  function proposeItems(actor, projectId, workId, number, input = {}) {
+    const item = goalItem(projectId, workId);
+    const action = actionRows(projectId, workId).find(entry => entry.number === Number(number)) || fail('Action not found.', 404);
+    if (action.state !== 'working') fail(`Move #${action.number} to working before it proposes anything.`, 409);
+    const items = Array.isArray(input.items) ? input.items : [];
+    if (!items.length || items.length > 10) fail('Propose one to ten items.');
+    const ids = items.map(() => `prp-${randomBytes(4).toString('hex')}`);
+    const rows = items.map((entry, index) => ({ id: ids[index], title: clean(entry?.title, 160, `Item ${index + 1}'s title`, true), brief: clean(entry?.brief, 4000, `Item ${index + 1}'s brief`),
+      why: clean(entry?.why, 1000, `Why item ${index + 1}`, true),
+      after: [...new Set((Array.isArray(entry?.after) ? entry.after : []).map(Number))].map(other => Number.isInteger(other) && other >= 0 && other < index ? ids[other] : fail(`Item ${index + 1} can only come after an earlier item (by its index from 0).`)) }));
+    const kept = db.prepare("SELECT COALESCE(MAX(position), -1) AS last FROM work_goal_proposals WHERE project_id = ? AND work_id = ? AND action_number = ? AND state != 'proposed'").get(projectId, workId, action.number).last;
+    transaction(() => {
+      db.prepare("DELETE FROM work_goal_proposals WHERE project_id = ? AND work_id = ? AND action_number = ? AND state = 'proposed'").run(projectId, workId, action.number);
+      rows.forEach((row, index) => db.prepare("INSERT INTO work_goal_proposals VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'proposed', NULL, NULL, ?)")
+        .run(row.id, projectId, workId, action.number, kept + 1 + index, row.title, row.brief, row.why, JSON.stringify(row.after), JSON.stringify(actor), now()));
+    });
+    record(projectId, workId, { kind: 'log', action: action.number, author: actor, text: `Proposed ${rows.length} work item${rows.length === 1 ? '' : 's'}: ${rows.map(row => row.title).join('; ')}` });
+    emit(projectId, workId, { type: 'action', number: action.number });
+    return view(projectId, item.id);
+  }
+  // A person creates a proposed item (as edited) as a Draft goal item, or dismisses it. Its dependencies become blocking
+  // links between the created items, whichever order they're created in.
+  function decideProposal(user, projectId, workId, proposalId, input = {}) {
+    requireMember(db, user, projectId);
+    const item = goalItem(projectId, workId);
+    const row = db.prepare('SELECT * FROM work_goal_proposals WHERE id = ? AND project_id = ? AND work_id = ?').get(String(proposalId), projectId, workId);
+    if (!row) fail('Proposal not found.', 404);
+    const proposal = proposalRow(row);
+    if (proposal.state !== 'proposed') fail('Already decided.', 409);
+    const person = { kind: 'person', id: user.id, name: user.name };
+    const decided = { by: { id: user.id, name: user.name }, at: now() };
+    if (input.decision === 'dismiss') {
+      db.prepare("UPDATE work_goal_proposals SET state = 'dismissed', decided_json = ? WHERE id = ?").run(JSON.stringify(decided), row.id);
+      record(projectId, workId, { kind: 'log', action: proposal.action, author: person, text: `Dismissed proposed item: ${proposal.title}` });
+    } else if (input.decision === 'create') {
+      const task = input.task && typeof input.task === 'object' ? input.task : {};
+      const created = createGoal(user, projectId, { title: clean(task.title ?? proposal.title, 160, 'Title', true), brief: task.brief ?? task.suggestion ?? proposal.brief, priority: task.priority }).item;
+      const from = `${item.ref} #${proposal.action}`;
+      record(projectId, created.id, { kind: 'log', author: proposal.author || person, text: `Proposed in ${from}: ${proposal.why}` });
+      db.prepare("UPDATE work_goal_proposals SET state = 'created', created_work_id = ?, decided_json = ? WHERE id = ?").run(created.id, JSON.stringify(decided), row.id);
+      const all = proposalRows(projectId, workId);
+      const blocks = (blocker, blocked) => { const current = know.workById(projectId, blocker); if (current && !current.blocks.includes(blocked)) know.updateWork(user, projectId, blocker, { blocks: [...current.blocks, blocked] }); };
+      for (const first of all.filter(other => proposal.after.includes(other.id) && other.createdWorkId)) blocks(first.createdWorkId, created.id);
+      for (const next of all.filter(other => other.after.includes(proposal.id) && other.createdWorkId)) blocks(created.id, next.createdWorkId);
+      record(projectId, workId, { kind: 'log', action: proposal.action, author: person, text: `Created ${created.ref} from a proposal: ${created.title}` });
+    } else fail('Create or dismiss the proposed item.');
+    emit(projectId, workId, { type: 'item' });
+    return view(projectId, workId);
+  }
   // A4: close-out merges the reported branch into the project's main branch, as a person saying "looks good, merge it".
   // COLLAB-WORK-01 CW-1: the commit comes from the project's GitHub repository (fetchCode), never from a folder on the
   // person's machine, so it works the same for a collaborator on another machine. A fast-forward when it can,
@@ -450,6 +533,7 @@ export function agentWork({ db, know, catalogs = null }) {
   function fetchCode(projectId, workId, remote) {
     const item = goalItem(projectId, workId), code = goalOf(item).code;
     if (!code || item.board !== 'review') return null; // close-out itself says what's missing first
+    if (wrapUpOf(actionRows(projectId, workId))) return null; // ending as not done merges nothing
     const repo = repository(projectId);
     if (!repo) fail(`This project has no repository with a main branch for Aludel to merge ${code.branch} into.`, 409);
     if (!remote) {
@@ -469,9 +553,13 @@ export function agentWork({ db, know, catalogs = null }) {
   function closeOut(user, projectId, workId) {
     const item = goalItem(projectId, workId);
     if (item.board !== 'review') fail(`Move ${item.ref} to review first.`, 409);
-    const left = actionRows(projectId, workId).filter(action => action.state !== 'done');
+    const wrapUp = wrapUpOf(actionRows(projectId, workId));
+    const left = (wrapUp ? [wrapUp] : actionRows(projectId, workId)).filter(action => action.state !== 'done');
     if (left.length) fail(`Review #${left.map(action => action.number).join(', #')} first.`, 409);
     if (openNeeds(projectId, workId).length) fail('Answer what the item is waiting on first.', 409);
+    const undecided = proposalRows(projectId, workId).filter(proposal => proposal.state === 'proposed');
+    if (undecided.length) fail(`Create or dismiss the ${undecided.length} proposed item${undecided.length === 1 ? '' : 's'} first.`, 409);
+    if (wrapUp) return endNotDone(user, projectId, item, wrapUp);
     const code = goalOf(item).code || null;
     const groups = changeset(projectId, workId);
     for (const group of groups) for (const change of group.changes) {
@@ -502,6 +590,19 @@ export function agentWork({ db, know, catalogs = null }) {
       text: `Closed: applied ${applied} record change${applied === 1 ? '' : 's'}${codeText}` });
     emit(projectId, workId, { type: 'item' });
     return { ...view(projectId, workId), merged: merged && merged.mode !== 'already' ? { ...merged, workspace: plan.workspace } : null };
+  }
+  // E3: ending as not done applies nothing and merges nothing. The staged changeset stays unapplied on the item, and its
+  // branch stays on GitHub for a retry to build on; the items its wrap-up proposed carry the work forward.
+  function endNotDone(user, projectId, item, wrapUp) {
+    const staged = changeset(projectId, item.id).reduce((sum, group) => sum + group.changes.length, 0), code = goalOf(item).code || null;
+    const by = { kind: 'person', id: user.id };
+    saveGoal(projectId, item, { closedAt: now(), applied: 0, outcome: { kind: 'not-done', reason: wrapUp.summary, by: { id: user.id, name: user.name } } }, `${user.name} ended it as not done`, by);
+    setState(projectId, goalItem(projectId, item.id), 'done', 'Ended as not done', by);
+    const created = proposalRows(projectId, item.id).filter(proposal => proposal.createdWorkId).map(proposal => know.workById(projectId, proposal.createdWorkId)?.ref).filter(Boolean);
+    record(projectId, item.id, { kind: 'log', author: { kind: 'person', id: user.id, name: user.name },
+      text: `Ended as not done: ${staged} staged record change${staged === 1 ? '' : 's'} not applied${code ? `; ${code.branch} not merged` : ''}${created.length ? `; continued in ${created.join(', ')}` : ''}` });
+    emit(projectId, item.id, { type: 'item' });
+    return { ...view(projectId, item.id), merged: null };
   }
   // After a merge, the host pushes main when the project has a GitHub repository, and notes the outcome on the item.
   function notePush(projectId, workId, text) {
@@ -576,5 +677,5 @@ export function agentWork({ db, know, catalogs = null }) {
     return () => bus.off(key, listener);
   }
 
-  return { createGoal, view, define, move, claim, assign, assertPerformer, addAction, updateAction, post, answer, stage, recordCode, review, fetchCode, closeOut, notePush, changeset, stackMap, readLayer, goals, subscribe };
+  return { createGoal, view, define, move, claim, assign, assertPerformer, addAction, updateAction, post, answer, stage, recordCode, review, proposeItems, decideProposal, fetchCode, closeOut, notePush, changeset, stackMap, readLayer, goals, subscribe };
 }

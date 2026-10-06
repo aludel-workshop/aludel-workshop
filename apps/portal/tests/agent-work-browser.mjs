@@ -244,8 +244,63 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload(); await main.getByRole('heading', { name: 'Create the sign-up flow' }).waitFor();
   await shot('07-phone'); await audit('phone');
+
+  // W-8 attempt 2, E3: an item that can't be finished. The agent's action fails; it proposes a wrap-up, which its person
+  // approves; the wrap-up proposes what has to happen first (the retry after both), and the person edits, creates and
+  // dismisses them in the stack, then confirms ending it as not done. Nothing applies or merges.
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const goalsApi = `${portal}/api/projects/${project.id}/goals`;
+  const second = (await (await context.request.post(goalsApi, { data: { title: 'Kanban board', brief: 'A board for every item.' } })).json()).item.id;
+  const as = async (path, body) => { const response = await context.request.fetch(`${portal}/api/editor/goals/${encodeURIComponent(second)}${path}`, { method: 'POST', data: body, headers: { authorization: `Bearer ${editorToken}` } });
+    const value = await response.json(); if (!response.ok()) throw new Error(`${path}: ${value.error}`); return value; };
+  assert.ok((await context.request.post(`${goalsApi}/${second}/assign`, { data: { assignee: { kind: 'person', id: owner.id } } })).ok());
+  await as('/define', { brief: 'A board for every item.', actions: [{ layer: 'pages', goal: 'Spec the board in Pages' }] });
+  assert.ok((await context.request.post(`${goalsApi}/${second}/move`, { data: { to: 'progress' } })).ok());
+  await as('/actions/1', { state: 'working' });
+  await as('/actions', { goal: 'Wrap up: propose what has to happen first', wrapUp: true, reason: "Flows need a persona, and Pages has none of its own; the container can't build the portal." });
+  await page.goto(`${portal}/p/${project.slug}/work/item/${encodeURIComponent(second)}`);
+  await main.getByRole('heading', { name: 'Kanban board' }).waitFor();
+  await card(2).getByText('End this item as not done?').waitFor();
+  await card(2).getByRole('button', { name: 'Approve' }).click();
+  await card(2).getByText(/Ends W-\d+ as not done/).waitFor();
+  await as('/actions/2', { state: 'working' });
+  const proposed = await as('/actions/2/proposals', { items: [
+    { title: 'Serve layer templates to item containers', brief: 'The container gets layer-base from Aludel.', why: "The container can't build the portal without layer-base." },
+    { title: 'Personas in Pages', brief: 'Pages keeps its own personas, bound to Vision through the Library.', why: 'A flow needs a persona, and a layer never needs another layer.' },
+    { title: 'Kanban board, again', brief: 'Retry W-8 once both are done.', why: 'The retry.', after: [0, 1] }] });
+  assert.equal(proposed.proposals.length, 3, 'the agent gets back what it proposed, not the whole item (F14)');
+  await as('/actions/2', { state: 'review', summary: "Ended: the item container can't build the portal, and Pages can't hold a flow's persona." });
+  const stack = main.getByRole('group', { name: 'Items #2 proposes' });
+  await stack.getByText('Proposed to happen first').waitFor();
+  await stack.getByText(/After Serve layer templates to item containers and Personas in Pages/).waitFor();
+  await shot('08-proposed'); await audit('proposed items');
+  const proposal = n => stack.locator('.wg-proposal').nth(n);
+  await proposal(2).getByLabel('Title', { exact: true }).fill('Kanban board (attempt 2)');
+  await proposal(2).getByRole('button', { name: 'Create item' }).click();
+  await stack.locator('.wg-decided', { hasText: 'Kanban board (attempt 2)' }).waitFor();
+  await proposal(1).getByRole('button', { name: 'Dismiss' }).click();
+  await stack.locator('.wg-decided', { hasText: 'Dismissed' }).waitFor();
+  await proposal(0).getByRole('button', { name: 'Create item' }).click();
+  await stack.locator('.wg-decided', { hasText: 'Serve layer templates' }).waitFor();
+  await card(2).getByRole('button', { name: 'Approve' }).click();
+  await main.getByText('The wrap-up is ready for review.').waitFor();
+  await main.getByRole('button', { name: 'Move to review' }).click();
+  await main.getByRole('heading', { name: 'Ready to end as not done' }).waitFor();
+  await main.locator('.wg-close-notdone').getByText(/Ending applies nothing and merges nothing: 0 staged record changes stay unapplied\. The work continues in W-\d+, W-\d+\./).waitFor();
+  await shot('09-end-not-done'); await audit('end as not done');
+  await main.getByRole('button', { name: 'End as not done' }).click();
+  await main.getByRole('group', { name: 'Confirm ending as not done' }).getByRole('button', { name: 'End as not done' }).click();
+  await main.locator('.wg-board-done').waitFor();
+  await main.getByText(/Ended as not done: Ended: the item container can't build the portal/).waitFor();
+  const decided = (await (await context.request.get(`${goalsApi}/${second}`)).json()).actions[1].proposals;
+  const [templatesItem, , retry] = decided.map(entry => entry.createdWorkId);
+  assert.deepEqual((await (await context.request.get(`${goalsApi}/${templatesItem}`)).json()).item.blocks, [retry], 'the prerequisite blocks the retry');
+  await shot('10-ended'); await audit('ended');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload(); await main.getByRole('heading', { name: 'Kanban board' }).waitFor();
+  await shot('11-ended-phone'); await audit('ended, phone');
   assert.deepEqual(errors, []);
-  console.log('PASS goal item page: create, define, agent phases it with a review gate, assign yourself (agents wait on A2), Open in a container (refused without a GitHub repository) or your checkout, start, live question and approval on their actions, answer, staged changeset by layer, reported code, details and log, steer, per-action review with a flag the agent addresses, gate held and cleared, move to review, close-out that merges the branch into main, axe at 1440 and 390 px.');
+  console.log('PASS goal item page: create, define, agent phases it with a review gate, assign yourself (agents wait on A2), Open in a container (refused without a GitHub repository) or your checkout, start, live question and approval on their actions, answer, staged changeset by layer, reported code, details and log, steer, per-action review with a flag the agent addresses, gate held and cleared, move to review, close-out that merges the branch into main; and an item ended as not done: wrap-up approved, its proposed items edited, created and dismissed, dependencies as blocking links, the ending confirmed; axe at 1440 and 390 px.');
 } catch (error) {
   for (const open of browser.contexts().flatMap(context => context.pages())) await open.screenshot({ path: dest + 'failure.png', fullPage: true }).catch(() => {});
   console.error(serverLog.split('\n').filter(line => /error/i.test(line) && !/ExperimentalWarning/.test(line)).slice(-10).join('\n'));

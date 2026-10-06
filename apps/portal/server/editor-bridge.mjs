@@ -2,6 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { getUser, requireMember } from './accounts.mjs';
 import { compileTaskManifest } from './task-manifest.mjs';
+import { gitIdentity } from './item-environment.mjs';
 
 const sha = value => createHash('sha256').update(value).digest('hex');
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
@@ -113,7 +114,7 @@ export function editorBridge({ db, know, projectSetup, previewStatus }) {
     db.prepare('INSERT INTO editor_tokens(token_hash, user_id, project_id, created_at, expires_at, work_id) VALUES (?, ?, ?, ?, ?, ?)')
       .run(sha(token), user.id, row.project_id, now(), new Date(Date.now() + 30 * 86400_000).toISOString(), row.work_id);
     db.prepare('DELETE FROM editor_connect_requests WHERE device_hash = ?').run(row.device_hash);
-    return { status: 'connected', token, projectId: row.project_id, workId: row.work_id };
+    return { status: 'connected', token, projectId: row.project_id, workId: row.work_id, identity: gitIdentity(db, user.id) };
   }
   function assigned(user, projectId) {
     return know.workList(projectId).filter(item => item.assignee?.kind === 'person' && item.assignee.id === user.id && item.state !== 'done')

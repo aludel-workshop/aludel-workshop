@@ -1,8 +1,8 @@
 // The connection the local Aludel tools share: the portal origin and an editor token, stored outside any repository.
 import { execFileSync } from 'node:child_process';
-import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { homedir } from 'node:os';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { homedir, tmpdir } from 'node:os';
 
 export const configPath = process.env.ALUDEL_EDITOR_CONFIG || join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), 'aludel', 'editor.json');
 export function validateUrl(value) {
@@ -35,8 +35,15 @@ export async function readToken() {
   });
 }
 export async function request(config, path, payload) {
-  const response = await fetch(config.url + '/api/editor' + path, { method: payload ? 'POST' : 'GET', body: payload ? JSON.stringify(payload) : undefined,
-    headers: { authorization: 'Bearer ' + config.token, ...(payload ? { 'content-type': 'application/json' } : {}) }, signal: AbortSignal.timeout(8000) });
+  let response;
+  try {
+    response = await fetch(config.url + '/api/editor' + path, { method: payload ? 'POST' : 'GET', body: payload ? JSON.stringify(payload) : undefined,
+      headers: { authorization: 'Bearer ' + config.token, ...(payload ? { 'content-type': 'application/json' } : {}) }, signal: AbortSignal.timeout(8000) });
+  } catch (error) {
+    // W-8 F12: say which way it failed: no answer in time (often a busy portal; retry) or no connection at all.
+    if (error.name === 'TimeoutError') throw new Error(`Aludel at ${config.url} didn't answer within 8 s; it may be busy. Try again in a minute, and if it keeps happening, tell your person.`);
+    throw new Error(`Couldn't reach Aludel at ${config.url} (${error.cause?.code || error.message}). Ask your person whether the portal is running.`);
+  }
   const body = await response.json();
   if (!response.ok) throw new Error(body.error || 'Aludel returned ' + response.status);
   return body;
@@ -80,6 +87,8 @@ export async function connectContainer(cwd, { origin, said = () => {}, wait = ms
     const polled = await post(url, '/api/editor/connect/poll', { deviceCode: asked.deviceCode });
     if (polled.status === 'connected') {
       saveConfig({ url, token: polled.token, workId: polled.workId });
+      // F11: commit as the person who connected it, in this clone only.
+      if (polled.identity) { git('config', 'user.name', polled.identity.name); git('config', 'user.email', polled.identity.email); }
       // Cloned on main, the container now knows its item: switch to the item's branch.
       const started = polled.item ? startBranch(cwd, polled.item.ref) : null;
       return { ...asked, ...polled, item: polled.item || asked.item, started, token: undefined };
@@ -152,4 +161,32 @@ export function startBranch(cwd, ref) {
   if (!base) throw new Error('This checkout has no main branch to start from.');
   git('checkout', '--quiet', '-b', branch, base);
   return { branch, created: true, base };
+}
+// W-8 attempt 2, E1: the layer templates this checkout's branch pins (a catalog like apps/portal/config/layer-templates.json),
+// from the portal as a Git bundle, into the catalog's repository folder beside the checkout's top. A fresh folder gets the
+// pins as its branches; an existing one (a person's own layer-base) only gains the commits, under refs/remotes/aludel/*.
+export async function fetchTemplates(cwd, catalogPath, config = loadConfig()) {
+  const top = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  const catalog = JSON.parse(readFileSync(resolve(cwd, catalogPath), 'utf8'));
+  if (typeof catalog.repo !== 'string' || !catalog.templates) throw new Error(`${catalogPath} isn't a layer template catalog.`);
+  const target = resolve(top, catalog.repo);
+  const pins = Object.values(catalog.templates).map(({ branch, commit }) => ({ branch, commit }));
+  const git = (...args) => execFileSync('git', ['-C', target, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  const has = commit => { try { return git('cat-file', '-t', commit) === 'commit'; } catch { return false; } };
+  const fresh = !existsSync(join(target, '.git'));
+  if (!fresh && pins.every(pin => has(pin.commit))) return { target, fetched: 0, fresh };
+  const query = pins.map(pin => 'pin=' + encodeURIComponent(`${pin.branch}@${pin.commit}`)).join('&');
+  const response = await fetch(`${config.url}/api/editor/templates?${query}`, { headers: { authorization: 'Bearer ' + config.token }, signal: AbortSignal.timeout(120000) });
+  if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || 'Aludel returned ' + response.status);
+  const scratch = mkdtempSync(join(tmpdir(), 'aludel-templates-'));
+  try {
+    const bundle = join(scratch, 'templates.bundle');
+    writeFileSync(bundle, Buffer.from(await response.arrayBuffer()));
+    if (fresh) { mkdirSync(target, { recursive: true }); git('init', '--quiet'); }
+    git('fetch', '--quiet', bundle, fresh ? '+refs/heads/*:refs/heads/*' : '+refs/heads/*:refs/remotes/aludel/*');
+    if (fresh) git('checkout', '--quiet', pins.some(pin => pin.branch === 'main') ? 'main' : pins[0].branch);
+  } finally { rmSync(scratch, { recursive: true, force: true }); }
+  const missing = pins.filter(pin => !has(pin.commit));
+  if (missing.length) throw new Error(`Still missing ${missing.map(pin => pin.branch).join(', ')} after fetching from Aludel.`);
+  return { target, fetched: pins.length, fresh };
 }

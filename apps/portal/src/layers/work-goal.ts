@@ -5,6 +5,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Assignee, ProjectContext, WorkItem, layerLabel, priorityLabel, priorityOrder } from './context';
 import { AssigneeComponent, PriorityComponent } from './work-shared';
+import { WorkCreateComponent } from './work-create';
 
 // AGENT-WORK-01 A3: a goal item, as the a0/v2 prototype drew it. The brief and how it is worked on top; actions in phases,
 // each naming a layer, with what blocks it and what it needs from you sitting on it; review gates between phases; the
@@ -13,18 +14,22 @@ type GoalAuthor = { kind: 'person' | 'agent'; id: string; name: string };
 export type GoalEvent = { id: number; action: number | null; kind: 'message' | 'log' | 'steer' | 'flag' | 'question' | 'allow' | 'approval'; author: GoalAuthor | null; text: string;
   options?: string[]; at: string; resolvedAt: string | null; resolution: { text?: string; allow?: boolean; note?: string; by?: { id: string; name: string } } | null };
 export type GoalAction = { id: string; number: number; phase: number; layer: string | null; goal: string; after: number[]; state: 'proposed' | 'todo' | 'working' | 'review' | 'done';
-  summary: string; addedBy: GoalAuthor | null; updatedAt: string; needs: GoalEvent[]; blocked: string | null };
+  summary: string; addedBy: GoalAuthor | null; updatedAt: string; needs: GoalEvent[]; blocked: string | null; kind: 'wrap-up' | null; proposals: GoalProposal[] };
+// W-8 attempt 2, E3: an item an action proposed (a follow-up, or what comes first after a wrap-up), decided by a person.
+export type GoalProposal = { id: string; action: number; position: number; title: string; brief: string; why: string; after: string[]; author: GoalAuthor | null;
+  state: 'proposed' | 'created' | 'dismissed'; createdWorkId: string | null; created: { ref: string; title: string } | null };
 type GoalChange = { id: string; kind: string; op: 'create' | 'update' | 'delete'; action?: number | null; after?: Record<string, unknown> | null; before?: Record<string, unknown> | null };
 export type GoalCode = { branch: string; commit: string; base: string | null; files: { path: string; status: string }[]; at: string; inRepository?: boolean; target?: string | null; merged?: { into: string; commit: string; mode: string } | null };
 export type GoalView = { item: WorkItem & { board: string }; brief: string; defined: boolean; performer: string | null; code: GoalCode | null; phases: { number: number; title: string; gated: boolean }[];
-  actions: GoalAction[]; needs: GoalEvent[]; events: GoalEvent[]; changeset: { layer: string; changes: GoalChange[] }[] };
+  actions: GoalAction[]; needs: GoalEvent[]; events: GoalEvent[]; changeset: { layer: string; changes: GoalChange[] }[];
+  ending: { kind: 'not-done'; action: number; reason: string } | null; outcome: { kind: 'not-done'; reason: string } | null };
 
 const boardLabel: Record<string, string> = { draft: 'Draft', ready: 'Ready', progress: 'In progress', review: 'In review', done: 'Done' };
 const actionLabel: Record<string, string> = { proposed: 'New: needs your approval', todo: 'To do', working: 'Working', review: 'Ready for review', done: 'Done' };
 const actionIcon: Record<string, string> = { proposed: 'add_task', todo: 'radio_button_unchecked', working: 'progress_activity', review: 'rate_review', done: 'check_circle' };
 
 @Component({
-  selector: 'aludel-work-goal', standalone: true, imports: [FormsModule, MatIconModule, MatMenuModule, MatTooltipModule, AssigneeComponent, PriorityComponent],
+  selector: 'aludel-work-goal', standalone: true, imports: [FormsModule, MatIconModule, MatMenuModule, MatTooltipModule, AssigneeComponent, PriorityComponent, WorkCreateComponent],
   styleUrl: './work-goal.css',
   template: `
   @if (view(); as goal) {
@@ -71,9 +76,19 @@ const actionIcon: Record<string, string> = { proposed: 'add_task', todo: 'radio_
             </div>
           }
           @if (goal.item.board === 'progress' && readyForReview()) {
-            <div class="wg-start"><p class="wg-hint">Every action is ready for review.</p><button type="button" class="lay-button wg-go" (click)="move('review')"><mat-icon aria-hidden="true">rate_review</mat-icon>Move to review</button></div>
+            <div class="wg-start"><p class="wg-hint">{{ goal.ending ? 'The wrap-up is ready for review.' : 'Every action is ready for review.' }}</p><button type="button" class="lay-button wg-go" (click)="move('review')"><mat-icon aria-hidden="true">rate_review</mat-icon>Move to review</button></div>
           }
-          @if (goal.item.board === 'review') {
+          @if (goal.item.board === 'review' && goal.ending) {
+            <div class="wg-close wg-close-notdone" role="group" aria-labelledby="wg-close-title">
+              <h2 id="wg-close-title"><mat-icon aria-hidden="true">cancel</mat-icon>Ready to end as not done</h2>
+              <p>{{ goal.ending.reason }}</p>
+              <p>Ending applies nothing and merges nothing: {{ recordCount() }} staged record change{{ recordCount() === 1 ? '' : 's' }} stay unapplied@if (goal.code) { and <code>{{ goal.code.branch }}</code> stays on GitHub }.@if (continued().length) { The work continues in {{ continued().join(', ') }}. }</p>
+              @if (confirmEnd()) {
+                <div class="wg-row wg-end" role="group" aria-label="Confirm ending as not done"><span class="wg-confirm">End {{ goal.item.ref }} as not done?</span><button type="button" class="lay-button ghost small" (click)="confirmEnd.set(false)">Cancel</button><button type="button" class="lay-button danger" (click)="close()"><mat-icon aria-hidden="true">cancel</mat-icon>End as not done</button></div>
+              } @else { <div class="wg-row wg-end"><button type="button" class="lay-button wg-go" (click)="confirmEnd.set(true)"><mat-icon aria-hidden="true">cancel</mat-icon>End as not done</button></div> }
+            </div>
+          }
+          @if (goal.item.board === 'review' && !goal.ending) {
             <div class="wg-close" role="group" aria-labelledby="wg-close-title">
               <h2 id="wg-close-title"><mat-icon aria-hidden="true">task_alt</mat-icon>Ready to close out</h2>
               <p>Closing @if (goal.code && !goal.code.inRepository) { merges <code>{{ goal.code.branch }}</code> ({{ goal.code.commit.slice(0, 7) }}) into {{ goal.code.target || 'main' }} and }applies {{ recordCount() }} staged record change{{ recordCount() === 1 ? '' : 's' }}@if (goal.changeset.length) { in {{ changedLayers() }} } at once.@if (!goal.changeset.length && !goal.code) { Nothing is staged; it closes as done. }</p>
@@ -81,7 +96,7 @@ const actionIcon: Record<string, string> = { proposed: 'add_task', todo: 'radio_
               <div class="wg-row wg-end"><button type="button" class="lay-button wg-go" (click)="close()"><mat-icon aria-hidden="true">done_all</mat-icon>{{ goal.code && !goal.code.inRepository ? 'Close out and merge' : 'Close out' }}</button></div>
             </div>
           }
-          @if (goal.item.board === 'done') { <p class="wg-hint wg-closed"><mat-icon aria-hidden="true">task_alt</mat-icon>Closed. {{ closedText() }}</p> }
+          @if (goal.item.board === 'done') { <p class="wg-hint wg-closed"><mat-icon aria-hidden="true">{{ goal.outcome ? 'cancel' : 'task_alt' }}</mat-icon>{{ goal.outcome ? 'Ended as not done: ' + goal.outcome.reason : 'Closed.' }} {{ closedText() }}</p> }
         </section>
 
         <section aria-labelledby="wg-actions">
@@ -95,6 +110,7 @@ const actionIcon: Record<string, string> = { proposed: 'add_task', todo: 'radio_
                   <span [class]="'wg-state wg-state-' + (action.needs.length && action.state !== 'proposed' ? 'needs' : action.state)"><mat-icon aria-hidden="true">{{ action.needs.length && action.state !== 'proposed' ? 'front_hand' : actionIcon[action.state] }}</mat-icon>{{ action.needs.length && action.state !== 'proposed' ? 'Needs you' : actionLabel[action.state] }}</span>
                 </div>
                 <div class="wg-meta">
+                  @if (action.kind === 'wrap-up') { <span class="wg-wrapup"><mat-icon aria-hidden="true">cancel</mat-icon>Ends {{ goal.item.ref }} as not done</span> }
                   @if (action.layer) { <span [class]="'lay-chip lay-l-' + action.layer">{{ layerName(action.layer) }}</span> }
                   @if (action.after.length) { <span><mat-icon aria-hidden="true">subdirectory_arrow_right</mat-icon>After #{{ action.after.join(', #') }}</span> }
                   @if (action.addedBy) { <span><mat-icon aria-hidden="true">{{ action.addedBy.kind === 'agent' ? 'smart_toy' : 'person' }}</mat-icon>Added by {{ action.addedBy.kind === 'person' && action.addedBy.id === ctx.me() ? 'you' : action.addedBy.name }}</span> }
@@ -103,7 +119,7 @@ const actionIcon: Record<string, string> = { proposed: 'add_task', todo: 'radio_
                 @if (action.blocked && goal.item.board === 'progress') { <p class="wg-blocked"><mat-icon aria-hidden="true">lock</mat-icon>{{ action.blocked }}</p> }
                 @for (need of action.needs; track need.id) {
                   <div class="wg-need" role="group" [attr.aria-label]="needTitle(need)">
-                    <p class="wg-needhead"><mat-icon aria-hidden="true">{{ need.kind === 'question' ? 'help' : need.kind === 'allow' ? 'front_hand' : 'add_task' }}</mat-icon><strong>{{ need.kind === 'approval' ? 'Approve this new action?' : need.text }}</strong></p>
+                    <p class="wg-needhead"><mat-icon aria-hidden="true">{{ need.kind === 'question' ? 'help' : need.kind === 'allow' ? 'front_hand' : 'add_task' }}</mat-icon><strong>{{ need.kind === 'approval' ? (action.kind === 'wrap-up' ? 'End this item as not done?' : 'Approve this new action?') : need.text }}</strong></p>
                     <p class="wg-needby">From {{ need.author?.name || 'the agent' }}@if (need.kind === 'approval') { · {{ need.text }} }</p>
                     @if (need.kind === 'question') {
                       <form (ngSubmit)="answer(need)">
@@ -127,6 +143,19 @@ const actionIcon: Record<string, string> = { proposed: 'add_task', todo: 'radio_
                   <button type="button" class="wg-link" (click)="select(action.number)" [attr.aria-pressed]="selected() === action.number"><mat-icon aria-hidden="true">forum</mat-icon>Details and log</button>
                   @if (open() && action.state !== 'done') { <button type="button" class="wg-link" (click)="editGoal(action)"><mat-icon aria-hidden="true">edit</mat-icon>Edit goal</button> }
                 </div>
+                @if (action.proposals.length) {
+                  <div class="wg-proposals" role="group" [attr.aria-label]="'Items #' + action.number + ' proposes'">
+                    <p class="wg-needhead"><mat-icon aria-hidden="true">playlist_add</mat-icon><strong>{{ action.kind === 'wrap-up' ? 'Proposed to happen first' : 'Proposed items' }}</strong><span class="lay-muted small">Edit, create or dismiss each. Creating one doesn't start it.</span></p>
+                    @for (proposal of action.proposals; track proposal.id) {
+                      @if (proposal.state === 'proposed') {
+                        <div class="wg-proposal"><p class="wg-why"><strong>Why:</strong> {{ proposal.why }}@if (proposal.after.length) { <span class="wg-after"><mat-icon aria-hidden="true">subdirectory_arrow_right</mat-icon>After {{ afterNames(action, proposal) }}</span> }</p>
+                          <aludel-work-create [embedded]="true" [proposal]="{ workId: goal.item.id, entry: proposal }" (proposed)="load()" (dismissed)="dismiss(proposal)" /></div>
+                      } @else {
+                        <p class="wg-decided"><mat-icon aria-hidden="true">{{ proposal.state === 'created' ? 'add_task' : 'block' }}</mat-icon>@if (proposal.createdWorkId && proposal.created) { <a [href]="ctx.link('work', 'item', proposal.createdWorkId)" (click)="ctx.go(ctx.link('work', 'item', proposal.createdWorkId), $event)">{{ proposal.created.ref }}</a> }<span>{{ proposal.created?.title || proposal.title }}</span><span class="lay-muted small">{{ proposal.state === 'created' ? 'Created' : 'Dismissed' }}</span></p>
+                      }
+                    }
+                  </div>
+                }
                 @if (action.state === 'review') {
                   <div class="wg-review" role="group" [attr.aria-label]="'Review #' + action.number">
                     <p class="wg-needhead"><mat-icon aria-hidden="true">rate_review</mat-icon><strong>Ready for your review</strong></p>
@@ -222,14 +251,20 @@ export class WorkGoalComponent {
   readonly stack = computed(() => this.stackKeys().length ? this.stackKeys() : this.ctx.layerInstances().filter(entry => entry.enabled).map(entry => entry.key));
   readonly phaseList = computed(() => { const view = this.view(); return view?.phases.length ? view.phases : [{ number: 1, title: 'Work', gated: false }]; });
   readonly counted = computed(() => { const actions = (this.view()?.actions || []).filter(action => action.state !== 'proposed'); return { total: actions.length, done: actions.filter(action => action.state === 'done').length }; });
-  readonly readyForReview = computed(() => { const view = this.view(); const actions = (view?.actions || []).filter(action => action.state !== 'proposed');
+  readonly readyForReview = computed(() => { const view = this.view(); const all = (view?.actions || []).filter(action => action.state !== 'proposed');
+    const actions = view?.ending ? all.filter(action => action.number === view.ending!.action) : all;
     return Boolean(view && actions.length && !view.needs.length && actions.every(action => ['review', 'done'].includes(action.state))); });
   readonly startBlock = computed(() => { const item = this.view()?.item; if (!item) return '';
     if (item.board === 'draft') return this.mine() ? 'Claude Code defines it first: Open in VS Code' : item.assignee ? `${this.ctx.whoName(item.assignee)} defines it first` : 'Assign it, or write the brief and actions yourself';
     if (!item.assignee) return 'Assign it first'; return ''; });
   readonly recordCount = computed(() => (this.view()?.changeset || []).reduce((sum, group) => sum + group.changes.length, 0));
   readonly changedLayers = computed(() => (this.view()?.changeset || []).map(group => this.layerName(group.layer)).join(' and '));
-  readonly closedText = computed(() => [...(this.view()?.events || [])].reverse().find(event => event.kind === 'log' && event.text.startsWith('Closed:'))?.text.replace(/^Closed: (.)/, (_, first: string) => first.toUpperCase()) || '');
+  readonly closedText = computed(() => [...(this.view()?.events || [])].reverse().find(event => event.kind === 'log' && /^(Closed|Ended as not done): /.test(event.text))?.text.replace(/^(?:Closed|Ended as not done): (.)/, (_, first: string) => first.toUpperCase()) || '');
+  readonly confirmEnd = signal(false);
+  // The items created from this item's proposals, by ref, for the ending's note.
+  readonly continued = computed(() => (this.view()?.actions || []).flatMap(action => action.proposals).flatMap(proposal => proposal.created ? [proposal.created.ref] : []));
+  afterNames(action: GoalAction, proposal: GoalProposal) { return proposal.after.map(id => action.proposals.find(other => other.id === id)?.title || 'an earlier item').join(' and '); }
+  dismiss(proposal: GoalProposal) { void this.act(() => this.ctx.api(this.path(`/proposals/${encodeURIComponent(proposal.id)}`), 'POST', { decision: 'dismiss' }), 'Dismissed.'); }
   readonly selectedAction = computed(() => this.view()?.actions.find(action => action.number === this.selected()) || null);
   readonly shownEvents = computed(() => { const events = this.view()?.events || []; const number = this.selected(); return number === null ? events : events.filter(event => event.action === number); });
 
@@ -271,7 +306,7 @@ export class WorkGoalComponent {
   approve(action: GoalAction) { void this.act(() => this.ctx.api(this.path(`/review/${action.number}`), 'POST', { verdict: 'approve' }), `Approved #${action.number}.`); }
   flag(action: GoalAction) { const note = this.flagDraft.trim(); if (!note) return;
     void this.act(() => this.ctx.api(this.path(`/review/${action.number}`), 'POST', { verdict: 'flag', note }), `Flagged #${action.number}; it's back with the agent.`).then(ok => { if (ok) this.flagging.set(null); }); }
-  close() { void this.act(() => this.ctx.api(this.path('/close'), 'POST', {}), 'Closed.'); }
+  close() { const ending = Boolean(this.view()?.ending); void this.act(() => this.ctx.api(this.path('/close'), 'POST', {}), ending ? 'Ended as not done.' : 'Closed.').then(() => this.confirmEnd.set(false)); }
   actionsIn(phase: number) { return (this.view()?.actions || []).filter(action => action.phase === phase); }
   gate(phase: number) {
     const view = this.view(); const entry = view?.phases.find(item => item.number === phase);
