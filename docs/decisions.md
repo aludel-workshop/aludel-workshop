@@ -11,6 +11,11 @@ This is the seed of the portal's decision workflow. Confirmed owner answers and 
 
 ## Confirmed
 
+2026-10-06 — **DEC-070: Design's HTML kit is Design's own, and Code binds its components to it; review previews match what an action changed (AGENT-WORK-01 D4, A7).** The owner, after learning W-25 built a link rather than the review modal: "d4: designs html kit is fully internal, then bound to codes components. we need a7 now, write it up as a task. it shouldnt be just pages, either, if its just code i want to see those files, if it builds ui i want to interact with it".
+(1) Design generates its HTML kit from its own component contracts and tokens. It is not extracted from built app components. EXISTING-PROJECTS-01's connected apps start a kit in Design like any other project.
+(2) Code binds each of its UI components to the kit element it implements. Design is the authority for the look, and Code is the authority for the implementation, under the layer-connections binding rules: drift is adopted, rectified or assessed.
+(3) Every action's review opens a preview that matches what it changed. Staged records are walked or compared (Pages through the flow walker). Code without UI shows its files. Code that builds UI is interactive in the review. This widens A7 beyond Pages. The brief is [a7-brief.md](design/agent-work/a7-brief.md).
+
 2026-10-06 — **DEC-069: Work is a layer whose items are records staged like any other; layer-base is managed as part of the main repository.** The owner, reviewing W-9: "work should be a layer, and the proposed actions shouldnt be actually created until the work item is signed off, same as any other record change. layer base, we want to manage it just as if its a part of the main repo. any code repos can have work done on them as long as they're following spec."
 (1) Work is a layer. An action whose output is work items names the Work layer (W-9's P2).
 (2) An item proposed by an action is a staged Work record. It applies when its item is signed off at close-out, as any other record change does, including an item ending as not done. Deciding a proposal (edit, keep, dismiss) shapes the staged record; it doesn't create the item. This supersedes AGENT-WORK-01 E3's "Create item", which creates at decision time.

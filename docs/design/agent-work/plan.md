@@ -29,7 +29,7 @@ Sizes are relative (S, M, L), not time. Each slice ends with server tests, the l
 - **D1 Spending (blocks A2, no longer the first milestone).** The Agent SDK calls the Anthropic API, which costs money per token; today's Codex path uses ChatGPT Plus at no extra cost. Needs the owner's authorization of an API key and a monthly budget, or a decision to keep a no-cost runtime for now. *Inferred:* a Claude subscription can't be used as the SDK's credential for a separate app; check Anthropic's current terms before relying on either way.
 - **D2 Plan approval:** every definition waits for the owner (recommended to start) or small ones start on their own.
 - **D3 Review signing:** one reviewer per action with elevated layers needing their own (recommended), or per layer.
-- **D4 Kit source (blocks A7):** Design's HTML kit generated from component contracts only, or also extracted from built components.
+- **D4 Kit source (blocks A7):** Design's HTML kit generated from component contracts only, or also extracted from built components. *Decided 2026-10-06 ([DEC-070](../../decisions.md)):* Design's own, from its contracts; Code binds its components to it.
 - **D5 Linear (blocks A8):** in scope now, or after the owner trial.
 - Answers to Q1–Q8, E1–E7, P1–P6 settle the remaining UI details; slices start on the prototype's choices where an answer is missing.
 - Access: `layer-base` is not in this checkout; A2 and A7 need it (the owner approved editing it).
@@ -68,6 +68,7 @@ Sizes are relative (S, M, L), not time. Each slice ends with server tests, the l
 - *Exit:* browser journeys of the ecosystem walkthrough (without Linear).
 
 ### A7 Design HTML kit and the Pages review action (L) — after A4, needs D4
+- *Widened 2026-10-06 (DEC-070):* every action's review opens a modal with a preview matching what it changed (records walked or compared, code files, live UI with a checklist), and the live build reaches the portal through a tunnel from the agent's container. Brief: [a7-brief.md](a7-brief.md). The bullets below are the original Pages scope.
 - Design: generate `kit.js` (tokens as CSS variables, components as custom elements) per Design revision from component contracts (`server/design.mjs:324`); the Components tab renders demos from it.
 - Pages: page specs as HTML files in the Pages repository pinned to a kit revision (with `data-go` links), migrated from `page` records; Spec view and Flows render them; `kit-render.ts` retires for spec previews.
 - Scripted flows: a flow can carry scenarios (timed or triggered state changes across pages, as the prototypes' Play/Step and Scenarios do) and **branches** (a step with alternatives, such as a wrong password or an expired link). Each path through a branch is its own journey for the same persona, so Code's step tests and the one-persona rule hold.
