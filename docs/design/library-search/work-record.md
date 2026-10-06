@@ -211,6 +211,8 @@ The Code layer's pin moves with each merge to `main`, so the first search after 
 
 **Gate** (`test:server:templates`, all 73 files at `--test-concurrency=3`, because the default parallel run is killed for memory in this container): 367 tests, 354 passed, 10 skipped, 3 failed. The three are the Docker-only F30 failures that also fail on the unchanged base `6a3e964` (#2): two `runner ENOENT` in `symphony-proposals`, and the worker run in `symphony-worker`. No other failures. `test:server` (templates off) wasn't run separately, since nothing changed the templates switch; the Library tests were run with templates off as well (#2, #3).
 
+**Finding W10-F1, for Work:** answering an agent's question moved the started item back to Ready ("Answered; work continues" in the log, while the board showed ready and the status queued). Then `report_code` refused with "Start W-10 before reporting code", so #4's commit couldn't be reported until the owner moved the item back to In progress. Expected: answering a need returns the item to In progress.
+
 ## Retrospective (W-10, 2026-10-06)
 
 1. **What made it harder, slower or more error-prone than necessary?**
